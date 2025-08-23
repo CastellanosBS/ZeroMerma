@@ -1,0 +1,43 @@
+Riesgos/Huecos (y cómo cerrarlos)
+
+Unidades de medida (UoM) y conversiones. Hoy varias columnas de unidad son VARCHAR (p.ej., yield_unit en receta). Suma una tabla unit + unit_conversion y referencia por FK para evitar drift y errores de consistencia entre insumos/recetas/producción.
+
+Histórico de precios e impuestos. Crea product_price_history(product_id, price, effective_from, …); el propio doc sugiere que podría existir una tabla de precios con vigencias. Añade también estrategia fiscal (precios con/ sin IVA, tasa por categoría, redondeos).
+
+Lotes y caducidad. Si quieres trazabilidad sanitaria/costos, agrega inventory_lot(lot_code, expiry, unit_cost, supplier_id, ...) y referencia lot_id desde movimientos; soporta FIFO/FEFO sin reventar el modelo.
+
+Reglas de sesión de caja. En la práctica necesitas “una sola sesión abierta por caja/usuario” mediante índice único parcial (p. ej. UNIQUE (branch_id, register_id) WHERE status='OPEN'). Considera añadir register_id. El doc ya contempla múltiples sesiones/registros como escenario.
+
+Invariantes de inventario. El doc especifica el inventario como derivado; refuérzalo con triggers (o lógica de dominio) que: (a) bloqueen cantidades negativas y (b) registren siempre un movimiento por evento; complementa con job nocturno de reconciliación.
+
+Consumo real en producción. Ya propones ProductionDetail como opcional; si quieres control de mermas y costos reales, vuélvelo obligatorio para lotes clave y deduce inventario desde esas capturas.
+
+Pronósticos: unicidad y “vigente”. Define cómo eliges el forecast actual por (sucursal, producto, fecha): UNIQUE (branch_id, product_id, date) o (…, model_version) y consulta por MAX(generated_at) si conservarás históricos completos.
+
+Índices de reporte. Además de los de FKs, añade covering indexes típicos: sale(branch_id, datetime, total_amount) para cortes diarios; considera sale_item(product_id, sale_id) si harás “top N” frecuente sin table scans.
+
+Integridad de pagos. Impón (con constraint o trigger) que la suma de sale_payment.amount == sale.total_amount; tu tabla de pagos ya cubre splits y métodos.
+
+Moneda/tiempo. Si prevés multi-moneda, agrega currency_id y totales en moneda base; mantén timestamps en UTC (como ya documentas con TIMESTAMPTZ) y define zona local en la app.
+
+Telemetría a escala. Excelente que planifiques particionado/índices por sensor+tiempo; formaliza la política de retención (p. ej. 24 meses online + archivado).
+
+Transferencias: simetría y “stock en tránsito”. Define reportes/reglas para asegurar que todo TRANSFER OUT tenga su TRANSFER IN y métrica de tránsito.
+
+Mini-checklist (para “cerrar” el modelo)
+
+Tabla UoM + conversiones (FKs en producto/receta/lecturas).
+
+Price history + reglas de IVA/ descuentos (global vs por línea).
+
+Lotes/caducidad/costo (y método de valuación: FIFO/CPP).
+
+Constraint de pagos==total y único parcial de sesión abierta.
+
+Triggers de inventario + job de reconciliación.
+
+Índices de reporte (ventas por fecha/sucursal, top productos).
+
+Política de retención/particionado (telemetría y movimientos).
+
+Cuando quieras, pasamos a herramientas y estrategia de desarrollo (stack, ORM, migraciones, testing, orquestación de jobs, y plan de entregables).
