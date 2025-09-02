@@ -1,0 +1,10 @@
+﻿repos:
+- repo: https://github.com/astral-sh/ruff-pre-commit
+  rev: v0.6.0
+  hooks:
+    - id: ruff           # Lint (static analysis)
+    - id: ruff-format    # Format (same result as black, powered by Ruff)
+- repo: https://github.com/psf/black
+  rev: 24.8.0
+  hooks:
+    - id: black
