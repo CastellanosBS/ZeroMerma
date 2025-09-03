@@ -1,8 +1,8 @@
-﻿{
+{
   "files.eol": "\n",                  // line endings: LF (consistent across OS)
   "editor.formatOnSave": true,        // auto-format on save
   "python.formatting.provider": "black",
   "editor.codeActionsOnSave": {
-    "source.fixAll": true             // let the editor apply safe fixes
+    "source.fixAll": "explicit"
   }
 }

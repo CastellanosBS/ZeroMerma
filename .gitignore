@@ -28,9 +28,9 @@ dist/
 .DS_Store
 Thumbs.db
 .vscode/
-!.vscode/settings.json  
+!.vscode/settings.json
 
-# Heavy Data 
+# Heavy Data
 data/**/*.parquet
 data/**/*.csv
 !data/README.md

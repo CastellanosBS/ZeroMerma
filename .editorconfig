@@ -1,0 +1,25 @@
+# EditorConfig ayuda a mantener estilos de codificación consistentes.
+# VS Code, PyCharm y otros lo respetan automáticamente (si tienen soporte activado).
+
+root = true
+
+# Reglas por defecto para todos los archivos
+[*]
+charset = utf-8
+end_of_line = lf
+insert_final_newline = true
+indent_style = space
+indent_size = 4
+trim_trailing_whitespace = true
+
+# Markdown: no recortar espacios (porque afectan formato en tablas)
+[*.md]
+trim_trailing_whitespace = false
+
+# YAML y TOML: siempre 2 espacios
+[*.{yml,yaml,toml}]
+indent_size = 2
+
+# Makefile: usar tabs (requisito histórico de Make)
+[Makefile]
+indent_style = tab
