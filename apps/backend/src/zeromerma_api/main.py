@@ -9,6 +9,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from zeromerma_api.logging_config import setup_logging
 from zeromerma_api.routers.health import router as health_router
+from zeromerma_api.routers.ready import router as ready_router
 from zeromerma_api.settings import get_settings
 
 log = logging.getLogger(__name__)
@@ -51,7 +52,7 @@ def create_app() -> FastAPI:
 
     # Routers
     app.include_router(health_router)
-
+    app.include_router(ready_router)
     return app
 
 

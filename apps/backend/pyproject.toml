@@ -26,7 +26,7 @@ pydantic-settings = "^2.10.1"
 # ──────────────────────────────────────────────────────────────────────────────
 # Development dependencies (excluded from production environments by default)
 # ──────────────────────────────────────────────────────────────────────────────
-sqlalchemy = "^2.0.43"
+sqlalchemy = ">=2.0"
 alembic = "^1.16.5"
 psycopg = {extras = ["binary"], version = "^3.2.10"}
 [tool.poetry.group.dev.dependencies]
