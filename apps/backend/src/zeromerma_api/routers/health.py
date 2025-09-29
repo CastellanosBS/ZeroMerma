@@ -6,7 +6,7 @@ from importlib.metadata import PackageNotFoundError, version
 from fastapi import APIRouter
 from pydantic import BaseModel
 
-from zeromerma_api.settings import get_settings
+from zeromerma_api.core.settings import get_settings
 
 router = APIRouter(tags=["meta"])
 
@@ -17,7 +17,7 @@ def _get_version() -> str:
     In dev you might run from source; in CI/CD you'll have a package version.
     """
     try:
-        return version("zeromerma-api")  # If you later package with this name
+        return version("zeromerma_api")  # If you later package with this name
     except PackageNotFoundError:
         return "0.0.0-dev"
 

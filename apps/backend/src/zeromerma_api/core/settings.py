@@ -14,7 +14,10 @@ class AppSettings(BaseSettings):
     log_level: str = "INFO"
     port: int = 8000
 
-    # database_url: str | None = None
+    # ---- DB ----
+    database_url: str = (
+        "postgresql+psycopg://zeromerma:zeromerma@localhost:5432/zeromerma"
+    )
 
     model_config = SettingsConfigDict(
         env_prefix="",  # reaf variables as APP_NAME, ENV, PORT, etc.

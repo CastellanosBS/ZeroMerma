@@ -1,17 +1,18 @@
-# apps/backend/Makefile
-
-.PHONY: run lint test format
+.PHONY: run lint test format seed  # declare phony targets so make doesn't look for files
 
 run:
-\tpoetry run uvicorn zeromerma_api.main:app --reload --host 0.0.0.0 --port $${PORT:-8000}
+	poetry run uvicorn zeromerma_api.main:app --reload --host 0.0.0.0 --port $${PORT:-8000}
 
 lint:
-\tpoetry run ruff check .
-\tpoetry run black --check .
+	poetry run ruff check .
+	poetry run black --check .
 
 format:
-\tpoetry run ruff check . --fix
-\tpoetry run black .
+	poetry run ruff check . --fix
+	poetry run black .
 
 test:
-\tpoetry run pytest -q
+	poetry run pytest -q
+
+seed:
+	poetry run python seed.py

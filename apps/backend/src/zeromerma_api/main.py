@@ -7,10 +7,10 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from zeromerma_api.logging_config import setup_logging
+from zeromerma_api.core.logging_config import setup_logging
+from zeromerma_api.core.settings import get_settings
 from zeromerma_api.routers.health import router as health_router
 from zeromerma_api.routers.ready import router as ready_router
-from zeromerma_api.settings import get_settings
 
 log = logging.getLogger(__name__)
 

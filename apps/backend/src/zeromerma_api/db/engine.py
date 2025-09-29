@@ -1,13 +1,21 @@
-﻿from sqlalchemy import create_engine
+﻿from __future__ import annotations
+
+from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
-from config import settings
+from zeromerma_api.core.settings import get_settings
+
+s = get_settings()
+
+url = s.database_url
+if url is None:
+    raise RuntimeError("DATABASE_URL no está configurada en el entorno")
+
 
 # Engine: manages connections and talks to the DB (database)
 engine = create_engine(
-    settings.DATABASE_URL,
-    pool_pre_ping=True,  # checks connections before using (avoids stale connections)
-    future=True,  # SQLAlchemy 2.x style
+    url,
+    pool_pre_ping=True,
 )
 
 # Session factory: creates Session objects (units of work)
