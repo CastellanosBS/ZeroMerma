@@ -1,4 +1,4 @@
-﻿from sqlalchemy import MetaData
+﻿from sqlalchemy import MetaData, func
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
 # Naming convention helps Alembic autogenerate consistent constraint names
@@ -20,3 +20,11 @@ class Base(DeclarativeBase):
 # Example mixin for future models (ID primary key)
 class IdMixin:
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+
+
+def created_at_col():
+    return mapped_column(default=func.now(), nullable=False)
+
+
+def updated_at_col():
+    return mapped_column(default=func.now(), nullable=False)
