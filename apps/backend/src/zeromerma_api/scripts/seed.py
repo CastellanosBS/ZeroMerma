@@ -29,7 +29,7 @@ from zeromerma_api.core.settings import get_settings
 from zeromerma_api.db.engine import SessionLocal, engine
 
 # (8) Import your three admin models FROM THEIR FILES (matching your current layout).
-from zeromerma_api.models.admin import Branch, Role, UserAccount
+from zeromerma_api.models import Branch, Role, UserAccount
 
 # (9) Configure a module logger. __name__ resolves to "seed" when executed as a script.
 log = logging.getLogger(__name__)
