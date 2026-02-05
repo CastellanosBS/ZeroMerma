@@ -1,0 +1,57 @@
+name: backend-ci # workflow name shown in GitHub UI
+
+on: # events that trigger this workflow
+  push:
+    branches: ["*"] # run on all branches
+  pull_request:
+    branches: ["*"] # run on PRs targeting any branch
+
+jobs:
+  backend:
+    runs-on: ubuntu-latest # GitHub-hosted Linux runner
+
+    services:
+      postgres:
+        image: postgres:16 # same major version you use locally
+        env:
+          POSTGRES_DB: zeromerma_ci # database created at container start
+          POSTGRES_USER: postgres # superuser for tests
+          POSTGRES_PASSWORD: postgres # simple password for CI only
+        ports:
+          - "5432:5432" # expose to localhost on the runner
+        options: >-
+          --health-cmd="pg_isready -U postgres -d zeromerma_ci"
+          --health-interval=5s
+          --health-timeout=5s
+          --health-retries=20
+
+    env:
+      # Make Poetry non-interactive and set DB URL for tests (/readyz)
+      POETRY_VIRTUALENVS_CREATE: "false"
+      DATABASE_URL: postgresql+psycopg://postgres:postgres@localhost:5432/zeromerma_ci
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4 # fetch your repo contents
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12" # align with your local Python version
+
+      - name: Install Poetry
+        run: pip install poetry # lightweight Poetry install
+
+      - name: Install backend deps
+        working-directory: apps/backend
+        run: poetry install --no-interaction --no-root # install pyproject dependencies
+
+      - name: Ruff & Black (lint)
+        working-directory: apps/backend
+        run: |
+          poetry run ruff check .
+          poetry run black --check .
+
+      - name: Run tests (pytest)
+        working-directory: apps/backend
+        run: poetry run pytest -q
