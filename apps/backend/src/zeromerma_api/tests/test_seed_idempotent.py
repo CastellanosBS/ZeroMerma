@@ -14,7 +14,7 @@ from sqlalchemy import func, select  # (4) To query counts after seeding.
 from sqlalchemy.orm import Session  # (5) Type hints for sessions.
 
 from zeromerma_api.db.engine import SessionLocal
-from zeromerma_api.models.admin import Branch, Role, UserAccount
+from zeromerma_api.models import Branch, Role, UserAccount
 
 # (7) Import the seed orchestrator and DB/session bits from your project.
 from zeromerma_api.scripts.seed import run_all
