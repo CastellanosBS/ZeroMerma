@@ -16,3 +16,6 @@ test:
 
 seed:
 	poetry run python seed.py
+
+dev-seed-inventory:
+\tpoetry run python scripts/dev_seed_inventory.py

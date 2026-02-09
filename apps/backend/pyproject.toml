@@ -40,3 +40,17 @@ httpx = "^0.27"
 [tool.black]
 line-length = 88
 target-version = ["py312"]
+
+# ──────────────────────────────────────────────────────────────────────────────
+# Ruff (lint)
+# ──────────────────────────────────────────────────────────────────────────────
+[tool.ruff]
+line-length = 160
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "B", "I"]  # básico: pycodestyle, pyflakes, bugbear, isort
+# (no ignoramos B008 global, solo por archivo)
+
+[tool.ruff.lint.per-file-ignores]
+"**/src/zeromerma_api/routers/*.py" = ["B008"]
