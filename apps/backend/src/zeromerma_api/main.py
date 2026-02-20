@@ -11,6 +11,7 @@ from zeromerma_api.core.logging_config import setup_logging
 from zeromerma_api.core.settings import get_settings
 from zeromerma_api.routers.health import router as health_router
 from zeromerma_api.routers.inventory import router as inventory_router
+from zeromerma_api.routers.pos import router as pos_router
 from zeromerma_api.routers.ready import router as ready_router
 
 log = logging.getLogger(__name__)
@@ -55,6 +56,7 @@ def create_app() -> FastAPI:
     app.include_router(health_router)
     app.include_router(ready_router)
     app.include_router(inventory_router)
+    app.include_router(pos_router)
 
     return app
 
