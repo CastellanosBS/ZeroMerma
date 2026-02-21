@@ -5,6 +5,7 @@
 from .branch import Branch  # noqa: F401
 from .cash_session import CashSession, CashSessionStatus  # noqa: F401
 from .inventory_movement import InventoryMovement, MovementReason  # noqa: F401
+from .payment import Payment, PaymentMethod  # noqa: F401
 from .product import Product  # noqa: F401
 from .role import Role  # noqa: F401
 from .sale import Sale, SaleStatus  # noqa: F401
@@ -23,4 +24,6 @@ __all__ = [
     "Sale",
     "SaleStatus",
     "SaleItem",
+    "Payment",
+    "PaymentMethod",
 ]
