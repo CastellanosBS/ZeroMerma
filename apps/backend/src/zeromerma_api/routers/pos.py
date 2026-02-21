@@ -10,6 +10,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
 from zeromerma_api.db.engine import SessionLocal
+from zeromerma_api.routers.pos_payments import router as payments_router
 from zeromerma_api.routers.pos_sales import router as sales_router
 from zeromerma_api.schemas.cash_session import (
     CashSessionCloseIn,
@@ -94,3 +95,4 @@ def api_current_cash_session(
 
 
 router.include_router(sales_router)
+router.include_router(payments_router)

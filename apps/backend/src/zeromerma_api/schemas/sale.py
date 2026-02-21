@@ -5,6 +5,8 @@ from typing import List
 
 from pydantic import BaseModel, Field
 
+from zeromerma_api.schemas.payment import PaymentOut
+
 
 class SaleItemCreate(BaseModel):
     """
@@ -48,3 +50,13 @@ class SaleOut(BaseModel):
 
     class Config:
         orm_mode = True
+
+
+class SaleDetailOut(SaleOut):
+    """
+    Extends SaleOut with payments and computed balance information.
+    """
+
+    payments: List[PaymentOut]
+    paid_amount: float
+    balance_due: float
