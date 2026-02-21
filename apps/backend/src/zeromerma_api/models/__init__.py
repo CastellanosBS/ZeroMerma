@@ -7,6 +7,8 @@ from .cash_session import CashSession, CashSessionStatus  # noqa: F401
 from .inventory_movement import InventoryMovement, MovementReason  # noqa: F401
 from .product import Product  # noqa: F401
 from .role import Role  # noqa: F401
+from .sale import Sale, SaleStatus  # noqa: F401
+from .sale_item import SaleItem  # noqa: F401
 from .user_account import UserAccount  # noqa: F401
 
 __all__ = [
@@ -18,4 +20,7 @@ __all__ = [
     "MovementReason",
     "CashSession",
     "CashSessionStatus",
+    "Sale",
+    "SaleStatus",
+    "SaleItem",
 ]
