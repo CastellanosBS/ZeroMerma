@@ -1,15 +1,3 @@
-# apps/backend/tests/test_pos_inventory_coupling.py
-# PURPOSE:
-#   End-to-end tests for B3.4 inventory coupling:
-#     - When a sale is created, inventory_movement rows are written (reason='SALE')
-#     - Stock (on-hand) is computed from ledger and oversell is blocked
-#
-# Verifies:
-#   1) Seed opening stock with OPENING_BALANCE movement.
-#   2) Create a sale that consumes stock -> OK + movement rows created.
-#   3) Attempt a sale that would oversell -> 409.
-#   4) Confirm ledger sums match expected on-hand.
-
 from __future__ import annotations
 
 import os
@@ -38,14 +26,12 @@ def reset_tables(s: Session) -> None:
     """
     Reset state in dependency-safe order.
     """
-    # Payments and sale items depend on sale; movements depend on branch/product/user.
-    # If payment table exists but you haven't created it yet, TRUNCATE will fail.
-    # In your project B3.3 is already done, so payment exists.
     s.execute(text("TRUNCATE TABLE payment RESTART IDENTITY CASCADE;"))
     s.execute(text("TRUNCATE TABLE sale_item RESTART IDENTITY CASCADE;"))
     s.execute(text("TRUNCATE TABLE sale RESTART IDENTITY CASCADE;"))
     s.execute(text("TRUNCATE TABLE cash_session RESTART IDENTITY CASCADE;"))
     s.execute(text("TRUNCATE TABLE inventory_movement RESTART IDENTITY CASCADE;"))
+    s.execute(text("TRUNCATE TABLE inventory_balance RESTART IDENTITY CASCADE;"))
     s.execute(text("TRUNCATE TABLE product RESTART IDENTITY CASCADE;"))
     s.execute(text("TRUNCATE TABLE user_account RESTART IDENTITY CASCADE;"))
     s.execute(text("TRUNCATE TABLE role RESTART IDENTITY CASCADE;"))
@@ -54,10 +40,6 @@ def reset_tables(s: Session) -> None:
 
 
 def seed_core(s: Session) -> tuple[int, int, int]:
-    """
-    Minimal core entities.
-    Returns: (branch_id, user_id, product_id)
-    """
     b = Branch(code="MAIN", name="Main Branch")
     s.add(b)
     s.flush()
@@ -89,9 +71,13 @@ def seed_opening_stock(
     s: Session, *, branch_id: int, product_id: int, qty: float, created_by_id: int
 ) -> None:
     """
-    Insert opening stock directly into the inventory ledger.
-    We do this at DB level because your API for stock seeding isn't built yet.
+    Seed BOTH:
+      1) inventory_movement ledger (audit)
+      2) inventory_balance snapshot (operational)
+
+    This avoids calling bootstrap inside tests and keeps tests deterministic.
     """
+    # Ledger entry (audit)
     s.execute(
         text(
             """
@@ -108,31 +94,44 @@ def seed_opening_stock(
             "created_by_id": created_by_id,
         },
     )
+
+    # Snapshot row (operational truth)
+    s.execute(
+        text(
+            """
+            INSERT INTO inventory_balance
+                (branch_id, product_id, on_hand, reserved, created_at, updated_at)
+            VALUES
+                (:branch_id, :product_id, :qty, 0, now(), now())
+            ON CONFLICT (branch_id, product_id)
+            DO UPDATE SET on_hand = EXCLUDED.on_hand, updated_at = now()
+            """
+        ),
+        {"branch_id": branch_id, "product_id": product_id, "qty": qty},
+    )
+
     s.commit()
 
 
-def on_hand(s: Session, *, branch_id: int, product_id: int) -> float:
-    """
-    Compute on-hand from ledger directly in SQL for assertion.
-    """
+def snapshot_on_hand(s: Session, *, branch_id: int, product_id: int) -> float:
     val = s.execute(
         text(
             """
-            SELECT COALESCE(SUM(qty), 0)
-            FROM inventory_movement
+            SELECT COALESCE(on_hand, 0)
+            FROM inventory_balance
             WHERE branch_id = :branch_id AND product_id = :product_id
             """
         ),
         {"branch_id": branch_id, "product_id": product_id},
-    ).scalar_one()
-    return float(val)
+    ).scalar_one_or_none()
+    return float(val or 0)
 
 
 @pytest.mark.skipif(
     not os.getenv("DATABASE_URL"),
     reason="DATABASE_URL not set; skipping inventory coupling tests",
 )
-def test_sale_creates_negative_inventory_movements_and_updates_on_hand():
+def test_sale_creates_negative_inventory_movements_and_decrements_snapshot():
     alembic_upgrade_head()
 
     s: Session = SessionLocal()
@@ -147,8 +146,10 @@ def test_sale_creates_negative_inventory_movements_and_updates_on_hand():
             created_by_id=user_id,
         )
 
-        # Sanity: on hand should be 10
-        assert abs(on_hand(s, branch_id=branch_id, product_id=product_id) - 10.0) < 1e-6
+        assert (
+            abs(snapshot_on_hand(s, branch_id=branch_id, product_id=product_id) - 10.0)
+            < 1e-6
+        )
     finally:
         s.close()
 
@@ -163,7 +164,7 @@ def test_sale_creates_negative_inventory_movements_and_updates_on_hand():
     assert open_resp.status_code == 200, open_resp.text
     cash_session_id = open_resp.json()["id"]
 
-    # Create sale that consumes 3 units
+    # Create sale that consumes 3
     sale_resp = client.post(
         "/pos/sales",
         json={
@@ -174,10 +175,9 @@ def test_sale_creates_negative_inventory_movements_and_updates_on_hand():
         },
     )
     assert sale_resp.status_code == 200, sale_resp.text
-    sale = sale_resp.json()
-    sale_id = sale["id"]
+    sale_id = sale_resp.json()["id"]
 
-    # Verify ledger: there must be one SALE movement with qty=-3 and ref_id=sale_id
+    # Verify ledger movement exists and is linked to sale
     s2: Session = SessionLocal()
     try:
         rows = s2.execute(
@@ -199,8 +199,11 @@ def test_sale_creates_negative_inventory_movements_and_updates_on_hand():
         assert ref_type == "SALE"
         assert int(ref_id) == int(sale_id)
 
-        # On hand should now be 7
-        assert abs(on_hand(s2, branch_id=branch_id, product_id=product_id) - 7.0) < 1e-6
+        # Snapshot must decrement from 10 -> 7
+        assert (
+            abs(snapshot_on_hand(s2, branch_id=branch_id, product_id=product_id) - 7.0)
+            < 1e-6
+        )
     finally:
         s2.close()
 
@@ -209,7 +212,7 @@ def test_sale_creates_negative_inventory_movements_and_updates_on_hand():
     not os.getenv("DATABASE_URL"),
     reason="DATABASE_URL not set; skipping inventory coupling tests",
 )
-def test_oversell_is_blocked_with_409_and_no_sale_is_created():
+def test_oversell_is_blocked_with_409_and_snapshot_not_modified():
     alembic_upgrade_head()
 
     s: Session = SessionLocal()
@@ -223,7 +226,10 @@ def test_oversell_is_blocked_with_409_and_no_sale_is_created():
             qty=5.0,
             created_by_id=user_id,
         )
-        assert abs(on_hand(s, branch_id=branch_id, product_id=product_id) - 5.0) < 1e-6
+        assert (
+            abs(snapshot_on_hand(s, branch_id=branch_id, product_id=product_id) - 5.0)
+            < 1e-6
+        )
     finally:
         s.close()
 
@@ -238,7 +244,7 @@ def test_oversell_is_blocked_with_409_and_no_sale_is_created():
     assert open_resp.status_code == 200, open_resp.text
     cash_session_id = open_resp.json()["id"]
 
-    # Try to sell 6 units when only 5 on hand -> expect 409
+    # Sell 6 with only 5 in snapshot -> 409
     resp = client.post(
         "/pos/sales",
         json={
@@ -250,18 +256,18 @@ def test_oversell_is_blocked_with_409_and_no_sale_is_created():
     )
     assert resp.status_code == 409, resp.text
 
-    # Confirm no sale row exists and no SALE movement row exists
+    # Verify rollback: no sale created, no SALE movement created, snapshot unchanged
     s2: Session = SessionLocal()
     try:
         sale_count = s2.execute(text("SELECT COUNT(*) FROM sale")).scalar_one()
         sale_mov_count = s2.execute(
             text("SELECT COUNT(*) FROM inventory_movement WHERE reason='SALE'")
         ).scalar_one()
-
         assert int(sale_count) == 0
         assert int(sale_mov_count) == 0
-
-        # Stock should still be 5
-        assert abs(on_hand(s2, branch_id=branch_id, product_id=product_id) - 5.0) < 1e-6
+        assert (
+            abs(snapshot_on_hand(s2, branch_id=branch_id, product_id=product_id) - 5.0)
+            < 1e-6
+        )
     finally:
         s2.close()
