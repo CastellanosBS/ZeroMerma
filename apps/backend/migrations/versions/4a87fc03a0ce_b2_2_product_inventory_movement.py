@@ -16,9 +16,7 @@ from alembic import op  # Alembic operations (DDL)
 
 # --- Alembic identifiers ---
 revision = "4a87fc03a0ce"  # This file's unique revision id
-down_revision = (
-    "6358fce6b0b4_admin_core_tables"  # <-- CHANGE THIS to your B1.2 revision id
-)
+down_revision = "6358fce6b0b4"
 branch_labels = None
 depends_on = None
 
