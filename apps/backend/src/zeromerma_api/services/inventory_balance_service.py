@@ -96,3 +96,55 @@ def atomic_decrement_on_hand(
         )
 
     return qty(to_decimal(row[0]))
+
+
+def bootstrap_inventory_balance_from_ledger(db: Session, *, branch_id: int) -> int:
+    """
+    Build or rebuild inventory_balance rows for a branch using the inventory_movement ledger.
+
+    What it does:
+      1) Aggregate movements by (branch_id, product_id): SUM(qty)
+      2) Upsert into inventory_balance:
+         - on_hand = aggregated sum
+         - reserved = 0 (for now; reserved logic comes later)
+         - updated_at = now()
+
+    Why we need this:
+      - Deterministic dev seeding: create OPENING_BALANCE movements, then bootstrap snapshot.
+      - Recovery tool: if snapshot ever drifts (dev mistakes), we can rebuild safely.
+
+    Returns:
+      Number of rows inserted/updated in inventory_balance.
+    """
+    result = db.execute(
+        text(
+            """
+            WITH agg AS (
+                SELECT
+                    branch_id,
+                    product_id,
+                    COALESCE(SUM(qty), 0) AS on_hand
+                FROM inventory_movement
+                WHERE branch_id = :b
+                GROUP BY branch_id, product_id
+            )
+            INSERT INTO inventory_balance (branch_id, product_id, on_hand, reserved, created_at, updated_at)
+            SELECT
+                agg.branch_id,
+                agg.product_id,
+                agg.on_hand,
+                0,
+                now(),
+                now()
+            FROM agg
+            ON CONFLICT (branch_id, product_id)
+            DO UPDATE SET
+                on_hand = EXCLUDED.on_hand,
+                reserved = EXCLUDED.reserved,
+                updated_at = now()
+            """
+        ),
+        {"b": int(branch_id)},
+    )
+    # rowcount is best-effort depending on driver, but it's still useful as feedback.
+    return int(result.rowcount or 0)  # type: ignore[attr-defined]
