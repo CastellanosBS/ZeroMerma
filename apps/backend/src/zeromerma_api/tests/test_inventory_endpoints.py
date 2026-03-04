@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import os
+from pathlib import Path
 from typing import Any
 
 import pytest
@@ -20,9 +21,29 @@ from zeromerma_api.models.inventory_movement import InventoryMovement, MovementR
 from zeromerma_api.models.product import Product
 
 
+def make_alembic_config() -> Config:
+    backend_dir = Path(__file__).resolve().parents[1]  # apps/backend
+    alembic_ini = backend_dir / "alembic.ini"
+    migrations_dir = backend_dir / "migrations"
+
+    cfg = Config(str(alembic_ini))
+    cfg.set_main_option("script_location", str(migrations_dir))
+    return cfg
+
+
 def _alembic_upgrade_head() -> None:
-    """Apply all migrations to head using Alembic's programmatic API."""
-    cfg = Config("alembic.ini")
+    # __file__ = .../apps/backend/src/zeromerma_api/tests/test_xxx.py
+    # parents[0]=tests, [1]=zeromerma_api, [2]=src, [3]=backend
+    backend_dir = Path(__file__).resolve().parents[3]
+
+    cfg = Config(str(backend_dir / "alembic.ini"))
+
+    # IMPORTANT: point to the real migrations folder
+    cfg.set_main_option("script_location", str(backend_dir / "migrations"))
+
+    # Make sure we use the DB from env var (the tests skip otherwise)
+    cfg.set_main_option("sqlalchemy.url", os.environ["DATABASE_URL"])
+
     command.upgrade(cfg, "head")
 
 
@@ -38,33 +59,28 @@ def test_stock_and_movements_endpoints():
     app = create_app()
     client = TestClient(app)
 
-    # 3) Create minimal fixture: ensure MAIN branch exists (from seeds or create if missing),
-    #    create one product, and two movements: +10 OPENING_BALANCE, -3 SALE.
+    # 3) Create minimal fixture: ensure MAIN branch exists, create a product, and movements: +10, -3
     s: Session = SessionLocal()
     try:
-        # MAIN branch (create if missing)
         main = s.scalar(select(Branch).where(Branch.code == "MAIN"))
         if main is None:
             main = Branch(code="MAIN", name="Main Branch")
             s.add(main)
             s.flush()
 
-        # Product
         prod = s.scalar(select(Product).where(Product.sku == "DONUT-GLA"))
         if prod is None:
             prod = Product(sku="DONUT-GLA", name="Donut Glazed")
             s.add(prod)
             s.flush()
 
-        # Clear any prior movements for deterministic assertions (dev DB only).
-        # NOTE: In production tests you'd use an isolated DB/schema; this keeps test stable locally.
+        # Clear any prior movements for deterministic assertions
         s.query(InventoryMovement).filter(
             InventoryMovement.branch_id == main.id,
             InventoryMovement.product_id == prod.id,
         ).delete()
         s.flush()
 
-        # +10 opening balance
         s.add(
             InventoryMovement(
                 branch_id=main.id,
@@ -73,7 +89,6 @@ def test_stock_and_movements_endpoints():
                 reason=MovementReason.OPENING_BALANCE.value,
             )
         )
-        # -3 sale
         s.add(
             InventoryMovement(
                 branch_id=main.id,
@@ -83,20 +98,24 @@ def test_stock_and_movements_endpoints():
             )
         )
         s.commit()
+
+        # IMPORTANT: keep ids outside the session scope for later asserts
+        branch_id = int(main.id)
+        product_id = int(prod.id)
     finally:
         s.close()
 
-    # 4) Call /inventory/stock: expect a single row with qty=7
+    # 4) Call /inventory/stock: expect qty=7
     r = client.get(
-        "/inventory/stock", params={"branch_id": main.id, "product_id": prod.id}
+        "/inventory/stock", params={"branch_id": branch_id, "product_id": product_id}
     )
     assert r.status_code == 200, r.text
     data = r.json()
     assert isinstance(data, list)
     assert len(data) == 1
     row: dict[str, Any] = data[0]
-    assert row["branch_id"] == main.id
-    assert row["product_id"] == prod.id
+    assert row["branch_id"] == branch_id
+    assert row["product_id"] == product_id
     assert row["sku"] == "DONUT-GLA"
     assert row["product_name"] == "Donut Glazed"
     assert abs(row["qty"] - 7.0) < 1e-6  # 10 - 3 = 7
@@ -104,12 +123,11 @@ def test_stock_and_movements_endpoints():
     # 5) Call /inventory/movements: expect two rows, newest first
     r2 = client.get(
         "/inventory/movements",
-        params={"branch_id": main.id, "product_id": prod.id, "limit": 10},
+        params={"branch_id": branch_id, "product_id": product_id, "limit": 10},
     )
     assert r2.status_code == 200, r2.text
     items = r2.json()
     assert len(items) == 2
-    # newest first should be the SALE (the second insert)
     assert items[0]["reason"] in ("SALE", MovementReason.SALE.value)
     assert items[0]["qty"] == -3.0
     assert items[1]["reason"] in (

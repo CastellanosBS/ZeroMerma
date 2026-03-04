@@ -29,7 +29,7 @@ try:
     )  # e.g., "postgresql+psycopg://user:pass@host:5432/dbname"
 except Exception:
     # Fallback to env or alembic.ini if settings import fails (e.g., in bare CI bootstrap).
-    _APP_DATABASE_URL = os.getenv("DATABASE_URL")
+    _APP_DATABASE_URL = os.getenv("DATABASE_URL") or os.getenv("database_url")
 
 # this is the Alembic Config object, which provides access to the .ini file values.
 config = context.config

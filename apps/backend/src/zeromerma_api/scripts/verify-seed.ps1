@@ -1,15 +1,20 @@
-# scripts/verify-seed.ps1
+# apps/backend/scripts/verify-seed.ps1
 # Verifies dev seed invariants:
 # - basic counts exist
-# - ledger matches snapshot (inventory_movement SUM(qty) == inventory_balance.on_hand)
+# - ledger matches snapshot
 
-Set-Location -Path (Split-Path $PSScriptRoot -Parent)
+$BackendRoot = Split-Path -Parent $PSScriptRoot
+Set-Location -Path $BackendRoot
 
-# Load DATABASE_URL from .env if not present
+$EnvFile = Join-Path $BackendRoot ".env"
 if (-not $env:DATABASE_URL) {
-  $line = Get-Content .\.env | Select-String '^DATABASE_URL=' | Select-Object -First 1
-  if ($line) {
-    $env:DATABASE_URL = $line.ToString().Split('=',2)[1].Trim()
+  if (Test-Path $EnvFile) {
+    $line = Get-Content $EnvFile | Select-String '^DATABASE_URL=' | Select-Object -First 1
+    if ($line) {
+      $env:DATABASE_URL = $line.ToString().Split('=',2)[1].Trim()
+    }
+  } else {
+    Write-Warning "No .env found at $EnvFile. Assuming DATABASE_URL is already configured in environment."
   }
 }
 
@@ -18,7 +23,6 @@ from decimal import Decimal
 from sqlalchemy import text
 from zeromerma_api.db.engine import engine
 
-# Helper: raise with a clean message (PowerShell will show traceback)
 def assert_true(cond: bool, msg: str) -> None:
     if not cond:
         raise AssertionError(msg)
@@ -31,7 +35,6 @@ with engine.connect() as c:
     print(f"inet_server_addr: {ip}")
     print(f"version: {ver}")
 
-    # --- counts ---
     counts = c.execute(text(r'''
         SELECT
           (SELECT count(*) FROM branch) AS branch_count,
@@ -39,7 +42,11 @@ with engine.connect() as c:
           (SELECT count(*) FROM user_account) AS user_count,
           (SELECT count(*) FROM product) AS product_count,
           (SELECT count(*) FROM inventory_movement) AS movement_count,
-          (SELECT count(*) FROM inventory_balance) AS balance_count
+          (SELECT count(*) FROM inventory_balance) AS balance_count,
+          (SELECT count(*) FROM cash_session) AS cash_session_count,
+          (SELECT count(*) FROM sale) AS sale_count,
+          (SELECT count(*) FROM sale_item) AS sale_item_count,
+          (SELECT count(*) FROM payment) AS payment_count
     ''')).mappings().one()
 
     print("counts:", dict(counts))
@@ -50,8 +57,6 @@ with engine.connect() as c:
     assert_true(counts["product_count"] >= 1, "Expected at least 1 product.")
     assert_true(counts["balance_count"] >= 1, "Expected at least 1 inventory_balance row.")
 
-    # --- ledger vs snapshot ---
-    # tolerance because NUMERIC(18,3) quantization
     tol = Decimal("0.001")
 
     mismatches = c.execute(text(r'''

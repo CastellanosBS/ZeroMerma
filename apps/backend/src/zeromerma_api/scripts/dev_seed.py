@@ -19,6 +19,7 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass
+from datetime import datetime, timezone
 from decimal import Decimal
 from typing import Iterable
 
@@ -31,9 +32,13 @@ from zeromerma_api.db.engine import SessionLocal
 
 # Import ORM models (adjust imports if your module names differ)
 from zeromerma_api.models.branch import Branch
+from zeromerma_api.models.cash_session import CashSession
 from zeromerma_api.models.inventory_movement import InventoryMovement
+from zeromerma_api.models.payment import Payment
 from zeromerma_api.models.product import Product
 from zeromerma_api.models.role import Role
+from zeromerma_api.models.sale import Sale
+from zeromerma_api.models.sale_item import SaleItem
 from zeromerma_api.models.user_account import UserAccount
 
 # We reuse your existing bootstrap logic for snapshot creation
@@ -238,6 +243,161 @@ def ensure_opening_balance_movements(
     return created
 
 
+def get_or_create_open_cash_session(
+    session: Session,
+    *,
+    branch_id: int,
+    opened_by_id: int,
+    opening_amount: Decimal,
+) -> CashSession:
+    existing = session.execute(
+        select(CashSession).where(
+            CashSession.branch_id == branch_id,
+            CashSession.status == "OPEN",
+        )
+    ).scalar_one_or_none()
+
+    if existing:
+        return existing
+
+    obj = CashSession(
+        branch_id=branch_id,
+        opened_by_id=opened_by_id,
+        closed_by_id=None,
+        opened_at=datetime.now(
+            timezone.utc
+        ),  # let DB default now() apply if you have it; else set explicitly
+        closed_at=None,
+        opening_amount=opening_amount,
+        closing_amount=None,
+        status="OPEN",
+    )
+    session.add(obj)
+    session.flush()
+    return obj
+
+
+SEED_SAMPLE_PAYMENT_REF = "DEV_SEED_SAMPLE_SALE_V1"
+
+
+def sample_sale_already_seeded(session: Session) -> bool:
+    """
+    Idempotency key:
+    - If a payment with reference=SEED_SAMPLE_PAYMENT_REF exists, we assume the sample sale exists.
+    """
+    existing = session.execute(
+        select(Payment.id).where(Payment.reference == SEED_SAMPLE_PAYMENT_REF)
+    ).first()
+    return existing is not None
+
+
+def create_sample_sale_payment_and_inventory(
+    session: Session,
+    *,
+    branch_id: int,
+    cash_session_id: int,
+    created_by_id: int,
+    products: list[Product],
+) -> int:
+    """
+    Create exactly one deterministic sample sale (if not seeded yet):
+      - 1 Sale
+      - 2 SaleItem rows
+      - 1 Payment row (method=CASH) with deterministic reference
+      - Inventory movements (reason=SALE) for each line item (negative qty)
+      - Rebuild inventory_balance snapshot from ledger after commit (done in main)
+
+    Returns:
+      sale_id of the created sale.
+    """
+    if len(products) < 2:
+        raise ValueError("Need at least 2 products to create sample sale.")
+
+    # Choose two deterministic products (stable ordering by sku)
+    prods = sorted(products, key=lambda p: (p.sku or "", p.id))
+    p1, p2 = prods[0], prods[1]
+
+    # Deterministic pricing/quantities for sample
+    qty1 = Decimal("2.000")
+    qty2 = Decimal("1.000")
+    unit1 = Decimal("25.00")
+    unit2 = Decimal("30.00")
+
+    line1 = (qty1 * unit1).quantize(Decimal("0.01"))
+    line2 = (qty2 * unit2).quantize(Decimal("0.01"))
+
+    subtotal = (line1 + line2).quantize(Decimal("0.01"))
+    tax = Decimal("0.00")
+    total = (subtotal + tax).quantize(Decimal("0.01"))
+
+    sale = Sale(
+        branch_id=branch_id,
+        cash_session_id=cash_session_id,
+        created_by_id=created_by_id,
+        subtotal=subtotal,
+        tax=tax,
+        total=total,
+        status="OPEN",
+    )
+    session.add(sale)
+    session.flush()  # sale.id available
+
+    item1 = SaleItem(
+        sale_id=sale.id,
+        product_id=p1.id,
+        qty=qty1,
+        unit_price=unit1,
+        line_total=line1,
+    )
+    item2 = SaleItem(
+        sale_id=sale.id,
+        product_id=p2.id,
+        qty=qty2,
+        unit_price=unit2,
+        line_total=line2,
+    )
+    session.add_all([item1, item2])
+
+    # Payment (ties the seed to a deterministic reference)
+    pay = Payment(
+        sale_id=sale.id,
+        method="CASH",
+        amount=total,
+        reference=SEED_SAMPLE_PAYMENT_REF,
+    )
+    session.add(pay)
+
+    # Inventory coupling: create ledger movements for the sale lines (negative qty)
+    # We intentionally do this in the seed (service layer coupling can come later).
+    mv1 = InventoryMovement(
+        branch_id=branch_id,
+        product_id=p1.id,
+        qty=(qty1 * Decimal("-1")),
+        reason="SALE",
+        ref_type="sale",
+        ref_id=sale.id,
+        note="Dev seed sample sale",
+        created_by_id=created_by_id,
+    )
+    mv2 = InventoryMovement(
+        branch_id=branch_id,
+        product_id=p2.id,
+        qty=(qty2 * Decimal("-1")),
+        reason="SALE",
+        ref_type="sale",
+        ref_id=sale.id,
+        note="Dev seed sample sale",
+        created_by_id=created_by_id,
+    )
+    session.add_all([mv1, mv2])
+
+    # Mark sale paid/closed (simple deterministic state)
+    sale.status = "PAID"
+    session.flush()
+
+    return int(sale.id)
+
+
 def main() -> None:
     # 1) Ensure settings are loaded (DATABASE_URL, etc.)
     _ = get_settings()
@@ -264,6 +424,14 @@ def main() -> None:
             role_id=roles["ADMIN"].id,
         )
 
+        # 5.1) Ensure one OPEN cash session exists for this branch
+        cash_session = get_or_create_open_cash_session(
+            session,
+            branch_id=branch.id,
+            opened_by_id=admin.id,
+            opening_amount=Decimal("1000.00"),
+        )
+
         # 6) Products
         products_with_qty: list[tuple[Product, Decimal]] = []
         for p in DEFAULT_PRODUCTS:
@@ -278,18 +446,31 @@ def main() -> None:
             products=products_with_qty,
         )
 
-        # 8) Commit ledger first (so bootstrap reads consistent data)
+        # 7.1) Optional sample POS transaction (idempotent)
+        if not sample_sale_already_seeded(session):
+            sale_id = create_sample_sale_payment_and_inventory(
+                session,
+                branch_id=branch.id,
+                cash_session_id=cash_session.id,
+                created_by_id=admin.id,
+                products=[p for (p, _q) in products_with_qty],
+            )
+            log.info("sample_sale_created_id=%s", sale_id)
+        else:
+            log.info("sample_sale_already_seeded=True")
+
+        # 8) COMMIT all seed writes (entities + ledger + sample sale + movements)
         session.commit()
 
-        # 9) Bootstrap snapshot from ledger (inventory_balance)
-        #    This function should internally open its own session or accept one.
-        #    If it accepts a session, we can pass it; if not, it will use SessionLocal.
+        # 9) Rebuild snapshot from ledger (inventory_balance)
         bootstrap_inventory_balance_from_ledger(session, branch_id=branch.id)
         session.commit()
 
+        # 10) Summary
         log.info("Dev seed done.")
         log.info("branch=%s (%s)", branch.code, branch.id)
         log.info("admin=%s (%s)", admin.email, admin.id)
+        log.info("cash_session_open_id=%s", cash_session.id)
         log.info("products=%s", len(products_with_qty))
         log.info("opening movements created=%s", created_movements)
 

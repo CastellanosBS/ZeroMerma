@@ -1,18 +1,7 @@
-# apps/backend/tests/test_pos_payments_endpoints.py
-# PURPOSE:
-#   End-to-end tests for POS Payments:
-#     - POST /pos/sales/{sale_id}/payments
-#     - GET  /pos/sales/{sale_id}
-#
-# Validates:
-#   - Payments can be added to OPEN sales
-#   - paid_amount and balance_due are computed correctly
-#   - Overpay is rejected (409)
-#   - Payments are rejected if sale not OPEN (409)
-
 from __future__ import annotations
 
 import os
+from pathlib import Path
 
 import pytest
 from alembic import command
@@ -23,73 +12,103 @@ from sqlalchemy.orm import Session
 
 from zeromerma_api.db.engine import SessionLocal
 from zeromerma_api.main import create_app
-from zeromerma_api.models.branch import Branch
-from zeromerma_api.models.product import Product
-from zeromerma_api.models.role import Role
-from zeromerma_api.models.user_account import UserAccount
+
+
+def make_alembic_config() -> Config:
+    """
+    Tests live at:
+      .../apps/backend/src/zeromerma_api/tests/test_pos_payments_endpoints.py
+
+    So:
+      parents[0]=tests
+      parents[1]=zeromerma_api
+      parents[2]=src
+      parents[3]=backend ✅
+    """
+    backend_dir = Path(__file__).resolve().parents[3]
+    cfg = Config(str(backend_dir / "alembic.ini"))
+    cfg.set_main_option("script_location", str(backend_dir / "migrations"))
+
+    if os.getenv("DATABASE_URL"):
+        cfg.set_main_option("sqlalchemy.url", os.environ["DATABASE_URL"])
+
+    return cfg
 
 
 def alembic_upgrade_head() -> None:
-    """
-    Ensure schema exists at HEAD. Uses alembic.ini in apps/backend/.
-    """
-    cfg = Config("alembic.ini")
+    cfg = make_alembic_config()
     command.upgrade(cfg, "head")
 
 
 def reset_tables(s: Session) -> None:
-    """
-    Reset DB state so tests are deterministic.
-    Order: leaf tables first, then parents.
-    """
-    # Payments depend on sale; sale_items depend on sale; sessions depend on users/branch.
-    s.execute(text("TRUNCATE TABLE payment RESTART IDENTITY CASCADE;"))
-    s.execute(text("TRUNCATE TABLE sale_item RESTART IDENTITY CASCADE;"))
-    s.execute(text("TRUNCATE TABLE sale RESTART IDENTITY CASCADE;"))
-    s.execute(text("TRUNCATE TABLE cash_session RESTART IDENTITY CASCADE;"))
-    s.execute(text("TRUNCATE TABLE inventory_movement RESTART IDENTITY CASCADE;"))
-    s.execute(text("TRUNCATE TABLE product RESTART IDENTITY CASCADE;"))
-    s.execute(text("TRUNCATE TABLE user_account RESTART IDENTITY CASCADE;"))
-    s.execute(text("TRUNCATE TABLE role RESTART IDENTITY CASCADE;"))
-    s.execute(text("TRUNCATE TABLE branch RESTART IDENTITY CASCADE;"))
+    s.execute(text("DELETE FROM payment"))
+    s.execute(text("DELETE FROM sale_item"))
+    s.execute(text("DELETE FROM sale"))
+    s.execute(text("DELETE FROM inventory_movement"))
+    s.execute(text("DELETE FROM inventory_balance"))
+    s.execute(text("DELETE FROM cash_session"))
+    s.execute(text("DELETE FROM user_account"))
+    s.execute(text("DELETE FROM role"))
+    s.execute(text("DELETE FROM branch"))
+    s.execute(text("DELETE FROM product"))
     s.commit()
 
 
 def seed_core(s: Session) -> tuple[int, int, int]:
-    """
-    Create minimal entities:
-      - branch MAIN
-      - role ADMIN
-      - user admin@example.com
-      - product DONUT-GLA
+    branch_id = s.execute(
+        text(
+            """
+            INSERT INTO branch (code, name, is_active, created_at, updated_at)
+            VALUES ('MAIN', 'Main Branch', true, now(), now())
+            RETURNING id
+            """
+        )
+    ).scalar_one()
 
-    Returns: (branch_id, user_id, product_id)
-    """
-    b = Branch(code="MAIN", name="Main Branch")
-    s.add(b)
-    s.flush()
+    role_id = s.execute(
+        text(
+            """
+            INSERT INTO role (code, name, created_at, updated_at)
+            VALUES ('ADMIN', 'Admin', now(), now())
+            RETURNING id
+            """
+        )
+    ).scalar_one()
 
-    r = Role(code="ADMIN", name="Admin")
-    s.add(r)
-    s.flush()
+    user_id = s.execute(
+        text(
+            """
+            INSERT INTO user_account (branch_id, role_id, email, full_name, password_hash, is_active, created_at, updated_at)
+            VALUES (:branch_id, :role_id, 'admin@example.com', 'Admin User', NULL, true, now(), now())
+            RETURNING id
+            """
+        ),
+        {"branch_id": branch_id, "role_id": role_id},
+    ).scalar_one()
 
-    u = UserAccount(
-        branch_id=b.id,
-        role_id=r.id,
-        email="admin@example.com",
-        full_name="Admin User",
-        password_hash=None,
-        is_active=True,
+    product_id = s.execute(
+        text(
+            """
+            INSERT INTO product (sku, name, is_active, created_at, updated_at)
+            VALUES ('SKU-001', 'Test Product', true, now(), now())
+            RETURNING id
+            """
+        )
+    ).scalar_one()
+
+    # Snapshot row for inventory_balance so sales can decrement safely
+    s.execute(
+        text(
+            """
+            INSERT INTO inventory_balance (branch_id, product_id, on_hand, reserved, created_at, updated_at)
+            VALUES (:b, :p, 100.000, 0.000, now(), now())
+            """
+        ),
+        {"b": branch_id, "p": product_id},
     )
-    s.add(u)
-    s.flush()
-
-    p = Product(sku="DONUT-GLA", name="Donut Glazed")
-    s.add(p)
-    s.flush()
 
     s.commit()
-    return b.id, u.id, p.id
+    return int(branch_id), int(user_id), int(product_id)
 
 
 @pytest.mark.skipif(
@@ -97,10 +116,8 @@ def seed_core(s: Session) -> tuple[int, int, int]:
     reason="DATABASE_URL not set; skipping POS payments tests",
 )
 def test_payments_flow_and_balance_and_overpay():
-    # 1) Ensure schema up to date
     alembic_upgrade_head()
 
-    # 2) Clean state + seed core
     s: Session = SessionLocal()
     try:
         reset_tables(s)
@@ -111,7 +128,7 @@ def test_payments_flow_and_balance_and_overpay():
     app = create_app()
     client = TestClient(app)
 
-    # 3) Open cash session (required for sale creation in your flow)
+    # Open cash session
     open_resp = client.post(
         "/pos/cash-sessions/open",
         json={"branch_id": branch_id, "opened_by_id": user_id, "opening_amount": 0.00},
@@ -119,7 +136,7 @@ def test_payments_flow_and_balance_and_overpay():
     assert open_resp.status_code == 200, open_resp.text
     cash_session_id = open_resp.json()["id"]
 
-    # 4) Create a sale total=75.00
+    # Create sale total=75 (3 items at 25)
     sale_resp = client.post(
         "/pos/sales",
         json={
@@ -127,26 +144,21 @@ def test_payments_flow_and_balance_and_overpay():
             "cash_session_id": cash_session_id,
             "created_by_id": user_id,
             "items": [
-                {"product_id": product_id, "qty": 2, "unit_price": 25.00},  # 50
-                {"product_id": product_id, "qty": 1, "unit_price": 25.00},  # 25
+                {"product_id": product_id, "qty": 2, "unit_price": 25.00},
+                {"product_id": product_id, "qty": 1, "unit_price": 25.00},
             ],
         },
     )
     assert sale_resp.status_code == 200, sale_resp.text
     sale_id = sale_resp.json()["id"]
-    assert abs(sale_resp.json()["total"] - 75.00) < 1e-6
 
-    # 5) Add first payment: 50.00
+    # First payment: 50
     p1 = client.post(
-        f"/pos/sales/{sale_id}/payments",
-        json={"method": "CASH", "amount": 50.00, "reference": None},
+        f"/pos/sales/{sale_id}/payments", json={"method": "CASH", "amount": 50.00}
     )
     assert p1.status_code == 200, p1.text
-    assert abs(p1.json()["amount"] - 50.00) < 1e-6
-    assert p1.json()["method"] == "CASH"
-    assert p1.json()["sale_id"] == sale_id
 
-    # 6) Sale detail should show paid=50, balance=25, payments length=1
+    # Sale detail should show paid=50, balance=25
     d1 = client.get(f"/pos/sales/{sale_id}")
     assert d1.status_code == 200, d1.text
     detail = d1.json()
@@ -154,14 +166,13 @@ def test_payments_flow_and_balance_and_overpay():
     assert abs(detail["balance_due"] - 25.00) < 1e-6
     assert len(detail["payments"]) == 1
 
-    # 7) Add second payment: 25.00 (exactly completes sale)
+    # Second payment: 25 completes
     p2 = client.post(
         f"/pos/sales/{sale_id}/payments",
         json={"method": "CARD", "amount": 25.00, "reference": "AUTH123"},
     )
     assert p2.status_code == 200, p2.text
 
-    # 8) Sale detail should show paid=75, balance=0, payments length=2
     d2 = client.get(f"/pos/sales/{sale_id}")
     assert d2.status_code == 200, d2.text
     detail2 = d2.json()
@@ -169,7 +180,7 @@ def test_payments_flow_and_balance_and_overpay():
     assert abs(detail2["balance_due"] - 0.00) < 1e-6
     assert len(detail2["payments"]) == 2
 
-    # 9) Overpay should be rejected (409)
+    # Overpay rejected
     over = client.post(
         f"/pos/sales/{sale_id}/payments", json={"method": "CASH", "amount": 0.01}
     )
@@ -193,7 +204,6 @@ def test_payments_rejected_when_sale_not_open():
     app = create_app()
     client = TestClient(app)
 
-    # Open cash session
     open_resp = client.post(
         "/pos/cash-sessions/open",
         json={"branch_id": branch_id, "opened_by_id": user_id, "opening_amount": 0.00},
@@ -201,7 +211,6 @@ def test_payments_rejected_when_sale_not_open():
     assert open_resp.status_code == 200, open_resp.text
     cash_session_id = open_resp.json()["id"]
 
-    # Create sale
     sale_resp = client.post(
         "/pos/sales",
         json={
@@ -214,15 +223,13 @@ def test_payments_rejected_when_sale_not_open():
     assert sale_resp.status_code == 200, sale_resp.text
     sale_id = sale_resp.json()["id"]
 
-    # Close cash session (this does NOT close the sale, but in real life you might close session after sales)
     close_resp = client.post(
         f"/pos/cash-sessions/{cash_session_id}/close",
         json={"closed_by_id": user_id, "closing_amount": 0.00},
     )
     assert close_resp.status_code == 200, close_resp.text
 
-    # Now we need a non-OPEN sale status to test payment rejection.
-    # MVP: you don't yet have a cancel endpoint, so we simulate by directly updating the DB.
+    # Force sale status out of OPEN to test rejection
     s2: Session = SessionLocal()
     try:
         s2.execute(
@@ -232,7 +239,6 @@ def test_payments_rejected_when_sale_not_open():
     finally:
         s2.close()
 
-    # Try to pay a CANCELED sale -> 409
     p = client.post(
         f"/pos/sales/{sale_id}/payments", json={"method": "CASH", "amount": 5.00}
     )

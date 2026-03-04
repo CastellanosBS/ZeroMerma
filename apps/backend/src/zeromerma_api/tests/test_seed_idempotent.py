@@ -1,32 +1,46 @@
 # apps/backend/tests/test_seed_idempotent.py
 # PURPOSE: Prove seeds are idempotent by running them twice and asserting counts do not increase.
 
-from __future__ import annotations  # (1) Modern typing behavior.
+from __future__ import annotations
 
-import os  # (2) To check DATABASE_URL presence for readiness.
+import os
+from pathlib import Path
 
-import pytest  # (3) Pytest framework for assertions and skipping.
+import pytest
 from alembic import command
-
-# (6) Alembic programmatic API: lets tests apply migrations without shelling out.
 from alembic.config import Config
-from sqlalchemy import func, select  # (4) To query counts after seeding.
-from sqlalchemy.orm import Session  # (5) Type hints for sessions.
+from sqlalchemy import func, select
+from sqlalchemy.orm import Session
 
 from zeromerma_api.db.engine import SessionLocal
 from zeromerma_api.models import Branch, Role, UserAccount
-
-# (7) Import the seed orchestrator and DB/session bits from your project.
 from zeromerma_api.scripts.seed import run_all
 
 
+def make_alembic_config() -> Config:
+    backend_dir = Path(__file__).resolve().parents[1]  # apps/backend
+    alembic_ini = backend_dir / "alembic.ini"
+    migrations_dir = backend_dir / "migrations"
+
+    cfg = Config(str(alembic_ini))
+    cfg.set_main_option("script_location", str(migrations_dir))
+    return cfg
+
+
 def _alembic_upgrade_head() -> None:
-    """
-    Apply all migrations up to 'head' using Alembic's API.
-    Assumes tests run with working directory 'apps/backend' so alembic.ini is resolvable.
-    """
-    cfg = Config("alembic.ini")  # (8) Read Alembic config from local file.
-    command.upgrade(cfg, "head")  # (9) Run "alembic upgrade head" programmatically.
+    # __file__ = .../apps/backend/src/zeromerma_api/tests/test_xxx.py
+    # parents[0]=tests, [1]=zeromerma_api, [2]=src, [3]=backend
+    backend_dir = Path(__file__).resolve().parents[3]
+
+    cfg = Config(str(backend_dir / "alembic.ini"))
+
+    # IMPORTANT: point to the real migrations folder
+    cfg.set_main_option("script_location", str(backend_dir / "migrations"))
+
+    # Make sure we use the DB from env var (the tests skip otherwise)
+    cfg.set_main_option("sqlalchemy.url", os.environ["DATABASE_URL"])
+
+    command.upgrade(cfg, "head")
 
 
 @pytest.mark.skipif(
@@ -40,53 +54,52 @@ def test_seeds_are_idempotent():
       - runs the seeder twice,
       - asserts counts remain stable.
     """
-    # (10) Bring schema to the latest state.
     _alembic_upgrade_head()
 
-    # (11) First run: should create rows.
+    # First run
     s1: Session = SessionLocal()
     try:
         run_all(s1)
+        s1.commit()
     finally:
         s1.close()
 
-    # (12) Second run: should detect existing rows and do nothing.
+    # Second run (must be idempotent)
     s2: Session = SessionLocal()
     try:
         run_all(s2)
+        s2.commit()
     finally:
         s2.close()
 
-    # (13) Verify counts are as expected and stable.
-
-
-s3: Session = SessionLocal()
-try:
-    # Count roles with code in (...)
-    num_roles = (
-        s3.scalar(
-            select(func.count())
-            .select_from(Role)
-            .where(Role.code.in_(["ADMIN", "CASHIER", "BAKER"]))
+    # Verify stable counts
+    s3: Session = SessionLocal()
+    try:
+        num_roles = (
+            s3.scalar(
+                select(func.count())
+                .select_from(Role)
+                .where(Role.code.in_(["ADMIN", "CASHIER", "BAKER"]))
+            )
+            or 0
         )
-        or 0
-    )
-
-    # Count branches with code == MAIN
-    num_branches = (
-        s3.scalar(select(func.count()).select_from(Branch).where(Branch.code == "MAIN"))
-        or 0
-    )
-
-    # Count admin users by email
-    num_admins = (
-        s3.scalar(
-            select(func.count())
-            .select_from(UserAccount)
-            .where(UserAccount.email == "admin@example.com")
+        num_branches = (
+            s3.scalar(
+                select(func.count()).select_from(Branch).where(Branch.code == "MAIN")
+            )
+            or 0
         )
-        or 0
-    )
+        num_admins = (
+            s3.scalar(
+                select(func.count())
+                .select_from(UserAccount)
+                .where(UserAccount.email == "admin@example.com")
+            )
+            or 0
+        )
+    finally:
+        s3.close()
 
-finally:
-    s3.close()
+    assert int(num_roles) == 3
+    assert int(num_branches) == 1
+    assert int(num_admins) == 1

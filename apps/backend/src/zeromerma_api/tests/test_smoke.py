@@ -50,4 +50,16 @@ def test_readyz_ok_or_skip():
 
     r = client.get("/readyz")
     assert r.status_code == 200
-    assert r.json() == {"status": "ready"}
+
+    payload = r.json()
+    assert isinstance(payload, dict)
+
+    # Contract invariant:
+    assert payload.get("status") == "ready"
+
+    # Optional (non-fragile) checks:
+    # If these keys exist, ensure types look correct.
+    if "app" in payload:
+        assert isinstance(payload["app"], str)
+    if "env" in payload:
+        assert isinstance(payload["env"], str)

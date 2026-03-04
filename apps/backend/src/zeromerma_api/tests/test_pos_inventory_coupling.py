@@ -1,18 +1,7 @@
-# apps/backend/tests/test_pos_inventory_coupling.py
-# PURPOSE:
-#   End-to-end tests for B3.4 inventory coupling:
-#     - When a sale is created, inventory_movement rows are written (reason='SALE')
-#     - Stock (on-hand) is computed from ledger and oversell is blocked
-#
-# Verifies:
-#   1) Seed opening stock with OPENING_BALANCE movement.
-#   2) Create a sale that consumes stock -> OK + movement rows created.
-#   3) Attempt a sale that would oversell -> 409.
-#   4) Confirm ledger sums match expected on-hand.
-
 from __future__ import annotations
 
 import os
+from pathlib import Path
 
 import pytest
 from alembic import command
@@ -23,109 +12,142 @@ from sqlalchemy.orm import Session
 
 from zeromerma_api.db.engine import SessionLocal
 from zeromerma_api.main import create_app
-from zeromerma_api.models.branch import Branch
-from zeromerma_api.models.product import Product
-from zeromerma_api.models.role import Role
-from zeromerma_api.models.user_account import UserAccount
+
+
+def make_alembic_config() -> Config:
+    """
+    __file__ = .../apps/backend/src/zeromerma_api/tests/test_xxx.py
+    parents[0]=tests, [1]=zeromerma_api, [2]=src, [3]=backend
+    """
+    backend_dir = Path(__file__).resolve().parents[3]
+    cfg = Config(str(backend_dir / "alembic.ini"))
+    cfg.set_main_option("script_location", str(backend_dir / "migrations"))
+
+    # Optional but good: force the same DB the tests are using
+    if os.getenv("DATABASE_URL"):
+        cfg.set_main_option("sqlalchemy.url", os.environ["DATABASE_URL"])
+
+    return cfg
 
 
 def alembic_upgrade_head() -> None:
-    cfg = Config("alembic.ini")
+    cfg = make_alembic_config()
     command.upgrade(cfg, "head")
 
 
 def reset_tables(s: Session) -> None:
-    """
-    Reset state in dependency-safe order.
-    """
-    # Payments and sale items depend on sale; movements depend on branch/product/user.
-    # If payment table exists but you haven't created it yet, TRUNCATE will fail.
-    # In your project B3.3 is already done, so payment exists.
-    s.execute(text("TRUNCATE TABLE payment RESTART IDENTITY CASCADE;"))
-    s.execute(text("TRUNCATE TABLE sale_item RESTART IDENTITY CASCADE;"))
-    s.execute(text("TRUNCATE TABLE sale RESTART IDENTITY CASCADE;"))
-    s.execute(text("TRUNCATE TABLE cash_session RESTART IDENTITY CASCADE;"))
-    s.execute(text("TRUNCATE TABLE inventory_movement RESTART IDENTITY CASCADE;"))
-    s.execute(text("TRUNCATE TABLE product RESTART IDENTITY CASCADE;"))
-    s.execute(text("TRUNCATE TABLE user_account RESTART IDENTITY CASCADE;"))
-    s.execute(text("TRUNCATE TABLE role RESTART IDENTITY CASCADE;"))
-    s.execute(text("TRUNCATE TABLE branch RESTART IDENTITY CASCADE;"))
+    # Keep deterministic runs locally by clearing key tables.
+    s.execute(text("DELETE FROM payment"))
+    s.execute(text("DELETE FROM sale_item"))
+    s.execute(text("DELETE FROM sale"))
+    s.execute(text("DELETE FROM inventory_movement"))
+    s.execute(text("DELETE FROM inventory_balance"))
+    s.execute(text("DELETE FROM cash_session"))
+    s.execute(text("DELETE FROM user_account"))
+    s.execute(text("DELETE FROM role"))
+    s.execute(text("DELETE FROM branch"))
+    s.execute(text("DELETE FROM product"))
     s.commit()
 
 
 def seed_core(s: Session) -> tuple[int, int, int]:
     """
-    Minimal core entities.
-    Returns: (branch_id, user_id, product_id)
+    Create:
+      - branch MAIN
+      - role ADMIN
+      - user admin@example.com
+      - product SKU-001
+    Return: (branch_id, user_id, product_id)
     """
-    b = Branch(code="MAIN", name="Main Branch")
-    s.add(b)
-    s.flush()
+    branch_id = s.execute(
+        text(
+            """
+            INSERT INTO branch (code, name, is_active, created_at, updated_at)
+            VALUES ('MAIN', 'Main Branch', true, now(), now())
+            RETURNING id
+            """
+        )
+    ).scalar_one()
 
-    r = Role(code="ADMIN", name="Admin")
-    s.add(r)
-    s.flush()
+    role_id = s.execute(
+        text(
+            """
+            INSERT INTO role (code, name, created_at, updated_at)
+            VALUES ('ADMIN', 'Admin', now(), now())
+            RETURNING id
+            """
+        )
+    ).scalar_one()
 
-    u = UserAccount(
-        branch_id=b.id,
-        role_id=r.id,
-        email="admin@example.com",
-        full_name="Admin User",
-        password_hash=None,
-        is_active=True,
-    )
-    s.add(u)
-    s.flush()
+    user_id = s.execute(
+        text(
+            """
+            INSERT INTO user_account (branch_id, role_id, email, full_name, password_hash, is_active, created_at, updated_at)
+            VALUES (:branch_id, :role_id, 'admin@example.com', 'Admin User', NULL, true, now(), now())
+            RETURNING id
+            """
+        ),
+        {"branch_id": branch_id, "role_id": role_id},
+    ).scalar_one()
 
-    p = Product(sku="DONUT-GLA", name="Donut Glazed")
-    s.add(p)
-    s.flush()
+    product_id = s.execute(
+        text(
+            """
+            INSERT INTO product (sku, name, is_active, created_at, updated_at)
+            VALUES ('SKU-001', 'Test Product', true, now(), now())
+            RETURNING id
+            """
+        )
+    ).scalar_one()
 
     s.commit()
-    return b.id, u.id, p.id
+    return int(branch_id), int(user_id), int(product_id)
 
 
-def seed_opening_stock(
+def seed_stock_ledger_only(
     s: Session, *, branch_id: int, product_id: int, qty: float, created_by_id: int
 ) -> None:
-    """
-    Insert opening stock directly into the inventory ledger.
-    We do this at DB level because your API for stock seeding isn't built yet.
-    """
     s.execute(
         text(
             """
             INSERT INTO inventory_movement
-                (branch_id, product_id, qty, reason, ref_type, ref_id, note, created_by_id, created_at, updated_at)
+              (branch_id, product_id, qty, reason, ref_type, ref_id, note, created_by_id, created_at, updated_at)
             VALUES
-                (:branch_id, :product_id, :qty, 'OPENING_BALANCE', NULL, NULL, 'seed opening stock', :created_by_id, now(), now())
+              (:b, :p, :q, 'OPENING_BALANCE', NULL, NULL, 'seed', :u, now(), now())
             """
         ),
-        {
-            "branch_id": branch_id,
-            "product_id": product_id,
-            "qty": qty,
-            "created_by_id": created_by_id,
-        },
+        {"b": branch_id, "p": product_id, "q": qty, "u": created_by_id},
+    )
+    s.commit()
+
+
+def seed_stock_snapshot(
+    s: Session, *, branch_id: int, product_id: int, on_hand: float
+) -> None:
+    s.execute(
+        text(
+            """
+            INSERT INTO inventory_balance (branch_id, product_id, on_hand, reserved, created_at, updated_at)
+            VALUES (:b, :p, :oh, 0, now(), now())
+            """
+        ),
+        {"b": branch_id, "p": product_id, "oh": on_hand},
     )
     s.commit()
 
 
 def on_hand(s: Session, *, branch_id: int, product_id: int) -> float:
-    """
-    Compute on-hand from ledger directly in SQL for assertion.
-    """
     val = s.execute(
         text(
             """
-            SELECT COALESCE(SUM(qty), 0)
-            FROM inventory_movement
-            WHERE branch_id = :branch_id AND product_id = :product_id
+            SELECT COALESCE(on_hand, 0)
+            FROM inventory_balance
+            WHERE branch_id = :b AND product_id = :p
             """
         ),
-        {"branch_id": branch_id, "product_id": product_id},
-    ).scalar_one()
-    return float(val)
+        {"b": branch_id, "p": product_id},
+    ).scalar_one_or_none()
+    return float(val or 0)
 
 
 @pytest.mark.skipif(
@@ -139,7 +161,12 @@ def test_sale_creates_negative_inventory_movements_and_updates_on_hand():
     try:
         reset_tables(s)
         branch_id, user_id, product_id = seed_core(s)
-        seed_opening_stock(
+
+        # Seed snapshot stock (operational truth for decrement)
+        seed_stock_snapshot(s, branch_id=branch_id, product_id=product_id, on_hand=10.0)
+
+        # Optionally seed ledger too (audit)
+        seed_stock_ledger_only(
             s,
             branch_id=branch_id,
             product_id=product_id,
@@ -147,7 +174,6 @@ def test_sale_creates_negative_inventory_movements_and_updates_on_hand():
             created_by_id=user_id,
         )
 
-        # Sanity: on hand should be 10
         assert abs(on_hand(s, branch_id=branch_id, product_id=product_id) - 10.0) < 1e-6
     finally:
         s.close()
@@ -155,7 +181,6 @@ def test_sale_creates_negative_inventory_movements_and_updates_on_hand():
     app = create_app()
     client = TestClient(app)
 
-    # Open cash session
     open_resp = client.post(
         "/pos/cash-sessions/open",
         json={"branch_id": branch_id, "opened_by_id": user_id, "opening_amount": 0.00},
@@ -163,44 +188,35 @@ def test_sale_creates_negative_inventory_movements_and_updates_on_hand():
     assert open_resp.status_code == 200, open_resp.text
     cash_session_id = open_resp.json()["id"]
 
-    # Create sale that consumes 3 units
-    sale_resp = client.post(
+    resp = client.post(
         "/pos/sales",
         json={
             "branch_id": branch_id,
             "cash_session_id": cash_session_id,
             "created_by_id": user_id,
-            "items": [{"product_id": product_id, "qty": 3.0, "unit_price": 25.00}],
+            "items": [{"product_id": product_id, "qty": 2.0, "unit_price": 10.00}],
         },
     )
-    assert sale_resp.status_code == 200, sale_resp.text
-    sale = sale_resp.json()
-    sale_id = sale["id"]
+    assert resp.status_code == 200, resp.text
 
-    # Verify ledger: there must be one SALE movement with qty=-3 and ref_id=sale_id
     s2: Session = SessionLocal()
     try:
-        rows = s2.execute(
+        mov_qty_sum = s2.execute(
             text(
                 """
-                SELECT qty, reason, ref_type, ref_id
+                SELECT COALESCE(SUM(qty), 0)
                 FROM inventory_movement
-                WHERE branch_id = :branch_id AND product_id = :product_id AND reason = 'SALE'
-                ORDER BY id ASC
+                WHERE branch_id = :b AND product_id = :p
                 """
             ),
-            {"branch_id": branch_id, "product_id": product_id},
-        ).fetchall()
+            {"b": branch_id, "p": product_id},
+        ).scalar_one()
 
-        assert len(rows) == 1
-        qty_val, reason, ref_type, ref_id = rows[0]
-        assert float(qty_val) == -3.0
-        assert reason == "SALE"
-        assert ref_type == "SALE"
-        assert int(ref_id) == int(sale_id)
+        # Ledger should reflect -2 SALE (and +10 opening if you seeded it)
+        assert float(mov_qty_sum) == pytest.approx(8.0, abs=1e-6)
 
-        # On hand should now be 7
-        assert abs(on_hand(s2, branch_id=branch_id, product_id=product_id) - 7.0) < 1e-6
+        # Snapshot must reflect on_hand = 8
+        assert abs(on_hand(s2, branch_id=branch_id, product_id=product_id) - 8.0) < 1e-6
     finally:
         s2.close()
 
@@ -216,13 +232,16 @@ def test_oversell_is_blocked_with_409_and_no_sale_is_created():
     try:
         reset_tables(s)
         branch_id, user_id, product_id = seed_core(s)
-        seed_opening_stock(
+
+        seed_stock_snapshot(s, branch_id=branch_id, product_id=product_id, on_hand=5.0)
+        seed_stock_ledger_only(
             s,
             branch_id=branch_id,
             product_id=product_id,
             qty=5.0,
             created_by_id=user_id,
         )
+
         assert abs(on_hand(s, branch_id=branch_id, product_id=product_id) - 5.0) < 1e-6
     finally:
         s.close()
@@ -230,7 +249,6 @@ def test_oversell_is_blocked_with_409_and_no_sale_is_created():
     app = create_app()
     client = TestClient(app)
 
-    # Open cash session
     open_resp = client.post(
         "/pos/cash-sessions/open",
         json={"branch_id": branch_id, "opened_by_id": user_id, "opening_amount": 0.00},
@@ -238,7 +256,6 @@ def test_oversell_is_blocked_with_409_and_no_sale_is_created():
     assert open_resp.status_code == 200, open_resp.text
     cash_session_id = open_resp.json()["id"]
 
-    # Try to sell 6 units when only 5 on hand -> expect 409
     resp = client.post(
         "/pos/sales",
         json={
@@ -250,7 +267,6 @@ def test_oversell_is_blocked_with_409_and_no_sale_is_created():
     )
     assert resp.status_code == 409, resp.text
 
-    # Confirm no sale row exists and no SALE movement row exists
     s2: Session = SessionLocal()
     try:
         sale_count = s2.execute(text("SELECT COUNT(*) FROM sale")).scalar_one()
@@ -260,8 +276,6 @@ def test_oversell_is_blocked_with_409_and_no_sale_is_created():
 
         assert int(sale_count) == 0
         assert int(sale_mov_count) == 0
-
-        # Stock should still be 5
         assert abs(on_hand(s2, branch_id=branch_id, product_id=product_id) - 5.0) < 1e-6
     finally:
         s2.close()

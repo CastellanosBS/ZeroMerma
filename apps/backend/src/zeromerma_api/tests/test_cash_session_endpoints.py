@@ -1,12 +1,13 @@
 from __future__ import annotations
 
 import os
+from pathlib import Path
 
 import pytest
 from alembic import command
 from alembic.config import Config
 from fastapi.testclient import TestClient
-from sqlalchemy import select
+from sqlalchemy import select, text
 from sqlalchemy.orm import Session
 
 from zeromerma_api.db.engine import SessionLocal
@@ -16,9 +17,56 @@ from zeromerma_api.models.role import Role
 from zeromerma_api.models.user_account import UserAccount
 
 
+def make_alembic_config() -> Config:
+    """
+    Tests live at:
+      .../apps/backend/src/zeromerma_api/tests/test_cash_session_endpoints.py
+
+    So:
+      parents[0]=tests
+      parents[1]=zeromerma_api
+      parents[2]=src
+      parents[3]=backend  ✅
+    """
+    backend_dir = Path(__file__).resolve().parents[3]
+    cfg = Config(str(backend_dir / "alembic.ini"))
+    cfg.set_main_option("script_location", str(backend_dir / "migrations"))
+
+    # Optional but recommended: force URL for programmatic runs
+    if os.getenv("DATABASE_URL"):
+        cfg.set_main_option("sqlalchemy.url", os.environ["DATABASE_URL"])
+
+    return cfg
+
+
 def _alembic_upgrade_head() -> None:
-    cfg = Config("alembic.ini")
+    cfg = make_alembic_config()
     command.upgrade(cfg, "head")
+
+
+def _close_open_cash_sessions_for_branch(branch_id: int, *, closed_by_id: int) -> None:
+    """
+    IMPORTANT:
+      We do NOT delete cash_session rows because sales reference them (FK).
+      Instead, we close any OPEN sessions so the test can open a new one.
+    """
+    with SessionLocal() as s:
+        s.execute(
+            text(
+                """
+                UPDATE cash_session
+                SET status = 'CLOSED',
+                    closed_by_id = :u,
+                    closed_at = now(),
+                    closing_amount = COALESCE(closing_amount, opening_amount, 0),
+                    updated_at = now()
+                WHERE branch_id = :b
+                  AND status = 'OPEN'
+                """
+            ),
+            {"b": branch_id, "u": closed_by_id},
+        )
+        s.commit()
 
 
 @pytest.mark.skipif(
@@ -61,10 +109,13 @@ def test_cash_session_open_close_flow():
             s.flush()
 
         s.commit()
-        branch_id = b.id
-        user_id = u.id
+        branch_id = int(b.id)
+        user_id = int(u.id)
     finally:
         s.close()
+
+    # Ensure test isolation: if there is an OPEN session already, close it (don't delete).
+    _close_open_cash_sessions_for_branch(branch_id, closed_by_id=user_id)
 
     # Open
     resp = client.post(
