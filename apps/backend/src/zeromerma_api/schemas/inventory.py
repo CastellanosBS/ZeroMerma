@@ -8,7 +8,10 @@ from __future__ import (
 
 from datetime import datetime  # We will return created_at on movement rows.
 
-from pydantic import BaseModel  # Base class for our response models.
+from pydantic import (
+    BaseModel,  # Base class for our response models.
+    ConfigDict,
+)
 
 
 class StockRow(BaseModel):
@@ -22,8 +25,9 @@ class StockRow(BaseModel):
     product_name: str  # Human-friendly name.
     qty: float  # Aggregated quantity: SUM(qty) across movements.
 
-    class Config:
-        orm_mode = True  # Allows returning ORM-ish rows or named tuples.
+    model_config = ConfigDict(
+        from_attributes=True
+    )  # Allows returning ORM-ish rows or named tuples.
 
 
 class MovementRow(BaseModel):
@@ -42,5 +46,4 @@ class MovementRow(BaseModel):
     created_by_id: int | None
     created_at: datetime
 
-    class Config:
-        orm_mode = True
+    model_config = ConfigDict(from_attributes=True)

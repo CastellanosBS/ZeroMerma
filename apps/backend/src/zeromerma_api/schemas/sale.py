@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from typing import List
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 from zeromerma_api.schemas.payment import PaymentOut
 
@@ -33,8 +33,7 @@ class SaleItemOut(BaseModel):
     unit_price: float
     line_total: float
 
-    class Config:
-        orm_mode = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class SaleOut(BaseModel):
@@ -48,8 +47,7 @@ class SaleOut(BaseModel):
     status: str
     items: List[SaleItemOut]
 
-    class Config:
-        orm_mode = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class SaleDetailOut(SaleOut):
