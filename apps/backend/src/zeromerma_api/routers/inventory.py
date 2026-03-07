@@ -19,9 +19,11 @@ from sqlalchemy import (
 )  # SQL builders for aggregation and sorting.
 from sqlalchemy.orm import Session  # ORM Session type for the dependency.
 
+from zeromerma_api.core.deps_auth import get_current_active_user
 from zeromerma_api.db.engine import SessionLocal
 from zeromerma_api.models.inventory_movement import InventoryMovement, MovementReason
 from zeromerma_api.models.product import Product
+from zeromerma_api.models.user_account import UserAccount
 from zeromerma_api.schemas.inventory import MovementRow, StockRow
 
 
@@ -54,6 +56,7 @@ def get_stock(
     page: int = Query(1, ge=1, description="1-based page number"),
     page_size: int = Query(50, ge=1, le=200, description="Items per page (max 200)"),
     db: Session = Depends(get_db),
+    current_user: UserAccount = Depends(get_current_active_user),
 ):
     """
     Compute stock as SUM(qty) grouped by (branch_id, product_id, sku, name).
