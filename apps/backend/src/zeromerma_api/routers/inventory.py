@@ -2,16 +2,28 @@
 # PURPOSE: Read-only inventory endpoints:
 #   - GET /inventory/stock
 #   - GET /inventory/movements
+#
+# AUTHORIZATION:
+#   - Allowed roles: ADMIN, CASHIER
+#   - Branch scoping:
+#       * ADMIN -> can query any branch_id (if provided)
+#       * CASHIER -> only their own branch_id
+#   - If branch_id is omitted, we default to current_user.branch_id for safety.
 
 from __future__ import annotations
 
 from collections.abc import Generator
 from datetime import datetime
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, Query
 from sqlalchemy import and_, desc, func, select
 from sqlalchemy.orm import Session
 
+from zeromerma_api.core.authz import (
+    INVENTORY_ALLOWED_ROLES,
+    enforce_branch_access,
+    require_role,
+)
 from zeromerma_api.core.deps_auth import get_current_active_user
 from zeromerma_api.db.engine import SessionLocal
 from zeromerma_api.models.inventory_movement import InventoryMovement, MovementReason
@@ -21,10 +33,6 @@ from zeromerma_api.schemas.inventory import MovementRow, StockRow
 
 
 def get_db() -> Generator[Session, None, None]:
-    """
-    FastAPI dependency that opens a Session, yields it to the handler,
-    and always closes it after the request.
-    """
     db = SessionLocal()
     try:
         yield db
@@ -33,18 +41,6 @@ def get_db() -> Generator[Session, None, None]:
 
 
 router = APIRouter(prefix="/inventory", tags=["inventory"])
-
-
-def _enforce_branch_scope(*, current_user: UserAccount, branch_id: int) -> None:
-    """
-    Minimal authorization rule:
-    - Users can only read inventory for their own branch (until roles exist).
-    """
-    if int(current_user.branch_id) != int(branch_id):
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Forbidden: user cannot access the requested branch.",
-        )
 
 
 @router.get(
@@ -61,14 +57,18 @@ def get_stock(
     db: Session = Depends(get_db),
     current_user: UserAccount = Depends(get_current_active_user),
 ):
-    """
-    Compute stock as SUM(qty) grouped by (branch_id, product_id, sku, name).
-    """
-    # Default branch scope to current user if branch_id is omitted
+    role_code = require_role(
+        db, current_user=current_user, allowed_roles=INVENTORY_ALLOWED_ROLES
+    )
+
     effective_branch_id = (
         branch_id if branch_id is not None else int(current_user.branch_id)
     )
-    _enforce_branch_scope(current_user=current_user, branch_id=effective_branch_id)
+    enforce_branch_access(
+        current_user=current_user,
+        role_code=role_code,
+        branch_id=int(effective_branch_id),
+    )
 
     stmt = (
         select(
@@ -86,16 +86,16 @@ def get_stock(
             Product.name,
         )
         .order_by(InventoryMovement.branch_id.asc(), InventoryMovement.product_id.asc())
+        .where(InventoryMovement.branch_id == int(effective_branch_id))
     )
 
-    filters = [InventoryMovement.branch_id == effective_branch_id]
-
+    filters = []
     if product_id is not None:
         filters.append(InventoryMovement.product_id == product_id)
     if sku is not None:
         filters.append(Product.sku == sku)
-
-    stmt = stmt.where(and_(*filters))
+    if filters:
+        stmt = stmt.where(and_(*filters))
 
     offset = (page - 1) * page_size
     stmt = stmt.offset(offset).limit(page_size)
@@ -134,24 +134,27 @@ def list_movements(
     db: Session = Depends(get_db),
     current_user: UserAccount = Depends(get_current_active_user),
 ):
-    """
-    Return a paged list of ledger movements ordered by created_at DESC, id DESC.
+    role_code = require_role(
+        db, current_user=current_user, allowed_roles=INVENTORY_ALLOWED_ROLES
+    )
 
-    Authorization defaults:
-      - If branch_id is omitted, default to current_user.branch_id.
-      - If branch_id is provided and differs, reject (403).
-    """
     effective_branch_id = (
         branch_id if branch_id is not None else int(current_user.branch_id)
     )
-    _enforce_branch_scope(current_user=current_user, branch_id=effective_branch_id)
-
-    stmt = select(InventoryMovement).order_by(
-        desc(InventoryMovement.created_at),
-        desc(InventoryMovement.id),
+    enforce_branch_access(
+        current_user=current_user,
+        role_code=role_code,
+        branch_id=int(effective_branch_id),
     )
 
-    stmt = stmt.where(InventoryMovement.branch_id == effective_branch_id)
+    stmt = (
+        select(InventoryMovement)
+        .where(InventoryMovement.branch_id == int(effective_branch_id))
+        .order_by(
+            desc(InventoryMovement.created_at),
+            desc(InventoryMovement.id),
+        )
+    )
 
     if product_id is not None:
         stmt = stmt.where(InventoryMovement.product_id == product_id)

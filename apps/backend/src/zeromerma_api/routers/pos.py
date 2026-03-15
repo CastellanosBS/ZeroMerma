@@ -1,18 +1,27 @@
 # apps/backend/src/zeromerma_api/routers/pos.py
-# PURPOSE:
-#   POS endpoints (cash sessions + mount sales/payments).
+# PURPOSE: POS endpoints (cash sessions) + mount sales/payments.
 #
-# SECURITY NOTE (anti-impersonation):
-#   - The client must NOT be trusted for actor identifiers (opened_by_id/closed_by_id).
-#   - We derive the actor from the authenticated user (JWT -> current_user.id).
+# AUTHORIZATION:
+# - Only POS roles (ADMIN, CASHIER) can access POS endpoints.
+# - Branch scoping:
+#     * ADMIN -> any branch
+#     * CASHIER -> only their own branch
+#
+# ANTI-IMPERSONATION:
+# - opened_by_id and closed_by_id are derived from current_user.id, never from the client.
 
 from __future__ import annotations
 
 from typing import Generator
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
+from zeromerma_api.core.authz import (
+    POS_ALLOWED_ROLES,
+    enforce_branch_access,
+    require_role,
+)
 from zeromerma_api.core.deps_auth import get_current_active_user
 from zeromerma_api.db.engine import SessionLocal
 from zeromerma_api.models.user_account import UserAccount
@@ -33,27 +42,11 @@ router = APIRouter(prefix="/pos", tags=["pos"])
 
 
 def get_db() -> Generator[Session, None, None]:
-    """
-    FastAPI DB dependency: open a session, yield it, always close it.
-    """
     db = SessionLocal()
     try:
         yield db
     finally:
         db.close()
-
-
-def _enforce_branch_scope(*, current_user: UserAccount, branch_id: int) -> None:
-    """
-    Enforce that the authenticated user can only operate on their own branch.
-
-    This is a minimal authorization rule until we add roles (ADMIN multi-branch).
-    """
-    if int(current_user.branch_id) != int(branch_id):
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Forbidden: user cannot operate on the requested branch.",
-        )
 
 
 @router.post("/cash-sessions/open", response_model=CashSessionOut)
@@ -64,12 +57,14 @@ def api_open_cash_session(
 ):
     """
     Open a new cash session.
-
-    Anti-impersonation:
-      - We ignore any opened_by_id sent by the client.
-      - The opener is always the authenticated user.
+    Returns 409 if a session is already open for the branch.
     """
-    _enforce_branch_scope(current_user=current_user, branch_id=payload.branch_id)
+    role_code = require_role(
+        db, current_user=current_user, allowed_roles=POS_ALLOWED_ROLES
+    )
+    enforce_branch_access(
+        current_user=current_user, role_code=role_code, branch_id=payload.branch_id
+    )
 
     try:
         cs = open_cash_session(
@@ -95,11 +90,12 @@ def api_close_cash_session(
 ):
     """
     Close an OPEN cash session.
-
-    Anti-impersonation:
-      - We ignore any closed_by_id sent by the client.
-      - The closer is always the authenticated user.
+    Returns 404 if not found; 409 if already closed/canceled.
     """
+    # Note: branch scoping is enforced inside service constraints (sale/session relations),
+    # but we still enforce POS role here.
+    _ = require_role(db, current_user=current_user, allowed_roles=POS_ALLOWED_ROLES)
+
     try:
         cs = close_cash_session(
             db=db,
@@ -110,11 +106,9 @@ def api_close_cash_session(
         db.commit()
         db.refresh(cs)
         return cs
-
     except LookupError as e:
         db.rollback()
         raise HTTPException(status_code=404, detail=str(e)) from e
-
     except ValueError as e:
         db.rollback()
         raise HTTPException(status_code=409, detail=str(e)) from e
@@ -128,14 +122,16 @@ def api_current_cash_session(
 ):
     """
     Return the current OPEN cash session for a branch (or null if none).
-
-    Authorization:
-      - Users can only query their own branch for now.
     """
-    _enforce_branch_scope(current_user=current_user, branch_id=branch_id)
+    role_code = require_role(
+        db, current_user=current_user, allowed_roles=POS_ALLOWED_ROLES
+    )
+    enforce_branch_access(
+        current_user=current_user, role_code=role_code, branch_id=branch_id
+    )
+
     return get_current_open_session(db, branch_id=branch_id)
 
 
-# Mount sub-routers under /pos
 router.include_router(sales_router)
 router.include_router(payments_router)

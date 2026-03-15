@@ -1,50 +1,43 @@
 # apps/backend/src/zeromerma_api/routers/pos_sales.py
 # PURPOSE:
 #   Sales endpoints under the POS area.
-#   Mounted under /pos via routers/pos.py (so this file uses prefix="/sales").
 #
-# SECURITY NOTE (anti-impersonation):
-#   - The client must NOT control created_by_id.
-#   - created_by_id is derived from the authenticated user (JWT -> current_user.id).
-#   - Optional branch scoping: user can only operate on their own branch for now.
+# AUTHORIZATION:
+#   - Only POS roles (ADMIN, CASHIER) can create/list sales.
+#   - Branch scoping:
+#       * ADMIN -> any branch
+#       * CASHIER -> only their own branch
+#
+# ANTI-IMPERSONATION:
+#   - created_by_id is derived from current_user.id, never from the client.
 
 from __future__ import annotations
 
 from typing import Generator, List, Optional
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
+from zeromerma_api.core.authz import (
+    POS_ALLOWED_ROLES,
+    enforce_branch_access,
+    require_role,
+)
 from zeromerma_api.core.deps_auth import get_current_active_user
 from zeromerma_api.db.engine import SessionLocal
 from zeromerma_api.models.user_account import UserAccount
 from zeromerma_api.schemas.sale import SaleCreate, SaleOut
 from zeromerma_api.services.sale_service import create_sale, list_sales
 
-router = APIRouter(prefix="/sales", tags=["pos"])  # final path becomes /pos/sales
+router = APIRouter(prefix="/sales", tags=["pos"])  # final path: /pos/sales
 
 
 def get_db() -> Generator[Session, None, None]:
-    """
-    FastAPI DB dependency: open a session, yield it, always close it.
-    """
     db = SessionLocal()
     try:
         yield db
     finally:
         db.close()
-
-
-def _enforce_branch_scope(*, current_user: UserAccount, branch_id: int) -> None:
-    """
-    Minimal authorization rule:
-    - Non-admin users can only operate within their own branch.
-    """
-    if int(current_user.branch_id) != int(branch_id):
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Forbidden: user cannot operate on the requested branch.",
-        )
 
 
 @router.post("", response_model=SaleOut)
@@ -55,15 +48,13 @@ def api_create_sale(
 ):
     """
     Create a sale + items transactionally.
-
-    Anti-impersonation:
-      - Ignore payload.created_by_id (if present in the schema).
-      - Use current_user.id as the canonical actor.
-
-    Authorization:
-      - Enforce that the sale branch matches current_user.branch_id (for now).
     """
-    _enforce_branch_scope(current_user=current_user, branch_id=payload.branch_id)
+    role_code = require_role(
+        db, current_user=current_user, allowed_roles=POS_ALLOWED_ROLES
+    )
+    enforce_branch_access(
+        current_user=current_user, role_code=role_code, branch_id=payload.branch_id
+    )
 
     try:
         sale = create_sale(
@@ -102,18 +93,26 @@ def api_list_sales(
     """
     List sales (newest first) with optional filters and paging.
 
-    Authorization defaults:
-      - If branch_id is not provided, default to current_user.branch_id.
-      - If branch_id is provided and differs, reject (403).
+    Branch scoping:
+      - If branch_id is omitted, default to user's own branch.
+      - If branch_id is provided, enforce authorization for that branch.
     """
+    role_code = require_role(
+        db, current_user=current_user, allowed_roles=POS_ALLOWED_ROLES
+    )
+
     effective_branch_id = (
         branch_id if branch_id is not None else int(current_user.branch_id)
     )
-    _enforce_branch_scope(current_user=current_user, branch_id=effective_branch_id)
+    enforce_branch_access(
+        current_user=current_user,
+        role_code=role_code,
+        branch_id=int(effective_branch_id),
+    )
 
     return list_sales(
         db,
-        branch_id=effective_branch_id,
+        branch_id=int(effective_branch_id),
         cash_session_id=cash_session_id,
         limit=limit,
         offset=offset,
