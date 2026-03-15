@@ -1,23 +1,16 @@
 # apps/backend/src/zeromerma_api/routers/inventory.py
 # PURPOSE: Read-only inventory endpoints:
-#   - GET /inventory/stock: aggregate SUM(qty) by (branch, product)
-#   - GET /inventory/movements: list movements with filters/pagination
+#   - GET /inventory/stock
+#   - GET /inventory/movements
 
-from __future__ import (
-    annotations,
-)  # Modern typing mode; prevents certain circular import issues.
+from __future__ import annotations
 
-from collections.abc import Generator  # Typing for query params and response lists.
-from datetime import datetime  # For date range filters.
+from collections.abc import Generator
+from datetime import datetime
 
-from fastapi import APIRouter, Depends, Query  # Core FastAPI constructs.
-from sqlalchemy import (
-    and_,
-    desc,
-    func,
-    select,
-)  # SQL builders for aggregation and sorting.
-from sqlalchemy.orm import Session  # ORM Session type for the dependency.
+from fastapi import APIRouter, Depends, HTTPException, Query, status
+from sqlalchemy import and_, desc, func, select
+from sqlalchemy.orm import Session
 
 from zeromerma_api.core.deps_auth import get_current_active_user
 from zeromerma_api.db.engine import SessionLocal
@@ -30,7 +23,7 @@ from zeromerma_api.schemas.inventory import MovementRow, StockRow
 def get_db() -> Generator[Session, None, None]:
     """
     FastAPI dependency that opens a Session, yields it to the handler,
-    and always closes it after the request (connection returned to pool).
+    and always closes it after the request.
     """
     db = SessionLocal()
     try:
@@ -39,14 +32,24 @@ def get_db() -> Generator[Session, None, None]:
         db.close()
 
 
-router = APIRouter(
-    prefix="/inventory", tags=["inventory"]
-)  # All routes mount under /inventory.
+router = APIRouter(prefix="/inventory", tags=["inventory"])
+
+
+def _enforce_branch_scope(*, current_user: UserAccount, branch_id: int) -> None:
+    """
+    Minimal authorization rule:
+    - Users can only read inventory for their own branch (until roles exist).
+    """
+    if int(current_user.branch_id) != int(branch_id):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Forbidden: user cannot access the requested branch.",
+        )
 
 
 @router.get(
     "/stock",
-    response_model=list[StockRow],  # We return a list of StockRow items.
+    response_model=list[StockRow],
     summary="Aggregated stock by (branch, product).",
 )
 def get_stock(
@@ -60,20 +63,22 @@ def get_stock(
 ):
     """
     Compute stock as SUM(qty) grouped by (branch_id, product_id, sku, name).
-    Optional filters narrow the aggregation; results are paginated with stable ordering.
     """
-    # Base SELECT with JOIN and GROUP BY across grouping columns.
+    # Default branch scope to current user if branch_id is omitted
+    effective_branch_id = (
+        branch_id if branch_id is not None else int(current_user.branch_id)
+    )
+    _enforce_branch_scope(current_user=current_user, branch_id=effective_branch_id)
+
     stmt = (
         select(
-            InventoryMovement.branch_id,  # grouping key 1
-            InventoryMovement.product_id,  # grouping key 2
-            Product.sku,  # grouping key 3
-            Product.name.label("product_name"),  # grouping key 4 (aliased for schema)
-            func.sum(InventoryMovement.qty).label("qty_sum"),  # aggregated metric
+            InventoryMovement.branch_id,
+            InventoryMovement.product_id,
+            Product.sku,
+            Product.name.label("product_name"),
+            func.sum(InventoryMovement.qty).label("qty_sum"),
         )
-        .join(
-            Product, Product.id == InventoryMovement.product_id
-        )  # join to read sku/name
+        .join(Product, Product.id == InventoryMovement.product_id)
         .group_by(
             InventoryMovement.branch_id,
             InventoryMovement.product_id,
@@ -83,26 +88,20 @@ def get_stock(
         .order_by(InventoryMovement.branch_id.asc(), InventoryMovement.product_id.asc())
     )
 
-    # Dynamic filters only when specified.
-    filters = []
-    if branch_id is not None:
-        filters.append(InventoryMovement.branch_id == branch_id)
+    filters = [InventoryMovement.branch_id == effective_branch_id]
+
     if product_id is not None:
         filters.append(InventoryMovement.product_id == product_id)
     if sku is not None:
         filters.append(Product.sku == sku)
 
-    if filters:
-        stmt = stmt.where(and_(*filters))
+    stmt = stmt.where(and_(*filters))
 
-    # 1-based page → 0-based offset; apply pagination to the grouped result.
     offset = (page - 1) * page_size
     stmt = stmt.offset(offset).limit(page_size)
 
-    # Execute and fetch.
     rows = db.execute(stmt).all()
 
-    # Map DB decimals to float for JSON.
     return [
         StockRow(
             branch_id=r.branch_id,
@@ -133,17 +132,27 @@ def list_movements(
     limit: int = Query(50, ge=1, le=200, description="Max rows to return"),
     offset: int = Query(0, ge=0, description="Rows to skip (for paging)"),
     db: Session = Depends(get_db),
+    current_user: UserAccount = Depends(get_current_active_user),
 ):
     """
     Return a paged list of ledger movements ordered by created_at DESC, id DESC.
+
+    Authorization defaults:
+      - If branch_id is omitted, default to current_user.branch_id.
+      - If branch_id is provided and differs, reject (403).
     """
-    stmt = select(InventoryMovement).order_by(  # stable “newest first”
+    effective_branch_id = (
+        branch_id if branch_id is not None else int(current_user.branch_id)
+    )
+    _enforce_branch_scope(current_user=current_user, branch_id=effective_branch_id)
+
+    stmt = select(InventoryMovement).order_by(
         desc(InventoryMovement.created_at),
         desc(InventoryMovement.id),
     )
 
-    if branch_id is not None:
-        stmt = stmt.where(InventoryMovement.branch_id == branch_id)
+    stmt = stmt.where(InventoryMovement.branch_id == effective_branch_id)
+
     if product_id is not None:
         stmt = stmt.where(InventoryMovement.product_id == product_id)
     if reason is not None:
@@ -157,7 +166,6 @@ def list_movements(
 
     rows = db.execute(stmt).scalars().all()
 
-    # Map to the response model (Decimal → float for qty).
     return [
         MovementRow(
             id=mv.id,

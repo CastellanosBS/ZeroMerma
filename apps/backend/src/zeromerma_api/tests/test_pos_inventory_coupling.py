@@ -1,3 +1,4 @@
+# apps/backend/src/zeromerma_api/tests/test_pos_inventory_coupling.py
 from __future__ import annotations
 
 import os
@@ -10,8 +11,17 @@ from fastapi.testclient import TestClient
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
+from zeromerma_api.core.security import create_access_token
 from zeromerma_api.db.engine import SessionLocal
 from zeromerma_api.main import create_app
+
+
+def auth_headers(user_id: int) -> dict[str, str]:
+    """
+    Build Authorization headers for protected endpoints.
+    """
+    token = create_access_token(subject=str(user_id))
+    return {"Authorization": f"Bearer {token}"}
 
 
 def make_alembic_config() -> Config:
@@ -19,7 +29,7 @@ def make_alembic_config() -> Config:
     Build an Alembic Config that is independent of the current working directory.
 
     File path:
-      .../apps/backend/src/zeromerma_api/tests/test_xxx.py
+      .../apps/backend/src/zeromerma_api/tests/test_pos_inventory_coupling.py
 
     Parent chain:
       parents[0] = tests
@@ -31,7 +41,6 @@ def make_alembic_config() -> Config:
     cfg = Config(str(backend_dir / "alembic.ini"))
     cfg.set_main_option("script_location", str(backend_dir / "migrations"))
 
-    # Optional but good: force the same DB the tests are using
     if os.getenv("DATABASE_URL"):
         cfg.set_main_option("sqlalchemy.url", os.environ["DATABASE_URL"])
 
@@ -39,18 +48,13 @@ def make_alembic_config() -> Config:
 
 
 def alembic_upgrade_head() -> None:
-    """
-    Apply migrations up to head using Alembic's programmatic API.
-    """
     cfg = make_alembic_config()
     command.upgrade(cfg, "head")
 
 
 def reset_tables(s: Session) -> None:
     """
-    Keep deterministic test runs locally by clearing key tables.
-
-    We delete in FK-safe order (children first, parents last).
+    Keep deterministic test runs locally by clearing key tables in FK-safe order.
     """
     s.execute(text("DELETE FROM payment"))
     s.execute(text("DELETE FROM sale_item"))
@@ -127,9 +131,6 @@ def seed_stock_ledger_only(
 ) -> None:
     """
     Insert a single OPENING_BALANCE movement into the ledger.
-
-    This is used to keep ledger and snapshot consistent for tests that
-    validate both.
     """
     s.execute(
         text(
@@ -149,28 +150,20 @@ def seed_stock_snapshot(
     s: Session, *, branch_id: int, product_id: int, on_hand: float
 ) -> None:
     """
-    Upsert inventory snapshot row (inventory_balance).
-
-    Why upsert:
-    - Tests may run multiple times against the same DB.
-    - We want deterministic behavior without UNIQUE constraint failures.
-
-    Important:
-    - inventory_balance has a non-negative check constraint for on_hand, so
-      tests should only seed non-negative values here.
+    Upsert inventory_balance snapshot row.
     """
     s.execute(
         text(
             """
             INSERT INTO inventory_balance
-                (branch_id, product_id, on_hand, reserved, created_at, updated_at)
+              (branch_id, product_id, on_hand, reserved, created_at, updated_at)
             VALUES
-                (:b, :p, :on_hand, 0, now(), now())
+              (:b, :p, :on_hand, 0, now(), now())
             ON CONFLICT (branch_id, product_id)
             DO UPDATE SET
-                on_hand = EXCLUDED.on_hand,
-                reserved = EXCLUDED.reserved,
-                updated_at = now()
+              on_hand = EXCLUDED.on_hand,
+              reserved = EXCLUDED.reserved,
+              updated_at = now()
             """
         ),
         {"b": branch_id, "p": product_id, "on_hand": float(on_hand)},
@@ -192,7 +185,6 @@ def on_hand(s: Session, *, branch_id: int, product_id: int) -> float:
         ),
         {"b": branch_id, "p": product_id},
     ).scalar_one_or_none()
-
     return float(val or 0)
 
 
@@ -208,10 +200,7 @@ def test_sale_creates_negative_inventory_movements_and_decrements_snapshot():
         reset_tables(s)
         branch_id, user_id, product_id = seed_core(s)
 
-        # Seed snapshot stock (operational truth for decrement)
         seed_stock_snapshot(s, branch_id=branch_id, product_id=product_id, on_hand=10.0)
-
-        # Seed ledger too (audit truth)
         seed_stock_ledger_only(
             s,
             branch_id=branch_id,
@@ -229,7 +218,8 @@ def test_sale_creates_negative_inventory_movements_and_decrements_snapshot():
 
     open_resp = client.post(
         "/pos/cash-sessions/open",
-        json={"branch_id": branch_id, "opened_by_id": user_id, "opening_amount": 0.00},
+        json={"branch_id": branch_id, "opening_amount": 0.00},
+        headers=auth_headers(user_id),
     )
     assert open_resp.status_code == 200, open_resp.text
     cash_session_id = open_resp.json()["id"]
@@ -239,9 +229,9 @@ def test_sale_creates_negative_inventory_movements_and_decrements_snapshot():
         json={
             "branch_id": branch_id,
             "cash_session_id": cash_session_id,
-            "created_by_id": user_id,
             "items": [{"product_id": product_id, "qty": 2.0, "unit_price": 10.00}],
         },
+        headers=auth_headers(user_id),
     )
     assert resp.status_code == 200, resp.text
 
@@ -258,10 +248,7 @@ def test_sale_creates_negative_inventory_movements_and_decrements_snapshot():
             {"b": branch_id, "p": product_id},
         ).scalar_one()
 
-        # Ledger should reflect -2 SALE (and +10 opening)
         assert float(mov_qty_sum) == pytest.approx(8.0, abs=1e-6)
-
-        # Snapshot must reflect on_hand = 8
         assert abs(on_hand(s2, branch_id=branch_id, product_id=product_id) - 8.0) < 1e-6
     finally:
         s2.close()
@@ -297,7 +284,8 @@ def test_oversell_is_blocked_with_409_and_snapshot_not_modified():
 
     open_resp = client.post(
         "/pos/cash-sessions/open",
-        json={"branch_id": branch_id, "opened_by_id": user_id, "opening_amount": 0.00},
+        json={"branch_id": branch_id, "opening_amount": 0.00},
+        headers=auth_headers(user_id),
     )
     assert open_resp.status_code == 200, open_resp.text
     cash_session_id = open_resp.json()["id"]
@@ -307,9 +295,9 @@ def test_oversell_is_blocked_with_409_and_snapshot_not_modified():
         json={
             "branch_id": branch_id,
             "cash_session_id": cash_session_id,
-            "created_by_id": user_id,
             "items": [{"product_id": product_id, "qty": 6.0, "unit_price": 10.00}],
         },
+        headers=auth_headers(user_id),
     )
     assert resp.status_code == 409, resp.text
 

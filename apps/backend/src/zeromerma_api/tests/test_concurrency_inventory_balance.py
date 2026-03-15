@@ -1,3 +1,4 @@
+# apps/backend/src/zeromerma_api/tests/test_concurrency_inventory_balance.py
 from __future__ import annotations
 
 import os
@@ -8,10 +9,9 @@ import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import text
 
-# We ONLY depend on these, because you've already used them in your probes/scripts.
+from zeromerma_api.core.security import create_access_token
 from zeromerma_api.db.engine import SessionLocal
 
-# App import that works regardless of whether you expose create_app() or app
 try:
     from zeromerma_api.main import create_app  # type: ignore
 except Exception:  # pragma: no cover
@@ -21,6 +21,14 @@ try:
     from zeromerma_api.main import app as fastapi_app  # type: ignore
 except Exception:  # pragma: no cover
     fastapi_app = None  # type: ignore
+
+
+def auth_headers(user_id: int) -> dict[str, str]:
+    """
+    Build Authorization headers for protected endpoints.
+    """
+    token = create_access_token(subject=str(user_id))
+    return {"Authorization": f"Bearer {token}"}
 
 
 def get_app():
@@ -41,7 +49,6 @@ def get_app():
 def reset_tables() -> None:
     """
     Deterministic state: TRUNCATE all relevant tables.
-    Order doesn't matter much with CASCADE, but we keep it explicit.
     """
     with SessionLocal() as s:
         s.execute(text("TRUNCATE TABLE payment RESTART IDENTITY CASCADE;"))
@@ -66,8 +73,6 @@ def seed_base_state() -> dict[str, int]:
     - product
     - cash_session (OPEN)
     - inventory_balance (on_hand=1)
-
-    Returns IDs for later use.
     """
     with SessionLocal() as s:
         branch_id = s.execute(
@@ -124,7 +129,6 @@ def seed_base_state() -> dict[str, int]:
             {"branch_id": branch_id, "opened_by_id": user_id},
         ).scalar_one()
 
-        # Snapshot row: THIS is the operational truth (atomic decrement uses this)
         s.execute(
             text(
                 """
@@ -135,7 +139,6 @@ def seed_base_state() -> dict[str, int]:
             {"branch_id": branch_id, "product_id": product_id},
         )
 
-        # Optional: seed ledger too (audit). Not required for atomic decrement, but useful consistency check.
         s.execute(
             text(
                 """
@@ -183,7 +186,6 @@ def test_concurrent_sales_do_not_oversell_inventory_balance():
     Run N concurrent sale attempts of qty=1.
     Expect exactly one 200 and N-1 conflicts (409).
     """
-
     reset_tables()
     ids = seed_base_state()
 
@@ -195,8 +197,9 @@ def test_concurrent_sales_do_not_oversell_inventory_balance():
     def worker_attempt_sale() -> int:
         """
         Each thread uses its own TestClient (avoid shared-client thread-safety issues).
+        We attach auth headers because /pos/* endpoints are protected.
         """
-        client = TestClient(app)
+        client = TestClient(app, headers=auth_headers(ids["user_id"]))
         barrier.wait()
 
         resp = client.post(
@@ -204,7 +207,6 @@ def test_concurrent_sales_do_not_oversell_inventory_balance():
             json={
                 "branch_id": ids["branch_id"],
                 "cash_session_id": ids["cash_session_id"],
-                "created_by_id": ids["user_id"],
                 "items": [
                     {"product_id": ids["product_id"], "qty": 1.0, "unit_price": 10.00}
                 ],
@@ -226,5 +228,4 @@ def test_concurrent_sales_do_not_oversell_inventory_balance():
         conflict == workers - 1
     ), f"Expected {workers-1} conflicts (409). Got statuses={statuses}"
 
-    # DB truth: snapshot must be exactly 0.000 after one success
     assert abs(snapshot_on_hand(ids["branch_id"], ids["product_id"]) - 0.0) < 1e-9

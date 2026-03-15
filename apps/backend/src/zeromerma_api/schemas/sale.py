@@ -1,4 +1,11 @@
 # apps/backend/src/zeromerma_api/schemas/sale.py
+# PURPOSE: Pydantic schemas for POS sales.
+#
+# SECURITY MODEL:
+# - created_by_id is NOT accepted from clients.
+# - created_by_id is derived from the authenticated user (JWT).
+# - We forbid unknown fields on request payloads to prevent impersonation attempts.
+
 from __future__ import annotations
 
 from typing import List
@@ -18,12 +25,23 @@ class SaleItemCreate(BaseModel):
     qty: float = Field(..., gt=0)
     unit_price: float = Field(..., ge=0)
 
+    model_config = ConfigDict(extra="forbid")
+
 
 class SaleCreate(BaseModel):
+    """
+    Request body for creating a sale.
+
+    Security:
+    - created_by_id is derived from the authenticated user (JWT).
+    - Clients must not send created_by_id.
+    """
+
     branch_id: int = Field(..., ge=1)
     cash_session_id: int = Field(..., ge=1)
-    created_by_id: int = Field(..., ge=1)
     items: List[SaleItemCreate]
+
+    model_config = ConfigDict(extra="forbid")
 
 
 class SaleItemOut(BaseModel):

@@ -1,3 +1,4 @@
+# apps/backend/src/zeromerma_api/tests/test_pos_sales_endpoints.py
 from __future__ import annotations
 
 import os
@@ -10,20 +11,28 @@ from fastapi.testclient import TestClient
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
+from zeromerma_api.core.security import create_access_token
 from zeromerma_api.db.engine import SessionLocal
 from zeromerma_api.main import create_app
 
 
+def auth_headers(user_id: int) -> dict[str, str]:
+    """
+    Build Authorization headers for protected endpoints.
+    """
+    token = create_access_token(subject=str(user_id))
+    return {"Authorization": f"Bearer {token}"}
+
+
 def make_alembic_config() -> Config:
     """
-    __file__ = .../apps/backend/src/zeromerma_api/tests/test_xxx.py
+    __file__ = .../apps/backend/src/zeromerma_api/tests/test_pos_sales_endpoints.py
     parents[0]=tests, [1]=zeromerma_api, [2]=src, [3]=backend
     """
     backend_dir = Path(__file__).resolve().parents[3]
     cfg = Config(str(backend_dir / "alembic.ini"))
     cfg.set_main_option("script_location", str(backend_dir / "migrations"))
 
-    # Optional but good: force the same DB the tests are using
     if os.getenv("DATABASE_URL"):
         cfg.set_main_option("sqlalchemy.url", os.environ["DATABASE_URL"])
 
@@ -126,7 +135,8 @@ def test_pos_sales_create_and_list_and_errors():
     # Open cash session
     open_resp = client.post(
         "/pos/cash-sessions/open",
-        json={"branch_id": branch_id, "opened_by_id": user_id, "opening_amount": 0.00},
+        json={"branch_id": branch_id, "opening_amount": 0.00},
+        headers=auth_headers(user_id),
     )
     assert open_resp.status_code == 200, open_resp.text
     cash_session_id = open_resp.json()["id"]
@@ -137,12 +147,12 @@ def test_pos_sales_create_and_list_and_errors():
         json={
             "branch_id": branch_id,
             "cash_session_id": cash_session_id,
-            "created_by_id": user_id,
             "items": [
                 {"product_id": product_id, "qty": 2, "unit_price": 25.00},
                 {"product_id": product_id, "qty": 1, "unit_price": 25.00},
             ],
         },
+        headers=auth_headers(user_id),
     )
     assert sale_resp.status_code == 200, sale_resp.text
     sale = sale_resp.json()
@@ -156,41 +166,46 @@ def test_pos_sales_create_and_list_and_errors():
     assert abs(sale["items"][0]["line_total"] - 50.00) < 1e-6
     assert abs(sale["items"][1]["line_total"] - 25.00) < 1e-6
 
-    # List sales should include it
-    list_resp = client.get("/pos/sales", params={"branch_id": branch_id, "limit": 50})
+    # List sales should include it (AUTH REQUIRED)
+    list_resp = client.get(
+        "/pos/sales",
+        params={"branch_id": branch_id, "limit": 50},
+        headers=auth_headers(user_id),
+    )
     assert list_resp.status_code == 200, list_resp.text
     sales = list_resp.json()
     assert isinstance(sales, list)
     assert any(x["id"] == sale["id"] for x in sales)
 
-    # Missing product -> 404
+    # Missing product -> 404 (AUTH REQUIRED)
     missing_product_resp = client.post(
         "/pos/sales",
         json={
             "branch_id": branch_id,
             "cash_session_id": cash_session_id,
-            "created_by_id": user_id,
             "items": [{"product_id": 999999, "qty": 1, "unit_price": 10.00}],
         },
+        headers=auth_headers(user_id),
     )
     assert missing_product_resp.status_code == 404, missing_product_resp.text
 
-    # Close cash session
+    # Close cash session (AUTH REQUIRED)
     close_resp = client.post(
         f"/pos/cash-sessions/{cash_session_id}/close",
-        json={"closed_by_id": user_id, "closing_amount": 0.00},
+        json={"closing_amount": 0.00},
+        headers=auth_headers(user_id),
     )
     assert close_resp.status_code == 200, close_resp.text
     assert close_resp.json()["status"] == "CLOSED"
 
-    # Creating a sale on CLOSED session -> 409
+    # Creating a sale on CLOSED session -> 409 (AUTH REQUIRED)
     closed_session_resp = client.post(
         "/pos/sales",
         json={
             "branch_id": branch_id,
             "cash_session_id": cash_session_id,
-            "created_by_id": user_id,
             "items": [{"product_id": product_id, "qty": 1, "unit_price": 10.00}],
         },
+        headers=auth_headers(user_id),
     )
     assert closed_session_resp.status_code == 409, closed_session_resp.text

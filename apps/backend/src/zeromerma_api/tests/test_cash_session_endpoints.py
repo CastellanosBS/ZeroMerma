@@ -1,3 +1,4 @@
+# apps/backend/src/zeromerma_api/tests/test_cash_session_endpoints.py
 from __future__ import annotations
 
 import os
@@ -10,11 +11,22 @@ from fastapi.testclient import TestClient
 from sqlalchemy import select, text
 from sqlalchemy.orm import Session
 
+from zeromerma_api.core.security import create_access_token
 from zeromerma_api.db.engine import SessionLocal
 from zeromerma_api.main import create_app
 from zeromerma_api.models.branch import Branch
 from zeromerma_api.models.role import Role
 from zeromerma_api.models.user_account import UserAccount
+
+
+def auth_headers(user_id: int) -> dict[str, str]:
+    """
+    Build Authorization headers for protected endpoints.
+
+    We generate a JWT directly in tests so we don't depend on /auth/login.
+    """
+    token = create_access_token(subject=str(user_id))
+    return {"Authorization": f"Bearer {token}"}
 
 
 def make_alembic_config() -> Config:
@@ -26,7 +38,7 @@ def make_alembic_config() -> Config:
       parents[0]=tests
       parents[1]=zeromerma_api
       parents[2]=src
-      parents[3]=backend  ✅
+      parents[3]=backend ✅
     """
     backend_dir = Path(__file__).resolve().parents[3]
     cfg = Config(str(backend_dir / "alembic.ini"))
@@ -120,11 +132,8 @@ def test_cash_session_open_close_flow():
     # Open
     resp = client.post(
         "/pos/cash-sessions/open",
-        json={
-            "branch_id": branch_id,
-            "opened_by_id": user_id,
-            "opening_amount": 100.00,
-        },
+        json={"branch_id": branch_id, "opening_amount": 100.00},
+        headers=auth_headers(user_id),
     )
     assert resp.status_code == 200, resp.text
     opened = resp.json()
@@ -134,13 +143,18 @@ def test_cash_session_open_close_flow():
     # Open again should fail
     resp2 = client.post(
         "/pos/cash-sessions/open",
-        json={"branch_id": branch_id, "opened_by_id": user_id, "opening_amount": 50.00},
+        json={"branch_id": branch_id, "opening_amount": 50.00},
+        headers=auth_headers(user_id),
     )
     assert resp2.status_code == 409, resp2.text
 
-    # Current should return the open session
-    resp3 = client.get("/pos/cash-sessions/current", params={"branch_id": branch_id})
-    assert resp3.status_code == 200
+    # Current should return the open session (AUTH REQUIRED)
+    resp3 = client.get(
+        "/pos/cash-sessions/current",
+        params={"branch_id": branch_id},
+        headers=auth_headers(user_id),
+    )
+    assert resp3.status_code == 200, resp3.text
     current = resp3.json()
     assert current["id"] == session_id
     assert current["status"] == "OPEN"
@@ -148,7 +162,8 @@ def test_cash_session_open_close_flow():
     # Close
     resp4 = client.post(
         f"/pos/cash-sessions/{session_id}/close",
-        json={"closed_by_id": user_id, "closing_amount": 150.00},
+        json={"closing_amount": 150.00},
+        headers=auth_headers(user_id),
     )
     assert resp4.status_code == 200, resp4.text
     closed = resp4.json()
@@ -158,7 +173,8 @@ def test_cash_session_open_close_flow():
     # Now open again should succeed
     resp5 = client.post(
         "/pos/cash-sessions/open",
-        json={"branch_id": branch_id, "opened_by_id": user_id, "opening_amount": 0.00},
+        json={"branch_id": branch_id, "opening_amount": 0.00},
+        headers=auth_headers(user_id),
     )
     assert resp5.status_code == 200, resp5.text
     assert resp5.json()["status"] == "OPEN"

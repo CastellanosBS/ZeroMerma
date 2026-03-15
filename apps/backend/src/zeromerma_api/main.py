@@ -5,12 +5,13 @@ import logging
 from contextlib import asynccontextmanager
 from typing import Any, cast
 
-from fastapi import FastAPI, Request
+from fastapi import Depends, FastAPI, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
+from zeromerma_api.core.deps_auth import get_current_active_user
 from zeromerma_api.core.logging_config import setup_logging
 from zeromerma_api.core.settings import get_settings
 from zeromerma_api.routers.auth import router as auth_router
@@ -291,7 +292,10 @@ def create_app() -> FastAPI:
     app.include_router(ready_router)
     app.include_router(auth_router)
     app.include_router(inventory_router)
-    app.include_router(pos_router)
+    app.include_router(
+        pos_router,
+        dependencies=[Depends(get_current_active_user)],
+    )
 
     return app
 

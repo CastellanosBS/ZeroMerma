@@ -1,3 +1,4 @@
+# apps/backend/src/zeromerma_api/tests/test_pos_payments_endpoints.py
 from __future__ import annotations
 
 import os
@@ -10,8 +11,17 @@ from fastapi.testclient import TestClient
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
+from zeromerma_api.core.security import create_access_token
 from zeromerma_api.db.engine import SessionLocal
 from zeromerma_api.main import create_app
+
+
+def auth_headers(user_id: int) -> dict[str, str]:
+    """
+    Build Authorization headers for protected endpoints.
+    """
+    token = create_access_token(subject=str(user_id))
+    return {"Authorization": f"Bearer {token}"}
 
 
 def make_alembic_config() -> Config:
@@ -19,11 +29,7 @@ def make_alembic_config() -> Config:
     Tests live at:
       .../apps/backend/src/zeromerma_api/tests/test_pos_payments_endpoints.py
 
-    So:
-      parents[0]=tests
-      parents[1]=zeromerma_api
-      parents[2]=src
-      parents[3]=backend ✅
+    parents[3] = backend ✅
     """
     backend_dir = Path(__file__).resolve().parents[3]
     cfg = Config(str(backend_dir / "alembic.ini"))
@@ -96,7 +102,7 @@ def seed_core(s: Session) -> tuple[int, int, int]:
         )
     ).scalar_one()
 
-    # Snapshot row for inventory_balance so sales can decrement safely
+    # Snapshot row so sales can decrement safely
     s.execute(
         text(
             """
@@ -131,7 +137,8 @@ def test_payments_flow_and_balance_and_overpay():
     # Open cash session
     open_resp = client.post(
         "/pos/cash-sessions/open",
-        json={"branch_id": branch_id, "opened_by_id": user_id, "opening_amount": 0.00},
+        json={"branch_id": branch_id, "opening_amount": 0.00},
+        headers=auth_headers(user_id),
     )
     assert open_resp.status_code == 200, open_resp.text
     cash_session_id = open_resp.json()["id"]
@@ -142,47 +149,52 @@ def test_payments_flow_and_balance_and_overpay():
         json={
             "branch_id": branch_id,
             "cash_session_id": cash_session_id,
-            "created_by_id": user_id,
             "items": [
                 {"product_id": product_id, "qty": 2, "unit_price": 25.00},
                 {"product_id": product_id, "qty": 1, "unit_price": 25.00},
             ],
         },
+        headers=auth_headers(user_id),
     )
     assert sale_resp.status_code == 200, sale_resp.text
     sale_id = sale_resp.json()["id"]
 
-    # First payment: 50
+    # First payment: 50 (AUTH REQUIRED)
     p1 = client.post(
-        f"/pos/sales/{sale_id}/payments", json={"method": "CASH", "amount": 50.00}
+        f"/pos/sales/{sale_id}/payments",
+        json={"method": "CASH", "amount": 50.00},
+        headers=auth_headers(user_id),
     )
     assert p1.status_code == 200, p1.text
 
-    # Sale detail should show paid=50, balance=25
-    d1 = client.get(f"/pos/sales/{sale_id}")
+    # Sale detail should show paid=50, balance=25 (AUTH REQUIRED)
+    d1 = client.get(f"/pos/sales/{sale_id}", headers=auth_headers(user_id))
     assert d1.status_code == 200, d1.text
     detail = d1.json()
     assert abs(detail["paid_amount"] - 50.00) < 1e-6
     assert abs(detail["balance_due"] - 25.00) < 1e-6
     assert len(detail["payments"]) == 1
 
-    # Second payment: 25 completes
+    # Second payment: 25 completes (AUTH REQUIRED)
     p2 = client.post(
         f"/pos/sales/{sale_id}/payments",
         json={"method": "CARD", "amount": 25.00, "reference": "AUTH123"},
+        headers=auth_headers(user_id),
     )
     assert p2.status_code == 200, p2.text
 
-    d2 = client.get(f"/pos/sales/{sale_id}")
+    d2 = client.get(f"/pos/sales/{sale_id}", headers=auth_headers(user_id))
     assert d2.status_code == 200, d2.text
     detail2 = d2.json()
     assert abs(detail2["paid_amount"] - 75.00) < 1e-6
     assert abs(detail2["balance_due"] - 0.00) < 1e-6
     assert len(detail2["payments"]) == 2
 
-    # Overpay rejected
+    # Overpay rejected (AUTH REQUIRED)
     over = client.post(
-        f"/pos/sales/{sale_id}/payments", json={"method": "CASH", "amount": 0.01}
+        f"/pos/sales/{sale_id}/payments",
+        json={"method": "CASH", "amount": 0.01},
+        headers=auth_headers(user_id),
     )
     assert over.status_code == 409, over.text
 
@@ -206,7 +218,8 @@ def test_payments_rejected_when_sale_not_open():
 
     open_resp = client.post(
         "/pos/cash-sessions/open",
-        json={"branch_id": branch_id, "opened_by_id": user_id, "opening_amount": 0.00},
+        json={"branch_id": branch_id, "opening_amount": 0.00},
+        headers=auth_headers(user_id),
     )
     assert open_resp.status_code == 200, open_resp.text
     cash_session_id = open_resp.json()["id"]
@@ -216,16 +229,17 @@ def test_payments_rejected_when_sale_not_open():
         json={
             "branch_id": branch_id,
             "cash_session_id": cash_session_id,
-            "created_by_id": user_id,
             "items": [{"product_id": product_id, "qty": 1, "unit_price": 10.00}],
         },
+        headers=auth_headers(user_id),
     )
     assert sale_resp.status_code == 200, sale_resp.text
     sale_id = sale_resp.json()["id"]
 
     close_resp = client.post(
         f"/pos/cash-sessions/{cash_session_id}/close",
-        json={"closed_by_id": user_id, "closing_amount": 0.00},
+        json={"closing_amount": 0.00},
+        headers=auth_headers(user_id),
     )
     assert close_resp.status_code == 200, close_resp.text
 
@@ -240,6 +254,8 @@ def test_payments_rejected_when_sale_not_open():
         s2.close()
 
     p = client.post(
-        f"/pos/sales/{sale_id}/payments", json={"method": "CASH", "amount": 5.00}
+        f"/pos/sales/{sale_id}/payments",
+        json={"method": "CASH", "amount": 5.00},
+        headers=auth_headers(user_id),
     )
     assert p.status_code == 409, p.text

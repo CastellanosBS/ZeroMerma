@@ -1,6 +1,4 @@
-# apps/backend/tests/test_inventory_endpoints.py
-# PURPOSE: Prove /inventory/stock and /inventory/movements behave correctly on real data.
-
+# apps/backend/src/zeromerma_api/tests/test_inventory_endpoints.py
 from __future__ import annotations
 
 import os
@@ -14,36 +12,29 @@ from fastapi.testclient import TestClient
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from zeromerma_api.core.security import create_access_token
 from zeromerma_api.db.engine import SessionLocal
 from zeromerma_api.main import create_app
 from zeromerma_api.models.branch import Branch
 from zeromerma_api.models.inventory_movement import InventoryMovement, MovementReason
 from zeromerma_api.models.product import Product
+from zeromerma_api.models.role import Role
+from zeromerma_api.models.user_account import UserAccount
 
 
-def make_alembic_config() -> Config:
-    backend_dir = Path(__file__).resolve().parents[1]  # apps/backend
-    alembic_ini = backend_dir / "alembic.ini"
-    migrations_dir = backend_dir / "migrations"
-
-    cfg = Config(str(alembic_ini))
-    cfg.set_main_option("script_location", str(migrations_dir))
-    return cfg
+def auth_headers(user_id: int) -> dict[str, str]:
+    """
+    Build Authorization headers for protected endpoints.
+    """
+    token = create_access_token(subject=str(user_id))
+    return {"Authorization": f"Bearer {token}"}
 
 
 def _alembic_upgrade_head() -> None:
-    # __file__ = .../apps/backend/src/zeromerma_api/tests/test_xxx.py
-    # parents[0]=tests, [1]=zeromerma_api, [2]=src, [3]=backend
     backend_dir = Path(__file__).resolve().parents[3]
-
     cfg = Config(str(backend_dir / "alembic.ini"))
-
-    # IMPORTANT: point to the real migrations folder
     cfg.set_main_option("script_location", str(backend_dir / "migrations"))
-
-    # Make sure we use the DB from env var (the tests skip otherwise)
     cfg.set_main_option("sqlalchemy.url", os.environ["DATABASE_URL"])
-
     command.upgrade(cfg, "head")
 
 
@@ -52,25 +43,47 @@ def _alembic_upgrade_head() -> None:
     reason="DATABASE_URL not set; skipping inventory endpoint tests",
 )
 def test_stock_and_movements_endpoints():
-    # 1) Bring schema up
     _alembic_upgrade_head()
 
-    # 2) Build a test client
     app = create_app()
     client = TestClient(app)
 
-    # 3) Create minimal fixture: ensure MAIN branch exists, create a product, and movements: +10, -3
     s: Session = SessionLocal()
     try:
+        # Ensure MAIN branch exists
         main = s.scalar(select(Branch).where(Branch.code == "MAIN"))
         if main is None:
             main = Branch(code="MAIN", name="Main Branch")
             s.add(main)
             s.flush()
 
+        # Ensure ADMIN role exists
+        role = s.scalar(select(Role).where(Role.code == "ADMIN"))
+        if role is None:
+            role = Role(code="ADMIN", name="Admin")
+            s.add(role)
+            s.flush()
+
+        # Ensure user exists (needed only if /inventory/* is protected)
+        user = s.scalar(
+            select(UserAccount).where(UserAccount.email == "admin@example.com")
+        )
+        if user is None:
+            user = UserAccount(
+                branch_id=main.id,
+                role_id=role.id,
+                email="admin@example.com",
+                full_name="Admin User",
+                password_hash=None,
+                is_active=True,
+            )
+            s.add(user)
+            s.flush()
+
+        # Ensure product exists
         prod = s.scalar(select(Product).where(Product.sku == "DONUT-GLA"))
         if prod is None:
-            prod = Product(sku="DONUT-GLA", name="Donut Glazed")
+            prod = Product(sku="DONUT-GLA", name="Donut Glazed", is_active=True)
             s.add(prod)
             s.flush()
 
@@ -81,6 +94,7 @@ def test_stock_and_movements_endpoints():
         ).delete()
         s.flush()
 
+        # Insert movements: +10, -3
         s.add(
             InventoryMovement(
                 branch_id=main.id,
@@ -99,15 +113,17 @@ def test_stock_and_movements_endpoints():
         )
         s.commit()
 
-        # IMPORTANT: keep ids outside the session scope for later asserts
         branch_id = int(main.id)
         product_id = int(prod.id)
+        user_id = int(user.id)
     finally:
         s.close()
 
-    # 4) Call /inventory/stock: expect qty=7
+    # /inventory/stock
     r = client.get(
-        "/inventory/stock", params={"branch_id": branch_id, "product_id": product_id}
+        "/inventory/stock",
+        params={"branch_id": branch_id, "product_id": product_id},
+        headers=auth_headers(user_id),
     )
     assert r.status_code == 200, r.text
     data = r.json()
@@ -120,10 +136,11 @@ def test_stock_and_movements_endpoints():
     assert row["product_name"] == "Donut Glazed"
     assert abs(row["qty"] - 7.0) < 1e-6  # 10 - 3 = 7
 
-    # 5) Call /inventory/movements: expect two rows, newest first
+    # /inventory/movements
     r2 = client.get(
         "/inventory/movements",
         params={"branch_id": branch_id, "product_id": product_id, "limit": 10},
+        headers=auth_headers(user_id),
     )
     assert r2.status_code == 200, r2.text
     items = r2.json()
