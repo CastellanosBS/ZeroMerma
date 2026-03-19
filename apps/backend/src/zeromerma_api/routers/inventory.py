@@ -1,14 +1,23 @@
 # apps/backend/src/zeromerma_api/routers/inventory.py
-# PURPOSE: Read-only inventory endpoints:
-#   - GET /inventory/stock
-#   - GET /inventory/movements
+# PURPOSE:
+#   Read-only inventory endpoints:
+#     - GET /inventory/stock
+#     - GET /inventory/movements
 #
-# AUTHORIZATION:
+# AUTHORIZATION (roles + branch scoping):
 #   - Allowed roles: ADMIN, CASHIER
-#   - Branch scoping:
-#       * ADMIN -> can query any branch_id (if provided)
+#   - Branch scope:
+#       * ADMIN -> can query any branch_id
 #       * CASHIER -> only their own branch_id
-#   - If branch_id is omitted, we default to current_user.branch_id for safety.
+#   - If branch_id is omitted, we default to ctx.user.branch_id
+#
+# FAST-PATH (role-coded JWT):
+#   - role_code is read from JWT claims via AuthContext.
+#   - No per-request DB lookup to resolve role.code.
+#
+# NOTE:
+#   If an older token does not include role_code, get_current_auth_context()
+#   will fallback to DB role lookup (backward compatible).
 
 from __future__ import annotations
 
@@ -19,28 +28,31 @@ from fastapi import APIRouter, Depends, Query
 from sqlalchemy import and_, desc, func, select
 from sqlalchemy.orm import Session
 
+from zeromerma_api.core.auth_context import AuthContext
 from zeromerma_api.core.authz import (
     INVENTORY_ALLOWED_ROLES,
     enforce_branch_access,
-    require_role,
+    require_ctx_role,
 )
-from zeromerma_api.core.deps_auth import get_current_active_user
+from zeromerma_api.core.deps_auth import get_current_active_auth_context
 from zeromerma_api.db.engine import SessionLocal
 from zeromerma_api.models.inventory_movement import InventoryMovement, MovementReason
 from zeromerma_api.models.product import Product
-from zeromerma_api.models.user_account import UserAccount
 from zeromerma_api.schemas.inventory import MovementRow, StockRow
+
+router = APIRouter(prefix="/inventory", tags=["inventory"])
 
 
 def get_db() -> Generator[Session, None, None]:
+    """
+    FastAPI DB dependency: open a session, yield it to the handler,
+    and always close it afterwards.
+    """
     db = SessionLocal()
     try:
         yield db
     finally:
         db.close()
-
-
-router = APIRouter(prefix="/inventory", tags=["inventory"])
 
 
 @router.get(
@@ -55,19 +67,24 @@ def get_stock(
     page: int = Query(1, ge=1, description="1-based page number"),
     page_size: int = Query(50, ge=1, le=200, description="Items per page (max 200)"),
     db: Session = Depends(get_db),
-    current_user: UserAccount = Depends(get_current_active_user),
+    ctx: AuthContext = Depends(get_current_active_auth_context),
 ):
-    role_code = require_role(
-        db, current_user=current_user, allowed_roles=INVENTORY_ALLOWED_ROLES
-    )
+    """
+    Compute stock as SUM(qty) grouped by (branch_id, product_id, sku, name).
+
+    Security:
+      - Role check via ctx.role_code (JWT claim).
+      - Branch scoping enforced (ADMIN any branch, CASHIER own branch).
+    """
+    role_code = require_ctx_role(ctx=ctx, allowed_roles=INVENTORY_ALLOWED_ROLES)
 
     effective_branch_id = (
-        branch_id if branch_id is not None else int(current_user.branch_id)
+        int(branch_id) if branch_id is not None else int(ctx.user.branch_id)
     )
     enforce_branch_access(
-        current_user=current_user,
+        current_user=ctx.user,
         role_code=role_code,
-        branch_id=int(effective_branch_id),
+        branch_id=effective_branch_id,
     )
 
     stmt = (
@@ -79,6 +96,7 @@ def get_stock(
             func.sum(InventoryMovement.qty).label("qty_sum"),
         )
         .join(Product, Product.id == InventoryMovement.product_id)
+        .where(InventoryMovement.branch_id == effective_branch_id)
         .group_by(
             InventoryMovement.branch_id,
             InventoryMovement.product_id,
@@ -86,19 +104,19 @@ def get_stock(
             Product.name,
         )
         .order_by(InventoryMovement.branch_id.asc(), InventoryMovement.product_id.asc())
-        .where(InventoryMovement.branch_id == int(effective_branch_id))
     )
 
     filters = []
     if product_id is not None:
-        filters.append(InventoryMovement.product_id == product_id)
+        filters.append(InventoryMovement.product_id == int(product_id))
     if sku is not None:
         filters.append(Product.sku == sku)
+
     if filters:
         stmt = stmt.where(and_(*filters))
 
-    offset = (page - 1) * page_size
-    stmt = stmt.offset(offset).limit(page_size)
+    offset = (int(page) - 1) * int(page_size)
+    stmt = stmt.offset(offset).limit(int(page_size))
 
     rows = db.execute(stmt).all()
 
@@ -132,32 +150,34 @@ def list_movements(
     limit: int = Query(50, ge=1, le=200, description="Max rows to return"),
     offset: int = Query(0, ge=0, description="Rows to skip (for paging)"),
     db: Session = Depends(get_db),
-    current_user: UserAccount = Depends(get_current_active_user),
+    ctx: AuthContext = Depends(get_current_active_auth_context),
 ):
-    role_code = require_role(
-        db, current_user=current_user, allowed_roles=INVENTORY_ALLOWED_ROLES
-    )
+    """
+    Return a paged list of ledger movements ordered by created_at DESC, id DESC.
+
+    Security:
+      - Role check via ctx.role_code (JWT claim).
+      - Branch scoping enforced.
+    """
+    role_code = require_ctx_role(ctx=ctx, allowed_roles=INVENTORY_ALLOWED_ROLES)
 
     effective_branch_id = (
-        branch_id if branch_id is not None else int(current_user.branch_id)
+        int(branch_id) if branch_id is not None else int(ctx.user.branch_id)
     )
     enforce_branch_access(
-        current_user=current_user,
+        current_user=ctx.user,
         role_code=role_code,
-        branch_id=int(effective_branch_id),
+        branch_id=effective_branch_id,
     )
 
     stmt = (
         select(InventoryMovement)
-        .where(InventoryMovement.branch_id == int(effective_branch_id))
-        .order_by(
-            desc(InventoryMovement.created_at),
-            desc(InventoryMovement.id),
-        )
+        .where(InventoryMovement.branch_id == effective_branch_id)
+        .order_by(desc(InventoryMovement.created_at), desc(InventoryMovement.id))
     )
 
     if product_id is not None:
-        stmt = stmt.where(InventoryMovement.product_id == product_id)
+        stmt = stmt.where(InventoryMovement.product_id == int(product_id))
     if reason is not None:
         stmt = stmt.where(InventoryMovement.reason == reason.value)
     if date_from is not None:
@@ -165,7 +185,7 @@ def list_movements(
     if date_to is not None:
         stmt = stmt.where(InventoryMovement.created_at <= date_to)
 
-    stmt = stmt.offset(offset).limit(limit)
+    stmt = stmt.offset(int(offset)).limit(int(limit))
 
     rows = db.execute(stmt).scalars().all()
 
