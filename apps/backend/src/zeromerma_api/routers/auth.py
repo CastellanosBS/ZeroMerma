@@ -8,6 +8,7 @@ from sqlalchemy.orm import Session
 from zeromerma_api.core.security import create_access_token, verify_password
 from zeromerma_api.core.settings import get_settings
 from zeromerma_api.db.engine import get_session
+from zeromerma_api.models.role import Role
 from zeromerma_api.models.user_account import UserAccount
 from zeromerma_api.schemas.auth import LoginRequest, TokenResponse
 
@@ -31,7 +32,8 @@ def login(
     2) Ensure the account exists and is active.
     3) Ensure the account has a stored password hash.
     4) Verify the provided password.
-    5) Issue a signed JWT access token.
+    5) Resolve role_code once (DB) and embed it in the JWT.
+    6) Issue a signed JWT access token.
 
     Security behavior:
     - We intentionally return a generic 401 for invalid credentials.
@@ -40,53 +42,53 @@ def login(
 
     settings = get_settings()
 
-    # Look up the account by its unique email.
     user = db.execute(
         select(UserAccount).where(UserAccount.email == payload.email)
     ).scalar_one_or_none()
 
-    # Generic auth failure to avoid leaking which part was invalid.
     unauthorized_exc = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
         detail="Invalid credentials.",
         headers={"WWW-Authenticate": "Bearer"},
     )
 
-    # If no account exists, fail generically.
     if user is None:
         raise unauthorized_exc
 
-    # Do not allow login for inactive users.
     if not user.is_active:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="User account is inactive.",
         )
 
-    # If the account exists but has no password hash, login cannot work yet.
-    # This is common during bootstrap before all seeded users are updated.
     if not user.password_hash:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail="User account has no password configured.",
         )
 
-    # Verify the provided plain password against the stored hash.
     if not verify_password(payload.password, user.password_hash):
         raise unauthorized_exc
 
-    # Build a token with the user id as the canonical subject.
-    # We also include a few practical claims that are useful to downstream code.
+    # Resolve role_code ONCE at login-time (so we avoid per-request role lookups).
+    role = db.execute(select(Role).where(Role.id == user.role_id)).scalar_one_or_none()
+    if role is None:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="User role is invalid or missing.",
+        )
+
     token = create_access_token(
         subject=str(user.id),
         extra_claims={
+            # Convenience claims for downstream layers
             "email": user.email,
-            "role_id": user.role_id,
-            "branch_id": user.branch_id,
+            "role_id": int(user.role_id),
+            "role_code": str(role.code),  # <-- NEW: role-coded JWT
+            "branch_id": int(user.branch_id),
         },
     )
 
-    # Convert configured token lifetime to seconds for client convenience.
     expires_in_seconds = int(settings.auth_access_token_expires_minutes) * 60
 
     return TokenResponse(

@@ -14,6 +14,7 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 from zeromerma_api.core.deps_auth import get_current_active_user
 from zeromerma_api.core.logging_config import setup_logging
 from zeromerma_api.core.settings import get_settings
+from zeromerma_api.routers.admin import router as admin_router
 from zeromerma_api.routers.auth import router as auth_router
 from zeromerma_api.routers.health import router as health_router
 from zeromerma_api.routers.inventory import router as inventory_router
@@ -291,6 +292,7 @@ def create_app() -> FastAPI:
     app.include_router(health_router)
     app.include_router(ready_router)
     app.include_router(auth_router)
+    app.include_router(admin_router)
     app.include_router(inventory_router)
     app.include_router(
         pos_router,

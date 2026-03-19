@@ -119,8 +119,8 @@ def ensure_branch_main(s: Session) -> Branch:
 def ensure_admin_user(
     s: Session,
     *,
-    admin_email: str = "admin@example.com",
-    full_name: str = "System Admin",
+    admin_email: str = "admin@zeromerma.local",
+    full_name: str = "ZeroMerma Admin",
 ) -> UserAccount:
     """
     Ensure a single admin user exists, associated with Role('ADMIN') and Branch('MAIN').
@@ -152,7 +152,7 @@ def ensure_admin_user(
         full_name=full_name,
         role_id=role_admin.id,
         branch_id=branch_main.id,
-        password_hash=None,  # TODO: once auth is wired, set a real hash or an initial random password.
+        password_hash="admin1234",  # TODO: once auth is wired, set a real hash or an initial random password.
         is_active=True,
     )
     s.add(user)

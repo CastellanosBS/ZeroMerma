@@ -1,24 +1,11 @@
 # apps/backend/src/zeromerma_api/core/authz.py
-# PURPOSE:
-#   Central authorization helpers (roles + branch scoping).
-#
-# WHY THIS MODULE EXISTS:
-#   We want a single source of truth for authorization rules so that:
-#     - Routers remain thin and consistent
-#     - Branch scoping is enforced everywhere the same way
-#     - Role checks are explicit and auditable
-#
-# SECURITY PRINCIPLES:
-#   - Authentication answers: "who are you?"
-#   - Authorization answers: "what are you allowed to do?"
-#   - Clients must never be trusted to decide scope (e.g., branch_id for non-admin).
-
 from __future__ import annotations
 
 from fastapi import HTTPException, status
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
+from zeromerma_api.core.auth_context import AuthContext
 from zeromerma_api.models.user_account import UserAccount
 
 ROLE_ADMIN = "ADMIN"
@@ -31,9 +18,6 @@ INVENTORY_ALLOWED_ROLES: set[str] = {ROLE_ADMIN, ROLE_CASHIER}
 def get_role_code(db: Session, *, role_id: int) -> str:
     """
     Resolve role.code from role.id.
-
-    We use a DB lookup instead of trusting client input or duplicating role code
-    into the user table.
     """
     code = db.execute(
         text("SELECT code FROM role WHERE id = :id"),
@@ -41,7 +25,6 @@ def get_role_code(db: Session, *, role_id: int) -> str:
     ).scalar_one_or_none()
 
     if not code:
-        # This indicates corrupted data: user has a role_id that doesn't exist.
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="User role is invalid or missing.",
@@ -57,27 +40,37 @@ def is_admin(role_code: str) -> bool:
     return role_code == ROLE_ADMIN
 
 
-def require_role(
-    db: Session, *, current_user: UserAccount, allowed_roles: set[str]
-) -> str:
+def require_role_code(*, role_code: str, allowed_roles: set[str]) -> str:
     """
-    Enforce that current_user.role is in allowed_roles.
+    Enforce that role_code is in allowed_roles (no DB lookup).
 
-    Returns:
-      role_code (string) to avoid re-querying in the caller.
-
-    Raises:
-      HTTP 403 if not allowed.
+    Use this when role_code comes from JWT claims (fast path).
     """
-    role_code = get_role_code(db, role_id=int(current_user.role_id))
-
     if role_code not in allowed_roles:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Forbidden: user role is not allowed for this operation.",
         )
-
     return role_code
+
+
+def require_ctx_role(*, ctx: AuthContext, allowed_roles: set[str]) -> str:
+    """
+    Enforce allowed roles using an AuthContext (preferred for role-coded JWT).
+    """
+    return require_role_code(role_code=ctx.role_code, allowed_roles=allowed_roles)
+
+
+def require_role(
+    db: Session, *, current_user: UserAccount, allowed_roles: set[str]
+) -> str:
+    """
+    Backward-compatible role enforcement:
+    - Resolves role_code by querying DB.
+    - Use require_ctx_role() to avoid this query once JWT includes role_code.
+    """
+    role_code = get_role_code(db, role_id=int(current_user.role_id))
+    return require_role_code(role_code=role_code, allowed_roles=allowed_roles)
 
 
 def enforce_branch_access(
@@ -122,11 +115,6 @@ def enforce_sale_access(
 ) -> None:
     """
     Enforce that the requested sale belongs to a branch the user can access.
-
-    Rule v1:
-      - If sale doesn't exist -> 404
-      - ADMIN -> allowed
-      - Others -> sale.branch_id must equal current_user.branch_id
     """
     b = sale_branch_id(db, sale_id=sale_id)
     if b is None:
