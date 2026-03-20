@@ -7,12 +7,12 @@ from typing import Any, cast
 
 from fastapi import Depends, FastAPI, Request
 from fastapi.exceptions import RequestValidationError
-from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from zeromerma_api.core.deps_auth import get_current_active_user
 from zeromerma_api.core.logging_config import setup_logging
+from zeromerma_api.core.request_middleware import RequestContextMiddleware
 from zeromerma_api.core.settings import get_settings
 from zeromerma_api.routers.admin import router as admin_router
 from zeromerma_api.routers.auth import router as auth_router
@@ -249,18 +249,20 @@ def create_app() -> FastAPI:
         lifespan=lifespan,
     )
 
+    app.add_middleware(RequestContextMiddleware)
+
     # -------------------------------------------------------------------------
     # CORS
     # -------------------------------------------------------------------------
     # Development is intentionally permissive to unblock local frontend work.
     # In production, this should be restricted to explicit trusted origins.
-    app.add_middleware(
-        CORSMiddleware,
-        allow_origins=["*"] if s.env == "development" else [],
-        allow_credentials=True,
-        allow_methods=["*"],
-        allow_headers=["*"],
-    )
+    # app.add_middleware(
+    #    CORSMiddleware,
+    #    allow_origins=["*"] if s.env == "development" else [],
+    #    allow_credentials=True,
+    #    allow_methods=["*"],
+    #    allow_headers=["*"],
+    # )
 
     # -------------------------------------------------------------------------
     # Global exception handlers
