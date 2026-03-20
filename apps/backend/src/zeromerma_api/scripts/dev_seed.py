@@ -8,12 +8,13 @@
 #        - product_category
 #        - product with v2 fields (category_id, uom, is_input, sale_price, standard_cost)
 #   3) Seeds opening inventory ledger movements (OPENING_BALANCE) for deterministic stock.
-#   4) Bootstraps inventory_balance snapshot from the ledger (so operational stock is consistent).
+#   4) Bootstraps inventory_balance snapshot from the ledger (operational truth).
+#   5) Creates an OPTIONAL sample POS transaction (sale + payment) safely and idempotently.
 #
-# DESIGN PRINCIPLES:
-#   - Idempotent: running multiple times should not duplicate records.
-#   - Backward-compatible: does not assume new fields are NOT NULL (except uom/is_input defaults).
-#   - Safe: avoids creating negative stock in inventory_balance.
+# IDENTITY & SECURITY NOTES:
+#   - This script runs server-side, so it uses service-layer functions directly.
+#   - We still enforce "anti-impersonation" by always deriving actor ids from seed users,
+#     never taking them from external input.
 
 from __future__ import annotations
 
@@ -28,14 +29,20 @@ from sqlalchemy.orm import Session
 from zeromerma_api.core.security import hash_password
 from zeromerma_api.core.settings import get_settings
 from zeromerma_api.db.engine import SessionLocal
+from zeromerma_api.services.cash_session_service import (
+    get_current_open_session,
+    open_cash_session,
+)
 from zeromerma_api.services.inventory_balance_service import (
     bootstrap_inventory_balance_from_ledger,
 )
+from zeromerma_api.services.payment_service import add_payment
+from zeromerma_api.services.sale_service import create_sale
 
 log = logging.getLogger(__name__)
 
 # ---------------------------------------------------------------------------
-# Seed constants (edit these if you want different defaults)
+# Seed constants
 # ---------------------------------------------------------------------------
 
 DEFAULT_BRANCH_CODE = "MAIN"
@@ -54,7 +61,7 @@ SEED_REF_TYPE = "SEED"
 SEED_REF_ID = 1
 OPENING_NOTE = "DEV_SEED_OPENING_BALANCE"
 
-# A stable marker used to detect whether we already created the optional sample sale/payment.
+# Marker for the optional sample transaction idempotency.
 SAMPLE_PAYMENT_REFERENCE = "DEV_SEED_SAMPLE_V1"
 
 # ---------------------------------------------------------------------------
@@ -73,11 +80,11 @@ class ProductDef:
     sku: str
     name: str
     category_code: str
-    uom: str  # Must satisfy the CHECK constraint (PCS/KG/G/L/ML)
+    uom: str  # Must satisfy CHECK: PCS/KG/G/L/ML
     is_input: bool
     sale_price: Decimal | None
     standard_cost: Decimal | None
-    opening_qty: Decimal  # Opening inventory (ledger)
+    opening_qty: Decimal  # Ledger opening qty
 
 
 DEFAULT_CATEGORIES: list[CategoryDef] = [
@@ -88,11 +95,7 @@ DEFAULT_CATEGORIES: list[CategoryDef] = [
     CategoryDef(code="INGREDIENTS", name="Ingredients"),
 ]
 
-# NOTE:
-# - Keep at least one sellable product with enough opening_qty so the sample sale can succeed.
-# - Keep all opening_qty >= 0 to avoid inventory_balance negative check violations.
 DEFAULT_PRODUCTS: list[ProductDef] = [
-    # Sellable products
     ProductDef(
         sku="DONUT-GLA",
         name="Donut Glazed",
@@ -123,7 +126,6 @@ DEFAULT_PRODUCTS: list[ProductDef] = [
         standard_cost=Decimal("10.00"),
         opening_qty=Decimal("30.000"),
     ),
-    # Inputs / ingredients (not sold directly)
     ProductDef(
         sku="FLOUR",
         name="Wheat Flour",
@@ -136,19 +138,12 @@ DEFAULT_PRODUCTS: list[ProductDef] = [
     ),
 ]
 
-
 # ---------------------------------------------------------------------------
-# DB helpers (idempotent "get or create")
+# Core "get or create" helpers
 # ---------------------------------------------------------------------------
 
 
 def get_or_create_branch(db: Session, *, code: str, name: str) -> int:
-    """
-    Get or create a branch by code.
-
-    Returns:
-      branch_id
-    """
     row = db.execute(
         text("SELECT id FROM branch WHERE code = :code"),
         {"code": code},
@@ -172,12 +167,6 @@ def get_or_create_branch(db: Session, *, code: str, name: str) -> int:
 
 
 def get_or_create_role(db: Session, *, code: str, name: str) -> int:
-    """
-    Get or create a role by code.
-
-    Returns:
-      role_id
-    """
     row = db.execute(
         text("SELECT id FROM role WHERE code = :code"),
         {"code": code},
@@ -209,17 +198,6 @@ def get_or_create_user(
     role_id: int,
     password: str,
 ) -> int:
-    """
-    Get or create a user by email.
-
-    Behavior:
-      - If user exists but password_hash is NULL, we set it (so login works).
-      - We also ensure branch_id/role_id and is_active are aligned with seed defaults
-        (safe for dev; for prod you would not do this blindly).
-
-    Returns:
-      user_id
-    """
     email_norm = email.strip().lower()
 
     row = db.execute(
@@ -231,7 +209,6 @@ def get_or_create_user(
         user_id = int(row[0])
         password_hash = row[1]
 
-        # Ensure password exists for login in dev.
         if password_hash is None:
             db.execute(
                 text(
@@ -244,7 +221,6 @@ def get_or_create_user(
                 {"ph": hash_password(password), "id": user_id},
             )
 
-        # Keep dev users aligned (role/branch/active/name)
         db.execute(
             text(
                 """
@@ -283,12 +259,6 @@ def get_or_create_user(
 
 
 def get_or_create_category(db: Session, *, code: str, name: str) -> int:
-    """
-    Get or create a product category by code.
-
-    Returns:
-      category_id
-    """
     row = db.execute(
         text("SELECT id FROM product_category WHERE code = :code"),
         {"code": code},
@@ -296,7 +266,6 @@ def get_or_create_category(db: Session, *, code: str, name: str) -> int:
 
     if row:
         category_id = int(row[0])
-        # Keep name aligned in dev.
         db.execute(
             text(
                 "UPDATE product_category SET name = :name, updated_at = now() WHERE id = :id"
@@ -331,13 +300,6 @@ def get_or_create_product(
     standard_cost: Decimal | None,
     is_active: bool = True,
 ) -> int:
-    """
-    Get or create a product by sku.
-
-    Behavior:
-      - If exists: update name + v2 fields (category/uom/is_input/sale_price/standard_cost/is_active).
-      - If missing: insert with v2 fields.
-    """
     sku_norm = sku.strip().upper()
 
     row = db.execute(
@@ -398,6 +360,11 @@ def get_or_create_product(
     return int(product_id)
 
 
+# ---------------------------------------------------------------------------
+# Inventory helpers
+# ---------------------------------------------------------------------------
+
+
 def ensure_opening_balance_movements(
     db: Session,
     *,
@@ -405,31 +372,15 @@ def ensure_opening_balance_movements(
     created_by_id: int,
     products: Iterable[tuple[int, Decimal]],
 ) -> int:
-    """
-    Ensure deterministic OPENING_BALANCE movements exist for (branch, product).
-
-    Idempotency rule:
-      A movement is considered the "seed opening balance" if:
-        - reason = 'OPENING_BALANCE'
-        - ref_type = 'SEED'
-        - ref_id = 1
-        - note = OPENING_NOTE
-
-    Returns:
-      number_of_movements_created
-    """
     created = 0
 
     for product_id, opening_qty in products:
         qty = Decimal(opening_qty)
 
-        # Never create negative opening quantities (would break snapshot non-negative checks).
         if qty < 0:
             raise ValueError(
                 f"Invalid opening_qty for product_id={product_id}: {qty}. Must be >= 0."
             )
-
-        # If qty is zero, we skip creating the movement.
         if qty == 0:
             continue
 
@@ -484,13 +435,6 @@ def ensure_opening_balance_movements(
 
 
 def assert_ledger_non_negative(db: Session, *, branch_id: int) -> None:
-    """
-    Safety check before bootstrapping snapshot:
-
-    inventory_balance enforces on_hand >= 0.
-    Since bootstrap computes on_hand = SUM(inventory_movement.qty),
-    we must ensure no product has net negative qty in the ledger.
-    """
     rows = db.execute(
         text(
             """
@@ -514,38 +458,113 @@ def assert_ledger_non_negative(db: Session, *, branch_id: int) -> None:
         )
 
 
-def sample_sale_already_seeded(db: Session) -> bool:
-    """
-    Detect if we already created the sample transaction.
-
-    We use payment.reference as a stable marker.
-    """
-    row = db.execute(
+def get_on_hand(db: Session, *, branch_id: int, product_id: int) -> Decimal:
+    val = db.execute(
         text(
             """
-            SELECT 1
-            FROM payment
-            WHERE reference = :ref
-            LIMIT 1
+            SELECT COALESCE(on_hand, 0)
+            FROM inventory_balance
+            WHERE branch_id = :b AND product_id = :p
             """
         ),
+        {"b": int(branch_id), "p": int(product_id)},
+    ).scalar_one_or_none()
+    return Decimal(str(val or 0))
+
+
+# ---------------------------------------------------------------------------
+# POS sample transaction (safe + idempotent)
+# ---------------------------------------------------------------------------
+
+
+def sample_sale_already_seeded(db: Session) -> bool:
+    row = db.execute(
+        text("SELECT 1 FROM payment WHERE reference = :ref LIMIT 1"),
         {"ref": SAMPLE_PAYMENT_REFERENCE},
     ).fetchone()
-
     return bool(row)
 
 
+def get_or_create_open_cash_session_id(
+    db: Session,
+    *,
+    branch_id: int,
+    opened_by_id: int,
+    opening_amount: float,
+) -> int:
+    """
+    Ensure there is an OPEN cash session for the branch.
+    If one exists, reuse it. Otherwise create a new one.
+    """
+    current = get_current_open_session(db, branch_id=int(branch_id))
+    if current is not None:
+        return int(current.id)
+
+    cs = open_cash_session(
+        db=db,
+        branch_id=int(branch_id),
+        opened_by_id=int(opened_by_id),
+        opening_amount=opening_amount,
+    )
+    db.flush()
+    return int(cs.id)
+
+
+def create_sample_sale_and_payment(
+    db: Session,
+    *,
+    branch_id: int,
+    cash_session_id: int,
+    created_by_id: int,
+    product_id: int,
+    unit_price: Decimal,
+    qty: Decimal,
+) -> int:
+    """
+    Create a minimal sample sale and fully pay it.
+
+    Safety:
+      - Caller must ensure qty <= on_hand for the chosen product.
+      - Uses a stable payment.reference for idempotency.
+    """
+    sale = create_sale(
+        db,
+        branch_id=int(branch_id),
+        cash_session_id=int(cash_session_id),
+        created_by_id=int(created_by_id),
+        items=[
+            {
+                "product_id": int(product_id),
+                "qty": float(qty),
+                "unit_price": float(unit_price),
+            }
+        ],
+    )
+    db.flush()
+
+    add_payment(
+        db,
+        sale_id=int(sale.id),
+        method="CASH",
+        amount=float(str(sale.total)),
+        reference=SAMPLE_PAYMENT_REFERENCE,
+    )
+    db.flush()
+
+    return int(sale.id)
+
+
+# ---------------------------------------------------------------------------
+# Main
+# ---------------------------------------------------------------------------
+
+
 def main() -> None:
-    # 1) Ensure settings are loaded (.env, DATABASE_URL, etc.)
     _ = get_settings()
 
-    # 2) Create a DB session
     session = SessionLocal()
-
     try:
-        # -------------------------------------------------------------------
-        # (A) Admin core entities
-        # -------------------------------------------------------------------
+        # (A) Admin core
         branch_id = get_or_create_branch(
             session, code=DEFAULT_BRANCH_CODE, name=DEFAULT_BRANCH_NAME
         )
@@ -571,9 +590,7 @@ def main() -> None:
             password=DEFAULT_CASHIER_PASSWORD,
         )
 
-        # -------------------------------------------------------------------
-        # (B) Catalog: categories + products (ProductCategory + Product v2)
-        # -------------------------------------------------------------------
+        # (B) Catalog
         category_ids: dict[str, int] = {}
         for c in DEFAULT_CATEGORIES:
             category_ids[c.code] = get_or_create_category(
@@ -581,6 +598,8 @@ def main() -> None:
             )
 
         products_with_qty: list[tuple[int, Decimal]] = []
+        sku_to_product_id: dict[str, int] = {}
+
         for p in DEFAULT_PRODUCTS:
             cat_id = category_ids.get(p.category_code)
             product_id = get_or_create_product(
@@ -594,57 +613,89 @@ def main() -> None:
                 standard_cost=p.standard_cost,
                 is_active=True,
             )
+            sku_to_product_id[p.sku.strip().upper()] = product_id
             products_with_qty.append((product_id, p.opening_qty))
 
         session.commit()
 
-        # -------------------------------------------------------------------
-        # (C) Ledger: deterministic opening balance movements
-        # -------------------------------------------------------------------
+        # (C) Ledger opening balances
         created_movements = ensure_opening_balance_movements(
             session,
             branch_id=branch_id,
             created_by_id=admin_user_id,
             products=products_with_qty,
         )
-
         session.commit()
 
-        # -------------------------------------------------------------------
-        # (D) Snapshot: bootstrap inventory_balance from ledger
-        # -------------------------------------------------------------------
+        # (D) Snapshot from ledger
         assert_ledger_non_negative(session, branch_id=branch_id)
         bootstrap_inventory_balance_from_ledger(session, branch_id=branch_id)
         session.commit()
 
-        # -------------------------------------------------------------------
-        # (E) Optional: sample sale/payment (kept minimal & deterministic)
-        # -------------------------------------------------------------------
-        # NOTE:
-        # We keep this optional flow because it validates end-to-end POS + inventory coupling.
-        # It must never create negative ledger totals.
-        if not sample_sale_already_seeded(session):
-            # Choose a sellable product with sufficient opening stock
-            sellable = [
-                p
-                for p in DEFAULT_PRODUCTS
-                if not p.is_input and p.opening_qty >= Decimal("5.000")
-            ]
-            if not sellable:
-                log.warning(
-                    "No sellable products with enough stock for sample sale; skipping."
-                )
-            else:
-                # We do not import services here to keep the seed decoupled.
-                # Instead, we rely on your API flow/tests for sale creation.
-                # If you want, we can wire in create_sale/add_payment here in Phase 6.1-C.
-                log.info("sample_sale_skipped=True (kept for next step Phase 6.1-C)")
-        else:
+        # (E) Optional sample transaction (sale + payment), safe & idempotent
+        if sample_sale_already_seeded(session):
             log.info("sample_sale_already_seeded=True")
+        else:
+            # Choose a deterministic sellable SKU first; fallback to first sellable product.
+            preferred_sku = "DONUT-GLA"
+            product_id = sku_to_product_id.get(preferred_sku)
 
-        # -------------------------------------------------------------------
-        # Summary logs (helpful when running dev-seed.ps1)
-        # -------------------------------------------------------------------
+            if product_id is None:
+                sellable = [p for p in DEFAULT_PRODUCTS if not p.is_input]
+                if not sellable:
+                    log.warning(
+                        "No sellable products available for sample sale; skipping."
+                    )
+                    product_id = None
+                else:
+                    product_id = sku_to_product_id[sellable[0].sku.strip().upper()]
+
+            if product_id is not None:
+                # Determine a safe qty and unit price
+                on_hand = get_on_hand(
+                    session, branch_id=branch_id, product_id=product_id
+                )
+                qty = Decimal("2.000")
+                if on_hand < qty:
+                    log.warning(
+                        "Sample sale skipped: insufficient stock on_hand=%s required=%s (branch_id=%s product_id=%s)",
+                        on_hand,
+                        qty,
+                        branch_id,
+                        product_id,
+                    )
+                else:
+                    # Use catalog sale_price when available; fallback to a safe value.
+                    unit_price = session.execute(
+                        text(
+                            "SELECT COALESCE(sale_price, 10.00) FROM product WHERE id = :id"
+                        ),
+                        {"id": int(product_id)},
+                    ).scalar_one()
+                    unit_price_dec = Decimal(str(unit_price))
+
+                    cash_session_id = get_or_create_open_cash_session_id(
+                        session,
+                        branch_id=branch_id,
+                        opened_by_id=admin_user_id,
+                        opening_amount=float("1000.00"),
+                    )
+                    session.commit()
+
+                    sale_id = create_sample_sale_and_payment(
+                        session,
+                        branch_id=branch_id,
+                        cash_session_id=cash_session_id,
+                        created_by_id=admin_user_id,
+                        product_id=product_id,
+                        unit_price=unit_price_dec,
+                        qty=qty,
+                    )
+                    session.commit()
+
+                    log.info("sample_sale_created_id=%s", sale_id)
+
+        # Summary
         log.info("Dev seed done.")
         log.info("branch_id=%s", branch_id)
         log.info("admin_user_id=%s email=%s", admin_user_id, DEFAULT_ADMIN_EMAIL)
