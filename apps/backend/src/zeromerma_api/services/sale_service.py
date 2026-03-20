@@ -5,7 +5,7 @@ from __future__ import annotations
 from decimal import ROUND_HALF_UP, Decimal
 from typing import Iterable
 
-from sqlalchemy import desc, select
+from sqlalchemy import desc, select, text
 from sqlalchemy.orm import Session
 
 from zeromerma_api.models.cash_session import CashSession, CashSessionStatus
@@ -22,6 +22,47 @@ from zeromerma_api.services.inventory_balance_service import (
 from zeromerma_api.services.inventory_balance_service import (
     qty as qty_dec,
 )
+
+
+def assert_products_are_sellable(db: Session, *, product_ids: list[int]) -> None:
+    """
+    Guardrail: prevent selling inputs (ingredients/raw materials) via POS.
+
+    Business rule:
+      - product.is_input = TRUE  -> NOT sellable in POS
+      - product.is_input = FALSE -> sellable
+
+    Raises:
+      - LookupError if any product_id does not exist
+      - ValueError  if any product_id is an input (is_input = TRUE)
+    """
+    if not product_ids:
+        return
+
+    # Query product metadata in one roundtrip.
+    rows = db.execute(
+        text(
+            """
+            SELECT id, is_input
+            FROM product
+            WHERE id = ANY(CAST(:ids AS BIGINT[]))
+            """
+        ),
+        {"ids": [int(x) for x in product_ids]},
+    ).fetchall()
+
+    found_ids = {int(r[0]) for r in rows}
+    missing = sorted(set(int(x) for x in product_ids) - found_ids)
+    if missing:
+        raise LookupError(f"Some products do not exist: {missing}")
+
+    input_ids = sorted(int(r[0]) for r in rows if bool(r[1]) is True)
+    if input_ids:
+        raise ValueError(
+            "Cannot sell input/ingredient products via POS. "
+            f"Input product_ids={input_ids}."
+        )
+
 
 MONEY_PLACES = Decimal("0.01")
 QTY_PLACES = Decimal("0.001")
@@ -105,6 +146,9 @@ def create_sale(
     # 3) Validate products exist
     product_ids = [int(it["product_id"]) for it in item_list]
     require_products(db, product_ids)
+
+    product_ids = [int(it["product_id"]) for it in items]
+    assert_products_are_sellable(db, product_ids=product_ids)
 
     # 4) Compute items + totals
     computed_items: list[SaleItem] = []

@@ -16,6 +16,7 @@ from zeromerma_api.core.request_middleware import RequestContextMiddleware
 from zeromerma_api.core.settings import get_settings
 from zeromerma_api.routers.admin import router as admin_router
 from zeromerma_api.routers.auth import router as auth_router
+from zeromerma_api.routers.catalog import router as catalog_router
 from zeromerma_api.routers.health import router as health_router
 from zeromerma_api.routers.inventory import router as inventory_router
 from zeromerma_api.routers.pos import router as pos_router
@@ -300,6 +301,7 @@ def create_app() -> FastAPI:
         pos_router,
         dependencies=[Depends(get_current_active_user)],
     )
+    app.include_router(catalog_router)
 
     return app
 
