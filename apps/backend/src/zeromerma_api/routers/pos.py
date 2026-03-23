@@ -11,6 +11,7 @@ from zeromerma_api.core.authz import (
 from zeromerma_api.core.dependency_aliases import ActiveAuthContextDep, DbSessionDep
 from zeromerma_api.core.domain_errors import DomainNotFoundError
 from zeromerma_api.models.cash_session import CashSession
+from zeromerma_api.routers.pos_orders import router as orders_router
 from zeromerma_api.routers.pos_payments import router as payments_router
 from zeromerma_api.routers.pos_sales import router as sales_router
 from zeromerma_api.schemas.cash_session import (
@@ -54,13 +55,6 @@ def api_get_pos_bootstrap(
 ) -> PosBootstrapOut:
     """
     Return the POS bootstrap payload for one branch.
-
-    Includes:
-    - current open cash session (if any)
-    - visible POS categories and products
-    - effective prices for the requested branch
-    - payment methods
-    - current POS capability flags
     """
     role_code = require_ctx_role(ctx=ctx, allowed_roles=POS_ALLOWED_ROLES)
     enforce_branch_access(
@@ -81,19 +75,6 @@ def api_checkout_pos_sale(
 ) -> PosCheckoutOut:
     """
     Execute one atomic POS checkout.
-
-    Flow:
-    - validate branch scope
-    - resolve effective prices server-side
-    - create sale
-    - register payment
-    - compute change (cash only)
-    - mark sale as PAID
-    - return receipt payload
-
-    Notes:
-    - printing does not block commit
-    - v1 supports exactly one payment per checkout
     """
     role_code = require_ctx_role(ctx=ctx, allowed_roles=POS_ALLOWED_ROLES)
     enforce_branch_access(
@@ -127,13 +108,6 @@ def api_reprint_sale_receipt(
 ) -> PosReprintOut:
     """
     Return the canonical printable receipt payload for one sale.
-
-    Reprint policy:
-    - does not mutate inventory
-    - does not mutate payments
-    - does not block on printer integration
-    - prefers persisted receipt_snapshot
-    - falls back to reconstructed receipt if snapshot is absent
     """
     role_code = require_ctx_role(ctx=ctx, allowed_roles=POS_ALLOWED_ROLES)
     enforce_sale_access(
@@ -155,11 +129,6 @@ def api_open_cash_session(
 ) -> CashSessionOut:
     """
     Open a new cash session.
-
-    Security:
-      - role check via JWT-backed AuthContext
-      - branch scoping enforced
-      - opened_by_id always derived from the authenticated user
     """
     role_code = require_ctx_role(ctx=ctx, allowed_roles=POS_ALLOWED_ROLES)
     enforce_branch_access(
@@ -192,11 +161,6 @@ def api_close_cash_session(
 ) -> CashSessionOut:
     """
     Close an OPEN cash session.
-
-    Security:
-      - role check via JWT-backed AuthContext
-      - branch scoping enforced using the target session's branch
-      - closed_by_id always derived from the authenticated user
     """
     role_code = require_ctx_role(ctx=ctx, allowed_roles=POS_ALLOWED_ROLES)
 
@@ -244,3 +208,4 @@ def api_current_cash_session(
 
 router.include_router(sales_router)
 router.include_router(payments_router)
+router.include_router(orders_router)

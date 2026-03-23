@@ -1,5 +1,7 @@
 ﻿from .branch import Branch
 from .cash_session import CashSession, CashSessionStatus
+from .customer_order import CustomerOrder, CustomerOrderStatus
+from .customer_order_item import CustomerOrderItem
 from .inventory_balance import InventoryBalance
 from .inventory_movement import InventoryMovement, MovementReason
 from .payment import Payment, PaymentMethod
@@ -30,4 +32,7 @@ __all__ = [
     "Payment",
     "PaymentMethod",
     "ProductionRun",
+    "CustomerOrder",
+    "CustomerOrderStatus",
+    "CustomerOrderItem",
 ]

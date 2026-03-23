@@ -82,13 +82,13 @@ def _capabilities_payload() -> dict:
     """
     Feature flags exposed to the POS client.
 
-    For 2A.1 we expose the current kernel capabilities conservatively:
-    - keyboard_first: yes
-    - orders / delivery flows: not yet active until the order kernel is built
+    Orders are now available in 2B.1:
+    - can_take_orders: yes
+    - can_deliver_orders: yes
     """
     return {
-        "can_take_orders": False,
-        "can_deliver_orders": False,
+        "can_take_orders": True,
+        "can_deliver_orders": True,
         "keyboard_first": True,
     }
 

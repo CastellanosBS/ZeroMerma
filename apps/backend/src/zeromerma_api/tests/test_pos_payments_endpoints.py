@@ -27,9 +27,14 @@ def reset_tables(s: Session) -> None:
     Hard reset all tables touched by POS payment tests.
 
     Important:
+    - customer_order_item/customer_order must be cleared before user_account
+      because customer_order references multiple user_account FKs.
+    - customer_order must be cleared before sale if delivered_sale_id is ever set.
     - product_price must be cleared before branch/product due to FK references.
     - production_run must be cleared before user_account due to FK references.
     """
+    s.execute(text("DELETE FROM customer_order_item"))
+    s.execute(text("DELETE FROM customer_order"))
     s.execute(text("DELETE FROM product_price"))
     s.execute(text("DELETE FROM payment"))
     s.execute(text("DELETE FROM sale_item"))
