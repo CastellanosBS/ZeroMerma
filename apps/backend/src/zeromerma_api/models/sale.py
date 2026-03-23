@@ -1,94 +1,119 @@
-# PURPOSE: Sale header table for POS.
-#          Holds branch/session linkage, totals, status, and audit fields.
-
 from __future__ import annotations
 
 from datetime import datetime
+from decimal import Decimal
 from enum import Enum
-from typing import TYPE_CHECKING, List
+from typing import TYPE_CHECKING, Any
 
-from sqlalchemy import BigInteger, DateTime, ForeignKey, Index, Numeric, String, func
+from sqlalchemy import BigInteger, ForeignKey, Index, Numeric, String, text
+from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from .base import Base, updated_at_col
+from .base import Base, created_at_col, updated_at_col
 
 if TYPE_CHECKING:
     from .branch import Branch
     from .cash_session import CashSession
+    from .payment import Payment
     from .sale_item import SaleItem
     from .user_account import UserAccount
 
 
 class SaleStatus(str, Enum):
     """
-    Allowed sale statuses.
-    For MVP we’ll use only OPEN and CANCELED later.
+    Canonical sale lifecycle states for the POS kernel.
     """
 
     OPEN = "OPEN"
-    CANCELED = "CANCELED"
+    PAID = "PAID"
+    VOIDED = "VOIDED"
+    REFUNDED = "REFUNDED"
+    PARTIALLY_REFUNDED = "PARTIALLY_REFUNDED"
 
 
 class Sale(Base):
-    __table_args__ = (
-        Index("ix_sale_created_at", "created_at"),
-        Index("ix_sale_status", "status"),
-    )
     """
-    Sale header:
-      - belongs to one branch
-      - belongs to one cash session (required for POS flow)
-      - created_by for auditing
-      - totals computed by backend (subtotal/tax/total)
+    POS sale header.
+
+    Notes:
+    - Monetary fields use Decimal-compatible NUMERIC(18,2).
+    - receipt_snapshot stores the printable receipt payload captured at checkout
+      time so reprints can remain stable even if catalog/pricing changes later.
     """
 
     __tablename__ = "sale"
+    __table_args__ = (
+        Index("ix_sale_branch_id", "branch_id"),
+        Index("ix_sale_cash_session_id", "cash_session_id"),
+        Index("ix_sale_created_by_id", "created_by_id"),
+        Index("ix_sale_status", "status"),
+        Index("ix_sale_created_at", "created_at"),
+    )
 
     id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
 
     branch_id: Mapped[int] = mapped_column(
         ForeignKey("branch.id", ondelete="RESTRICT"),
-        index=True,
         nullable=False,
     )
 
     cash_session_id: Mapped[int] = mapped_column(
         ForeignKey("cash_session.id", ondelete="RESTRICT"),
-        index=True,
         nullable=False,
     )
 
     created_by_id: Mapped[int] = mapped_column(
         ForeignKey("user_account.id", ondelete="RESTRICT"),
-        index=True,
         nullable=False,
     )
 
-    created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True),
+    subtotal: Mapped[Decimal] = mapped_column(
+        Numeric(18, 2),
         nullable=False,
-        server_default=func.now(),
+        server_default=text("0"),
+        default=Decimal("0.00"),
     )
 
-    # Totals: NUMERIC to avoid float rounding errors in DB
-    subtotal: Mapped[float] = mapped_column(Numeric(18, 2), nullable=False)
-    tax: Mapped[float] = mapped_column(Numeric(18, 2), nullable=False, server_default="0")
-    total: Mapped[float] = mapped_column(Numeric(18, 2), nullable=False)
+    tax: Mapped[Decimal] = mapped_column(
+        Numeric(18, 2),
+        nullable=False,
+        server_default=text("0"),
+        default=Decimal("0.00"),
+    )
+
+    total: Mapped[Decimal] = mapped_column(
+        Numeric(18, 2),
+        nullable=False,
+        server_default=text("0"),
+        default=Decimal("0.00"),
+    )
 
     status: Mapped[str] = mapped_column(
-        String(16),
+        String(32),
         nullable=False,
-        server_default="OPEN",
+        server_default=text("'OPEN'"),
+        default=SaleStatus.OPEN.value,
     )
 
+    receipt_snapshot: Mapped[dict[str, Any] | None] = mapped_column(
+        JSONB,
+        nullable=True,
+        doc="Persisted printable receipt payload captured at checkout time.",
+    )
+
+    created_at: Mapped[datetime] = created_at_col()
     updated_at: Mapped[datetime] = updated_at_col()
 
-    # Relationships
     branch: Mapped["Branch"] = relationship()
     cash_session: Mapped["CashSession"] = relationship()
     created_by: Mapped["UserAccount"] = relationship()
 
-    items: Mapped[List["SaleItem"]] = relationship(
+    items: Mapped[list["SaleItem"]] = relationship(
         back_populates="sale",
-        cascade="all, delete-orphan",  # if a sale is removed (dev only), items go too
+        cascade="all, delete-orphan",
+    )
+
+    payments: Mapped[list["Payment"]] = relationship(
+        back_populates="sale",
+        cascade="all, delete-orphan",
     )
