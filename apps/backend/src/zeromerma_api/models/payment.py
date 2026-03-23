@@ -10,7 +10,7 @@ from datetime import datetime
 from enum import Enum
 from typing import TYPE_CHECKING, Optional
 
-from sqlalchemy import BigInteger, DateTime, ForeignKey, Numeric, String, func
+from sqlalchemy import BigInteger, DateTime, ForeignKey, Index, Numeric, String, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from .base import Base
@@ -32,6 +32,11 @@ class PaymentMethod(str, Enum):
 
 
 class Payment(Base):
+
+    __table_args__ = (
+        Index("ix_payment_created_at", "created_at"),
+        Index("ix_payment_method", "method"),
+    )
     """
     Payment record:
       - belongs to a sale

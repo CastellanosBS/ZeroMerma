@@ -1,24 +1,27 @@
-﻿# apps/backend/src/zeromerma_api/models/__init__.py
-# PURPOSE: Package-level exports for ergonomic imports like:
-#   from zeromerma_api.models import Branch, Role, UserAccount, Product, InventoryMovement, CashSession
-
-from .branch import Branch  # noqa: F401
-from .cash_session import CashSession, CashSessionStatus  # noqa: F401
-from .inventory_movement import InventoryMovement, MovementReason  # noqa: F401
-from .payment import Payment, PaymentMethod  # noqa: F401
-from .product import Product  # noqa: F401
-from .role import Role  # noqa: F401
-from .sale import Sale, SaleStatus  # noqa: F401
-from .sale_item import SaleItem  # noqa: F401
-from .user_account import UserAccount  # noqa: F401
+﻿from .branch import Branch
+from .cash_session import CashSession, CashSessionStatus
+from .inventory_balance import InventoryBalance
+from .inventory_movement import InventoryMovement, MovementReason
+from .payment import Payment, PaymentMethod
+from .product import Product
+from .product_category import ProductCategory
+from .product_price import ProductPrice
+from .production_run import ProductionRun
+from .role import Role
+from .sale import Sale, SaleStatus
+from .sale_item import SaleItem
+from .user_account import UserAccount
 
 __all__ = [
     "Branch",
     "Role",
     "UserAccount",
+    "ProductCategory",
     "Product",
+    "ProductPrice",
     "InventoryMovement",
     "MovementReason",
+    "InventoryBalance",
     "CashSession",
     "CashSessionStatus",
     "Sale",
@@ -26,4 +29,5 @@ __all__ = [
     "SaleItem",
     "Payment",
     "PaymentMethod",
+    "ProductionRun",
 ]

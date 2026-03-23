@@ -4,14 +4,16 @@ from __future__ import (
     annotations,  # 1) delays evaluation of type hints -> avoids circular import issues in 3.11+
 )
 
-# 2) Standard library imports (no side effects): typing for lists/optionals, datetime for timestamp types.
+# 2) Standard library imports (no side effects): typing for lists/optionals, datetime for
+#  timestamp types.
 from datetime import datetime
 
 # 3) SQLAlchemy ORM primitives for typed mappings in 2.0 style.
 from sqlalchemy import BigInteger, Boolean, ForeignKey, String, Text, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-# 4) Import your shared Declarative Base (one Base across the project keeps metadata coherent for Alembic).
+# 4) Import your shared Declarative Base (one Base across the project keeps metadata coherent
+# for Alembic).
 from zeromerma_api.models.base import Base
 
 
@@ -31,7 +33,8 @@ def created_at_col():
 def updated_at_col():
     """
     Return a mapped_column for 'updated_at' that is initially set to now().
-    IMPORTANT: SQLAlchemy won't auto-update this on update; we will update it in code paths that modify rows.
+    IMPORTANT: SQLAlchemy won't auto-update this on update; we will update it in code paths that
+      modify rows.
     (If you prefer DB triggers later, we can add them—but app-layer updates are enough for MVP.)
     """
     return mapped_column(default=func.now(), nullable=False)
@@ -52,25 +55,32 @@ class Branch(Base):
     - Timestamps are audit fields; we can add created_by/updated_by later if needed.
     """
 
-    __tablename__ = "branch"  # 5) explicit table name (snake_case) -> stable and predictable in migrations
+    __tablename__ = (
+        "branch"  # 5) explicit table name (snake_case) -> stable and predictable in migrations
+    )
 
-    # 6) Primary key: BIGINT auto-increment. 'autoincrement=True' on Postgres + BigInteger produces a bigserial-like sequence.
+    # 6) Primary key: BIGINT auto-increment. 'autoincrement=True' on Postgres + BigInteger produces
+    #  a bigserial-like sequence.
     id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
 
-    # 7) Short stable key. UNIQUE + index=True for fast lookups (e.g., seed/refs). Max length chosen to fit codes like 'NORTH-01'.
+    # 7) Short stable key. UNIQUE + index=True for fast lookups (e.g., seed/refs). Max length
+    #  chosen to fit codes like 'NORTH-01'.
     code: Mapped[str] = mapped_column(String(16), unique=True, index=True)
 
-    # 8) Human-readable label. Text allows long names; if you prefer capped length, use String(100/150).
+    # 8) Human-readable label. Text allows long names; if you prefer capped length,
+    #  use String(100/150).
     name: Mapped[str] = mapped_column(Text)
 
     # 9) Operational flag. Default True so new branches are active by default.
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
 
-    # 10) Audit timestamps. DB default 'now()' assigned via default=func.now() (see helper). Non-nullable for consistent history.
+    # 10) Audit timestamps. DB default 'now()' assigned via default=func.now() (see helper).
+    # Non-nullable for consistent history.
     created_at: Mapped[datetime] = created_at_col()
     updated_at: Mapped[datetime] = updated_at_col()
 
-    # 11) Reverse relationship: a branch has many users. We define this AFTER UserAccount class exists,
+    # 11) Reverse relationship: a branch has many users. We define this AFTER UserAccount
+    #  class exists,
     #     but referencing by string is fine (SQLAlchemy resolves later).
     users: Mapped[list[UserAccount]] = relationship(back_populates="branch")
 
@@ -120,20 +130,14 @@ class UserAccount(Base):
     - Timestamps for audit.
     """
 
-    __tablename__ = (
-        "user_account"  # not 'user' to avoid reserved-word collisions across DBs
-    )
+    __tablename__ = "user_account"  # not 'user' to avoid reserved-word collisions across DBs
 
     id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
 
     # Foreign keys to branch and role. index=True improves join/filter performance.
     # ondelete is enforced at DB level in migration for RESTRICT semantics.
-    branch_id: Mapped[int] = mapped_column(
-        ForeignKey("branch.id"), index=True, nullable=False
-    )
-    role_id: Mapped[int] = mapped_column(
-        ForeignKey("role.id"), index=True, nullable=False
-    )
+    branch_id: Mapped[int] = mapped_column(ForeignKey("branch.id"), index=True, nullable=False)
+    role_id: Mapped[int] = mapped_column(ForeignKey("role.id"), index=True, nullable=False)
 
     # Unique login identity. Index + unique -> fast/email-based lookups, prevents duplicates.
     email: Mapped[str] = mapped_column(String(255), unique=True, index=True)
@@ -141,7 +145,8 @@ class UserAccount(Base):
     # Display name for UIs and reports. Text gives flexibility (e.g., long names).
     full_name: Mapped[str] = mapped_column(Text)
 
-    # Nullable hash allows creating the user record before setting password (or using external auth later).
+    # Nullable hash allows creating the user record before setting password
+    # (or using external auth later).
     password_hash: Mapped[str | None] = mapped_column(String(255), nullable=True)
 
     # Operational flag. Default True so users start enabled.

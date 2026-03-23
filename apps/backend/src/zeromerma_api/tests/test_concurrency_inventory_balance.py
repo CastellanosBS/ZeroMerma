@@ -109,8 +109,8 @@ def seed_base_state() -> dict[str, int]:
         product_id = s.execute(
             text(
                 """
-                INSERT INTO product (sku, name, is_active, created_at, updated_at)
-                VALUES ('SKU-001', 'Test Product', true, now(), now())
+                INSERT INTO product (sku, name, uom, is_input, is_active, created_at, updated_at)
+                VALUES ('SKU-001', 'Test Product', 'PCS', false, true, now(), now())
                 RETURNING id
                 """
             )
@@ -207,9 +207,7 @@ def test_concurrent_sales_do_not_oversell_inventory_balance():
             json={
                 "branch_id": ids["branch_id"],
                 "cash_session_id": ids["cash_session_id"],
-                "items": [
-                    {"product_id": ids["product_id"], "qty": 1.0, "unit_price": 10.00}
-                ],
+                "items": [{"product_id": ids["product_id"], "qty": 1.0, "unit_price": 10.00}],
             },
         )
         return resp.status_code
@@ -224,8 +222,6 @@ def test_concurrent_sales_do_not_oversell_inventory_balance():
     conflict = sum(1 for s in statuses if s == 409)
 
     assert ok == 1, f"Expected exactly 1 success (200). Got statuses={statuses}"
-    assert (
-        conflict == workers - 1
-    ), f"Expected {workers-1} conflicts (409). Got statuses={statuses}"
+    assert conflict == workers - 1, f"Expected {workers-1} conflicts (409). Got statuses={statuses}"
 
     assert abs(snapshot_on_hand(ids["branch_id"], ids["product_id"]) - 0.0) < 1e-9

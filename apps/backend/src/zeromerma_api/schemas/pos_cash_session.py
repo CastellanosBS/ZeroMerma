@@ -1,31 +1,24 @@
 # apps/backend/src/zeromerma_api/schemas/pos_cash_session.py
-from __future__ import annotations
+"""
+Deprecated compatibility shim.
 
-from decimal import Decimal
+The canonical cash-session API contracts now live in:
+    zeromerma_api.schemas.cash_session
 
-from pydantic import BaseModel, Field
+This module remains only to avoid breaking older imports during Phase 0.
+Remove it after all imports are migrated.
+"""
 
+from .cash_session import (
+    CashSessionCloseIn as CashSessionCloseRequest,
+)
+from .cash_session import (
+    CashSessionOpenIn as CashSessionOpenRequest,
+)
+from .cash_session import CashSessionOut
 
-class CashSessionOpenRequest(BaseModel):
-    """
-    Request payload to open a cash session.
-
-    Security model:
-    - The authenticated user becomes the opener (opened_by_id is derived from the token).
-    - The client must NOT provide opened_by_id.
-    """
-
-    branch_id: int = Field(ge=1)
-    opening_amount: Decimal = Field(ge=Decimal("0"))
-
-
-class CashSessionCloseRequest(BaseModel):
-    """
-    Request payload to close a cash session.
-
-    Security model:
-    - The authenticated user becomes the closer (closed_by_id is derived from the token).
-    - The client must NOT provide closed_by_id.
-    """
-
-    closing_amount: Decimal = Field(ge=Decimal("0"))
+__all__ = [
+    "CashSessionOpenRequest",
+    "CashSessionCloseRequest",
+    "CashSessionOut",
+]

@@ -1,41 +1,22 @@
-# apps/backend/src/zeromerma_api/models/cash_session.py
-# PURPOSE: Represent a POS "cash session" (register session) per branch.
-#          A branch typically has at most ONE open session at a time.
-#          Sales will later reference a cash_session to enforce operational flow.
+from __future__ import annotations
 
-from __future__ import (
-    annotations,
-)  # Postpone evaluation of type hints (helps avoid import cycles).
-
-from datetime import datetime  # We store open/close timestamps for auditing.
-from enum import Enum  # We'll model session status as a constrained set of values.
-from typing import (
-    TYPE_CHECKING,
-    Optional,
-)  # Optional for nullable fields; TYPE_CHECKING avoids runtime cycles.
+from datetime import datetime
+from decimal import Decimal
+from enum import Enum
+from typing import TYPE_CHECKING
 
 from sqlalchemy import (
     BigInteger,
     DateTime,
     ForeignKey,
+    Index,
     Numeric,
     String,
-    func,
-)  # SQLAlchemy column types and DB expressions.
-from sqlalchemy.orm import (
-    Mapped,
-    mapped_column,
-    relationship,
-)  # SQLAlchemy 2.0 typed ORM mapping tools.
+    text,
+)
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from .base import (
-    Base,
-    created_at_col,
-    updated_at_col,
-)  # The single Declarative Base shared across your entire model layer.
-
-# TYPE_CHECKING imports are ONLY for editors/type-checkers.
-# They are NOT executed at runtime, which prevents circular imports.
+from .base import Base, created_at_col, updated_at_col
 
 if TYPE_CHECKING:
     from .branch import Branch
@@ -43,96 +24,88 @@ if TYPE_CHECKING:
 
 
 class CashSessionStatus(str, Enum):
-    """
-    Allowed session statuses.
-    Stored in DB as strings for simplicity and easy debugging.
-    """
-
-    OPEN = "OPEN"  # Session is active; sales are allowed.
-    CLOSED = "CLOSED"  # Session is finished; sales should not be created under it.
-    CANCELED = "CANCELED"  # Optional future use (e.g., session opened by mistake).
+    OPEN = "OPEN"
+    CLOSED = "CLOSED"
+    CANCELED = "CANCELED"
 
 
 class CashSession(Base):
     """
-    CashSession is the cashier/register lifecycle per branch:
-      - opened_at/opening_amount recorded when opening the register
-      - closed_at/closing_amount recorded when closing it
-      - opened_by_id/closed_by_id for accountability
+    Cash register session for a branch.
+
+    Invariants:
+    - At most one OPEN session per branch.
+    - Monetary amounts are stored as Decimal-compatible NUMERIC(18,2).
     """
 
-    __tablename__ = "cash_session"  # Explicit table name; stable and predictable.
-
-    # Primary key: BIGINT for plenty of headroom and consistent style with other tables.
-    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
-
-    # Branch scope: a session belongs to exactly one branch (NOT NULL).
-    branch_id: Mapped[int] = mapped_column(
-        ForeignKey(
-            "branch.id", ondelete="RESTRICT"
-        ),  # RESTRICT: do not allow deleting branch with history.
-        index=True,  # Index: we filter by branch frequently.
-        nullable=False,
+    __tablename__ = "cash_session"
+    __table_args__ = (
+        Index("ix_cash_session_opened_at", "opened_at"),
+        Index("ix_cash_session_status", "status"),
+        Index(
+            "uq_cash_session_one_open_per_branch",
+            "branch_id",
+            unique=True,
+            postgresql_where=text("status = 'OPEN'"),
+        ),
     )
 
-    # Who opened the session (NOT NULL) — accountability.
-    opened_by_id: Mapped[int] = mapped_column(
-        ForeignKey(
-            "user_account.id", ondelete="RESTRICT"
-        ),  # Restrict: don't delete users with history by default.
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+
+    branch_id: Mapped[int] = mapped_column(
+        ForeignKey("branch.id", ondelete="RESTRICT"),
         index=True,
         nullable=False,
     )
 
-    # Who closed the session (nullable until closed).
-    closed_by_id: Mapped[Optional[int]] = mapped_column(
-        ForeignKey(
-            "user_account.id", ondelete="SET NULL"
-        ),  # If a user is removed, keep session but clear pointer.
+    opened_by_id: Mapped[int] = mapped_column(
+        ForeignKey("user_account.id", ondelete="RESTRICT"),
+        index=True,
+        nullable=False,
+    )
+
+    closed_by_id: Mapped[int | None] = mapped_column(
+        ForeignKey("user_account.id", ondelete="RESTRICT"),
         index=True,
         nullable=True,
     )
 
-    # When the session was opened: DB-side timestamp.
     opened_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         nullable=False,
-        server_default=func.now(),  # DB sets time at insert; consistent across services.
     )
 
-    # When the session was closed: NULL while status is OPEN.
-    closed_at: Mapped[Optional[datetime]] = mapped_column(
+    closed_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True),
         nullable=True,
     )
 
-    # Currency fields as NUMERIC(18,2) to avoid floating precision errors.
-    opening_amount: Mapped[float] = mapped_column(
+    opening_amount: Mapped[Decimal] = mapped_column(
         Numeric(18, 2),
         nullable=False,
+        default=Decimal("0.00"),
+        server_default=text("0"),
     )
 
-    closing_amount: Mapped[Optional[float]] = mapped_column(
+    closing_amount: Mapped[Decimal | None] = mapped_column(
         Numeric(18, 2),
         nullable=True,
     )
 
-    # Status stored as short string (OPEN/CLOSED/CANCELED).
     status: Mapped[str] = mapped_column(
-        String(16),
+        String(20),
         nullable=False,
-        server_default="OPEN",  # Default: an inserted session starts open unless stated otherwise.
+        default=CashSessionStatus.OPEN.value,
+        server_default=text("'OPEN'"),
     )
 
-    # Standard audit timestamps (optional but useful for consistency and debugging).
     created_at: Mapped[datetime] = created_at_col()
     updated_at: Mapped[datetime] = updated_at_col()
 
-    # ORM relationships (not required, but improves developer ergonomics).
-    branch: Mapped["Branch"] = (
-        relationship()
-    )  # We can add back_populates later if you want it bidirectional.
-    opened_by: Mapped["UserAccount"] = relationship(foreign_keys=[opened_by_id])
-    closed_by: Mapped[Optional["UserAccount"]] = relationship(
-        foreign_keys=[closed_by_id]
+    branch: Mapped["Branch"] = relationship()
+    opened_by: Mapped["UserAccount"] = relationship(
+        foreign_keys=[opened_by_id],
+    )
+    closed_by: Mapped["UserAccount | None"] = relationship(
+        foreign_keys=[closed_by_id],
     )

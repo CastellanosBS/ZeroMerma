@@ -146,9 +146,7 @@ def seed_stock_ledger_only(
     s.commit()
 
 
-def seed_stock_snapshot(
-    s: Session, *, branch_id: int, product_id: int, on_hand: float
-) -> None:
+def seed_stock_snapshot(s: Session, *, branch_id: int, product_id: int, on_hand: float) -> None:
     """
     Upsert inventory_balance snapshot row.
     """

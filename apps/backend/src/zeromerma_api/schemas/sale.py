@@ -1,78 +1,100 @@
 # apps/backend/src/zeromerma_api/schemas/sale.py
-# PURPOSE: Pydantic schemas for POS sales.
-#
-# SECURITY MODEL:
-# - created_by_id is NOT accepted from clients.
-# - created_by_id is derived from the authenticated user (JWT).
-# - We forbid unknown fields on request payloads to prevent impersonation attempts.
-
 from __future__ import annotations
 
-from typing import List
+from datetime import datetime
+from decimal import Decimal
+from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import Field
 
-from zeromerma_api.schemas.payment import PaymentOut
+from .common import (
+    NonNegativeMoney,
+    ORMReadSchema,
+    PositiveQuantity,
+    StrictInputSchema,
+)
+
+SaleStatusLiteral = Literal["OPEN", "CANCELED"]
 
 
-class SaleItemCreate(BaseModel):
+class SaleItemCreate(StrictInputSchema):
     """
-    MVP: client provides unit_price (POS price source for now).
-    Backend computes line_total and totals.
+    One sale line in the sale creation payload.
+
+    Notes:
+    - unit_price is optional so the backend can resolve effective price server-side.
     """
 
-    product_id: int = Field(..., ge=1)
-    qty: float = Field(..., gt=0)
-    unit_price: float = Field(..., ge=0)
-
-    model_config = ConfigDict(extra="forbid")
+    product_id: int = Field(ge=1)
+    qty: PositiveQuantity
+    unit_price: NonNegativeMoney | None = None
 
 
-class SaleCreate(BaseModel):
+class SaleCreate(StrictInputSchema):
     """
-    Request body for creating a sale.
+    Create a sale transactionally.
 
     Security:
-    - created_by_id is derived from the authenticated user (JWT).
-    - Clients must not send created_by_id.
+    - created_by_id is derived from the authenticated user, never from the client payload.
     """
 
-    branch_id: int = Field(..., ge=1)
-    cash_session_id: int = Field(..., ge=1)
-    items: List[SaleItemCreate]
-
-    model_config = ConfigDict(extra="forbid")
+    branch_id: int = Field(ge=1)
+    cash_session_id: int = Field(ge=1)
+    items: list[SaleItemCreate] = Field(min_length=1)
 
 
-class SaleItemOut(BaseModel):
+class SaleItemOut(ORMReadSchema):
+    """
+    Sale line returned by the API.
+    """
+
     id: int
     product_id: int
-    qty: float
-    unit_price: float
-    line_total: float
-
-    model_config = ConfigDict(from_attributes=True)
+    qty: Decimal
+    unit_price: Decimal
+    line_total: Decimal
 
 
-class SaleOut(BaseModel):
+class PaymentEmbeddedOut(ORMReadSchema):
+    """
+    Embedded payment representation used in sale detail responses.
+    """
+
+    id: int
+    sale_id: int
+    method: str
+    amount: Decimal
+    reference: str | None = None
+    created_at: datetime
+
+
+class SaleOut(ORMReadSchema):
+    """
+    Canonical sale response model.
+    """
+
     id: int
     branch_id: int
     cash_session_id: int
     created_by_id: int
-    subtotal: float
-    tax: float
-    total: float
-    status: str
-    items: List[SaleItemOut]
 
-    model_config = ConfigDict(from_attributes=True)
+    created_at: datetime
+    updated_at: datetime
+
+    subtotal: Decimal
+    tax: Decimal
+    total: Decimal
+
+    status: SaleStatusLiteral | str
+
+    items: list[SaleItemOut] = Field(default_factory=list)
 
 
 class SaleDetailOut(SaleOut):
     """
-    Extends SaleOut with payments and computed balance information.
+    Extended sale view including payments and derived amounts.
     """
 
-    payments: List[PaymentOut]
-    paid_amount: float
-    balance_due: float
+    payments: list[PaymentEmbeddedOut] = Field(default_factory=list)
+    paid_amount: Decimal = Decimal("0")
+    balance_due: Decimal = Decimal("0")

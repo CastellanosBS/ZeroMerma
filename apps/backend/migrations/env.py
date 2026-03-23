@@ -11,22 +11,23 @@ from sqlalchemy import (  # Alembic uses these to create an Engine
     pool,
 )
 
-# ------------- NEW: import your Base to expose metadata to Alembic -------------
+#  NEW: import your Base to expose metadata to Alembic
 # We import the project's Declarative Base, which aggregates all table metadata.
-# Alembic uses this 'target_metadata' to understand tables/columns when autogenerating,
+# Alembic uses this 'target_metadata' to understand
+# tables/columns when autogenerating,
 # and it's also a good sanity anchor for migrations.
+import zeromerma_api.models  # noqa: F401
 from zeromerma_api.models.base import Base
 
-# ------------- Optional: load DB URL from your app settings for single source of truth -------------
-# If your alembic.ini has sqlalchemy.url unset, we set it at runtime from your app's settings.
+#  Optional: load DB URL from your app settings for single source of truth
+# If your alembic.ini has sqlalchemy.url unset, we set it at runtime
+# from your app's settings.
 # This keeps local/CI configs consistent.
 try:
     from zeromerma_api.core.settings import get_settings
 
     _S = get_settings()
-    _APP_DATABASE_URL = (
-        _S.database_url
-    )  # e.g., "postgresql+psycopg://user:pass@host:5432/dbname"
+    _APP_DATABASE_URL = _S.database_url  # e.g., "postgresql+psycopg://user:pass@host:5432/dbname"
 except Exception:
     # Fallback to env or alembic.ini if settings import fails (e.g., in bare CI bootstrap).
     _APP_DATABASE_URL = os.getenv("DATABASE_URL") or os.getenv("database_url")
@@ -43,7 +44,7 @@ if _APP_DATABASE_URL:
 if config.config_file_name is not None:
     fileConfig(config.config_file_name)
 
-# ------------- This is the single most important line for Alembic to "see" your models -------------
+#  This is the single most important line for Alembic to "see" your models
 target_metadata = Base.metadata
 
 

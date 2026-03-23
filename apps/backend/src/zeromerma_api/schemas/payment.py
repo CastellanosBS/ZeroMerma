@@ -1,35 +1,39 @@
 # apps/backend/src/zeromerma_api/schemas/payment.py
-# PURPOSE: Pydantic schemas for payments API.
-
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Optional
+from decimal import Decimal
+from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import Field
+
+from .common import ORMReadSchema, PositiveMoney, StrictInputSchema
+
+PaymentMethodLiteral = Literal["CASH", "CARD", "TRANSFER", "OTHER"]
 
 
-class PaymentCreate(BaseModel):
+class PaymentCreate(StrictInputSchema):
     """
-    Client submits method + amount (+ optional reference).
-    We do NOT accept sale_id in body because it is in the URL path.
+    Append a payment to an existing sale.
+
+    Notes:
+    - sale_id is taken from the path parameter, not from the body.
+    - amount must be strictly positive.
     """
 
-    method: str = Field(..., min_length=1, max_length=16)
-    amount: float = Field(..., gt=0)
-    reference: Optional[str] = Field(None, max_length=64)
+    method: PaymentMethodLiteral | str
+    amount: PositiveMoney
+    reference: str | None = Field(default=None, max_length=64)
 
 
-class PaymentOut(BaseModel):
+class PaymentOut(ORMReadSchema):
     """
-    API representation of a payment record.
+    Canonical payment response model.
     """
 
     id: int
     sale_id: int
-    method: str
-    amount: float
-    reference: Optional[str]
+    method: PaymentMethodLiteral | str
+    amount: Decimal
+    reference: str | None = None
     created_at: datetime
-
-    model_config = ConfigDict(from_attributes=True)

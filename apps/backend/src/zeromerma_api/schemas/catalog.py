@@ -1,70 +1,58 @@
 # apps/backend/src/zeromerma_api/schemas/catalog.py
-# PURPOSE:
-#   Pydantic schemas for the Catalog module (ProductCategory + Product v2).
-#
-# PRODUCT v2 FIELDS:
-#   - uom: unit of measure (PCS/KG/G/L/ML)
-#   - is_input: True for ingredients/raw materials; False for finished/sellable goods
-#   - sale_price: optional catalog-level selling price (used later for pricing policy)
-#   - standard_cost: optional catalog-level standard cost (used later for costing)
-#
-# API DESIGN GOALS:
-#   - Backward compatible: existing clients can omit new fields.
-#   - Strict-enough validation to keep the catalog clean.
-#   - Response models include convenience fields (category_name).
-
 from __future__ import annotations
 
+from datetime import datetime
 from decimal import Decimal
-from typing import Optional
+from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import Field
+
+from .common import (
+    NonNegativeMoney,
+    ORMReadSchema,
+    PatchInputSchema,
+    StrictInputSchema,
+)
+
+UomLiteral = Literal["PCS", "KG", "G", "L", "ML"]
+
 
 # ---------------------------------------------------------------------------
-# ProductCategory schemas
+# Category schemas
 # ---------------------------------------------------------------------------
 
 
-class CategoryBase(BaseModel):
+class CategoryCreate(StrictInputSchema):
     """
-    Shared fields for ProductCategory.
+    Payload to create a product category.
     """
-
-    model_config = ConfigDict(extra="ignore")
 
     code: str = Field(min_length=1, max_length=32)
     name: str = Field(min_length=1, max_length=120)
     is_active: bool = True
 
 
-class CategoryCreate(CategoryBase):
+class CategoryUpdate(PatchInputSchema):
     """
-    Payload to create a category.
-    """
-
-    pass
-
-
-class CategoryUpdate(BaseModel):
-    """
-    Payload to update a category.
-
-    All fields optional to support partial updates via PUT.
+    Partial update payload for a product category.
     """
 
-    model_config = ConfigDict(extra="ignore")
-
-    code: Optional[str] = Field(default=None, min_length=1, max_length=32)
-    name: Optional[str] = Field(default=None, min_length=1, max_length=120)
-    is_active: Optional[bool] = None
+    code: str | None = Field(default=None, min_length=1, max_length=32)
+    name: str | None = Field(default=None, min_length=1, max_length=120)
+    is_active: bool | None = None
 
 
-class CategoryOut(CategoryBase):
+class CategoryOut(ORMReadSchema):
     """
     Category returned by the API.
     """
 
     id: int
+    code: str
+    name: str
+    is_active: bool
+    created_at: datetime | None = None
+    updated_at: datetime | None = None
 
 
 # ---------------------------------------------------------------------------
@@ -72,64 +60,66 @@ class CategoryOut(CategoryBase):
 # ---------------------------------------------------------------------------
 
 
-class ProductBase(BaseModel):
+class ProductCreate(StrictInputSchema):
     """
-    Shared fields for Product v2.
+    Payload to create a product.
 
-    NOTE:
-    - category_id is required in v2 because we want every product to belong to a category.
-    - uom/is_input have safe defaults (aligned with DB server defaults).
+    Notes:
+    - category_id is required at the API level even if the DB remains temporarily
+      backward-compatible.
+    - is_input distinguishes ingredients/raw materials from sellable products.
     """
 
-    model_config = ConfigDict(extra="ignore")
-
-    sku: Optional[str] = Field(default=None, min_length=1, max_length=64)
+    sku: str | None = Field(default=None, min_length=1, max_length=32)
     name: str = Field(min_length=1, max_length=200)
     category_id: int = Field(ge=1)
 
-    # v2 fields
-    uom: str = Field(default="PCS", min_length=1, max_length=16)
-    is_input: bool = Field(default=False)
+    uom: UomLiteral = "PCS"
+    is_input: bool = False
 
-    # optional catalog economics
-    sale_price: Optional[Decimal] = Field(default=None, ge=0)
-    standard_cost: Optional[Decimal] = Field(default=None, ge=0)
+    sale_price: NonNegativeMoney | None = None
+    standard_cost: NonNegativeMoney | None = None
 
     is_active: bool = True
 
 
-class ProductCreate(ProductBase):
+class ProductUpdate(PatchInputSchema):
     """
-    Payload to create a product.
-    """
-
-    pass
-
-
-class ProductUpdate(BaseModel):
-    """
-    Payload to update an existing product (partial fields).
+    Partial update payload for a product.
     """
 
-    model_config = ConfigDict(extra="ignore")
+    sku: str | None = Field(default=None, min_length=1, max_length=32)
+    name: str | None = Field(default=None, min_length=1, max_length=200)
+    category_id: int | None = Field(default=None, ge=1)
 
-    sku: Optional[str] = Field(default=None, min_length=1, max_length=64)
-    name: Optional[str] = Field(default=None, min_length=1, max_length=200)
-    category_id: Optional[int] = Field(default=None, ge=1)
+    uom: UomLiteral | None = None
+    is_input: bool | None = None
 
-    uom: Optional[str] = Field(default=None, min_length=1, max_length=16)
-    is_input: Optional[bool] = None
+    sale_price: NonNegativeMoney | None = None
+    standard_cost: NonNegativeMoney | None = None
 
-    sale_price: Optional[Decimal] = Field(default=None, ge=0)
-    standard_cost: Optional[Decimal] = Field(default=None, ge=0)
-
-    is_active: Optional[bool] = None
+    is_active: bool | None = None
 
 
-class ProductOut(ProductBase):
+class ProductOut(ORMReadSchema):
     """
     Product returned by the API.
     """
 
     id: int
-    category_name: Optional[str] = None
+    sku: str | None = None
+    name: str
+
+    category_id: int | None = None
+    category_name: str | None = None
+
+    uom: UomLiteral | str
+    is_input: bool
+
+    sale_price: Decimal | None = None
+    standard_cost: Decimal | None = None
+
+    is_active: bool
+
+    created_at: datetime | None = None
+    updated_at: datetime | None = None

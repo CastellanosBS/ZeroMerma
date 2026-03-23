@@ -72,9 +72,7 @@ class RequestContextMiddleware(BaseHTTPMiddleware):
         request_id = request.headers.get("X-Request-ID", "").strip() or uuid.uuid4().hex
 
         # 2) Best-effort auth claims (no DB)
-        user_id, role_code, branch_id = _extract_claims_from_authorization_header(
-            request
-        )
+        user_id, role_code, branch_id = _extract_claims_from_authorization_header(request)
 
         # 3) Set contextvars for this request
         tokens = set_request_context(

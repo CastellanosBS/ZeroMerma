@@ -18,7 +18,7 @@ def get_bearer_token(request: Request) -> str:
     """
     Extract a Bearer token from the Authorization header.
 
-    Expected header format:
+    Expected format:
       Authorization: Bearer <token>
     """
     auth = request.headers.get("Authorization", "")
@@ -49,18 +49,23 @@ def get_bearer_token(request: Request) -> str:
     return token
 
 
+def _decode_payload_or_401(token: str) -> dict[str, Any]:
+    """
+    Decode JWT or raise a standardized 401 response.
+    """
+    try:
+        return decode_access_token(token)
+    except AuthTokenError as e:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid or expired token.",
+            headers={"WWW-Authenticate": "Bearer"},
+        ) from e
+
+
 def _parse_user_id_from_payload(payload: dict[str, Any]) -> int:
     """
-    Parse `sub` claim as numeric user id.
-
-    Accepts:
-      - int
-      - str containing an int (e.g., "7")
-
-    Rejects:
-      - None
-      - bool (because bool is a subclass of int)
-      - any other type
+    Parse the `sub` claim as a numeric user id.
     """
     sub = payload.get("sub")
 
@@ -98,32 +103,12 @@ def _parse_user_id_from_payload(payload: dict[str, Any]) -> int:
     )
 
 
-def get_current_user(
-    token: Annotated[str, Depends(get_bearer_token)],
-    db: Annotated[Session, Depends(get_session)],
-) -> UserAccount:
+def _load_user_or_401(db: Session, user_id: int) -> UserAccount:
     """
-    Resolve the current authenticated user from a JWT Bearer token.
-
-    Steps:
-      1) Decode/validate the JWT signature and claims.
-      2) Read the 'sub' claim as the user id.
-      3) Fetch the user from the database.
+    Load authenticated user from DB or raise 401.
     """
-    try:
-        payload: dict[str, Any] = decode_access_token(token)
-    except AuthTokenError as e:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid or expired token.",
-            headers={"WWW-Authenticate": "Bearer"},
-        ) from e
+    user = db.execute(select(UserAccount).where(UserAccount.id == user_id)).scalar_one_or_none()
 
-    user_id = _parse_user_id_from_payload(payload)
-
-    user = db.execute(
-        select(UserAccount).where(UserAccount.id == user_id)
-    ).scalar_one_or_none()
     if user is None:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -132,6 +117,18 @@ def get_current_user(
         )
 
     return user
+
+
+def get_current_user(
+    token: Annotated[str, Depends(get_bearer_token)],
+    db: Annotated[Session, Depends(get_session)],
+) -> UserAccount:
+    """
+    Resolve the current authenticated user from a JWT Bearer token.
+    """
+    payload = _decode_payload_or_401(token)
+    user_id = _parse_user_id_from_payload(payload)
+    return _load_user_or_401(db, user_id)
 
 
 def get_current_active_user(
@@ -148,51 +145,27 @@ def get_current_active_user(
     return user
 
 
-# -------------------------------------------------------------------------
-# New: AuthContext-based dependencies (role-coded JWT support)
-# -------------------------------------------------------------------------
-
-
 def get_current_auth_context(
     token: Annotated[str, Depends(get_bearer_token)],
     db: Annotated[Session, Depends(get_session)],
 ) -> AuthContext:
     """
-    Resolve an AuthContext from the Bearer token.
+    Resolve AuthContext from the Bearer token.
 
-    What this adds beyond get_current_user():
-      - Extract role_code from token claim 'role_code' (if present)
-      - Fallback to DB lookup if claim is missing (backward compatibility)
+    Preferred path:
+      - role_code is embedded in JWT
 
-    This lets routers avoid a DB query per request once tokens include role_code.
+    Backward-compatible fallback:
+      - if role_code claim is missing, resolve it from the DB
     """
-    try:
-        payload: dict[str, Any] = decode_access_token(token)
-    except AuthTokenError as e:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid or expired token.",
-            headers={"WWW-Authenticate": "Bearer"},
-        ) from e
-
+    payload = _decode_payload_or_401(token)
     user_id = _parse_user_id_from_payload(payload)
+    user = _load_user_or_401(db, user_id)
 
-    user = db.execute(
-        select(UserAccount).where(UserAccount.id == user_id)
-    ).scalar_one_or_none()
-    if user is None:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="User not found for token.",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
-
-    # Preferred path: role_code is embedded in JWT.
     role_code_claim = payload.get("role_code")
     if isinstance(role_code_claim, str) and role_code_claim.strip():
         role_code = role_code_claim.strip()
     else:
-        # Backward compatibility: tokens without role_code still work.
         role_code = get_role_code(db, role_id=int(user.role_id))
 
     return AuthContext(user=user, role_code=role_code)
@@ -202,7 +175,7 @@ def get_current_active_auth_context(
     ctx: Annotated[AuthContext, Depends(get_current_auth_context)],
 ) -> AuthContext:
     """
-    Enforce that the authenticated user is active (AuthContext version).
+    Enforce that the authenticated user in AuthContext is active.
     """
     if not ctx.user.is_active:
         raise HTTPException(

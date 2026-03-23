@@ -1,12 +1,9 @@
-# apps/backend/src/zeromerma_api/tests/test_pos_payments_endpoints.py
 from __future__ import annotations
 
 import os
-from pathlib import Path
+from decimal import Decimal
 
 import pytest
-from alembic import command
-from alembic.config import Config
 from fastapi.testclient import TestClient
 from sqlalchemy import text
 from sqlalchemy.orm import Session
@@ -14,6 +11,7 @@ from sqlalchemy.orm import Session
 from zeromerma_api.core.security import create_access_token
 from zeromerma_api.db.engine import SessionLocal
 from zeromerma_api.main import create_app
+from zeromerma_api.tests.alembic_utils import alembic_upgrade_head
 
 
 def auth_headers(user_id: int) -> dict[str, str]:
@@ -24,48 +22,56 @@ def auth_headers(user_id: int) -> dict[str, str]:
     return {"Authorization": f"Bearer {token}"}
 
 
-def make_alembic_config() -> Config:
-    """
-    Tests live at:
-      .../apps/backend/src/zeromerma_api/tests/test_pos_payments_endpoints.py
-
-    parents[3] = backend ✅
-    """
-    backend_dir = Path(__file__).resolve().parents[3]
-    cfg = Config(str(backend_dir / "alembic.ini"))
-    cfg.set_main_option("script_location", str(backend_dir / "migrations"))
-
-    if os.getenv("DATABASE_URL"):
-        cfg.set_main_option("sqlalchemy.url", os.environ["DATABASE_URL"])
-
-    return cfg
-
-
-def alembic_upgrade_head() -> None:
-    cfg = make_alembic_config()
-    command.upgrade(cfg, "head")
-
-
 def reset_tables(s: Session) -> None:
+    """
+    Hard reset all tables touched by POS payment tests.
+
+    Important:
+    - product_price must be cleared before branch/product due to FK references.
+    - production_run must be cleared before user_account due to FK references.
+    """
+    s.execute(text("DELETE FROM product_price"))
     s.execute(text("DELETE FROM payment"))
     s.execute(text("DELETE FROM sale_item"))
     s.execute(text("DELETE FROM sale"))
     s.execute(text("DELETE FROM inventory_movement"))
     s.execute(text("DELETE FROM inventory_balance"))
+    s.execute(text("DELETE FROM production_run"))
     s.execute(text("DELETE FROM cash_session"))
     s.execute(text("DELETE FROM user_account"))
     s.execute(text("DELETE FROM role"))
     s.execute(text("DELETE FROM branch"))
     s.execute(text("DELETE FROM product"))
+    s.execute(text("DELETE FROM product_category"))
     s.commit()
 
 
 def seed_core(s: Session) -> tuple[int, int, int]:
+    """
+    Seed:
+      - one category
+      - one branch
+      - one ADMIN role
+      - one active user
+      - one finished product with stock
+    """
+    category_id = s.execute(
+        text(
+            """
+            INSERT INTO product_category
+                (code, name, quick_name, show_in_pos, default_pos_order, is_active, created_at, updated_at)
+            VALUES
+                ('FINISHED', 'Finished Goods', 'Finished', TRUE, 10, TRUE, now(), now())
+            RETURNING id
+            """
+        )
+    ).scalar_one()
+
     branch_id = s.execute(
         text(
             """
             INSERT INTO branch (code, name, is_active, created_at, updated_at)
-            VALUES ('MAIN', 'Main Branch', true, now(), now())
+            VALUES ('MAIN', 'Main Branch', TRUE, now(), now())
             RETURNING id
             """
         )
@@ -84,8 +90,10 @@ def seed_core(s: Session) -> tuple[int, int, int]:
     user_id = s.execute(
         text(
             """
-            INSERT INTO user_account (branch_id, role_id, email, full_name, password_hash, is_active, created_at, updated_at)
-            VALUES (:branch_id, :role_id, 'admin@example.com', 'Admin User', NULL, true, now(), now())
+            INSERT INTO user_account
+                (branch_id, role_id, email, full_name, password_hash, is_active, created_at, updated_at)
+            VALUES
+                (:branch_id, :role_id, 'admin@example.com', 'Admin User', NULL, TRUE, now(), now())
             RETURNING id
             """
         ),
@@ -95,26 +103,95 @@ def seed_core(s: Session) -> tuple[int, int, int]:
     product_id = s.execute(
         text(
             """
-            INSERT INTO product (sku, name, is_active, created_at, updated_at)
-            VALUES ('SKU-001', 'Test Product', true, now(), now())
+            INSERT INTO product
+                (
+                    sku,
+                    name,
+                    quick_name,
+                    category_id,
+                    uom,
+                    is_input,
+                    show_in_pos,
+                    is_sellable_in_pos,
+                    default_pos_order,
+                    sale_price,
+                    is_active,
+                    created_at,
+                    updated_at
+                )
+            VALUES
+                (
+                    'SKU-001',
+                    'Test Product',
+                    'Test',
+                    :category_id,
+                    'PCS',
+                    FALSE,
+                    TRUE,
+                    TRUE,
+                    10,
+                    25.00,
+                    TRUE,
+                    now(),
+                    now()
+                )
             RETURNING id
             """
-        )
+        ),
+        {"category_id": category_id},
     ).scalar_one()
 
-    # Snapshot row so sales can decrement safely
     s.execute(
         text(
             """
             INSERT INTO inventory_balance (branch_id, product_id, on_hand, reserved, created_at, updated_at)
-            VALUES (:b, :p, 100.000, 0.000, now(), now())
+            VALUES (:branch_id, :product_id, 999.000, 0.000, now(), now())
             """
         ),
-        {"b": branch_id, "p": product_id},
+        {"branch_id": branch_id, "product_id": product_id},
     )
 
     s.commit()
     return int(branch_id), int(user_id), int(product_id)
+
+
+def open_cash_session(client: TestClient, *, branch_id: int, user_id: int) -> int:
+    resp = client.post(
+        "/pos/cash-sessions/open",
+        json={"branch_id": branch_id, "opening_amount": "0.00"},
+        headers=auth_headers(user_id),
+    )
+    assert resp.status_code == 200, resp.text
+    return int(resp.json()["id"])
+
+
+def create_sale(
+    client: TestClient,
+    *,
+    branch_id: int,
+    cash_session_id: int,
+    user_id: int,
+    product_id: int,
+    qty: str,
+    unit_price: str,
+) -> dict:
+    resp = client.post(
+        "/pos/sales",
+        json={
+            "branch_id": branch_id,
+            "cash_session_id": cash_session_id,
+            "items": [
+                {
+                    "product_id": product_id,
+                    "qty": qty,
+                    "unit_price": unit_price,
+                }
+            ],
+        },
+        headers=auth_headers(user_id),
+    )
+    assert resp.status_code == 200, resp.text
+    return resp.json()
 
 
 @pytest.mark.skipif(
@@ -134,69 +211,69 @@ def test_payments_flow_and_balance_and_overpay():
     app = create_app()
     client = TestClient(app)
 
-    # Open cash session
-    open_resp = client.post(
-        "/pos/cash-sessions/open",
-        json={"branch_id": branch_id, "opening_amount": 0.00},
-        headers=auth_headers(user_id),
-    )
-    assert open_resp.status_code == 200, open_resp.text
-    cash_session_id = open_resp.json()["id"]
+    cash_session_id = open_cash_session(client, branch_id=branch_id, user_id=user_id)
 
-    # Create sale total=75 (3 items at 25)
-    sale_resp = client.post(
-        "/pos/sales",
-        json={
-            "branch_id": branch_id,
-            "cash_session_id": cash_session_id,
-            "items": [
-                {"product_id": product_id, "qty": 2, "unit_price": 25.00},
-                {"product_id": product_id, "qty": 1, "unit_price": 25.00},
-            ],
-        },
-        headers=auth_headers(user_id),
+    sale = create_sale(
+        client,
+        branch_id=branch_id,
+        cash_session_id=cash_session_id,
+        user_id=user_id,
+        product_id=product_id,
+        qty="3.000",
+        unit_price="25.00",
     )
-    assert sale_resp.status_code == 200, sale_resp.text
-    sale_id = sale_resp.json()["id"]
+    sale_id = int(sale["id"])
 
-    # First payment: 50 (AUTH REQUIRED)
-    p1 = client.post(
+    payment_1 = client.post(
         f"/pos/sales/{sale_id}/payments",
-        json={"method": "CASH", "amount": 50.00},
+        json={"method": "CASH", "amount": "50.00", "reference": "CASH-1"},
         headers=auth_headers(user_id),
     )
-    assert p1.status_code == 200, p1.text
+    assert payment_1.status_code == 200, payment_1.text
+    payment_1_json = payment_1.json()
+    assert payment_1_json["sale_id"] == sale_id
+    assert payment_1_json["method"] == "CASH"
+    assert Decimal(payment_1_json["amount"]) == Decimal("50.00")
+    assert payment_1_json["reference"] == "CASH-1"
 
-    # Sale detail should show paid=50, balance=25 (AUTH REQUIRED)
-    d1 = client.get(f"/pos/sales/{sale_id}", headers=auth_headers(user_id))
-    assert d1.status_code == 200, d1.text
-    detail = d1.json()
-    assert abs(detail["paid_amount"] - 50.00) < 1e-6
-    assert abs(detail["balance_due"] - 25.00) < 1e-6
-    assert len(detail["payments"]) == 1
+    detail_1 = client.get(
+        f"/pos/sales/{sale_id}",
+        headers=auth_headers(user_id),
+    )
+    assert detail_1.status_code == 200, detail_1.text
+    detail_1_json = detail_1.json()
+    assert Decimal(detail_1_json["total"]) == Decimal("75.00")
+    assert Decimal(detail_1_json["paid_amount"]) == Decimal("50.00")
+    assert Decimal(detail_1_json["balance_due"]) == Decimal("25.00")
+    assert len(detail_1_json["payments"]) == 1
 
-    # Second payment: 25 completes (AUTH REQUIRED)
-    p2 = client.post(
+    payment_2 = client.post(
         f"/pos/sales/{sale_id}/payments",
-        json={"method": "CARD", "amount": 25.00, "reference": "AUTH123"},
+        json={"method": "CARD", "amount": "25.00", "reference": "CARD-1"},
         headers=auth_headers(user_id),
     )
-    assert p2.status_code == 200, p2.text
+    assert payment_2.status_code == 200, payment_2.text
+    payment_2_json = payment_2.json()
+    assert payment_2_json["method"] == "CARD"
+    assert Decimal(payment_2_json["amount"]) == Decimal("25.00")
 
-    d2 = client.get(f"/pos/sales/{sale_id}", headers=auth_headers(user_id))
-    assert d2.status_code == 200, d2.text
-    detail2 = d2.json()
-    assert abs(detail2["paid_amount"] - 75.00) < 1e-6
-    assert abs(detail2["balance_due"] - 0.00) < 1e-6
-    assert len(detail2["payments"]) == 2
+    detail_2 = client.get(
+        f"/pos/sales/{sale_id}",
+        headers=auth_headers(user_id),
+    )
+    assert detail_2.status_code == 200, detail_2.text
+    detail_2_json = detail_2.json()
+    assert Decimal(detail_2_json["total"]) == Decimal("75.00")
+    assert Decimal(detail_2_json["paid_amount"]) == Decimal("75.00")
+    assert Decimal(detail_2_json["balance_due"]) == Decimal("0.00")
+    assert len(detail_2_json["payments"]) == 2
 
-    # Overpay rejected (AUTH REQUIRED)
-    over = client.post(
+    overpay = client.post(
         f"/pos/sales/{sale_id}/payments",
-        json={"method": "CASH", "amount": 0.01},
+        json={"method": "CASH", "amount": "1.00", "reference": "OVERPAY"},
         headers=auth_headers(user_id),
     )
-    assert over.status_code == 409, over.text
+    assert overpay.status_code == 409, overpay.text
 
 
 @pytest.mark.skipif(
@@ -216,46 +293,46 @@ def test_payments_rejected_when_sale_not_open():
     app = create_app()
     client = TestClient(app)
 
-    open_resp = client.post(
-        "/pos/cash-sessions/open",
-        json={"branch_id": branch_id, "opening_amount": 0.00},
-        headers=auth_headers(user_id),
-    )
-    assert open_resp.status_code == 200, open_resp.text
-    cash_session_id = open_resp.json()["id"]
+    cash_session_id = open_cash_session(client, branch_id=branch_id, user_id=user_id)
 
-    sale_resp = client.post(
-        "/pos/sales",
-        json={
-            "branch_id": branch_id,
-            "cash_session_id": cash_session_id,
-            "items": [{"product_id": product_id, "qty": 1, "unit_price": 10.00}],
-        },
-        headers=auth_headers(user_id),
+    sale = create_sale(
+        client,
+        branch_id=branch_id,
+        cash_session_id=cash_session_id,
+        user_id=user_id,
+        product_id=product_id,
+        qty="1.000",
+        unit_price="25.00",
     )
-    assert sale_resp.status_code == 200, sale_resp.text
-    sale_id = sale_resp.json()["id"]
+    sale_id = int(sale["id"])
 
     close_resp = client.post(
         f"/pos/cash-sessions/{cash_session_id}/close",
-        json={"closing_amount": 0.00},
+        json={"closing_amount": "0.00"},
         headers=auth_headers(user_id),
     )
     assert close_resp.status_code == 200, close_resp.text
 
-    # Force sale status out of OPEN to test rejection
     s2: Session = SessionLocal()
     try:
         s2.execute(
-            text("UPDATE sale SET status='CANCELED' WHERE id=:id"), {"id": sale_id}
+            text(
+                """
+                UPDATE sale
+                SET status = 'VOIDED',
+                    updated_at = now()
+                WHERE id = :sale_id
+                """
+            ),
+            {"sale_id": sale_id},
         )
         s2.commit()
     finally:
         s2.close()
 
-    p = client.post(
+    payment_resp = client.post(
         f"/pos/sales/{sale_id}/payments",
-        json={"method": "CASH", "amount": 5.00},
+        json={"method": "CASH", "amount": "25.00", "reference": "CASH-CLOSED"},
         headers=auth_headers(user_id),
     )
-    assert p.status_code == 409, p.text
+    assert payment_resp.status_code == 409, payment_resp.text

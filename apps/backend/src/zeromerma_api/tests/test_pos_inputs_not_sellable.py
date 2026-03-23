@@ -203,9 +203,7 @@ def test_input_products_cannot_be_sold_via_pos():
     try:
         reset_tables(s)
         ids = seed_base_state(s)
-        before = get_on_hand(
-            s, branch_id=ids["branch_id"], product_id=ids["product_id"]
-        )
+        before = get_on_hand(s, branch_id=ids["branch_id"], product_id=ids["product_id"])
         assert before == Decimal("100")
     finally:
         s.close()
@@ -213,9 +211,7 @@ def test_input_products_cannot_be_sold_via_pos():
     app = create_app()
     client = TestClient(app)
 
-    headers = auth_headers(
-        user_id=ids["user_id"], role_code="ADMIN", branch_id=ids["branch_id"]
-    )
+    headers = auth_headers(user_id=ids["user_id"], role_code="ADMIN", branch_id=ids["branch_id"])
 
     # Open cash session (anti-impersonation: no opened_by_id in payload)
     open_resp = client.post(
@@ -233,13 +229,15 @@ def test_input_products_cannot_be_sold_via_pos():
         json={
             "branch_id": ids["branch_id"],
             "cash_session_id": cash_session_id,
-            "items": [
-                {"product_id": ids["product_id"], "qty": 1.0, "unit_price": 10.00}
-            ],
+            "items": [{"product_id": ids["product_id"], "qty": 1.0, "unit_price": 10.00}],
         },
         headers=headers,
     )
-    assert sale_resp.status_code == 409, sale_resp.text
+    assert sale_resp.status_code == 400, sale_resp.text
+
+    payload = sale_resp.json()
+    assert payload["error"]["code"] == "DOMAIN_VALIDATION_ERROR"
+    assert "Cannot sell input/ingredient products via POS." in payload["error"]["message"]
 
     # DB invariants: no sale, no SALE movements, snapshot unchanged
     s2: Session = SessionLocal()
@@ -248,9 +246,7 @@ def test_input_products_cannot_be_sold_via_pos():
         sale_mov_count = s2.execute(
             text("SELECT COUNT(*) FROM inventory_movement WHERE reason = 'SALE'")
         ).scalar_one()
-        after = get_on_hand(
-            s2, branch_id=ids["branch_id"], product_id=ids["product_id"]
-        )
+        after = get_on_hand(s2, branch_id=ids["branch_id"], product_id=ids["product_id"])
 
         assert int(sale_count) == 0
         assert int(sale_mov_count) == 0

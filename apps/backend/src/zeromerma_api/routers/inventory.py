@@ -1,58 +1,22 @@
-# apps/backend/src/zeromerma_api/routers/inventory.py
-# PURPOSE:
-#   Read-only inventory endpoints:
-#     - GET /inventory/stock
-#     - GET /inventory/movements
-#
-# AUTHORIZATION (roles + branch scoping):
-#   - Allowed roles: ADMIN, CASHIER
-#   - Branch scope:
-#       * ADMIN -> can query any branch_id
-#       * CASHIER -> only their own branch_id
-#   - If branch_id is omitted, we default to ctx.user.branch_id
-#
-# FAST-PATH (role-coded JWT):
-#   - role_code is read from JWT claims via AuthContext.
-#   - No per-request DB lookup to resolve role.code.
-#
-# NOTE:
-#   If an older token does not include role_code, get_current_auth_context()
-#   will fallback to DB role lookup (backward compatible).
-
 from __future__ import annotations
 
-from collections.abc import Generator
 from datetime import datetime
+from decimal import Decimal
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Query
 from sqlalchemy import and_, desc, func, select
-from sqlalchemy.orm import Session
 
-from zeromerma_api.core.auth_context import AuthContext
 from zeromerma_api.core.authz import (
     INVENTORY_ALLOWED_ROLES,
     enforce_branch_access,
     require_ctx_role,
 )
-from zeromerma_api.core.deps_auth import get_current_active_auth_context
-from zeromerma_api.db.engine import SessionLocal
+from zeromerma_api.core.dependency_aliases import ActiveAuthContextDep, DbSessionDep
 from zeromerma_api.models.inventory_movement import InventoryMovement, MovementReason
 from zeromerma_api.models.product import Product
 from zeromerma_api.schemas.inventory import MovementRow, StockRow
 
 router = APIRouter(prefix="/inventory", tags=["inventory"])
-
-
-def get_db() -> Generator[Session, None, None]:
-    """
-    FastAPI DB dependency: open a session, yield it to the handler,
-    and always close it afterwards.
-    """
-    db = SessionLocal()
-    try:
-        yield db
-    finally:
-        db.close()
 
 
 @router.get(
@@ -61,26 +25,25 @@ def get_db() -> Generator[Session, None, None]:
     summary="Aggregated stock by (branch, product).",
 )
 def get_stock(
+    db: DbSessionDep,
+    ctx: ActiveAuthContextDep,
     branch_id: int | None = Query(None, description="Filter by branch id"),
     product_id: int | None = Query(None, description="Filter by product id"),
     sku: str | None = Query(None, description="Filter by product SKU"),
     page: int = Query(1, ge=1, description="1-based page number"),
     page_size: int = Query(50, ge=1, le=200, description="Items per page (max 200)"),
-    db: Session = Depends(get_db),
-    ctx: AuthContext = Depends(get_current_active_auth_context),
-):
+) -> list[StockRow]:
     """
     Compute stock as SUM(qty) grouped by (branch_id, product_id, sku, name).
 
     Security:
       - Role check via ctx.role_code (JWT claim).
       - Branch scoping enforced (ADMIN any branch, CASHIER own branch).
+      - If branch_id is omitted, we default to ctx.user.branch_id.
     """
     role_code = require_ctx_role(ctx=ctx, allowed_roles=INVENTORY_ALLOWED_ROLES)
 
-    effective_branch_id = (
-        int(branch_id) if branch_id is not None else int(ctx.user.branch_id)
-    )
+    effective_branch_id = int(branch_id) if branch_id is not None else int(ctx.user.branch_id)
     enforce_branch_access(
         current_user=ctx.user,
         role_code=role_code,
@@ -122,11 +85,11 @@ def get_stock(
 
     return [
         StockRow(
-            branch_id=r.branch_id,
-            product_id=r.product_id,
+            branch_id=int(r.branch_id),
+            product_id=int(r.product_id),
             sku=r.sku,
-            product_name=r.product_name,
-            qty=float(r.qty_sum or 0),
+            product_name=str(r.product_name),
+            qty=Decimal(str(r.qty_sum or 0)),
         )
         for r in rows
     ]
@@ -138,32 +101,22 @@ def get_stock(
     summary="List inventory movements (newest first).",
 )
 def list_movements(
+    db: DbSessionDep,
+    ctx: ActiveAuthContextDep,
     branch_id: int | None = Query(None, description="Filter by branch id"),
     product_id: int | None = Query(None, description="Filter by product id"),
     reason: MovementReason | None = Query(None, description="Filter by reason"),
-    date_from: datetime | None = Query(
-        None, description="created_at ≥ this UTC datetime"
-    ),
-    date_to: datetime | None = Query(
-        None, description="created_at ≤ this UTC datetime"
-    ),
+    date_from: datetime | None = Query(None, description="created_at ≥ this UTC datetime"),
+    date_to: datetime | None = Query(None, description="created_at ≤ this UTC datetime"),
     limit: int = Query(50, ge=1, le=200, description="Max rows to return"),
     offset: int = Query(0, ge=0, description="Rows to skip (for paging)"),
-    db: Session = Depends(get_db),
-    ctx: AuthContext = Depends(get_current_active_auth_context),
-):
+) -> list[MovementRow]:
     """
     Return a paged list of ledger movements ordered by created_at DESC, id DESC.
-
-    Security:
-      - Role check via ctx.role_code (JWT claim).
-      - Branch scoping enforced.
     """
     role_code = require_ctx_role(ctx=ctx, allowed_roles=INVENTORY_ALLOWED_ROLES)
 
-    effective_branch_id = (
-        int(branch_id) if branch_id is not None else int(ctx.user.branch_id)
-    )
+    effective_branch_id = int(branch_id) if branch_id is not None else int(ctx.user.branch_id)
     enforce_branch_access(
         current_user=ctx.user,
         role_code=role_code,
@@ -186,16 +139,15 @@ def list_movements(
         stmt = stmt.where(InventoryMovement.created_at <= date_to)
 
     stmt = stmt.offset(int(offset)).limit(int(limit))
-
     rows = db.execute(stmt).scalars().all()
 
     return [
         MovementRow(
-            id=mv.id,
-            branch_id=mv.branch_id,
-            product_id=mv.product_id,
-            qty=float(mv.qty),
-            reason=mv.reason,
+            id=int(mv.id),
+            branch_id=int(mv.branch_id),
+            product_id=int(mv.product_id),
+            qty=Decimal(str(mv.qty)),
+            reason=str(mv.reason),
             ref_type=mv.ref_type,
             ref_id=mv.ref_id,
             note=mv.note,

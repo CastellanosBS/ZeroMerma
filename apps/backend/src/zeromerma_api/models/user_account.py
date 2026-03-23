@@ -22,12 +22,8 @@ class UserAccount(Base):
     id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
 
     # Foreign keys (NOT NULL): every user must have a branch and a role
-    branch_id: Mapped[int] = mapped_column(
-        ForeignKey("branch.id"), index=True, nullable=False
-    )
-    role_id: Mapped[int] = mapped_column(
-        ForeignKey("role.id"), index=True, nullable=False
-    )
+    branch_id: Mapped[int] = mapped_column(ForeignKey("branch.id"), index=True, nullable=False)
+    role_id: Mapped[int] = mapped_column(ForeignKey("role.id"), index=True, nullable=False)
 
     # Identity
     email: Mapped[str] = mapped_column(String(255), unique=True, index=True)

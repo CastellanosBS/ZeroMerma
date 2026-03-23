@@ -7,7 +7,7 @@ from datetime import datetime
 from enum import Enum
 from typing import TYPE_CHECKING, List
 
-from sqlalchemy import BigInteger, DateTime, ForeignKey, Numeric, String, func
+from sqlalchemy import BigInteger, DateTime, ForeignKey, Index, Numeric, String, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from .base import Base, updated_at_col
@@ -30,6 +30,10 @@ class SaleStatus(str, Enum):
 
 
 class Sale(Base):
+    __table_args__ = (
+        Index("ix_sale_created_at", "created_at"),
+        Index("ix_sale_status", "status"),
+    )
     """
     Sale header:
       - belongs to one branch
@@ -68,9 +72,7 @@ class Sale(Base):
 
     # Totals: NUMERIC to avoid float rounding errors in DB
     subtotal: Mapped[float] = mapped_column(Numeric(18, 2), nullable=False)
-    tax: Mapped[float] = mapped_column(
-        Numeric(18, 2), nullable=False, server_default="0"
-    )
+    tax: Mapped[float] = mapped_column(Numeric(18, 2), nullable=False, server_default="0")
     total: Mapped[float] = mapped_column(Numeric(18, 2), nullable=False)
 
     status: Mapped[str] = mapped_column(

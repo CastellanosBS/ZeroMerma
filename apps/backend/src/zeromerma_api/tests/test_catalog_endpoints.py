@@ -38,17 +38,38 @@ def auth_headers(*, user_id: int, role_code: str, branch_id: int) -> dict[str, s
 
 
 def reset_db_for_catalog(s: Session) -> None:
-    s.execute(text("DELETE FROM payment"))
-    s.execute(text("DELETE FROM sale_item"))
-    s.execute(text("DELETE FROM sale"))
-    s.execute(text("DELETE FROM cash_session"))
-    s.execute(text("DELETE FROM inventory_movement"))
-    s.execute(text("DELETE FROM inventory_balance"))
-    s.execute(text("DELETE FROM product"))
-    s.execute(text("DELETE FROM product_category"))
-    s.execute(text("DELETE FROM user_account"))
-    s.execute(text("DELETE FROM role"))
-    s.execute(text("DELETE FROM branch"))
+    """
+    Reset DB state for deterministic catalog tests.
+
+    Why TRUNCATE instead of DELETE:
+      - We now have more tables with FK dependencies (e.g., production_run -> user_account).
+      - TRUNCATE ... CASCADE avoids FK ordering problems.
+      - RESTART IDENTITY keeps IDs predictable across repeated runs.
+
+    Note:
+      - This is an integration test suite that shares a real Postgres DB.
+      - A "hard reset" is the simplest way to guarantee isolation.
+    """
+    s.execute(
+        text(
+            """
+            TRUNCATE TABLE
+                payment,
+                sale_item,
+                sale,
+                inventory_movement,
+                inventory_balance,
+                cash_session,
+                production_run,
+                product,
+                product_category,
+                user_account,
+                role,
+                branch
+            RESTART IDENTITY CASCADE
+            """
+        )
+    )
     s.commit()
 
 

@@ -1,64 +1,57 @@
 # apps/backend/src/zeromerma_api/schemas/cash_session.py
-# PURPOSE: Pydantic schemas for cash session endpoints.
-#
-# SECURITY MODEL:
-# - Actor identifiers are NOT accepted from clients:
-#     * opened_by_id is derived from the authenticated user (JWT).
-#     * closed_by_id is derived from the authenticated user (JWT).
-# - We forbid unknown fields on request payloads to prevent impersonation attempts
-#   or stale clients sending deprecated fields.
-
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Optional
+from decimal import Decimal
+from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import Field
+
+from .common import NonNegativeMoney, ORMReadSchema, StrictInputSchema
+
+CashSessionStatusLiteral = Literal["OPEN", "CLOSED", "CANCELED"]
 
 
-class CashSessionOut(BaseModel):
+class CashSessionOpenIn(StrictInputSchema):
     """
-    API representation of a cash session.
-    Response models remain stable and explicit.
+    Request payload to open a cash session.
+
+    Security:
+    - opened_by_id is derived from the authenticated user, never from the client payload.
+    """
+
+    branch_id: int = Field(ge=1)
+    opening_amount: NonNegativeMoney
+
+
+class CashSessionCloseIn(StrictInputSchema):
+    """
+    Request payload to close a cash session.
+
+    Security:
+    - closed_by_id is derived from the authenticated user, never from the client payload.
+    """
+
+    closing_amount: NonNegativeMoney
+
+
+class CashSessionOut(ORMReadSchema):
+    """
+    Canonical cash session response model.
     """
 
     id: int
     branch_id: int
     opened_by_id: int
-    closed_by_id: Optional[int]
+    closed_by_id: int | None = None
+
     opened_at: datetime
-    closed_at: Optional[datetime]
-    opening_amount: float
-    closing_amount: Optional[float]
-    status: str
+    closed_at: datetime | None = None
 
-    model_config = ConfigDict(from_attributes=True)
+    opening_amount: Decimal
+    closing_amount: Decimal | None = None
 
+    status: CashSessionStatusLiteral | str
 
-class CashSessionOpenIn(BaseModel):
-    """
-    Request body for opening a cash session.
-
-    Security:
-    - opened_by_id is derived from the authenticated user (JWT).
-    - Clients must not send opened_by_id.
-    """
-
-    branch_id: int = Field(..., ge=1)
-    opening_amount: float = Field(..., ge=0)
-
-    model_config = ConfigDict(extra="forbid")
-
-
-class CashSessionCloseIn(BaseModel):
-    """
-    Request body for closing a cash session.
-
-    Security:
-    - closed_by_id is derived from the authenticated user (JWT).
-    - Clients must not send closed_by_id.
-    """
-
-    closing_amount: float = Field(..., ge=0)
-
-    model_config = ConfigDict(extra="forbid")
+    created_at: datetime
+    updated_at: datetime

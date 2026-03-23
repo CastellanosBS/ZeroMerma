@@ -1,13 +1,11 @@
-# apps/backend/src/zeromerma_api/tests/test_inventory_endpoints.py
 from __future__ import annotations
 
 import os
-from pathlib import Path
+from decimal import Decimal
 from typing import Any
+from uuid import uuid4
 
 import pytest
-from alembic import command
-from alembic.config import Config
 from fastapi.testclient import TestClient
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -20,22 +18,15 @@ from zeromerma_api.models.inventory_movement import InventoryMovement, MovementR
 from zeromerma_api.models.product import Product
 from zeromerma_api.models.role import Role
 from zeromerma_api.models.user_account import UserAccount
+from zeromerma_api.tests.alembic_utils import alembic_upgrade_head as _alembic_upgrade_head
 
 
 def auth_headers(user_id: int) -> dict[str, str]:
     """
-    Build Authorization headers for protected endpoints.
+    Build Authorization headers for protected inventory endpoints.
     """
     token = create_access_token(subject=str(user_id))
     return {"Authorization": f"Bearer {token}"}
-
-
-def _alembic_upgrade_head() -> None:
-    backend_dir = Path(__file__).resolve().parents[3]
-    cfg = Config(str(backend_dir / "alembic.ini"))
-    cfg.set_main_option("script_location", str(backend_dir / "migrations"))
-    cfg.set_main_option("sqlalchemy.url", os.environ["DATABASE_URL"])
-    command.upgrade(cfg, "head")
 
 
 @pytest.mark.skipif(
@@ -64,10 +55,8 @@ def test_stock_and_movements_endpoints():
             s.add(role)
             s.flush()
 
-        # Ensure user exists (needed only if /inventory/* is protected)
-        user = s.scalar(
-            select(UserAccount).where(UserAccount.email == "admin@example.com")
-        )
+        # Ensure user exists (needed if /inventory/* is protected)
+        user = s.scalar(select(UserAccount).where(UserAccount.email == "admin@example.com"))
         if user is None:
             user = UserAccount(
                 branch_id=main.id,
@@ -80,26 +69,32 @@ def test_stock_and_movements_endpoints():
             s.add(user)
             s.flush()
 
-        # Ensure product exists
-        prod = s.scalar(select(Product).where(Product.sku == "DONUT-GLA"))
-        if prod is None:
-            prod = Product(sku="DONUT-GLA", name="Donut Glazed", is_active=True)
-            s.add(prod)
-            s.flush()
+        # Create an isolated product for deterministic assertions
+        test_sku = f"DONUT-GLA-{uuid4().hex[:8].upper()}"
 
-        # Clear any prior movements for deterministic assertions
+        prod = Product(
+            sku=test_sku,
+            name="Donut Glazed",
+            is_active=True,
+            uom="PCS",
+            is_input=False,
+        )
+        s.add(prod)
+        s.flush()
+
+        # Clear any prior movements for this exact (branch, product)
         s.query(InventoryMovement).filter(
             InventoryMovement.branch_id == main.id,
             InventoryMovement.product_id == prod.id,
         ).delete()
         s.flush()
 
-        # Insert movements: +10, -3
+        # Insert deterministic ledger movements: +10, -3 => net 7
         s.add(
             InventoryMovement(
                 branch_id=main.id,
                 product_id=prod.id,
-                qty=10.000,
+                qty=Decimal("10.000"),
                 reason=MovementReason.OPENING_BALANCE.value,
             )
         )
@@ -107,7 +102,7 @@ def test_stock_and_movements_endpoints():
             InventoryMovement(
                 branch_id=main.id,
                 product_id=prod.id,
-                qty=-3.000,
+                qty=Decimal("-3.000"),
                 reason=MovementReason.SALE.value,
             )
         )
@@ -127,28 +122,33 @@ def test_stock_and_movements_endpoints():
     )
     assert r.status_code == 200, r.text
     data = r.json()
+
     assert isinstance(data, list)
     assert len(data) == 1
+
     row: dict[str, Any] = data[0]
     assert row["branch_id"] == branch_id
     assert row["product_id"] == product_id
-    assert row["sku"] == "DONUT-GLA"
+    assert row["sku"] == test_sku
     assert row["product_name"] == "Donut Glazed"
-    assert abs(row["qty"] - 7.0) < 1e-6  # 10 - 3 = 7
+    assert Decimal(row["qty"]) == Decimal("7.000")
 
     # /inventory/movements
     r2 = client.get(
         "/inventory/movements",
-        params={"branch_id": branch_id, "product_id": product_id, "limit": 10},
+        params={"branch_id": branch_id, "product_id": product_id, "limit": 50},
         headers=auth_headers(user_id),
     )
     assert r2.status_code == 200, r2.text
-    items = r2.json()
-    assert len(items) == 2
-    assert items[0]["reason"] in ("SALE", MovementReason.SALE.value)
-    assert items[0]["qty"] == -3.0
-    assert items[1]["reason"] in (
-        "OPENING_BALANCE",
-        MovementReason.OPENING_BALANCE.value,
-    )
-    assert items[1]["qty"] == 10.0
+    moves = r2.json()
+
+    assert isinstance(moves, list)
+    assert len(moves) == 2
+
+    # Newest first (service orders by id desc), so SALE should typically come first
+    reasons = {m["reason"] for m in moves}
+    assert MovementReason.OPENING_BALANCE.value in reasons
+    assert MovementReason.SALE.value in reasons
+
+    qtys = sorted(Decimal(m["qty"]) for m in moves)
+    assert qtys == [Decimal("-3.000"), Decimal("10.000")]

@@ -9,9 +9,7 @@ settings = get_settings()
 
 db_url = settings.database_url
 if not db_url:
-    raise RuntimeError(
-        "database_url is not configured (check DATABASE_URL and your .env file)."
-    )
+    raise RuntimeError("database_url is not configured (check DATABASE_URL and your .env file).")
 
 engine = create_engine(
     db_url,

@@ -81,9 +81,7 @@ def whoami(
     """
     _require_admin(db, current_user)
 
-    role = db.execute(
-        select(Role).where(Role.id == current_user.role_id)
-    ).scalar_one_or_none()
+    role = db.execute(select(Role).where(Role.id == current_user.role_id)).scalar_one_or_none()
 
     return {
         "id": int(current_user.id),
@@ -168,18 +166,12 @@ def create_user(
         select(Branch).where(Branch.id == int(payload.branch_id))
     ).scalar_one_or_none()
     if branch is None:
-        raise HTTPException(
-            status_code=404, detail=f"Branch {payload.branch_id} not found."
-        )
+        raise HTTPException(status_code=404, detail=f"Branch {payload.branch_id} not found.")
 
     # Validate role exists
-    role = db.execute(
-        select(Role).where(Role.id == int(payload.role_id))
-    ).scalar_one_or_none()
+    role = db.execute(select(Role).where(Role.id == int(payload.role_id))).scalar_one_or_none()
     if role is None:
-        raise HTTPException(
-            status_code=404, detail=f"Role {payload.role_id} not found."
-        )
+        raise HTTPException(status_code=404, detail=f"Role {payload.role_id} not found.")
 
     # Check email uniqueness (pre-check; still handle IntegrityError for race safety)
     existing = db.execute(
@@ -229,13 +221,9 @@ def update_user(
         raise HTTPException(status_code=404, detail=f"User {user_id} not found.")
 
     if payload.role_id is not None:
-        role = db.execute(
-            select(Role).where(Role.id == int(payload.role_id))
-        ).scalar_one_or_none()
+        role = db.execute(select(Role).where(Role.id == int(payload.role_id))).scalar_one_or_none()
         if role is None:
-            raise HTTPException(
-                status_code=404, detail=f"Role {payload.role_id} not found."
-            )
+            raise HTTPException(status_code=404, detail=f"Role {payload.role_id} not found.")
         user.role_id = int(payload.role_id)
 
     if payload.branch_id is not None:
@@ -243,9 +231,7 @@ def update_user(
             select(Branch).where(Branch.id == int(payload.branch_id))
         ).scalar_one_or_none()
         if branch is None:
-            raise HTTPException(
-                status_code=404, detail=f"Branch {payload.branch_id} not found."
-            )
+            raise HTTPException(status_code=404, detail=f"Branch {payload.branch_id} not found.")
         user.branch_id = int(payload.branch_id)
 
     if payload.full_name is not None:

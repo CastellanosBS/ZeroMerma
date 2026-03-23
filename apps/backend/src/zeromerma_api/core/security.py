@@ -110,9 +110,7 @@ def verify_password(plain_password: str, stored_hash: str | None) -> bool:
     return hmac.compare_digest(candidate_hash, expected_hash)
 
 
-def create_access_token(
-    subject: str, *, extra_claims: dict[str, object] | None = None
-) -> str:
+def create_access_token(subject: str, *, extra_claims: dict[str, object] | None = None) -> str:
     """
     Create a signed JWT access token.
 

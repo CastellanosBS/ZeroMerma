@@ -1,21 +1,27 @@
-# PURPOSE: Sale line items.
-#          Each line references a product, quantity, and price snapshot.
-
+# apps/backend/src/zeromerma_api/models/sale_item.py
 from __future__ import annotations
+
+from decimal import Decimal
+from typing import TYPE_CHECKING
 
 from sqlalchemy import BigInteger, ForeignKey, Numeric
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from .base import Base
 
+if TYPE_CHECKING:
+    from .product import Product
+    from .sale import Sale
+
 
 class SaleItem(Base):
     """
-    SaleItem:
-      - belongs to one sale
-      - references one product
-      - stores qty and unit_price (snapshot at sale time)
-      - stores line_total = qty * unit_price (computed by backend)
+    Sale line item.
+
+    Stores the pricing snapshot used at sale time:
+      - qty
+      - unit_price
+      - line_total
     """
 
     __tablename__ = "sale_item"
@@ -23,7 +29,7 @@ class SaleItem(Base):
     id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
 
     sale_id: Mapped[int] = mapped_column(
-        ForeignKey("sale.id", ondelete="CASCADE"),  # if sale deleted, delete items
+        ForeignKey("sale.id", ondelete="CASCADE"),
         index=True,
         nullable=False,
     )
@@ -34,20 +40,20 @@ class SaleItem(Base):
         nullable=False,
     )
 
-    qty: Mapped[float] = mapped_column(
-        Numeric(18, 3),  # allow fractional quantities if needed
+    qty: Mapped[Decimal] = mapped_column(
+        Numeric(18, 3),
         nullable=False,
     )
 
-    unit_price: Mapped[float] = mapped_column(
+    unit_price: Mapped[Decimal] = mapped_column(
         Numeric(18, 2),
         nullable=False,
     )
 
-    line_total: Mapped[float] = mapped_column(
+    line_total: Mapped[Decimal] = mapped_column(
         Numeric(18, 2),
         nullable=False,
     )
 
-    sale = relationship("Sale", back_populates="items")
-    product = relationship("Product")
+    sale: Mapped["Sale"] = relationship(back_populates="items")
+    product: Mapped["Product"] = relationship(back_populates="sale_items")

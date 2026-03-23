@@ -11,6 +11,14 @@ from fastapi.responses import JSONResponse
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from zeromerma_api.core.deps_auth import get_current_active_user
+from zeromerma_api.core.domain_errors import (
+    DomainAuthorizationError,
+    DomainConflictError,
+    DomainError,
+    DomainInvariantError,
+    DomainNotFoundError,
+    DomainValidationError,
+)
 from zeromerma_api.core.logging_config import setup_logging
 from zeromerma_api.core.request_middleware import RequestContextMiddleware
 from zeromerma_api.core.settings import get_settings
@@ -20,6 +28,8 @@ from zeromerma_api.routers.catalog import router as catalog_router
 from zeromerma_api.routers.health import router as health_router
 from zeromerma_api.routers.inventory import router as inventory_router
 from zeromerma_api.routers.pos import router as pos_router
+from zeromerma_api.routers.pricing import router as pricing_router
+from zeromerma_api.routers.production import router as production_router
 from zeromerma_api.routers.ready import router as ready_router
 
 log = logging.getLogger(__name__)
@@ -115,6 +125,55 @@ def _http_status_to_error_code(status_code: int) -> str:
         422: "VALIDATION_ERROR",
     }
     return mapping.get(status_code, "HTTP_ERROR")
+
+
+def _domain_error_to_status_and_code(exc: DomainError) -> tuple[int, str]:
+    """
+    Map domain exceptions to HTTP status + stable API error code.
+    """
+    if isinstance(exc, DomainValidationError):
+        return 400, "DOMAIN_VALIDATION_ERROR"
+
+    if isinstance(exc, DomainNotFoundError):
+        return 404, "DOMAIN_NOT_FOUND"
+
+    if isinstance(exc, DomainConflictError):
+        return 409, "DOMAIN_CONFLICT"
+
+    if isinstance(exc, DomainAuthorizationError):
+        return 403, "DOMAIN_FORBIDDEN"
+
+    if isinstance(exc, DomainInvariantError):
+        return 500, "DOMAIN_INVARIANT_ERROR"
+
+    return 400, "DOMAIN_ERROR"
+
+
+async def domain_exception_handler(
+    request: Request,
+    exc: Exception,
+) -> JSONResponse:
+    """
+    Global handler for canonical domain/business exceptions.
+    """
+    domain_exc = cast(DomainError, exc)
+    status_code, code = _domain_error_to_status_and_code(domain_exc)
+
+    if status_code >= 500:
+        log.exception(
+            "Domain invariant/internal error while processing %s %s",
+            request.method,
+            request.url.path,
+        )
+
+    return JSONResponse(
+        status_code=status_code,
+        content=_error_payload(
+            code=code,
+            message=domain_exc.message,
+            details=domain_exc.details,
+        ),
+    )
 
 
 def _normalize_http_exception_detail(detail: object) -> tuple[str, object | None]:
@@ -274,6 +333,7 @@ def create_app() -> FastAPI:
     # Runtime behavior is correct:
     # - The framework dispatches these handlers only for the registered exception type.
     # - The casts are only to satisfy static type checkers cleanly.
+    app.add_exception_handler(DomainError, domain_exception_handler)
     app.add_exception_handler(
         StarletteHTTPException,
         cast(Any, http_exception_handler),
@@ -302,6 +362,8 @@ def create_app() -> FastAPI:
         dependencies=[Depends(get_current_active_user)],
     )
     app.include_router(catalog_router)
+    app.include_router(production_router)
+    app.include_router(pricing_router)
 
     return app
 

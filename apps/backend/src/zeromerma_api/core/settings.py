@@ -45,9 +45,7 @@ class AppSettings(BaseSettings):
     # Full SQLAlchemy connection URL.
     # Example:
     # postgresql+psycopg://zeromerma:zeromerma@localhost:5432/zeromerma
-    database_url: str = (
-        "postgresql+psycopg://zeromerma:zeromerma@localhost:5432/zeromerma"
-    )
+    database_url: str = "postgresql+psycopg://zeromerma:zeromerma@localhost:5432/zeromerma"
 
     # -------------------------------------------------------------------------
     # Authentication / JWT

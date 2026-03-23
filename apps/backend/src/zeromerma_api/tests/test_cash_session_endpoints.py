@@ -105,9 +105,7 @@ def test_cash_session_open_close_flow():
             s.add(r)
             s.flush()
 
-        u = s.scalar(
-            select(UserAccount).where(UserAccount.email == "admin@example.com")
-        )
+        u = s.scalar(select(UserAccount).where(UserAccount.email == "admin@example.com"))
         if u is None:
             u = UserAccount(
                 branch_id=b.id,

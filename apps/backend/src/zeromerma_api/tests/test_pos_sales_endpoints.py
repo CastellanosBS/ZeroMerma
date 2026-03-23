@@ -1,12 +1,9 @@
-# apps/backend/src/zeromerma_api/tests/test_pos_sales_endpoints.py
 from __future__ import annotations
 
 import os
-from pathlib import Path
+from decimal import Decimal
 
 import pytest
-from alembic import command
-from alembic.config import Config
 from fastapi.testclient import TestClient
 from sqlalchemy import text
 from sqlalchemy.orm import Session
@@ -14,6 +11,7 @@ from sqlalchemy.orm import Session
 from zeromerma_api.core.security import create_access_token
 from zeromerma_api.db.engine import SessionLocal
 from zeromerma_api.main import create_app
+from zeromerma_api.tests.alembic_utils import alembic_upgrade_head
 
 
 def auth_headers(user_id: int) -> dict[str, str]:
@@ -24,41 +22,52 @@ def auth_headers(user_id: int) -> dict[str, str]:
     return {"Authorization": f"Bearer {token}"}
 
 
-def make_alembic_config() -> Config:
-    """
-    __file__ = .../apps/backend/src/zeromerma_api/tests/test_pos_sales_endpoints.py
-    parents[0]=tests, [1]=zeromerma_api, [2]=src, [3]=backend
-    """
-    backend_dir = Path(__file__).resolve().parents[3]
-    cfg = Config(str(backend_dir / "alembic.ini"))
-    cfg.set_main_option("script_location", str(backend_dir / "migrations"))
-
-    if os.getenv("DATABASE_URL"):
-        cfg.set_main_option("sqlalchemy.url", os.environ["DATABASE_URL"])
-
-    return cfg
-
-
-def alembic_upgrade_head() -> None:
-    cfg = make_alembic_config()
-    command.upgrade(cfg, "head")
-
-
 def reset_tables(s: Session) -> None:
+    """
+    Hard reset only the tables needed by this test module.
+
+    Important:
+    - product_price must be cleared before branch/product due to FK references.
+    - production_run must be cleared before user_account because it references
+      user_account.created_by_id.
+    """
+    s.execute(text("DELETE FROM product_price"))
     s.execute(text("DELETE FROM payment"))
     s.execute(text("DELETE FROM sale_item"))
     s.execute(text("DELETE FROM sale"))
     s.execute(text("DELETE FROM inventory_movement"))
     s.execute(text("DELETE FROM inventory_balance"))
+    s.execute(text("DELETE FROM production_run"))
     s.execute(text("DELETE FROM cash_session"))
     s.execute(text("DELETE FROM user_account"))
     s.execute(text("DELETE FROM role"))
     s.execute(text("DELETE FROM branch"))
     s.execute(text("DELETE FROM product"))
+    s.execute(text("DELETE FROM product_category"))
     s.commit()
 
 
 def seed_core(s: Session) -> tuple[int, int, int]:
+    """
+    Seed:
+      - one branch
+      - one ADMIN role
+      - one active user
+      - one finished product
+      - one inventory_balance row with ample stock
+    """
+    category_id = s.execute(
+        text(
+            """
+            INSERT INTO product_category
+                (code, name, quick_name, show_in_pos, default_pos_order, is_active, created_at, updated_at)
+            VALUES
+                ('FINISHED', 'Finished Goods', 'Finished', TRUE, 10, TRUE, now(), now())
+            RETURNING id
+            """
+        )
+    ).scalar_one()
+
     branch_id = s.execute(
         text(
             """
@@ -82,8 +91,10 @@ def seed_core(s: Session) -> tuple[int, int, int]:
     user_id = s.execute(
         text(
             """
-            INSERT INTO user_account (branch_id, role_id, email, full_name, password_hash, is_active, created_at, updated_at)
-            VALUES (:branch_id, :role_id, 'admin@example.com', 'Admin User', NULL, true, now(), now())
+            INSERT INTO user_account
+                (branch_id, role_id, email, full_name, password_hash, is_active, created_at, updated_at)
+            VALUES
+                (:branch_id, :role_id, 'admin@example.com', 'Admin User', NULL, true, now(), now())
             RETURNING id
             """
         ),
@@ -93,14 +104,42 @@ def seed_core(s: Session) -> tuple[int, int, int]:
     product_id = s.execute(
         text(
             """
-            INSERT INTO product (sku, name, is_active, created_at, updated_at)
-            VALUES ('SKU-001', 'Test Product', true, now(), now())
+            INSERT INTO product
+                (
+                    sku,
+                    name,
+                    quick_name,
+                    category_id,
+                    uom,
+                    is_input,
+                    show_in_pos,
+                    is_sellable_in_pos,
+                    default_pos_order,
+                    is_active,
+                    created_at,
+                    updated_at
+                )
+            VALUES
+                (
+                    'SKU-001',
+                    'Test Product',
+                    'Test',
+                    :category_id,
+                    'PCS',
+                    false,
+                    true,
+                    true,
+                    10,
+                    true,
+                    now(),
+                    now()
+                )
             RETURNING id
             """
-        )
+        ),
+        {"category_id": category_id},
     ).scalar_one()
 
-    # Provide inventory snapshot so sales can decrement
     s.execute(
         text(
             """
@@ -132,24 +171,22 @@ def test_pos_sales_create_and_list_and_errors():
     app = create_app()
     client = TestClient(app)
 
-    # Open cash session
     open_resp = client.post(
         "/pos/cash-sessions/open",
-        json={"branch_id": branch_id, "opening_amount": 0.00},
+        json={"branch_id": branch_id, "opening_amount": "0.00"},
         headers=auth_headers(user_id),
     )
     assert open_resp.status_code == 200, open_resp.text
     cash_session_id = open_resp.json()["id"]
 
-    # Create sale
     sale_resp = client.post(
         "/pos/sales",
         json={
             "branch_id": branch_id,
             "cash_session_id": cash_session_id,
             "items": [
-                {"product_id": product_id, "qty": 2, "unit_price": 25.00},
-                {"product_id": product_id, "qty": 1, "unit_price": 25.00},
+                {"product_id": product_id, "qty": "2.000", "unit_price": "25.00"},
+                {"product_id": product_id, "qty": "1.000", "unit_price": "25.00"},
             ],
         },
         headers=auth_headers(user_id),
@@ -158,15 +195,14 @@ def test_pos_sales_create_and_list_and_errors():
     sale = sale_resp.json()
 
     assert sale["status"] == "OPEN"
-    assert abs(sale["subtotal"] - 75.00) < 1e-6
-    assert abs(sale["tax"] - 0.00) < 1e-6
-    assert abs(sale["total"] - 75.00) < 1e-6
+    assert Decimal(sale["subtotal"]) == Decimal("75.00")
+    assert Decimal(sale["tax"]) == Decimal("0.00")
+    assert Decimal(sale["total"]) == Decimal("75.00")
 
     assert len(sale["items"]) == 2
-    assert abs(sale["items"][0]["line_total"] - 50.00) < 1e-6
-    assert abs(sale["items"][1]["line_total"] - 25.00) < 1e-6
+    assert Decimal(sale["items"][0]["line_total"]) == Decimal("50.00")
+    assert Decimal(sale["items"][1]["line_total"]) == Decimal("25.00")
 
-    # List sales should include it (AUTH REQUIRED)
     list_resp = client.get(
         "/pos/sales",
         params={"branch_id": branch_id, "limit": 50},
@@ -177,34 +213,31 @@ def test_pos_sales_create_and_list_and_errors():
     assert isinstance(sales, list)
     assert any(x["id"] == sale["id"] for x in sales)
 
-    # Missing product -> 404 (AUTH REQUIRED)
     missing_product_resp = client.post(
         "/pos/sales",
         json={
             "branch_id": branch_id,
             "cash_session_id": cash_session_id,
-            "items": [{"product_id": 999999, "qty": 1, "unit_price": 10.00}],
+            "items": [{"product_id": 999999, "qty": "1.000", "unit_price": "10.00"}],
         },
         headers=auth_headers(user_id),
     )
     assert missing_product_resp.status_code == 404, missing_product_resp.text
 
-    # Close cash session (AUTH REQUIRED)
     close_resp = client.post(
         f"/pos/cash-sessions/{cash_session_id}/close",
-        json={"closing_amount": 0.00},
+        json={"closing_amount": "0.00"},
         headers=auth_headers(user_id),
     )
     assert close_resp.status_code == 200, close_resp.text
     assert close_resp.json()["status"] == "CLOSED"
 
-    # Creating a sale on CLOSED session -> 409 (AUTH REQUIRED)
     closed_session_resp = client.post(
         "/pos/sales",
         json={
             "branch_id": branch_id,
             "cash_session_id": cash_session_id,
-            "items": [{"product_id": product_id, "qty": 1, "unit_price": 10.00}],
+            "items": [{"product_id": product_id, "qty": "1.000", "unit_price": "10.00"}],
         },
         headers=auth_headers(user_id),
     )

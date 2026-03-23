@@ -18,9 +18,9 @@ from sqlalchemy.orm import Session
 QTY_PLACES = Decimal("0.001")
 
 
-def to_decimal(value: float | int | str) -> Decimal:
+def to_decimal(value: Decimal | float | int | str) -> Decimal:
     """
-    Safe Decimal conversion to avoid float artifacts.
+    Convert numeric-like input to Decimal safely.
     """
     return Decimal(str(value))
 
@@ -45,7 +45,8 @@ def ensure_balance_row(db: Session, *, branch_id: int, product_id: int) -> None:
     db.execute(
         text(
             """
-            INSERT INTO inventory_balance (branch_id, product_id, on_hand, reserved, created_at, updated_at)
+            INSERT INTO inventory_balance (branch_id, product_id, on_hand, reserved, created_at,
+              updated_at)
             VALUES (:b, :p, 0, 0, now(), now())
             ON CONFLICT (branch_id, product_id) DO NOTHING
             """
@@ -128,7 +129,8 @@ def bootstrap_inventory_balance_from_ledger(db: Session, *, branch_id: int) -> i
                 WHERE branch_id = :b
                 GROUP BY branch_id, product_id
             )
-            INSERT INTO inventory_balance (branch_id, product_id, on_hand, reserved, created_at, updated_at)
+            INSERT INTO inventory_balance (branch_id, product_id, on_hand, reserved, created_at,
+            updated_at)
             SELECT
                 agg.branch_id,
                 agg.product_id,
@@ -148,3 +150,48 @@ def bootstrap_inventory_balance_from_ledger(db: Session, *, branch_id: int) -> i
     )
     # rowcount is best-effort depending on driver, but it's still useful as feedback.
     return int(result.rowcount or 0)  # type: ignore[attr-defined]
+
+
+def atomic_increment_on_hand(
+    db: Session, *, branch_id: int, product_id: int, amount: Decimal
+) -> Decimal:
+    """
+    Atomically increment on_hand by amount.
+
+    Why we need this:
+      - Production outputs create stock (finished goods).
+      - We want the snapshot (inventory_balance) updated in the same transaction
+        as the production movements.
+
+    Returns:
+      new_on_hand (Decimal)
+
+    Raises:
+      ValueError if amount <= 0
+    """
+    amount = qty(amount)
+    if amount <= 0:
+        raise ValueError("Increment amount must be > 0.")
+
+    # Ensure the row exists (safe under concurrency).
+    ensure_balance_row(db, branch_id=branch_id, product_id=product_id)
+
+    row = db.execute(
+        text(
+            """
+            UPDATE inventory_balance
+            SET on_hand = on_hand + :q,
+                updated_at = now()
+            WHERE branch_id = :b
+              AND product_id = :p
+            RETURNING on_hand
+            """
+        ),
+        {"b": int(branch_id), "p": int(product_id), "q": float(amount)},
+    ).fetchone()
+
+    # This should never be None because ensure_balance_row inserted the row if missing.
+    if row is None:
+        raise RuntimeError("Failed to increment inventory_balance row unexpectedly.")
+
+    return qty(to_decimal(row[0]))

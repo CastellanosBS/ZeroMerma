@@ -14,16 +14,10 @@ import contextvars
 from dataclasses import dataclass
 
 # Defaults must exist so the log formatter never crashes.
-_request_id: contextvars.ContextVar[str] = contextvars.ContextVar(
-    "request_id", default="-"
-)
+_request_id: contextvars.ContextVar[str] = contextvars.ContextVar("request_id", default="-")
 _user_id: contextvars.ContextVar[str] = contextvars.ContextVar("user_id", default="-")
-_role_code: contextvars.ContextVar[str] = contextvars.ContextVar(
-    "role_code", default="-"
-)
-_branch_id: contextvars.ContextVar[str] = contextvars.ContextVar(
-    "branch_id", default="-"
-)
+_role_code: contextvars.ContextVar[str] = contextvars.ContextVar("role_code", default="-")
+_branch_id: contextvars.ContextVar[str] = contextvars.ContextVar("branch_id", default="-")
 
 
 @dataclass(frozen=True)

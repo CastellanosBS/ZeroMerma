@@ -84,10 +84,7 @@ def test_seeds_are_idempotent():
             or 0
         )
         num_branches = (
-            s3.scalar(
-                select(func.count()).select_from(Branch).where(Branch.code == "MAIN")
-            )
-            or 0
+            s3.scalar(select(func.count()).select_from(Branch).where(Branch.code == "MAIN")) or 0
         )
         num_admins = (
             s3.scalar(

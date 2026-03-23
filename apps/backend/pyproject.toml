@@ -2,9 +2,9 @@
 requires = ["poetry-core>=2.0.0,<3.0.0"]
 build-backend = "poetry.core.masonry.api"
 
-# ──────────────────────────────────────────────────────────────────────────────
-# Proyect Metadata (Poetry Style)
-# ──────────────────────────────────────────────────────────────────────────────
+# ------------------------------------------------------------------------------
+# Project metadata
+# ------------------------------------------------------------------------------
 [tool.poetry]
 name = "zeromerma-backend"
 version = "0.1.0"
@@ -13,46 +13,69 @@ authors = ["CastellanosBS <scb.castellanos@gmail.com>"]
 readme = "README.md"
 packages = [{ include = "zeromerma_api", from = "src" }]
 
-# ──────────────────────────────────────────────────────────────────────────────
-# Runtime dependencies (prod)
-# ──────────────────────────────────────────────────────────────────────────────
+# ------------------------------------------------------------------------------
+# Runtime dependencies
+# ------------------------------------------------------------------------------
 [tool.poetry.dependencies]
 python = "^3.12"
 fastapi = "^0.116.1"
 uvicorn = { extras = ["standard"], version = "^0.35.0" }
 pydantic = { version = "^2.7.0", extras = ["email"] }
 pydantic-settings = "^2.10.1"
-
-
-# ──────────────────────────────────────────────────────────────────────────────
-# Development dependencies (excluded from production environments by default)
-# ──────────────────────────────────────────────────────────────────────────────
 sqlalchemy = ">=2.0"
 alembic = "^1.16.5"
-psycopg = {extras = ["binary"], version = "^3.2.10"}
+psycopg = { extras = ["binary"], version = "^3.2.10" }
 pyjwt = "^2.11.0"
+
+# ------------------------------------------------------------------------------
+# Development dependencies
+# ------------------------------------------------------------------------------
 [tool.poetry.group.dev.dependencies]
 ruff = "^0.12.11"
 black = "^25.1.0"
 pytest = "^8.4.1"
 pre-commit = "^4.3.0"
-uvicorn = "^0.35.0"
 httpx = "^0.27"
 
+# ------------------------------------------------------------------------------
+# Black
+# ------------------------------------------------------------------------------
 [tool.black]
-line-length = 88
+line-length = 100
 target-version = ["py312"]
+include = '\.pyi?$'
 
-# ──────────────────────────────────────────────────────────────────────────────
-# Ruff (lint)
-# ──────────────────────────────────────────────────────────────────────────────
+# ------------------------------------------------------------------------------
+# Ruff
+# ------------------------------------------------------------------------------
 [tool.ruff]
-line-length = 160
+line-length = 100
 target-version = "py312"
 
 [tool.ruff.lint]
-select = ["E", "F", "B", "I"]  # básico: pycodestyle, pyflakes, bugbear, isort
-# (no ignoramos B008 global, solo por archivo)
+select = ["E", "F", "B", "I"]
+fixable = ["ALL"]
 
 [tool.ruff.lint.per-file-ignores]
-"**/src/zeromerma_api/routers/*.py" = ["B008"]
+"src/zeromerma_api/routers/*.py" = ["B008"]
+"src/zeromerma_api/tests/*.py" = ["E501"]
+"src/zeromerma_api/scripts/bootstrap_db.py" = ["E501"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["zeromerma_api"]
+
+# ------------------------------------------------------------------------------
+# Pytest
+# ------------------------------------------------------------------------------
+[tool.pytest.ini_options]
+testpaths = ["src/zeromerma_api/tests"]
+python_files = ["test_*.py"]
+python_functions = ["test_*"]
+addopts = "-ra"
+filterwarnings = [
+  "ignore::DeprecationWarning",
+]
+
+# ------------------------------------------------------------------------------
+# Optional: coverage could live here later if/when you add pytest-cov
+# ------------------------------------------------------------------------------

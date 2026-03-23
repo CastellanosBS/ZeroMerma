@@ -26,20 +26,14 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 
-def list_categories(
-    db: Session, *, include_inactive: bool = False
-) -> list[dict[str, Any]]:
+def list_categories(db: Session, *, include_inactive: bool = False) -> list[dict[str, Any]]:
     sql = """
         SELECT *
         FROM product_category
         WHERE (:include_inactive = TRUE OR is_active = TRUE)
         ORDER BY name ASC
     """
-    rows = (
-        db.execute(text(sql), {"include_inactive": bool(include_inactive)})
-        .mappings()
-        .all()
-    )
+    rows = db.execute(text(sql), {"include_inactive": bool(include_inactive)}).mappings().all()
     return [dict(r) for r in rows]
 
 
@@ -96,9 +90,7 @@ def list_products(
     return [dict(r) for r in rows]
 
 
-def create_category(
-    db: Session, *, code: str, name: str, is_active: bool = True
-) -> dict[str, Any]:
+def create_category(db: Session, *, code: str, name: str, is_active: bool = True) -> dict[str, Any]:
     try:
         row = (
             db.execute(
@@ -262,9 +254,7 @@ def update_product(
                     "id": int(product_id),
                     "sku": sku,
                     "name": name,
-                    "category_id": (
-                        int(category_id) if category_id is not None else None
-                    ),
+                    "category_id": (int(category_id) if category_id is not None else None),
                     "uom": uom,
                     "is_input": is_input,
                     "sale_price": sale_price,

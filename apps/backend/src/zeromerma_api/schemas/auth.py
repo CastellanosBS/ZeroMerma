@@ -8,7 +8,8 @@ class LoginRequest(BaseModel):
     Rationale:
     - Login needs a stable user identifier, not necessarily a publicly deliverable email.
     - In internal systems, development environments often use non-public domains (e.g., *.local).
-    - We therefore validate email as a non-empty string and normalize/validate further at the DB layer
+    - We therefore validate email as a non-empty string and normalize/validate further at the DB
+    layer
       (unique constraint) and at the UI layer if needed.
     """
 

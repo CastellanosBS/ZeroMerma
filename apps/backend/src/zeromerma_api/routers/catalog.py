@@ -1,32 +1,13 @@
-# apps/backend/src/zeromerma_api/routers/catalog.py
-# PURPOSE:
-#   Catalog API:
-#     GET /catalog/categories
-#     GET /catalog/products
-#     ADMIN:
-#       POST /catalog/categories
-#       PUT  /catalog/categories/{id}
-#       POST /catalog/products
-#       PUT  /catalog/products/{id}
-#
-# AUTHZ:
-#   - Read endpoints: ADMIN or CASHIER
-#   - Write endpoints: ADMIN only
-#
-# NOTE:
-#   Catalog is global (no branch scoping) in v1.
-
 from __future__ import annotations
 
-from typing import Generator, List, Optional
+from fastapi import APIRouter, Query
 
-from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy.orm import Session
-
-from zeromerma_api.core.authz import POS_ALLOWED_ROLES, ROLE_ADMIN, require_role
-from zeromerma_api.core.deps_auth import get_current_active_user
-from zeromerma_api.db.engine import SessionLocal
-from zeromerma_api.models.user_account import UserAccount
+from zeromerma_api.core.authz import POS_ALLOWED_ROLES, ROLE_ADMIN, require_ctx_role
+from zeromerma_api.core.dependency_aliases import ActiveAuthContextDep, DbSessionDep
+from zeromerma_api.core.domain_errors import (
+    DomainConflictError,
+    DomainNotFoundError,
+)
 from zeromerma_api.schemas.catalog import (
     CategoryCreate,
     CategoryOut,
@@ -47,76 +28,55 @@ from zeromerma_api.services.catalog_service import (
 router = APIRouter(prefix="/catalog", tags=["catalog"])
 
 
-def get_db() -> Generator[Session, None, None]:
+def _require_catalog_read(ctx: ActiveAuthContextDep) -> str:
     """
-    Dependency that provides a DB session per request.
+    Read endpoints are allowed for ADMIN and CASHIER.
     """
-    db = SessionLocal()
-    try:
-        yield db
-    finally:
-        db.close()
+    return require_ctx_role(ctx=ctx, allowed_roles=POS_ALLOWED_ROLES)
 
 
-def _require_catalog_read(db: Session, current_user: UserAccount) -> str:
+def _require_catalog_write(ctx: ActiveAuthContextDep) -> str:
     """
-    Enforce read permissions for the Catalog module.
+    Write endpoints are ADMIN-only.
     """
-    return require_role(db, current_user=current_user, allowed_roles=POS_ALLOWED_ROLES)
+    return require_ctx_role(ctx=ctx, allowed_roles={ROLE_ADMIN})
 
 
-def _require_admin(db: Session, current_user: UserAccount) -> str:
-    """
-    Enforce admin role.
-    """
-    return require_role(db, current_user=current_user, allowed_roles={ROLE_ADMIN})
-
-
-@router.get("/categories", response_model=List[CategoryOut])
-def api_get_categories(
+@router.get("/categories", response_model=list[CategoryOut])
+def api_list_categories(
+    db: DbSessionDep,
+    ctx: ActiveAuthContextDep,
     include_inactive: bool = Query(False),
-    db: Session = Depends(get_db),
-    current_user: UserAccount = Depends(get_current_active_user),
-):
+) -> list[CategoryOut]:
     """
-    List product categories.
+    List catalog categories.
 
-    Query params:
-      - include_inactive: if True, return inactive categories too
-
-    Security:
-      - Requires authenticated user with allowed role (ADMIN/CASHIER).
+    Catalog is global in v1 (no branch scoping).
     """
-    _require_catalog_read(db, current_user)
-    return list_categories(db, include_inactive=include_inactive)
+    _require_catalog_read(ctx)
+    rows = list_categories(db, include_inactive=include_inactive)
+    return [CategoryOut.model_validate(r) for r in rows]
 
 
-@router.get("/products", response_model=List[ProductOut])
-def api_get_products(
-    category_id: Optional[int] = Query(None, ge=1),
-    is_input: Optional[bool] = Query(None),
+@router.get("/products", response_model=list[ProductOut])
+def api_list_products(
+    db: DbSessionDep,
+    ctx: ActiveAuthContextDep,
+    category_id: int | None = Query(None, ge=1),
+    is_input: bool | None = Query(None),
     include_inactive: bool = Query(False),
-    q: Optional[str] = Query(None, min_length=1, max_length=200),
+    q: str | None = Query(None, min_length=1, max_length=200),
     limit: int = Query(200, ge=1, le=500),
     offset: int = Query(0, ge=0),
-    db: Session = Depends(get_db),
-    current_user: UserAccount = Depends(get_current_active_user),
-):
+) -> list[ProductOut]:
     """
-    List products.
+    List catalog products.
 
-    Query params:
-      - category_id: filter by category
-      - is_input: filter inputs (true) vs sellables (false)
-      - q: substring search on name/sku
-      - include_inactive: include disabled products
-      - limit/offset: pagination
-
-    Security:
-      - Requires authenticated user with allowed role (ADMIN/CASHIER).
+    Catalog is global in v1 (no branch scoping).
     """
-    _require_catalog_read(db, current_user)
-    return list_products(
+    _require_catalog_read(ctx)
+
+    rows = list_products(
         db,
         category_id=category_id,
         is_input=is_input,
@@ -125,23 +85,20 @@ def api_get_products(
         limit=limit,
         offset=offset,
     )
-
-
-# ---------------------------------------------------------------------------
-# ADMIN endpoints
-# ---------------------------------------------------------------------------
+    return [ProductOut.model_validate(r) for r in rows]
 
 
 @router.post("/categories", response_model=CategoryOut)
 def api_create_category(
     payload: CategoryCreate,
-    db: Session = Depends(get_db),
-    current_user: UserAccount = Depends(get_current_active_user),
-):
+    db: DbSessionDep,
+    ctx: ActiveAuthContextDep,
+) -> CategoryOut:
     """
     Create a category (ADMIN only).
     """
-    _require_admin(db, current_user)
+    _require_catalog_write(ctx)
+
     try:
         row = create_category(
             db,
@@ -150,10 +107,10 @@ def api_create_category(
             is_active=payload.is_active,
         )
         db.commit()
-        return row
+        return CategoryOut.model_validate(row)
     except ValueError as e:
         db.rollback()
-        raise HTTPException(status_code=409, detail=str(e)) from e
+        raise DomainConflictError(message=str(e)) from e
     except Exception:
         db.rollback()
         raise
@@ -163,13 +120,14 @@ def api_create_category(
 def api_update_category(
     category_id: int,
     payload: CategoryUpdate,
-    db: Session = Depends(get_db),
-    current_user: UserAccount = Depends(get_current_active_user),
-):
+    db: DbSessionDep,
+    ctx: ActiveAuthContextDep,
+) -> CategoryOut:
     """
     Update a category (ADMIN only).
     """
-    _require_admin(db, current_user)
+    _require_catalog_write(ctx)
+
     try:
         row = update_category(
             db,
@@ -179,13 +137,13 @@ def api_update_category(
             is_active=payload.is_active,
         )
         db.commit()
-        return row
+        return CategoryOut.model_validate(row)
     except LookupError as e:
         db.rollback()
-        raise HTTPException(status_code=404, detail=str(e)) from e
+        raise DomainNotFoundError(message=str(e)) from e
     except ValueError as e:
         db.rollback()
-        raise HTTPException(status_code=409, detail=str(e)) from e
+        raise DomainConflictError(message=str(e)) from e
     except Exception:
         db.rollback()
         raise
@@ -194,13 +152,14 @@ def api_update_category(
 @router.post("/products", response_model=ProductOut)
 def api_create_product(
     payload: ProductCreate,
-    db: Session = Depends(get_db),
-    current_user: UserAccount = Depends(get_current_active_user),
-):
+    db: DbSessionDep,
+    ctx: ActiveAuthContextDep,
+) -> ProductOut:
     """
     Create a product (ADMIN only).
     """
-    _require_admin(db, current_user)
+    _require_catalog_write(ctx)
+
     try:
         row = create_product(
             db,
@@ -214,10 +173,10 @@ def api_create_product(
             is_active=payload.is_active,
         )
         db.commit()
-        return row
+        return ProductOut.model_validate(row)
     except ValueError as e:
         db.rollback()
-        raise HTTPException(status_code=409, detail=str(e)) from e
+        raise DomainConflictError(message=str(e)) from e
     except Exception:
         db.rollback()
         raise
@@ -227,13 +186,14 @@ def api_create_product(
 def api_update_product(
     product_id: int,
     payload: ProductUpdate,
-    db: Session = Depends(get_db),
-    current_user: UserAccount = Depends(get_current_active_user),
-):
+    db: DbSessionDep,
+    ctx: ActiveAuthContextDep,
+) -> ProductOut:
     """
     Update a product (ADMIN only).
     """
-    _require_admin(db, current_user)
+    _require_catalog_write(ctx)
+
     try:
         row = update_product(
             db,
@@ -248,13 +208,13 @@ def api_update_product(
             is_active=payload.is_active,
         )
         db.commit()
-        return row
+        return ProductOut.model_validate(row)
     except LookupError as e:
         db.rollback()
-        raise HTTPException(status_code=404, detail=str(e)) from e
+        raise DomainNotFoundError(message=str(e)) from e
     except ValueError as e:
         db.rollback()
-        raise HTTPException(status_code=409, detail=str(e)) from e
+        raise DomainConflictError(message=str(e)) from e
     except Exception:
         db.rollback()
         raise

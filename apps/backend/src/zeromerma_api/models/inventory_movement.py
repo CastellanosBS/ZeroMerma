@@ -30,7 +30,8 @@ from .base import (
     updated_at_col,
 )  # Shared Declarative Base for coherent metadata.
 
-# TYPE_CHECKING imports give editors/types checkers class info without runtime imports (avoid cycles).
+# TYPE_CHECKING imports give editors/types checkers class info without runtime imports
+# (avoid cycles).
 if TYPE_CHECKING:
     pass
 
@@ -45,12 +46,8 @@ class MovementReason(str, Enum):
     SALE = "SALE"  # Customer sale: finished goods OUT (negative qty).
     PURCHASE = "PURCHASE"  # Supplier purchase: goods IN (positive qty).
     ADJUSTMENT = "ADJUSTMENT"  # Manual correction: could be + or -.
-    PRODUCTION_INPUT = (
-        "PRODUCTION_INPUT"  # Consumed input for production: OUT (negative qty).
-    )
-    PRODUCTION_OUTPUT = (
-        "PRODUCTION_OUTPUT"  # Produced finished goods: IN (positive qty).
-    )
+    PRODUCTION_INPUT = "PRODUCTION_INPUT"  # Consumed input for production: OUT (negative qty).
+    PRODUCTION_OUTPUT = "PRODUCTION_OUTPUT"  # Produced finished goods: IN (positive qty).
     TRANSFER_IN = "TRANSFER_IN"  # Branch transfer inbound: IN (positive qty).
     TRANSFER_OUT = "TRANSFER_OUT"  # Branch transfer outbound: OUT (negative qty).
     OPENING_BALANCE = "OPENING_BALANCE"  # Initial stock: IN (usually positive).
@@ -63,7 +60,8 @@ class InventoryMovement(Base):
     - 'branch_id' (FK): stock is always branch-scoped.
     - 'product_id' (FK): which item moved.
     - 'qty' (NUMERIC(18,3)): signed quantity (>= 0 for inflows; < 0 for outflows).
-    - 'reason' (String): one of MovementReason values (validated in app; enforced via DB CHECK in migration).
+    - 'reason' (String): one of MovementReason values (validated in app; enforced via DB CHECK
+    in migration).
     - 'ref_type' / 'ref_id': traceability to the generating document (SALE, PURCHASE, etc.).
     - 'note': optional comment.
     - 'created_by_id' (FK): attribution (nullable until auth is wired end-to-end).

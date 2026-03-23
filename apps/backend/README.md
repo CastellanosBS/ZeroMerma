@@ -1,284 +1,248 @@
-﻿# ZeroMerma
+﻿# ZeroMerma Backend
 
-[![Python](https://img.shields.io/badge/Python-3.12+-blue.svg)](https://www.python.org/)
-[![FastAPI](https://img.shields.io/badge/FastAPI-Framework-teal.svg)](https://fastapi.tiangolo.com/)
-[![Poetry](https://img.shields.io/badge/Poetry-Dependencies-purple.svg)](https://python-poetry.org/)
-[![Ruff](https://img.shields.io/badge/Linter-Ruff-informational.svg)](https://docs.astral.sh/ruff/)
-[![Tests](https://img.shields.io/badge/Tests-Pytest-success.svg)](https://docs.pytest.org/)
-[![License](https://img.shields.io/badge/License-TBD-lightgrey.svg)](#license)
+Backend service for **ZeroMerma**, a bakery-oriented operational platform focused on:
 
-Data‑driven, multi‑branch **bakery management system** (operations + analytics) built as a modern monorepo. The goal is operational excellence (≈ zero waste) across branches through clean processes, reliable data, and actionable insights.
+- point of sale (POS)
+- cash sessions
+- inventory integrity
+- production tracking
+- branch-specific pricing
+- reproducible database bootstrap
+- consistent engineering workflows
 
----
+This repository is structured around **FastAPI + SQLAlchemy + Alembic + PostgreSQL**, with a strong emphasis on:
 
-## Table of Contents
-
--   [Vision & Scope](#vision--scope)
--   [Core Modules](#core-modules)
--   [Tech Stack](#tech-stack)
--   [Repository Layout](#repository-layout)
--   [Quickstart](#quickstart)
--   [Configuration](#configuration)
-    -   [Environment Variables (`.env`)](#environment-variables-env)
--   [Quality Gates](#quality-gates)
-    -   [Formatting & Linting](#formatting--linting)
-    -   [Git Hooks (`pre-commit`)](#git-hooks-pre-commit)
-    -   [Tests](#tests)
--   [Database & Migrations](#database--migrations)
--   [Conventions](#conventions)
-    -   [Branching](#branching)
-    -   [Commit Messages (Conventional Commits)](#commit-messages-conventional-commits)
--   [Roadmap](#roadmap)
--   [Troubleshooting](#troubleshooting)
--   [Examples](#examples)
--   [License](#license)
--   [Maintainers](#maintainers)
+- deterministic behavior
+- explicit business rules
+- inventory traceability
+- reproducible developer workflows
+- long-term maintainability
 
 ---
 
-## Vision & Scope
+## 1. Project intent
 
-ZeroMerma provides an end‑to‑end operational backbone for a multi‑branch bakery:
+ZeroMerma is not a generic CRUD backend. It is meant to support the real operational needs of a bakery / pastry business, including:
 
--   **Operations:** inventory, purchases, production, sales (POS), inter‑branch transfers, cash sessions.
--   **Analytics (phase II):** telemetry/IoT capture, demand & production forecasting, reporting.
--   **Governance:** roles/permissions, audit fields, soft deletes, data retention.
+- fast sales execution
+- stock consistency
+- opening/closing cash sessions
+- production-to-inventory transitions
+- auditable payment flows
+- branch-level pricing behavior
+- stable test/bootstrap flows
 
-Target outcomes: reduced waste, accurate costing, reliable stock rotation (FIFO/PEPS), and decision‑quality data.
+The project is evolving toward a **keyboard-first POS workflow** with strong backend authority over:
 
-## Core Modules
+- pricing
+- inventory
+- authorization
+- transactional integrity
 
--   **Branches & Users:** branches, roles/permissions, auth, audit trails.
--   **Catalogs:** products, recipes/BOM, units of measure (UoM) & conversions.
--   **Inventory:** stock per branch & location, lot/expiry tracking, cost method (FIFO/Avg).
--   **Purchases:** suppliers, POs, receipts, price & tax history.
--   **Sales (POS):** tickets, payments, discounts, tax rates, cash sessions (open/close).
--   **Production:** work orders, ingredient consumption, finished goods, scrap.
--   **Transfers:** inter‑branch movements, approvals, reconciliation.
--   **Telemetry (IoT):** sensors (temperature, humidity, people counting), time‑series storage.
--   **Forecasting:** demand predictions per branch/product/date, model versioning & confidence.
+---
 
-> Full ER model and specs are in `/docs/requirements/` (PDFs/diagrams).
+## 2. Current system status
 
-## Tech Stack
+The backend has already gone through a major stabilization phase and now has:
 
--   **Backend:** Python 3.12+, FastAPI, Uvicorn
--   **Config:** Pydantic & pydantic‑settings
--   **Quality:** Ruff, Black, Pytest, pre‑commit
--   **Packaging:** Poetry
--   **DB (planned):** PostgreSQL 16/17 (+ TimescaleDB for telemetry), SQLAlchemy 2.x + Alembic
--   **Realtime & Jobs (planned):** WebSockets, Celery + Redis
--   **Frontend (planned):** TBD
+- canonical ORM models aligned with the real schema
+- canonical Pydantic schemas with `Decimal`-oriented contracts
+- canonical domain errors and centralized error translation
+- canonical DB bootstrap / seed flow
+- cleaner router and dependency structure
+- a reproducible local developer workflow
 
-## Repository Layout
+This is the engineering baseline intended for the next phase of POS implementation.
+
+---
+
+## 3. Current functional scope
+
+### 3.1 Authentication and security
+- JWT-based authentication
+- active user enforcement
+- `AuthContext` support
+- role-aware router/service flows
+- standardized security helpers
+
+### 3.2 Admin / master data
+- branches
+- roles
+- users
+
+### 3.3 Catalog
+- product categories
+- products
+- sellable products vs input/raw-material products
+- product activation state
+
+### 3.4 Inventory
+- immutable movement ledger (`inventory_movement`)
+- operational snapshot (`inventory_balance`)
+- stock queries
+- movement queries
+
+### 3.5 POS
+- open cash session
+- close cash session
+- create sale
+- list sales
+- retrieve sale detail
+- append payments
+- server-side pricing fallback during sale creation
+- guardrail: input/raw-material products cannot be sold through POS
+
+### 3.6 Pricing
+- catalog/base sale price
+- branch override price
+- effective price resolution
+
+### 3.7 Production
+- production run creation
+- input consumption
+- output generation
+- snapshot and ledger synchronization
+
+---
+
+## 4. Architecture principles
+
+### 4.1 Ledger + snapshot inventory model
+Inventory uses a hybrid model:
+
+- `inventory_movement` = immutable ledger / audit trail
+- `inventory_balance` = operational snapshot / fast stock state
+
+This provides:
+
+- traceability
+- auditability
+- atomic decrement workflows
+- efficient reads for operational flows
+
+### 4.2 Money and quantity semantics
+The system treats money and quantity as exact decimal values:
+
+- money → `NUMERIC(18,2)`
+- quantity → `NUMERIC(18,3)`
+
+In Python and Pydantic, the backend uses `Decimal`-oriented contracts.
+JSON responses may serialize numeric values as strings. Consumers and tests must treat those values as exact decimals, not floating-point approximations.
+
+### 4.3 Domain errors
+The service layer expresses business failures through canonical domain exceptions such as:
+
+- `DomainValidationError`
+- `DomainNotFoundError`
+- `DomainConflictError`
+- `DomainAuthorizationError`
+- `DomainInvariantError`
+
+These are translated centrally by the API layer into a consistent error envelope.
+
+### 4.4 Soft-delete preference
+Master data is generally modeled using `is_active` flags rather than physical deletion whenever historical integrity matters.
+
+### 4.5 Backend authority
+The backend is intended to be the source of truth for:
+
+- sellability rules
+- effective pricing
+- inventory mutation safety
+- branch scoping
+- transactional integrity
+
+---
+
+## 5. Main modules
+
+### `zeromerma_api/core`
+Core infrastructure:
+- auth context
+- security helpers
+- dependency aliases
+- authorization helpers
+- request context / logging helpers
+- domain error types
+
+### `zeromerma_api/db`
+Database access:
+- engine
+- session factory
+- request-scoped DB dependency
+
+### `zeromerma_api/models`
+Canonical ORM models aligned with the current Alembic schema.
+
+### `zeromerma_api/schemas`
+Canonical API contracts:
+- strict request schemas
+- ORM-friendly response schemas
+- `Decimal`-based contracts
+
+### `zeromerma_api/services`
+Business logic:
+- cash sessions
+- sales
+- payments
+- inventory balance
+- pricing
+- production
+- catalog
+
+### `zeromerma_api/routers`
+HTTP routes grouped by module:
+- auth
+- admin
+- catalog
+- inventory
+- pos
+- pricing
+- production
+- health / ready
+
+### `zeromerma_api/scripts`
+Importable internal scripts and canonical DB bootstrap utilities.
+
+### `zeromerma_api/tests`
+Automated tests covering:
+- smoke behavior
+- seeds
+- POS flows
+- inventory
+- catalog
+- pricing
+- production
+- concurrency scenarios
+
+---
+
+## 6. Repository structure
 
 ```text
-ZeroMerma/
-├─ apps/
-│  ├─ backend/
-│  │  ├─ pyproject.toml
-│  │  ├─ .pre-commit-config.yaml
-│  │  ├─ .ruff.toml
-│  │  ├─ README.md
-│  │  └─ src/
-│  │     └─ zeromerma_api/
-│  │        └─ main.py
-│  └─ frontend/            # placeholder for future UI
-├─ docs/
-│  └─ requirements/        # DB PDFs, ER diagrams, specs
-├─ infra/                  # IaC / ops (WIP)
-├─ ci/                     # CI pipelines (WIP)
-├─ data/                   # seeds/samples (WIP)
-├─ .vscode/
-└─ .editorconfig
-```
-
-> Avoid sharing `.git/` in public archives. Ensure `.gitignore` includes `.env`, build artifacts, and local caches.
-
-## Quickstart
-
-```bash
-# 1) Clone
-git clone <https://github.com/CastellanosBS/ZeroMerma.git> && cd ZeroMerma
-
-# 2) Backend setup
-cd apps/backend
-poetry install
-poetry run pre-commit install
-
-# 3) Run API (dev)
-poetry run uvicorn zeromerma_api.main:app --reload
-# Swagger UI: http://127.0.0.1:8000/docs
-
-# 4) Run tests
-poetry run pytest -q
-```
-
-## Configuration
-
-### Environment Variables (`.env`)
-
-Create `apps/backend/.env`:
-
-```ini
-# App
-APP_NAME=ZeroMerma API
-APP_ENV=development
-APP_VERSION=0.1.0
-LOG_LEVEL=INFO
-CORS_ORIGINS=http://localhost:5173,http://localhost:3000
-
-# Security
-SECRET_KEY=change-me
-
-# Database (future ORM/Alembic)
-DATABASE_URL=postgresql+psycopg2://user:pass@localhost:5432/zeromerma
-
-# Telemetry (optional, future)
-REDIS_URL=redis://localhost:6379/0
-```
-
-Use **pydantic‑settings** to load this configuration into a `Settings` class.
-
-## Quality Gates
-
-### Formatting & Linting
-
-```bash
-poetry run ruff check .
-poetry run ruff format .    # or: poetry run black . (if Black is configured)
-```
-
-### Git Hooks (`pre-commit`)
-
-```bash
-poetry run pre-commit run --all-files
-```
-
-### Tests
-
-```bash
-poetry run pytest -q
-```
-
-Recommended minimum:
-
--   `tests/test_health.py` — returns `200 OK`
--   `tests/test_version.py` — exposes app version
-
-## Database & Migrations
-
--   ER model and detailed table specs live in `/docs/requirements/` (PDFs/diagrams).
--   Planned stack: **SQLAlchemy 2.x** + **Alembic** for migrations.
--   Suggested first migration: Branch/Role/User/Auth + audit fields.
--   Inventory invariants via DB constraints + lightweight triggers; nightly reconciliation job.
-
-## Conventions
-
-### Branching
-
--   `main`: stable, release‑ready
--   `develop` (optional): integration branch
--   Short‑lived topic branches: `feat/*`, `fix/*`, `chore/*` merged via PR
-
-### Commit Messages (Conventional Commits)
-
-```text
-feat(inventory): add lot/expiry tracking to stock ledger
-fix(pos): correct VAT rounding on mixed‑rate tickets
-chore(ci): enable pre-commit in pipeline
-docs(db): document UoM conversion strategy
-refactor(api): split services by bounded context
-test(forecast): add baseline model tests
-```
-
-## Roadmap
-
-**MVP**
-
--   Health/version endpoints & tests
--   Config via pydantic‑settings
--   CI (lint + tests)
--   Auth (JWT) and basic RBAC
-
-**Operations**
-
--   Products, UoM & conversions, suppliers
--   Inventory ledger (FIFO), purchases, production, transfers
--   POS tickets & cash sessions (unique open‑per‑branch)
-
-**Analytics**
-
--   Telemetry ingestion (TimescaleDB)
--   Forecasting service (demand per branch/product)
--   Reporting/BI views and indices
-
-## Troubleshooting
-
--   Poetry errors: ensure `pyproject.toml` is valid TOML (remove any placeholder lines like `...`).
--   Import errors: run commands from `apps/backend` and reference the app as `zeromerma_api.main:app`.
--   CORS: update `CORS_ORIGINS` in `.env` to include your frontend dev URL.
-
-## Examples
-
-**`tests/test_health.py`**
-
-```python
-# apps/backend/tests/test_health.py
-from fastapi.testclient import TestClient
-from zeromerma_api.main import app
-
-client = TestClient(app)
-
-def test_health_ok():
-    r = client.get("/health")
-    assert r.status_code == 200
-    assert r.json().get("status") == "ok"
-```
-
-**`tests/test_version.py`**
-
-```python
-# apps/backend/tests/test_version.py
-from fastapi.testclient import TestClient
-from zeromerma_api.main import app
-
-client = TestClient(app)
-
-def test_version_exposed():
-    r = client.get("/version")
-    assert r.status_code == 200
-    payload = r.json()
-    assert "version" in payload and isinstance(payload["version"], str)
-```
-
-**Minimal endpoints to support the tests**
-
-```python
-# apps/backend/src/zeromerma_api/main.py
-from fastapi import FastAPI
-
-app = FastAPI(title="ZeroMerma API", version="0.1.0")
-
-@app.get("/", tags=["meta"])
-def root():
-    return {"message": "Welcome to ZeroMerma API"}
-
-@app.get("/health", tags=["meta"])
-def health():
-    return {"status": "ok"}
-
-@app.get("/version", tags=["meta"])
-def version():
-    return {"version": app.version}
-```
-
-## License
-
-TBD. Until defined, all rights reserved to the project owner.
-
-## Maintainers
-
--   **Sergio Castellanos** — Product Owner
-
-Contributions welcome via pull requests.
+apps/backend/
+├── alembic.ini
+├── dev_seed.py
+├── dev_seed_inventory.py
+├── devcheck_db.py
+├── Makefile
+├── pyproject.toml
+├── README.md
+├── seed.py
+├── tasks.ps1
+├── docs/
+│   └── runbook/
+│       └── backend-operations.md
+├── migrations/
+│   ├── env.py
+│   └── versions/
+└── src/
+    └── zeromerma_api/
+        ├── core/
+        ├── db/
+        ├── models/
+        ├── routers/
+        ├── schemas/
+        ├── scripts/
+        ├── services/
+        └── tests/
