@@ -25,6 +25,7 @@ from zeromerma_api.models.product_category import ProductCategory
 from zeromerma_api.models.product_price import ProductPrice
 from zeromerma_api.models.sale import Sale
 from zeromerma_api.services.payment_service import add_payment
+from zeromerma_api.services.pos_audit_service import record_pos_audit_event
 from zeromerma_api.services.sale_service import create_sale
 
 MONEY_PLACES = Decimal("0.01")
@@ -439,6 +440,27 @@ def checkout_pos_sale(
 
     sale.status = "PAID"
     db.flush()
+
+    record_pos_audit_event(
+        db,
+        branch_id=int(sale.branch_id),
+        actor_user_id=int(created_by_id),
+        entity_type="SALE",
+        entity_id=int(sale.id),
+        event_type="SALE_CHECKOUT_COMPLETED",
+        payload={
+            "sale_id": int(sale.id),
+            "cash_session_id": int(sale.cash_session_id),
+            "payment_id": int(payment_row.id),
+            "payment_method": method,
+            "subtotal": money(to_decimal(sale.subtotal)),
+            "tax": money(to_decimal(sale.tax)),
+            "total": total,
+            "paid_amount": total,
+            "change_due": change_due,
+            "print_ticket": bool(print_ticket),
+        },
+    )
 
     paid_amount = total
     balance_due = Decimal("0.00")

@@ -22,6 +22,7 @@ from zeromerma_api.services.inventory_balance_service import (
     ensure_balance_row,
 )
 from zeromerma_api.services.payment_service import money, to_decimal, validate_method
+from zeromerma_api.services.pos_audit_service import record_pos_audit_event
 
 QTY_PLACES = Decimal("0.001")
 
@@ -125,12 +126,6 @@ def void_sale(
 ) -> dict[str, Any]:
     """
     Void one OPEN unpaid sale.
-
-    Rules:
-    - sale must be OPEN
-    - sale must not have any recorded payments
-    - inventory is restored
-    - status becomes VOIDED
     """
     _require_user(db, user_id=int(actor_user_id))
     sale = _require_sale_with_relations(db, sale_id=int(sale_id))
@@ -190,6 +185,17 @@ def void_sale(
 
     db.flush()
 
+    record_pos_audit_event(
+        db,
+        branch_id=int(sale.branch_id),
+        actor_user_id=int(actor_user_id),
+        entity_type="SALE",
+        entity_id=int(sale.id),
+        event_type="SALE_VOIDED",
+        occurred_at=when,
+        payload=snapshot,
+    )
+
     return {
         "sale_id": int(sale.id),
         "status": sale.status,
@@ -215,14 +221,6 @@ def refund_sale(
 ) -> dict[str, Any]:
     """
     Fully refund one PAID sale.
-
-    Rules:
-    - sale must be PAID
-    - no prior negative refund payments may exist
-    - refund is full only in this block
-    - negative payment rows mirror the original positive payments
-    - inventory is restored
-    - status becomes REFUNDED
     """
     _require_user(db, user_id=int(actor_user_id))
     sale = _require_sale_with_relations(db, sale_id=int(sale_id))
@@ -323,6 +321,17 @@ def refund_sale(
     sale.reversal_snapshot = snapshot
 
     db.flush()
+
+    record_pos_audit_event(
+        db,
+        branch_id=int(sale.branch_id),
+        actor_user_id=int(actor_user_id),
+        entity_type="SALE",
+        entity_id=int(sale.id),
+        event_type="SALE_REFUNDED",
+        occurred_at=when,
+        payload=snapshot,
+    )
 
     return {
         "sale_id": int(sale.id),

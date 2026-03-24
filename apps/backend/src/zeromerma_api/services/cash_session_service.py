@@ -22,6 +22,7 @@ from zeromerma_api.core.domain_errors import (
 from zeromerma_api.models.cash_session import CashSession, CashSessionStatus
 from zeromerma_api.models.payment import Payment
 from zeromerma_api.models.sale import Sale
+from zeromerma_api.services.pos_audit_service import record_pos_audit_event
 
 MONEY = Decimal("0.01")
 
@@ -79,13 +80,6 @@ def _sum_session_payment_totals_by_method(
 ) -> dict[str, Decimal]:
     """
     Sum recorded payments by method for all sales linked to one cash session.
-
-    Design decision:
-    - we reconcile from the immutable payment records tied to sales
-    - we do not infer from receipt snapshots
-    - we do not require sale status filtering here because the payment ledger
-      itself is the authoritative source of collected amounts in the current
-      POS scope
     """
     totals = _empty_payment_totals()
 
@@ -135,9 +129,6 @@ def _serialize_reconciliation_snapshot(
 ) -> dict[str, Any]:
     """
     Build a JSON-serializable reconciliation snapshot.
-
-    We serialize monetary values as strings so JSONB persistence remains exact
-    and the API can safely round-trip them back into Decimal-friendly schemas.
     """
     return {
         "expected_payment_totals_by_method": {
@@ -181,12 +172,6 @@ def open_cash_session(
 ) -> CashSession:
     """
     Open a new cash session for a branch.
-
-    Rules:
-      - Only one OPEN session per branch.
-      - opening_amount must be >= 0.
-      - The INSERT must remain transactional.
-      - Concurrent opens are prevented by the DB unique partial index.
     """
     opening_amount_dec = money(opening_amount)
     if opening_amount_dec < 0:
@@ -206,12 +191,13 @@ def open_cash_session(
             },
         )
 
+    opened_at = utcnow()
     cs = CashSession(
         branch_id=branch_id,
         opened_by_id=opened_by_id,
         opening_amount=opening_amount_dec,
         status=CashSessionStatus.OPEN.value,
-        opened_at=utcnow(),
+        opened_at=opened_at,
     )
 
     db.add(cs)
@@ -223,6 +209,21 @@ def open_cash_session(
             message="Cash session already open for this branch.",
             details={"branch_id": int(branch_id)},
         ) from e
+
+    record_pos_audit_event(
+        db,
+        branch_id=int(branch_id),
+        actor_user_id=int(opened_by_id),
+        entity_type="CASH_SESSION",
+        entity_id=int(cs.id),
+        event_type="CASH_SESSION_OPENED",
+        occurred_at=opened_at,
+        payload={
+            "cash_session_id": int(cs.id),
+            "opening_amount": opening_amount_dec,
+            "opened_by_id": int(opened_by_id),
+        },
+    )
 
     return cs
 
@@ -240,21 +241,6 @@ def close_cash_session(
 ) -> CashSession:
     """
     Close an OPEN cash session and persist reconciliation evidence.
-
-    Semantics:
-    - closing_amount is the real counted cash in drawer
-    - expected_cash = opening_amount + total recorded CASH payments in session
-    - non-cash expected totals are derived from recorded payments in the session
-    - non-cash counted totals are optional; when omitted, they default to the
-      expected totals and the assumption is recorded in the snapshot
-
-    Persisted fields on close:
-      * status = CLOSED
-      * closed_at
-      * closed_by_id
-      * closing_amount
-      * expected_cash
-      * reconciliation_snapshot
     """
     closing_amount_dec = money(closing_amount)
     if closing_amount_dec < 0:
@@ -348,12 +334,8 @@ def close_cash_session(
     if normalized_note == "":
         normalized_note = None
 
-    cs.status = CashSessionStatus.CLOSED.value
-    cs.closed_at = utcnow()
-    cs.closed_by_id = int(closed_by_id)
-    cs.closing_amount = closing_amount_dec
-    cs.expected_cash = expected_cash
-    cs.reconciliation_snapshot = _serialize_reconciliation_snapshot(
+    closed_at = utcnow()
+    snapshot = _serialize_reconciliation_snapshot(
         expected_payment_totals=expected_payment_totals,
         expected_cash=expected_cash,
         counted_cash=closing_amount_dec,
@@ -369,5 +351,31 @@ def close_cash_session(
         note=normalized_note,
     )
 
+    cs.status = CashSessionStatus.CLOSED.value
+    cs.closed_at = closed_at
+    cs.closed_by_id = int(closed_by_id)
+    cs.closing_amount = closing_amount_dec
+    cs.expected_cash = expected_cash
+    cs.reconciliation_snapshot = snapshot
+
     db.flush()
+
+    record_pos_audit_event(
+        db,
+        branch_id=int(cs.branch_id),
+        actor_user_id=int(closed_by_id),
+        entity_type="CASH_SESSION",
+        entity_id=int(cs.id),
+        event_type="CASH_SESSION_CLOSED",
+        occurred_at=closed_at,
+        payload={
+            "cash_session_id": int(cs.id),
+            "opening_amount": money(cs.opening_amount or 0),
+            "closing_amount": closing_amount_dec,
+            "expected_cash": expected_cash,
+            "closed_by_id": int(closed_by_id),
+            "reconciliation_snapshot": snapshot,
+        },
+    )
+
     return cs

@@ -6,6 +6,7 @@ from zeromerma_api.core.authz import (
     POS_ALLOWED_ROLES,
     POS_CASH_SESSION_CLOSE_ALLOWED_ROLES,
     POS_CASH_SESSION_OPEN_ALLOWED_ROLES,
+    ROLE_ADMIN,
     enforce_branch_access,
     enforce_cash_session_close_access,
     enforce_sale_access,
@@ -20,6 +21,7 @@ from zeromerma_api.schemas.cash_session import (
     CashSessionOpenIn,
     CashSessionOut,
 )
+from zeromerma_api.schemas.pos_audit import PosAuditEventOut
 from zeromerma_api.schemas.pos_bootstrap import PosBootstrapOut
 from zeromerma_api.schemas.pos_checkout import PosCheckoutIn, PosCheckoutOut
 from zeromerma_api.schemas.pos_reprint import PosReprintOut
@@ -28,6 +30,7 @@ from zeromerma_api.services.cash_session_service import (
     get_current_open_session,
     open_cash_session,
 )
+from zeromerma_api.services.pos_audit_service import list_pos_audit_events
 from zeromerma_api.services.pos_bootstrap_service import get_pos_bootstrap
 from zeromerma_api.services.pos_checkout_service import checkout_pos_sale
 from zeromerma_api.services.pos_reprint_service import get_reprint_payload
@@ -209,6 +212,42 @@ def api_current_cash_session(
 
     cs = get_current_open_session(db, branch_id=int(branch_id))
     return CashSessionOut.model_validate(cs) if cs is not None else None
+
+
+@router.get("/audit-events", response_model=list[PosAuditEventOut])
+def api_list_pos_audit_events(
+    db: DbSessionDep,
+    ctx: ActiveAuthContextDep,
+    branch_id: int = Query(..., ge=1),
+    entity_type: str | None = Query(None),
+    entity_id: int | None = Query(None, ge=1),
+    event_type: str | None = Query(None),
+    limit: int = Query(100, ge=1, le=500),
+    offset: int = Query(0, ge=0),
+) -> list[PosAuditEventOut]:
+    """
+    List persisted POS audit events for one branch.
+
+    Policy:
+    - ADMIN only
+    """
+    role_code = require_ctx_role(ctx=ctx, allowed_roles={ROLE_ADMIN})
+    enforce_branch_access(
+        current_user=ctx.user,
+        role_code=role_code,
+        branch_id=int(branch_id),
+    )
+
+    rows = list_pos_audit_events(
+        db,
+        branch_id=int(branch_id),
+        entity_type=entity_type,
+        entity_id=entity_id,
+        event_type=event_type,
+        limit=limit,
+        offset=offset,
+    )
+    return [PosAuditEventOut.model_validate(row) for row in rows]
 
 
 router.include_router(sales_router)
