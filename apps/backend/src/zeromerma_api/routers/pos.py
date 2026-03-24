@@ -6,6 +6,7 @@ from zeromerma_api.core.authz import (
     POS_ALLOWED_ROLES,
     POS_CASH_SESSION_CLOSE_ALLOWED_ROLES,
     POS_CASH_SESSION_OPEN_ALLOWED_ROLES,
+    POS_FINISHED_GOODS_STOCK_ALLOWED_ROLES,
     ROLE_ADMIN,
     enforce_branch_access,
     enforce_cash_session_close_access,
@@ -25,6 +26,10 @@ from zeromerma_api.schemas.pos_audit import PosAuditEventOut
 from zeromerma_api.schemas.pos_bootstrap import PosBootstrapOut
 from zeromerma_api.schemas.pos_checkout import PosCheckoutIn, PosCheckoutOut
 from zeromerma_api.schemas.pos_reprint import PosReprintOut
+from zeromerma_api.schemas.pos_stock import (
+    PosFinishedGoodsStockIn,
+    PosFinishedGoodsStockOut,
+)
 from zeromerma_api.services.cash_session_service import (
     close_cash_session,
     get_current_open_session,
@@ -34,6 +39,7 @@ from zeromerma_api.services.pos_audit_service import list_pos_audit_events
 from zeromerma_api.services.pos_bootstrap_service import get_pos_bootstrap
 from zeromerma_api.services.pos_checkout_service import checkout_pos_sale
 from zeromerma_api.services.pos_reprint_service import get_reprint_payload
+from zeromerma_api.services.pos_stock_service import register_finished_goods_stock
 
 router = APIRouter(prefix="/pos", tags=["pos"])
 
@@ -86,6 +92,46 @@ def api_checkout_pos_sale(
         )
         db.commit()
         return PosCheckoutOut.model_validate(result)
+    except Exception:
+        db.rollback()
+        raise
+
+
+@router.post("/stock/finished-goods", response_model=PosFinishedGoodsStockOut)
+def api_register_finished_goods_stock(
+    payload: PosFinishedGoodsStockIn,
+    db: DbSessionDep,
+    ctx: ActiveAuthContextDep,
+) -> PosFinishedGoodsStockOut:
+    """
+    Register newly available finished goods directly from the POS.
+
+    This route is intentionally specific:
+    - finished goods only
+    - active POS-sellable products only
+    - immediate inventory snapshot update
+    - non-ambiguous inventory movement reason
+    """
+    role_code = require_ctx_role(
+        ctx=ctx,
+        allowed_roles=POS_FINISHED_GOODS_STOCK_ALLOWED_ROLES,
+    )
+    enforce_branch_access(
+        current_user=ctx.user,
+        role_code=role_code,
+        branch_id=int(payload.branch_id),
+    )
+
+    try:
+        result = register_finished_goods_stock(
+            db=db,
+            branch_id=int(payload.branch_id),
+            actor_user_id=int(ctx.user.id),
+            items=[item.model_dump(exclude_none=True) for item in payload.items],
+            note=payload.note,
+        )
+        db.commit()
+        return PosFinishedGoodsStockOut.model_validate(result)
     except Exception:
         db.rollback()
         raise

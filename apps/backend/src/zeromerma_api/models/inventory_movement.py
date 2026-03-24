@@ -1,4 +1,3 @@
-# apps/backend/src/zeromerma_api/models/inventory_movement.py
 from __future__ import annotations
 
 from datetime import datetime
@@ -26,6 +25,7 @@ class MovementReason(str, Enum):
     SALE = "SALE"
     SALE_VOID = "SALE_VOID"
     SALE_REFUND = "SALE_REFUND"
+    POS_FINISHED_GOODS_STOCK_IN = "POS_FINISHED_GOODS_STOCK_IN"
     PURCHASE = "PURCHASE"
     ADJUSTMENT = "ADJUSTMENT"
     PRODUCTION_INPUT = "PRODUCTION_INPUT"
@@ -62,9 +62,9 @@ class InventoryMovement(Base):
     )
 
     qty: Mapped[float] = mapped_column(Numeric(18, 3), nullable=False)
-    reason: Mapped[str] = mapped_column(String(32), nullable=False)
+    reason: Mapped[str] = mapped_column(String(64), nullable=False)
 
-    ref_type: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    ref_type: Mapped[str | None] = mapped_column(String(64), nullable=True)
     ref_id: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
 
     note: Mapped[str | None] = mapped_column(Text, nullable=True)

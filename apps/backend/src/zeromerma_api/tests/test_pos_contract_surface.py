@@ -33,6 +33,7 @@ def test_pos_v1_official_route_surface_exists() -> None:
     official_routes = [
         ("get", "/pos/bootstrap"),
         ("post", "/pos/checkout"),
+        ("post", "/pos/stock/finished-goods"),
         ("post", "/pos/sales/{sale_id}/reprint"),
         ("post", "/pos/cash-sessions/open"),
         ("post", "/pos/cash-sessions/{session_id}/close"),
