@@ -3,7 +3,9 @@ from __future__ import annotations
 from fastapi import APIRouter, Query
 
 from zeromerma_api.core.authz import (
-    POS_ALLOWED_ROLES,
+    POS_REVERSAL_ALLOWED_ROLES,
+    POS_SALE_MUTATION_ALLOWED_ROLES,
+    POS_SALE_READ_ALLOWED_ROLES,
     enforce_branch_access,
     enforce_sale_access,
     require_ctx_role,
@@ -32,7 +34,7 @@ def api_create_sale(
 
     The authenticated user is always the creator of the sale.
     """
-    role_code = require_ctx_role(ctx=ctx, allowed_roles=POS_ALLOWED_ROLES)
+    role_code = require_ctx_role(ctx=ctx, allowed_roles=POS_SALE_MUTATION_ALLOWED_ROLES)
     enforce_branch_access(
         current_user=ctx.user,
         role_code=role_code,
@@ -67,7 +69,7 @@ def api_list_sales(
     """
     List sales with optional filters.
     """
-    role_code = require_ctx_role(ctx=ctx, allowed_roles=POS_ALLOWED_ROLES)
+    role_code = require_ctx_role(ctx=ctx, allowed_roles=POS_SALE_READ_ALLOWED_ROLES)
 
     if branch_id is not None:
         enforce_branch_access(
@@ -86,7 +88,11 @@ def api_list_sales(
     return [SaleOut.model_validate(s) for s in sales]
 
 
-@router.post("/{sale_id}/void", response_model=SaleReversalOut, summary="Void an unpaid open sale")
+@router.post(
+    "/{sale_id}/void",
+    response_model=SaleReversalOut,
+    summary="Void an unpaid open sale",
+)
 def api_void_sale(
     sale_id: int,
     payload: SaleVoidIn,
@@ -96,10 +102,10 @@ def api_void_sale(
     """
     Void one OPEN unpaid sale.
 
-    This route is for operational cancellation before money collection has been
-    finalized. It restores inventory and preserves a reversal audit snapshot.
+    Policy:
+    - ADMIN only
     """
-    role_code = require_ctx_role(ctx=ctx, allowed_roles=POS_ALLOWED_ROLES)
+    role_code = require_ctx_role(ctx=ctx, allowed_roles=POS_REVERSAL_ALLOWED_ROLES)
     enforce_sale_access(
         db=db,
         current_user=ctx.user,
@@ -122,7 +128,9 @@ def api_void_sale(
 
 
 @router.post(
-    "/{sale_id}/refund", response_model=SaleReversalOut, summary="Fully refund a paid sale"
+    "/{sale_id}/refund",
+    response_model=SaleReversalOut,
+    summary="Fully refund a paid sale",
 )
 def api_refund_sale(
     sale_id: int,
@@ -133,11 +141,10 @@ def api_refund_sale(
     """
     Fully refund one PAID sale.
 
-    This block implements only full refunds. It mirrors original payment lines
-    as negative payments, restores inventory, and preserves a reversal audit
-    snapshot.
+    Policy:
+    - ADMIN only
     """
-    role_code = require_ctx_role(ctx=ctx, allowed_roles=POS_ALLOWED_ROLES)
+    role_code = require_ctx_role(ctx=ctx, allowed_roles=POS_REVERSAL_ALLOWED_ROLES)
     enforce_sale_access(
         db=db,
         current_user=ctx.user,

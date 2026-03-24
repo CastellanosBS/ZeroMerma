@@ -4,13 +4,14 @@ from fastapi import APIRouter, Query
 
 from zeromerma_api.core.authz import (
     POS_ALLOWED_ROLES,
+    POS_CASH_SESSION_CLOSE_ALLOWED_ROLES,
+    POS_CASH_SESSION_OPEN_ALLOWED_ROLES,
     enforce_branch_access,
+    enforce_cash_session_close_access,
     enforce_sale_access,
     require_ctx_role,
 )
 from zeromerma_api.core.dependency_aliases import ActiveAuthContextDep, DbSessionDep
-from zeromerma_api.core.domain_errors import DomainNotFoundError
-from zeromerma_api.models.cash_session import CashSession
 from zeromerma_api.routers.pos_orders import router as orders_router
 from zeromerma_api.routers.pos_payments import router as payments_router
 from zeromerma_api.routers.pos_sales import router as sales_router
@@ -32,19 +33,6 @@ from zeromerma_api.services.pos_checkout_service import checkout_pos_sale
 from zeromerma_api.services.pos_reprint_service import get_reprint_payload
 
 router = APIRouter(prefix="/pos", tags=["pos"])
-
-
-def _require_cash_session(db, *, session_id: int) -> CashSession:
-    """
-    Load a cash session for authorization checks before close.
-    """
-    cs = db.get(CashSession, int(session_id))
-    if cs is None:
-        raise DomainNotFoundError(
-            message=f"Cash session {session_id} not found.",
-            details={"cash_session_id": int(session_id)},
-        )
-    return cs
 
 
 @router.get("/bootstrap", response_model=PosBootstrapOut)
@@ -129,8 +117,15 @@ def api_open_cash_session(
 ) -> CashSessionOut:
     """
     Open a new cash session.
+
+    Policy:
+    - ADMIN and CASHIER may open sessions
+    - non-admins remain branch-scoped
     """
-    role_code = require_ctx_role(ctx=ctx, allowed_roles=POS_ALLOWED_ROLES)
+    role_code = require_ctx_role(
+        ctx=ctx,
+        allowed_roles=POS_CASH_SESSION_OPEN_ALLOWED_ROLES,
+    )
     enforce_branch_access(
         current_user=ctx.user,
         role_code=role_code,
@@ -160,15 +155,21 @@ def api_close_cash_session(
     ctx: ActiveAuthContextDep,
 ) -> CashSessionOut:
     """
-    Close an OPEN cash session and persist reconciliation evidence.
-    """
-    role_code = require_ctx_role(ctx=ctx, allowed_roles=POS_ALLOWED_ROLES)
+    Close an OPEN cash session.
 
-    cs = _require_cash_session(db, session_id=int(session_id))
-    enforce_branch_access(
+    Fine-grained policy:
+    - ADMIN may close any accessible session
+    - CASHIER may close only the session they opened
+    """
+    role_code = require_ctx_role(
+        ctx=ctx,
+        allowed_roles=POS_CASH_SESSION_CLOSE_ALLOWED_ROLES,
+    )
+    enforce_cash_session_close_access(
+        db=db,
         current_user=ctx.user,
         role_code=role_code,
-        branch_id=int(cs.branch_id),
+        session_id=int(session_id),
     )
 
     try:
