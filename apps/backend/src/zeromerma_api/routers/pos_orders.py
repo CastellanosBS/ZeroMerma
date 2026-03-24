@@ -16,6 +16,7 @@ from zeromerma_api.models.customer_order import CustomerOrder
 from zeromerma_api.schemas.pos_order import (
     PosOrderCreateIn,
     PosOrderDetailOut,
+    PosOrderManualDeliverIn,
     PosOrderSummaryOut,
 )
 from zeromerma_api.schemas.pos_order_checkout import (
@@ -31,7 +32,7 @@ from zeromerma_api.services.pos_order_checkout_service import (
 from zeromerma_api.services.pos_order_service import (
     cancel_customer_order,
     create_customer_order,
-    deliver_customer_order,
+    deliver_customer_order_manually,
     get_customer_order_detail,
     get_customer_order_queue,
     list_customer_orders,
@@ -45,7 +46,7 @@ ORDER_CREATE_ALLOWED_ROLES = {ROLE_ADMIN, ROLE_CASHIER}
 ORDER_READ_ALLOWED_ROLES = {ROLE_ADMIN, ROLE_CASHIER, ROLE_BAKER}
 ORDER_SEND_ALLOWED_ROLES = {ROLE_ADMIN}
 ORDER_READY_ALLOWED_ROLES = {ROLE_ADMIN, ROLE_BAKER}
-ORDER_DELIVER_ALLOWED_ROLES = {ROLE_ADMIN, ROLE_CASHIER}
+ORDER_MANUAL_DELIVERY_ALLOWED_ROLES = {ROLE_ADMIN}
 ORDER_CANCEL_ALLOWED_ROLES = {ROLE_ADMIN, ROLE_CASHIER}
 ORDER_CHECKOUT_ALLOWED_ROLES = {ROLE_ADMIN, ROLE_CASHIER}
 
@@ -163,15 +164,18 @@ def api_deliver_order_via_checkout(
     ctx: ActiveAuthContextDep,
 ) -> PosOrderDeliverCheckoutOut:
     """
-    Atomically deliver one READY customer order through the POS checkout flow.
+    Official delivery path for a READY customer order.
 
-    This endpoint:
+    This endpoint is the authoritative front-of-house flow because it:
     - creates the final sale
     - registers the payment
     - affects inventory through sale creation
     - persists a receipt snapshot
     - marks the order as DELIVERED
     - links delivered_sale_id
+
+    Any delivery that should represent real commercial closure should use
+    this route instead of the manual `/deliver` escape hatch.
     """
     role_code = require_ctx_role(ctx=ctx, allowed_roles=ORDER_CHECKOUT_ALLOWED_ROLES)
     order = _require_customer_order(db, order_id=int(order_id))
@@ -321,18 +325,28 @@ def api_mark_customer_order_ready(
 
 
 @router.post("/{order_id}/deliver", response_model=PosOrderDetailOut)
-def api_deliver_customer_order(
+def api_deliver_customer_order_manually(
     order_id: int,
+    payload: PosOrderManualDeliverIn,
     db: DbSessionDep,
     ctx: ActiveAuthContextDep,
 ) -> PosOrderDetailOut:
     """
-    Legacy/manual delivery transition.
+    Exceptional manual delivery path without creating a sale.
 
-    This keeps the pure operational transition available, but the preferred
-    front-of-house path after 2B.4 is /deliver-checkout.
+    This route is intentionally restricted and should NOT be used as the
+    normal front-of-house flow after `deliver-checkout` exists.
+
+    Semantics:
+    - marks the order as DELIVERED
+    - keeps delivered_sale_id as NULL
+    - appends an operational audit marker into `note`
+    - requires explicit acknowledgement that no sale will be linked
     """
-    role_code = require_ctx_role(ctx=ctx, allowed_roles=ORDER_DELIVER_ALLOWED_ROLES)
+    role_code = require_ctx_role(
+        ctx=ctx,
+        allowed_roles=ORDER_MANUAL_DELIVERY_ALLOWED_ROLES,
+    )
     order = _require_customer_order(db, order_id=int(order_id))
 
     enforce_branch_access(
@@ -342,13 +356,14 @@ def api_deliver_customer_order(
     )
 
     try:
-        payload = deliver_customer_order(
+        result = deliver_customer_order_manually(
             db=db,
             order_id=int(order_id),
             actor_user_id=int(ctx.user.id),
+            reason=payload.reason,
         )
         db.commit()
-        return PosOrderDetailOut.model_validate(payload)
+        return PosOrderDetailOut.model_validate(result)
     except Exception:
         db.rollback()
         raise

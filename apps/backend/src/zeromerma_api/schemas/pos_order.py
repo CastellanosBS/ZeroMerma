@@ -4,7 +4,7 @@ from datetime import datetime
 from decimal import Decimal
 from typing import Literal
 
-from pydantic import Field
+from pydantic import Field, field_validator
 
 from .common import ORMReadSchema, PositiveQuantity, StrictInputSchema
 
@@ -42,6 +42,33 @@ class PosOrderCreateIn(StrictInputSchema):
     note: str | None = Field(default=None, max_length=1000)
     requested_for_at: datetime | None = None
     items: list[PosOrderCreateItemIn] = Field(min_length=1)
+
+
+class PosOrderManualDeliverIn(StrictInputSchema):
+    """
+    Exceptional manual delivery request without creating a sale.
+
+    This contract exists to keep `/deliver` available only as a controlled
+    operational escape hatch. It is NOT the preferred front-of-house flow.
+
+    Use cases should be exceptional, for example:
+    - administrative release of a prepaid order managed outside the POS
+    - operational correction approved by management
+    - extraordinary fulfillment where no in-POS checkout is appropriate
+
+    The normal delivery path remains `/deliver-checkout`.
+    """
+
+    confirm_without_sale: Literal[True]
+    reason: str = Field(min_length=5, max_length=500)
+
+    @field_validator("reason")
+    @classmethod
+    def validate_reason(cls, value: str) -> str:
+        normalized = value.strip()
+        if not normalized:
+            raise ValueError("reason must not be blank.")
+        return normalized
 
 
 class PosOrderItemOut(ORMReadSchema):

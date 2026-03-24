@@ -658,6 +658,37 @@ def _assert_transition(
         )
 
 
+def _build_manual_delivery_audit_note(
+    *,
+    reason: str,
+    actor_user_id: int,
+    delivered_at: datetime,
+) -> str:
+    """
+    Build a compact audit marker for exceptional manual delivery without sale.
+
+    This project does not yet have a dedicated structured audit table/columns
+    for manual delivery exceptions, so the current transitional strategy is to
+    append an explicit system-generated marker into `customer_order.note`.
+
+    This keeps the decision visible in existing read models without requiring a
+    schema migration in this block.
+    """
+    normalized_reason = str(reason).strip()
+    if not normalized_reason:
+        raise DomainValidationError(
+            message="Manual delivery reason must not be blank.",
+            details={"reason": normalized_reason},
+        )
+
+    return (
+        "[MANUAL_DELIVERY_WITHOUT_SALE] "
+        f"delivered_at={delivered_at.isoformat()} "
+        f"delivered_by_id={int(actor_user_id)} "
+        f"reason={normalized_reason}"
+    )
+
+
 def send_customer_order_to_bakery(
     db: Session,
     *,
@@ -712,16 +743,25 @@ def mark_customer_order_ready(
     return _serialize_order_detail(_require_order(db, order_id=int(order.id)))
 
 
-def deliver_customer_order(
+def deliver_customer_order_manually(
     db: Session,
     *,
     order_id: int,
     actor_user_id: int,
+    reason: str,
 ) -> dict[str, Any]:
     """
-    Transition READY -> DELIVERED.
+    Exceptional manual transition READY -> DELIVERED without creating a sale.
 
-    delivered_sale_id remains NULL in 2B.1/2B.2 by design.
+    This function intentionally preserves `/deliver` only as a controlled
+    operational escape hatch. It must not compete with the canonical commercial
+    flow implemented by `deliver_order_via_checkout()`.
+
+    Guarantees:
+    - order must currently be READY
+    - delivered_sale_id remains NULL
+    - the actor is recorded
+    - an explicit audit marker is appended to `note`
     """
     _require_actor_user(db, user_id=int(actor_user_id))
     order = _require_order(db, order_id=int(order_id))
@@ -733,9 +773,31 @@ def deliver_customer_order(
         order_id=int(order.id),
     )
 
+    if order.delivered_sale_id is not None:
+        raise DomainConflictError(
+            message=(
+                f"Customer order {order_id} is already linked to sale "
+                f"{int(order.delivered_sale_id)}."
+            ),
+            details={
+                "order_id": int(order.id),
+                "delivered_sale_id": int(order.delivered_sale_id),
+            },
+        )
+
+    delivered_at = utcnow()
+    audit_note = _build_manual_delivery_audit_note(
+        reason=reason,
+        actor_user_id=int(actor_user_id),
+        delivered_at=delivered_at,
+    )
+
     order.status = CustomerOrderStatus.DELIVERED.value
     order.delivered_by_id = int(actor_user_id)
-    order.delivered_at = utcnow()
+    order.delivered_at = delivered_at
+
+    existing_note = (order.note or "").rstrip()
+    order.note = f"{existing_note}\n{audit_note}" if existing_note else audit_note
 
     db.flush()
     return _serialize_order_detail(_require_order(db, order_id=int(order.id)))

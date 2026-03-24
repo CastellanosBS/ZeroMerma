@@ -4,7 +4,7 @@ from .customer_order import CustomerOrder, CustomerOrderStatus
 from .customer_order_item import CustomerOrderItem
 from .inventory_balance import InventoryBalance
 from .inventory_movement import InventoryMovement, MovementReason
-from .payment import Payment, PaymentMethod
+from .payment import Payment
 from .product import Product
 from .product_category import ProductCategory
 from .product_price import ProductPrice
@@ -30,7 +30,6 @@ __all__ = [
     "SaleStatus",
     "SaleItem",
     "Payment",
-    "PaymentMethod",
     "ProductionRun",
     "CustomerOrder",
     "CustomerOrderStatus",

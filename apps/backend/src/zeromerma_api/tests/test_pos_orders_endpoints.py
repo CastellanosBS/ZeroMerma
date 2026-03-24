@@ -458,7 +458,7 @@ def test_create_order_rejects_input_product():
     not os.getenv("DATABASE_URL"),
     reason="DATABASE_URL not set; skipping POS order tests",
 )
-def test_order_lifecycle_send_ready_deliver():
+def test_order_lifecycle_send_ready_manual_deliver_is_admin_only():
     alembic_upgrade_head()
 
     s = SessionLocal()
@@ -547,16 +547,120 @@ def test_order_lifecycle_send_ready_deliver():
     assert ready["ready_by_id"] == baker_user_id
     assert ready["ready_at"] is not None
 
-    deliver_resp = client.post(
+    cashier_deliver_resp = client.post(
         f"/pos/orders/{order_id}/deliver",
+        json={
+            "confirm_without_sale": True,
+            "reason": "Cashier should not use manual delivery route.",
+        },
         headers=auth_headers(cashier_user_id),
     )
-    assert deliver_resp.status_code == 200, deliver_resp.text
-    delivered = deliver_resp.json()
+    assert cashier_deliver_resp.status_code == 403, cashier_deliver_resp.text
+
+    admin_deliver_resp = client.post(
+        f"/pos/orders/{order_id}/deliver",
+        json={
+            "confirm_without_sale": True,
+            "reason": "Order settled outside POS under administrative approval.",
+        },
+        headers=auth_headers(admin_user_id),
+    )
+    assert admin_deliver_resp.status_code == 200, admin_deliver_resp.text
+    delivered = admin_deliver_resp.json()
+
     assert delivered["status"] == "DELIVERED"
-    assert delivered["delivered_by_id"] == cashier_user_id
+    assert delivered["delivered_by_id"] == admin_user_id
     assert delivered["delivered_at"] is not None
     assert delivered["delivered_sale_id"] is None
+    assert delivered["note"] is not None
+    assert "[MANUAL_DELIVERY_WITHOUT_SALE]" in delivered["note"]
+
+
+@pytest.mark.skipif(
+    not os.getenv("DATABASE_URL"),
+    reason="DATABASE_URL not set; skipping POS order tests",
+)
+def test_manual_deliver_requires_explicit_acknowledgement_payload():
+    alembic_upgrade_head()
+
+    s = SessionLocal()
+    try:
+        reset_db(s)
+        admin_role_id = seed_role(s, "ADMIN", "Administrator")
+        baker_role_id = seed_role(s, "BAKER", "Baker")
+
+        branch_id = seed_branch(s, "MAIN", "Main Branch")
+        admin_user_id = seed_user(
+            s,
+            branch_id=branch_id,
+            role_id=admin_role_id,
+            email="admin@example.com",
+            full_name="Admin User",
+        )
+        baker_user_id = seed_user(
+            s,
+            branch_id=branch_id,
+            role_id=baker_role_id,
+            email="baker@example.com",
+            full_name="Baker User",
+        )
+
+        category_id = seed_category(
+            s,
+            code="BREAD",
+            name="Bread",
+            quick_name="Bread",
+            show_in_pos=True,
+            default_pos_order=10,
+        )
+        product_id = seed_product(
+            s,
+            category_id=category_id,
+            sku="BREAD-BOL",
+            name="Bolillo",
+            quick_name="Bolillo",
+            sale_price=Decimal("8.00"),
+            on_hand_branch_id=branch_id,
+            on_hand=Decimal("50.000"),
+        )
+    finally:
+        s.close()
+
+    app = create_app()
+    client = TestClient(app)
+
+    create_resp = client.post(
+        "/pos/orders",
+        json={
+            "branch_id": branch_id,
+            "items": [{"product_id": product_id, "qty": "2.000"}],
+        },
+        headers=auth_headers(admin_user_id),
+    )
+    assert create_resp.status_code == 200, create_resp.text
+    order_id = create_resp.json()["id"]
+
+    sent_resp = client.post(
+        f"/pos/orders/{order_id}/send-to-bakery",
+        headers=auth_headers(admin_user_id),
+    )
+    assert sent_resp.status_code == 200, sent_resp.text
+
+    ready_resp = client.post(
+        f"/pos/orders/{order_id}/ready",
+        headers=auth_headers(baker_user_id),
+    )
+    assert ready_resp.status_code == 200, ready_resp.text
+
+    invalid_resp = client.post(
+        f"/pos/orders/{order_id}/deliver",
+        json={
+            "confirm_without_sale": False,
+            "reason": "Invalid acknowledgement flag.",
+        },
+        headers=auth_headers(admin_user_id),
+    )
+    assert invalid_resp.status_code == 422, invalid_resp.text
 
 
 @pytest.mark.skipif(
@@ -717,6 +821,10 @@ def test_order_scope_blocks_other_branch_cashier():
 
     deliver_resp = client.post(
         f"/pos/orders/{order_id}/deliver",
+        json={
+            "confirm_without_sale": True,
+            "reason": "Cross-branch cashier must not deliver manually.",
+        },
         headers=auth_headers(other_branch_cashier_id),
     )
     assert deliver_resp.status_code == 403, deliver_resp.text
