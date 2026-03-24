@@ -13,6 +13,12 @@ from zeromerma_api.core.domain_errors import (
     DomainNotFoundError,
     DomainValidationError,
 )
+from zeromerma_api.core.payment_method import (
+    CASH_PAYMENT_METHOD,
+    PAYMENT_METHOD_VALUES,
+    is_cash_payment_method,
+    normalize_payment_method,
+)
 from zeromerma_api.models.branch import Branch
 from zeromerma_api.models.product import Product
 from zeromerma_api.models.product_category import ProductCategory
@@ -347,15 +353,18 @@ def checkout_pos_sale(
     - exactly one payment block
     - no split tender
     - CASH supports change
-    - CARD/OTHER behave as fully authorized methods for now
+    - CARD/TRANSFER/OTHER behave as fully authorized methods for now
     """
     _require_branch(db, branch_id=int(branch_id))
 
-    method = str(payment["method"])
-    if method not in {"CASH", "CARD", "OTHER"}:
+    method = normalize_payment_method(payment["method"])
+    if method not in PAYMENT_METHOD_VALUES:
         raise DomainValidationError(
             message=f"Unsupported checkout payment method '{method}'.",
-            details={"method": method},
+            details={
+                "method": method,
+                "allowed_methods": list(PAYMENT_METHOD_VALUES),
+            },
         )
 
     resolved_lines = _resolve_checkout_lines(
@@ -378,12 +387,12 @@ def checkout_pos_sale(
     amount_tendered: Decimal | None = None
     change_due = Decimal("0.00")
 
-    if method == "CASH":
+    if is_cash_payment_method(method):
         raw_amount_tendered = payment.get("amount_tendered")
         if raw_amount_tendered is None:
             raise DomainValidationError(
-                message="amount_tendered is required for CASH checkout.",
-                details={"method": "CASH"},
+                message="amount_tendered is required for cash checkout.",
+                details={"method": CASH_PAYMENT_METHOD},
             )
 
         amount_tendered = money(to_decimal(raw_amount_tendered))
@@ -402,7 +411,7 @@ def checkout_pos_sale(
     else:
         if payment.get("amount_tendered") is not None:
             raise DomainValidationError(
-                message="amount_tendered is only allowed for CASH checkout.",
+                message="amount_tendered is only allowed for cash checkout.",
                 details={"method": method},
             )
         change_due = Decimal("0.00")

@@ -1,14 +1,17 @@
 # apps/backend/src/zeromerma_api/models/payment.py
-# PURPOSE:
-#   Immutable payment records attached to a sale.
-#   A sale can have many payments (partial payments allowed by data model),
-#   but for MVP we will enforce "no overpay" at the service layer.
+"""
+Immutable payment records attached to a sale.
+
+A sale can have many payments at the data-model level. The service layer
+decides whether partial payments, overpayments, or future refund flows are
+allowed for a given API contract.
+"""
 
 from __future__ import annotations
 
 from datetime import datetime
-from enum import Enum
-from typing import TYPE_CHECKING, Optional
+from decimal import Decimal
+from typing import TYPE_CHECKING
 
 from sqlalchemy import BigInteger, DateTime, ForeignKey, Index, Numeric, String, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
@@ -19,32 +22,22 @@ if TYPE_CHECKING:
     from .sale import Sale
 
 
-class PaymentMethod(str, Enum):
-    """
-    MVP payment methods.
-    Stored as string for simplicity; we can expand later.
-    """
-
-    CASH = "CASH"
-    CARD = "CARD"
-    TRANSFER = "TRANSFER"
-    OTHER = "OTHER"
-
-
 class Payment(Base):
+    """
+    Immutable payment event.
 
+    Important:
+    - `method` is stored as the canonical string representation of
+      `PaymentMethod`.
+    - `reference` is optional metadata for card/transfer authorization codes,
+      external transaction identifiers, or operator-entered notes.
+    """
+
+    __tablename__ = "payment"
     __table_args__ = (
         Index("ix_payment_created_at", "created_at"),
         Index("ix_payment_method", "method"),
     )
-    """
-    Payment record:
-      - belongs to a sale
-      - captures method and amount
-      - optional reference for external transaction identifiers
-    """
-
-    __tablename__ = "payment"
 
     id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
 
@@ -57,14 +50,15 @@ class Payment(Base):
     method: Mapped[str] = mapped_column(
         String(16),
         nullable=False,
+        doc="Canonical payment method string from PaymentMethod.",
     )
 
-    amount: Mapped[float] = mapped_column(
+    amount: Mapped[Decimal] = mapped_column(
         Numeric(18, 2),
         nullable=False,
     )
 
-    reference: Mapped[Optional[str]] = mapped_column(
+    reference: Mapped[str | None] = mapped_column(
         String(64),
         nullable=True,
     )
@@ -75,4 +69,4 @@ class Payment(Base):
         server_default=func.now(),
     )
 
-    sale: Mapped["Sale"] = relationship()
+    sale: Mapped["Sale"] = relationship(back_populates="payments")

@@ -18,7 +18,16 @@ from zeromerma_api.schemas.pos_order import (
     PosOrderDetailOut,
     PosOrderSummaryOut,
 )
+from zeromerma_api.schemas.pos_order_checkout import (
+    PosOrderCheckoutPreviewOut,
+    PosOrderDeliverCheckoutIn,
+    PosOrderDeliverCheckoutOut,
+)
 from zeromerma_api.schemas.pos_order_queue import PosOrderQueueOut
+from zeromerma_api.services.pos_order_checkout_service import (
+    deliver_order_via_checkout,
+    get_order_checkout_preview,
+)
 from zeromerma_api.services.pos_order_service import (
     cancel_customer_order,
     create_customer_order,
@@ -38,6 +47,7 @@ ORDER_SEND_ALLOWED_ROLES = {ROLE_ADMIN}
 ORDER_READY_ALLOWED_ROLES = {ROLE_ADMIN, ROLE_BAKER}
 ORDER_DELIVER_ALLOWED_ROLES = {ROLE_ADMIN, ROLE_CASHIER}
 ORDER_CANCEL_ALLOWED_ROLES = {ROLE_ADMIN, ROLE_CASHIER}
+ORDER_CHECKOUT_ALLOWED_ROLES = {ROLE_ADMIN, ROLE_CASHIER}
 
 router = APIRouter(prefix="/orders", tags=["pos"])
 
@@ -102,8 +112,6 @@ def api_get_customer_order_queue(
 ) -> PosOrderQueueOut:
     """
     Return the operational queue for orders in one branch.
-
-    If branch_id is omitted, the caller's own branch is used.
     """
     role_code = require_ctx_role(ctx=ctx, allowed_roles=ORDER_READ_ALLOWED_ROLES)
 
@@ -120,6 +128,74 @@ def api_get_customer_order_queue(
         branch_id=effective_branch_id,
     )
     return PosOrderQueueOut.model_validate(payload)
+
+
+@router.get("/{order_id}/checkout-preview", response_model=PosOrderCheckoutPreviewOut)
+def api_get_order_checkout_preview(
+    order_id: int,
+    db: DbSessionDep,
+    ctx: ActiveAuthContextDep,
+) -> PosOrderCheckoutPreviewOut:
+    """
+    Return the POS checkout preview for one READY customer order.
+
+    This preview is intended for front-of-house delivery flow:
+    the cashier sees the order lines, frozen prices, and total before charging.
+    """
+    role_code = require_ctx_role(ctx=ctx, allowed_roles=ORDER_CHECKOUT_ALLOWED_ROLES)
+    order = _require_customer_order(db, order_id=int(order_id))
+
+    enforce_branch_access(
+        current_user=ctx.user,
+        role_code=role_code,
+        branch_id=int(order.branch_id),
+    )
+
+    payload = get_order_checkout_preview(db, order_id=int(order_id))
+    return PosOrderCheckoutPreviewOut.model_validate(payload)
+
+
+@router.post("/{order_id}/deliver-checkout", response_model=PosOrderDeliverCheckoutOut)
+def api_deliver_order_via_checkout(
+    order_id: int,
+    payload: PosOrderDeliverCheckoutIn,
+    db: DbSessionDep,
+    ctx: ActiveAuthContextDep,
+) -> PosOrderDeliverCheckoutOut:
+    """
+    Atomically deliver one READY customer order through the POS checkout flow.
+
+    This endpoint:
+    - creates the final sale
+    - registers the payment
+    - affects inventory through sale creation
+    - persists a receipt snapshot
+    - marks the order as DELIVERED
+    - links delivered_sale_id
+    """
+    role_code = require_ctx_role(ctx=ctx, allowed_roles=ORDER_CHECKOUT_ALLOWED_ROLES)
+    order = _require_customer_order(db, order_id=int(order_id))
+
+    enforce_branch_access(
+        current_user=ctx.user,
+        role_code=role_code,
+        branch_id=int(order.branch_id),
+    )
+
+    try:
+        result = deliver_order_via_checkout(
+            db=db,
+            order_id=int(order_id),
+            cash_session_id=int(payload.cash_session_id),
+            actor_user_id=int(ctx.user.id),
+            payment=payload.payment.model_dump(exclude_none=True),
+            print_ticket=bool(payload.print_ticket),
+        )
+        db.commit()
+        return PosOrderDeliverCheckoutOut.model_validate(result)
+    except Exception:
+        db.rollback()
+        raise
 
 
 @router.get("", response_model=list[PosOrderSummaryOut])
@@ -251,9 +327,10 @@ def api_deliver_customer_order(
     ctx: ActiveAuthContextDep,
 ) -> PosOrderDetailOut:
     """
-    Transition one order from READY to DELIVERED.
+    Legacy/manual delivery transition.
 
-    In 2B.1/2B.2 this only marks operational delivery; it does not yet create/link a sale.
+    This keeps the pure operational transition available, but the preferred
+    front-of-house path after 2B.4 is /deliver-checkout.
     """
     role_code = require_ctx_role(ctx=ctx, allowed_roles=ORDER_DELIVER_ALLOWED_ROLES)
     order = _require_customer_order(db, order_id=int(order_id))

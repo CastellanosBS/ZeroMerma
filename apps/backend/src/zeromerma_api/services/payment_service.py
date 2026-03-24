@@ -11,7 +11,12 @@ from zeromerma_api.core.domain_errors import (
     DomainNotFoundError,
     DomainValidationError,
 )
-from zeromerma_api.models.payment import Payment, PaymentMethod
+from zeromerma_api.core.payment_method import (
+    PAYMENT_METHOD_VALUES,
+    PaymentMethod,
+    normalize_payment_method,
+)
+from zeromerma_api.models.payment import Payment
 from zeromerma_api.models.sale import Sale, SaleStatus
 
 MONEY = Decimal("0.01")
@@ -63,24 +68,31 @@ def compute_paid_amount(db: Session, sale_id: int) -> Decimal:
     return money(to_decimal(val or 0))
 
 
-def validate_method(method: str) -> str:
+def validate_method(method: PaymentMethod | str) -> str:
     """
-    Ensure method is one of the allowed PaymentMethod enum values.
+    Ensure the payment method belongs to the canonical shared vocabulary.
+
+    This service-level validator is intentionally aligned with:
+    - the Payment ORM model
+    - raw `/pos/sales/{sale_id}/payments`
+    - atomic POS checkout
+    - atomic order delivery checkout
+    - receipt/reprint contracts
     """
-    allowed = {m.value for m in PaymentMethod}
-    if method not in allowed:
+    normalized = normalize_payment_method(method)
+    if normalized not in PAYMENT_METHOD_VALUES:
         raise DomainValidationError(
-            message=f"Invalid payment method '{method}'.",
-            details={"allowed_methods": sorted(allowed)},
+            message=f"Invalid payment method '{normalized}'.",
+            details={"allowed_methods": list(PAYMENT_METHOD_VALUES)},
         )
-    return method
+    return normalized
 
 
 def add_payment(
     db: Session,
     *,
     sale_id: int,
-    method: str,
+    method: PaymentMethod | str,
     amount: Decimal | float | int | str,
     reference: str | None = None,
 ) -> Payment:
@@ -89,7 +101,7 @@ def add_payment(
     """
     sale = require_sale_open(db, sale_id)
 
-    method = validate_method(method)
+    method_value = validate_method(method)
 
     amount_dec = money(to_decimal(amount))
     if amount_dec <= 0:
@@ -113,23 +125,27 @@ def add_payment(
             },
         )
 
-    p = Payment(
+    payment = Payment(
         sale_id=sale_id,
-        method=method,
+        method=method_value,
         amount=amount_dec,
         reference=reference,
     )
 
-    db.add(p)
+    db.add(payment)
     db.flush()
-    return p
+    return payment
 
 
 def get_sale_detail(db: Session, sale_id: int) -> dict:
     """
     Load sale with items and payments, and compute paid/balance.
     """
-    stmt = select(Sale).where(Sale.id == sale_id).options(selectinload(Sale.items))
+    stmt = (
+        select(Sale)
+        .where(Sale.id == sale_id)
+        .options(selectinload(Sale.items), selectinload(Sale.payments))
+    )
     sale = db.scalar(stmt)
     if sale is None:
         raise DomainNotFoundError(
@@ -137,8 +153,7 @@ def get_sale_detail(db: Session, sale_id: int) -> dict:
             details={"sale_id": int(sale_id)},
         )
 
-    pay_stmt = select(Payment).where(Payment.sale_id == sale_id).order_by(Payment.id.asc())
-    payments = db.execute(pay_stmt).scalars().all()
+    payments = list(sale.payments or [])
 
     total_dec = money(to_decimal(sale.total))
     paid_dec = money(sum((to_decimal(p.amount) for p in payments), Decimal("0.00")))

@@ -5,10 +5,11 @@ from typing import Literal
 
 from pydantic import Field, model_validator
 
+from zeromerma_api.core.payment_method import PaymentMethod
+
 from .common import NonNegativeMoney, ORMReadSchema, PositiveQuantity, StrictInputSchema
 from .pos_receipt import PosReceiptOut
 
-CheckoutPaymentMethod = Literal["CASH", "CARD", "OTHER"]
 CheckoutSaleStatus = Literal["PAID"]
 CheckoutPaymentStatus = Literal["AUTHORIZED"]
 
@@ -29,20 +30,26 @@ class PosCheckoutPaymentIn(StrictInputSchema):
     """
     Payment block for atomic checkout.
 
-    Rules in v1:
-    - CASH requires amount_tendered and must be >= total (validated later in service)
-    - CARD and OTHER must not send amount_tendered
+    Supported methods in POS v1:
+    - CASH
+    - CARD
+    - TRANSFER
+    - OTHER
+
+    Rules:
+    - CASH requires amount_tendered and it must be >= total (validated later in service)
+    - non-cash methods must not send amount_tendered
     - reference/external_auth_code are optional metadata fields
     """
 
-    method: CheckoutPaymentMethod
+    method: PaymentMethod
     amount_tendered: NonNegativeMoney | None = None
     reference: str | None = Field(default=None, max_length=64)
     external_auth_code: str | None = Field(default=None, max_length=64)
 
     @model_validator(mode="after")
     def validate_method_specific_fields(self) -> "PosCheckoutPaymentIn":
-        if self.method == "CASH":
+        if self.method == PaymentMethod.CASH:
             if self.amount_tendered is None:
                 raise ValueError("amount_tendered is required when payment method is CASH.")
         else:

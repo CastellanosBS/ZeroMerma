@@ -2,13 +2,12 @@ from __future__ import annotations
 
 from datetime import datetime
 from decimal import Decimal
-from typing import Literal
 
 from pydantic import Field
 
-from .common import ORMReadSchema
+from zeromerma_api.core.payment_method import PaymentMethod
 
-ReceiptPaymentMethod = Literal["CASH", "CARD", "OTHER"]
+from .common import ORMReadSchema
 
 
 class PosReceiptLineOut(ORMReadSchema):
@@ -44,7 +43,7 @@ class PosReceiptOut(ORMReadSchema):
     cash_session_id: int
     created_at: datetime
 
-    payment_method: ReceiptPaymentMethod
+    payment_method: PaymentMethod
     amount_tendered: Decimal | None = None
     change_due: Decimal
 
