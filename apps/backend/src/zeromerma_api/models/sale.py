@@ -5,7 +5,7 @@ from decimal import Decimal
 from enum import Enum
 from typing import TYPE_CHECKING, Any
 
-from sqlalchemy import BigInteger, ForeignKey, Index, Numeric, String, text
+from sqlalchemy import BigInteger, DateTime, ForeignKey, Index, Numeric, String, text
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -36,9 +36,8 @@ class Sale(Base):
     POS sale header.
 
     Notes:
-    - Monetary fields use Decimal-compatible NUMERIC(18,2).
-    - receipt_snapshot stores the printable receipt payload captured at checkout
-      time so reprints can remain stable even if catalog/pricing changes later.
+    - receipt_snapshot stores the printable ticket captured at checkout time.
+    - reversal_snapshot stores the operational evidence of a void/refund.
     """
 
     __tablename__ = "sale"
@@ -48,6 +47,8 @@ class Sale(Base):
         Index("ix_sale_created_by_id", "created_by_id"),
         Index("ix_sale_status", "status"),
         Index("ix_sale_created_at", "created_at"),
+        Index("ix_sale_voided_by_id", "voided_by_id"),
+        Index("ix_sale_refunded_by_id", "refunded_by_id"),
     )
 
     id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
@@ -101,12 +102,50 @@ class Sale(Base):
         doc="Persisted printable receipt payload captured at checkout time.",
     )
 
+    voided_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True),
+        nullable=True,
+    )
+    voided_by_id: Mapped[int | None] = mapped_column(
+        ForeignKey("user_account.id", ondelete="RESTRICT"),
+        nullable=True,
+    )
+
+    refunded_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True),
+        nullable=True,
+    )
+    refunded_by_id: Mapped[int | None] = mapped_column(
+        ForeignKey("user_account.id", ondelete="RESTRICT"),
+        nullable=True,
+    )
+
+    reversal_reason: Mapped[str | None] = mapped_column(
+        String(500),
+        nullable=True,
+    )
+
+    reversal_snapshot: Mapped[dict[str, Any] | None] = mapped_column(
+        JSONB,
+        nullable=True,
+        doc="Persisted operational evidence for sale void/refund actions.",
+    )
+
     created_at: Mapped[datetime] = created_at_col()
     updated_at: Mapped[datetime] = updated_at_col()
 
     branch: Mapped["Branch"] = relationship()
     cash_session: Mapped["CashSession"] = relationship()
-    created_by: Mapped["UserAccount"] = relationship()
+    created_by: Mapped["UserAccount"] = relationship(
+        foreign_keys=[created_by_id],
+    )
+
+    voided_by: Mapped["UserAccount | None"] = relationship(
+        foreign_keys=[voided_by_id],
+    )
+    refunded_by: Mapped["UserAccount | None"] = relationship(
+        foreign_keys=[refunded_by_id],
+    )
 
     items: Mapped[list["SaleItem"]] = relationship(
         back_populates="sale",

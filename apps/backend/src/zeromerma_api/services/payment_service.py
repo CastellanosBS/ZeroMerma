@@ -1,4 +1,3 @@
-# apps/backend/src/zeromerma_api/services/payment_service.py
 from __future__ import annotations
 
 from decimal import ROUND_HALF_UP, Decimal
@@ -13,7 +12,6 @@ from zeromerma_api.core.domain_errors import (
 )
 from zeromerma_api.core.payment_method import (
     PAYMENT_METHOD_VALUES,
-    PaymentMethod,
     normalize_payment_method,
 )
 from zeromerma_api.models.payment import Payment
@@ -62,28 +60,24 @@ def require_sale_open(db: Session, sale_id: int) -> Sale:
 def compute_paid_amount(db: Session, sale_id: int) -> Decimal:
     """
     Compute SUM(payment.amount) for a given sale.
+
+    Positive amounts increase collected money.
+    Negative amounts are refunds/returns and reduce the net collected amount.
     """
     stmt = select(func.coalesce(func.sum(Payment.amount), 0)).where(Payment.sale_id == sale_id)
     val = db.scalar(stmt)
     return money(to_decimal(val or 0))
 
 
-def validate_method(method: PaymentMethod | str) -> str:
+def validate_method(method: str) -> str:
     """
-    Ensure the payment method belongs to the canonical shared vocabulary.
-
-    This service-level validator is intentionally aligned with:
-    - the Payment ORM model
-    - raw `/pos/sales/{sale_id}/payments`
-    - atomic POS checkout
-    - atomic order delivery checkout
-    - receipt/reprint contracts
+    Ensure method is one of the allowed canonical payment method values.
     """
     normalized = normalize_payment_method(method)
     if normalized not in PAYMENT_METHOD_VALUES:
         raise DomainValidationError(
             message=f"Invalid payment method '{normalized}'.",
-            details={"allowed_methods": list(PAYMENT_METHOD_VALUES)},
+            details={"allowed_methods": sorted(PAYMENT_METHOD_VALUES)},
         )
     return normalized
 
@@ -92,16 +86,16 @@ def add_payment(
     db: Session,
     *,
     sale_id: int,
-    method: PaymentMethod | str,
+    method: str,
     amount: Decimal | float | int | str,
     reference: str | None = None,
 ) -> Payment:
     """
-    Append a payment to a sale, enforcing the "no overpay" invariant.
+    Append a positive payment to an OPEN sale, enforcing no overpay.
     """
     sale = require_sale_open(db, sale_id)
 
-    method_value = validate_method(method)
+    method = validate_method(method)
 
     amount_dec = money(to_decimal(amount))
     if amount_dec <= 0:
@@ -127,7 +121,7 @@ def add_payment(
 
     payment = Payment(
         sale_id=sale_id,
-        method=method_value,
+        method=method,
         amount=amount_dec,
         reference=reference,
     )
@@ -140,6 +134,12 @@ def add_payment(
 def get_sale_detail(db: Session, sale_id: int) -> dict:
     """
     Load sale with items and payments, and compute paid/balance.
+
+    Semantic choice:
+    - paid_amount is the net collected amount:
+        sum(positive payments) + sum(negative refund payments)
+    - balance_due is forced to 0 for terminal reversed sales because the sale
+      is no longer collectible, even if net paid becomes 0 after refund.
     """
     stmt = (
         select(Sale)
@@ -157,7 +157,15 @@ def get_sale_detail(db: Session, sale_id: int) -> dict:
 
     total_dec = money(to_decimal(sale.total))
     paid_dec = money(sum((to_decimal(p.amount) for p in payments), Decimal("0.00")))
-    balance_dec = money(total_dec - paid_dec)
+
+    if sale.status in {
+        SaleStatus.VOIDED.value,
+        SaleStatus.REFUNDED.value,
+        SaleStatus.PARTIALLY_REFUNDED.value,
+    }:
+        balance_dec = Decimal("0.00")
+    else:
+        balance_dec = money(total_dec - paid_dec)
 
     return {
         "id": sale.id,
