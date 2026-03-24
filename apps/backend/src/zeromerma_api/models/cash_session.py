@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import datetime
 from decimal import Decimal
 from enum import Enum
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from sqlalchemy import (
     BigInteger,
@@ -14,6 +14,7 @@ from sqlalchemy import (
     String,
     text,
 )
+from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from .base import Base, created_at_col, updated_at_col
@@ -36,6 +37,9 @@ class CashSession(Base):
     Invariants:
     - At most one OPEN session per branch.
     - Monetary amounts are stored as Decimal-compatible NUMERIC(18,2).
+    - expected_cash is persisted at close time.
+    - reconciliation_snapshot stores the operational cash-close evidence
+      captured when the session is closed.
     """
 
     __tablename__ = "cash_session"
@@ -90,6 +94,23 @@ class CashSession(Base):
     closing_amount: Mapped[Decimal | None] = mapped_column(
         Numeric(18, 2),
         nullable=True,
+        doc="Actual cash counted in drawer at close.",
+    )
+
+    expected_cash: Mapped[Decimal | None] = mapped_column(
+        Numeric(18, 2),
+        nullable=True,
+        doc="System-calculated expected cash at close time.",
+    )
+
+    reconciliation_snapshot: Mapped[dict[str, Any] | None] = mapped_column(
+        JSONB,
+        nullable=True,
+        doc=(
+            "Persisted reconciliation evidence captured at close time, including "
+            "expected payment totals by method, declared non-cash totals, "
+            "differences, and optional operator note."
+        ),
     )
 
     status: Mapped[str] = mapped_column(

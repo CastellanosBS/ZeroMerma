@@ -160,7 +160,7 @@ def api_close_cash_session(
     ctx: ActiveAuthContextDep,
 ) -> CashSessionOut:
     """
-    Close an OPEN cash session.
+    Close an OPEN cash session and persist reconciliation evidence.
     """
     role_code = require_ctx_role(ctx=ctx, allowed_roles=POS_ALLOWED_ROLES)
 
@@ -177,6 +177,10 @@ def api_close_cash_session(
             session_id=int(session_id),
             closed_by_id=int(ctx.user.id),
             closing_amount=payload.closing_amount,
+            counted_card_total=payload.counted_card_total,
+            counted_transfer_total=payload.counted_transfer_total,
+            counted_other_total=payload.counted_other_total,
+            note=payload.note,
         )
         db.commit()
         db.refresh(updated)
