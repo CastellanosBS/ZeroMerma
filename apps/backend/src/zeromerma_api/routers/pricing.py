@@ -4,11 +4,7 @@ from fastapi import APIRouter, Query
 
 from zeromerma_api.core.authz import ROLE_ADMIN, ROLE_CASHIER, require_ctx_role
 from zeromerma_api.core.dependency_aliases import ActiveAuthContextDep, DbSessionDep
-from zeromerma_api.core.domain_errors import (
-    DomainAuthorizationError,
-    DomainConflictError,
-    DomainNotFoundError,
-)
+from zeromerma_api.core.domain_errors import DomainAuthorizationError
 from zeromerma_api.schemas.pricing import (
     EffectivePriceRow,
     PriceOverrideOut,
@@ -27,8 +23,8 @@ router = APIRouter(prefix="/pricing", tags=["pricing"])
 def _enforce_same_branch_only(*, branch_id: int, ctx: ActiveAuthContextDep) -> None:
     """
     Pricing v1 policy:
-      - users may only access/manage pricing for their own branch
-      - ADMIN does not bypass this yet (no SUPERADMIN concept)
+    - users may only access/manage pricing for their own branch
+    - ADMIN does not bypass this yet
     """
     if int(ctx.user.branch_id) != int(branch_id):
         raise DomainAuthorizationError(
@@ -68,7 +64,7 @@ def api_list_effective_prices(
         limit=limit,
         offset=offset,
     )
-    return [EffectivePriceRow.model_validate(r) for r in rows]
+    return [EffectivePriceRow.model_validate(row) for row in rows]
 
 
 @router.get("/branches/{branch_id}/products/{product_id}", response_model=EffectivePriceRow)
@@ -84,11 +80,12 @@ def api_get_effective_price(
     require_ctx_role(ctx=ctx, allowed_roles={ROLE_ADMIN, ROLE_CASHIER})
     _enforce_same_branch_only(branch_id=branch_id, ctx=ctx)
 
-    try:
-        row = get_effective_price(db, branch_id=branch_id, product_id=product_id)
-        return EffectivePriceRow.model_validate(row)
-    except LookupError as e:
-        raise DomainNotFoundError(message=str(e)) from e
+    row = get_effective_price(
+        db,
+        branch_id=branch_id,
+        product_id=product_id,
+    )
+    return EffectivePriceRow.model_validate(row)
 
 
 @router.put("/branches/{branch_id}/products/{product_id}", response_model=PriceOverrideOut)
@@ -116,12 +113,6 @@ def api_upsert_price_override(
         )
         db.commit()
         return PriceOverrideOut.model_validate(row)
-    except LookupError as e:
-        db.rollback()
-        raise DomainNotFoundError(message=str(e)) from e
-    except ValueError as e:
-        db.rollback()
-        raise DomainConflictError(message=str(e)) from e
     except Exception:
         db.rollback()
         raise
@@ -140,6 +131,14 @@ def api_delete_price_override(
     require_ctx_role(ctx=ctx, allowed_roles={ROLE_ADMIN})
     _enforce_same_branch_only(branch_id=branch_id, ctx=ctx)
 
-    deleted = delete_price_override(db, branch_id=branch_id, product_id=product_id)
-    db.commit()
-    return {"deleted": bool(deleted)}
+    try:
+        deleted = delete_price_override(
+            db,
+            branch_id=branch_id,
+            product_id=product_id,
+        )
+        db.commit()
+        return {"deleted": bool(deleted)}
+    except Exception:
+        db.rollback()
+        raise

@@ -11,39 +11,51 @@
 #       CAST(:category_id AS BIGINT)
 #       CAST(:q AS TEXT)
 #       CAST(:is_input AS BOOLEAN)
-#
-# ERROR CONTRACT (used by routers):
-#   - LookupError -> 404
-#   - ValueError  -> 409 (conflict / invalid references / uniqueness)
 
 from __future__ import annotations
 
 from decimal import Decimal
-from typing import Any, Optional
+from typing import Any
 
 from sqlalchemy import text
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
+from zeromerma_api.core.domain_errors import (
+    DomainConflictError,
+    DomainNotFoundError,
+)
 
-def list_categories(db: Session, *, include_inactive: bool = False) -> list[dict[str, Any]]:
+
+def list_categories(
+    db: Session,
+    *,
+    include_inactive: bool = False,
+) -> list[dict[str, Any]]:
     sql = """
         SELECT *
         FROM product_category
         WHERE (:include_inactive = TRUE OR is_active = TRUE)
         ORDER BY name ASC
     """
-    rows = db.execute(text(sql), {"include_inactive": bool(include_inactive)}).mappings().all()
+    rows = (
+        db.execute(
+            text(sql),
+            {"include_inactive": bool(include_inactive)},
+        )
+        .mappings()
+        .all()
+    )
     return [dict(r) for r in rows]
 
 
 def list_products(
     db: Session,
     *,
-    category_id: Optional[int] = None,
-    is_input: Optional[bool] = None,
+    category_id: int | None = None,
+    is_input: bool | None = None,
     include_inactive: bool = False,
-    q: Optional[str] = None,
+    q: str | None = None,
     limit: int = 200,
     offset: int = 0,
 ) -> list[dict[str, Any]]:
@@ -90,62 +102,98 @@ def list_products(
     return [dict(r) for r in rows]
 
 
-def create_category(db: Session, *, code: str, name: str, is_active: bool = True) -> dict[str, Any]:
+def _require_category_exists(db: Session, *, category_id: int) -> None:
+    exists = db.execute(
+        text("SELECT 1 FROM product_category WHERE id = :id"),
+        {"id": int(category_id)},
+    ).scalar_one_or_none()
+    if exists is None:
+        raise DomainNotFoundError(
+            message=f"Category {category_id} not found.",
+            details={"category_id": int(category_id)},
+        )
+
+
+def create_category(
+    db: Session,
+    *,
+    code: str,
+    name: str,
+    is_active: bool = True,
+) -> dict[str, Any]:
     try:
         row = (
             db.execute(
                 text(
                     """
-                INSERT INTO product_category (code, name, is_active, created_at, updated_at)
-                VALUES (:code, :name, :is_active, now(), now())
-                RETURNING *
-                """
+                    INSERT INTO product_category
+                        (code, name, is_active, created_at, updated_at)
+                    VALUES
+                        (:code, :name, :is_active, now(), now())
+                    RETURNING *
+                    """
                 ),
-                {"code": code, "name": name, "is_active": bool(is_active)},
+                {
+                    "code": code,
+                    "name": name,
+                    "is_active": bool(is_active),
+                },
             )
             .mappings()
             .one()
         )
         return dict(row)
-    except IntegrityError as e:
-        raise ValueError("Category already exists (duplicate code).") from e
+    except IntegrityError as exc:
+        raise DomainConflictError(
+            message="Category already exists (duplicate code).",
+            details={"code": code},
+        ) from exc
 
 
 def update_category(
     db: Session,
     *,
     category_id: int,
-    code: Optional[str],
-    name: Optional[str],
-    is_active: Optional[bool],
+    code: str | None,
+    name: str | None,
+    is_active: bool | None,
 ) -> dict[str, Any]:
-    row = (
-        db.execute(
-            text(
-                """
-            UPDATE product_category
-            SET
-                code = COALESCE(:code, code),
-                name = COALESCE(:name, name),
-                is_active = COALESCE(:is_active, is_active),
-                updated_at = now()
-            WHERE id = :id
-            RETURNING *
-            """
-            ),
-            {
-                "id": int(category_id),
-                "code": code,
-                "name": name,
-                "is_active": is_active,
-            },
+    try:
+        row = (
+            db.execute(
+                text(
+                    """
+                    UPDATE product_category
+                    SET
+                        code = COALESCE(:code, code),
+                        name = COALESCE(:name, name),
+                        is_active = COALESCE(:is_active, is_active),
+                        updated_at = now()
+                    WHERE id = :id
+                    RETURNING *
+                    """
+                ),
+                {
+                    "id": int(category_id),
+                    "code": code,
+                    "name": name,
+                    "is_active": is_active,
+                },
+            )
+            .mappings()
+            .one_or_none()
         )
-        .mappings()
-        .one_or_none()
-    )
+    except IntegrityError as exc:
+        raise DomainConflictError(
+            message="Category update conflict.",
+            details={"category_id": int(category_id)},
+        ) from exc
 
     if row is None:
-        raise LookupError(f"Category {category_id} not found.")
+        raise DomainNotFoundError(
+            message=f"Category {category_id} not found.",
+            details={"category_id": int(category_id)},
+        )
 
     return dict(row)
 
@@ -153,42 +201,48 @@ def update_category(
 def create_product(
     db: Session,
     *,
-    sku: Optional[str],
+    sku: str | None,
     name: str,
     category_id: int,
     uom: str,
     is_input: bool,
-    sale_price: Optional[Decimal],
-    standard_cost: Optional[Decimal],
+    sale_price: Decimal | None,
+    standard_cost: Decimal | None,
     is_active: bool = True,
 ) -> dict[str, Any]:
-    # Validate category exists
-    cat = db.execute(
-        text("SELECT 1 FROM product_category WHERE id = :id"),
-        {"id": int(category_id)},
-    ).scalar_one_or_none()
-    if cat is None:
-        raise ValueError(f"category_id={category_id} does not exist.")
+    _require_category_exists(db, category_id=int(category_id))
 
     try:
         row = (
             db.execute(
                 text(
                     """
-                INSERT INTO product (
-                    sku, name, category_id,
-                    uom, is_input,
-                    sale_price, standard_cost,
-                    is_active, created_at, updated_at
-                )
-                VALUES (
-                    :sku, :name, :category_id,
-                    :uom, :is_input,
-                    :sale_price, :standard_cost,
-                    :is_active, now(), now()
-                )
-                RETURNING *
-                """
+                    INSERT INTO product (
+                        sku,
+                        name,
+                        category_id,
+                        uom,
+                        is_input,
+                        sale_price,
+                        standard_cost,
+                        is_active,
+                        created_at,
+                        updated_at
+                    )
+                    VALUES (
+                        :sku,
+                        :name,
+                        :category_id,
+                        :uom,
+                        :is_input,
+                        :sale_price,
+                        :standard_cost,
+                        :is_active,
+                        now(),
+                        now()
+                    )
+                    RETURNING *
+                    """
                 ),
                 {
                     "sku": sku,
@@ -205,50 +259,48 @@ def create_product(
             .one()
         )
         return dict(row)
-    except IntegrityError as e:
-        raise ValueError("Product already exists (duplicate sku).") from e
+    except IntegrityError as exc:
+        raise DomainConflictError(
+            message="Product already exists (duplicate sku).",
+            details={"sku": sku},
+        ) from exc
 
 
 def update_product(
     db: Session,
     *,
     product_id: int,
-    sku: Optional[str],
-    name: Optional[str],
-    category_id: Optional[int],
-    uom: Optional[str],
-    is_input: Optional[bool],
-    sale_price: Optional[Decimal],
-    standard_cost: Optional[Decimal],
-    is_active: Optional[bool],
+    sku: str | None,
+    name: str | None,
+    category_id: int | None,
+    uom: str | None,
+    is_input: bool | None,
+    sale_price: Decimal | None,
+    standard_cost: Decimal | None,
+    is_active: bool | None,
 ) -> dict[str, Any]:
     if category_id is not None:
-        cat = db.execute(
-            text("SELECT 1 FROM product_category WHERE id = :id"),
-            {"id": int(category_id)},
-        ).scalar_one_or_none()
-        if cat is None:
-            raise ValueError(f"category_id={category_id} does not exist.")
+        _require_category_exists(db, category_id=int(category_id))
 
     try:
         row = (
             db.execute(
                 text(
                     """
-                UPDATE product
-                SET
-                    sku = COALESCE(:sku, sku),
-                    name = COALESCE(:name, name),
-                    category_id = COALESCE(:category_id, category_id),
-                    uom = COALESCE(:uom, uom),
-                    is_input = COALESCE(:is_input, is_input),
-                    sale_price = COALESCE(:sale_price, sale_price),
-                    standard_cost = COALESCE(:standard_cost, standard_cost),
-                    is_active = COALESCE(:is_active, is_active),
-                    updated_at = now()
-                WHERE id = :id
-                RETURNING *
-                """
+                    UPDATE product
+                    SET
+                        sku = COALESCE(:sku, sku),
+                        name = COALESCE(:name, name),
+                        category_id = COALESCE(:category_id, category_id),
+                        uom = COALESCE(:uom, uom),
+                        is_input = COALESCE(:is_input, is_input),
+                        sale_price = COALESCE(:sale_price, sale_price),
+                        standard_cost = COALESCE(:standard_cost, standard_cost),
+                        is_active = COALESCE(:is_active, is_active),
+                        updated_at = now()
+                    WHERE id = :id
+                    RETURNING *
+                    """
                 ),
                 {
                     "id": int(product_id),
@@ -265,10 +317,16 @@ def update_product(
             .mappings()
             .one_or_none()
         )
-    except IntegrityError as e:
-        raise ValueError("Product update conflict (duplicate sku).") from e
+    except IntegrityError as exc:
+        raise DomainConflictError(
+            message="Product update conflict (duplicate sku).",
+            details={"product_id": int(product_id), "sku": sku},
+        ) from exc
 
     if row is None:
-        raise LookupError(f"Product {product_id} not found.")
+        raise DomainNotFoundError(
+            message=f"Product {product_id} not found.",
+            details={"product_id": int(product_id)},
+        )
 
     return dict(row)

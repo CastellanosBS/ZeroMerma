@@ -6,7 +6,7 @@
 #
 # IMPORTANT:
 #   These functions must be called inside the same DB transaction
-#   as sale creation, so rollback reverses everything.
+#   as sale creation / production, so rollback reverses everything.
 
 from __future__ import annotations
 
@@ -14,6 +14,12 @@ from decimal import ROUND_HALF_UP, Decimal
 
 from sqlalchemy import text
 from sqlalchemy.orm import Session
+
+from zeromerma_api.core.domain_errors import (
+    DomainConflictError,
+    DomainInvariantError,
+    DomainValidationError,
+)
 
 QTY_PLACES = Decimal("0.001")
 
@@ -37,17 +43,18 @@ def ensure_balance_row(db: Session, *, branch_id: int, product_id: int) -> None:
     Ensure inventory_balance has a row for this (branch_id, product_id).
 
     We do INSERT ... ON CONFLICT DO NOTHING so:
-      - first time we see a product/branch pair, we create it with zeros
-      - if it already exists, no error and no change
+    - first time we see a product/branch pair, we create it with zeros
+    - if it already exists, no error and no change
 
     This is safe under concurrency.
     """
     db.execute(
         text(
             """
-            INSERT INTO inventory_balance (branch_id, product_id, on_hand, reserved, created_at,
-              updated_at)
-            VALUES (:b, :p, 0, 0, now(), now())
+            INSERT INTO inventory_balance
+                (branch_id, product_id, on_hand, reserved, created_at, updated_at)
+            VALUES
+                (:b, :p, 0, 0, now(), now())
             ON CONFLICT (branch_id, product_id) DO NOTHING
             """
         ),
@@ -56,7 +63,11 @@ def ensure_balance_row(db: Session, *, branch_id: int, product_id: int) -> None:
 
 
 def atomic_decrement_on_hand(
-    db: Session, *, branch_id: int, product_id: int, amount: Decimal
+    db: Session,
+    *,
+    branch_id: int,
+    product_id: int,
+    amount: Decimal,
 ) -> Decimal:
     """
     Atomically decrement on_hand if sufficient stock exists.
@@ -64,16 +75,20 @@ def atomic_decrement_on_hand(
     Returns:
       new_on_hand (Decimal)
 
-    Raises:
-      ValueError if insufficient stock
+    Domain contract:
+    - amount <= 0         -> DomainValidationError
+    - insufficient stock  -> DomainConflictError
 
     Concurrency behavior:
-      - Postgres will lock the row during UPDATE.
-      - Two transactions decrementing the same row will serialize safely.
+    - Postgres locks the row during UPDATE.
+    - Two transactions decrementing the same row serialize safely.
     """
     amount = qty(amount)
     if amount <= 0:
-        raise ValueError("Decrement amount must be > 0.")
+        raise DomainValidationError(
+            message="Decrement amount must be greater than zero.",
+            details={"amount": str(amount)},
+        )
 
     row = db.execute(
         text(
@@ -91,9 +106,13 @@ def atomic_decrement_on_hand(
     ).fetchone()
 
     if row is None:
-        raise ValueError(
-            f"Insufficient stock for product_id={product_id} in branch_id={branch_id}: "
-            f"required={amount}."
+        raise DomainConflictError(
+            message="Insufficient stock for inventory decrement.",
+            details={
+                "branch_id": int(branch_id),
+                "product_id": int(product_id),
+                "required_qty": str(amount),
+            },
         )
 
     return qty(to_decimal(row[0]))
@@ -111,11 +130,8 @@ def bootstrap_inventory_balance_from_ledger(db: Session, *, branch_id: int) -> i
          - updated_at = now()
 
     Why we need this:
-      - Deterministic dev seeding: create OPENING_BALANCE movements, then bootstrap snapshot.
-      - Recovery tool: if snapshot ever drifts (dev mistakes), we can rebuild safely.
-
-    Returns:
-      Number of rows inserted/updated in inventory_balance.
+      - deterministic dev seeding
+      - recovery tool if snapshot ever drifts in development
     """
     result = db.execute(
         text(
@@ -129,8 +145,8 @@ def bootstrap_inventory_balance_from_ledger(db: Session, *, branch_id: int) -> i
                 WHERE branch_id = :b
                 GROUP BY branch_id, product_id
             )
-            INSERT INTO inventory_balance (branch_id, product_id, on_hand, reserved, created_at,
-            updated_at)
+            INSERT INTO inventory_balance
+                (branch_id, product_id, on_hand, reserved, created_at, updated_at)
             SELECT
                 agg.branch_id,
                 agg.product_id,
@@ -148,32 +164,30 @@ def bootstrap_inventory_balance_from_ledger(db: Session, *, branch_id: int) -> i
         ),
         {"b": int(branch_id)},
     )
-    # rowcount is best-effort depending on driver, but it's still useful as feedback.
     return int(result.rowcount or 0)  # type: ignore[attr-defined]
 
 
 def atomic_increment_on_hand(
-    db: Session, *, branch_id: int, product_id: int, amount: Decimal
+    db: Session,
+    *,
+    branch_id: int,
+    product_id: int,
+    amount: Decimal,
 ) -> Decimal:
     """
     Atomically increment on_hand by amount.
 
-    Why we need this:
-      - Production outputs create stock (finished goods).
-      - We want the snapshot (inventory_balance) updated in the same transaction
-        as the production movements.
-
-    Returns:
-      new_on_hand (Decimal)
-
-    Raises:
-      ValueError if amount <= 0
+    Domain contract:
+    - amount <= 0         -> DomainValidationError
+    - impossible missing row after ensure -> DomainInvariantError
     """
     amount = qty(amount)
     if amount <= 0:
-        raise ValueError("Increment amount must be > 0.")
+        raise DomainValidationError(
+            message="Increment amount must be greater than zero.",
+            details={"amount": str(amount)},
+        )
 
-    # Ensure the row exists (safe under concurrency).
     ensure_balance_row(db, branch_id=branch_id, product_id=product_id)
 
     row = db.execute(
@@ -190,8 +204,13 @@ def atomic_increment_on_hand(
         {"b": int(branch_id), "p": int(product_id), "q": float(amount)},
     ).fetchone()
 
-    # This should never be None because ensure_balance_row inserted the row if missing.
     if row is None:
-        raise RuntimeError("Failed to increment inventory_balance row unexpectedly.")
+        raise DomainInvariantError(
+            message="Failed to increment inventory balance row unexpectedly.",
+            details={
+                "branch_id": int(branch_id),
+                "product_id": int(product_id),
+            },
+        )
 
     return qty(to_decimal(row[0]))

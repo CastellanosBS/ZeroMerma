@@ -4,10 +4,6 @@ from fastapi import APIRouter, Query
 
 from zeromerma_api.core.authz import POS_ALLOWED_ROLES, ROLE_ADMIN, require_ctx_role
 from zeromerma_api.core.dependency_aliases import ActiveAuthContextDep, DbSessionDep
-from zeromerma_api.core.domain_errors import (
-    DomainConflictError,
-    DomainNotFoundError,
-)
 from zeromerma_api.schemas.catalog import (
     CategoryCreate,
     CategoryOut,
@@ -55,7 +51,7 @@ def api_list_categories(
     """
     _require_catalog_read(ctx)
     rows = list_categories(db, include_inactive=include_inactive)
-    return [CategoryOut.model_validate(r) for r in rows]
+    return [CategoryOut.model_validate(row) for row in rows]
 
 
 @router.get("/products", response_model=list[ProductOut])
@@ -85,7 +81,7 @@ def api_list_products(
         limit=limit,
         offset=offset,
     )
-    return [ProductOut.model_validate(r) for r in rows]
+    return [ProductOut.model_validate(row) for row in rows]
 
 
 @router.post("/categories", response_model=CategoryOut)
@@ -108,9 +104,6 @@ def api_create_category(
         )
         db.commit()
         return CategoryOut.model_validate(row)
-    except ValueError as e:
-        db.rollback()
-        raise DomainConflictError(message=str(e)) from e
     except Exception:
         db.rollback()
         raise
@@ -138,12 +131,6 @@ def api_update_category(
         )
         db.commit()
         return CategoryOut.model_validate(row)
-    except LookupError as e:
-        db.rollback()
-        raise DomainNotFoundError(message=str(e)) from e
-    except ValueError as e:
-        db.rollback()
-        raise DomainConflictError(message=str(e)) from e
     except Exception:
         db.rollback()
         raise
@@ -174,9 +161,6 @@ def api_create_product(
         )
         db.commit()
         return ProductOut.model_validate(row)
-    except ValueError as e:
-        db.rollback()
-        raise DomainConflictError(message=str(e)) from e
     except Exception:
         db.rollback()
         raise
@@ -209,12 +193,6 @@ def api_update_product(
         )
         db.commit()
         return ProductOut.model_validate(row)
-    except LookupError as e:
-        db.rollback()
-        raise DomainNotFoundError(message=str(e)) from e
-    except ValueError as e:
-        db.rollback()
-        raise DomainConflictError(message=str(e)) from e
     except Exception:
         db.rollback()
         raise
