@@ -1,18 +1,31 @@
+import { getStoredAuthSession } from "@/lib/auth/storage";
+
 export interface ActivePosContext {
-    branchId: number;
+    branchId: number | null;
     token: string | null;
+    roleCode: string | null;
+    userId: number | null;
+    email: string | null;
 }
 
 export function getActivePosContext(): ActivePosContext {
-    if (typeof window === "undefined") {
+    const session = getStoredAuthSession();
+
+    if (!session) {
         return {
-            branchId: 1,
+            branchId: null,
             token: null,
+            roleCode: null,
+            userId: null,
+            email: null,
         };
     }
 
     return {
-        branchId: 1,
-        token: window.localStorage.getItem("access_token"),
+        branchId: session.user.branchId,
+        token: session.accessToken,
+        roleCode: session.user.roleCode,
+        userId: session.user.id,
+        email: session.user.email,
     };
 }

@@ -70,6 +70,16 @@ class AppSettings(BaseSettings):
     auth_access_token_expires_minutes: int = Field(default=60, ge=1)
 
     # -------------------------------------------------------------------------
+    # CORS
+    # -------------------------------------------------------------------------
+    # IMPORTANT:
+    # - For local development, this should include the frontend origin.
+    # - Pydantic Settings can parse JSON arrays from environment variables.
+    # - Example in .env:
+    #   CORS_ALLOWED_ORIGINS=["http://localhost:3000"]
+    cors_allowed_origins: list[str] = Field(default_factory=lambda: ["http://localhost:3000"])
+
+    # -------------------------------------------------------------------------
     # Pydantic Settings configuration
     # -------------------------------------------------------------------------
     # env_prefix=""

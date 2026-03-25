@@ -1,3 +1,7 @@
+import {
+    clearStoredAuthSession,
+    emitUnauthorizedEvent,
+} from "@/lib/auth/storage";
 import { parseApiError } from "./errors";
 
 const API_BASE_URL =
@@ -5,13 +9,14 @@ const API_BASE_URL =
 
 export interface RequestOptions extends RequestInit {
     token?: string | null;
+    handleUnauthorized?: boolean;
 }
 
 export async function apiRequest<T>(
     path: string,
     options: RequestOptions = {},
 ): Promise<T> {
-    const { token, headers, ...rest } = options;
+    const { token, headers, handleUnauthorized = true, ...rest } = options;
 
     const response = await fetch(`${API_BASE_URL}${path}`, {
         ...rest,
@@ -30,6 +35,11 @@ export async function apiRequest<T>(
             payload = await response.json();
         } catch {
             payload = null;
+        }
+
+        if (response.status === 401 && handleUnauthorized) {
+            clearStoredAuthSession();
+            emitUnauthorizedEvent();
         }
 
         throw parseApiError(response.status, payload);

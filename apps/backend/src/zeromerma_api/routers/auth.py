@@ -1,16 +1,20 @@
-# apps/backend/src/zeromerma_api/routers/auth.py
 from __future__ import annotations
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from zeromerma_api.core.dependency_aliases import ActiveAuthContextDep
 from zeromerma_api.core.security import create_access_token, verify_password
 from zeromerma_api.core.settings import get_settings
 from zeromerma_api.db.engine import get_session
 from zeromerma_api.models.role import Role
 from zeromerma_api.models.user_account import UserAccount
-from zeromerma_api.schemas.auth import LoginRequest, TokenResponse
+from zeromerma_api.schemas.auth import (
+    CurrentUserResponse,
+    LoginRequest,
+    TokenResponse,
+)
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
@@ -34,12 +38,7 @@ def login(
     4) Verify the provided password.
     5) Resolve role_code once (DB) and embed it in the JWT.
     6) Issue a signed JWT access token.
-
-    Security behavior:
-    - We intentionally return a generic 401 for invalid credentials.
-    - We do not reveal whether the email or the password was wrong.
     """
-
     settings = get_settings()
 
     user = db.execute(
@@ -70,8 +69,8 @@ def login(
     if not verify_password(payload.password, user.password_hash):
         raise unauthorized_exc
 
-    # Resolve role_code ONCE at login-time (so we avoid per-request role lookups).
     role = db.execute(select(Role).where(Role.id == user.role_id)).scalar_one_or_none()
+
     if role is None:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
@@ -81,10 +80,9 @@ def login(
     token = create_access_token(
         subject=str(user.id),
         extra_claims={
-            # Convenience claims for downstream layers
             "email": user.email,
             "role_id": int(user.role_id),
-            "role_code": str(role.code),  # <-- NEW: role-coded JWT
+            "role_code": str(role.code),
             "branch_id": int(user.branch_id),
         },
     )
@@ -95,4 +93,31 @@ def login(
         access_token=token,
         token_type="bearer",
         expires_in=expires_in_seconds,
+    )
+
+
+@router.get(
+    "/me",
+    response_model=CurrentUserResponse,
+    summary="Return the authenticated user profile",
+)
+def get_authenticated_user(
+    ctx: ActiveAuthContextDep,
+) -> CurrentUserResponse:
+    """
+    Resolve the current authenticated user from the JWT Bearer token.
+
+    Why this route exists:
+    - The frontend should not trust local token payload as its only source of truth.
+    - This route confirms the token is valid and returns the DB-backed current user.
+    - It gives the frontend the authoritative branch and role context.
+    """
+    return CurrentUserResponse(
+        id=int(ctx.user.id),
+        email=ctx.user.email,
+        full_name=ctx.user.full_name,
+        is_active=bool(ctx.user.is_active),
+        branch_id=int(ctx.user.branch_id),
+        role_id=int(ctx.user.role_id),
+        role_code=str(ctx.role_code),
     )
