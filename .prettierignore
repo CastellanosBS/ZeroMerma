@@ -1,0 +1,13 @@
+node_modules
+dist
+coverage
+.venv
+.mypy_cache
+.pytest_cache
+.ruff_cache
+AGENTS.md
+docs/codex/prompts
+pnpm-lock.yaml
+uv.lock
+packages/api-client/src/generated
+packages/api-client/openapi.json

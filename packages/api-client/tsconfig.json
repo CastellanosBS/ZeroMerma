@@ -1,0 +1,4 @@
+{
+  "extends": "@zeromerma/typescript-config/base",
+  "include": ["src"]
+}

@@ -1,0 +1,23 @@
+{
+  "name": "zeromerma",
+  "version": "0.1.0",
+  "private": true,
+  "packageManager": "pnpm@9.15.4",
+  "scripts": {
+    "build": "corepack pnpm -r --if-present build",
+    "contracts:generate": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/contracts/generate-api-client.ps1",
+    "dev:backoffice": "corepack pnpm --filter @zeromerma/backoffice-web dev",
+    "dev:pos": "corepack pnpm --filter @zeromerma/pos-web dev",
+    "format": "prettier --check .",
+    "format:write": "prettier --write .",
+    "foundation:check": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/dev/check-foundation.ps1",
+    "lint": "corepack pnpm -r --if-present lint",
+    "test": "corepack pnpm -r --if-present test",
+    "test:e2e": "corepack pnpm -r --if-present test:e2e",
+    "typecheck": "corepack pnpm -r --if-present typecheck"
+  },
+  "devDependencies": {
+    "prettier": "^3.4.2",
+    "typescript": "^5.7.2"
+  }
+}

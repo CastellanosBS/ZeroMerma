@@ -8,6 +8,8 @@ __pycache__/
 .mypy_cache/
 .ruff_cache/
 .venv/
+htmlcov/
+*.egg-info/
 *.pyc
 
 # Node
@@ -15,6 +17,8 @@ node_modules/
 dist/
 coverage/
 .playwright/
+playwright-report/
+test-results/
 
 # Env
 .env

@@ -1,0 +1,22 @@
+name: zeromerma
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: zeromerma-postgres
+    environment:
+      POSTGRES_DB: zeromerma
+      POSTGRES_USER: zeromerma
+      POSTGRES_PASSWORD: zeromerma
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U zeromerma -d zeromerma"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+    volumes:
+      - zeromerma_postgres_data:/var/lib/postgresql/data
+
+volumes:
+  zeromerma_postgres_data:

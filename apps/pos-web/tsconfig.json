@@ -1,0 +1,10 @@
+{
+  "extends": "@zeromerma/typescript-config/react-app",
+  "compilerOptions": {
+    "baseUrl": ".",
+    "paths": {
+      "@/*": ["./src/*"]
+    }
+  },
+  "include": ["src", "vite.config.ts"]
+}
