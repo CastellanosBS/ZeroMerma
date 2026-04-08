@@ -8,6 +8,9 @@ from sqlalchemy import engine_from_config, pool
 from zeromerma_api.core.config import get_settings
 from zeromerma_api.db.base import Base
 from zeromerma_api.modules.audit.infrastructure import models as audit_models
+from zeromerma_api.modules.branches.infrastructure import models as branch_models
+from zeromerma_api.modules.cash.infrastructure import models as cash_models
+from zeromerma_api.modules.identity.infrastructure import models as identity_models
 from zeromerma_api.modules.outbox.infrastructure import models as outbox_models
 
 config = context.config
@@ -17,7 +20,7 @@ if config.config_file_name is not None:
 
 target_metadata = Base.metadata
 
-_ = (audit_models, outbox_models)
+_ = (audit_models, branch_models, cash_models, identity_models, outbox_models)
 
 
 def run_migrations_offline() -> None:

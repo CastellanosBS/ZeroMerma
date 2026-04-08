@@ -1,15 +1,8 @@
-import type { components } from "@zeromerma/api-client";
+import type { HealthResponse } from "./api-contracts";
+import { requestJson } from "./http";
 
-export type HealthResponse = components["schemas"]["HealthResponse"];
-
-const apiBaseUrl = import.meta.env.VITE_API_BASE_URL ?? "http://localhost:8000";
+export type { HealthResponse } from "./api-contracts";
 
 export async function fetchApiHealth(): Promise<HealthResponse> {
-  const response = await fetch(`${apiBaseUrl}/health`);
-
-  if (!response.ok) {
-    throw new Error("API health check failed.");
-  }
-
-  return (await response.json()) as HealthResponse;
+  return requestJson<HealthResponse>({ path: "/health" });
 }

@@ -14,8 +14,8 @@ class OutboxPoller:
     def poll_once(self) -> int:
         query = text(
             """
-            SELECT id, event_type, aggregate_type, aggregate_id, attempts
-            FROM outbox_messages
+            SELECT id, event_name, aggregate_type, aggregate_id, attempts
+            FROM outbox_events
             WHERE status = 'pending'
               AND processed_at IS NULL
               AND available_at <= now()
@@ -33,7 +33,7 @@ class OutboxPoller:
                 "outbox_message_ready",
                 extra={
                     "outbox_id": str(row["id"]),
-                    "event_type": row["event_type"],
+                    "event_name": row["event_name"],
                     "aggregate_type": row["aggregate_type"],
                     "aggregate_id": row["aggregate_id"],
                     "attempts": row["attempts"],

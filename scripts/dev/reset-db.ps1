@@ -17,7 +17,8 @@ try {
   Invoke-ZeroMermaUv sync --all-packages --dev
   Start-ZeroMermaPostgres
   Wait-ZeroMermaPostgres
-  Invoke-ZeroMermaUv run --project apps/api alembic -c apps/api/alembic.ini upgrade head
+  Invoke-ZeroMermaApiMigrations
+  Invoke-ZeroMermaApiSeedLocalData
 }
 finally {
   Pop-Location

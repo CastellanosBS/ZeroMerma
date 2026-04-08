@@ -11,13 +11,13 @@ from sqlalchemy.orm import Mapped, mapped_column
 from zeromerma_api.db.base import Base
 
 
-class OutboxMessage(Base):
-    __tablename__ = "outbox_messages"
+class OutboxEvent(Base):
+    __tablename__ = "outbox_events"
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     aggregate_type: Mapped[str] = mapped_column(String(120), nullable=False)
     aggregate_id: Mapped[str] = mapped_column(String(120), nullable=False)
-    event_type: Mapped[str] = mapped_column(String(160), nullable=False)
+    event_name: Mapped[str] = mapped_column(String(160), nullable=False)
     payload: Mapped[dict[str, Any]] = mapped_column(JSONB, default=dict, nullable=False)
     headers: Mapped[dict[str, Any]] = mapped_column(JSONB, default=dict, nullable=False)
     occurred_at: Mapped[datetime] = mapped_column(

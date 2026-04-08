@@ -42,11 +42,11 @@ def upgrade() -> None:
     op.create_index(op.f("ix_audit_log_resource"), "audit_log", ["resource_type", "resource_id"], unique=False)
 
     op.create_table(
-        "outbox_messages",
+        "outbox_events",
         sa.Column("id", postgresql.UUID(as_uuid=True), nullable=False),
         sa.Column("aggregate_type", sa.String(length=120), nullable=False),
         sa.Column("aggregate_id", sa.String(length=120), nullable=False),
-        sa.Column("event_type", sa.String(length=160), nullable=False),
+        sa.Column("event_name", sa.String(length=160), nullable=False),
         sa.Column(
             "payload",
             postgresql.JSONB(astext_type=sa.Text()),
@@ -65,21 +65,21 @@ def upgrade() -> None:
         sa.Column("status", sa.String(length=32), server_default=sa.text("'pending'"), nullable=False),
         sa.Column("attempts", sa.Integer(), server_default=sa.text("0"), nullable=False),
         sa.Column("last_error", sa.Text(), nullable=True),
-        sa.PrimaryKeyConstraint("id", name=op.f("pk_outbox_messages")),
+        sa.PrimaryKeyConstraint("id", name=op.f("pk_outbox_events")),
     )
     op.create_index(
-        "ix_outbox_messages_pending",
-        "outbox_messages",
+        "ix_outbox_events_pending",
+        "outbox_events",
         ["status", "available_at", "occurred_at"],
         unique=False,
     )
-    op.create_index(op.f("ix_outbox_messages_event_type"), "outbox_messages", ["event_type"], unique=False)
+    op.create_index(op.f("ix_outbox_events_event_name"), "outbox_events", ["event_name"], unique=False)
 
 
 def downgrade() -> None:
-    op.drop_index(op.f("ix_outbox_messages_event_type"), table_name="outbox_messages")
-    op.drop_index("ix_outbox_messages_pending", table_name="outbox_messages")
-    op.drop_table("outbox_messages")
+    op.drop_index(op.f("ix_outbox_events_event_name"), table_name="outbox_events")
+    op.drop_index("ix_outbox_events_pending", table_name="outbox_events")
+    op.drop_table("outbox_events")
     op.drop_index(op.f("ix_audit_log_resource"), table_name="audit_log")
     op.drop_index(op.f("ix_audit_log_occurred_at"), table_name="audit_log")
     op.drop_index(op.f("ix_audit_log_branch_id"), table_name="audit_log")

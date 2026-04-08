@@ -61,6 +61,17 @@ try {
   Write-Host "Installing Node workspace dependencies..."
   Invoke-ZeroMermaPnpm install --frozen-lockfile
 
+  Write-Host "Validating Docker Compose configuration..."
+  Invoke-ZeroMermaDockerCompose config
+  Start-ZeroMermaPostgres
+  Wait-ZeroMermaPostgres
+
+  Write-Host "Applying database migrations..."
+  Invoke-ZeroMermaApiMigrations
+
+  Write-Host "Seeding local development data..."
+  Invoke-ZeroMermaApiSeedLocalData
+
   Write-Host "Running Python validation..."
   Invoke-ZeroMermaUv run ruff check apps/api/src apps/api/tests apps/worker/src apps/worker/tests
   Invoke-ZeroMermaUv run mypy apps/api/src apps/worker/src
@@ -76,14 +87,6 @@ try {
   Invoke-ZeroMermaPnpm lint
   Invoke-ZeroMermaPnpm test
   Invoke-ZeroMermaPnpm build
-
-  Write-Host "Validating Docker Compose configuration..."
-  Invoke-ZeroMermaDockerCompose config
-  Start-ZeroMermaPostgres
-  Wait-ZeroMermaPostgres
-
-  Write-Host "Applying database migrations..."
-  Invoke-ZeroMermaUv run --project apps/api alembic -c apps/api/alembic.ini upgrade head
 
   Write-Host "Verifying worker bootability against PostgreSQL..."
   Invoke-ZeroMermaUv run --project apps/worker python -m zeromerma_worker --once

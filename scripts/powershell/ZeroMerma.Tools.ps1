@@ -118,6 +118,14 @@ function Invoke-ZeroMermaDockerCompose {
   }
 }
 
+function Invoke-ZeroMermaApiMigrations {
+  Invoke-ZeroMermaUv run --project apps/api alembic -c apps/api/alembic.ini upgrade head
+}
+
+function Invoke-ZeroMermaApiSeedLocalData {
+  Invoke-ZeroMermaUv run --project apps/api python scripts/bootstrap/seed-local-data.py
+}
+
 function Start-ZeroMermaPostgres {
   Write-Host "Starting PostgreSQL..."
   $arguments = @("up", "-d", "postgres")

@@ -1,7 +1,9 @@
 import { expect, test } from "@playwright/test";
 
-test("loads the POS shell", async ({ page }) => {
+test("loads the POS login screen", async ({ page }) => {
   await page.goto("/");
 
-  await expect(page.getByRole("heading", { name: "Cash session required" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Operator sign in" })).toBeVisible();
+  await expect(page.getByLabel("Operator email")).toBeVisible();
+  await expect(page.getByLabel("Password")).toBeVisible();
 });

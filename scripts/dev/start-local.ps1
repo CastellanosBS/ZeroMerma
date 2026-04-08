@@ -40,7 +40,10 @@ try {
   Wait-ZeroMermaPostgres
 
   Write-Host "Applying database migrations..."
-  Invoke-ZeroMermaUv run --project apps/api alembic -c apps/api/alembic.ini upgrade head
+  Invoke-ZeroMermaApiMigrations
+
+  Write-Host "Seeding local development data..."
+  Invoke-ZeroMermaApiSeedLocalData
 
   Start-ZeroMermaProcess `
     -Title "ZeroMerma API" `
