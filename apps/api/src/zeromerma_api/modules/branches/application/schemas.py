@@ -28,9 +28,16 @@ class WorkstationSummary(BaseModel):
     is_active: bool
 
 
+class TrainingModeView(BaseModel):
+    is_enabled: bool
+    label: str
+    safeguard_note: str
+
+
 class PosBootstrapResponse(BaseModel):
     user: AuthenticatedUser
     branch: BranchSummary
     workstation: WorkstationSummary
     local_timestamp: datetime
     active_cash_session: CashSessionView | None
+    training_mode: TrainingModeView | None = None

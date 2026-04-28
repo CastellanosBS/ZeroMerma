@@ -9,13 +9,15 @@ describe("resolvePosEntryRoute", () => {
     );
   });
 
-  it("routes authenticated operators without a session to the open screen", () => {
+  it("routes authenticated operators to the gate when there is no session", () => {
     expect(resolvePosEntryRoute({ hasAccessToken: true, hasActiveCashSession: false })).toBe(
       "/cash-session/open",
     );
   });
 
-  it("routes authenticated operators with an active session to the register home", () => {
-    expect(resolvePosEntryRoute({ hasAccessToken: true, hasActiveCashSession: true })).toBe("/");
+  it("routes authenticated operators directly to POS when the session is already open", () => {
+    expect(resolvePosEntryRoute({ hasAccessToken: true, hasActiveCashSession: true })).toBe(
+      "/pos",
+    );
   });
 });

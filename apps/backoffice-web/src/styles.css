@@ -6,6 +6,30 @@
   --background: 0 0% 100%;
   --foreground: 160 24% 12%;
   --border: 150 16% 84%;
+  --ui-color-surface: #ffffff;
+  --ui-color-surface-muted: #f8fafc;
+  --ui-color-surface-tint: #eff6ff;
+  --ui-color-border: #dbe4ee;
+  --ui-color-foreground: #0f172a;
+  --ui-color-muted: #475569;
+  --ui-color-primary: #14532d;
+  --ui-color-primary-strong: #166534;
+  --ui-color-primary-foreground: #ffffff;
+  --ui-color-primary-soft: #ecfdf3;
+  --ui-color-financial-soft: #fdf7e6;
+  --ui-color-financial-border: #ead8a2;
+  --ui-color-success: #047857;
+  --ui-color-success-soft: #ecfdf3;
+  --ui-color-warning: #b45309;
+  --ui-color-warning-soft: #fffbeb;
+  --ui-color-danger: #be123c;
+  --ui-color-danger-strong: #9f1239;
+  --ui-color-danger-soft: #fff1f2;
+  --ui-color-info: #0369a1;
+  --ui-color-info-soft: #f0f9ff;
+  --ui-color-ring: rgba(20, 83, 45, 0.18);
+  --ui-shadow-subtle: 0 18px 40px rgba(15, 23, 42, 0.07);
+  --ui-shadow-overlay: 0 28px 80px rgba(15, 23, 42, 0.18);
   color: hsl(var(--foreground));
   background: hsl(var(--background));
   font-family:
@@ -26,4 +50,11 @@ body {
 
 * {
   box-sizing: border-box;
+}
+
+button,
+input,
+textarea,
+select {
+  font: inherit;
 }

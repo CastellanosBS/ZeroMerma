@@ -1,21 +1,32 @@
-import { Navigate } from "@tanstack/react-router";
+import { Navigate, useRouterState } from "@tanstack/react-router";
 import type { PropsWithChildren } from "react";
 import { useEffect } from "react";
 
 import { AppShell } from "../../components/app-shell";
+import { OperationalStatus } from "../../components/operational-status";
 import { Button } from "../../components/ui/button";
-import { formatLocalDateTime } from "../../lib/formatters";
 import { ApiError, toOperationalErrorMessage } from "../../lib/http";
 import { queryClient } from "../../lib/query-client";
+import { useCurrentCashSessionQuery } from "../cash-session-open/queries";
 import { usePosAuthStore } from "../auth/auth-store";
+import { usePosShellStore } from "../pos-shell/shell-store";
+import { usePosTerminalStore } from "../pos-terminal/store";
 import { usePosBootstrapQuery } from "./queries";
+import { resolvePosEntryRoute } from "./route-state";
 
 export function PosProtectedLayout({ children }: PropsWithChildren) {
   const accessToken = usePosAuthStore((state) => state.accessToken);
   const clearSession = usePosAuthStore((state) => state.clearSession);
+  const resetPosTerminal = usePosTerminalStore((state) => state.reset);
+  const lastOperationalPath = usePosShellStore((state) => state.lastOperationalPath);
+  const pathname = useRouterState({
+    select: (state) => state.location.pathname,
+  });
   const bootstrapQuery = usePosBootstrapQuery();
+  const currentCashSessionQuery = useCurrentCashSessionQuery();
   const isUnauthorized =
-    bootstrapQuery.error instanceof ApiError && bootstrapQuery.error.statusCode === 401;
+    (bootstrapQuery.error instanceof ApiError && bootstrapQuery.error.statusCode === 401) ||
+    (currentCashSessionQuery.error instanceof ApiError && currentCashSessionQuery.error.statusCode === 401);
 
   useEffect(() => {
     if (!isUnauthorized) {
@@ -23,8 +34,9 @@ export function PosProtectedLayout({ children }: PropsWithChildren) {
     }
 
     clearSession();
+    resetPosTerminal();
     queryClient.clear();
-  }, [clearSession, isUnauthorized]);
+  }, [clearSession, isUnauthorized, resetPosTerminal]);
 
   if (!accessToken) {
     return <Navigate to="/login" />;
@@ -34,54 +46,82 @@ export function PosProtectedLayout({ children }: PropsWithChildren) {
     return <Navigate to="/login" />;
   }
 
-  if (bootstrapQuery.isPending) {
+  if (bootstrapQuery.isPending || currentCashSessionQuery.isPending) {
     return (
-      <div className="min-h-screen bg-slate-50 px-4 py-10">
-        <section className="mx-auto max-w-3xl rounded-lg border border-slate-200 bg-white p-6 shadow-sm">
-          <p className="text-sm font-medium uppercase tracking-wide text-green-800">ZeroMerma POS</p>
-          <h1 className="mt-2 text-3xl font-semibold text-slate-950">Loading workstation context</h1>
-          <p className="mt-4 text-sm leading-6 text-slate-700">
-            Retrieving the active branch, workstation, and operator context for this register.
-          </p>
-        </section>
+      <div className="min-h-screen bg-[var(--pos-shell-bg)] px-4 py-4">
+        <div className="mx-auto flex min-h-[calc(100vh-2rem)] max-w-3xl items-center">
+          <OperationalStatus
+            description="Consultando la sucursal, la estacion y el cajero de este punto de venta."
+            title="Cargando contexto"
+          />
+        </div>
       </div>
     );
   }
 
   if (bootstrapQuery.error) {
     return (
-      <div className="min-h-screen bg-slate-50 px-4 py-10">
-        <section className="mx-auto max-w-3xl rounded-lg border border-amber-200 bg-white p-6 shadow-sm">
-          <p className="text-sm font-medium uppercase tracking-wide text-green-800">ZeroMerma POS</p>
-          <h1 className="mt-2 text-3xl font-semibold text-slate-950">
-            Workstation context is unavailable
-          </h1>
-          <p className="mt-4 text-sm leading-6 text-slate-700">
-            {toOperationalErrorMessage(
+      <div className="min-h-screen bg-[var(--pos-shell-bg)] px-4 py-4">
+        <div className="mx-auto flex min-h-[calc(100vh-2rem)] max-w-3xl items-center">
+          <OperationalStatus
+            action={<Button onClick={() => bootstrapQuery.refetch()}>Reintentar</Button>}
+            description={toOperationalErrorMessage(
               bootstrapQuery.error,
-              "Confirm the API, branch assignment, and workstation configuration.",
+              "Confirma la API, la asignacion de sucursal y la configuracion de la estacion.",
             )}
-          </p>
-          <div className="mt-6">
-            <Button onClick={() => bootstrapQuery.refetch()}>Retry context load</Button>
-          </div>
-        </section>
+            title="No fue posible cargar el contexto"
+          />
+        </div>
       </div>
     );
+  }
+
+  if (currentCashSessionQuery.error) {
+    return (
+      <div className="min-h-screen bg-[var(--pos-shell-bg)] px-4 py-4">
+        <div className="mx-auto flex min-h-[calc(100vh-2rem)] max-w-3xl items-center">
+          <OperationalStatus
+            action={<Button onClick={() => currentCashSessionQuery.refetch()}>Reintentar</Button>}
+            description={toOperationalErrorMessage(
+              currentCashSessionQuery.error,
+              "Confirma la conexion con la API y el estado actual de la caja para esta estacion.",
+            )}
+            title="No fue posible consultar la caja"
+          />
+        </div>
+      </div>
+    );
+  }
+
+  const hasActiveCashSession = currentCashSessionQuery.data !== null;
+  const resumePath =
+    hasActiveCashSession &&
+    lastOperationalPath &&
+    lastOperationalPath !== "/" &&
+    lastOperationalPath !== "/cash-session/open"
+      ? lastOperationalPath
+      : "/pos";
+
+  if (pathname === "/") {
+    const nextRoute = resolvePosEntryRoute({
+      hasActiveCashSession,
+      hasAccessToken: true,
+    });
+
+    return <Navigate to={nextRoute === "/pos" ? resumePath : nextRoute} />;
   }
 
   const bootstrap = bootstrapQuery.data;
 
   return (
     <AppShell
-      branchName={bootstrap.branch.name}
-      localDateTime={formatLocalDateTime(bootstrap.local_timestamp, bootstrap.branch.timezone)}
-      operatorName={bootstrap.user.full_name}
+      bootstrap={bootstrap}
+      cashSession={currentCashSessionQuery.data}
       onSignOut={() => {
         clearSession();
+        resetPosTerminal();
         queryClient.clear();
       }}
-      workstationName={bootstrap.workstation.name}
     >
       {children}
     </AppShell>

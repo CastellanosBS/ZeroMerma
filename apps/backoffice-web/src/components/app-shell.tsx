@@ -9,25 +9,25 @@ export function AppShell({ children }: PropsWithChildren) {
 
   return (
     <div className="min-h-screen bg-slate-50 text-slate-950">
-      <header className="border-b border-slate-200 bg-white">
+      <header className="border-b border-[var(--ui-color-border)] bg-white shadow-[var(--ui-shadow-subtle)]">
         <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-4 px-4 py-4">
           <div>
-            <p className="text-sm font-medium uppercase tracking-wide text-green-800">
+            <p className="text-sm font-medium uppercase tracking-[0.2em] text-[var(--ui-color-primary)]">
               ZeroMerma Backoffice
             </p>
-            <p className="text-lg font-semibold">{workspaceName}</p>
+            <p className="text-lg font-semibold text-slate-950">{workspaceName}</p>
           </div>
           <nav className="flex items-center gap-2">
-            <Link className="rounded-md px-3 py-2 text-sm font-medium hover:bg-slate-100" to="/">
+            <Link className="rounded-xl px-3 py-2 text-sm font-medium hover:bg-slate-100" to="/">
               Operations
             </Link>
             <Link
-              className="rounded-md px-3 py-2 text-sm font-medium hover:bg-slate-100"
+              className="rounded-xl px-3 py-2 text-sm font-medium hover:bg-slate-100"
               to="/health"
             >
               Health
             </Link>
-            <Button className="h-9">Audit required</Button>
+            <Button className="h-9 rounded-xl">Audit required</Button>
           </nav>
         </div>
       </header>

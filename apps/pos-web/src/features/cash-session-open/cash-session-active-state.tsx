@@ -1,79 +1,107 @@
+import { useNavigate } from "@tanstack/react-router";
+
+import { PosButton, PosPanel, PosSectionTitle, PosStatusBadge } from "../../components/pos-foundations";
+import { FlowGuide } from "../../components/pos-module-primitives";
+import {
+  CheckCircleIcon,
+  ClockIcon,
+  MoneyIcon,
+  OperatorIcon,
+  StationIcon,
+} from "../../components/pos-icons";
 import type { CashSessionView, PosBootstrapResponse } from "../../lib/api-contracts";
 import { formatCurrency, formatLocalDateTime } from "../../lib/formatters";
+import { CashSessionContextGrid } from "./cash-session-context-grid";
 
 export function CashSessionActiveState({
   bootstrap,
   cashSession,
-  successMessage,
+  description,
+  title,
 }: {
   bootstrap: PosBootstrapResponse;
   cashSession: CashSessionView;
-  successMessage?: string;
+  description: string;
+  title: string;
 }) {
+  const navigate = useNavigate();
+
   return (
-    <section className="grid gap-6 lg:grid-cols-[1.2fr_0.8fr]">
-      <div className="rounded-lg border border-emerald-200 bg-white p-6 shadow-sm">
-        <p className="text-sm font-medium uppercase tracking-wide text-emerald-800">
-          Cash session active
-        </p>
-        <h1 className="mt-2 text-3xl font-semibold text-slate-950">Register ready</h1>
-        <p className="mt-4 text-sm leading-6 text-slate-700">
-          {successMessage ?? "The operator and workstation are ready for sales operations."}
-        </p>
+    <div className="grid min-h-0 lg:h-full lg:place-items-center">
+      <div className="w-full max-w-[46rem]">
+        <PosPanel className="grid gap-5 px-5 py-5 lg:px-6 lg:py-6">
+          <PosSectionTitle
+            action={<PosStatusBadge status="confirmed">Caja abierta</PosStatusBadge>}
+            description={description}
+            eyebrow="Sesion activa"
+            title={title}
+          />
 
-        <dl className="mt-8 grid gap-4 sm:grid-cols-2">
-          <div>
-            <dt className="text-sm font-medium text-slate-600">Opening amount</dt>
-            <dd className="mt-1 text-2xl font-semibold text-slate-950">
-              {formatCurrency(cashSession.opening_amount)}
-            </dd>
+          <FlowGuide
+            activeStepKey="opening"
+            steps={[
+              { key: "identity", label: "Cajero", state: "completed" },
+              { key: "station", label: "Estacion", state: "completed" },
+              { key: "opening", label: "Apertura", state: "completed" },
+            ]}
+            variant="compact"
+          />
+
+          <CashSessionContextGrid
+            items={[
+              {
+                icon: <OperatorIcon className="h-4 w-4" />,
+                key: "cashier",
+                label: "Cajero",
+                value: bootstrap.user.full_name,
+              },
+              {
+                icon: <StationIcon className="h-4 w-4" />,
+                key: "branch",
+                label: "Sucursal",
+                value: bootstrap.branch.name,
+              },
+              {
+                icon: <StationIcon className="h-4 w-4" />,
+                key: "workstation",
+                label: "Caja",
+                value: bootstrap.workstation.name,
+              },
+              {
+                icon: <CheckCircleIcon className="h-4 w-4" />,
+                key: "session-status",
+                label: "Estado de sesion",
+                tone: "success",
+                value: "Lista para vender",
+              },
+              {
+                icon: <MoneyIcon className="h-4 w-4" />,
+                key: "opening-amount",
+                label: "Monto de apertura",
+                value: formatCurrency(cashSession.opening_amount),
+              },
+              {
+                icon: <ClockIcon className="h-4 w-4" />,
+                key: "opened-at",
+                label: "Hora de apertura",
+                value: formatLocalDateTime(cashSession.opened_at, bootstrap.branch.timezone),
+              },
+            ]}
+          />
+
+          <div className="flex justify-start">
+            <PosButton
+              className="min-w-[11rem]"
+              onClick={() => {
+                void navigate({ to: "/pos" });
+              }}
+              variant="primary"
+            >
+              Ir al POS
+            </PosButton>
           </div>
-          <div>
-            <dt className="text-sm font-medium text-slate-600">Opened at</dt>
-            <dd className="mt-1 text-lg font-semibold text-slate-950">
-              {formatLocalDateTime(cashSession.opened_at, bootstrap.branch.timezone)}
-            </dd>
-          </div>
-          <div>
-            <dt className="text-sm font-medium text-slate-600">Branch</dt>
-            <dd className="mt-1 text-lg font-semibold text-slate-950">{bootstrap.branch.name}</dd>
-          </div>
-          <div>
-            <dt className="text-sm font-medium text-slate-600">Workstation</dt>
-            <dd className="mt-1 text-lg font-semibold text-slate-950">
-              {bootstrap.workstation.name}
-            </dd>
-          </div>
-          <div>
-            <dt className="text-sm font-medium text-slate-600">Operator</dt>
-            <dd className="mt-1 text-lg font-semibold text-slate-950">{bootstrap.user.full_name}</dd>
-          </div>
-          <div>
-            <dt className="text-sm font-medium text-slate-600">Session status</dt>
-            <dd className="mt-1 text-lg font-semibold text-emerald-800">{cashSession.status}</dd>
-          </div>
-        </dl>
+        </PosPanel>
       </div>
-
-      <aside className="rounded-lg border border-slate-200 bg-white p-6 shadow-sm">
-        <h2 className="text-lg font-semibold text-slate-950">Current POS context</h2>
-        <dl className="mt-4 grid gap-4">
-          <div>
-            <dt className="text-sm font-medium text-slate-600">Operator</dt>
-            <dd className="mt-1 text-sm text-slate-900">{bootstrap.user.full_name}</dd>
-          </div>
-          <div>
-            <dt className="text-sm font-medium text-slate-600">Workstation</dt>
-            <dd className="mt-1 text-sm text-slate-900">{bootstrap.workstation.name}</dd>
-          </div>
-          <div>
-            <dt className="text-sm font-medium text-slate-600">Local date and time</dt>
-            <dd className="mt-1 text-sm text-slate-900">
-              {formatLocalDateTime(bootstrap.local_timestamp, bootstrap.branch.timezone)}
-            </dd>
-          </div>
-        </dl>
-      </aside>
-    </section>
+    </div>
   );
 }

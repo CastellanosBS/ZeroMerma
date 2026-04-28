@@ -4,7 +4,7 @@ import { fetchApiHealth } from "../lib/api";
 import type { HealthResponse } from "../lib/api";
 
 const fallbackHealth: HealthResponse = {
-  status: "not checked",
+  status: "sin revisar",
   service: "zeromerma-api",
   environment: "local",
   version: "0.1.0",
@@ -23,18 +23,18 @@ export function HealthDemoPage() {
 
   return (
     <section className="rounded-lg border border-slate-200 bg-white p-6 shadow-sm">
-      <h1 className="text-2xl font-semibold">API health</h1>
+      <h1 className="text-2xl font-semibold">Salud de la API</h1>
       <dl className="mt-6 grid gap-4 sm:grid-cols-2">
         <div>
-          <dt className="text-sm font-medium text-slate-600">Status</dt>
-          <dd className="mt-1 text-lg font-semibold">{isFetching ? "checking" : data.status}</dd>
+          <dt className="text-sm font-medium text-slate-600">Estado</dt>
+          <dd className="mt-1 text-lg font-semibold">{isFetching ? "revisando" : data.status}</dd>
         </div>
         <div>
-          <dt className="text-sm font-medium text-slate-600">Service</dt>
+          <dt className="text-sm font-medium text-slate-600">Servicio</dt>
           <dd className="mt-1 text-lg font-semibold">{data.service}</dd>
         </div>
         <div>
-          <dt className="text-sm font-medium text-slate-600">Environment</dt>
+          <dt className="text-sm font-medium text-slate-600">Entorno</dt>
           <dd className="mt-1 text-lg font-semibold">{data.environment}</dd>
         </div>
         <div>
@@ -43,8 +43,8 @@ export function HealthDemoPage() {
         </div>
       </dl>
       {error ? (
-        <p className="mt-4 rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-900">
-          API health is unavailable from this browser session.
+        <p className="mt-4 rounded-md border border-[var(--ui-color-warning-soft)] bg-[var(--ui-color-warning-soft)] px-3 py-2 text-sm text-[var(--ui-color-warning)]">
+          La salud de la API no esta disponible desde esta sesion del navegador.
         </p>
       ) : null}
     </section>

@@ -10,8 +10,17 @@ from zeromerma_api.db.base import Base
 from zeromerma_api.modules.audit.infrastructure import models as audit_models
 from zeromerma_api.modules.branches.infrastructure import models as branch_models
 from zeromerma_api.modules.cash.infrastructure import models as cash_models
+from zeromerma_api.modules.cash_close.infrastructure import models as cash_close_models
+from zeromerma_api.modules.catalog.infrastructure import models as catalog_models
+from zeromerma_api.modules.corrections.infrastructure import models as corrections_models
+from zeromerma_api.modules.discounts.infrastructure import models as discounts_models
 from zeromerma_api.modules.identity.infrastructure import models as identity_models
+from zeromerma_api.modules.operations.infrastructure import models as operations_models
+from zeromerma_api.modules.orders.infrastructure import models as orders_models
+from zeromerma_api.modules.payments.infrastructure import models as payments_models
 from zeromerma_api.modules.outbox.infrastructure import models as outbox_models
+from zeromerma_api.modules.returns.infrastructure import models as returns_models
+from zeromerma_api.modules.sales.infrastructure import models as sales_models
 
 config = context.config
 
@@ -20,7 +29,22 @@ if config.config_file_name is not None:
 
 target_metadata = Base.metadata
 
-_ = (audit_models, branch_models, cash_models, identity_models, outbox_models)
+_ = (
+    audit_models,
+    branch_models,
+    catalog_models,
+    cash_models,
+    cash_close_models,
+    corrections_models,
+    discounts_models,
+    identity_models,
+    operations_models,
+    orders_models,
+    payments_models,
+    outbox_models,
+    returns_models,
+    sales_models,
+)
 
 
 def run_migrations_offline() -> None:

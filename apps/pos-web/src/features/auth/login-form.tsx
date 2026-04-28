@@ -1,18 +1,24 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation } from "@tanstack/react-query";
 import { Navigate, useNavigate } from "@tanstack/react-router";
+import { useEffect, useRef, useState } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 
-import { Button } from "../../components/ui/button";
+import { PosInlineValidationMessage } from "../../components/pos-feedback";
+import { PosButton, PosFieldLabel, PosPanel, PosSectionTitle, PosStatusBadge } from "../../components/pos-foundations";
+import { posInputClass } from "../pos-theme/theme";
 import type { LoginRequest } from "../../lib/api-contracts";
-import { toOperationalErrorMessage } from "../../lib/http";
+import { ApiError, toOperationalErrorMessage } from "../../lib/http";
+import { cn } from "../../lib/utils";
+import { FlowGuide } from "../../components/pos-module-primitives";
+import { useFocusFlow } from "../pos-shell/keyboard";
 import { loginOperator } from "./auth-api";
 import { usePosAuthStore } from "./auth-store";
 
 const loginSchema = z.object({
-  email: z.string().trim().min(1, "Enter the operator email."),
-  password: z.string().min(1, "Enter the operator password."),
+  email: z.string().trim().min(1, "Ingresa el correo del cajero."),
+  password: z.string().min(1, "Ingresa la contrasena."),
 });
 
 type LoginFormValues = z.infer<typeof loginSchema>;
@@ -21,11 +27,20 @@ export function LoginForm() {
   const navigate = useNavigate();
   const accessToken = usePosAuthStore((state) => state.accessToken);
   const setAccessToken = usePosAuthStore((state) => state.setAccessToken);
+  const [formError, setFormError] = useState<string | null>(null);
+  const formRef = useRef<HTMLFormElement>(null);
+  const passwordInputRef = useRef<HTMLInputElement | null>(null);
+  const { scopeProps } = useFocusFlow({
+    containerRef: formRef,
+  });
   const {
+    clearErrors,
     formState: { errors, isSubmitting },
     handleSubmit,
     register,
     setError,
+    setFocus,
+    trigger,
   } = useForm<LoginFormValues>({
     defaultValues: {
       email: "",
@@ -42,12 +57,19 @@ export function LoginForm() {
     },
   });
 
+  useEffect(() => {
+    if (!accessToken) {
+      setFocus("email");
+    }
+  }, [accessToken, setFocus]);
+
   if (accessToken) {
     return <Navigate to="/" />;
   }
 
-  const onSubmit = handleSubmit(async (values) => {
+  const submitLogin = handleSubmit(async (values) => {
     loginMutation.reset();
+    setFormError(null);
 
     try {
       await loginMutation.mutateAsync({
@@ -55,62 +77,141 @@ export function LoginForm() {
         password: values.password,
       });
     } catch (error) {
-      setError("root", {
-        message: toOperationalErrorMessage(
+      if (error instanceof ApiError && error.statusCode === 401) {
+        setError("password", {
+          message: "Verifica el correo y la contrasena.",
+          type: "server",
+        });
+        passwordInputRef.current?.focus();
+        return;
+      }
+
+      setFormError(
+        toOperationalErrorMessage(
           error,
-          "Login failed. Confirm the operator credentials and API connectivity.",
+          "No fue posible iniciar sesion. Verifica las credenciales y la conexion con la API.",
         ),
-      });
+      );
     }
   });
 
+  const emailField = register("email", {
+    onChange: () => {
+      setFormError(null);
+      clearErrors("email");
+    },
+  });
+  const passwordField = register("password", {
+    onChange: () => {
+      setFormError(null);
+      clearErrors("password");
+    },
+  });
+
   return (
-    <section className="mx-auto flex min-h-screen max-w-md items-center px-4 py-10">
-      <div className="w-full rounded-lg border border-slate-200 bg-white p-6 shadow-sm">
-        <p className="text-sm font-medium uppercase tracking-wide text-green-800">ZeroMerma POS</p>
-        <h1 className="mt-2 text-3xl font-semibold text-slate-950">Operator sign in</h1>
-        <p className="mt-3 text-sm leading-6 text-slate-700">
-          Sign in before opening the register for this workstation.
-        </p>
+    <section className="mx-auto grid min-h-screen max-w-4xl place-items-center px-4 py-10">
+      <div className="w-full max-w-[39rem]">
+        <PosPanel className="px-6 py-6 sm:px-7 sm:py-7">
+          <PosSectionTitle
+            action={<PosStatusBadge status="draft">Paso 1 de 3</PosStatusBadge>}
+            description="Inicia sesion para confirmar la estacion y abrir la caja."
+            eyebrow="Identidad de cajero"
+            title="Acceso del cajero"
+          />
 
-        <form className="mt-8 grid gap-5" onSubmit={onSubmit}>
-          <label className="grid gap-2">
-            <span className="text-sm font-medium text-slate-800">Operator email</span>
-            <input
-              {...register("email")}
-              autoComplete="username"
-              className="h-11 rounded-md border border-slate-300 px-3 text-sm text-slate-950 outline-none transition focus:border-green-700 focus:ring-2 focus:ring-green-700/20"
-              placeholder="cashier@zeromerma.local"
+          <div className="mt-4">
+            <FlowGuide
+              activeStepKey="identity"
+              steps={[
+                { key: "identity", label: "Cajero", state: "current" },
+                { key: "station", label: "Estacion", state: "upcoming" },
+                { key: "opening", label: "Apertura", state: "upcoming" },
+              ]}
+              variant="compact"
             />
-            {errors.email ? (
-              <span className="text-sm text-rose-700">{errors.email.message}</span>
-            ) : null}
-          </label>
+          </div>
 
-          <label className="grid gap-2">
-            <span className="text-sm font-medium text-slate-800">Password</span>
-            <input
-              {...register("password")}
-              autoComplete="current-password"
-              className="h-11 rounded-md border border-slate-300 px-3 text-sm text-slate-950 outline-none transition focus:border-green-700 focus:ring-2 focus:ring-green-700/20"
-              placeholder="Enter password"
-              type="password"
-            />
-            {errors.password ? (
-              <span className="text-sm text-rose-700">{errors.password.message}</span>
-            ) : null}
-          </label>
+          <form className="mt-6 grid gap-4" onSubmit={submitLogin} ref={formRef} {...scopeProps}>
+            <div className="grid gap-2">
+              <PosFieldLabel htmlFor="cashier-email">Correo</PosFieldLabel>
+              <input
+                {...emailField}
+                autoComplete="username"
+                className={cn(
+                  posInputClass,
+                  "h-12 rounded-[var(--pos-radius-control)] px-4 text-[15px]",
+                )}
+                id="cashier-email"
+                onKeyDown={(event) => {
+                  if (event.key !== "Enter" && event.key !== "NumpadEnter") {
+                    return;
+                  }
 
-          {errors.root?.message ? (
-            <div className="rounded-md border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-800">
-              {errors.root.message}
+                  event.preventDefault();
+                  void trigger("email").then((isValid) => {
+                    if (isValid) {
+                      passwordInputRef.current?.focus();
+                    }
+                  });
+                }}
+                placeholder="cashier@zeromerma.local"
+                ref={(node) => {
+                  emailField.ref(node);
+                }}
+              />
+              {errors.email?.message ? (
+                <PosInlineValidationMessage tone="error">
+                  {errors.email.message}
+                </PosInlineValidationMessage>
+              ) : null}
             </div>
-          ) : null}
 
-          <Button className="h-11 w-full" disabled={isSubmitting || loginMutation.isPending} type="submit">
-            {loginMutation.isPending ? "Signing in..." : "Sign in"}
-          </Button>
-        </form>
+            <div className="grid gap-2">
+              <PosFieldLabel htmlFor="cashier-password">Contrasena</PosFieldLabel>
+              <input
+                {...passwordField}
+                autoComplete="current-password"
+                className={cn(
+                  posInputClass,
+                  "h-12 rounded-[var(--pos-radius-control)] px-4 text-[15px]",
+                )}
+                id="cashier-password"
+                onKeyDown={(event) => {
+                  if (event.key !== "Enter" && event.key !== "NumpadEnter") {
+                    return;
+                  }
+
+                  event.preventDefault();
+                  void submitLogin();
+                }}
+                placeholder="Ingresa tu contrasena"
+                ref={(node) => {
+                  passwordField.ref(node);
+                  passwordInputRef.current = node;
+                }}
+                type="password"
+              />
+              {errors.password?.message ? (
+                <PosInlineValidationMessage tone="error">
+                  {errors.password.message}
+                </PosInlineValidationMessage>
+              ) : null}
+            </div>
+
+            {formError ? (
+              <PosInlineValidationMessage tone="error">{formError}</PosInlineValidationMessage>
+            ) : null}
+
+            <PosButton
+              className="mt-1 h-12 w-full"
+              disabled={isSubmitting || loginMutation.isPending}
+              type="submit"
+              variant="primary"
+            >
+              {loginMutation.isPending ? "Entrando..." : "Entrar"}
+            </PosButton>
+          </form>
+        </PosPanel>
       </div>
     </section>
   );

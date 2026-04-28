@@ -1,0 +1,1 @@
+"""Cash close application layer."""

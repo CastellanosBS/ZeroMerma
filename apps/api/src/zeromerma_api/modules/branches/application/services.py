@@ -5,10 +5,12 @@ from zoneinfo import ZoneInfo
 
 from sqlalchemy.orm import Session
 
+from zeromerma_api.core.config import ApiSettings, get_settings
 from zeromerma_api.modules.branches.application.access import WorkstationAccessService
 from zeromerma_api.modules.branches.application.schemas import (
     BranchSummary,
     PosBootstrapResponse,
+    TrainingModeView,
     WorkstationSummary,
 )
 from zeromerma_api.modules.cash.application.services import CashSessionQueryService
@@ -20,9 +22,11 @@ class PosBootstrapService:
         self,
         workstation_access: WorkstationAccessService | None = None,
         cash_sessions: CashSessionQueryService | None = None,
+        settings: ApiSettings | None = None,
     ) -> None:
         self._workstation_access = workstation_access or WorkstationAccessService()
         self._cash_sessions = cash_sessions or CashSessionQueryService()
+        self._settings = settings or get_settings()
 
     def get_bootstrap(
         self,
@@ -57,5 +61,19 @@ class PosBootstrapService:
             active_cash_session=self._cash_sessions.get_open_session_for_workstation_code(
                 session,
                 workstation_code=workstation_code,
+            ),
+            training_mode=self._build_training_mode(),
+        )
+
+    def _build_training_mode(self) -> TrainingModeView | None:
+        if not self._settings.training_mode_enabled:
+            return None
+
+        return TrainingModeView(
+            is_enabled=True,
+            label=self._settings.training_mode_label,
+            safeguard_note=(
+                "Usa una API, worker y base de datos separados para entrenamiento. "
+                "No mezcles esta sesion con datos operativos reales."
             ),
         )

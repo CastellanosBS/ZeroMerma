@@ -1,5 +1,6 @@
 import { Outlet, useRouterState } from "@tanstack/react-router";
 
+import { StatusMessagesViewport } from "../components/status-messages";
 import { PosProtectedLayout } from "../features/pos-bootstrap/pos-protected-layout";
 
 export function RootLayout() {
@@ -9,12 +10,20 @@ export function RootLayout() {
   const isPublicRoute = pathname === "/login" || pathname === "/health";
 
   if (isPublicRoute) {
-    return <Outlet />;
+    return (
+      <>
+        <StatusMessagesViewport />
+        <Outlet />
+      </>
+    );
   }
 
   return (
-    <PosProtectedLayout>
-      <Outlet />
-    </PosProtectedLayout>
+    <>
+      <StatusMessagesViewport />
+      <PosProtectedLayout>
+        <Outlet />
+      </PosProtectedLayout>
+    </>
   );
 }

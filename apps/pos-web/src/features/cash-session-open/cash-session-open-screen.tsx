@@ -2,13 +2,14 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Navigate } from "@tanstack/react-router";
 import { useState } from "react";
 
-import { OperationalStatus } from "../../components/operational-status";
-import { Button } from "../../components/ui/button";
+import { PosErrorState, PosLoadingState } from "../../components/pos-feedback";
+import { PosButton } from "../../components/pos-foundations";
 import { appEnv } from "../../env";
 import type { CashSessionView, OpenCashSessionRequest } from "../../lib/api-contracts";
 import { toOperationalErrorMessage } from "../../lib/http";
 import { usePosAuthStore } from "../auth/auth-store";
 import { bootstrapQueryKey, usePosBootstrapQuery } from "../pos-bootstrap/queries";
+import { useStatusMessageStore } from "../status-messages/store";
 import { CashSessionActiveState } from "./cash-session-active-state";
 import { openCashSession } from "./cash-session-api";
 import { CashSessionOpenForm } from "./cash-session-open-form";
@@ -20,16 +21,30 @@ export function CashSessionOpenScreen() {
   const currentCashSessionQuery = useCurrentCashSessionQuery();
   const queryClient = useQueryClient();
   const [openedSession, setOpenedSession] = useState<CashSessionView | null>(null);
+  const [submitError, setSubmitError] = useState<string | null>(null);
+  const showSuccess = useStatusMessageStore((state) => state.showSuccess);
 
+  function createRequestId(scope: string): string {
+    if (
+      typeof globalThis.crypto !== "undefined" &&
+      typeof globalThis.crypto.randomUUID === "function"
+    ) {
+      return `${scope}-${globalThis.crypto.randomUUID()}`;
+    }
+
+    return `${scope}-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+  }
   const openCashSessionMutation = useMutation({
     mutationFn: (payload: OpenCashSessionRequest) =>
       openCashSession({
         accessToken: accessToken!,
         payload,
-        requestId: crypto.randomUUID(),
+        requestId: createRequestId("cash-session-open"),
       }),
     onSuccess: async (cashSession) => {
       setOpenedSession(cashSession);
+      setSubmitError(null);
+      showSuccess("Caja abierta \u00b7 Turno iniciado");
       await Promise.all([
         queryClient.invalidateQueries({
           queryKey: bootstrapQueryKey(appEnv.VITE_POS_WORKSTATION_CODE),
@@ -45,63 +60,84 @@ export function CashSessionOpenScreen() {
     return <Navigate to="/login" />;
   }
 
-  if (openedSession && (currentCashSessionQuery.isPending || currentCashSessionQuery.data === null)) {
+  if (
+    openedSession &&
+    (currentCashSessionQuery.isPending || currentCashSessionQuery.data === null)
+  ) {
     return (
       <CashSessionActiveState
         bootstrap={bootstrapQuery.data!}
         cashSession={openedSession}
-        successMessage="Cash session opened successfully. Confirming the active register state."
+        description="La apertura quedo registrada y la estacion esta lista para vender."
+        title="Caja abierta"
       />
     );
   }
 
   if (bootstrapQuery.isPending || currentCashSessionQuery.isPending) {
     return (
-      <OperationalStatus
-        description="Retrieving the current workstation and cash-session state."
-        title="Loading cash session"
-      />
+      <div className="grid min-h-0 lg:h-full lg:place-items-center">
+        <div className="w-full max-w-[46rem]">
+          <PosLoadingState
+            description="Consultando la sucursal, la estacion y el estado actual de la caja."
+            title="Cargando contexto de apertura"
+          />
+        </div>
+      </div>
     );
   }
 
   if (bootstrapQuery.error) {
     return (
-      <OperationalStatus
-        action={<Button onClick={() => bootstrapQuery.refetch()}>Retry context load</Button>}
-        description={toOperationalErrorMessage(
-          bootstrapQuery.error,
-          "Confirm the workstation configuration and branch assignment.",
-        )}
-        title="Workstation context is unavailable"
-      />
+      <div className="grid min-h-0 lg:h-full lg:place-items-center">
+        <div className="w-full max-w-[46rem]">
+          <PosErrorState
+            action={
+              <PosButton onClick={() => bootstrapQuery.refetch()} variant="neutral">
+                Reintentar
+              </PosButton>
+            }
+            description={toOperationalErrorMessage(
+              bootstrapQuery.error,
+              "Confirma la configuracion de la estacion y la asignacion de sucursal.",
+            )}
+            title="El contexto de la estacion no esta disponible"
+          />
+        </div>
+      </div>
     );
   }
 
   if (currentCashSessionQuery.error) {
     return (
-      <OperationalStatus
-        action={<Button onClick={() => currentCashSessionQuery.refetch()}>Retry session check</Button>}
-        description={toOperationalErrorMessage(
-          currentCashSessionQuery.error,
-          "Confirm the API connection and retry the active-session check.",
-        )}
-        title="Current cash session is unavailable"
-      />
+      <div className="grid min-h-0 lg:h-full lg:place-items-center">
+        <div className="w-full max-w-[46rem]">
+          <PosErrorState
+            action={
+              <PosButton onClick={() => currentCashSessionQuery.refetch()} variant="neutral">
+                Reintentar
+              </PosButton>
+            }
+            description={toOperationalErrorMessage(
+              currentCashSessionQuery.error,
+              "Confirma la conexion con la API y vuelve a revisar la caja activa.",
+            )}
+            title="No fue posible consultar la caja actual"
+          />
+        </div>
+      </div>
     );
   }
 
   if (currentCashSessionQuery.data) {
-    if (openedSession && currentCashSessionQuery.data.id === openedSession.id) {
-      return (
-        <CashSessionActiveState
-          bootstrap={bootstrapQuery.data}
-          cashSession={currentCashSessionQuery.data}
-          successMessage="Cash session opened successfully."
-        />
-      );
-    }
-
-    return <Navigate to="/" />;
+    return (
+      <CashSessionActiveState
+        bootstrap={bootstrapQuery.data}
+        cashSession={currentCashSessionQuery.data}
+        description="Esta caja ya esta abierta. Puedes continuar directamente al POS."
+        title="Caja abierta"
+      />
+    );
   }
 
   if (openedSession) {
@@ -109,7 +145,8 @@ export function CashSessionOpenScreen() {
       <CashSessionActiveState
         bootstrap={bootstrapQuery.data}
         cashSession={openedSession}
-        successMessage="Cash session opened successfully. Confirming the active register state."
+        description="La apertura quedo registrada y la estacion esta lista para vender."
+        title="Caja abierta"
       />
     );
   }
@@ -117,22 +154,26 @@ export function CashSessionOpenScreen() {
   return (
     <CashSessionOpenForm
       bootstrap={bootstrapQuery.data}
-      errorMessage={
-        openCashSessionMutation.error
-          ? toOperationalErrorMessage(
-              openCashSessionMutation.error,
-              "Cash session opening failed. Confirm the workstation state and retry.",
-            )
-          : undefined
-      }
       isSubmitDisabled={openCashSessionMutation.isPending || openedSession !== null}
       onSubmit={async (values) => {
         openCashSessionMutation.reset();
-        await openCashSessionMutation.mutateAsync({
-          opening_amount: values.openingAmount,
-          workstation_code: appEnv.VITE_POS_WORKSTATION_CODE,
-        });
+        setSubmitError(null);
+
+        try {
+          await openCashSessionMutation.mutateAsync({
+            opening_amount: values.openingAmount,
+            workstation_code: appEnv.VITE_POS_WORKSTATION_CODE,
+          });
+        } catch (error) {
+          setSubmitError(
+            toOperationalErrorMessage(
+              error,
+              "No fue posible abrir la caja. Revisa el estado de la estacion e intentalo de nuevo.",
+            ),
+          );
+        }
       }}
+      submitError={submitError}
     />
   );
 }
