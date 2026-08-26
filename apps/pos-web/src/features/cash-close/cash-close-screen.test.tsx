@@ -8,14 +8,15 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { CashCloseScreen } from "./cash-close-screen";
 
-(globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT =
-  true;
+(
+  globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }
+).IS_REACT_ACT_ENVIRONMENT = true;
 
 const navigateMock = vi.fn();
 const showErrorMock = vi.fn();
 const showSuccessMock = vi.fn();
-const clearSessionMock = vi.fn();
 const resetPosTerminalMock = vi.fn();
+const clearSessionMock = vi.fn();
 const previewCashCloseMock = vi.fn();
 const commitCashCloseMock = vi.fn();
 let publishRightPanel: ((node: React.ReactNode) => void) | null = null;
@@ -99,7 +100,7 @@ const paymentMethodCatalog = [
     currency_code: "MXN",
     display_order: 20,
     is_active: true,
-    is_expected_supported: true,
+    is_expected_supported: false,
     payment_method_code: "CARD",
   },
 ] as const;
@@ -111,22 +112,7 @@ const summaryResponse = {
   cash_session: openCashSession,
   currency_code: "MXN",
   expected_cash_amount: "180.00",
-  movement_breakdown: [
-    {
-      currency_code: "MXN",
-      direction: "IN",
-      movement_count: 2,
-      movement_type: "SALE_PAYMENTS",
-      total_amount: "205.00",
-    },
-    {
-      currency_code: "MXN",
-      direction: "OUT",
-      movement_count: 1,
-      movement_type: "OPERATIONAL_PAYMENTS",
-      total_amount: "10.00",
-    },
-  ],
+  movement_breakdown: [],
   opening_amount: "300.00",
   pending_class_capture: pendingClassCapture,
   reconciliation_status: "REVIEW_REQUIRED",
@@ -135,38 +121,15 @@ const summaryResponse = {
   warnings: [],
 } as const;
 
-const reconciliationResponse = {
-  baseline_snapshot: baselineSnapshot,
-  blockers: [],
-  can_commit: false,
-  cash_session: openCashSession,
-  class_reconciliations: [
-    {
-      attribution_lines: [],
-      auto_attributed_quantity: "5.000",
-      discrepancy_quantity: "0.000",
-      final_attributed_quantity: "5.000",
-      notes: null,
-      pending_quantity: "5.000",
-      product_class_code: "PAN-DULCE",
-      product_class_id: "class-1",
-      product_class_name: "Pan dulce",
-      resolution_status: "AUTO_RESOLVED",
-    },
-  ],
-  pending_class_capture: pendingClassCapture,
-  reconciliation_status: "REVIEW_REQUIRED",
-  relevant_products: [relevantProduct],
-  warnings: [],
-} as const;
-
 const committedCloseDetail = {
   baseline_snapshot: baselineSnapshot,
   branch,
   branch_brand_key: "EL_MEJOR_PAN",
   cash_session: openCashSession,
+  close_mode: "WITH_COUNT",
+  counter_empty_confirmed: false,
   cash_variance_amount: "0.00",
-  class_reconciliations: reconciliationResponse.class_reconciliations,
+  class_reconciliations: [],
   closed_at: "2026-04-22T20:10:00Z",
   closed_by: user,
   counted_cash_amount: "180.00",
@@ -176,8 +139,8 @@ const committedCloseDetail = {
   expected_cash_amount: "180.00",
   generated_discrepancy_documents: [],
   id: "close-1",
-  movement_breakdown: summaryResponse.movement_breakdown,
-  notes: null,
+  movement_breakdown: [],
+  notes: "Caja sin centavos",
   opened_at: "2026-04-22T18:00:00Z",
   opened_by: user,
   opening_amount: "300.00",
@@ -192,13 +155,13 @@ const committedCloseDetail = {
       variance_amount: "0.00",
     },
     {
-      counted_amount: "25.00",
+      counted_amount: "0.00",
       currency_code: "MXN",
       display_order: 20,
-      expected_amount: "25.00",
-      is_expected_supported: true,
+      expected_amount: null,
+      is_expected_supported: false,
       payment_method_code: "CARD",
-      variance_amount: "0.00",
+      variance_amount: null,
     },
   ],
   pending_class_capture: pendingClassCapture,
@@ -210,14 +173,18 @@ const committedCloseDetail = {
 } as const;
 
 let mockBootstrapResponse = buildBootstrapResponse(true);
-let previewMode: "difference" | "exact" = "exact";
 
 function buildBootstrapResponse(hasOpenSession: boolean) {
   return {
     baseline_snapshot: baselineSnapshot,
     blockers: hasOpenSession
       ? []
-      : [{ code: "NO_ACTIVE_OPEN_CASH_SESSION", message: "No hay una sesion abierta para cerrar." }],
+      : [
+          {
+            code: "NO_ACTIVE_OPEN_CASH_SESSION",
+            message: "No hay una sesion abierta para cerrar.",
+          },
+        ],
     branch,
     branch_brand_key: "EL_MEJOR_PAN",
     can_start_close: hasOpenSession,
@@ -232,85 +199,73 @@ function buildBootstrapResponse(hasOpenSession: boolean) {
 }
 
 function buildPreviewResponse(payload: {
-  counted_payment_methods: Array<{ counted_amount: string; payment_method_code: string }>;
-  counted_product_lines: Array<{ counted_quantity: string; product_id: string }>;
+  close_mode?: string;
+  counter_empty_confirmed?: boolean;
+  counted_payment_methods?: Array<{ counted_amount: string; payment_method_code: string }>;
+  counted_product_lines?: Array<{ counted_quantity: string; product_id: string }>;
+  notes?: string | null;
   workstation_code: string;
 }) {
   void payload.workstation_code;
 
+  const counterEmptyConfirmed = payload.counter_empty_confirmed === true;
   const cashCount =
-    payload.counted_payment_methods.find((row) => row.payment_method_code === "CASH")
+    payload.counted_payment_methods?.find((row) => row.payment_method_code === "CASH")
       ?.counted_amount ?? "0.00";
   const cardCount =
-    payload.counted_payment_methods.find((row) => row.payment_method_code === "CARD")
+    payload.counted_payment_methods?.find((row) => row.payment_method_code === "CARD")
       ?.counted_amount ?? "0.00";
-  const hasCash = Number(cashCount) > 0;
-  const hasCard = Number(cardCount) > 0;
-  const hasPhysical = payload.counted_product_lines.some(
-    (row) => Number(row.counted_quantity) > 0,
-  );
-  const isReady = hasCash && hasCard && hasPhysical;
-  const hasDifference = isReady && previewMode === "difference";
+  const hasCash =
+    Number(cashCount) >= 0 &&
+    payload.counted_payment_methods?.some((row) => row.payment_method_code === "CASH");
+  const hasPhysical =
+    payload.counted_product_lines?.some((row) => Number(row.counted_quantity) > 0) ?? false;
+  const isReady = Boolean(hasCash && (hasPhysical || counterEmptyConfirmed));
 
   return {
     baseline_snapshot: baselineSnapshot,
     blockers: [
-      ...(hasCash && hasCard ? [] : [{ code: "MISSING_COUNTED_PAYMENT_TOTALS", message: "Faltan montos contados del cierre." }]),
-      ...(hasPhysical ? [] : [{ code: "MISSING_COUNTED_CLOSING_STOCK", message: "Falta conteo fisico del mostrador." }]),
+      ...(hasCash
+        ? []
+        : [
+            {
+              code: "MISSING_COUNTED_PAYMENT_TOTALS",
+              message: "Falta capturar el total contado de efectivo.",
+            },
+          ]),
+      ...(counterEmptyConfirmed || hasPhysical
+        ? []
+        : [
+            {
+              code: "MISSING_COUNTED_CLOSING_STOCK",
+              message: "Falta capturar el conteo final del mostrador.",
+            },
+          ]),
     ],
     can_start_close: true,
     cash_session: openCashSession,
-    cash_variance_amount: hasDifference ? "50.00" : "0.00",
-    class_reconciliations: [
-      {
-        attribution_lines: [],
-        auto_attributed_quantity: "5.000",
-        discrepancy_quantity: hasDifference ? "1.000" : "0.000",
-        final_attributed_quantity: "5.000",
-        notes: null,
-        pending_quantity: "5.000",
-        product_class_code: "PAN-DULCE",
-        product_class_id: "class-1",
-        product_class_name: "Pan dulce",
-        resolution_status: hasPhysical ? "AUTO_RESOLVED" : "PENDING",
-      },
-    ],
+    close_mode: payload.close_mode ?? "WITH_COUNT",
+    counter_empty_confirmed: counterEmptyConfirmed,
+    cash_variance_amount: hasCash ? (Number(cashCount) - 180).toFixed(2) : "0.00",
+    class_reconciliations: [],
     counted_cash_amount: cashCount,
-    counted_product_lines: hasPhysical
-      ? [
-          {
-            ...relevantProduct,
-            counted_quantity: payload.counted_product_lines[0]?.counted_quantity ?? "0.000",
-            discrepancy_quantity: hasDifference ? "1.000" : "0.000",
-          },
-        ]
-      : [],
+    counted_product_lines:
+      hasPhysical || counterEmptyConfirmed
+        ? [
+            {
+              ...relevantProduct,
+              counted_quantity: counterEmptyConfirmed
+                ? "0.000"
+                : (payload.counted_product_lines?.[0]?.counted_quantity ?? "0.000"),
+            },
+          ]
+        : [],
     currency_code: "MXN",
-    discrepancy_resolutions: hasDifference
-      ? [
-          {
-            counted_quantity: payload.counted_product_lines[0]?.counted_quantity ?? "5.000",
-            discrepancy_quantity: "1.000",
-            expected_quantity: "5.000",
-            generated_document_id: "adjustment-1",
-            notes: null,
-            product_class_code: "PAN-DULCE",
-            product_class_id: "class-1",
-            product_class_name: "Pan dulce",
-            product_code: "CONCHA-VAN",
-            product_id: "product-1",
-            product_name: "Concha vainilla",
-            reason_code: "AUTO_ADJUSTMENT",
-            resolution_type: "COUNTER_ADJUSTMENT",
-          },
-        ]
-      : [],
+    discrepancy_resolutions: [],
     expected_cash_amount: "180.00",
-    generated_discrepancy_documents: hasDifference
-      ? [{ document_type: "COUNTER_ADJUSTMENT", id: "adjustment-1", status: "PENDING" }]
-      : [],
-    movement_breakdown: summaryResponse.movement_breakdown,
-    notes: null,
+    generated_discrepancy_documents: [],
+    movement_breakdown: [],
+    notes: payload.notes ?? null,
     opening_amount: "300.00",
     payment_method_rows: [
       {
@@ -320,25 +275,23 @@ function buildPreviewResponse(payload: {
         expected_amount: "180.00",
         is_expected_supported: true,
         payment_method_code: "CASH",
-        variance_amount: hasDifference ? "50.00" : "0.00",
+        variance_amount: hasCash ? (Number(cashCount) - 180).toFixed(2) : "0.00",
       },
       {
         counted_amount: cardCount,
         currency_code: "MXN",
         display_order: 20,
-        expected_amount: "25.00",
-        is_expected_supported: true,
+        expected_amount: null,
+        is_expected_supported: false,
         payment_method_code: "CARD",
-        variance_amount: "0.00",
+        variance_amount: null,
       },
     ],
     pending_class_capture: pendingClassCapture,
     reconciliation_status: isReady ? "READY" : "REVIEW_REQUIRED",
     total_cash_in: "205.00",
     total_cash_out: "10.00",
-    warnings: hasDifference
-      ? [{ code: "LARGE_CASH_VARIANCE", message: "La diferencia de efectivo es alta." }]
-      : [],
+    warnings: [],
   };
 }
 
@@ -367,9 +320,7 @@ vi.mock("../auth/auth-store", () => ({
 }));
 
 vi.mock("../pos-terminal/store", () => ({
-  usePosTerminalStore: (
-    selector: (state: { reset: typeof resetPosTerminalMock }) => unknown,
-  ) =>
+  usePosTerminalStore: (selector: (state: { reset: typeof resetPosTerminalMock }) => unknown) =>
     selector({
       reset: resetPosTerminalMock,
     }),
@@ -404,6 +355,7 @@ vi.mock("../operations/queries", () => ({
     },
     error: null,
     isPending: false,
+    refetch: vi.fn(),
   }),
   useOperationsClassProductsQuery: () => ({
     data: {
@@ -415,12 +367,13 @@ vi.mock("../operations/queries", () => ({
           id: "product-1",
           name: "Concha vainilla",
           quick_name: "Concha",
-          unit_price: "0.00",
+          unit_price: "12.50",
         },
       ],
     },
     error: null,
     isPending: false,
+    refetch: vi.fn(),
   }),
 }));
 
@@ -431,11 +384,6 @@ vi.mock("./queries", () => ({
     isError: false,
     isPending: false,
     refetch: vi.fn(),
-  }),
-  useCashCloseReconciliationQuery: () => ({
-    data: reconciliationResponse,
-    error: null,
-    isPending: false,
   }),
   useCashCloseSummaryQuery: () => ({
     data: summaryResponse,
@@ -545,11 +493,8 @@ function dispatchWindowKey(key: string, options?: KeyboardEventInit) {
   });
 }
 
-function setInputValue(input: HTMLInputElement, value: string) {
-  const descriptor = Object.getOwnPropertyDescriptor(
-    HTMLInputElement.prototype,
-    "value",
-  )?.set;
+function setInputValue(input: HTMLInputElement | HTMLTextAreaElement, value: string) {
+  const descriptor = Object.getOwnPropertyDescriptor(Object.getPrototypeOf(input), "value")?.set;
 
   act(() => {
     descriptor?.call(input, value);
@@ -584,33 +529,10 @@ function getInputByLabel(container: HTMLElement, label: string) {
   return container.querySelector<HTMLInputElement>(`input[aria-label="${label}"]`);
 }
 
-async function moveToPhysicalStep(container: HTMLElement) {
-  click(getButtonByText(container, "Ver resumen del turno"));
-  await flushAsync();
-
-  click(getButtonByText(container, "Capturar efectivo"));
-  await flushAsync();
-
-  const cashInput = getInputByLabel(container, "Total contado en Efectivo");
-  if (!cashInput) {
-    throw new Error("Expected cash input to exist.");
-  }
-  setInputValue(cashInput, "180.00");
-  dispatchElementKey(cashInput, "Enter");
-  await flushAsync();
-
-  const cardInput = getInputByLabel(container, "Total contado en Tarjeta");
-  if (!cardInput) {
-    throw new Error("Expected card input to exist.");
-  }
-  setInputValue(cardInput, "25.00");
-  dispatchElementKey(cardInput, "Enter");
-  await flushAsync();
-}
-
 async function addPhysicalCountWithKeyboard(container: HTMLElement) {
   dispatchWindowKey("1");
   await flushAsync();
+
   dispatchWindowKey("1");
   await flushAsync();
 
@@ -622,7 +544,6 @@ async function addPhysicalCountWithKeyboard(container: HTMLElement) {
   setInputValue(quantityInput, "5");
   dispatchElementKey(quantityInput, "Enter");
   await flushAsync();
-  await advancePreview();
 }
 
 let mountedRoots: Array<() => void> = [];
@@ -631,12 +552,11 @@ beforeEach(() => {
   vi.useFakeTimers();
   vi.setSystemTime(new Date("2026-04-22T19:30:00Z"));
   mockBootstrapResponse = buildBootstrapResponse(true);
-  previewMode = "exact";
   navigateMock.mockReset();
   showErrorMock.mockReset();
   showSuccessMock.mockReset();
-  clearSessionMock.mockReset();
   resetPosTerminalMock.mockReset();
+  clearSessionMock.mockReset();
   previewCashCloseMock.mockReset();
   commitCashCloseMock.mockReset();
   previewCashCloseMock.mockImplementation(async (_token, payload) => buildPreviewResponse(payload));
@@ -651,7 +571,7 @@ afterEach(() => {
   vi.useRealTimers();
 });
 
-describe("cash close wizard screen", () => {
+describe("cash close screen", () => {
   it("shows a blocker when there is no open cash session", async () => {
     mockBootstrapResponse = buildBootstrapResponse(false);
 
@@ -660,119 +580,211 @@ describe("cash close wizard screen", () => {
     await flushAsync();
 
     expect(view.container.textContent).toContain("No hay turno abierto");
-    expect(view.container.textContent).toContain("No hay una sesion abierta para cerrar.");
+    expect(view.container.textContent).toContain("No hay una caja abierta para cerrar.");
     expect(getButtonByText(view.container, "Ir a apertura")).not.toBeNull();
   });
 
-  it("advances from cash count to payment reconciliation with Enter", async () => {
+  it("counts products with the POS selection flow and hides product prices", async () => {
     const view = renderUi(<CashCloseScreen />);
     mountedRoots.push(view.unmount);
 
-    click(getButtonByText(view.container, "Ver resumen del turno"));
-    await flushAsync();
-    click(getButtonByText(view.container, "Capturar efectivo"));
+    await addPhysicalCountWithKeyboard(view.container);
+
+    expect(view.container.textContent).toContain("Conteo guardado");
+    expect(view.container.textContent).toContain("Concha vainilla");
+    expect(view.container.textContent).toContain("5");
+    expect(view.container.querySelector('input[placeholder="Filtrar clase"]')).not.toBeNull();
+    expect(getInputByLabel(view.container, "Efectivo")).toBeNull();
+    expect(view.container.textContent).not.toContain("12.50");
+
+    click(getButtonByText(view.container, "Cerrar con conteo"));
     await flushAsync();
 
-    const cashInput = getInputByLabel(view.container, "Total contado en Efectivo");
+    expect(view.container.textContent).toContain("Productos contados");
+    expect(view.container.textContent).toContain("Producto");
+    expect(view.container.textContent).toContain("Clase");
+    expect(view.container.textContent).toContain("Cantidad");
+    expect(getInputByLabel(view.container, "Efectivo")).not.toBeNull();
+    expect(view.container.textContent).not.toContain("Lineas");
+    expect(view.container.textContent).not.toContain("Líneas");
+  });
+
+  it("closes the shift with counted cash, product counts, and an optional observation", async () => {
+    const view = renderUi(<CashCloseScreen />);
+    mountedRoots.push(view.unmount);
+
+    await addPhysicalCountWithKeyboard(view.container);
+    click(getButtonByText(view.container, "Cerrar con conteo"));
+    await flushAsync();
+
+    expect(view.container.textContent).not.toContain("Contado");
+    const cashInput = getInputByLabel(view.container, "Efectivo");
     if (!cashInput) {
-      throw new Error("Expected cash input to exist.");
+      throw new Error("Expected counted cash input to exist.");
     }
-
     setInputValue(cashInput, "180.00");
-    dispatchElementKey(cashInput, "Enter");
-    await flushAsync();
+    expect(getInputByLabel(view.container, "Tarjeta")).not.toBeNull();
+    expect(view.container.textContent).toContain("Diferencia");
+    expect(view.container.textContent).toContain("$0.00");
 
-    expect(view.container.textContent).toContain("Tarjeta y otros medios");
-  });
-
-  it("shows class capture reconciliation data in the differences step", async () => {
-    const view = renderUi(<CashCloseScreen />);
-    mountedRoots.push(view.unmount);
-
-    await moveToPhysicalStep(view.container);
-    await addPhysicalCountWithKeyboard(view.container);
-
-    click(getButtonByText(view.container, "Revisar diferencias"));
-    await flushAsync();
-
-    expect(view.container.textContent).toContain("Paso 6");
-    expect(view.container.textContent).toContain("Pan dulce");
-    expect(view.container.textContent).toContain("AUTO_RESOLVED");
-  });
-
-  it("requires cashier acknowledgement for a high-impact difference and marks the cash reason step as deferred", async () => {
-    previewMode = "difference";
-
-    const view = renderUi(<CashCloseScreen />);
-    mountedRoots.push(view.unmount);
-
-    await moveToPhysicalStep(view.container);
-    await addPhysicalCountWithKeyboard(view.container);
-
-    click(getButtonByText(view.container, "Revisar diferencias"));
-    await flushAsync();
-
-    expect(view.container.textContent).toContain(
-      "El motivo manual para la diferencia de efectivo sigue pendiente de contrato backend.",
+    click(getButtonByText(view.container, "Agregar observación"));
+    const observationInput = view.container.querySelector<HTMLTextAreaElement>(
+      'textarea[aria-label="Observación del cierre"]',
     );
-
-    click(getButtonByText(view.container, "Validar cierre"));
-    await flushAsync();
-
-    expect(view.container.textContent).toContain("Paso 7");
-    expect(view.container.textContent).toContain("Reconocimiento requerido");
-    expect(view.container.textContent).toContain("Confirma la revision del cajero para continuar.");
-
-    const acknowledgement = view.container.querySelector<HTMLInputElement>('input[type="checkbox"]');
-    if (!acknowledgement) {
-      throw new Error("Expected acknowledgement checkbox to exist.");
+    if (!observationInput) {
+      throw new Error("Expected observation textarea to exist.");
     }
+    setInputValue(observationInput, "Caja sin centavos");
 
-    click(acknowledgement);
-    await flushAsync();
+    await advancePreview();
 
-    expect(view.container.textContent).not.toContain("Confirma la revision del cajero para continuar.");
-  });
-
-  it("confirms and commits a close without differences", async () => {
-    const view = renderUi(<CashCloseScreen />);
-    mountedRoots.push(view.unmount);
-
-    await moveToPhysicalStep(view.container);
-    await addPhysicalCountWithKeyboard(view.container);
-
-    click(getButtonByText(view.container, "Revisar diferencias"));
-    await flushAsync();
-    click(getButtonByText(view.container, "Validar cierre"));
-    await flushAsync();
-    click(getButtonByText(view.container, "Ir al cierre final"));
-    await flushAsync();
-
-    const finalizeButton = getButtonByText(view.container, "Confirmar cierre");
-    if (!finalizeButton) {
-      throw new Error("Expected final confirm button to exist.");
-    }
-    click(finalizeButton);
-    await flushAsync();
-    expect(getButtonByText(view.container, "Cancelar")).not.toBeNull();
-
-    const dialogSurface = view.container.querySelector(".fixed.inset-0");
-    if (!dialogSurface) {
-      throw new Error("Expected confirmation dialog to be visible.");
-    }
-
-    const dialogConfirmButton = [...dialogSurface.querySelectorAll("button")].find(
-      (button) => button.textContent?.trim() === "Confirmar cierre",
-    );
-    click(dialogConfirmButton ?? null);
+    click(getButtonByText(view.container, "Cerrar turno"));
     await flushAsync();
 
     expect(commitCashCloseMock).toHaveBeenCalledTimes(1);
-    expect(showSuccessMock).toHaveBeenCalledTimes(1);
-    expect(showSuccessMock.mock.calls[0]?.[0]).toContain("Turno cerrado");
-    expect(view.container.textContent).toContain("Resultado del cierre");
-    expect(view.container.textContent).toContain("Copiar referencia");
-    expect(view.container.textContent).toContain("Exportar PDF");
-    expect(view.container.textContent).toContain("Abrir nuevo turno");
+    expect(commitCashCloseMock.mock.calls[0]?.[1]).toEqual({
+      close_mode: "WITH_COUNT",
+      counter_empty_confirmed: false,
+      counted_payment_methods: [
+        {
+          counted_amount: "180.00",
+          payment_method_code: "CASH",
+        },
+        {
+          counted_amount: "0.00",
+          payment_method_code: "CARD",
+        },
+      ],
+      counted_product_lines: [
+        {
+          counted_quantity: "5",
+          product_id: "product-1",
+        },
+      ],
+      notes: "Caja sin centavos",
+      workstation_code: "POS-01",
+    });
+    expect(showSuccessMock).toHaveBeenCalledWith("Turno cerrado correctamente");
+    expect(resetPosTerminalMock).toHaveBeenCalledTimes(1);
+    expect(clearSessionMock).toHaveBeenCalledTimes(1);
+    expect(navigateMock).toHaveBeenCalledWith({ to: "/login" });
+    expect(view.container.textContent).not.toContain("Abrir nuevo turno");
+  });
+
+  it("keeps the cashier in close shift when the backend rejects the close", async () => {
+    commitCashCloseMock.mockRejectedValueOnce(new Error("Fallo del backend"));
+
+    const view = renderUi(<CashCloseScreen />);
+    mountedRoots.push(view.unmount);
+
+    await addPhysicalCountWithKeyboard(view.container);
+    click(getButtonByText(view.container, "Cerrar con conteo"));
+    await flushAsync();
+
+    const cashInput = getInputByLabel(view.container, "Efectivo");
+    if (!cashInput) {
+      throw new Error("Expected counted cash input to exist.");
+    }
+    setInputValue(cashInput, "180.00");
+
+    await advancePreview();
+
+    click(getButtonByText(view.container, "Cerrar turno"));
+    await flushAsync();
+
+    expect(commitCashCloseMock).toHaveBeenCalledTimes(1);
+    expect(showErrorMock).toHaveBeenCalledWith("Fallo del backend");
+    expect(showSuccessMock).not.toHaveBeenCalled();
+    expect(resetPosTerminalMock).not.toHaveBeenCalled();
+    expect(clearSessionMock).not.toHaveBeenCalled();
+    expect(navigateMock).not.toHaveBeenCalled();
+    expect(getButtonByText(view.container, "Cerrar turno")).not.toBeNull();
+  });
+
+  it("closes with an explicit empty counter after money count confirmation", async () => {
+    const view = renderUi(<CashCloseScreen />);
+    mountedRoots.push(view.unmount);
+    await flushAsync();
+
+    click(getButtonByText(view.container, "No sobró pan"));
+    await flushAsync();
+
+    expect(view.container.textContent).toContain("Mostrador vacío: 0 piezas de pan contadas.");
+    expect(commitCashCloseMock).not.toHaveBeenCalled();
+
+    const cashInput = getInputByLabel(view.container, "Efectivo");
+    if (!cashInput) {
+      throw new Error("Expected counted cash input to exist.");
+    }
+    setInputValue(cashInput, "180.00");
+    await advancePreview();
+
+    click(getButtonByText(view.container, "Cerrar turno"));
+    await flushAsync();
+
+    expect(view.container.textContent).toContain("Cerrar turno con mostrador vacío");
+    expect(view.container.textContent).toContain("conteo físico de pan registrado en cero piezas");
+
+    click(getButtonByText(view.container, "Cerrar con mostrador vacío"));
+    await flushAsync();
+    await flushAsync();
+
+    expect(commitCashCloseMock).toHaveBeenCalledTimes(1);
+    expect(commitCashCloseMock.mock.calls[0]?.[1]).toEqual({
+      close_mode: "WITH_COUNT",
+      counter_empty_confirmed: true,
+      counted_payment_methods: [
+        {
+          counted_amount: "180.00",
+          payment_method_code: "CASH",
+        },
+        {
+          counted_amount: "0.00",
+          payment_method_code: "CARD",
+        },
+      ],
+      counted_product_lines: [],
+      workstation_code: "POS-01",
+    });
+    expect(showSuccessMock).toHaveBeenCalledWith("Turno cerrado correctamente");
+    expect(clearSessionMock).toHaveBeenCalledTimes(1);
+    expect(navigateMock).toHaveBeenCalledWith({ to: "/login" });
+  });
+
+  it("calculates the difference and payload from efectivo plus tarjeta", async () => {
+    const view = renderUi(<CashCloseScreen />);
+    mountedRoots.push(view.unmount);
+
+    await addPhysicalCountWithKeyboard(view.container);
+    click(getButtonByText(view.container, "Cerrar con conteo"));
+    await flushAsync();
+
+    const cashInput = getInputByLabel(view.container, "Efectivo");
+    const cardInput = getInputByLabel(view.container, "Tarjeta");
+    if (!cashInput || !cardInput) {
+      throw new Error("Expected efectivo and tarjeta inputs to exist.");
+    }
+
+    setInputValue(cardInput, "180.00");
+    expect(view.container.textContent).toContain("$0.00");
+
+    setInputValue(cashInput, "20.00");
+    expect(view.container.textContent).toContain("$20.00");
+
+    await advancePreview();
+
+    click(getButtonByText(view.container, "Cerrar turno"));
+    await flushAsync();
+
+    expect(commitCashCloseMock.mock.calls[0]?.[1].counted_payment_methods).toEqual([
+      {
+        counted_amount: "20.00",
+        payment_method_code: "CASH",
+      },
+      {
+        counted_amount: "180.00",
+        payment_method_code: "CARD",
+      },
+    ]);
   });
 });

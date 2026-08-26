@@ -8,7 +8,11 @@ import {
   useRef,
 } from "react";
 
-import { formatCompactLocalDateTime, formatRecordReference, formatRecordStatus } from "../lib/formatters";
+import {
+  formatCompactLocalDateTime,
+  formatRecordReference,
+  formatRecordStatus,
+} from "../lib/formatters";
 import { cn } from "../lib/utils";
 import { useModuleHotkeys, useRovingFocusGrid } from "../features/pos-shell/keyboard";
 import { posInputClass } from "../features/pos-theme/theme";
@@ -21,6 +25,7 @@ type PosRecordActionTone = "danger" | "neutral";
 type PosRecordTableAlign = "center" | "left" | "right";
 
 export interface PosFilterChipOption {
+  className?: string;
   count?: number;
   isActive: boolean;
   key: string;
@@ -177,10 +182,7 @@ export function PosSearchInput({
       ariaLabel={ariaLabel}
       className={className}
       disabled={disabled}
-      inputClassName={cn(
-        posInputClass,
-        "h-10 rounded-[var(--pos-radius-control)] py-2 text-sm",
-      )}
+      inputClassName={cn(posInputClass, "h-10 rounded-[var(--pos-radius-control)] py-2 text-sm")}
       inputRef={(node) => {
         internalRef.current = node;
         assignRef(inputRef, node);
@@ -244,6 +246,7 @@ export function PosFilterBar({
         <div className="pos-filter-bar__chips">
           {chipFilters.map((filter) => (
             <FilterButton
+              className={filter.className}
               count={filter.count}
               isActive={filter.isActive}
               key={filter.key}
@@ -431,13 +434,7 @@ export function PosRecordList<TRecord>({
   }
 
   if (records.length === 0) {
-    return (
-      <PosEmptyState
-        action={emptyAction}
-        description={emptyDescription}
-        title={emptyTitle}
-      />
-    );
+    return <PosEmptyState action={emptyAction} description={emptyDescription} title={emptyTitle} />;
   }
 
   return (
@@ -478,7 +475,10 @@ function PosRecordTableSkeleton<TRecord>({
   return (
     <tbody>
       {Array.from({ length: rowCount }, (_, rowIndex) => (
-        <tr className="animate-pulse border-t border-[var(--pos-shell-border)]" key={`table-skeleton-${rowIndex}`}>
+        <tr
+          className="animate-pulse border-t border-[var(--pos-shell-border)]"
+          key={`table-skeleton-${rowIndex}`}
+        >
           {columns.map((column, columnIndex) => (
             <td className="px-3 py-3" key={`${column.key}-${columnIndex}`}>
               <div className="h-3.5 rounded bg-slate-100" />
@@ -503,6 +503,7 @@ export function PosRecordTable<TRecord>({
   emptyTitle = "Sin resultados",
   getKey,
   getRowActions,
+  getRowClassName,
   loading = false,
   loadingTitle = "Cargando registros",
   onSelect,
@@ -517,6 +518,7 @@ export function PosRecordTable<TRecord>({
   emptyTitle?: string;
   getKey: (record: TRecord) => string;
   getRowActions?: (record: TRecord) => PosRecordAction[];
+  getRowClassName?: (record: TRecord, state: PosRecordRenderState) => string | undefined;
   loading?: boolean;
   loadingTitle?: string;
   onSelect: (record: TRecord) => void;
@@ -548,13 +550,7 @@ export function PosRecordTable<TRecord>({
   const showActionColumn = Boolean(getRowActions);
 
   if (!loading && records.length === 0) {
-    return (
-      <PosEmptyState
-        action={emptyAction}
-        description={emptyDescription}
-        title={emptyTitle}
-      />
-    );
+    return <PosEmptyState action={emptyAction} description={emptyDescription} title={emptyTitle} />;
   }
 
   return (
@@ -600,11 +596,12 @@ export function PosRecordTable<TRecord>({
                   const isSelected = key === selectedKey;
                   const rowActions = getRowActions?.(record) ?? [];
                   const itemProps = getItemProps(index);
+                  const rowClassName = getRowClassName?.(record, { index, isSelected });
 
                   return (
                     <tr
                       aria-selected={isSelected}
-                      className="pos-record-table__row"
+                      className={cn("pos-record-table__row", rowClassName)}
                       data-selected={isSelected || undefined}
                       key={key}
                       onClick={() => onSelect(record)}
@@ -666,7 +663,9 @@ export function PosRecordDetailPanel({
     <PosPanel className={cn("flex h-full min-h-0 min-w-0 flex-col px-3.5 py-3", className)}>
       <PosSectionTitle action={action ?? badge} description={description} title={title} />
       <div className="mt-3 min-h-0 flex-1 overflow-hidden">{children}</div>
-      {footer ? <div className="mt-3 border-t border-[var(--pos-shell-border)] pt-3">{footer}</div> : null}
+      {footer ? (
+        <div className="mt-3 border-t border-[var(--pos-shell-border)] pt-3">{footer}</div>
+      ) : null}
     </PosPanel>
   );
 }
@@ -691,9 +690,13 @@ export function PosHistoryView({
   return (
     <PosPanel className={cn("flex h-full min-h-0 min-w-0 flex-col px-3.5 py-3", className)}>
       <PosSectionTitle action={action} description={description} title={title} />
-      {toolbar ? <div className="mt-3 border-t border-[var(--pos-shell-border)] pt-3">{toolbar}</div> : null}
+      {toolbar ? (
+        <div className="mt-3 border-t border-[var(--pos-shell-border)] pt-3">{toolbar}</div>
+      ) : null}
       <div className="mt-3 min-h-0 flex-1 overflow-hidden">{children}</div>
-      {footer ? <div className="mt-3 border-t border-[var(--pos-shell-border)] pt-3">{footer}</div> : null}
+      {footer ? (
+        <div className="mt-3 border-t border-[var(--pos-shell-border)] pt-3">{footer}</div>
+      ) : null}
     </PosPanel>
   );
 }
@@ -763,15 +766,27 @@ export function PosRecordMeta({
   className?: string;
   reference?: string | null;
   status?: string | null;
-  statusTone?: "blocked" | "confirmed" | "draft" | "error" | "pending" | "ready" | "success" | "warning";
+  statusTone?:
+    | "blocked"
+    | "confirmed"
+    | "draft"
+    | "error"
+    | "pending"
+    | "ready"
+    | "success"
+    | "warning";
   timeZone?: string;
   timestamp?: string | null;
 }) {
   return (
     <div className={cn("flex flex-wrap items-center gap-2 text-xs text-slate-500", className)}>
       <span className="font-semibold text-slate-700">{formatRecordReference(reference)}</span>
-      {status ? <PosStatusBadge status={statusTone}>{formatRecordStatus(status)}</PosStatusBadge> : null}
-      {timestamp && timeZone ? <span>{formatCompactLocalDateTime(timestamp, timeZone)}</span> : null}
+      {status ? (
+        <PosStatusBadge status={statusTone}>{formatRecordStatus(status)}</PosStatusBadge>
+      ) : null}
+      {timestamp && timeZone ? (
+        <span>{formatCompactLocalDateTime(timestamp, timeZone)}</span>
+      ) : null}
     </div>
   );
 }

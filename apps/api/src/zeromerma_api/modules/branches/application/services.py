@@ -13,8 +13,11 @@ from zeromerma_api.modules.branches.application.schemas import (
     TrainingModeView,
     WorkstationSummary,
 )
+from zeromerma_api.modules.branches.domain.exceptions import BranchAssignmentRequiredError
 from zeromerma_api.modules.cash.application.services import CashSessionQueryService
 from zeromerma_api.modules.identity.application.schemas import AuthenticatedUser
+from zeromerma_api.modules.identity.application.services import user_can_access_surface
+from zeromerma_api.modules.identity.domain.constants import IDENTITY_SURFACE_POS
 
 
 class PosBootstrapService:
@@ -35,6 +38,9 @@ class PosBootstrapService:
         current_user: AuthenticatedUser,
         workstation_code: str,
     ) -> PosBootstrapResponse:
+        if not user_can_access_surface(current_user, IDENTITY_SURFACE_POS):
+            raise BranchAssignmentRequiredError("POS access is required.")
+
         context = self._workstation_access.resolve_context(
             session,
             user_id=current_user.id,

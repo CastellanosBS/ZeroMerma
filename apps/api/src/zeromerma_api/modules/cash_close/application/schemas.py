@@ -28,7 +28,7 @@ class CashClosePaymentMethodRowView(BaseModel):
     payment_method_code: str
     currency_code: str
     display_order: int
-    counted_amount: Decimal
+    counted_amount: Decimal | None = None
     expected_amount: Decimal | None = None
     variance_amount: Decimal | None = None
     is_expected_supported: bool
@@ -122,6 +122,8 @@ class CashCloseDiscrepancyResolutionRequest(BaseModel):
 
 class CashClosePreviewRequest(BaseModel):
     workstation_code: str = Field(min_length=1, max_length=64)
+    close_mode: str = Field(default="WITH_COUNT", min_length=1, max_length=40)
+    counter_empty_confirmed: bool = False
     counted_payment_methods: list[CashCloseCountedPaymentMethodRequest] = Field(
         default_factory=list
     )
@@ -147,6 +149,15 @@ class CashCloseReconciliationProductView(BaseModel):
     final_expected_quantity: Decimal | None = None
     discrepancy_quantity: Decimal | None = None
     notes: str | None = None
+
+
+class CashCloseCounterClassAvailabilityView(BaseModel):
+    product_class_id: UUID
+    product_class_code: str
+    product_class_name: str
+    expected_quantity_before_deferred_attr: Decimal
+    pending_class_capture_quantity: Decimal
+    available_quantity: Decimal
 
 
 class CashCloseAttributionLineView(BaseModel):
@@ -204,19 +215,22 @@ class CashCloseReconciliationResponse(BaseModel):
     warnings: list[CashCloseIssueView]
     can_commit: bool
     relevant_products: list[CashCloseReconciliationProductView]
+    counter_class_availability: list[CashCloseCounterClassAvailabilityView]
     class_reconciliations: list[CashCloseClassReconciliationView]
     reconciliation_status: str
 
 
 class CashClosePreviewResponse(BaseModel):
     cash_session: CashSessionView
+    close_mode: str
+    counter_empty_confirmed: bool
     currency_code: str
     opening_amount: Decimal
     total_cash_in: Decimal
     total_cash_out: Decimal
     expected_cash_amount: Decimal
-    counted_cash_amount: Decimal
-    cash_variance_amount: Decimal
+    counted_cash_amount: Decimal | None = None
+    cash_variance_amount: Decimal | None = None
     payment_method_rows: list[CashClosePaymentMethodRowView]
     movement_breakdown: list[CashCloseMovementBreakdownView]
     blockers: list[CashCloseIssueView]
@@ -235,6 +249,8 @@ class CashClosePreviewResponse(BaseModel):
 class CashCloseDetailResponse(BaseModel):
     id: UUID
     cash_session: CashSessionView
+    close_mode: str
+    counter_empty_confirmed: bool
     branch: BranchSummary
     workstation: WorkstationSummary
     branch_brand_key: str | None = None
@@ -247,8 +263,8 @@ class CashCloseDetailResponse(BaseModel):
     total_cash_in: Decimal
     total_cash_out: Decimal
     expected_cash_amount: Decimal
-    counted_cash_amount: Decimal
-    cash_variance_amount: Decimal
+    counted_cash_amount: Decimal | None = None
+    cash_variance_amount: Decimal | None = None
     payment_method_rows: list[CashClosePaymentMethodRowView]
     movement_breakdown: list[CashCloseMovementBreakdownView]
     pending_class_capture: CashClosePendingClassCaptureSummaryView

@@ -4,12 +4,14 @@ import { act, type ReactElement, useEffect, useMemo, useRef, useState } from "re
 import { createRoot } from "react-dom/client";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
+import { PosStatusBadge } from "../../components/pos-foundations";
+import { SearchField } from "../../components/pos-module-primitives";
+import { PosFilterBar, PosRecordTable, type PosRecordColumn } from "../../components/pos-records";
 import type { TicketDetailResponse, TicketListItemView } from "../../lib/api-contracts";
-import { PosScannerInput } from "../../components/pos-scanner-input";
 import { matchesScannerValue, normalizeScannerText, parseTicketScannerValue } from "../../lib/scanner";
 import { KeyboardShortcutRegistry } from "../pos-shell/keyboard";
-import { PosFilterBar, PosRecordList } from "../../components/pos-records";
-import { TicketRecordCard, TicketSummaryPanel } from "./tickets-screen";
+import { posInputClass } from "../pos-theme/theme";
+import { TicketSummaryPanel } from "./tickets-screen";
 
 (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT =
   true;
@@ -155,14 +157,35 @@ function setInputValue(input: HTMLInputElement, value: string) {
   });
 }
 
+function getPaymentMethodLabel(code: string): string {
+  switch (code) {
+    case "CASH":
+      return "Efectivo";
+    case "CARD":
+      return "Tarjeta";
+    default:
+      return code;
+  }
+}
+
+function getPaymentSummaryLabel(ticket: TicketListItemView): string {
+  if (ticket.payment_summary.length === 0) {
+    return "Sin pago";
+  }
+
+  if (ticket.payment_summary.length === 1) {
+    return getPaymentMethodLabel(ticket.payment_summary[0]!.payment_method_code);
+  }
+
+  return "Mixto";
+}
+
 function TicketListHarness() {
   const [selectedScope, setSelectedScope] = useState("CURRENT_SHIFT");
   const [searchText, setSearchText] = useState("");
-  const [scannerText, setScannerText] = useState("");
   const [pendingScannerFolio, setPendingScannerFolio] = useState<string | null>(null);
-  const [selectedTicketId, setSelectedTicketId] = useState<string | null>(tickets[0]!.id);
+  const [selectedTicketId, setSelectedTicketId] = useState<string | null>(null);
   const searchInputRef = useRef<HTMLInputElement | null>(null);
-  const scannerInputRef = useRef<HTMLInputElement | null>(null);
 
   const visibleTickets = useMemo(() => {
     const scopeTickets = selectedScope === "TODAY" ? tickets.slice(1) : tickets;
@@ -191,32 +214,86 @@ function TicketListHarness() {
     }
   }, [pendingScannerFolio, visibleTickets]);
 
+  const columns: PosRecordColumn<TicketListItemView>[] = [
+    {
+      header: "Ticket",
+      key: "folio",
+      renderCell: (ticket) => <span className="font-semibold">{ticket.folio}</span>,
+    },
+    {
+      header: "Fecha/hora",
+      key: "date",
+      renderCell: (ticket) => ticket.confirmed_at,
+    },
+    {
+      header: "Cajero",
+      key: "operator",
+      renderCell: (ticket) => ticket.operator_full_name,
+    },
+    {
+      align: "right",
+      header: "Total",
+      key: "total",
+      renderCell: (ticket) => ticket.total_amount,
+    },
+    {
+      header: "Metodo de pago",
+      key: "payment",
+      renderCell: getPaymentSummaryLabel,
+    },
+    {
+      align: "right",
+      header: "Estado",
+      key: "status",
+      renderCell: (ticket) => (
+        <div className="flex justify-end gap-1">
+          <PosStatusBadge status="draft">Emitido</PosStatusBadge>
+          {ticket.return_status === "PARTIALLY_RETURNED" ? (
+            <PosStatusBadge status="warning">Devolucion parcial</PosStatusBadge>
+          ) : null}
+        </div>
+      ),
+    },
+  ];
+
   function handleScannerSubmit() {
     const scannedValue =
-      parseTicketScannerValue(scannerText) ?? normalizeScannerText(scannerText);
+      parseTicketScannerValue(searchText) ?? normalizeScannerText(searchText);
 
     if (scannedValue.length === 0) {
       return;
     }
 
-    setScannerText("");
     setPendingScannerFolio(scannedValue);
     setSearchText(scannedValue);
   }
 
   return (
     <KeyboardShortcutRegistry>
-      <div className="grid gap-3">
-        <PosScannerInput
-          ariaLabel="Escanear folio de ticket"
-          inputRef={scannerInputRef}
-          modeLabel="Escaneo de ticket"
-          onChange={setScannerText}
-          onSubmit={handleScannerSubmit}
-          placeholder="Escanear folio de ticket"
-          submitLabel="Buscar folio"
-          value={scannerText}
-        />
+      <div className="grid gap-2">
+        <div className="flex gap-2">
+          <SearchField
+            ariaLabel="Buscar o escanear folio de ticket"
+            className="min-w-0 flex-1"
+            inputClassName={`h-10 rounded-lg text-sm ${posInputClass}`}
+            inputRef={searchInputRef}
+            onChange={(value) => {
+              setPendingScannerFolio(null);
+              setSearchText(value);
+            }}
+            onKeyDown={(event) => {
+              if (event.key === "Enter" || event.key === "NumpadEnter") {
+                event.preventDefault();
+                handleScannerSubmit();
+              }
+            }}
+            placeholder="Buscar o escanear folio"
+            value={searchText}
+          />
+          <button disabled={searchText.trim().length === 0} onClick={handleScannerSubmit} type="button">
+            Buscar
+          </button>
+        </div>
         <PosFilterBar
           chipFilters={[
             {
@@ -232,31 +309,17 @@ function TicketListHarness() {
               onSelect: () => setSelectedScope("TODAY"),
             },
           ]}
-          searchInput={{
-            ariaLabel: "Buscar ticket por folio",
-            inputRef: searchInputRef,
-            onChange: (value) => {
-              setPendingScannerFolio(null);
-              setSearchText(value);
-            },
-            placeholder: "Buscar por folio",
-            value: searchText,
-          }}
-          title="Tickets emitidos"
+          countLabel={<span>{visibleTickets.length} tickets</span>}
         />
       </div>
-      <PosRecordList
+      <PosRecordTable
+        columns={columns}
+        emptyTitle="No hay tickets"
         getKey={(ticket) => ticket.id}
         onSelect={(ticket) => setSelectedTicketId(ticket.id)}
         records={visibleTickets}
-        renderContent={(ticket, state) => (
-          <TicketRecordCard
-            isSelected={state.isSelected}
-            ticket={ticket}
-            timeZone="America/Hermosillo"
-          />
-        )}
         selectedKey={selectedTicketId}
+        tableAriaLabel="Tabla de tickets"
       />
       <output data-testid="selected-ticket">{selectedTicketId ?? ""}</output>
     </KeyboardShortcutRegistry>
@@ -274,20 +337,6 @@ afterEach(() => {
 });
 
 describe("Tickets shared hub pieces", () => {
-  it("renders return status and returned amount in ticket cards", () => {
-    const view = renderUi(
-      <TicketRecordCard
-        isSelected={false}
-        ticket={tickets[1]!}
-        timeZone="America/Hermosillo"
-      />,
-    );
-    mountedRoots.push(view.unmount);
-
-    expect(view.container.textContent).toContain("Devolucion parcial");
-    expect(view.container.textContent).toContain("Devuelto $40.00");
-  });
-
   it("filters tickets by scope and folio", () => {
     const view = renderUi(<TicketListHarness />);
     mountedRoots.push(view.unmount);
@@ -308,30 +357,30 @@ describe("Tickets shared hub pieces", () => {
     expect(view.container.textContent).toContain("TCK-BBB002");
 
     const searchInput = view.container.querySelector(
-      'input[aria-label="Buscar ticket por folio"]',
+      'input[aria-label="Buscar o escanear folio de ticket"]',
     ) as HTMLInputElement;
     setInputValue(searchInput, "AAA");
 
-    expect(view.container.textContent).toContain("Sin resultados");
+    expect(view.container.textContent).toContain("No hay tickets");
   });
 
-  it("navigates the ticket list with arrows and Enter", () => {
+  it("navigates the ticket table with arrows and Enter", () => {
     const view = renderUi(<TicketListHarness />);
     mountedRoots.push(view.unmount);
 
-    const recordButtons = Array.from(
-      view.container.querySelectorAll(".pos-record-card__button"),
-    ) as HTMLButtonElement[];
-    expect(recordButtons).toHaveLength(2);
+    const recordRows = Array.from(
+      view.container.querySelectorAll(".pos-record-table__row"),
+    ) as HTMLTableRowElement[];
+    expect(recordRows).toHaveLength(2);
 
     act(() => {
-      recordButtons[0]?.focus();
+      recordRows[0]?.focus();
     });
 
-    dispatchKey(recordButtons[0]!, "ArrowDown");
-    expect(document.activeElement).toBe(recordButtons[1]);
+    dispatchKey(recordRows[0]!, "ArrowDown");
+    expect(document.activeElement).toBe(recordRows[1]);
 
-    dispatchKey(recordButtons[1]!, "Enter");
+    dispatchKey(recordRows[1]!, "Enter");
     expect(view.container.querySelector('[data-testid="selected-ticket"]')?.textContent).toBe(
       "ticket-2",
     );
@@ -341,15 +390,34 @@ describe("Tickets shared hub pieces", () => {
     const view = renderUi(<TicketListHarness />);
     mountedRoots.push(view.unmount);
 
-    const scannerInput = view.container.querySelector(
-      'input[aria-label="Escanear folio de ticket"]',
+    const searchInput = view.container.querySelector(
+      'input[aria-label="Buscar o escanear folio de ticket"]',
     ) as HTMLInputElement;
 
-    setInputValue(scannerInput, "tck-bbb002");
-    dispatchKey(scannerInput, "Enter");
+    setInputValue(searchInput, "tck-bbb002");
+    dispatchKey(searchInput, "Enter");
 
     expect(view.container.querySelector('[data-testid="selected-ticket"]')?.textContent).toBe(
       "ticket-2",
+    );
+  });
+
+  it("shows a compact empty panel message when no ticket is selected", () => {
+    const view = renderUi(
+      <TicketSummaryPanel
+        consoleState="RESULTS_AVAILABLE"
+        detailError={null}
+        isDetailPending={false}
+        isReprintPending={false}
+        onReprint={() => undefined}
+        onStartReturn={() => undefined}
+        selectedTicket={null}
+      />,
+    );
+    mountedRoots.push(view.unmount);
+
+    expect(view.container.textContent).toContain(
+      "Selecciona un ticket para ver su detalle y acciones disponibles.",
     );
   });
 
@@ -392,7 +460,7 @@ describe("Tickets shared hub pieces", () => {
     expect(onReprint).toHaveBeenCalledWith("ticket-2");
   });
 
-  it("keeps customer delivery actions disabled while notification infrastructure is missing", () => {
+  it("hides the return action when the ticket has no returnable quantity", () => {
     const view = renderUi(
       <TicketSummaryPanel
         consoleState="TICKET_SELECTED"
@@ -401,25 +469,11 @@ describe("Tickets shared hub pieces", () => {
         isReprintPending={false}
         onReprint={() => undefined}
         onStartReturn={() => undefined}
-        selectedTicket={ticketDetail}
+        selectedTicket={{ ...ticketDetail, has_returnable_quantity: false }}
       />,
     );
     mountedRoots.push(view.unmount);
 
-    expect(view.container.textContent).toContain(
-      "Envio de tickets pendiente: falta proveedor de entrega y el contrato no conserva contacto del cliente.",
-    );
-
-    const sendEmailButton = Array.from(view.container.querySelectorAll("button")).find((button) =>
-      button.textContent?.includes("Enviar ticket por correo"),
-    ) as HTMLButtonElement | undefined;
-    const sendSmsButton = Array.from(view.container.querySelectorAll("button")).find((button) =>
-      button.textContent?.includes("Enviar ticket por SMS"),
-    ) as HTMLButtonElement | undefined;
-
-    expect(sendEmailButton).toBeDefined();
-    expect(sendSmsButton).toBeDefined();
-    expect(sendEmailButton?.disabled).toBe(true);
-    expect(sendSmsButton?.disabled).toBe(true);
+    expect(view.container.textContent).not.toContain("Iniciar devolucion");
   });
 });

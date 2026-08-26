@@ -483,36 +483,34 @@ async function flush() {
 }
 
 async function selectTargetDocumentWithKeyboard(container: HTMLElement) {
-  const firstDocumentButton = container.querySelector<HTMLButtonElement>(".pos-record-card__button");
-  if (!firstDocumentButton) {
+  const firstDocumentRow = container.querySelector<HTMLTableRowElement>("tbody tr");
+  if (!firstDocumentRow) {
     throw new Error("Expected a correction target record.");
   }
 
-  firstDocumentButton.focus();
-  keydown(firstDocumentButton, "Enter");
+  firstDocumentRow.focus();
+  keydown(firstDocumentRow, "Enter");
   await flush();
 }
 
 async function addDraftAdjustment(container: HTMLElement, quantity = "2") {
-  const adjustButton = Array.from(container.querySelectorAll("button")).find((button) =>
-    button.textContent?.includes("Ajustar"),
+  const rightPanel = getRightPanel(container);
+  const quantityButton = rightPanel?.querySelector<HTMLButtonElement>(
+    '[data-correction-line-quantity-button="target-line-1"]',
   );
-  click(adjustButton);
+  click(quantityButton);
   await flush();
 
-  const lineRow = container.querySelector('[data-correction-line-row="target-line-1"]');
+  const lineRow = rightPanel?.querySelector('[data-correction-line-row="target-line-1"]');
   if (!(lineRow instanceof HTMLElement)) {
     throw new Error("Expected correction line row.");
   }
 
-  const quantityInput = lineRow.querySelector<HTMLInputElement>('input[placeholder="1"]');
+  const quantityInput = lineRow.querySelector<HTMLInputElement>('input[inputmode="decimal"]');
   changeInput(quantityInput, quantity);
   await flush();
 
-  const confirmButton = Array.from(lineRow.querySelectorAll("button")).find((button) =>
-    button.textContent?.includes("Confirmar"),
-  );
-  click(confirmButton);
+  keydown(quantityInput, "Enter");
   await flush();
 }
 
@@ -577,7 +575,7 @@ describe("CorrectionsScreen", () => {
     await flush();
 
     const rightPanel = getRightPanel(view.container);
-    expect(rightPanel?.textContent).toContain("Selecciona un documento original.");
+    expect(rightPanel?.textContent).toContain("Selecciona un movimiento para ajustar.");
   });
 
   it("selects the source document with keyboard and shows the original detail", async () => {
@@ -588,7 +586,7 @@ describe("CorrectionsScreen", () => {
     await selectTargetDocumentWithKeyboard(view.container);
 
     expect(view.container.textContent).toContain("Paso a mostrador del turno");
-    expect(view.container.textContent).toContain("Solo lectura. El original no se altera.");
+    expect(getRightPanel(view.container)?.textContent).toContain("Concha vainilla");
   });
 
   it("captures an adjustment line and blocks commit until a reason is selected", async () => {
@@ -601,7 +599,7 @@ describe("CorrectionsScreen", () => {
 
     const rightPanel = getRightPanel(view.container);
     expect(rightPanel?.textContent).toContain("Selecciona un motivo para continuar.");
-    expect(rightPanel?.textContent).toContain("-2 unidades");
+    expect(rightPanel?.textContent).toContain("-1");
   });
 
   it("confirms an adjustment and shows the success result with folio", async () => {
@@ -620,19 +618,9 @@ describe("CorrectionsScreen", () => {
 
     const rightPanel = getRightPanel(view.container);
     const registerButton = Array.from(rightPanel?.querySelectorAll("button") ?? []).find((button) =>
-      button.textContent?.includes("Confirmar ajuste"),
+      button.textContent?.includes("Guardar ajuste"),
     );
     click(registerButton);
-    await flush();
-
-    const dialog = view.container.querySelector('[data-operation-confirmation-dialog="true"]');
-    expect(dialog?.textContent).toContain("Confirmar ajuste auditado");
-    expect(dialog?.textContent).toContain("CTR-000001");
-
-    const confirmButton = Array.from(view.container.querySelectorAll("button")).find((button) =>
-      button.textContent?.includes("Confirmar ajuste") && !button.textContent?.includes("Registrando"),
-    );
-    click(confirmButton);
     await flush();
     await flush();
 
@@ -640,8 +628,8 @@ describe("CorrectionsScreen", () => {
     expect(showSuccessMock).toHaveBeenCalledWith(
       "Ajuste COR-000123 registrado correctamente.",
     );
-    expect(rightPanel?.textContent).toContain("Ajuste auditado registrado");
-    expect(rightPanel?.textContent).toContain("COR-000123");
+    expect(view.container.textContent).toContain("Movimientos");
+    expect(getRightPanel(view.container)?.textContent).toContain("Da click en una cantidad nueva");
   });
 
   it("opens the adjustment history from the result state", async () => {
@@ -660,20 +648,14 @@ describe("CorrectionsScreen", () => {
 
     const rightPanel = getRightPanel(view.container);
     const registerButton = Array.from(rightPanel?.querySelectorAll("button") ?? []).find((button) =>
-      button.textContent?.includes("Confirmar ajuste"),
+      button.textContent?.includes("Guardar ajuste"),
     );
     click(registerButton);
     await flush();
-
-    const confirmButton = Array.from(view.container.querySelectorAll("button")).find((button) =>
-      button.textContent?.includes("Confirmar ajuste") && !button.textContent?.includes("Registrando"),
-    );
-    click(confirmButton);
-    await flush();
     await flush();
 
-    const historyButton = Array.from(rightPanel?.querySelectorAll("button") ?? []).find((button) =>
-      button.textContent?.includes("Ver historial"),
+    const historyButton = Array.from(view.container.querySelectorAll("button")).find((button) =>
+      button.textContent?.includes("Historial de ajustes"),
     );
     click(historyButton);
     await flush();

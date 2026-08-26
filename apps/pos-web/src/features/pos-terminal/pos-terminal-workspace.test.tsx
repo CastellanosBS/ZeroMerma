@@ -210,7 +210,7 @@ describe("PosTerminalWorkspace", () => {
     expect(state.pendingSelection?.productClass.id).toBe(panDulceClass.id);
   });
 
-  it("supports keyboard-only product selection and keeps direct mode visible", async () => {
+  it("supports keyboard-only product selection", async () => {
     act(() => {
       usePosTerminalStore.getState().selectClass(bebidasClass);
     });
@@ -226,7 +226,6 @@ describe("PosTerminalWorkspace", () => {
       await Promise.resolve();
     });
 
-    expect(view.container.textContent).toContain("Producto directo");
     expect(document.activeElement).toBe(cards[0]);
 
     dispatchKey(cards[0]!, "ArrowRight");

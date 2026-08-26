@@ -6,13 +6,12 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { PosFilterBar, PosRecordList } from "../../components/pos-records";
 import { KeyboardShortcutRegistry } from "../pos-shell/keyboard";
-import {
-  OrderActionConfirmDialog,
-  OrderRecordCard,
-} from "./orders-screen";
+import { getOrderDeliveryActionLabel } from "./delivery-action-labels";
+import { OrderActionConfirmDialog, OrderRecordCard } from "./orders-screen";
 
-(globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT =
-  true;
+(
+  globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }
+).IS_REACT_ACT_ENVIRONMENT = true;
 
 const orders = [
   {
@@ -95,12 +94,11 @@ function dispatchKey(target: EventTarget, key: string, options?: KeyboardEventIn
   });
 }
 
-function setInputValue(
-  input: HTMLInputElement | HTMLTextAreaElement,
-  value: string,
-) {
+function setInputValue(input: HTMLInputElement | HTMLTextAreaElement, value: string) {
   const prototype =
-    input instanceof HTMLTextAreaElement ? HTMLTextAreaElement.prototype : HTMLInputElement.prototype;
+    input instanceof HTMLTextAreaElement
+      ? HTMLTextAreaElement.prototype
+      : HTMLInputElement.prototype;
   const valueSetter = Object.getOwnPropertyDescriptor(prototype, "value")?.set;
 
   act(() => {
@@ -226,6 +224,28 @@ afterEach(() => {
 });
 
 describe("Orders shared operational surfaces", () => {
+  it("uses concise delivery settlement labels without changing the delivery action path", () => {
+    const settlementLabel = getOrderDeliveryActionLabel({
+      isPending: false,
+      requiresSettlement: true,
+    });
+    const noSettlementLabel = getOrderDeliveryActionLabel({
+      isPending: false,
+      requiresSettlement: false,
+    });
+    const pendingSettlementLabel = getOrderDeliveryActionLabel({
+      isPending: true,
+      requiresSettlement: true,
+    });
+
+    expect(settlementLabel).toBe("Cobrar");
+    expect(noSettlementLabel).toBe("Entregar pedido");
+    expect(pendingSettlementLabel).toBe("Cobrando...");
+    expect([settlementLabel, noSettlementLabel, pendingSettlementLabel]).not.toContain(
+      "Cobrar y entregar",
+    );
+  });
+
   it("shows an empty state with CTA when no orders match the current query", () => {
     const view = renderUi(<OrdersListHarness />);
     mountedRoots.push(view.unmount);
@@ -253,9 +273,7 @@ describe("Orders shared operational surfaces", () => {
     ) as HTMLButtonElement;
     act(() => readyFilter.click());
 
-    const firstCard = view.container.querySelector(
-      ".pos-record-card__button",
-    ) as HTMLButtonElement;
+    const firstCard = view.container.querySelector(".pos-record-card__button") as HTMLButtonElement;
     firstCard.focus();
 
     dispatchKey(firstCard, "ArrowDown");
@@ -266,18 +284,14 @@ describe("Orders shared operational surfaces", () => {
     expect(selectedOrderOutput.textContent).toBe("order-3");
   });
 
-  it("requires a cancellation reason before allowing confirmation", () => {
+  it("confirms cancellation without asking for a reason", () => {
     const onConfirm = vi.fn();
     const onCancel = vi.fn();
-    const onChange = vi.fn();
 
     const view = renderUi(
       <OrderActionConfirmDialog
-        cancelReason=""
-        cancelReasonError="Captura un motivo claro antes de cancelar el pedido."
         isPending={false}
         onCancel={onCancel}
-        onCancelReasonChange={onChange}
         onConfirm={onConfirm}
         state={{
           kind: "cancel",
@@ -298,14 +312,10 @@ describe("Orders shared operational surfaces", () => {
     const confirmButton = Array.from(view.container.querySelectorAll("button")).find((button) =>
       button.textContent?.includes("Confirmar cancelacion"),
     ) as HTMLButtonElement;
-    expect(confirmButton.disabled).toBe(true);
-    expect(view.container.textContent).toContain(
-      "Captura un motivo claro antes de cancelar el pedido.",
-    );
+    expect(confirmButton.disabled).toBe(false);
+    expect(view.container.querySelector("textarea")).toBeNull();
 
-    const reasonInput = view.container.querySelector("textarea") as HTMLTextAreaElement;
-    setInputValue(reasonInput, "Cliente ya no puede recogerlo.");
-
-    expect(onChange).toHaveBeenCalledWith("Cliente ya no puede recogerlo.");
+    act(() => confirmButton.click());
+    expect(onConfirm).toHaveBeenCalledOnce();
   });
 });

@@ -13,8 +13,9 @@ import {
   type PosRecordColumn,
 } from "./pos-records";
 
-(globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean })
-  .IS_REACT_ACT_ENVIRONMENT = true;
+(
+  globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }
+).IS_REACT_ACT_ENVIRONMENT = true;
 
 function renderUi(element: React.ReactElement) {
   const container = document.createElement("div");
@@ -37,11 +38,7 @@ function renderUi(element: React.ReactElement) {
   };
 }
 
-function dispatchKey(
-  target: EventTarget,
-  key: string,
-  options?: Partial<KeyboardEventInit>,
-) {
+function dispatchKey(target: EventTarget, key: string, options?: Partial<KeyboardEventInit>) {
   const event = new KeyboardEvent("keydown", {
     bubbles: true,
     cancelable: true,
@@ -156,6 +153,7 @@ function TableDemo() {
       <PosRecordTable
         columns={columns}
         getKey={(record) => record.id}
+        getRowClassName={(record) => `status-row-${record.status.toLowerCase()}`}
         onSelect={(record) => setSelectedId(record.id)}
         records={demoRecords}
         selectedKey={selectedId}
@@ -206,14 +204,18 @@ describe("POS record primitives", () => {
     expect(view.container.textContent).toContain("Pedido pendiente");
     expect(view.container.textContent).not.toContain("Pedido entregado");
 
-    const firstListButton = view.container.querySelector(".pos-record-card__button") as HTMLButtonElement;
+    const firstListButton = view.container.querySelector(
+      ".pos-record-card__button",
+    ) as HTMLButtonElement;
     expect(firstListButton).not.toBeNull();
 
     act(() => {
       firstListButton.click();
     });
 
-    expect(view.container.querySelector('[data-testid="selected-record"]')?.textContent).toBe("record-1");
+    expect(view.container.querySelector('[data-testid="selected-record"]')?.textContent).toBe(
+      "record-1",
+    );
   });
 
   it("navigates table rows with arrows and selects with Enter", () => {
@@ -222,6 +224,7 @@ describe("POS record primitives", () => {
 
     const rows = Array.from(view.container.querySelectorAll("tbody tr"));
     expect(rows).toHaveLength(2);
+    expect(rows[0]?.classList.contains("status-row-pending")).toBe(true);
 
     focusElement(rows[0] as HTMLElement);
     expect(document.activeElement).toBe(rows[0]);
@@ -230,6 +233,8 @@ describe("POS record primitives", () => {
     expect(document.activeElement).toBe(rows[1]);
 
     dispatchKey(rows[1]!, "Enter");
-    expect(view.container.querySelector('[data-testid="selected-table-record"]')?.textContent).toBe("record-2");
+    expect(view.container.querySelector('[data-testid="selected-table-record"]')?.textContent).toBe(
+      "record-2",
+    );
   });
 });

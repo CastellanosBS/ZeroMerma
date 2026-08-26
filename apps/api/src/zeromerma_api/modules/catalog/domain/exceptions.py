@@ -13,3 +13,7 @@ class ProductNotFoundError(CatalogError):
 class ProductSelectionNotAllowedError(CatalogError):
     """Raised when products are requested for a class that does not support them."""
 
+
+class RecipeNotFoundError(CatalogError):
+    """Raised when a recipe is not available for administration."""
+

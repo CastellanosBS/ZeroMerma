@@ -69,9 +69,6 @@ export function CatalogVisual({
           <div className="grid h-16 w-16 shrink-0 place-items-center rounded-[1.25rem] border border-[var(--pos-shell-border)] bg-white/92 text-2xl font-semibold tracking-tight text-[var(--pos-primary)] shadow-sm">
             {monogram}
           </div>
-          <span className="pos-chip border-white/80 bg-white/88 text-slate-400 shadow-sm">
-            Catalogo
-          </span>
         </div>
       </div>
     </div>

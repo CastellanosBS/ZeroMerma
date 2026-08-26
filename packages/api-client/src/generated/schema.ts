@@ -21,6 +21,2165 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/admin/audit": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Admin Audit Events */
+        get: operations["list_admin_audit_events_v1_admin_audit_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/admin/audit/export": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Export Admin Audit Events */
+        get: operations["export_admin_audit_events_v1_admin_audit_export_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/admin/audit/{event_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Admin Audit Event Detail */
+        get: operations["get_admin_audit_event_detail_v1_admin_audit__event_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/admin/branches": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Admin Branches */
+        get: operations["list_admin_branches_v1_admin_branches_get"];
+        put?: never;
+        /** Create Admin Branch */
+        post: operations["create_admin_branch_v1_admin_branches_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/admin/branches/{branch_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Admin Branch Detail */
+        get: operations["get_admin_branch_detail_v1_admin_branches__branch_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** Update Admin Branch */
+        patch: operations["update_admin_branch_v1_admin_branches__branch_id__patch"];
+        trace?: never;
+    };
+    "/v1/admin/cash-cuts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Admin Cash Cuts */
+        get: operations["list_admin_cash_cuts_v1_admin_cash_cuts_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/admin/cash-cuts/{cash_session_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Admin Cash Cut Detail */
+        get: operations["get_admin_cash_cut_detail_v1_admin_cash_cuts__cash_session_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/admin/cash-flow": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Admin Cash Flow Movements */
+        get: operations["list_admin_cash_flow_movements_v1_admin_cash_flow_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/admin/cash-flow/{movement_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Admin Cash Flow Movement Detail */
+        get: operations["get_admin_cash_flow_movement_detail_v1_admin_cash_flow__movement_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/admin/cleaning-logs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Admin Cleaning Logs */
+        get: operations["list_admin_cleaning_logs_v1_admin_cleaning_logs_get"];
+        put?: never;
+        /** Create Admin Cleaning Log */
+        post: operations["create_admin_cleaning_log_v1_admin_cleaning_logs_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/admin/cleaning-logs/templates": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Admin Cleaning Templates */
+        get: operations["list_admin_cleaning_templates_v1_admin_cleaning_logs_templates_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/admin/cleaning-logs/{cleaning_log_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Admin Cleaning Log Detail */
+        get: operations["get_admin_cleaning_log_detail_v1_admin_cleaning_logs__cleaning_log_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/admin/cleaning-logs/{cleaning_log_id}/cancel": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Cancel Admin Cleaning Log */
+        post: operations["cancel_admin_cleaning_log_v1_admin_cleaning_logs__cleaning_log_id__cancel_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/admin/cleaning-logs/{cleaning_log_id}/complete": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Complete Admin Cleaning Log */
+        post: operations["complete_admin_cleaning_log_v1_admin_cleaning_logs__cleaning_log_id__complete_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/admin/discounts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Admin Discounts */
+        get: operations["list_admin_discounts_v1_admin_discounts_get"];
+        put?: never;
+        /** Create Admin Discount */
+        post: operations["create_admin_discount_v1_admin_discounts_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/admin/discounts/{discount_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Admin Discount Detail */
+        get: operations["get_admin_discount_detail_v1_admin_discounts__discount_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** Update Admin Discount */
+        patch: operations["update_admin_discount_v1_admin_discounts__discount_id__patch"];
+        trace?: never;
+    };
+    "/v1/admin/discounts/{discount_id}/duplicate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Duplicate Admin Discount */
+        post: operations["duplicate_admin_discount_v1_admin_discounts__discount_id__duplicate_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/admin/equipment-maintenance/equipment": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Admin Equipment */
+        get: operations["list_admin_equipment_v1_admin_equipment_maintenance_equipment_get"];
+        put?: never;
+        /** Create Admin Equipment */
+        post: operations["create_admin_equipment_v1_admin_equipment_maintenance_equipment_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/admin/equipment-maintenance/equipment/{equipment_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Admin Equipment Detail */
+        get: operations["get_admin_equipment_detail_v1_admin_equipment_maintenance_equipment__equipment_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** Update Admin Equipment */
+        patch: operations["update_admin_equipment_v1_admin_equipment_maintenance_equipment__equipment_id__patch"];
+        trace?: never;
+    };
+    "/v1/admin/equipment-maintenance/equipment/{equipment_id}/status": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Change Admin Equipment Status */
+        post: operations["change_admin_equipment_status_v1_admin_equipment_maintenance_equipment__equipment_id__status_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/admin/equipment-maintenance/maintenance": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Create Admin Equipment Maintenance */
+        post: operations["create_admin_equipment_maintenance_v1_admin_equipment_maintenance_maintenance_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/admin/equipment-maintenance/maintenance/{maintenance_id}/cancel": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Cancel Admin Equipment Maintenance */
+        post: operations["cancel_admin_equipment_maintenance_v1_admin_equipment_maintenance_maintenance__maintenance_id__cancel_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/admin/equipment-maintenance/maintenance/{maintenance_id}/complete": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Complete Admin Equipment Maintenance */
+        post: operations["complete_admin_equipment_maintenance_v1_admin_equipment_maintenance_maintenance__maintenance_id__complete_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/admin/equipment-maintenance/maintenance/{maintenance_id}/start": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Start Admin Equipment Maintenance */
+        post: operations["start_admin_equipment_maintenance_v1_admin_equipment_maintenance_maintenance__maintenance_id__start_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/admin/incidents": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Admin Incidents */
+        get: operations["list_admin_incidents_v1_admin_incidents_get"];
+        put?: never;
+        /** Create Admin Incident */
+        post: operations["create_admin_incident_v1_admin_incidents_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/admin/incidents/{incident_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Admin Incident Detail */
+        get: operations["get_admin_incident_detail_v1_admin_incidents__incident_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** Update Admin Incident */
+        patch: operations["update_admin_incident_v1_admin_incidents__incident_id__patch"];
+        trace?: never;
+    };
+    "/v1/admin/incidents/{incident_id}/follow-ups": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Add Admin Incident Follow Up */
+        post: operations["add_admin_incident_follow_up_v1_admin_incidents__incident_id__follow_ups_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/admin/incidents/{incident_id}/reopen": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Reopen Admin Incident */
+        post: operations["reopen_admin_incident_v1_admin_incidents__incident_id__reopen_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/admin/incidents/{incident_id}/resolve": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Resolve Admin Incident */
+        post: operations["resolve_admin_incident_v1_admin_incidents__incident_id__resolve_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/admin/incidents/{incident_id}/status": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Change Admin Incident Status */
+        post: operations["change_admin_incident_status_v1_admin_incidents__incident_id__status_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/admin/inputs-supplies": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Admin Inputs Supplies */
+        get: operations["list_admin_inputs_supplies_v1_admin_inputs_supplies_get"];
+        put?: never;
+        /** Create Admin Input Supply */
+        post: operations["create_admin_input_supply_v1_admin_inputs_supplies_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/admin/inputs-supplies/{product_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Admin Input Supply Detail */
+        get: operations["get_admin_input_supply_detail_v1_admin_inputs_supplies__product_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** Update Admin Input Supply */
+        patch: operations["update_admin_input_supply_v1_admin_inputs_supplies__product_id__patch"];
+        trace?: never;
+    };
+    "/v1/admin/inputs-supplies/{product_id}/status": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Change Admin Input Supply Status */
+        post: operations["change_admin_input_supply_status_v1_admin_inputs_supplies__product_id__status_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/admin/inputs-supplies/{product_id}/suppliers": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Upsert Admin Input Supply Supplier */
+        post: operations["upsert_admin_input_supply_supplier_v1_admin_inputs_supplies__product_id__suppliers_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/admin/inputs-supplies/{product_id}/suppliers/{relation_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** Update Admin Input Supply Supplier */
+        patch: operations["update_admin_input_supply_supplier_v1_admin_inputs_supplies__product_id__suppliers__relation_id__patch"];
+        trace?: never;
+    };
+    "/v1/admin/inventory": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Admin Inventory */
+        get: operations["list_admin_inventory_v1_admin_inventory_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/admin/inventory/adjustments": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Create Admin Inventory Adjustment */
+        post: operations["create_admin_inventory_adjustment_v1_admin_inventory_adjustments_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/admin/inventory/{balance_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Admin Inventory Detail */
+        get: operations["get_admin_inventory_detail_v1_admin_inventory__balance_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/admin/inventory/{balance_id}/movements": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Admin Inventory Movements */
+        get: operations["list_admin_inventory_movements_v1_admin_inventory__balance_id__movements_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/admin/orders": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Admin Orders */
+        get: operations["list_admin_orders_v1_admin_orders_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/admin/orders/{order_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Admin Order Detail */
+        get: operations["get_admin_order_detail_v1_admin_orders__order_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/admin/orders/{order_id}/cancel": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Cancel Admin Order */
+        post: operations["cancel_admin_order_v1_admin_orders__order_id__cancel_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/admin/orders/{order_id}/deliver": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Deliver Admin Order */
+        post: operations["deliver_admin_order_v1_admin_orders__order_id__deliver_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/admin/orders/{order_id}/mark-ready": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Mark Admin Order Ready */
+        post: operations["mark_admin_order_ready_v1_admin_orders__order_id__mark_ready_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/admin/prices": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Admin Prices */
+        get: operations["list_admin_prices_v1_admin_prices_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/admin/prices/{entity_type}/{entity_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Admin Price Detail */
+        get: operations["get_admin_price_detail_v1_admin_prices__entity_type___entity_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** Update Admin Price */
+        patch: operations["update_admin_price_v1_admin_prices__entity_type___entity_id__patch"];
+        trace?: never;
+    };
+    "/v1/admin/product-classes": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Admin Product Classes */
+        get: operations["list_admin_product_classes_v1_admin_product_classes_get"];
+        put?: never;
+        /** Create Admin Product Class */
+        post: operations["create_admin_product_class_v1_admin_product_classes_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/admin/product-classes/{class_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Admin Product Class Detail */
+        get: operations["get_admin_product_class_detail_v1_admin_product_classes__class_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** Update Admin Product Class */
+        patch: operations["update_admin_product_class_v1_admin_product_classes__class_id__patch"];
+        trace?: never;
+    };
+    "/v1/admin/production": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Admin Production */
+        get: operations["list_admin_production_v1_admin_production_get"];
+        put?: never;
+        /** Create Admin Production */
+        post: operations["create_admin_production_v1_admin_production_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/admin/production/{production_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Admin Production Detail */
+        get: operations["get_admin_production_detail_v1_admin_production__production_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** Update Admin Production */
+        patch: operations["update_admin_production_v1_admin_production__production_id__patch"];
+        trace?: never;
+    };
+    "/v1/admin/production/{production_id}/cancel": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Cancel Admin Production */
+        post: operations["cancel_admin_production_v1_admin_production__production_id__cancel_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/admin/production/{production_id}/complete": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Complete Admin Production */
+        post: operations["complete_admin_production_v1_admin_production__production_id__complete_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/admin/production/{production_id}/start": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Start Admin Production */
+        post: operations["start_admin_production_v1_admin_production__production_id__start_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/admin/products": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Admin Products */
+        get: operations["list_admin_products_v1_admin_products_get"];
+        put?: never;
+        /** Create Admin Product */
+        post: operations["create_admin_product_v1_admin_products_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/admin/products/{product_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Admin Product Detail */
+        get: operations["get_admin_product_detail_v1_admin_products__product_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** Update Admin Product */
+        patch: operations["update_admin_product_v1_admin_products__product_id__patch"];
+        trace?: never;
+    };
+    "/v1/admin/products/{product_id}/availability": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Configure Admin Product Availability */
+        post: operations["configure_admin_product_availability_v1_admin_products__product_id__availability_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/admin/purchases": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Admin Purchases */
+        get: operations["list_admin_purchases_v1_admin_purchases_get"];
+        put?: never;
+        /** Create Admin Purchase */
+        post: operations["create_admin_purchase_v1_admin_purchases_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/admin/purchases/direct-entry": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Create Admin Direct Entry */
+        post: operations["create_admin_direct_entry_v1_admin_purchases_direct_entry_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/admin/purchases/{purchase_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Admin Purchase Detail */
+        get: operations["get_admin_purchase_detail_v1_admin_purchases__purchase_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** Update Admin Purchase */
+        patch: operations["update_admin_purchase_v1_admin_purchases__purchase_id__patch"];
+        trace?: never;
+    };
+    "/v1/admin/purchases/{purchase_id}/cancel": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Cancel Admin Purchase */
+        post: operations["cancel_admin_purchase_v1_admin_purchases__purchase_id__cancel_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/admin/purchases/{purchase_id}/confirm": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Confirm Admin Purchase */
+        post: operations["confirm_admin_purchase_v1_admin_purchases__purchase_id__confirm_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/admin/purchases/{purchase_id}/receive": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Receive Admin Purchase */
+        post: operations["receive_admin_purchase_v1_admin_purchases__purchase_id__receive_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/admin/recipes-costs/products": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Admin Recipe Cost Products */
+        get: operations["list_admin_recipe_cost_products_v1_admin_recipes_costs_products_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/admin/recipes-costs/products/{product_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Admin Recipe Cost Product Detail */
+        get: operations["get_admin_recipe_cost_product_detail_v1_admin_recipes_costs_products__product_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/admin/recipes-costs/recipes": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Create Admin Recipe */
+        post: operations["create_admin_recipe_v1_admin_recipes_costs_recipes_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/admin/recipes-costs/recipes/{recipe_id}/activate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Activate Admin Recipe */
+        post: operations["activate_admin_recipe_v1_admin_recipes_costs_recipes__recipe_id__activate_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/admin/recipes-costs/recipes/{recipe_id}/apply-standard-cost": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Apply Admin Recipe Standard Cost */
+        post: operations["apply_admin_recipe_standard_cost_v1_admin_recipes_costs_recipes__recipe_id__apply_standard_cost_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/admin/recipes-costs/recipes/{recipe_id}/duplicate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Duplicate Admin Recipe */
+        post: operations["duplicate_admin_recipe_v1_admin_recipes_costs_recipes__recipe_id__duplicate_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/admin/reconciliation": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Admin Reconciliations */
+        get: operations["list_admin_reconciliations_v1_admin_reconciliation_get"];
+        put?: never;
+        /** Create Admin Reconciliation */
+        post: operations["create_admin_reconciliation_v1_admin_reconciliation_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/admin/reconciliation/pending": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Admin Pending Reconciliation Discrepancies */
+        get: operations["list_admin_pending_reconciliation_discrepancies_v1_admin_reconciliation_pending_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/admin/reconciliation/{reconciliation_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Admin Reconciliation Detail */
+        get: operations["get_admin_reconciliation_detail_v1_admin_reconciliation__reconciliation_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/admin/reconciliation/{reconciliation_id}/resolve": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Resolve Admin Reconciliation */
+        post: operations["resolve_admin_reconciliation_v1_admin_reconciliation__reconciliation_id__resolve_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/admin/reports": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Admin Reports */
+        get: operations["list_admin_reports_v1_admin_reports_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/admin/reports/{report_code}/export": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Export Admin Report */
+        post: operations["export_admin_report_v1_admin_reports__report_code__export_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/admin/reports/{report_code}/preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Preview Admin Report */
+        post: operations["preview_admin_report_v1_admin_reports__report_code__preview_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/admin/returns-corrections/corrections": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Admin Corrections */
+        get: operations["list_admin_corrections_v1_admin_returns_corrections_corrections_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/admin/returns-corrections/corrections/{correction_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Admin Correction Detail */
+        get: operations["get_admin_correction_detail_v1_admin_returns_corrections_corrections__correction_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/admin/returns-corrections/returns": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Admin Returns */
+        get: operations["list_admin_returns_v1_admin_returns_corrections_returns_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/admin/returns-corrections/returns/{return_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Admin Return Detail */
+        get: operations["get_admin_return_detail_v1_admin_returns_corrections_returns__return_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/admin/roles": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Admin Roles */
+        get: operations["list_admin_roles_v1_admin_roles_get"];
+        put?: never;
+        /** Create Admin Role */
+        post: operations["create_admin_role_v1_admin_roles_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/admin/roles/permissions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Admin Role Permissions */
+        get: operations["list_admin_role_permissions_v1_admin_roles_permissions_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/admin/roles/{role_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Admin Role Detail */
+        get: operations["get_admin_role_detail_v1_admin_roles__role_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** Update Admin Role */
+        patch: operations["update_admin_role_v1_admin_roles__role_id__patch"];
+        trace?: never;
+    };
+    "/v1/admin/roles/{role_id}/status": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Change Admin Role Status */
+        post: operations["change_admin_role_status_v1_admin_roles__role_id__status_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/admin/roles/{role_id}/users/{user_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Assign Admin Role To User */
+        post: operations["assign_admin_role_to_user_v1_admin_roles__role_id__users__user_id__post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/admin/roles/{role_id}/users/{user_id}/remove": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Remove Admin Role From User */
+        post: operations["remove_admin_role_from_user_v1_admin_roles__role_id__users__user_id__remove_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/admin/sales/tickets": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Admin Sales Tickets */
+        get: operations["list_admin_sales_tickets_v1_admin_sales_tickets_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/admin/sales/tickets/{ticket_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Admin Sales Ticket Detail */
+        get: operations["get_admin_sales_ticket_detail_v1_admin_sales_tickets__ticket_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/admin/sales/tickets/{ticket_id}/reprint": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Reprint Admin Sales Ticket */
+        post: operations["reprint_admin_sales_ticket_v1_admin_sales_tickets__ticket_id__reprint_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/admin/sanitary-verifications": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Admin Sanitary Verifications */
+        get: operations["list_admin_sanitary_verifications_v1_admin_sanitary_verifications_get"];
+        put?: never;
+        /** Create Admin Sanitary Verification */
+        post: operations["create_admin_sanitary_verification_v1_admin_sanitary_verifications_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/admin/sanitary-verifications/templates": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Admin Sanitary Templates */
+        get: operations["list_admin_sanitary_templates_v1_admin_sanitary_verifications_templates_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/admin/sanitary-verifications/{verification_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Admin Sanitary Verification Detail */
+        get: operations["get_admin_sanitary_verification_detail_v1_admin_sanitary_verifications__verification_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/admin/sanitary-verifications/{verification_id}/cancel": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Cancel Admin Sanitary Verification */
+        post: operations["cancel_admin_sanitary_verification_v1_admin_sanitary_verifications__verification_id__cancel_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/admin/sanitary-verifications/{verification_id}/complete": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Complete Admin Sanitary Verification */
+        post: operations["complete_admin_sanitary_verification_v1_admin_sanitary_verifications__verification_id__complete_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/admin/sanitary-verifications/{verification_id}/start": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Start Admin Sanitary Verification */
+        post: operations["start_admin_sanitary_verification_v1_admin_sanitary_verifications__verification_id__start_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/admin/settings": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Admin Settings */
+        get: operations["list_admin_settings_v1_admin_settings_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/admin/settings/{setting_key}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Admin Setting Detail */
+        get: operations["get_admin_setting_detail_v1_admin_settings__setting_key__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** Update Admin Setting */
+        patch: operations["update_admin_setting_v1_admin_settings__setting_key__patch"];
+        trace?: never;
+    };
+    "/v1/admin/settings/{setting_key}/reset": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Reset Admin Setting */
+        post: operations["reset_admin_setting_v1_admin_settings__setting_key__reset_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/admin/suppliers": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Admin Suppliers */
+        get: operations["list_admin_suppliers_v1_admin_suppliers_get"];
+        put?: never;
+        /** Create Admin Supplier */
+        post: operations["create_admin_supplier_v1_admin_suppliers_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/admin/suppliers/{supplier_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Admin Supplier Detail */
+        get: operations["get_admin_supplier_detail_v1_admin_suppliers__supplier_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** Update Admin Supplier */
+        patch: operations["update_admin_supplier_v1_admin_suppliers__supplier_id__patch"];
+        trace?: never;
+    };
+    "/v1/admin/suppliers/{supplier_id}/branches": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Upsert Admin Supplier Branch */
+        post: operations["upsert_admin_supplier_branch_v1_admin_suppliers__supplier_id__branches_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/admin/suppliers/{supplier_id}/contacts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Create Admin Supplier Contact */
+        post: operations["create_admin_supplier_contact_v1_admin_suppliers__supplier_id__contacts_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/admin/suppliers/{supplier_id}/contacts/{contact_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** Update Admin Supplier Contact */
+        patch: operations["update_admin_supplier_contact_v1_admin_suppliers__supplier_id__contacts__contact_id__patch"];
+        trace?: never;
+    };
+    "/v1/admin/suppliers/{supplier_id}/products": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Upsert Admin Supplier Product */
+        post: operations["upsert_admin_supplier_product_v1_admin_suppliers__supplier_id__products_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/admin/suppliers/{supplier_id}/products/{relation_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** Update Admin Supplier Product */
+        patch: operations["update_admin_supplier_product_v1_admin_suppliers__supplier_id__products__relation_id__patch"];
+        trace?: never;
+    };
+    "/v1/admin/suppliers/{supplier_id}/status": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Change Admin Supplier Status */
+        post: operations["change_admin_supplier_status_v1_admin_suppliers__supplier_id__status_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/admin/transfers": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Admin Transfers */
+        get: operations["list_admin_transfers_v1_admin_transfers_get"];
+        put?: never;
+        /** Create Admin Transfer */
+        post: operations["create_admin_transfer_v1_admin_transfers_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/admin/transfers/{transfer_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Admin Transfer Detail */
+        get: operations["get_admin_transfer_detail_v1_admin_transfers__transfer_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** Update Admin Transfer */
+        patch: operations["update_admin_transfer_v1_admin_transfers__transfer_id__patch"];
+        trace?: never;
+    };
+    "/v1/admin/transfers/{transfer_id}/cancel": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Cancel Admin Transfer */
+        post: operations["cancel_admin_transfer_v1_admin_transfers__transfer_id__cancel_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/admin/transfers/{transfer_id}/dispatch": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Dispatch Admin Transfer */
+        post: operations["dispatch_admin_transfer_v1_admin_transfers__transfer_id__dispatch_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/admin/transfers/{transfer_id}/receive": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Receive Admin Transfer */
+        post: operations["receive_admin_transfer_v1_admin_transfers__transfer_id__receive_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/admin/users": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Admin Users */
+        get: operations["list_admin_users_v1_admin_users_get"];
+        put?: never;
+        /** Create Admin User */
+        post: operations["create_admin_user_v1_admin_users_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/admin/users/{user_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Admin User Detail */
+        get: operations["get_admin_user_detail_v1_admin_users__user_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** Update Admin User */
+        patch: operations["update_admin_user_v1_admin_users__user_id__patch"];
+        trace?: never;
+    };
+    "/v1/admin/users/{user_id}/branch-assignments": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Add Admin User Branch Assignment */
+        post: operations["add_admin_user_branch_assignment_v1_admin_users__user_id__branch_assignments_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/admin/users/{user_id}/branch-assignments/{branch_id}/deactivate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Deactivate Admin User Branch Assignment */
+        post: operations["deactivate_admin_user_branch_assignment_v1_admin_users__user_id__branch_assignments__branch_id__deactivate_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/admin/users/{user_id}/branch-assignments/{branch_id}/default": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Set Admin User Default Branch Assignment */
+        post: operations["set_admin_user_default_branch_assignment_v1_admin_users__user_id__branch_assignments__branch_id__default_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/admin/users/{user_id}/lock": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Lock Admin User */
+        post: operations["lock_admin_user_v1_admin_users__user_id__lock_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/admin/users/{user_id}/roles": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Assign Admin User Role */
+        post: operations["assign_admin_user_role_v1_admin_users__user_id__roles_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/admin/users/{user_id}/roles/{role_id}/remove": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Remove Admin User Role */
+        post: operations["remove_admin_user_role_v1_admin_users__user_id__roles__role_id__remove_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/admin/users/{user_id}/status": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Change Admin User Status */
+        post: operations["change_admin_user_status_v1_admin_users__user_id__status_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/admin/users/{user_id}/unlock": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Unlock Admin User */
+        post: operations["unlock_admin_user_v1_admin_users__user_id__unlock_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/admin/waste": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Admin Waste */
+        get: operations["list_admin_waste_v1_admin_waste_get"];
+        put?: never;
+        /** Create Admin Waste */
+        post: operations["create_admin_waste_v1_admin_waste_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/admin/waste/reasons": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Admin Waste Reasons */
+        get: operations["list_admin_waste_reasons_v1_admin_waste_reasons_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/admin/waste/{waste_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Admin Waste Detail */
+        get: operations["get_admin_waste_detail_v1_admin_waste__waste_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/admin/workstations": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Admin Workstations */
+        get: operations["list_admin_workstations_v1_admin_workstations_get"];
+        put?: never;
+        /** Create Admin Workstation */
+        post: operations["create_admin_workstation_v1_admin_workstations_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/admin/workstations/{workstation_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Admin Workstation Detail */
+        get: operations["get_admin_workstation_detail_v1_admin_workstations__workstation_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** Update Admin Workstation */
+        patch: operations["update_admin_workstation_v1_admin_workstations__workstation_id__patch"];
+        trace?: never;
+    };
     "/v1/auth/login": {
         parameters: {
             query?: never;
@@ -1048,6 +3207,12252 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        /** AdminAuditActorContextView */
+        AdminAuditActorContextView: {
+            /** Branch Assignments Summary */
+            branch_assignments_summary?: string | null;
+            /**
+             * Can Open User
+             * @default false
+             */
+            can_open_user: boolean;
+            /** Email */
+            email?: string | null;
+            /** Full Name */
+            full_name: string;
+            /** Roles Summary */
+            roles_summary?: string | null;
+            /** User Id */
+            user_id?: string | null;
+            /** User Status */
+            user_status?: string | null;
+        };
+        /** AdminAuditAvailableActionsView */
+        AdminAuditAvailableActionsView: {
+            /**
+             * Can Copy Correlation Id
+             * @default false
+             */
+            can_copy_correlation_id: boolean;
+            /**
+             * Can Copy Event Id
+             * @default true
+             */
+            can_copy_event_id: boolean;
+            /**
+             * Can Export Event
+             * @default true
+             */
+            can_export_event: boolean;
+            /**
+             * Can Open Related Document
+             * @default false
+             */
+            can_open_related_document: boolean;
+            /**
+             * Can Open User
+             * @default false
+             */
+            can_open_user: boolean;
+            /**
+             * Can Search Related Events
+             * @default true
+             */
+            can_search_related_events: boolean;
+        };
+        /** AdminAuditBackendContractView */
+        AdminAuditBackendContractView: {
+            /**
+             * Export Supported
+             * @default true
+             */
+            export_supported: boolean;
+            /**
+             * Immutable Events
+             * @default true
+             */
+            immutable_events: boolean;
+            /**
+             * Mutation Supported
+             * @default false
+             */
+            mutation_supported: boolean;
+            /**
+             * Related Timeline Supported
+             * @default true
+             */
+            related_timeline_supported: boolean;
+            /**
+             * Request Context Supported
+             * @default true
+             */
+            request_context_supported: boolean;
+        };
+        /** AdminAuditChangeItemView */
+        AdminAuditChangeItemView: {
+            /** Change Type */
+            change_type: string;
+            /** Field */
+            field: string;
+            /** New Value Masked */
+            new_value_masked?: string | null;
+            /** Old Value Masked */
+            old_value_masked?: string | null;
+        };
+        /** AdminAuditEntityContextView */
+        AdminAuditEntityContextView: {
+            /** Branch Id */
+            branch_id?: string | null;
+            /** Branch Name */
+            branch_name?: string | null;
+            /**
+             * Can Open Related Document
+             * @default false
+             */
+            can_open_related_document: boolean;
+            /** Cash Session Id */
+            cash_session_id?: string | null;
+            /** Entity Id */
+            entity_id?: string | null;
+            /** Entity Reference */
+            entity_reference?: string | null;
+            /** Entity Type */
+            entity_type: string;
+            /** Related Module */
+            related_module: string;
+            /** Workstation Id */
+            workstation_id?: string | null;
+            /** Workstation Name */
+            workstation_name?: string | null;
+        };
+        /** AdminAuditEventDetailView */
+        AdminAuditEventDetailView: {
+            actor_context: components["schemas"]["AdminAuditActorContextView"];
+            available_actions: components["schemas"]["AdminAuditAvailableActionsView"];
+            /** Change Summary */
+            change_summary: components["schemas"]["AdminAuditChangeItemView"][];
+            entity_context: components["schemas"]["AdminAuditEntityContextView"];
+            overview: components["schemas"]["AdminAuditOverviewView"];
+            /** Related Documents */
+            related_documents: components["schemas"]["AdminAuditRelatedDocumentView"][];
+            request_context?: components["schemas"]["AdminAuditRequestContextView"] | null;
+            /** Timeline Related Events */
+            timeline_related_events: components["schemas"]["AdminAuditTimelineEventView"][];
+        };
+        /** AdminAuditEventListItemView */
+        AdminAuditEventListItemView: {
+            /** Action */
+            action: string;
+            /** Action Label */
+            action_label: string;
+            /** Actor Email */
+            actor_email?: string | null;
+            /** Actor Name */
+            actor_name: string;
+            /** Actor Type */
+            actor_type: string;
+            /** Actor User Id */
+            actor_user_id?: string | null;
+            /** Branch Id */
+            branch_id?: string | null;
+            /** Branch Name */
+            branch_name?: string | null;
+            /** Entity Id */
+            entity_id?: string | null;
+            /** Entity Reference */
+            entity_reference?: string | null;
+            /** Entity Type */
+            entity_type: string;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Is Sensitive */
+            is_sensitive: boolean;
+            /** Module */
+            module: string;
+            /** Module Label */
+            module_label: string;
+            /**
+             * Occurred At
+             * Format: date-time
+             */
+            occurred_at: string;
+            /** Result */
+            result: string;
+            /** Severity */
+            severity: string;
+            /** Source App */
+            source_app: string;
+            /** Warning State */
+            warning_state: string;
+            /** Workstation Id */
+            workstation_id?: string | null;
+            /** Workstation Name */
+            workstation_name?: string | null;
+        };
+        /** AdminAuditEventsListResponse */
+        AdminAuditEventsListResponse: {
+            backend_contract?: components["schemas"]["AdminAuditBackendContractView"];
+            filter_options: components["schemas"]["AdminAuditFilterOptionsView"];
+            /**
+             * Is Backend Connected
+             * @default true
+             */
+            is_backend_connected: boolean;
+            /** Items */
+            items: components["schemas"]["AdminAuditEventListItemView"][];
+            metrics: components["schemas"]["AdminAuditSummaryView"];
+            /** Page */
+            page: number;
+            /** Page Size */
+            page_size: number;
+            /** Total */
+            total: number;
+        };
+        /** AdminAuditExportResponse */
+        AdminAuditExportResponse: {
+            /**
+             * Format
+             * @default json
+             */
+            format: string;
+            /**
+             * Generated At
+             * Format: date-time
+             */
+            generated_at: string;
+            /** Rows */
+            rows: components["schemas"]["AdminAuditExportRowView"][];
+            /** Total */
+            total: number;
+        };
+        /** AdminAuditExportRowView */
+        AdminAuditExportRowView: {
+            /** Action */
+            action: string;
+            /** Actor */
+            actor: string;
+            /** Actor Email */
+            actor_email?: string | null;
+            /** Branch Name */
+            branch_name?: string | null;
+            /** Entity Id */
+            entity_id?: string | null;
+            /** Entity Reference */
+            entity_reference?: string | null;
+            /** Entity Type */
+            entity_type: string;
+            /** Is Sensitive */
+            is_sensitive: boolean;
+            /** Module */
+            module: string;
+            /**
+             * Occurred At
+             * Format: date-time
+             */
+            occurred_at: string;
+            /** Result */
+            result: string;
+            /** Source App */
+            source_app: string;
+            /** Workstation Name */
+            workstation_name?: string | null;
+        };
+        /** AdminAuditFilterOptionView */
+        AdminAuditFilterOptionView: {
+            /** Code */
+            code: string;
+            /** Label */
+            label: string;
+        };
+        /** AdminAuditFilterOptionsView */
+        AdminAuditFilterOptionsView: {
+            /** Actions */
+            actions: components["schemas"]["AdminAuditFilterOptionView"][];
+            /** Branches */
+            branches: components["schemas"]["AdminAuditFilterOptionView"][];
+            /** Entity Types */
+            entity_types: components["schemas"]["AdminAuditFilterOptionView"][];
+            /** Modules */
+            modules: components["schemas"]["AdminAuditFilterOptionView"][];
+            /** Results */
+            results: components["schemas"]["AdminAuditFilterOptionView"][];
+            /** Sensitivities */
+            sensitivities: components["schemas"]["AdminAuditFilterOptionView"][];
+            /** Severities */
+            severities: components["schemas"]["AdminAuditFilterOptionView"][];
+            /** Source Apps */
+            source_apps: components["schemas"]["AdminAuditFilterOptionView"][];
+            /** Users */
+            users: components["schemas"]["AdminAuditFilterOptionView"][];
+            /** Warning States */
+            warning_states: components["schemas"]["AdminAuditFilterOptionView"][];
+        };
+        /** AdminAuditOverviewView */
+        AdminAuditOverviewView: {
+            /** Action */
+            action: string;
+            /** Action Label */
+            action_label: string;
+            /** Actor Email */
+            actor_email?: string | null;
+            /** Actor Name */
+            actor_name: string;
+            /** Actor Type */
+            actor_type: string;
+            /** Actor User Id */
+            actor_user_id?: string | null;
+            /** Branch Id */
+            branch_id?: string | null;
+            /** Branch Name */
+            branch_name?: string | null;
+            /** Entity Id */
+            entity_id?: string | null;
+            /** Entity Reference */
+            entity_reference?: string | null;
+            /** Entity Type */
+            entity_type: string;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Is Sensitive */
+            is_sensitive: boolean;
+            /** Module */
+            module: string;
+            /** Module Label */
+            module_label: string;
+            /**
+             * Occurred At
+             * Format: date-time
+             */
+            occurred_at: string;
+            /** Request Id */
+            request_id?: string | null;
+            /** Result */
+            result: string;
+            /** Severity */
+            severity: string;
+            /** Source App */
+            source_app: string;
+            /** Warning State */
+            warning_state: string;
+            /** Workstation Id */
+            workstation_id?: string | null;
+            /** Workstation Name */
+            workstation_name?: string | null;
+        };
+        /** AdminAuditRelatedDocumentView */
+        AdminAuditRelatedDocumentView: {
+            /**
+             * Can Open
+             * @default false
+             */
+            can_open: boolean;
+            /** Document Id */
+            document_id?: string | null;
+            /** Document Type */
+            document_type: string;
+            /** Label */
+            label: string;
+            /** Module */
+            module: string;
+            /** Reference */
+            reference?: string | null;
+        };
+        /** AdminAuditRequestContextView */
+        AdminAuditRequestContextView: {
+            /** Correlation Id */
+            correlation_id?: string | null;
+            /** Duration Ms */
+            duration_ms?: number | null;
+            /** Endpoint */
+            endpoint?: string | null;
+            /** Error Code */
+            error_code?: string | null;
+            /** Ip Address */
+            ip_address?: string | null;
+            /** Method */
+            method?: string | null;
+            /** Request Id */
+            request_id?: string | null;
+            /** Status Code */
+            status_code?: number | null;
+            /** User Agent */
+            user_agent?: string | null;
+        };
+        /** AdminAuditSummaryView */
+        AdminAuditSummaryView: {
+            /** Access Events */
+            access_events: number;
+            /** Active Actors */
+            active_actors: number;
+            /** Failed Events */
+            failed_events: number;
+            /** Financial Events */
+            financial_events: number;
+            /** Inventory Events */
+            inventory_events: number;
+            /** Sensitive Events */
+            sensitive_events: number;
+            /** System Events */
+            system_events: number;
+            /** Total Events */
+            total_events: number;
+        };
+        /** AdminAuditTimelineEventView */
+        AdminAuditTimelineEventView: {
+            /** Action */
+            action: string;
+            /** Action Label */
+            action_label: string;
+            /** Actor Name */
+            actor_name: string;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Is Sensitive */
+            is_sensitive: boolean;
+            /**
+             * Occurred At
+             * Format: date-time
+             */
+            occurred_at: string;
+            /** Result */
+            result: string;
+        };
+        /** AdminBranchAvailableActionsView */
+        AdminBranchAvailableActionsView: {
+            /** Can Activate */
+            can_activate: boolean;
+            /** Can Deactivate */
+            can_deactivate: boolean;
+            /**
+             * Can Edit
+             * @default true
+             */
+            can_edit: boolean;
+            /**
+             * Can Open Users
+             * @default true
+             */
+            can_open_users: boolean;
+            /**
+             * Can Open Workstations
+             * @default true
+             */
+            can_open_workstations: boolean;
+        };
+        /** AdminBranchBackendContractView */
+        AdminBranchBackendContractView: {
+            /**
+             * Create Endpoint
+             * @default POST /v1/admin/branches
+             */
+            create_endpoint: string;
+            /**
+             * Detail Endpoint
+             * @default GET /v1/admin/branches/{id}
+             */
+            detail_endpoint: string;
+            /**
+             * List Endpoint
+             * @default GET /v1/admin/branches
+             */
+            list_endpoint: string;
+            /**
+             * Update Endpoint
+             * @default PATCH /v1/admin/branches/{id}
+             */
+            update_endpoint: string;
+        };
+        /** AdminBranchCreateRequest */
+        AdminBranchCreateRequest: {
+            /** Address Line */
+            address_line?: string | null;
+            /**
+             * Brand Id
+             * Format: uuid
+             */
+            brand_id: string;
+            /** City */
+            city?: string | null;
+            /** Code */
+            code: string;
+            /** Contact Email */
+            contact_email?: string | null;
+            /** Country */
+            country?: string | null;
+            /**
+             * Is Active
+             * @default true
+             */
+            is_active: boolean;
+            /** Name */
+            name: string;
+            /** Notes */
+            notes?: string | null;
+            /** Phone */
+            phone?: string | null;
+            /** Postal Code */
+            postal_code?: string | null;
+            /** State */
+            state?: string | null;
+            /** Timezone */
+            timezone: string;
+        };
+        /** AdminBranchDetailView */
+        AdminBranchDetailView: {
+            available_actions: components["schemas"]["AdminBranchAvailableActionsView"];
+            location_contact: components["schemas"]["AdminBranchLocationContactView"];
+            operational_config: components["schemas"]["AdminBranchOperationalConfigView"];
+            overview: components["schemas"]["AdminBranchOverviewView"];
+            related_operations_summary: components["schemas"]["AdminBranchRelatedOperationsSummaryView"];
+            user_assignments_summary: components["schemas"]["AdminBranchUsersSummaryView"];
+            /** Warnings */
+            warnings: components["schemas"]["AdminBranchWarningView"][];
+            workstations_summary: components["schemas"]["AdminBranchWorkstationsSummaryView"];
+        };
+        /** AdminBranchFilterOptionView */
+        AdminBranchFilterOptionView: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Label */
+            label: string;
+        };
+        /** AdminBranchFilterOptionsView */
+        AdminBranchFilterOptionsView: {
+            /** Brands */
+            brands: components["schemas"]["AdminBranchFilterOptionView"][];
+        };
+        /** AdminBranchListItemView */
+        AdminBranchListItemView: {
+            /** Active Workstation Count */
+            active_workstation_count: number;
+            /** Assigned User Count */
+            assigned_user_count: number;
+            /**
+             * Brand Id
+             * Format: uuid
+             */
+            brand_id: string;
+            /** Brand Name */
+            brand_name: string;
+            /** Code */
+            code: string;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Name */
+            name: string;
+            /**
+             * Readiness
+             * @enum {string}
+             */
+            readiness: "ready" | "warning" | "inactive";
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "active" | "inactive";
+            /** Timezone */
+            timezone: string;
+            /** Updated At */
+            updated_at?: string | null;
+            /** Warnings */
+            warnings: components["schemas"]["AdminBranchWarningView"][];
+            /** Workstation Count */
+            workstation_count: number;
+        };
+        /** AdminBranchLocationContactView */
+        AdminBranchLocationContactView: {
+            /** Address Line */
+            address_line?: string | null;
+            /** City */
+            city?: string | null;
+            /** Contact Email */
+            contact_email?: string | null;
+            /** Country */
+            country?: string | null;
+            /** Notes */
+            notes?: string | null;
+            /** Phone */
+            phone?: string | null;
+            /** Postal Code */
+            postal_code?: string | null;
+            /** State */
+            state?: string | null;
+        };
+        /** AdminBranchMetricsView */
+        AdminBranchMetricsView: {
+            /** Active Branches */
+            active_branches: number;
+            /** Inactive Branches */
+            inactive_branches: number;
+            /** Total Branches */
+            total_branches: number;
+            /** With Warnings */
+            with_warnings: number;
+            /** With Workstations */
+            with_workstations: number;
+            /** Without Active Workstation */
+            without_active_workstation: number;
+        };
+        /** AdminBranchOperationalConfigView */
+        AdminBranchOperationalConfigView: {
+            /**
+             * Inventory Scope Ready
+             * @default true
+             */
+            inventory_scope_ready: boolean;
+            /** Is Active */
+            is_active: boolean;
+            /** Pos Ready */
+            pos_ready: boolean;
+            /**
+             * Production Scope Ready
+             * @default true
+             */
+            production_scope_ready: boolean;
+            /** Timezone */
+            timezone: string;
+        };
+        /** AdminBranchOverviewView */
+        AdminBranchOverviewView: {
+            /**
+             * Brand Id
+             * Format: uuid
+             */
+            brand_id: string;
+            /** Brand Name */
+            brand_name: string;
+            /** Code */
+            code: string;
+            /** Created At */
+            created_at?: string | null;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Name */
+            name: string;
+            /**
+             * Readiness
+             * @enum {string}
+             */
+            readiness: "ready" | "warning" | "inactive";
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "active" | "inactive";
+            /** Timezone */
+            timezone: string;
+            /** Updated At */
+            updated_at?: string | null;
+        };
+        /** AdminBranchRelatedOperationsSummaryView */
+        AdminBranchRelatedOperationsSummaryView: {
+            /** Open Cash Sessions */
+            open_cash_sessions: number;
+        };
+        /** AdminBranchUpdateRequest */
+        AdminBranchUpdateRequest: {
+            /** Address Line */
+            address_line?: string | null;
+            /** Brand Id */
+            brand_id?: string | null;
+            /** City */
+            city?: string | null;
+            /** Code */
+            code?: string | null;
+            /** Contact Email */
+            contact_email?: string | null;
+            /** Country */
+            country?: string | null;
+            /** Is Active */
+            is_active?: boolean | null;
+            /** Name */
+            name?: string | null;
+            /** Notes */
+            notes?: string | null;
+            /** Phone */
+            phone?: string | null;
+            /** Postal Code */
+            postal_code?: string | null;
+            /** State */
+            state?: string | null;
+            /** Timezone */
+            timezone?: string | null;
+        };
+        /** AdminBranchUserAssignmentView */
+        AdminBranchUserAssignmentView: {
+            /**
+             * Assignment Id
+             * Format: uuid
+             */
+            assignment_id: string;
+            /** Is Active */
+            is_active: boolean;
+            /** Updated At */
+            updated_at?: string | null;
+            /** User Email */
+            user_email: string;
+            /**
+             * User Id
+             * Format: uuid
+             */
+            user_id: string;
+            /** User Name */
+            user_name: string;
+        };
+        /** AdminBranchUsersSummaryView */
+        AdminBranchUsersSummaryView: {
+            /** Active */
+            active: number;
+            /** Inactive */
+            inactive: number;
+            /** Items */
+            items: components["schemas"]["AdminBranchUserAssignmentView"][];
+            /** Total */
+            total: number;
+        };
+        /** AdminBranchWarningView */
+        AdminBranchWarningView: {
+            /** Code */
+            code: string;
+            /** Message */
+            message: string;
+            /**
+             * Severity
+             * @enum {string}
+             */
+            severity: "info" | "warning" | "critical";
+        };
+        /** AdminBranchWorkstationView */
+        AdminBranchWorkstationView: {
+            /** Code */
+            code: string;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Is Active */
+            is_active: boolean;
+            /** Name */
+            name: string;
+            /** Updated At */
+            updated_at?: string | null;
+        };
+        /** AdminBranchWorkstationsSummaryView */
+        AdminBranchWorkstationsSummaryView: {
+            /** Active */
+            active: number;
+            /** Inactive */
+            inactive: number;
+            /** Items */
+            items: components["schemas"]["AdminBranchWorkstationView"][];
+            /** Total */
+            total: number;
+        };
+        /** AdminBranchesListResponse */
+        AdminBranchesListResponse: {
+            backend_contract?: components["schemas"]["AdminBranchBackendContractView"];
+            filter_options: components["schemas"]["AdminBranchFilterOptionsView"];
+            /**
+             * Is Backend Connected
+             * @default true
+             */
+            is_backend_connected: boolean;
+            /** Items */
+            items: components["schemas"]["AdminBranchListItemView"][];
+            metrics: components["schemas"]["AdminBranchMetricsView"];
+            /** Page */
+            page: number;
+            /** Page Size */
+            page_size: number;
+            /** Total */
+            total: number;
+        };
+        /** AdminCashCutAvailableActionsView */
+        AdminCashCutAvailableActionsView: {
+            /**
+             * Can Copy Folio
+             * @default true
+             */
+            can_copy_folio: boolean;
+            /**
+             * Can Export Report
+             * @default false
+             */
+            can_export_report: boolean;
+            /**
+             * Can Open Operational Payments
+             * @default true
+             */
+            can_open_operational_payments: boolean;
+            /**
+             * Can Open Returns
+             * @default true
+             */
+            can_open_returns: boolean;
+            /**
+             * Can Open Tickets
+             * @default true
+             */
+            can_open_tickets: boolean;
+            /**
+             * Can Print Report
+             * @default false
+             */
+            can_print_report: boolean;
+            /**
+             * Can Remote Close
+             * @default false
+             */
+            can_remote_close: boolean;
+            /** Remote Close Note */
+            remote_close_note?: string | null;
+        };
+        /** AdminCashCutBackendContractView */
+        AdminCashCutBackendContractView: {
+            /** Detail Endpoint */
+            detail_endpoint: string;
+            /** Export Endpoint */
+            export_endpoint?: string | null;
+            /** List Endpoint */
+            list_endpoint: string;
+            /** Print Endpoint */
+            print_endpoint?: string | null;
+        };
+        /** AdminCashCutCorrectionAdjustmentItemView */
+        AdminCashCutCorrectionAdjustmentItemView: {
+            /** Amount */
+            amount?: string | null;
+            /** Document Type */
+            document_type: string;
+            /** Folio */
+            folio: string;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Notes */
+            notes?: string | null;
+            /** Occurred At */
+            occurred_at?: string | null;
+            /** Operator Name */
+            operator_name?: string | null;
+            /** Route Hint */
+            route_hint?: string | null;
+        };
+        /** AdminCashCutDenominationCountView */
+        AdminCashCutDenominationCountView: {
+            /** Is Supported */
+            is_supported: boolean;
+            /** Lines */
+            lines: components["schemas"]["AdminCashCutDenominationLineView"][];
+            /** Note */
+            note?: string | null;
+            /** Total Counted */
+            total_counted?: string | null;
+        };
+        /** AdminCashCutDenominationLineView */
+        AdminCashCutDenominationLineView: {
+            /** Denomination */
+            denomination: string;
+            /** Quantity */
+            quantity: number;
+            /** Subtotal */
+            subtotal: string;
+        };
+        /** AdminCashCutDetailView */
+        AdminCashCutDetailView: {
+            /** Audit Timeline */
+            audit_timeline: components["schemas"]["AdminCashCutTimelineItemView"][];
+            available_actions: components["schemas"]["AdminCashCutAvailableActionsView"];
+            backend_contract: components["schemas"]["AdminCashCutBackendContractView"];
+            /** Corrections Adjustments */
+            corrections_adjustments: components["schemas"]["AdminCashCutCorrectionAdjustmentItemView"][];
+            denomination_count: components["schemas"]["AdminCashCutDenominationCountView"];
+            expected_vs_counted: components["schemas"]["AdminCashCutExpectedVsCountedView"];
+            /** Included Tickets */
+            included_tickets: components["schemas"]["AdminCashCutTicketItemView"][];
+            /** Operational Payments */
+            operational_payments: components["schemas"]["AdminCashCutOperationalPaymentItemView"][];
+            overview: components["schemas"]["AdminCashCutOverviewView"];
+            /** Payment Breakdown */
+            payment_breakdown: components["schemas"]["AdminCashCutPaymentBreakdownView"][];
+            reconciliation_status: components["schemas"]["AdminCashCutReconciliationStatusView"];
+            /** Related Documents */
+            related_documents: components["schemas"]["AdminCashCutRelatedDocumentView"][];
+            /** Returns Refunds */
+            returns_refunds: components["schemas"]["AdminCashCutRefundItemView"][];
+        };
+        /** AdminCashCutExpectedVsCountedView */
+        AdminCashCutExpectedVsCountedView: {
+            /** Cash Adjustments Amount */
+            cash_adjustments_amount: string;
+            /** Cash Operational Discounts Amount */
+            cash_operational_discounts_amount: string;
+            /** Cash Operational Payments Amount */
+            cash_operational_payments_amount: string;
+            /** Cash Refunds Amount */
+            cash_refunds_amount: string;
+            /** Cash Sales Amount */
+            cash_sales_amount: string;
+            /** Counted Cash Amount */
+            counted_cash_amount?: string | null;
+            /** Difference Amount */
+            difference_amount?: string | null;
+            /** Difference State */
+            difference_state: string;
+            /** Expected Cash Amount */
+            expected_cash_amount: string;
+            /** Is Counted Cash Available */
+            is_counted_cash_available: boolean;
+            /** Note */
+            note?: string | null;
+            /** Opening Amount */
+            opening_amount: string;
+        };
+        /** AdminCashCutFilterOptionView */
+        AdminCashCutFilterOptionView: {
+            /** Id */
+            id: string;
+            /** Label */
+            label: string;
+        };
+        /** AdminCashCutFilterOptionsView */
+        AdminCashCutFilterOptionsView: {
+            /** Branches */
+            branches: components["schemas"]["AdminCashCutFilterOptionView"][];
+            /** Cashiers */
+            cashiers: components["schemas"]["AdminCashCutFilterOptionView"][];
+            /** Difference States */
+            difference_states: components["schemas"]["AdminCashCutFilterOptionView"][];
+            /** Payment Methods */
+            payment_methods: components["schemas"]["AdminCashCutFilterOptionView"][];
+            /** Statuses */
+            statuses: components["schemas"]["AdminCashCutFilterOptionView"][];
+            /** Workstations */
+            workstations: components["schemas"]["AdminCashCutFilterOptionView"][];
+        };
+        /** AdminCashCutListItemView */
+        AdminCashCutListItemView: {
+            /**
+             * Branch Id
+             * Format: uuid
+             */
+            branch_id: string;
+            /** Branch Name */
+            branch_name: string;
+            /**
+             * Cash Session Id
+             * Format: uuid
+             */
+            cash_session_id: string;
+            /**
+             * Cashier Id
+             * Format: uuid
+             */
+            cashier_id: string;
+            /** Cashier Name */
+            cashier_name: string;
+            /** Close Id */
+            close_id?: string | null;
+            /** Closed At */
+            closed_at?: string | null;
+            /** Counted Cash Amount */
+            counted_cash_amount?: string | null;
+            /** Difference Amount */
+            difference_amount?: string | null;
+            /** Difference State */
+            difference_state: string;
+            /** Expected Cash Amount */
+            expected_cash_amount: string;
+            /** Folio */
+            folio: string;
+            /** Has Operational Payments */
+            has_operational_payments: boolean;
+            /** Has Refunds */
+            has_refunds: boolean;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /**
+             * Opened At
+             * Format: date-time
+             */
+            opened_at: string;
+            /** Opening Amount */
+            opening_amount: string;
+            /** Payment Methods Summary */
+            payment_methods_summary: string;
+            /** Status */
+            status: string;
+            /** Total Sales Amount */
+            total_sales_amount: string;
+            /** Warning Count */
+            warning_count: number;
+            /** Warning State */
+            warning_state: string;
+            /** Workstation Code */
+            workstation_code: string;
+            /**
+             * Workstation Id
+             * Format: uuid
+             */
+            workstation_id: string;
+            /** Workstation Name */
+            workstation_name: string;
+        };
+        /** AdminCashCutMetricsView */
+        AdminCashCutMetricsView: {
+            /** Closed Cuts Count */
+            closed_cuts_count: number;
+            /** Counted Cash Amount */
+            counted_cash_amount: string;
+            /** Cuts With Difference Count */
+            cuts_with_difference_count: number;
+            /** Expected Cash Amount */
+            expected_cash_amount: string;
+            /** Net Difference Amount */
+            net_difference_amount: string;
+            /** Net Sales Amount */
+            net_sales_amount: string;
+            /** Operational Payments Amount */
+            operational_payments_amount: string;
+            /** Pending Close Count */
+            pending_close_count: number;
+        };
+        /** AdminCashCutOperationalPaymentItemView */
+        AdminCashCutOperationalPaymentItemView: {
+            /** Amount */
+            amount: string;
+            /** Cash Amount */
+            cash_amount: string;
+            /** Category Code */
+            category_code?: string | null;
+            /** Category Name */
+            category_name?: string | null;
+            /** Folio */
+            folio: string;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Notes */
+            notes?: string | null;
+            /**
+             * Occurred At
+             * Format: date-time
+             */
+            occurred_at: string;
+            /** Operator Name */
+            operator_name: string;
+            /** Payment Method Code */
+            payment_method_code: string;
+            /** Route Hint */
+            route_hint: string;
+        };
+        /** AdminCashCutOverviewView */
+        AdminCashCutOverviewView: {
+            /** Branch Code */
+            branch_code: string;
+            /**
+             * Branch Id
+             * Format: uuid
+             */
+            branch_id: string;
+            /** Branch Name */
+            branch_name: string;
+            /**
+             * Cash Session Id
+             * Format: uuid
+             */
+            cash_session_id: string;
+            /**
+             * Cashier Id
+             * Format: uuid
+             */
+            cashier_id: string;
+            /** Cashier Name */
+            cashier_name: string;
+            /** Close Id */
+            close_id?: string | null;
+            /** Closed At */
+            closed_at?: string | null;
+            /** Closing Notes */
+            closing_notes?: string | null;
+            /** Folio */
+            folio: string;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /**
+             * Opened At
+             * Format: date-time
+             */
+            opened_at: string;
+            /** Opening Amount */
+            opening_amount: string;
+            /** Status */
+            status: string;
+            /** Total Duration Minutes */
+            total_duration_minutes?: number | null;
+            /** Warning State */
+            warning_state: string;
+            /** Workstation Code */
+            workstation_code: string;
+            /**
+             * Workstation Id
+             * Format: uuid
+             */
+            workstation_id: string;
+            /** Workstation Name */
+            workstation_name: string;
+        };
+        /** AdminCashCutPaymentBreakdownView */
+        AdminCashCutPaymentBreakdownView: {
+            /** Counted Amount */
+            counted_amount?: string | null;
+            /** Currency Code */
+            currency_code: string;
+            /** Expected Amount */
+            expected_amount?: string | null;
+            /** Is Counted Supported */
+            is_counted_supported: boolean;
+            /** Net Amount */
+            net_amount: string;
+            /** Operational Discount Amount */
+            operational_discount_amount: string;
+            /** Operational Payment Amount */
+            operational_payment_amount: string;
+            /** Payment Method Code */
+            payment_method_code: string;
+            /** Refund Amount */
+            refund_amount: string;
+            /** Sales Amount */
+            sales_amount: string;
+            /** Variance Amount */
+            variance_amount?: string | null;
+        };
+        /** AdminCashCutReconciliationStatusView */
+        AdminCashCutReconciliationStatusView: {
+            /** Note */
+            note?: string | null;
+            /** Reconciled At */
+            reconciled_at?: string | null;
+            /** Reconciled By Name */
+            reconciled_by_name?: string | null;
+            /** Related Document Id */
+            related_document_id?: string | null;
+            /** Route Hint */
+            route_hint?: string | null;
+            /** Status */
+            status: string;
+        };
+        /** AdminCashCutRefundItemView */
+        AdminCashCutRefundItemView: {
+            /** Amount */
+            amount: string;
+            /** Folio */
+            folio: string;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /**
+             * Occurred At
+             * Format: date-time
+             */
+            occurred_at: string;
+            /** Operator Name */
+            operator_name: string;
+            /** Original Ticket Folio */
+            original_ticket_folio: string;
+            /** Payment Method Code */
+            payment_method_code: string;
+            /** Reason Name */
+            reason_name: string;
+            /** Route Hint */
+            route_hint: string;
+            /** Status */
+            status: string;
+        };
+        /** AdminCashCutRelatedDocumentView */
+        AdminCashCutRelatedDocumentView: {
+            /** Amount */
+            amount?: string | null;
+            /** Document Type */
+            document_type: string;
+            /** Folio */
+            folio: string;
+            /** Id */
+            id: string;
+            /** Occurred At */
+            occurred_at?: string | null;
+            /** Route Hint */
+            route_hint?: string | null;
+            /** Status */
+            status: string;
+        };
+        /** AdminCashCutTicketItemView */
+        AdminCashCutTicketItemView: {
+            /** Cashier Name */
+            cashier_name: string;
+            /** Currency Code */
+            currency_code: string;
+            /** Folio */
+            folio: string;
+            /**
+             * Occurred At
+             * Format: date-time
+             */
+            occurred_at: string;
+            /** Payment Method Summary */
+            payment_method_summary: string;
+            /** Route Hint */
+            route_hint: string;
+            /** Status */
+            status: string;
+            /**
+             * Ticket Id
+             * Format: uuid
+             */
+            ticket_id: string;
+            /** Total Amount */
+            total_amount: string;
+        };
+        /** AdminCashCutTimelineItemView */
+        AdminCashCutTimelineItemView: {
+            /** Actor Name */
+            actor_name?: string | null;
+            /** Event Code */
+            event_code: string;
+            /** Label */
+            label: string;
+            /**
+             * Occurred At
+             * Format: date-time
+             */
+            occurred_at: string;
+            /** Summary */
+            summary?: string | null;
+        };
+        /** AdminCashCutsListResponse */
+        AdminCashCutsListResponse: {
+            backend_contract: components["schemas"]["AdminCashCutBackendContractView"];
+            filter_options: components["schemas"]["AdminCashCutFilterOptionsView"];
+            /**
+             * Is Backend Connected
+             * @default true
+             */
+            is_backend_connected: boolean;
+            /** Items */
+            items: components["schemas"]["AdminCashCutListItemView"][];
+            metrics: components["schemas"]["AdminCashCutMetricsView"];
+            /** Page */
+            page: number;
+            /** Page Size */
+            page_size: number;
+            /** Total */
+            total: number;
+        };
+        /** AdminCashFlowAvailableActionsView */
+        AdminCashFlowAvailableActionsView: {
+            /**
+             * Can Copy Reference
+             * @default true
+             */
+            can_copy_reference: boolean;
+            /**
+             * Can Export
+             * @default false
+             */
+            can_export: boolean;
+            /**
+             * Can Open Cash Cut
+             * @default false
+             */
+            can_open_cash_cut: boolean;
+            /**
+             * Can Open Reconciliation
+             * @default false
+             */
+            can_open_reconciliation: boolean;
+            /**
+             * Can Open Source
+             * @default true
+             */
+            can_open_source: boolean;
+            /** Note */
+            note?: string | null;
+        };
+        /** AdminCashFlowBackendContractView */
+        AdminCashFlowBackendContractView: {
+            /** Detail Endpoint */
+            detail_endpoint: string;
+            /** Export Endpoint */
+            export_endpoint?: string | null;
+            /** List Endpoint */
+            list_endpoint: string;
+            /** Trend Endpoint */
+            trend_endpoint?: string | null;
+        };
+        /** AdminCashFlowFilterOptionView */
+        AdminCashFlowFilterOptionView: {
+            /** Id */
+            id: string;
+            /** Label */
+            label: string;
+        };
+        /** AdminCashFlowFilterOptionsView */
+        AdminCashFlowFilterOptionsView: {
+            /** Branches */
+            branches: components["schemas"]["AdminCashFlowFilterOptionView"][];
+            /** Categories */
+            categories: components["schemas"]["AdminCashFlowFilterOptionView"][];
+            /** Directions */
+            directions: components["schemas"]["AdminCashFlowFilterOptionView"][];
+            /** Operators */
+            operators: components["schemas"]["AdminCashFlowFilterOptionView"][];
+            /** Payment Methods */
+            payment_methods: components["schemas"]["AdminCashFlowFilterOptionView"][];
+            /** Reconciliation States */
+            reconciliation_states: components["schemas"]["AdminCashFlowFilterOptionView"][];
+            /** Source Types */
+            source_types: components["schemas"]["AdminCashFlowFilterOptionView"][];
+            /** Workstations */
+            workstations: components["schemas"]["AdminCashFlowFilterOptionView"][];
+        };
+        /** AdminCashFlowFinancialClassificationView */
+        AdminCashFlowFinancialClassificationView: {
+            /** Affects Bank Settlement */
+            affects_bank_settlement: boolean;
+            /** Affects Cash Drawer */
+            affects_cash_drawer: boolean;
+            /** Card Impact */
+            card_impact: string;
+            /** Cash Impact */
+            cash_impact: string;
+            /** Direction */
+            direction: string;
+            /** Net Effect */
+            net_effect: string;
+            /** Note */
+            note?: string | null;
+            /** Payment Method */
+            payment_method: string;
+            /** Source Category */
+            source_category?: string | null;
+        };
+        /** AdminCashFlowListResponse */
+        AdminCashFlowListResponse: {
+            backend_contract: components["schemas"]["AdminCashFlowBackendContractView"];
+            filter_options: components["schemas"]["AdminCashFlowFilterOptionsView"];
+            /**
+             * Is Backend Connected
+             * @default true
+             */
+            is_backend_connected: boolean;
+            /** Items */
+            items: components["schemas"]["AdminCashFlowMovementListItemView"][];
+            /** Page */
+            page: number;
+            /** Page Size */
+            page_size: number;
+            summary: components["schemas"]["AdminCashFlowSummaryView"];
+            /** Total */
+            total: number;
+            /** Trend */
+            trend: components["schemas"]["AdminCashFlowTrendPointView"][];
+        };
+        /** AdminCashFlowMovementDetailView */
+        AdminCashFlowMovementDetailView: {
+            available_actions: components["schemas"]["AdminCashFlowAvailableActionsView"];
+            backend_contract: components["schemas"]["AdminCashFlowBackendContractView"];
+            financial_classification: components["schemas"]["AdminCashFlowFinancialClassificationView"];
+            overview: components["schemas"]["AdminCashFlowMovementOverviewView"];
+            reconciliation: components["schemas"]["AdminCashFlowReconciliationView"];
+            /** Related Documents */
+            related_documents: components["schemas"]["AdminCashFlowRelatedDocumentView"][];
+            source_document_context: components["schemas"]["AdminCashFlowSourceContextView"];
+        };
+        /** AdminCashFlowMovementListItemView */
+        AdminCashFlowMovementListItemView: {
+            /** Amount */
+            amount: string;
+            /**
+             * Branch Id
+             * Format: uuid
+             */
+            branch_id: string;
+            /** Branch Name */
+            branch_name: string;
+            /** Category */
+            category?: string | null;
+            /** Currency */
+            currency: string;
+            /** Direction */
+            direction: string;
+            /** Id */
+            id: string;
+            /**
+             * Occurred At
+             * Format: date-time
+             */
+            occurred_at: string;
+            /** Operator Id */
+            operator_id?: string | null;
+            /** Operator Name */
+            operator_name: string;
+            /** Payment Method */
+            payment_method: string;
+            /** Reconciliation Status */
+            reconciliation_status: string;
+            /**
+             * Source Document Id
+             * Format: uuid
+             */
+            source_document_id: string;
+            /** Source Reference */
+            source_reference: string;
+            /** Source Type */
+            source_type: string;
+            /** Warning State */
+            warning_state: string;
+            /**
+             * Workstation Id
+             * Format: uuid
+             */
+            workstation_id: string;
+            /** Workstation Name */
+            workstation_name: string;
+        };
+        /** AdminCashFlowMovementOverviewView */
+        AdminCashFlowMovementOverviewView: {
+            /** Amount */
+            amount: string;
+            /**
+             * Branch Id
+             * Format: uuid
+             */
+            branch_id: string;
+            /** Branch Name */
+            branch_name: string;
+            /** Category */
+            category?: string | null;
+            /** Currency */
+            currency: string;
+            /** Direction */
+            direction: string;
+            /** Id */
+            id: string;
+            /**
+             * Occurred At
+             * Format: date-time
+             */
+            occurred_at: string;
+            /** Operator Id */
+            operator_id?: string | null;
+            /** Operator Name */
+            operator_name: string;
+            /** Payment Method */
+            payment_method: string;
+            /**
+             * Source Document Id
+             * Format: uuid
+             */
+            source_document_id: string;
+            /** Source Reference */
+            source_reference: string;
+            /** Source Type */
+            source_type: string;
+            /** Warning State */
+            warning_state: string;
+            /**
+             * Workstation Id
+             * Format: uuid
+             */
+            workstation_id: string;
+            /** Workstation Name */
+            workstation_name: string;
+        };
+        /** AdminCashFlowReconciliationView */
+        AdminCashFlowReconciliationView: {
+            /** Message */
+            message: string;
+            /** Reason Label */
+            reason_label?: string | null;
+            /** Reconciliation Folio */
+            reconciliation_folio?: string | null;
+            /** Reconciliation Id */
+            reconciliation_id?: string | null;
+            /** Route Hint */
+            route_hint?: string | null;
+            /** Status */
+            status: string;
+            /** Unresolved Amount */
+            unresolved_amount?: string | null;
+        };
+        /** AdminCashFlowRelatedDocumentView */
+        AdminCashFlowRelatedDocumentView: {
+            /** Amount */
+            amount?: string | null;
+            /** Document Type */
+            document_type: string;
+            /** Folio */
+            folio: string;
+            /** Id */
+            id: string;
+            /** Occurred At */
+            occurred_at?: string | null;
+            /** Route Hint */
+            route_hint?: string | null;
+            /** Status */
+            status: string;
+        };
+        /** AdminCashFlowSourceContextView */
+        AdminCashFlowSourceContextView: {
+            /** Cash Cut Folio */
+            cash_cut_folio?: string | null;
+            /** Cash Cut Id */
+            cash_cut_id?: string | null;
+            /** Cash Cut Route Hint */
+            cash_cut_route_hint?: string | null;
+            /** Cash Session Id */
+            cash_session_id?: string | null;
+            /** Concept */
+            concept?: string | null;
+            /** Counted Cash Amount */
+            counted_cash_amount?: string | null;
+            /** Difference Amount */
+            difference_amount?: string | null;
+            /** Expected Cash Amount */
+            expected_cash_amount?: string | null;
+            /** Note */
+            note?: string | null;
+            /** Original Ticket Folio */
+            original_ticket_folio?: string | null;
+            /** Source Payment Method */
+            source_payment_method?: string | null;
+            /** Source Reference */
+            source_reference: string;
+            /** Source Route Hint */
+            source_route_hint?: string | null;
+            /** Source Status */
+            source_status?: string | null;
+            /** Source Total Amount */
+            source_total_amount?: string | null;
+            /** Source Type */
+            source_type: string;
+        };
+        /** AdminCashFlowSummaryView */
+        AdminCashFlowSummaryView: {
+            /** Card Total */
+            card_total: string;
+            /** Cash Total */
+            cash_total: string;
+            /** Difference Total */
+            difference_total: string;
+            /** Inflows Total */
+            inflows_total: string;
+            /** Net Total */
+            net_total: string;
+            /** Operational Payments Total */
+            operational_payments_total: string;
+            /** Outflows Total */
+            outflows_total: string;
+            /** Pending Reconciliation Total */
+            pending_reconciliation_total: string;
+            /** Refunds Total */
+            refunds_total: string;
+        };
+        /** AdminCashFlowTrendPointView */
+        AdminCashFlowTrendPointView: {
+            /**
+             * Date
+             * Format: date
+             */
+            date: string;
+            /** Inflows */
+            inflows: string;
+            /** Net */
+            net: string;
+            /** Outflows */
+            outflows: string;
+        };
+        /** AdminCleaningAvailableActionsView */
+        AdminCleaningAvailableActionsView: {
+            /** Can Add Evidence */
+            can_add_evidence: boolean;
+            /** Can Cancel */
+            can_cancel: boolean;
+            /** Can Complete */
+            can_complete: boolean;
+            /** Can Create Incident */
+            can_create_incident: boolean;
+            /** Can Edit */
+            can_edit: boolean;
+            /** Can Export */
+            can_export: boolean;
+            /** Can Print */
+            can_print: boolean;
+            /** Note */
+            note?: string | null;
+        };
+        /** AdminCleaningBackendContractView */
+        AdminCleaningBackendContractView: {
+            /**
+             * Cancel Endpoint
+             * @default POST /v1/admin/cleaning-logs/{cleaning_log_id}/cancel
+             */
+            cancel_endpoint: string;
+            /**
+             * Complete Endpoint
+             * @default POST /v1/admin/cleaning-logs/{cleaning_log_id}/complete
+             */
+            complete_endpoint: string;
+            /**
+             * Create Endpoint
+             * @default POST /v1/admin/cleaning-logs
+             */
+            create_endpoint: string;
+            /**
+             * Detail Endpoint
+             * @default GET /v1/admin/cleaning-logs/{cleaning_log_id}
+             */
+            detail_endpoint: string;
+            /**
+             * Evidence Contract
+             * @default Evidence files are not supported yet; evidence is captured as evidence_note.
+             */
+            evidence_contract: string;
+            /**
+             * List Endpoint
+             * @default GET /v1/admin/cleaning-logs
+             */
+            list_endpoint: string;
+            /**
+             * Templates Endpoint
+             * @default GET /v1/admin/cleaning-logs/templates
+             */
+            templates_endpoint: string;
+        };
+        /** AdminCleaningChecklistItemInput */
+        AdminCleaningChecklistItemInput: {
+            /** Id */
+            id?: string | null;
+            /**
+             * Is Completed
+             * @default false
+             */
+            is_completed: boolean;
+            /**
+             * Is Required
+             * @default true
+             */
+            is_required: boolean;
+            /** Label */
+            label: string;
+            /** Notes */
+            notes?: string | null;
+        };
+        /** AdminCleaningChecklistItemView */
+        AdminCleaningChecklistItemView: {
+            /** Display Order */
+            display_order: number;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Is Completed */
+            is_completed: boolean;
+            /** Is Required */
+            is_required: boolean;
+            /** Label */
+            label: string;
+            /** Notes */
+            notes?: string | null;
+        };
+        /** AdminCleaningEvidenceView */
+        AdminCleaningEvidenceView: {
+            /**
+             * Empty State
+             * @default Esta bitacora no tiene evidencia adjunta.
+             */
+            empty_state: string;
+            /** Evidence Note */
+            evidence_note?: string | null;
+            /** Files */
+            files?: {
+                [key: string]: string;
+            }[];
+            /**
+             * Has Evidence
+             * @default false
+             */
+            has_evidence: boolean;
+            /**
+             * Is Supported
+             * @default true
+             */
+            is_supported: boolean;
+            /**
+             * Upload Supported
+             * @default false
+             */
+            upload_supported: boolean;
+        };
+        /** AdminCleaningFilterOptionView */
+        AdminCleaningFilterOptionView: {
+            /** Id */
+            id: string;
+            /** Label */
+            label: string;
+        };
+        /** AdminCleaningFilterOptionsView */
+        AdminCleaningFilterOptionsView: {
+            /** Area Types */
+            area_types: components["schemas"]["AdminCleaningFilterOptionView"][];
+            /** Areas */
+            areas: components["schemas"]["AdminCleaningFilterOptionView"][];
+            /** Branches */
+            branches: components["schemas"]["AdminCleaningFilterOptionView"][];
+            /** Cleaning Types */
+            cleaning_types: components["schemas"]["AdminCleaningFilterOptionView"][];
+            /** Evidence States */
+            evidence_states: components["schemas"]["AdminCleaningFilterOptionView"][];
+            /** Observation States */
+            observation_states: components["schemas"]["AdminCleaningFilterOptionView"][];
+            /** Responsible Users */
+            responsible_users: components["schemas"]["AdminCleaningFilterOptionView"][];
+            /** Risk Levels */
+            risk_levels: components["schemas"]["AdminCleaningFilterOptionView"][];
+            /** Shifts */
+            shifts: components["schemas"]["AdminCleaningFilterOptionView"][];
+            /** Statuses */
+            statuses: components["schemas"]["AdminCleaningFilterOptionView"][];
+            /** Templates */
+            templates: components["schemas"]["AdminCleaningFilterOptionView"][];
+        };
+        /** AdminCleaningLocationAreaView */
+        AdminCleaningLocationAreaView: {
+            /** Area Name */
+            area_name: string;
+            /** Area Type */
+            area_type: string;
+            /** Branch Code */
+            branch_code: string;
+            /**
+             * Branch Id
+             * Format: uuid
+             */
+            branch_id: string;
+            /** Branch Name */
+            branch_name: string;
+            /** Equipment Name */
+            equipment_name?: string | null;
+        };
+        /** AdminCleaningLogCancelRequest */
+        AdminCleaningLogCancelRequest: {
+            /** Reason */
+            reason: string;
+        };
+        /** AdminCleaningLogCompleteRequest */
+        AdminCleaningLogCompleteRequest: {
+            /** Checklist Items */
+            checklist_items?: components["schemas"]["AdminCleaningChecklistItemInput"][];
+            /** Completed At */
+            completed_at?: string | null;
+            /** Evidence Note */
+            evidence_note?: string | null;
+            /** Issue Notes */
+            issue_notes?: string | null;
+            /** Notes */
+            notes?: string | null;
+        };
+        /** AdminCleaningLogCreateRequest */
+        AdminCleaningLogCreateRequest: {
+            /** Area Name */
+            area_name: string;
+            /**
+             * Area Type
+             * @default OTHER
+             */
+            area_type: string;
+            /**
+             * Branch Id
+             * Format: uuid
+             */
+            branch_id: string;
+            /** Checklist Items */
+            checklist_items?: components["schemas"]["AdminCleaningChecklistItemInput"][];
+            /**
+             * Cleaning Type
+             * @default ROUTINE
+             */
+            cleaning_type: string;
+            /**
+             * Complete Immediately
+             * @default false
+             */
+            complete_immediately: boolean;
+            /** Completed At */
+            completed_at?: string | null;
+            /** Equipment Name */
+            equipment_name?: string | null;
+            /** Evidence Note */
+            evidence_note?: string | null;
+            /** Issue Notes */
+            issue_notes?: string | null;
+            /** Notes */
+            notes?: string | null;
+            /**
+             * Responsible User Id
+             * Format: uuid
+             */
+            responsible_user_id: string;
+            /**
+             * Risk Level
+             * @default MEDIUM
+             * @enum {string}
+             */
+            risk_level: "LOW" | "MEDIUM" | "HIGH" | "CRITICAL";
+            /**
+             * Scheduled At
+             * Format: date-time
+             */
+            scheduled_at: string;
+            /**
+             * Shift Code
+             * @default MORNING
+             */
+            shift_code: string;
+            /** Task Name */
+            task_name?: string | null;
+            /** Task Template Id */
+            task_template_id?: string | null;
+        };
+        /** AdminCleaningLogDetailView */
+        AdminCleaningLogDetailView: {
+            available_actions: components["schemas"]["AdminCleaningAvailableActionsView"];
+            /** Checklist */
+            checklist: components["schemas"]["AdminCleaningChecklistItemView"][];
+            evidence: components["schemas"]["AdminCleaningEvidenceView"];
+            location_area: components["schemas"]["AdminCleaningLocationAreaView"];
+            observations_issues: components["schemas"]["AdminCleaningObservationsView"];
+            overview: components["schemas"]["AdminCleaningOverviewView"];
+            /** Related Documents */
+            related_documents: components["schemas"]["AdminCleaningRelatedDocumentView"][];
+            task_template: components["schemas"]["AdminCleaningTaskTemplateView"];
+            /** Warnings */
+            warnings: components["schemas"]["AdminCleaningWarningView"][];
+        };
+        /** AdminCleaningLogListItemView */
+        AdminCleaningLogListItemView: {
+            /** Area Id */
+            area_id?: string | null;
+            /** Area Name */
+            area_name: string;
+            /**
+             * Branch Id
+             * Format: uuid
+             */
+            branch_id: string;
+            /** Branch Name */
+            branch_name: string;
+            /** Checklist Completed Count */
+            checklist_completed_count: number;
+            /** Checklist Total Count */
+            checklist_total_count: number;
+            /** Cleaning Type */
+            cleaning_type: string;
+            /** Completed At */
+            completed_at?: string | null;
+            /** Equipment Id */
+            equipment_id?: string | null;
+            /** Equipment Name */
+            equipment_name?: string | null;
+            /** Folio */
+            folio: string;
+            /** Has Evidence */
+            has_evidence: boolean;
+            /** Has Observations */
+            has_observations: boolean;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /**
+             * Responsible User Id
+             * Format: uuid
+             */
+            responsible_user_id: string;
+            /** Responsible User Name */
+            responsible_user_name: string;
+            /**
+             * Risk Level
+             * @enum {string}
+             */
+            risk_level: "LOW" | "MEDIUM" | "HIGH" | "CRITICAL";
+            /**
+             * Scheduled At
+             * Format: date-time
+             */
+            scheduled_at: string;
+            /** Shift Code */
+            shift_code: string;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "SCHEDULED" | "PENDING" | "IN_PROGRESS" | "COMPLETED" | "MISSED" | "CANCELLED" | "REQUIRES_REVIEW";
+            /** Task Name */
+            task_name: string;
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+            /** Warning State */
+            warning_state: string;
+            /** Warnings */
+            warnings: components["schemas"]["AdminCleaningWarningView"][];
+        };
+        /** AdminCleaningLogListResponse */
+        AdminCleaningLogListResponse: {
+            backend_contract?: components["schemas"]["AdminCleaningBackendContractView"];
+            filter_options: components["schemas"]["AdminCleaningFilterOptionsView"];
+            /**
+             * Is Backend Connected
+             * @default true
+             */
+            is_backend_connected: boolean;
+            /** Items */
+            items: components["schemas"]["AdminCleaningLogListItemView"][];
+            metrics: components["schemas"]["AdminCleaningMetricsView"];
+            /** Page */
+            page: number;
+            /** Page Size */
+            page_size: number;
+            /** Total */
+            total: number;
+        };
+        /** AdminCleaningMetricsView */
+        AdminCleaningMetricsView: {
+            /** Completed Count */
+            completed_count: number;
+            /** High Risk Count */
+            high_risk_count: number;
+            /** Overdue Count */
+            overdue_count: number;
+            /** Pending Count */
+            pending_count: number;
+            /** Requires Review Count */
+            requires_review_count: number;
+            /** Total Count */
+            total_count: number;
+            /** With Evidence Count */
+            with_evidence_count: number;
+            /** With Observations Count */
+            with_observations_count: number;
+        };
+        /** AdminCleaningObservationsView */
+        AdminCleaningObservationsView: {
+            /** Cancellation Reason */
+            cancellation_reason?: string | null;
+            /** Corrective Note */
+            corrective_note?: string | null;
+            /** Incomplete Required Count */
+            incomplete_required_count: number;
+            /** Issue Notes */
+            issue_notes?: string | null;
+            /** Notes */
+            notes?: string | null;
+        };
+        /** AdminCleaningOverviewView */
+        AdminCleaningOverviewView: {
+            /** Area Name */
+            area_name: string;
+            /**
+             * Branch Id
+             * Format: uuid
+             */
+            branch_id: string;
+            /** Branch Name */
+            branch_name: string;
+            /** Cleaning Type */
+            cleaning_type: string;
+            /** Completed At */
+            completed_at?: string | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /**
+             * Created By User Id
+             * Format: uuid
+             */
+            created_by_user_id: string;
+            /** Created By User Name */
+            created_by_user_name: string;
+            /** Equipment Name */
+            equipment_name?: string | null;
+            /** Folio */
+            folio: string;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /**
+             * Responsible User Id
+             * Format: uuid
+             */
+            responsible_user_id: string;
+            /** Responsible User Name */
+            responsible_user_name: string;
+            /**
+             * Risk Level
+             * @enum {string}
+             */
+            risk_level: "LOW" | "MEDIUM" | "HIGH" | "CRITICAL";
+            /**
+             * Scheduled At
+             * Format: date-time
+             */
+            scheduled_at: string;
+            /** Shift Code */
+            shift_code: string;
+            /** Started At */
+            started_at?: string | null;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "SCHEDULED" | "PENDING" | "IN_PROGRESS" | "COMPLETED" | "MISSED" | "CANCELLED" | "REQUIRES_REVIEW";
+            /** Task Name */
+            task_name: string;
+            /** Warning State */
+            warning_state: string;
+        };
+        /** AdminCleaningRelatedDocumentView */
+        AdminCleaningRelatedDocumentView: {
+            /**
+             * Document Id
+             * Format: uuid
+             */
+            document_id: string;
+            /** Document Type */
+            document_type: string;
+            /** Folio */
+            folio: string;
+            /** Route Hint */
+            route_hint?: string | null;
+            /** Status */
+            status: string;
+        };
+        /** AdminCleaningTaskTemplateView */
+        AdminCleaningTaskTemplateView: {
+            /** Cleaning Type */
+            cleaning_type: string;
+            /** Estimated Duration Minutes */
+            estimated_duration_minutes?: number | null;
+            /** Frequency */
+            frequency?: string | null;
+            /** Method Summary */
+            method_summary?: string | null;
+            /** Required Tools */
+            required_tools?: string | null;
+            /**
+             * Risk Level
+             * @enum {string}
+             */
+            risk_level: "LOW" | "MEDIUM" | "HIGH" | "CRITICAL";
+            /** Task Name */
+            task_name: string;
+            /** Task Template Id */
+            task_template_id?: string | null;
+            /** Task Template Name */
+            task_template_name?: string | null;
+        };
+        /** AdminCleaningTemplateItemView */
+        AdminCleaningTemplateItemView: {
+            /** Description */
+            description?: string | null;
+            /** Display Order */
+            display_order: number;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Is Required */
+            is_required: boolean;
+            /** Label */
+            label: string;
+        };
+        /** AdminCleaningTemplateView */
+        AdminCleaningTemplateView: {
+            /** Area Type */
+            area_type: string;
+            /** Cleaning Type */
+            cleaning_type: string;
+            /** Description */
+            description?: string | null;
+            /** Estimated Duration Minutes */
+            estimated_duration_minutes?: number | null;
+            /** Frequency */
+            frequency: string;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Is Active */
+            is_active: boolean;
+            /** Items */
+            items: components["schemas"]["AdminCleaningTemplateItemView"][];
+            /** Method Summary */
+            method_summary?: string | null;
+            /** Name */
+            name: string;
+            /** Required Tools */
+            required_tools?: string | null;
+            /** Requires Evidence */
+            requires_evidence: boolean;
+            /**
+             * Risk Level
+             * @enum {string}
+             */
+            risk_level: "LOW" | "MEDIUM" | "HIGH" | "CRITICAL";
+        };
+        /** AdminCleaningWarningView */
+        AdminCleaningWarningView: {
+            /** Code */
+            code: string;
+            /** Message */
+            message: string;
+            /**
+             * Severity
+             * @default warning
+             * @enum {string}
+             */
+            severity: "info" | "warning" | "critical";
+        };
+        /** AdminCommercialDiscountBackendContractView */
+        AdminCommercialDiscountBackendContractView: {
+            /**
+             * Create Endpoint
+             * @default POST /v1/admin/discounts
+             */
+            create_endpoint: string;
+            /**
+             * Detail Endpoint
+             * @default GET /v1/admin/discounts/{id}
+             */
+            detail_endpoint: string;
+            /**
+             * Duplicate Endpoint
+             * @default POST /v1/admin/discounts/{id}/duplicate
+             */
+            duplicate_endpoint: string;
+            /**
+             * List Endpoint
+             * @default GET /v1/admin/discounts
+             */
+            list_endpoint: string;
+            /**
+             * Update Endpoint
+             * @default PATCH /v1/admin/discounts/{id}
+             */
+            update_endpoint: string;
+        };
+        /** AdminCommercialDiscountCreateRequest */
+        AdminCommercialDiscountCreateRequest: {
+            /** Brand Id */
+            brand_id?: string | null;
+            /** Code */
+            code?: string | null;
+            /**
+             * Currency Code
+             * @default MXN
+             */
+            currency_code: string;
+            /** Description */
+            description?: string | null;
+            /**
+             * Discount Type
+             * @enum {string}
+             */
+            discount_type: "PERCENTAGE" | "FIXED_AMOUNT";
+            /**
+             * Is Pos Eligible
+             * @default true
+             */
+            is_pos_eligible: boolean;
+            /** Name */
+            name: string;
+            /**
+             * Priority
+             * @default 1000
+             */
+            priority: number;
+            /**
+             * Status
+             * @default INACTIVE
+             * @enum {string}
+             */
+            status: "ACTIVE" | "INACTIVE" | "ARCHIVED";
+            /** Target Id */
+            target_id?: string | null;
+            /**
+             * Target Scope
+             * @enum {string}
+             */
+            target_scope: "GLOBAL" | "PRODUCT" | "CLASS";
+            /** Valid From Utc */
+            valid_from_utc?: string | null;
+            /** Valid To Utc */
+            valid_to_utc?: string | null;
+            /** Value */
+            value: number | string;
+        };
+        /** AdminCommercialDiscountDuplicateRequest */
+        AdminCommercialDiscountDuplicateRequest: {
+            /** Code */
+            code?: string | null;
+            /** Name */
+            name?: string | null;
+        };
+        /** AdminCommercialDiscountFilterOptionView */
+        AdminCommercialDiscountFilterOptionView: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Label */
+            label: string;
+        };
+        /** AdminCommercialDiscountFilterOptionsView */
+        AdminCommercialDiscountFilterOptionsView: {
+            /** Brands */
+            brands: components["schemas"]["AdminCommercialDiscountFilterOptionView"][];
+            /** Classes */
+            classes: components["schemas"]["AdminCommercialDiscountFilterOptionView"][];
+            /** Products */
+            products: components["schemas"]["AdminCommercialDiscountFilterOptionView"][];
+        };
+        /** AdminCommercialDiscountMetricsView */
+        AdminCommercialDiscountMetricsView: {
+            /** Active Discounts */
+            active_discounts: number;
+            /** Class Scoped */
+            class_scoped: number;
+            /** Expired Discounts */
+            expired_discounts: number;
+            /** Product Scoped */
+            product_scoped: number;
+            /** Total Discounts */
+            total_discounts: number;
+            /** Upcoming Discounts */
+            upcoming_discounts: number;
+            /** With Warnings */
+            with_warnings: number;
+        };
+        /** AdminCommercialDiscountUpdateRequest */
+        AdminCommercialDiscountUpdateRequest: {
+            /** Brand Id */
+            brand_id?: string | null;
+            /** Code */
+            code?: string | null;
+            /** Currency Code */
+            currency_code?: string | null;
+            /** Description */
+            description?: string | null;
+            /** Discount Type */
+            discount_type?: ("PERCENTAGE" | "FIXED_AMOUNT") | null;
+            /** Is Pos Eligible */
+            is_pos_eligible?: boolean | null;
+            /** Name */
+            name?: string | null;
+            /** Priority */
+            priority?: number | null;
+            /** Status */
+            status?: ("ACTIVE" | "INACTIVE" | "ARCHIVED") | null;
+            /** Target Id */
+            target_id?: string | null;
+            /** Target Scope */
+            target_scope?: ("GLOBAL" | "PRODUCT" | "CLASS") | null;
+            /** Valid From Utc */
+            valid_from_utc?: string | null;
+            /** Valid To Utc */
+            valid_to_utc?: string | null;
+            /** Value */
+            value?: number | string | null;
+        };
+        /** AdminCommercialDiscountView */
+        AdminCommercialDiscountView: {
+            /** Base Price */
+            base_price?: string | null;
+            /** Brand Id */
+            brand_id?: string | null;
+            /** Brand Name */
+            brand_name?: string | null;
+            /** Code */
+            code?: string | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Currency Code */
+            currency_code: string;
+            /** Description */
+            description?: string | null;
+            /**
+             * Discount Type
+             * @enum {string}
+             */
+            discount_type: "PERCENTAGE" | "FIXED_AMOUNT";
+            /**
+             * Health
+             * @enum {string}
+             */
+            health: "healthy" | "warning" | "invalid" | "expired";
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Is Pos Eligible */
+            is_pos_eligible: boolean;
+            /** Name */
+            name: string;
+            /** Preview Price */
+            preview_price?: string | null;
+            /** Priority */
+            priority: number;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "ACTIVE" | "INACTIVE" | "ARCHIVED";
+            /** Target Class Id */
+            target_class_id?: string | null;
+            /** Target Class Name */
+            target_class_name?: string | null;
+            /** Target Code */
+            target_code?: string | null;
+            /** Target Id */
+            target_id?: string | null;
+            /** Target Name */
+            target_name?: string | null;
+            /**
+             * Target Scope
+             * @enum {string}
+             */
+            target_scope: "GLOBAL" | "PRODUCT" | "CLASS";
+            /** Target Status */
+            target_status?: string | null;
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+            /** Valid From Utc */
+            valid_from_utc?: string | null;
+            /** Valid To Utc */
+            valid_to_utc?: string | null;
+            /**
+             * Validity Status
+             * @enum {string}
+             */
+            validity_status: "current" | "upcoming" | "expired" | "not_scheduled";
+            /** Value */
+            value: string;
+            warnings: components["schemas"]["AdminCommercialDiscountWarningsView"];
+        };
+        /** AdminCommercialDiscountWarningsView */
+        AdminCommercialDiscountWarningsView: {
+            /** Codes */
+            codes: string[];
+            /** Messages */
+            messages: string[];
+        };
+        /** AdminCommercialDiscountsListResponse */
+        AdminCommercialDiscountsListResponse: {
+            backend_contract: components["schemas"]["AdminCommercialDiscountBackendContractView"];
+            filter_options: components["schemas"]["AdminCommercialDiscountFilterOptionsView"];
+            /**
+             * Is Backend Connected
+             * @default true
+             */
+            is_backend_connected: boolean;
+            /** Items */
+            items: components["schemas"]["AdminCommercialDiscountView"][];
+            metrics: components["schemas"]["AdminCommercialDiscountMetricsView"];
+            /** Page */
+            page: number;
+            /** Page Size */
+            page_size: number;
+            /** Total */
+            total: number;
+        };
+        /** AdminCorrectionAffectedLineView */
+        AdminCorrectionAffectedLineView: {
+            /** Corrected Quantity */
+            corrected_quantity?: string | null;
+            /** Difference Quantity */
+            difference_quantity: string;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Notes */
+            notes?: string | null;
+            /** Original Quantity */
+            original_quantity?: string | null;
+            /** Product Class Code */
+            product_class_code: string;
+            /** Product Class Name */
+            product_class_name: string;
+            /** Product Code */
+            product_code: string;
+            /** Product Name */
+            product_name: string;
+            /** Target Line Id */
+            target_line_id?: string | null;
+            /** Unit Of Measure Code */
+            unit_of_measure_code: string;
+        };
+        /** AdminCorrectionAvailableActionsView */
+        AdminCorrectionAvailableActionsView: {
+            /**
+             * Can Create From Backoffice
+             * @default false
+             */
+            can_create_from_backoffice: boolean;
+            /**
+             * Can Open Original Document
+             * @default true
+             */
+            can_open_original_document: boolean;
+            /**
+             * Can Print
+             * @default false
+             */
+            can_print: boolean;
+            /** Creation Note */
+            creation_note: string;
+        };
+        /** AdminCorrectionDetailView */
+        AdminCorrectionDetailView: {
+            /** Affected Lines */
+            affected_lines: components["schemas"]["AdminCorrectionAffectedLineView"][];
+            available_actions: components["schemas"]["AdminCorrectionAvailableActionsView"];
+            backend_contract: components["schemas"]["AdminCorrectionsBackendContractView"];
+            net_effect: components["schemas"]["AdminCorrectionNetEffectView"];
+            original_document: components["schemas"]["AdminCorrectionOriginalDocumentView"];
+            overview: components["schemas"]["AdminCorrectionOverviewView"];
+            reason_notes: components["schemas"]["AdminCorrectionReasonNotesView"];
+            /** Related Documents */
+            related_documents: components["schemas"]["AdminCorrectionRelatedDocumentView"][];
+        };
+        /** AdminCorrectionFilterOptionsView */
+        AdminCorrectionFilterOptionsView: {
+            /** Branches */
+            branches: components["schemas"]["AdminReturnCorrectionFilterOptionView"][];
+            /** Correction Types */
+            correction_types: components["schemas"]["AdminReturnCorrectionFilterOptionView"][];
+            /** Operators */
+            operators: components["schemas"]["AdminReturnCorrectionFilterOptionView"][];
+            /** Reasons */
+            reasons: components["schemas"]["AdminReturnCorrectionFilterOptionView"][];
+            /** Statuses */
+            statuses: components["schemas"]["AdminReturnCorrectionFilterOptionView"][];
+            /** Target Document Types */
+            target_document_types: components["schemas"]["AdminReturnCorrectionFilterOptionView"][];
+        };
+        /** AdminCorrectionListItemView */
+        AdminCorrectionListItemView: {
+            /**
+             * Branch Id
+             * Format: uuid
+             */
+            branch_id: string;
+            /** Branch Name */
+            branch_name: string;
+            /** Correction Type */
+            correction_type: string;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Folio */
+            folio: string;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Line Count */
+            line_count: number;
+            /** Net Effect */
+            net_effect: string;
+            /** Net Effect Quantity */
+            net_effect_quantity: string;
+            /**
+             * Operator Id
+             * Format: uuid
+             */
+            operator_id: string;
+            /** Operator Name */
+            operator_name: string;
+            /** Original Document Folio */
+            original_document_folio: string;
+            /**
+             * Original Document Id
+             * Format: uuid
+             */
+            original_document_id: string;
+            /** Original Document Type */
+            original_document_type: string;
+            /** Reason Code */
+            reason_code: string;
+            /** Reason Name */
+            reason_name: string;
+            /** Status */
+            status: string;
+            /** Total Units Affected */
+            total_units_affected: string;
+            /** Warning State */
+            warning_state?: string | null;
+            /** Workstation Code */
+            workstation_code: string;
+            /**
+             * Workstation Id
+             * Format: uuid
+             */
+            workstation_id: string;
+            /** Workstation Name */
+            workstation_name: string;
+        };
+        /** AdminCorrectionMetricsView */
+        AdminCorrectionMetricsView: {
+            /** Corrections Count */
+            corrections_count: number;
+            /** Negative Effect Count */
+            negative_effect_count: number;
+            /** Pending Review Count */
+            pending_review_count: number;
+            /** Positive Effect Count */
+            positive_effect_count: number;
+            /** Total Units Affected */
+            total_units_affected: string;
+        };
+        /** AdminCorrectionNetEffectView */
+        AdminCorrectionNetEffectView: {
+            /** Cash Effect */
+            cash_effect: string;
+            /** Inventory Effect */
+            inventory_effect: string;
+            /** Net Effect */
+            net_effect: string;
+            /** Total Amount Affected */
+            total_amount_affected?: string | null;
+            /** Total Units Affected */
+            total_units_affected: string;
+        };
+        /** AdminCorrectionOriginalDocumentView */
+        AdminCorrectionOriginalDocumentView: {
+            /** Branch Name */
+            branch_name: string;
+            /** Document Type */
+            document_type: string;
+            /** Folio */
+            folio: string;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Occurred At */
+            occurred_at?: string | null;
+            /** Operator Name */
+            operator_name: string;
+            /** Route Hint */
+            route_hint?: string | null;
+            /** Status */
+            status: string;
+            /** Workstation Name */
+            workstation_name: string;
+        };
+        /** AdminCorrectionOverviewView */
+        AdminCorrectionOverviewView: {
+            /**
+             * Branch Id
+             * Format: uuid
+             */
+            branch_id: string;
+            /** Branch Name */
+            branch_name: string;
+            /** Committed At */
+            committed_at?: string | null;
+            /** Correction Type */
+            correction_type: string;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Folio */
+            folio: string;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Net Effect */
+            net_effect: string;
+            /** Net Effect Quantity */
+            net_effect_quantity: string;
+            /**
+             * Operator Id
+             * Format: uuid
+             */
+            operator_id: string;
+            /** Operator Name */
+            operator_name: string;
+            /** Original Document Folio */
+            original_document_folio: string;
+            /**
+             * Original Document Id
+             * Format: uuid
+             */
+            original_document_id: string;
+            /** Original Document Type */
+            original_document_type: string;
+            /** Status */
+            status: string;
+            /** Total Units Affected */
+            total_units_affected: string;
+            /** Workstation Code */
+            workstation_code: string;
+            /**
+             * Workstation Id
+             * Format: uuid
+             */
+            workstation_id: string;
+            /** Workstation Name */
+            workstation_name: string;
+        };
+        /** AdminCorrectionReasonNotesView */
+        AdminCorrectionReasonNotesView: {
+            audit_summary?: components["schemas"]["AuditSummaryView"] | null;
+            /** Notes */
+            notes?: string | null;
+            /** Reason Code */
+            reason_code: string;
+            /** Reason Name */
+            reason_name: string;
+        };
+        /** AdminCorrectionRelatedDocumentView */
+        AdminCorrectionRelatedDocumentView: {
+            /** Document Type */
+            document_type: string;
+            /** Folio */
+            folio: string;
+            /** Id */
+            id: string;
+            /** Occurred At */
+            occurred_at?: string | null;
+            /** Route Hint */
+            route_hint?: string | null;
+            /** Status */
+            status: string;
+        };
+        /** AdminCorrectionsBackendContractView */
+        AdminCorrectionsBackendContractView: {
+            /** Create Endpoint */
+            create_endpoint?: string | null;
+            /** Detail Endpoint */
+            detail_endpoint: string;
+            /** List Endpoint */
+            list_endpoint: string;
+            /** Print Endpoint */
+            print_endpoint?: string | null;
+        };
+        /** AdminCorrectionsListResponse */
+        AdminCorrectionsListResponse: {
+            backend_contract: components["schemas"]["AdminCorrectionsBackendContractView"];
+            filter_options: components["schemas"]["AdminCorrectionFilterOptionsView"];
+            /**
+             * Is Backend Connected
+             * @default true
+             */
+            is_backend_connected: boolean;
+            /** Items */
+            items: components["schemas"]["AdminCorrectionListItemView"][];
+            metrics: components["schemas"]["AdminCorrectionMetricsView"];
+            /** Page */
+            page: number;
+            /** Page Size */
+            page_size: number;
+            /** Total */
+            total: number;
+        };
+        /** AdminEquipmentAvailableActionsView */
+        AdminEquipmentAvailableActionsView: {
+            /** Can Cancel Maintenance */
+            can_cancel_maintenance: boolean;
+            /** Can Complete Maintenance */
+            can_complete_maintenance: boolean;
+            /** Can Create Corrective */
+            can_create_corrective: boolean;
+            /** Can Create Preventive */
+            can_create_preventive: boolean;
+            /** Can Edit Equipment */
+            can_edit_equipment: boolean;
+            /** Can Export */
+            can_export: boolean;
+            /** Can Mark Operational */
+            can_mark_operational: boolean;
+            /** Can Mark Out Of Service */
+            can_mark_out_of_service: boolean;
+            /** Can Print */
+            can_print: boolean;
+            /** Can Start Maintenance */
+            can_start_maintenance: boolean;
+            /** Note */
+            note?: string | null;
+        };
+        /** AdminEquipmentBackendContractView */
+        AdminEquipmentBackendContractView: {
+            /**
+             * Cancel Maintenance Endpoint
+             * @default POST /v1/admin/equipment-maintenance/maintenance/{maintenance_id}/cancel
+             */
+            cancel_maintenance_endpoint: string;
+            /**
+             * Complete Maintenance Endpoint
+             * @default POST /v1/admin/equipment-maintenance/maintenance/{maintenance_id}/complete
+             */
+            complete_maintenance_endpoint: string;
+            /**
+             * Create Equipment Endpoint
+             * @default POST /v1/admin/equipment-maintenance/equipment
+             */
+            create_equipment_endpoint: string;
+            /**
+             * Create Maintenance Endpoint
+             * @default POST /v1/admin/equipment-maintenance/maintenance
+             */
+            create_maintenance_endpoint: string;
+            /**
+             * Detail Endpoint
+             * @default GET /v1/admin/equipment-maintenance/equipment/{equipment_id}
+             */
+            detail_endpoint: string;
+            /**
+             * Evidence Contract
+             * @default Evidence files are not supported yet; evidence is captured as evidence_note.
+             */
+            evidence_contract: string;
+            /**
+             * Incident Contract
+             * @default Incident backend is not available yet; incident links are stored as references.
+             */
+            incident_contract: string;
+            /**
+             * List Endpoint
+             * @default GET /v1/admin/equipment-maintenance/equipment
+             */
+            list_endpoint: string;
+            /**
+             * Start Maintenance Endpoint
+             * @default POST /v1/admin/equipment-maintenance/maintenance/{maintenance_id}/start
+             */
+            start_maintenance_endpoint: string;
+            /**
+             * Status Endpoint
+             * @default POST /v1/admin/equipment-maintenance/equipment/{equipment_id}/status
+             */
+            status_endpoint: string;
+            /**
+             * Update Equipment Endpoint
+             * @default PATCH /v1/admin/equipment-maintenance/equipment/{equipment_id}
+             */
+            update_equipment_endpoint: string;
+        };
+        /** AdminEquipmentCostContextView */
+        AdminEquipmentCostContextView: {
+            /** Last Service Cost */
+            last_service_cost?: string | null;
+            /** Period Cost */
+            period_cost: string;
+            /** Total Lifetime Cost */
+            total_lifetime_cost: string;
+            /** Warranty Note */
+            warranty_note?: string | null;
+        };
+        /** AdminEquipmentCreateRequest */
+        AdminEquipmentCreateRequest: {
+            /** Area Name */
+            area_name?: string | null;
+            /**
+             * Area Type
+             * @default OTHER
+             */
+            area_type: string;
+            /**
+             * Branch Id
+             * Format: uuid
+             */
+            branch_id: string;
+            /** Brand */
+            brand?: string | null;
+            /** Code */
+            code: string;
+            /**
+             * Equipment Type
+             * @default OTHER
+             */
+            equipment_type: string;
+            /**
+             * Food Safety Critical
+             * @default false
+             */
+            food_safety_critical: boolean;
+            /**
+             * Is Critical
+             * @default false
+             */
+            is_critical: boolean;
+            /** Maintenance Frequency Days */
+            maintenance_frequency_days?: number | null;
+            /** Model */
+            model?: string | null;
+            /** Name */
+            name: string;
+            /** Notes */
+            notes?: string | null;
+            /**
+             * Operational Status
+             * @default OPERATIONAL
+             * @enum {string}
+             */
+            operational_status: "OPERATIONAL" | "OUT_OF_SERVICE" | "UNDER_MAINTENANCE" | "RETIRED" | "INACTIVE";
+            /** Provider Name */
+            provider_name?: string | null;
+            /** Purchase Date */
+            purchase_date?: string | null;
+            /**
+             * Risk Level
+             * @default MEDIUM
+             * @enum {string}
+             */
+            risk_level: "LOW" | "MEDIUM" | "HIGH" | "CRITICAL";
+            /** Serial Number */
+            serial_number?: string | null;
+            /** Warranty Expires At */
+            warranty_expires_at?: string | null;
+        };
+        /** AdminEquipmentCurrentMaintenanceStatusView */
+        AdminEquipmentCurrentMaintenanceStatusView: {
+            /** Current Linked Incident */
+            current_linked_incident?: string | null;
+            current_open_maintenance?: components["schemas"]["AdminMaintenanceRecordListItemView"] | null;
+            /** Downtime State */
+            downtime_state: string;
+            /** Last Maintenance At */
+            last_maintenance_at?: string | null;
+            /** Last Maintenance Result */
+            last_maintenance_result?: ("NOT_COMPLETED" | "COMPLETED_SUCCESSFULLY" | "COMPLETED_WITH_OBSERVATIONS" | "FAILED" | "REQUIRES_FOLLOW_UP" | "CANCELLED") | null;
+            /** Last Maintenance Type */
+            last_maintenance_type?: ("PREVENTIVE" | "CORRECTIVE" | "INSPECTION" | "CALIBRATION" | "CLEANING_TECHNICAL") | null;
+            /** Next Scheduled Maintenance At */
+            next_scheduled_maintenance_at?: string | null;
+            /** Overdue */
+            overdue: boolean;
+        };
+        /** AdminEquipmentDetailView */
+        AdminEquipmentDetailView: {
+            available_actions: components["schemas"]["AdminEquipmentAvailableActionsView"];
+            cost_context: components["schemas"]["AdminEquipmentCostContextView"];
+            current_maintenance_status: components["schemas"]["AdminEquipmentCurrentMaintenanceStatusView"];
+            evidence: components["schemas"]["AdminEquipmentEvidenceView"];
+            /** Incidents Related */
+            incidents_related: components["schemas"]["AdminEquipmentIncidentRelatedView"][];
+            location_context: components["schemas"]["AdminEquipmentLocationContextView"];
+            /** Maintenance History */
+            maintenance_history: components["schemas"]["AdminMaintenanceRecordListItemView"][];
+            metadata: components["schemas"]["AdminEquipmentMetadataView"];
+            overview: components["schemas"]["AdminEquipmentOverviewView"];
+            /** Related Documents */
+            related_documents: components["schemas"]["AdminEquipmentRelatedDocumentView"][];
+            /** Warnings */
+            warnings: components["schemas"]["AdminEquipmentWarningView"][];
+        };
+        /** AdminEquipmentEvidenceView */
+        AdminEquipmentEvidenceView: {
+            /**
+             * Empty State
+             * @default Este mantenimiento no tiene evidencia adjunta.
+             */
+            empty_state: string;
+            /** Files */
+            files?: {
+                [key: string]: string;
+            }[];
+            /**
+             * Has Evidence
+             * @default false
+             */
+            has_evidence: boolean;
+            /**
+             * Is Supported
+             * @default true
+             */
+            is_supported: boolean;
+            /** Latest Evidence Note */
+            latest_evidence_note?: string | null;
+            /**
+             * Upload Supported
+             * @default false
+             */
+            upload_supported: boolean;
+        };
+        /** AdminEquipmentFilterOptionView */
+        AdminEquipmentFilterOptionView: {
+            /** Id */
+            id: string;
+            /** Label */
+            label: string;
+        };
+        /** AdminEquipmentFilterOptionsView */
+        AdminEquipmentFilterOptionsView: {
+            /** Area Types */
+            area_types: components["schemas"]["AdminEquipmentFilterOptionView"][];
+            /** Areas */
+            areas: components["schemas"]["AdminEquipmentFilterOptionView"][];
+            /** Branches */
+            branches: components["schemas"]["AdminEquipmentFilterOptionView"][];
+            /** Equipment Types */
+            equipment_types: components["schemas"]["AdminEquipmentFilterOptionView"][];
+            /** Incident States */
+            incident_states: components["schemas"]["AdminEquipmentFilterOptionView"][];
+            /** Maintenance Statuses */
+            maintenance_statuses: components["schemas"]["AdminEquipmentFilterOptionView"][];
+            /** Maintenance Types */
+            maintenance_types: components["schemas"]["AdminEquipmentFilterOptionView"][];
+            /** Operational Statuses */
+            operational_statuses: components["schemas"]["AdminEquipmentFilterOptionView"][];
+            /** Providers */
+            providers: components["schemas"]["AdminEquipmentFilterOptionView"][];
+            /** Risk Levels */
+            risk_levels: components["schemas"]["AdminEquipmentFilterOptionView"][];
+            /** Technicians */
+            technicians: components["schemas"]["AdminEquipmentFilterOptionView"][];
+        };
+        /** AdminEquipmentIncidentRelatedView */
+        AdminEquipmentIncidentRelatedView: {
+            /** Folio */
+            folio: string;
+            /**
+             * Route Hint
+             * @default /admin/incidencias
+             */
+            route_hint: string | null;
+            /**
+             * Severity
+             * @default UNKNOWN
+             */
+            severity: string;
+            /**
+             * Status
+             * @default REFERENCE_ONLY
+             */
+            status: string;
+        };
+        /** AdminEquipmentListItemView */
+        AdminEquipmentListItemView: {
+            /** Area Id */
+            area_id?: string | null;
+            /** Area Name */
+            area_name?: string | null;
+            /**
+             * Branch Id
+             * Format: uuid
+             */
+            branch_id: string;
+            /** Branch Name */
+            branch_name: string;
+            /** Code */
+            code: string;
+            /** Equipment Type */
+            equipment_type: string;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Last Maintenance At */
+            last_maintenance_at?: string | null;
+            /** Maintenance Status */
+            maintenance_status: string;
+            /** Name */
+            name: string;
+            /** Next Maintenance At */
+            next_maintenance_at?: string | null;
+            /** Open Incident Count */
+            open_incident_count: number;
+            /**
+             * Operational Status
+             * @enum {string}
+             */
+            operational_status: "OPERATIONAL" | "OUT_OF_SERVICE" | "UNDER_MAINTENANCE" | "RETIRED" | "INACTIVE";
+            /** Period Cost */
+            period_cost: string;
+            /**
+             * Risk Level
+             * @enum {string}
+             */
+            risk_level: "LOW" | "MEDIUM" | "HIGH" | "CRITICAL";
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+            /** Warning State */
+            warning_state: string;
+            /** Warnings */
+            warnings: components["schemas"]["AdminEquipmentWarningView"][];
+        };
+        /** AdminEquipmentListResponse */
+        AdminEquipmentListResponse: {
+            backend_contract?: components["schemas"]["AdminEquipmentBackendContractView"];
+            filter_options: components["schemas"]["AdminEquipmentFilterOptionsView"];
+            /**
+             * Is Backend Connected
+             * @default true
+             */
+            is_backend_connected: boolean;
+            /** Items */
+            items: components["schemas"]["AdminEquipmentListItemView"][];
+            metrics: components["schemas"]["AdminEquipmentMetricsView"];
+            /** Page */
+            page: number;
+            /** Page Size */
+            page_size: number;
+            /** Total */
+            total: number;
+        };
+        /** AdminEquipmentLocationContextView */
+        AdminEquipmentLocationContextView: {
+            /** Area Name */
+            area_name?: string | null;
+            /** Area Type */
+            area_type: string;
+            /** Branch Code */
+            branch_code: string;
+            /**
+             * Branch Id
+             * Format: uuid
+             */
+            branch_id: string;
+            /** Branch Name */
+            branch_name: string;
+            /** Food Safety Critical */
+            food_safety_critical: boolean;
+            /** Is Critical */
+            is_critical: boolean;
+        };
+        /** AdminEquipmentMetadataView */
+        AdminEquipmentMetadataView: {
+            /** Brand */
+            brand?: string | null;
+            /** Maintenance Frequency Days */
+            maintenance_frequency_days?: number | null;
+            /** Model */
+            model?: string | null;
+            /** Notes */
+            notes?: string | null;
+            /** Provider Name */
+            provider_name?: string | null;
+            /** Purchase Date */
+            purchase_date?: string | null;
+            /** Serial Number */
+            serial_number?: string | null;
+            /** Warranty Expires At */
+            warranty_expires_at?: string | null;
+        };
+        /** AdminEquipmentMetricsView */
+        AdminEquipmentMetricsView: {
+            /** Corrective Open Count */
+            corrective_open_count: number;
+            /** High Risk Count */
+            high_risk_count: number;
+            /** Operational Count */
+            operational_count: number;
+            /** Out Of Service Count */
+            out_of_service_count: number;
+            /** Overdue Count */
+            overdue_count: number;
+            /** Pending Maintenance Count */
+            pending_maintenance_count: number;
+            /** Period Cost */
+            period_cost: string;
+            /** Total Equipment Count */
+            total_equipment_count: number;
+        };
+        /** AdminEquipmentOverviewView */
+        AdminEquipmentOverviewView: {
+            /**
+             * Branch Id
+             * Format: uuid
+             */
+            branch_id: string;
+            /** Branch Name */
+            branch_name: string;
+            /** Code */
+            code: string;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Equipment Type */
+            equipment_type: string;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Name */
+            name: string;
+            /**
+             * Operational Status
+             * @enum {string}
+             */
+            operational_status: "OPERATIONAL" | "OUT_OF_SERVICE" | "UNDER_MAINTENANCE" | "RETIRED" | "INACTIVE";
+            /**
+             * Risk Level
+             * @enum {string}
+             */
+            risk_level: "LOW" | "MEDIUM" | "HIGH" | "CRITICAL";
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+            /** Warning State */
+            warning_state: string;
+        };
+        /** AdminEquipmentRelatedDocumentView */
+        AdminEquipmentRelatedDocumentView: {
+            /**
+             * Document Id
+             * Format: uuid
+             */
+            document_id: string;
+            /** Document Type */
+            document_type: string;
+            /** Folio */
+            folio: string;
+            /** Route Hint */
+            route_hint?: string | null;
+            /** Status */
+            status: string;
+        };
+        /** AdminEquipmentStatusRequest */
+        AdminEquipmentStatusRequest: {
+            /**
+             * Operational Status
+             * @enum {string}
+             */
+            operational_status: "OPERATIONAL" | "OUT_OF_SERVICE" | "UNDER_MAINTENANCE" | "RETIRED" | "INACTIVE";
+            /** Reason */
+            reason?: string | null;
+        };
+        /** AdminEquipmentUpdateRequest */
+        AdminEquipmentUpdateRequest: {
+            /** Area Name */
+            area_name?: string | null;
+            /**
+             * Area Type
+             * @default OTHER
+             */
+            area_type: string;
+            /**
+             * Branch Id
+             * Format: uuid
+             */
+            branch_id: string;
+            /** Brand */
+            brand?: string | null;
+            /** Code */
+            code: string;
+            /**
+             * Equipment Type
+             * @default OTHER
+             */
+            equipment_type: string;
+            /**
+             * Food Safety Critical
+             * @default false
+             */
+            food_safety_critical: boolean;
+            /**
+             * Is Critical
+             * @default false
+             */
+            is_critical: boolean;
+            /** Maintenance Frequency Days */
+            maintenance_frequency_days?: number | null;
+            /** Model */
+            model?: string | null;
+            /** Name */
+            name: string;
+            /** Notes */
+            notes?: string | null;
+            /**
+             * Operational Status
+             * @default OPERATIONAL
+             * @enum {string}
+             */
+            operational_status: "OPERATIONAL" | "OUT_OF_SERVICE" | "UNDER_MAINTENANCE" | "RETIRED" | "INACTIVE";
+            /** Provider Name */
+            provider_name?: string | null;
+            /** Purchase Date */
+            purchase_date?: string | null;
+            /**
+             * Risk Level
+             * @default MEDIUM
+             * @enum {string}
+             */
+            risk_level: "LOW" | "MEDIUM" | "HIGH" | "CRITICAL";
+            /** Serial Number */
+            serial_number?: string | null;
+            /** Warranty Expires At */
+            warranty_expires_at?: string | null;
+        };
+        /** AdminEquipmentWarningView */
+        AdminEquipmentWarningView: {
+            /** Code */
+            code: string;
+            /** Message */
+            message: string;
+            /**
+             * Severity
+             * @default warning
+             * @enum {string}
+             */
+            severity: "info" | "warning" | "critical";
+        };
+        /** AdminIncidentAvailableActionsView */
+        AdminIncidentAvailableActionsView: {
+            /** Can Add Evidence */
+            can_add_evidence: boolean;
+            /** Can Add Follow Up */
+            can_add_follow_up: boolean;
+            /** Can Assign */
+            can_assign: boolean;
+            /** Can Cancel */
+            can_cancel: boolean;
+            /** Can Create Corrective Action */
+            can_create_corrective_action: boolean;
+            /** Can Create Maintenance */
+            can_create_maintenance: boolean;
+            /** Can Export */
+            can_export: boolean;
+            /** Can Mark In Progress */
+            can_mark_in_progress: boolean;
+            /** Can Print */
+            can_print: boolean;
+            /** Can Reopen */
+            can_reopen: boolean;
+            /** Can Resolve */
+            can_resolve: boolean;
+            /** Note */
+            note?: string | null;
+        };
+        /** AdminIncidentBackendContractView */
+        AdminIncidentBackendContractView: {
+            /**
+             * Add Follow Up Endpoint
+             * @default POST /v1/admin/incidents/{incident_id}/follow-ups
+             */
+            add_follow_up_endpoint: string;
+            /**
+             * Change Status Endpoint
+             * @default POST /v1/admin/incidents/{incident_id}/status
+             */
+            change_status_endpoint: string;
+            /**
+             * Create Endpoint
+             * @default POST /v1/admin/incidents
+             */
+            create_endpoint: string;
+            /**
+             * Detail Endpoint
+             * @default GET /v1/admin/incidents/{incident_id}
+             */
+            detail_endpoint: string;
+            /**
+             * Evidence Contract
+             * @default Evidence files are not supported yet; evidence is captured as evidence_note.
+             */
+            evidence_contract: string;
+            /**
+             * List Endpoint
+             * @default GET /v1/admin/incidents
+             */
+            list_endpoint: string;
+            /**
+             * Reopen Endpoint
+             * @default POST /v1/admin/incidents/{incident_id}/reopen
+             */
+            reopen_endpoint: string;
+            /**
+             * Resolve Endpoint
+             * @default POST /v1/admin/incidents/{incident_id}/resolve
+             */
+            resolve_endpoint: string;
+            /**
+             * Update Endpoint
+             * @default PATCH /v1/admin/incidents/{incident_id}
+             */
+            update_endpoint: string;
+        };
+        /** AdminIncidentCorrectiveActionView */
+        AdminIncidentCorrectiveActionView: {
+            /** Corrective Action */
+            corrective_action?: string | null;
+            /** Current Progress */
+            current_progress: string;
+            /** Due At */
+            due_at?: string | null;
+            /** Resolution Note */
+            resolution_note?: string | null;
+            /** Resolution Result */
+            resolution_result?: string | null;
+            /** Resolved At */
+            resolved_at?: string | null;
+            /** Responsible User Id */
+            responsible_user_id?: string | null;
+            /** Responsible User Name */
+            responsible_user_name?: string | null;
+        };
+        /** AdminIncidentCreateRequest */
+        AdminIncidentCreateRequest: {
+            /** Area Name */
+            area_name?: string | null;
+            /**
+             * Branch Id
+             * Format: uuid
+             */
+            branch_id: string;
+            /** Corrective Action */
+            corrective_action?: string | null;
+            /** Description */
+            description: string;
+            /** Due At */
+            due_at?: string | null;
+            /** Equipment Name */
+            equipment_name?: string | null;
+            /** Evidence Note */
+            evidence_note?: string | null;
+            /**
+             * Food Safety Impact
+             * @default false
+             */
+            food_safety_impact: boolean;
+            /**
+             * Incident Type
+             * @enum {string}
+             */
+            incident_type: "SANITATION_ISSUE" | "CLEANING_NON_COMPLIANCE" | "EQUIPMENT_FAILURE" | "PRODUCTION_ISSUE" | "INVENTORY_ISSUE" | "TRANSFER_ISSUE" | "WASTE_ISSUE" | "SAFETY_ISSUE" | "CUSTOMER_COMPLAINT" | "PROCESS_DEVIATION" | "OTHER";
+            /** Notes */
+            notes?: string | null;
+            /** Operational Impact */
+            operational_impact?: string | null;
+            /** Process Name */
+            process_name?: string | null;
+            /** Product Reference */
+            product_reference?: string | null;
+            /** Production Reference */
+            production_reference?: string | null;
+            /** Responsible User Id */
+            responsible_user_id?: string | null;
+            /**
+             * Severity
+             * @enum {string}
+             */
+            severity: "LOW" | "MEDIUM" | "HIGH" | "CRITICAL";
+            /** Source Document Id */
+            source_document_id?: string | null;
+            /** Source Reference */
+            source_reference?: string | null;
+            /** Source Summary */
+            source_summary?: string | null;
+            /**
+             * Source Type
+             * @default MANUAL
+             * @enum {string}
+             */
+            source_type: "MANUAL" | "CLEANING_LOG" | "SANITARY_VERIFICATION" | "EQUIPMENT" | "PRODUCTION" | "INVENTORY" | "TRANSFER" | "WASTE_MERMA" | "CUSTOMER_REPORT" | "CORRECTION";
+            /** Title */
+            title: string;
+        };
+        /** AdminIncidentDescriptionClassificationView */
+        AdminIncidentDescriptionClassificationView: {
+            /** Description */
+            description: string;
+            /** Food Safety Impact */
+            food_safety_impact: boolean;
+            /**
+             * Incident Type
+             * @enum {string}
+             */
+            incident_type: "SANITATION_ISSUE" | "CLEANING_NON_COMPLIANCE" | "EQUIPMENT_FAILURE" | "PRODUCTION_ISSUE" | "INVENTORY_ISSUE" | "TRANSFER_ISSUE" | "WASTE_ISSUE" | "SAFETY_ISSUE" | "CUSTOMER_COMPLAINT" | "PROCESS_DEVIATION" | "OTHER";
+            /** Notes */
+            notes?: string | null;
+            /** Operational Impact */
+            operational_impact?: string | null;
+            /**
+             * Risk Level
+             * @enum {string}
+             */
+            risk_level: "LOW" | "MEDIUM" | "HIGH" | "CRITICAL";
+            /**
+             * Severity
+             * @enum {string}
+             */
+            severity: "LOW" | "MEDIUM" | "HIGH" | "CRITICAL";
+        };
+        /** AdminIncidentDetailView */
+        AdminIncidentDetailView: {
+            available_actions: components["schemas"]["AdminIncidentAvailableActionsView"];
+            corrective_action: components["schemas"]["AdminIncidentCorrectiveActionView"];
+            description_classification: components["schemas"]["AdminIncidentDescriptionClassificationView"];
+            evidence: components["schemas"]["AdminIncidentEvidenceView"];
+            /** Follow Ups */
+            follow_ups: components["schemas"]["AdminIncidentFollowUpView"][];
+            location_scope: components["schemas"]["AdminIncidentLocationScopeView"];
+            overview: components["schemas"]["AdminIncidentOverviewView"];
+            /** Related Documents */
+            related_documents: components["schemas"]["AdminIncidentRelatedDocumentView"][];
+            source_document: components["schemas"]["AdminIncidentSourceDocumentView"];
+            /** Timeline */
+            timeline: components["schemas"]["AdminIncidentTimelineItemView"][];
+            /** Warnings */
+            warnings: components["schemas"]["AdminIncidentWarningView"][];
+        };
+        /** AdminIncidentEvidenceView */
+        AdminIncidentEvidenceView: {
+            /**
+             * Empty State
+             * @default Esta incidencia no tiene evidencia adjunta.
+             */
+            empty_state: string;
+            /** Evidence Note */
+            evidence_note?: string | null;
+            /** Files */
+            files?: {
+                [key: string]: string;
+            }[];
+            /**
+             * Has Evidence
+             * @default false
+             */
+            has_evidence: boolean;
+            /**
+             * Is Supported
+             * @default true
+             */
+            is_supported: boolean;
+            /**
+             * Upload Supported
+             * @default false
+             */
+            upload_supported: boolean;
+        };
+        /** AdminIncidentFilterOptionView */
+        AdminIncidentFilterOptionView: {
+            /** Id */
+            id: string;
+            /** Label */
+            label: string;
+        };
+        /** AdminIncidentFilterOptionsView */
+        AdminIncidentFilterOptionsView: {
+            /** Areas */
+            areas: components["schemas"]["AdminIncidentFilterOptionView"][];
+            /** Branches */
+            branches: components["schemas"]["AdminIncidentFilterOptionView"][];
+            /** Due States */
+            due_states: components["schemas"]["AdminIncidentFilterOptionView"][];
+            /** Evidence States */
+            evidence_states: components["schemas"]["AdminIncidentFilterOptionView"][];
+            /** Incident Types */
+            incident_types: components["schemas"]["AdminIncidentFilterOptionView"][];
+            /** Related Document States */
+            related_document_states: components["schemas"]["AdminIncidentFilterOptionView"][];
+            /** Reported By Users */
+            reported_by_users: components["schemas"]["AdminIncidentFilterOptionView"][];
+            /** Responsible Users */
+            responsible_users: components["schemas"]["AdminIncidentFilterOptionView"][];
+            /** Severities */
+            severities: components["schemas"]["AdminIncidentFilterOptionView"][];
+            /** Source Types */
+            source_types: components["schemas"]["AdminIncidentFilterOptionView"][];
+            /** Statuses */
+            statuses: components["schemas"]["AdminIncidentFilterOptionView"][];
+        };
+        /** AdminIncidentFollowUpCreateRequest */
+        AdminIncidentFollowUpCreateRequest: {
+            /** Note */
+            note: string;
+            /** Status Change */
+            status_change?: ("OPEN" | "IN_REVIEW" | "IN_PROGRESS" | "WAITING_ACTION" | "RESOLVED" | "CLOSED" | "CANCELLED") | null;
+        };
+        /** AdminIncidentFollowUpView */
+        AdminIncidentFollowUpView: {
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /**
+             * Created By User Id
+             * Format: uuid
+             */
+            created_by_user_id: string;
+            /** Created By User Name */
+            created_by_user_name: string;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Note */
+            note: string;
+            /** Status Change */
+            status_change?: string | null;
+        };
+        /** AdminIncidentListItemView */
+        AdminIncidentListItemView: {
+            /** Area Name */
+            area_name?: string | null;
+            /**
+             * Branch Id
+             * Format: uuid
+             */
+            branch_id: string;
+            /** Branch Name */
+            branch_name: string;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Due At */
+            due_at?: string | null;
+            /** Folio */
+            folio: string;
+            /** Has Evidence */
+            has_evidence: boolean;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /**
+             * Incident Type
+             * @enum {string}
+             */
+            incident_type: "SANITATION_ISSUE" | "CLEANING_NON_COMPLIANCE" | "EQUIPMENT_FAILURE" | "PRODUCTION_ISSUE" | "INVENTORY_ISSUE" | "TRANSFER_ISSUE" | "WASTE_ISSUE" | "SAFETY_ISSUE" | "CUSTOMER_COMPLAINT" | "PROCESS_DEVIATION" | "OTHER";
+            /** Related Document Count */
+            related_document_count: number;
+            /**
+             * Reported By User Id
+             * Format: uuid
+             */
+            reported_by_user_id: string;
+            /** Reported By User Name */
+            reported_by_user_name: string;
+            /** Responsible User Id */
+            responsible_user_id?: string | null;
+            /** Responsible User Name */
+            responsible_user_name?: string | null;
+            /**
+             * Severity
+             * @enum {string}
+             */
+            severity: "LOW" | "MEDIUM" | "HIGH" | "CRITICAL";
+            /** Source Reference */
+            source_reference?: string | null;
+            /**
+             * Source Type
+             * @enum {string}
+             */
+            source_type: "MANUAL" | "CLEANING_LOG" | "SANITARY_VERIFICATION" | "EQUIPMENT" | "PRODUCTION" | "INVENTORY" | "TRANSFER" | "WASTE_MERMA" | "CUSTOMER_REPORT" | "CORRECTION";
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "OPEN" | "IN_REVIEW" | "IN_PROGRESS" | "WAITING_ACTION" | "RESOLVED" | "CLOSED" | "CANCELLED";
+            /** Title */
+            title: string;
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+            /** Warning State */
+            warning_state: string;
+            /** Warnings */
+            warnings: components["schemas"]["AdminIncidentWarningView"][];
+        };
+        /** AdminIncidentListResponse */
+        AdminIncidentListResponse: {
+            backend_contract?: components["schemas"]["AdminIncidentBackendContractView"];
+            filter_options: components["schemas"]["AdminIncidentFilterOptionsView"];
+            /**
+             * Is Backend Connected
+             * @default true
+             */
+            is_backend_connected: boolean;
+            /** Items */
+            items: components["schemas"]["AdminIncidentListItemView"][];
+            metrics: components["schemas"]["AdminIncidentMetricsView"];
+            /** Page */
+            page: number;
+            /** Page Size */
+            page_size: number;
+            /** Total */
+            total: number;
+        };
+        /** AdminIncidentLocationScopeView */
+        AdminIncidentLocationScopeView: {
+            /** Area Name */
+            area_name?: string | null;
+            /** Branch Code */
+            branch_code: string;
+            /**
+             * Branch Id
+             * Format: uuid
+             */
+            branch_id: string;
+            /** Branch Name */
+            branch_name: string;
+            /** Equipment Name */
+            equipment_name?: string | null;
+            /** Process Name */
+            process_name?: string | null;
+            /** Product Reference */
+            product_reference?: string | null;
+            /** Production Reference */
+            production_reference?: string | null;
+        };
+        /** AdminIncidentMetricsView */
+        AdminIncidentMetricsView: {
+            /** High Risk Count */
+            high_risk_count: number;
+            /** In Progress Count */
+            in_progress_count: number;
+            /** Open Count */
+            open_count: number;
+            /** Overdue Count */
+            overdue_count: number;
+            /** Resolved Count */
+            resolved_count: number;
+            /** Sanitary Generated Count */
+            sanitary_generated_count: number;
+            /** Total Count */
+            total_count: number;
+            /** With Evidence Count */
+            with_evidence_count: number;
+        };
+        /** AdminIncidentOverviewView */
+        AdminIncidentOverviewView: {
+            /** Area Name */
+            area_name?: string | null;
+            /**
+             * Branch Id
+             * Format: uuid
+             */
+            branch_id: string;
+            /** Branch Name */
+            branch_name: string;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Due At */
+            due_at?: string | null;
+            /** Folio */
+            folio: string;
+            /** Has Evidence */
+            has_evidence: boolean;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /**
+             * Incident Type
+             * @enum {string}
+             */
+            incident_type: "SANITATION_ISSUE" | "CLEANING_NON_COMPLIANCE" | "EQUIPMENT_FAILURE" | "PRODUCTION_ISSUE" | "INVENTORY_ISSUE" | "TRANSFER_ISSUE" | "WASTE_ISSUE" | "SAFETY_ISSUE" | "CUSTOMER_COMPLAINT" | "PROCESS_DEVIATION" | "OTHER";
+            /** Related Document Count */
+            related_document_count: number;
+            /**
+             * Reported By User Id
+             * Format: uuid
+             */
+            reported_by_user_id: string;
+            /** Reported By User Name */
+            reported_by_user_name: string;
+            /** Resolved At */
+            resolved_at?: string | null;
+            /** Responsible User Id */
+            responsible_user_id?: string | null;
+            /** Responsible User Name */
+            responsible_user_name?: string | null;
+            /**
+             * Severity
+             * @enum {string}
+             */
+            severity: "LOW" | "MEDIUM" | "HIGH" | "CRITICAL";
+            /** Source Reference */
+            source_reference?: string | null;
+            /**
+             * Source Type
+             * @enum {string}
+             */
+            source_type: "MANUAL" | "CLEANING_LOG" | "SANITARY_VERIFICATION" | "EQUIPMENT" | "PRODUCTION" | "INVENTORY" | "TRANSFER" | "WASTE_MERMA" | "CUSTOMER_REPORT" | "CORRECTION";
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "OPEN" | "IN_REVIEW" | "IN_PROGRESS" | "WAITING_ACTION" | "RESOLVED" | "CLOSED" | "CANCELLED";
+            /** Title */
+            title: string;
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+            /** Warning State */
+            warning_state: string;
+            /** Warnings */
+            warnings: components["schemas"]["AdminIncidentWarningView"][];
+        };
+        /** AdminIncidentRelatedDocumentView */
+        AdminIncidentRelatedDocumentView: {
+            /** Document Id */
+            document_id: string;
+            /** Document Type */
+            document_type: string;
+            /** Folio */
+            folio: string;
+            /** Route Hint */
+            route_hint?: string | null;
+            /** Status */
+            status: string;
+        };
+        /** AdminIncidentResolveRequest */
+        AdminIncidentResolveRequest: {
+            /** Evidence Note */
+            evidence_note?: string | null;
+            /** Resolution Note */
+            resolution_note: string;
+            /** Resolved At */
+            resolved_at?: string | null;
+            /** Result */
+            result: string;
+        };
+        /** AdminIncidentSourceDocumentView */
+        AdminIncidentSourceDocumentView: {
+            /**
+             * Empty State
+             * @default Esta incidencia fue registrada manualmente y no tiene documento origen.
+             */
+            empty_state: string;
+            /** Route Hint */
+            route_hint?: string | null;
+            /** Source Document Id */
+            source_document_id?: string | null;
+            /** Source Reference */
+            source_reference?: string | null;
+            /** Source Summary */
+            source_summary?: string | null;
+            /**
+             * Source Type
+             * @enum {string}
+             */
+            source_type: "MANUAL" | "CLEANING_LOG" | "SANITARY_VERIFICATION" | "EQUIPMENT" | "PRODUCTION" | "INVENTORY" | "TRANSFER" | "WASTE_MERMA" | "CUSTOMER_REPORT" | "CORRECTION";
+        };
+        /** AdminIncidentStatusRequest */
+        AdminIncidentStatusRequest: {
+            /** Cancellation Reason */
+            cancellation_reason?: string | null;
+            /** Note */
+            note?: string | null;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "OPEN" | "IN_REVIEW" | "IN_PROGRESS" | "WAITING_ACTION" | "RESOLVED" | "CLOSED" | "CANCELLED";
+        };
+        /** AdminIncidentTimelineItemView */
+        AdminIncidentTimelineItemView: {
+            /** Label */
+            label: string;
+            /** Note */
+            note?: string | null;
+            /**
+             * Occurred At
+             * Format: date-time
+             */
+            occurred_at: string;
+            /** User Name */
+            user_name?: string | null;
+        };
+        /** AdminIncidentUpdateRequest */
+        AdminIncidentUpdateRequest: {
+            /** Area Name */
+            area_name?: string | null;
+            /** Corrective Action */
+            corrective_action?: string | null;
+            /** Description */
+            description?: string | null;
+            /** Due At */
+            due_at?: string | null;
+            /** Equipment Name */
+            equipment_name?: string | null;
+            /** Evidence Note */
+            evidence_note?: string | null;
+            /** Food Safety Impact */
+            food_safety_impact?: boolean | null;
+            /** Operational Impact */
+            operational_impact?: string | null;
+            /** Process Name */
+            process_name?: string | null;
+            /** Product Reference */
+            product_reference?: string | null;
+            /** Production Reference */
+            production_reference?: string | null;
+            /** Responsible User Id */
+            responsible_user_id?: string | null;
+            /** Severity */
+            severity?: ("LOW" | "MEDIUM" | "HIGH" | "CRITICAL") | null;
+            /** Status */
+            status?: ("OPEN" | "IN_REVIEW" | "IN_PROGRESS" | "WAITING_ACTION" | "RESOLVED" | "CLOSED" | "CANCELLED") | null;
+            /** Title */
+            title?: string | null;
+        };
+        /** AdminIncidentWarningView */
+        AdminIncidentWarningView: {
+            /** Code */
+            code: string;
+            /** Message */
+            message: string;
+            /**
+             * Severity
+             * @default warning
+             * @enum {string}
+             */
+            severity: "info" | "warning" | "critical";
+        };
+        /** AdminInputSupplyAvailableActionsView */
+        AdminInputSupplyAvailableActionsView: {
+            /**
+             * Can Add Supplier
+             * @default true
+             */
+            can_add_supplier: boolean;
+            /**
+             * Can Deactivate
+             * @default true
+             */
+            can_deactivate: boolean;
+            /**
+             * Can Edit
+             * @default true
+             */
+            can_edit: boolean;
+            /**
+             * Can Open Inventory
+             * @default true
+             */
+            can_open_inventory: boolean;
+            /**
+             * Can Open Product
+             * @default true
+             */
+            can_open_product: boolean;
+            /**
+             * Can Open Recipes
+             * @default true
+             */
+            can_open_recipes: boolean;
+        };
+        /** AdminInputSupplyBackendContractView */
+        AdminInputSupplyBackendContractView: {
+            /**
+             * Add Supplier Relation Endpoint
+             * @default POST /v1/admin/inputs-supplies/{product_id}/suppliers
+             */
+            add_supplier_relation_endpoint: string;
+            /**
+             * Create Endpoint
+             * @default POST /v1/admin/inputs-supplies
+             */
+            create_endpoint: string;
+            /**
+             * Detail Endpoint
+             * @default GET /v1/admin/inputs-supplies/{product_id}
+             */
+            detail_endpoint: string;
+            /**
+             * List Endpoint
+             * @default GET /v1/admin/inputs-supplies
+             */
+            list_endpoint: string;
+            /**
+             * Status Endpoint
+             * @default POST /v1/admin/inputs-supplies/{product_id}/status
+             */
+            status_endpoint: string;
+            /**
+             * Update Endpoint
+             * @default PATCH /v1/admin/inputs-supplies/{product_id}
+             */
+            update_endpoint: string;
+            /**
+             * Update Supplier Relation Endpoint
+             * @default PATCH /v1/admin/inputs-supplies/{product_id}/suppliers/{relation_id}
+             */
+            update_supplier_relation_endpoint: string;
+        };
+        /** AdminInputSupplyClassificationView */
+        AdminInputSupplyClassificationView: {
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "RAW_MATERIAL" | "CONSUMABLE" | "DISPOSABLE";
+            /** Notes */
+            notes?: string | null;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "active" | "inactive";
+            /** Storage Group */
+            storage_group?: string | null;
+            /** Usage Type */
+            usage_type?: string | null;
+        };
+        /** AdminInputSupplyCostView */
+        AdminInputSupplyCostView: {
+            /** Cost Updated At */
+            cost_updated_at?: string | null;
+            /** Currency */
+            currency: string;
+            /** Last Purchase Cost */
+            last_purchase_cost?: string | null;
+            /** Standard Cost */
+            standard_cost?: string | null;
+            /** Supplier Price Max */
+            supplier_price_max?: string | null;
+            /** Supplier Price Min */
+            supplier_price_min?: string | null;
+            /** Warnings */
+            warnings: components["schemas"]["AdminInputSupplyWarningView"][];
+        };
+        /** AdminInputSupplyCreateRequest */
+        AdminInputSupplyCreateRequest: {
+            /** Code */
+            code: string;
+            /**
+             * Is Active
+             * @default true
+             */
+            is_active: boolean;
+            /**
+             * Is Inventory Tracked
+             * @default true
+             */
+            is_inventory_tracked: boolean;
+            /**
+             * Is Purchasable
+             * @default true
+             */
+            is_purchasable: boolean;
+            /** Minimum Stock */
+            minimum_stock?: number | string | null;
+            /** Name */
+            name: string;
+            /** Preferred Order Quantity */
+            preferred_order_quantity?: number | string | null;
+            /** Procurement Notes */
+            procurement_notes?: string | null;
+            /**
+             * Product Class Id
+             * Format: uuid
+             */
+            product_class_id: string;
+            /**
+             * Product Kind
+             * @enum {string}
+             */
+            product_kind: "RAW_MATERIAL" | "CONSUMABLE" | "DISPOSABLE";
+            /** Purchase Conversion Factor */
+            purchase_conversion_factor?: number | string | null;
+            /** Purchase Uom */
+            purchase_uom?: string | null;
+            /** Reorder Point */
+            reorder_point?: number | string | null;
+            /** Standard Cost */
+            standard_cost?: number | string | null;
+            /** Supplier Relations */
+            supplier_relations?: components["schemas"]["AdminInputSupplySupplierRelationRequest"][];
+            /** Unit Of Measure */
+            unit_of_measure: string;
+            /** Usage Type */
+            usage_type?: string | null;
+        };
+        /** AdminInputSupplyDetailView */
+        AdminInputSupplyDetailView: {
+            available_actions?: components["schemas"]["AdminInputSupplyAvailableActionsView"];
+            classification: components["schemas"]["AdminInputSupplyClassificationView"];
+            cost: components["schemas"]["AdminInputSupplyCostView"];
+            inventory_status: components["schemas"]["AdminInputSupplyInventoryStatusView"];
+            overview: components["schemas"]["AdminInputSupplyOverviewView"];
+            /** Procurement Warnings */
+            procurement_warnings: components["schemas"]["AdminInputSupplyWarningView"][];
+            /** Recipe Usage */
+            recipe_usage: components["schemas"]["AdminInputSupplyRecipeUsageView"][];
+            /** Related Documents */
+            related_documents: components["schemas"]["AdminInputSupplyRelatedDocumentView"][];
+            /** Suppliers */
+            suppliers: components["schemas"]["AdminInputSupplySupplierRelationView"][];
+            units_conversion: components["schemas"]["AdminInputSupplyUnitsConversionView"];
+        };
+        /** AdminInputSupplyFilterOptionView */
+        AdminInputSupplyFilterOptionView: {
+            /** Id */
+            id: string;
+            /** Label */
+            label: string;
+        };
+        /** AdminInputSupplyFilterOptionsView */
+        AdminInputSupplyFilterOptionsView: {
+            /** Classes */
+            classes: components["schemas"]["AdminInputSupplyFilterOptionView"][];
+            /** Cost States */
+            cost_states: components["schemas"]["AdminInputSupplyFilterOptionView"][];
+            /** Product Kinds */
+            product_kinds: components["schemas"]["AdminInputSupplyFilterOptionView"][];
+            /** Recipe Usage States */
+            recipe_usage_states: components["schemas"]["AdminInputSupplyFilterOptionView"][];
+            /** Statuses */
+            statuses: components["schemas"]["AdminInputSupplyFilterOptionView"][];
+            /** Stock States */
+            stock_states: components["schemas"]["AdminInputSupplyFilterOptionView"][];
+            /** Suppliers */
+            suppliers: components["schemas"]["AdminInputSupplyFilterOptionView"][];
+            /** Usage Types */
+            usage_types: components["schemas"]["AdminInputSupplyFilterOptionView"][];
+            /** Warning States */
+            warning_states: components["schemas"]["AdminInputSupplyFilterOptionView"][];
+        };
+        /** AdminInputSupplyInventoryBranchView */
+        AdminInputSupplyInventoryBranchView: {
+            /**
+             * Branch Id
+             * Format: uuid
+             */
+            branch_id: string;
+            /** Branch Name */
+            branch_name: string;
+            /** Last Movement At */
+            last_movement_at?: string | null;
+            /** Quantity On Hand */
+            quantity_on_hand: string;
+            /**
+             * Stock State
+             * @enum {string}
+             */
+            stock_state: "in_stock" | "low_stock" | "negative_stock" | "out_of_stock" | "no_inventory";
+        };
+        /** AdminInputSupplyInventoryStatusView */
+        AdminInputSupplyInventoryStatusView: {
+            /** Integration Available */
+            integration_available: boolean;
+            /** Last Movement At */
+            last_movement_at?: string | null;
+            /** Minimum Stock */
+            minimum_stock?: string | null;
+            /** Preferred Order Quantity */
+            preferred_order_quantity?: string | null;
+            /** Reorder Point */
+            reorder_point?: string | null;
+            /** Stock By Branch */
+            stock_by_branch: components["schemas"]["AdminInputSupplyInventoryBranchView"][];
+            /**
+             * Stock State
+             * @enum {string}
+             */
+            stock_state: "in_stock" | "low_stock" | "negative_stock" | "out_of_stock" | "no_inventory";
+            /** Total Stock */
+            total_stock?: string | null;
+            /** Unit Of Measure */
+            unit_of_measure: string;
+        };
+        /** AdminInputSupplyListItemView */
+        AdminInputSupplyListItemView: {
+            /** Base Uom */
+            base_uom: string;
+            /**
+             * Category Id
+             * Format: uuid
+             */
+            category_id: string;
+            /** Category Name */
+            category_name: string;
+            /** Code */
+            code: string;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Is Active */
+            is_active: boolean;
+            /** Is Inventory Tracked */
+            is_inventory_tracked: boolean;
+            /** Is Purchasable */
+            is_purchasable: boolean;
+            /** Last Movement At */
+            last_movement_at?: string | null;
+            /** Last Purchase Cost */
+            last_purchase_cost?: string | null;
+            /** Name */
+            name: string;
+            /** Primary Supplier Name */
+            primary_supplier_name?: string | null;
+            /**
+             * Product Kind
+             * @enum {string}
+             */
+            product_kind: "RAW_MATERIAL" | "CONSUMABLE" | "DISPOSABLE";
+            /** Purchase Uom */
+            purchase_uom?: string | null;
+            /** Recipe Usage Count */
+            recipe_usage_count: number;
+            /** Standard Cost */
+            standard_cost?: string | null;
+            /**
+             * Stock State
+             * @enum {string}
+             */
+            stock_state: "in_stock" | "low_stock" | "negative_stock" | "out_of_stock" | "no_inventory";
+            /** Supplier Count */
+            supplier_count: number;
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+            /**
+             * Warning State
+             * @enum {string}
+             */
+            warning_state: "ok" | "info" | "warning" | "critical";
+            /** Warnings */
+            warnings: components["schemas"]["AdminInputSupplyWarningView"][];
+        };
+        /** AdminInputSupplyListResponse */
+        AdminInputSupplyListResponse: {
+            backend_contract?: components["schemas"]["AdminInputSupplyBackendContractView"];
+            filter_options: components["schemas"]["AdminInputSupplyFilterOptionsView"];
+            /**
+             * Is Backend Connected
+             * @default true
+             */
+            is_backend_connected: boolean;
+            /** Items */
+            items: components["schemas"]["AdminInputSupplyListItemView"][];
+            metrics: components["schemas"]["AdminInputSupplyMetricsView"];
+            /** Page */
+            page: number;
+            /** Page Size */
+            page_size: number;
+            /** Total */
+            total: number;
+        };
+        /** AdminInputSupplyMetricsView */
+        AdminInputSupplyMetricsView: {
+            /** Active Consumables */
+            active_consumables: number;
+            /** Active Disposables */
+            active_disposables: number;
+            /** Active Raw Materials */
+            active_raw_materials: number;
+            /** Low Stock */
+            low_stock: number;
+            /** Missing Cost */
+            missing_cost: number;
+            /** Used In Recipes */
+            used_in_recipes: number;
+            /** Without Supplier */
+            without_supplier: number;
+        };
+        /** AdminInputSupplyOverviewView */
+        AdminInputSupplyOverviewView: {
+            /** Base Uom */
+            base_uom: string;
+            /**
+             * Category Id
+             * Format: uuid
+             */
+            category_id: string;
+            /** Category Name */
+            category_name: string;
+            /** Code */
+            code: string;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Is Active */
+            is_active: boolean;
+            /** Is Inventory Tracked */
+            is_inventory_tracked: boolean;
+            /** Is Purchasable */
+            is_purchasable: boolean;
+            /** Last Purchase Cost */
+            last_purchase_cost?: string | null;
+            /** Name */
+            name: string;
+            /**
+             * Product Kind
+             * @enum {string}
+             */
+            product_kind: "RAW_MATERIAL" | "CONSUMABLE" | "DISPOSABLE";
+            /** Purchase Uom */
+            purchase_uom?: string | null;
+            /**
+             * Readiness State
+             * @enum {string}
+             */
+            readiness_state: "ok" | "info" | "warning" | "critical";
+            /** Standard Cost */
+            standard_cost?: string | null;
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+            /**
+             * Warning State
+             * @enum {string}
+             */
+            warning_state: "ok" | "info" | "warning" | "critical";
+        };
+        /** AdminInputSupplyRecipeUsageView */
+        AdminInputSupplyRecipeUsageView: {
+            /** Finished Product Code */
+            finished_product_code: string;
+            /**
+             * Finished Product Id
+             * Format: uuid
+             */
+            finished_product_id: string;
+            /** Finished Product Name */
+            finished_product_name: string;
+            /** Quantity */
+            quantity: string;
+            /**
+             * Recipe Id
+             * Format: uuid
+             */
+            recipe_id: string;
+            /** Recipe Version Name */
+            recipe_version_name?: string | null;
+            /** Unit Of Measure */
+            unit_of_measure: string;
+        };
+        /** AdminInputSupplyRelatedDocumentView */
+        AdminInputSupplyRelatedDocumentView: {
+            /** Document Id */
+            document_id: string;
+            /** Document Type */
+            document_type: string;
+            /** Folio */
+            folio: string;
+            /** Status */
+            status: string;
+        };
+        /** AdminInputSupplyStatusRequest */
+        AdminInputSupplyStatusRequest: {
+            /** Is Active */
+            is_active: boolean;
+            /** Notes */
+            notes?: string | null;
+        };
+        /** AdminInputSupplySupplierRelationRequest */
+        AdminInputSupplySupplierRelationRequest: {
+            /** Conversion Factor */
+            conversion_factor?: number | string | null;
+            /**
+             * Currency
+             * @default MXN
+             */
+            currency: string;
+            /**
+             * Is Active
+             * @default true
+             */
+            is_active: boolean;
+            /** Last Known Price */
+            last_known_price?: number | string | null;
+            /**
+             * Lead Time Days
+             * @default 0
+             */
+            lead_time_days: number;
+            /** Minimum Order Qty */
+            minimum_order_qty?: number | string | null;
+            /** Notes */
+            notes?: string | null;
+            /** Purchase Uom */
+            purchase_uom?: string | null;
+            /**
+             * Supplier Id
+             * Format: uuid
+             */
+            supplier_id: string;
+            /** Supplier Sku */
+            supplier_sku?: string | null;
+        };
+        /** AdminInputSupplySupplierRelationView */
+        AdminInputSupplySupplierRelationView: {
+            /** Conversion Factor */
+            conversion_factor?: string | null;
+            /** Currency */
+            currency: string;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Is Active */
+            is_active: boolean;
+            /** Last Known Price */
+            last_known_price?: string | null;
+            /** Lead Time Days */
+            lead_time_days: number;
+            /** Minimum Order Qty */
+            minimum_order_qty?: string | null;
+            /** Notes */
+            notes?: string | null;
+            /** Purchase Uom */
+            purchase_uom?: string | null;
+            /**
+             * Supplier Id
+             * Format: uuid
+             */
+            supplier_id: string;
+            /** Supplier Name */
+            supplier_name: string;
+            /** Supplier Sku */
+            supplier_sku?: string | null;
+        };
+        /** AdminInputSupplyUnitsConversionView */
+        AdminInputSupplyUnitsConversionView: {
+            /** Base Uom */
+            base_uom: string;
+            /** Consumption Uom */
+            consumption_uom: string;
+            /** Conversion Factor */
+            conversion_factor?: string | null;
+            /** Minimum Purchase Quantity */
+            minimum_purchase_quantity?: string | null;
+            /** Purchase Uom */
+            purchase_uom?: string | null;
+            /** Unit Conversion Supported */
+            unit_conversion_supported: boolean;
+        };
+        /** AdminInputSupplyUpdateRequest */
+        AdminInputSupplyUpdateRequest: {
+            /** Code */
+            code: string;
+            /**
+             * Is Active
+             * @default true
+             */
+            is_active: boolean;
+            /**
+             * Is Inventory Tracked
+             * @default true
+             */
+            is_inventory_tracked: boolean;
+            /**
+             * Is Purchasable
+             * @default true
+             */
+            is_purchasable: boolean;
+            /** Minimum Stock */
+            minimum_stock?: number | string | null;
+            /** Name */
+            name: string;
+            /** Preferred Order Quantity */
+            preferred_order_quantity?: number | string | null;
+            /** Procurement Notes */
+            procurement_notes?: string | null;
+            /**
+             * Product Class Id
+             * Format: uuid
+             */
+            product_class_id: string;
+            /**
+             * Product Kind
+             * @enum {string}
+             */
+            product_kind: "RAW_MATERIAL" | "CONSUMABLE" | "DISPOSABLE";
+            /** Purchase Conversion Factor */
+            purchase_conversion_factor?: number | string | null;
+            /** Purchase Uom */
+            purchase_uom?: string | null;
+            /** Reorder Point */
+            reorder_point?: number | string | null;
+            /** Standard Cost */
+            standard_cost?: number | string | null;
+            /** Supplier Relations */
+            supplier_relations?: components["schemas"]["AdminInputSupplySupplierRelationRequest"][];
+            /** Unit Of Measure */
+            unit_of_measure: string;
+            /** Usage Type */
+            usage_type?: string | null;
+        };
+        /** AdminInputSupplyWarningView */
+        AdminInputSupplyWarningView: {
+            /** Code */
+            code: string;
+            /** Message */
+            message: string;
+            /**
+             * Severity
+             * @enum {string}
+             */
+            severity: "info" | "warning" | "critical";
+        };
+        /** AdminInventoryAdjustmentRequest */
+        AdminInventoryAdjustmentRequest: {
+            /**
+             * Adjustment Type
+             * @enum {string}
+             */
+            adjustment_type: "INCREASE" | "DECREASE" | "SET_COUNTED";
+            /**
+             * Branch Id
+             * Format: uuid
+             */
+            branch_id: string;
+            /**
+             * Location Code
+             * @default BACKROOM
+             * @enum {string}
+             */
+            location_code: "BACKROOM" | "COUNTER" | "IN_TRANSIT" | "WASTE";
+            /** Notes */
+            notes?: string | null;
+            /**
+             * Product Id
+             * Format: uuid
+             */
+            product_id: string;
+            /** Quantity */
+            quantity: number | string;
+            /** Reason */
+            reason: string;
+        };
+        /** AdminInventoryAdjustmentView */
+        AdminInventoryAdjustmentView: {
+            /**
+             * Adjustment Type
+             * @enum {string}
+             */
+            adjustment_type: "INCREASE" | "DECREASE" | "SET_COUNTED";
+            /**
+             * Balance Id
+             * Format: uuid
+             */
+            balance_id: string;
+            /**
+             * Branch Id
+             * Format: uuid
+             */
+            branch_id: string;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /**
+             * Created By User Id
+             * Format: uuid
+             */
+            created_by_user_id: string;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /**
+             * Location Code
+             * @enum {string}
+             */
+            location_code: "BACKROOM" | "COUNTER" | "IN_TRANSIT" | "WASTE";
+            /** New Quantity */
+            new_quantity: string;
+            /** Notes */
+            notes?: string | null;
+            /** Previous Quantity */
+            previous_quantity: string;
+            /**
+             * Product Id
+             * Format: uuid
+             */
+            product_id: string;
+            /** Quantity */
+            quantity: string;
+            /** Reason */
+            reason: string;
+        };
+        /** AdminInventoryBackendContractView */
+        AdminInventoryBackendContractView: {
+            /**
+             * Adjustment Endpoint
+             * @default POST /v1/admin/inventory/adjustments
+             */
+            adjustment_endpoint: string;
+            /**
+             * Detail Endpoint
+             * @default GET /v1/admin/inventory/{balance_id}
+             */
+            detail_endpoint: string;
+            /**
+             * List Endpoint
+             * @default GET /v1/admin/inventory
+             */
+            list_endpoint: string;
+            /**
+             * Movements Endpoint
+             * @default GET /v1/admin/inventory/{balance_id}/movements
+             */
+            movements_endpoint: string;
+        };
+        /** AdminInventoryBranchLocationView */
+        AdminInventoryBranchLocationView: {
+            /**
+             * Branch Id
+             * Format: uuid
+             */
+            branch_id: string;
+            /** Branch Is Active */
+            branch_is_active: boolean;
+            /** Branch Name */
+            branch_name: string;
+            /**
+             * Location Code
+             * @enum {string}
+             */
+            location_code: "BACKROOM" | "COUNTER" | "IN_TRANSIT" | "WASTE";
+            /**
+             * Location Model Supported
+             * @default true
+             */
+            location_model_supported: boolean;
+            /** Location Name */
+            location_name: string;
+        };
+        /** AdminInventoryDetailView */
+        AdminInventoryDetailView: {
+            /**
+             * Balance Id
+             * Format: uuid
+             */
+            balance_id: string;
+            branch_location: components["schemas"]["AdminInventoryBranchLocationView"];
+            movement_summary: components["schemas"]["AdminInventoryMovementSummaryView"];
+            /** Movements */
+            movements: components["schemas"]["AdminInventoryMovementView"][];
+            product: components["schemas"]["AdminInventoryProductView"];
+            related_actions: components["schemas"]["AdminInventoryRelatedActionsView"];
+            stock_breakdown: components["schemas"]["AdminInventoryStockBreakdownView"];
+            /**
+             * Stock State
+             * @enum {string}
+             */
+            stock_state: "in_stock" | "out_of_stock" | "low_stock" | "negative_stock";
+            /** Warnings */
+            warnings: components["schemas"]["AdminInventoryWarningView"][];
+        };
+        /** AdminInventoryFilterOptionView */
+        AdminInventoryFilterOptionView: {
+            /** Id */
+            id: string;
+            /** Label */
+            label: string;
+        };
+        /** AdminInventoryFilterOptionsView */
+        AdminInventoryFilterOptionsView: {
+            /** Branches */
+            branches: components["schemas"]["AdminInventoryFilterOptionView"][];
+            /** Classes */
+            classes: components["schemas"]["AdminInventoryFilterOptionView"][];
+            /** Locations */
+            locations: components["schemas"]["AdminInventoryFilterOptionView"][];
+            /** Product Kinds */
+            product_kinds: components["schemas"]["AdminInventoryFilterOptionView"][];
+            /** Products */
+            products: components["schemas"]["AdminInventoryFilterOptionView"][];
+        };
+        /** AdminInventoryListItemView */
+        AdminInventoryListItemView: {
+            /** Available Quantity */
+            available_quantity?: string | null;
+            /**
+             * Balance Id
+             * Format: uuid
+             */
+            balance_id: string;
+            /**
+             * Branch Id
+             * Format: uuid
+             */
+            branch_id: string;
+            /** Branch Is Active */
+            branch_is_active: boolean;
+            /** Branch Name */
+            branch_name: string;
+            /**
+             * Class Id
+             * Format: uuid
+             */
+            class_id: string;
+            /** Class Name */
+            class_name: string;
+            /** In Transit Quantity */
+            in_transit_quantity?: string | null;
+            /** Last Movement At */
+            last_movement_at?: string | null;
+            /**
+             * Location Code
+             * @enum {string}
+             */
+            location_code: "BACKROOM" | "COUNTER" | "IN_TRANSIT" | "WASTE";
+            /** Location Name */
+            location_name: string;
+            /** Product Code */
+            product_code: string;
+            /**
+             * Product Id
+             * Format: uuid
+             */
+            product_id: string;
+            /** Product Is Active */
+            product_is_active: boolean;
+            /**
+             * Product Kind
+             * @enum {string}
+             */
+            product_kind: "FINISHED_GOOD" | "RAW_MATERIAL" | "CONSUMABLE" | "DISPOSABLE";
+            /** Product Name */
+            product_name: string;
+            /** Quantity On Hand */
+            quantity_on_hand: string;
+            /** Reserved Quantity */
+            reserved_quantity?: string | null;
+            /**
+             * Stock State
+             * @enum {string}
+             */
+            stock_state: "in_stock" | "out_of_stock" | "low_stock" | "negative_stock";
+            /** Unit Of Measure */
+            unit_of_measure: string;
+            /** Warning State */
+            warning_state?: ("info" | "warning" | "critical") | null;
+            /** Warnings */
+            warnings: components["schemas"]["AdminInventoryWarningView"][];
+        };
+        /** AdminInventoryListResponse */
+        AdminInventoryListResponse: {
+            backend_contract?: components["schemas"]["AdminInventoryBackendContractView"];
+            filter_options: components["schemas"]["AdminInventoryFilterOptionsView"];
+            /**
+             * Is Backend Connected
+             * @default true
+             */
+            is_backend_connected: boolean;
+            /** Items */
+            items: components["schemas"]["AdminInventoryListItemView"][];
+            metrics: components["schemas"]["AdminInventoryMetricsView"];
+            /** Page */
+            page: number;
+            /** Page Size */
+            page_size: number;
+            /** Total */
+            total: number;
+        };
+        /** AdminInventoryMetricsView */
+        AdminInventoryMetricsView: {
+            /** Estimated Value */
+            estimated_value?: string | null;
+            /** Negative Stock */
+            negative_stock: number;
+            /** Products With Stock */
+            products_with_stock: number;
+            /** Stale Stock */
+            stale_stock: number;
+            /** Total Records */
+            total_records: number;
+        };
+        /** AdminInventoryMovementSummaryView */
+        AdminInventoryMovementSummaryView: {
+            /** Last Adjustment At */
+            last_adjustment_at?: string | null;
+            /** Last Inbound At */
+            last_inbound_at?: string | null;
+            /** Last Movement At */
+            last_movement_at?: string | null;
+            /** Last Outbound At */
+            last_outbound_at?: string | null;
+        };
+        /** AdminInventoryMovementView */
+        AdminInventoryMovementView: {
+            /** Balance After */
+            balance_after?: string | null;
+            /**
+             * Branch Id
+             * Format: uuid
+             */
+            branch_id: string;
+            /** Branch Name */
+            branch_name: string;
+            /**
+             * Direction
+             * @enum {string}
+             */
+            direction: "IN" | "OUT";
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /**
+             * Location Code
+             * @enum {string}
+             */
+            location_code: "BACKROOM" | "COUNTER" | "IN_TRANSIT" | "WASTE";
+            /** Movement Type */
+            movement_type: string;
+            /** Notes */
+            notes?: string | null;
+            /**
+             * Occurred At
+             * Format: date-time
+             */
+            occurred_at: string;
+            /** Operator Name */
+            operator_name?: string | null;
+            /**
+             * Product Id
+             * Format: uuid
+             */
+            product_id: string;
+            /** Quantity */
+            quantity: string;
+            /** Reason */
+            reason?: string | null;
+            /** Source Document Id */
+            source_document_id?: string | null;
+            /** Source Document Type */
+            source_document_type?: string | null;
+            /** Unit Of Measure */
+            unit_of_measure: string;
+        };
+        /** AdminInventoryMovementsResponse */
+        AdminInventoryMovementsResponse: {
+            /** Items */
+            items: components["schemas"]["AdminInventoryMovementView"][];
+            /** Page */
+            page: number;
+            /** Page Size */
+            page_size: number;
+            /** Total */
+            total: number;
+        };
+        /** AdminInventoryProductView */
+        AdminInventoryProductView: {
+            /**
+             * Class Id
+             * Format: uuid
+             */
+            class_id: string;
+            /** Class Name */
+            class_name: string;
+            /** Code */
+            code: string;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Is Active */
+            is_active: boolean;
+            /** Is Sellable */
+            is_sellable: boolean;
+            /** Name */
+            name: string;
+            /**
+             * Product Kind
+             * @enum {string}
+             */
+            product_kind: "FINISHED_GOOD" | "RAW_MATERIAL" | "CONSUMABLE" | "DISPOSABLE";
+            /** Standard Cost */
+            standard_cost?: string | null;
+            /** Unit Of Measure */
+            unit_of_measure: string;
+        };
+        /** AdminInventoryRelatedActionsView */
+        AdminInventoryRelatedActionsView: {
+            /**
+             * Can Create Adjustment
+             * @default true
+             */
+            can_create_adjustment: boolean;
+            /**
+             * Can Open Branch
+             * @default true
+             */
+            can_open_branch: boolean;
+            /**
+             * Can Open Product
+             * @default true
+             */
+            can_open_product: boolean;
+            /**
+             * Can Start Count
+             * @default false
+             */
+            can_start_count: boolean;
+            /**
+             * Count Endpoint Available
+             * @default false
+             */
+            count_endpoint_available: boolean;
+        };
+        /** AdminInventoryStockBreakdownView */
+        AdminInventoryStockBreakdownView: {
+            /** Available Quantity */
+            available_quantity?: string | null;
+            /** Estimated Value */
+            estimated_value?: string | null;
+            /** In Transit Quantity */
+            in_transit_quantity?: string | null;
+            /** Quantity On Hand */
+            quantity_on_hand: string;
+            /** Reserved Quantity */
+            reserved_quantity?: string | null;
+            /** Unit Of Measure */
+            unit_of_measure: string;
+        };
+        /** AdminInventoryWarningView */
+        AdminInventoryWarningView: {
+            /** Code */
+            code: string;
+            /** Message */
+            message: string;
+            /**
+             * Severity
+             * @enum {string}
+             */
+            severity: "info" | "warning" | "critical";
+        };
+        /** AdminMaintenanceCancelRequest */
+        AdminMaintenanceCancelRequest: {
+            /** Reason */
+            reason: string;
+        };
+        /** AdminMaintenanceCompleteRequest */
+        AdminMaintenanceCompleteRequest: {
+            /** Completed At */
+            completed_at?: string | null;
+            /** Cost */
+            cost?: number | string | null;
+            /** Equipment Status After Service */
+            equipment_status_after_service?: ("OPERATIONAL" | "OUT_OF_SERVICE" | "UNDER_MAINTENANCE" | "RETIRED" | "INACTIVE") | null;
+            /** Evidence Note */
+            evidence_note?: string | null;
+            /** Notes */
+            notes?: string | null;
+            /**
+             * Result
+             * @enum {string}
+             */
+            result: "NOT_COMPLETED" | "COMPLETED_SUCCESSFULLY" | "COMPLETED_WITH_OBSERVATIONS" | "FAILED" | "REQUIRES_FOLLOW_UP" | "CANCELLED";
+            /** Technician Name */
+            technician_name?: string | null;
+        };
+        /** AdminMaintenanceCreateRequest */
+        AdminMaintenanceCreateRequest: {
+            /** Description */
+            description: string;
+            /**
+             * Equipment Id
+             * Format: uuid
+             */
+            equipment_id: string;
+            /** Expected Cost */
+            expected_cost?: number | string | null;
+            /**
+             * Maintenance Type
+             * @enum {string}
+             */
+            maintenance_type: "PREVENTIVE" | "CORRECTIVE" | "INSPECTION" | "CALIBRATION" | "CLEANING_TECHNICAL";
+            /** Provider Name */
+            provider_name?: string | null;
+            /** Related Incident Reference */
+            related_incident_reference?: string | null;
+            /** Scheduled At */
+            scheduled_at?: string | null;
+            /** Source Document Reference */
+            source_document_reference?: string | null;
+            /** Source Document Type */
+            source_document_type?: string | null;
+            /**
+             * Start Immediately
+             * @default false
+             */
+            start_immediately: boolean;
+            /**
+             * Status
+             * @default PENDING
+             * @enum {string}
+             */
+            status: "SCHEDULED" | "PENDING" | "IN_PROGRESS" | "COMPLETED" | "OVERDUE" | "CANCELLED";
+            /** Technician Name */
+            technician_name?: string | null;
+        };
+        /** AdminMaintenanceRecordListItemView */
+        AdminMaintenanceRecordListItemView: {
+            /** Completed At */
+            completed_at?: string | null;
+            /** Cost */
+            cost?: string | null;
+            /** Evidence Note */
+            evidence_note?: string | null;
+            /** Folio */
+            folio: string;
+            /** Has Evidence */
+            has_evidence: boolean;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /**
+             * Maintenance Type
+             * @enum {string}
+             */
+            maintenance_type: "PREVENTIVE" | "CORRECTIVE" | "INSPECTION" | "CALIBRATION" | "CLEANING_TECHNICAL";
+            /** Notes */
+            notes?: string | null;
+            /** Provider Name */
+            provider_name?: string | null;
+            /** Related Incident Reference */
+            related_incident_reference?: string | null;
+            /**
+             * Result
+             * @enum {string}
+             */
+            result: "NOT_COMPLETED" | "COMPLETED_SUCCESSFULLY" | "COMPLETED_WITH_OBSERVATIONS" | "FAILED" | "REQUIRES_FOLLOW_UP" | "CANCELLED";
+            /** Scheduled At */
+            scheduled_at?: string | null;
+            /** Started At */
+            started_at?: string | null;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "SCHEDULED" | "PENDING" | "IN_PROGRESS" | "COMPLETED" | "OVERDUE" | "CANCELLED";
+            /** Technician Name */
+            technician_name?: string | null;
+            /** Warning State */
+            warning_state: string;
+        };
+        /** AdminOrderActionRequest */
+        AdminOrderActionRequest: {
+            /** Idempotency Key */
+            idempotency_key?: string | null;
+        };
+        /** AdminOrderAvailableActionsView */
+        AdminOrderAvailableActionsView: {
+            /** Can Cancel */
+            can_cancel: boolean;
+            /** Can Capture Balance */
+            can_capture_balance: boolean;
+            /** Can Create From Backoffice */
+            can_create_from_backoffice: boolean;
+            /** Can Deliver */
+            can_deliver: boolean;
+            /** Can Mark Ready */
+            can_mark_ready: boolean;
+            /** Financial Action Note */
+            financial_action_note?: string | null;
+            /** Requires Cash Session For Financial Action */
+            requires_cash_session_for_financial_action: boolean;
+            /** Requires Settlement On Delivery */
+            requires_settlement_on_delivery: boolean;
+        };
+        /** AdminOrderCustomerView */
+        AdminOrderCustomerView: {
+            /** Name */
+            name: string;
+            /** Notes */
+            notes?: string | null;
+            /** Phone */
+            phone?: string | null;
+        };
+        /** AdminOrderDetailView */
+        AdminOrderDetailView: {
+            available_actions: components["schemas"]["AdminOrderAvailableActionsView"];
+            backend_contract: components["schemas"]["AdminOrdersBackendContractView"];
+            customer: components["schemas"]["AdminOrderCustomerView"];
+            /** Lines */
+            lines: components["schemas"]["AdminOrderLineView"][];
+            /** Operational Context */
+            operational_context: {
+                [key: string]: string | null;
+            };
+            overview: components["schemas"]["AdminOrderOverviewView"];
+            /** Payments */
+            payments: components["schemas"]["AdminOrderPaymentView"][];
+            /** Related Documents */
+            related_documents: components["schemas"]["AdminOrderRelatedDocumentView"][];
+            /** Timeline */
+            timeline: components["schemas"]["AdminOrderTimelineEventView"][];
+        };
+        /** AdminOrderFilterOptionView */
+        AdminOrderFilterOptionView: {
+            /** Id */
+            id: string;
+            /** Label */
+            label: string;
+        };
+        /** AdminOrderFilterOptionsView */
+        AdminOrderFilterOptionsView: {
+            /** Branches */
+            branches: components["schemas"]["AdminOrderFilterOptionView"][];
+            /** Cashiers */
+            cashiers: components["schemas"]["AdminOrderFilterOptionView"][];
+            /** Payment States */
+            payment_states: components["schemas"]["AdminOrderFilterOptionView"][];
+            /** Statuses */
+            statuses: components["schemas"]["AdminOrderFilterOptionView"][];
+            /** Workstations */
+            workstations: components["schemas"]["AdminOrderFilterOptionView"][];
+        };
+        /** AdminOrderLineView */
+        AdminOrderLineView: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Line Number */
+            line_number: number;
+            /** Line Total Amount */
+            line_total_amount: string;
+            /** Product Class Code */
+            product_class_code: string;
+            /**
+             * Product Class Id
+             * Format: uuid
+             */
+            product_class_id: string;
+            /** Product Class Name */
+            product_class_name: string;
+            /** Product Code */
+            product_code: string;
+            /**
+             * Product Id
+             * Format: uuid
+             */
+            product_id: string;
+            /** Product Name */
+            product_name: string;
+            /** Quantity */
+            quantity: string;
+            /** Unit Price */
+            unit_price: string;
+        };
+        /** AdminOrderListItemView */
+        AdminOrderListItemView: {
+            /** Advance Amount */
+            advance_amount: string;
+            /**
+             * Branch Id
+             * Format: uuid
+             */
+            branch_id: string;
+            /** Branch Name */
+            branch_name: string;
+            /** Cancellation Refund Amount */
+            cancellation_refund_amount: string;
+            /** Cancellation Refund Eligible */
+            cancellation_refund_eligible: boolean;
+            /**
+             * Created At Utc
+             * Format: date-time
+             */
+            created_at_utc: string;
+            /** Created By User Full Name */
+            created_by_user_full_name: string;
+            /**
+             * Created By User Id
+             * Format: uuid
+             */
+            created_by_user_id: string;
+            /** Currency Code */
+            currency_code: string;
+            /** Customer Name */
+            customer_name: string;
+            /** Customer Phone */
+            customer_phone?: string | null;
+            /** Folio */
+            folio: string;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Line Count */
+            line_count: number;
+            /** Payment State */
+            payment_state: string;
+            /** Remaining Balance Amount */
+            remaining_balance_amount: string;
+            /** Requested For At */
+            requested_for_at?: string | null;
+            /** Status */
+            status: string;
+            /** Total Amount */
+            total_amount: string;
+            /** Total Units */
+            total_units: string;
+            /**
+             * Updated At Utc
+             * Format: date-time
+             */
+            updated_at_utc: string;
+            /** Warning State */
+            warning_state?: string | null;
+            /** Workstation Code */
+            workstation_code: string;
+            /**
+             * Workstation Id
+             * Format: uuid
+             */
+            workstation_id: string;
+            /** Workstation Name */
+            workstation_name: string;
+        };
+        /** AdminOrderMetricsView */
+        AdminOrderMetricsView: {
+            /** Active Orders */
+            active_orders: number;
+            /** Canceled Orders */
+            canceled_orders: number;
+            /** Deposits Received Amount */
+            deposits_received_amount: string;
+            /** Due Today */
+            due_today: number;
+            /** Outstanding Balance Amount */
+            outstanding_balance_amount: string;
+            /** Ready Orders */
+            ready_orders: number;
+        };
+        /** AdminOrderOverviewView */
+        AdminOrderOverviewView: {
+            /** Advance Amount */
+            advance_amount: string;
+            /**
+             * Branch Id
+             * Format: uuid
+             */
+            branch_id: string;
+            /** Branch Name */
+            branch_name: string;
+            /** Canceled At */
+            canceled_at?: string | null;
+            /** Cancellation Reason */
+            cancellation_reason?: string | null;
+            /** Cancellation Refund Amount */
+            cancellation_refund_amount: string;
+            /** Cancellation Refund Eligible */
+            cancellation_refund_eligible: boolean;
+            /**
+             * Created At Utc
+             * Format: date-time
+             */
+            created_at_utc: string;
+            /** Currency Code */
+            currency_code: string;
+            /** Customer Name */
+            customer_name: string;
+            /** Customer Phone */
+            customer_phone?: string | null;
+            /** Delivered At */
+            delivered_at?: string | null;
+            /** Folio */
+            folio: string;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Payment State */
+            payment_state: string;
+            /** Remaining Balance Amount */
+            remaining_balance_amount: string;
+            /** Requested For At */
+            requested_for_at?: string | null;
+            /** Status */
+            status: string;
+            /** Total Amount */
+            total_amount: string;
+            /**
+             * Updated At Utc
+             * Format: date-time
+             */
+            updated_at_utc: string;
+        };
+        /** AdminOrderPaymentView */
+        AdminOrderPaymentView: {
+            /** Amount */
+            amount: string;
+            /** Currency Code */
+            currency_code: string;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Payment Method Code */
+            payment_method_code: string;
+            /** Payment Type */
+            payment_type: string;
+            /**
+             * Recorded At Utc
+             * Format: date-time
+             */
+            recorded_at_utc: string;
+            /** Recorded By User Full Name */
+            recorded_by_user_full_name: string;
+            /**
+             * Recorded By User Id
+             * Format: uuid
+             */
+            recorded_by_user_id: string;
+            /** Sequence */
+            sequence: number;
+        };
+        /** AdminOrderRelatedDocumentView */
+        AdminOrderRelatedDocumentView: {
+            /** Amount */
+            amount?: string | null;
+            /** Document Type */
+            document_type: string;
+            /** Folio */
+            folio: string;
+            /** Id */
+            id: string;
+            /** Occurred At */
+            occurred_at?: string | null;
+            /** Route Hint */
+            route_hint?: string | null;
+            /** Status */
+            status: string;
+        };
+        /** AdminOrderTimelineEventView */
+        AdminOrderTimelineEventView: {
+            /** Description */
+            description?: string | null;
+            /** Key */
+            key: string;
+            /** Label */
+            label: string;
+            /**
+             * Occurred At
+             * Format: date-time
+             */
+            occurred_at: string;
+        };
+        /** AdminOrdersBackendContractView */
+        AdminOrdersBackendContractView: {
+            /** Cancel Endpoint */
+            cancel_endpoint: string;
+            /** Create Endpoint */
+            create_endpoint?: string | null;
+            /** Deliver Endpoint */
+            deliver_endpoint: string;
+            /** Detail Endpoint */
+            detail_endpoint: string;
+            /** Financial Capture Endpoint */
+            financial_capture_endpoint?: string | null;
+            /** List Endpoint */
+            list_endpoint: string;
+            /** Mark Ready Endpoint */
+            mark_ready_endpoint: string;
+        };
+        /** AdminOrdersListResponse */
+        AdminOrdersListResponse: {
+            backend_contract: components["schemas"]["AdminOrdersBackendContractView"];
+            filter_options: components["schemas"]["AdminOrderFilterOptionsView"];
+            /**
+             * Is Backend Connected
+             * @default true
+             */
+            is_backend_connected: boolean;
+            /** Items */
+            items: components["schemas"]["AdminOrderListItemView"][];
+            metrics: components["schemas"]["AdminOrderMetricsView"];
+            /** Page */
+            page: number;
+            /** Page Size */
+            page_size: number;
+            /** Total */
+            total: number;
+        };
+        /** AdminPendingDiscrepanciesResponse */
+        AdminPendingDiscrepanciesResponse: {
+            backend_contract: components["schemas"]["AdminReconciliationBackendContractView"];
+            /** Items */
+            items: components["schemas"]["AdminPendingDiscrepancyItemView"][];
+            /** Total */
+            total: number;
+        };
+        /** AdminPendingDiscrepancyItemView */
+        AdminPendingDiscrepancyItemView: {
+            /** Actual Amount */
+            actual_amount: string;
+            /**
+             * Branch Id
+             * Format: uuid
+             */
+            branch_id: string;
+            /** Branch Name */
+            branch_name: string;
+            /** Difference Amount */
+            difference_amount: string;
+            /** Difference Direction */
+            difference_direction: string;
+            /** Expected Amount */
+            expected_amount: string;
+            /**
+             * Occurred At
+             * Format: date-time
+             */
+            occurred_at: string;
+            /** Operator Id */
+            operator_id?: string | null;
+            /** Operator Name */
+            operator_name: string;
+            /** Payment Method */
+            payment_method: string;
+            /**
+             * Source Document Id
+             * Format: uuid
+             */
+            source_document_id: string;
+            /** Source Reference */
+            source_reference: string;
+            /** Source Type */
+            source_type: string;
+            /** Suggested Warning State */
+            suggested_warning_state: string;
+            /**
+             * Workstation Id
+             * Format: uuid
+             */
+            workstation_id: string;
+            /** Workstation Name */
+            workstation_name: string;
+        };
+        /** AdminPermissionGroupView */
+        AdminPermissionGroupView: {
+            /** Label */
+            label: string;
+            /** Module */
+            module: string;
+            /** Permissions */
+            permissions: components["schemas"]["AdminPermissionView"][];
+        };
+        /** AdminPermissionView */
+        AdminPermissionView: {
+            /** Action */
+            action: string;
+            /** Code */
+            code: string;
+            /** Description */
+            description?: string | null;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Is Enabled */
+            is_enabled: boolean;
+            /** Is Sensitive */
+            is_sensitive: boolean;
+            /** Label */
+            label: string;
+            /** Module */
+            module: string;
+            /** Module Label */
+            module_label: string;
+            /** Surfaces */
+            surfaces: ("POS" | "BACKOFFICE")[];
+        };
+        /** AdminPermissionsResponse */
+        AdminPermissionsResponse: {
+            /** Groups */
+            groups: components["schemas"]["AdminPermissionGroupView"][];
+            /** Sensitive Permission Codes */
+            sensitive_permission_codes: string[];
+        };
+        /** AdminPriceDetailView */
+        AdminPriceDetailView: {
+            /** History Note */
+            history_note?: string | null;
+            price: components["schemas"]["AdminPriceRowView"];
+        };
+        /** AdminPriceFilterOptionsView */
+        AdminPriceFilterOptionsView: {
+            /** Brands */
+            brands: components["schemas"]["AdminProductFilterOptionView"][];
+            /** Classes */
+            classes: components["schemas"]["AdminProductFilterOptionView"][];
+        };
+        /** AdminPriceMetricsView */
+        AdminPriceMetricsView: {
+            /** Class Capture */
+            class_capture: number;
+            /** High Variance */
+            high_variance: number;
+            /** Missing Or Invalid */
+            missing_or_invalid: number;
+            /** Product Direct */
+            product_direct: number;
+            /** Recently Changed */
+            recently_changed: number;
+            /** Total Entities */
+            total_entities: number;
+        };
+        /** AdminPriceRowView */
+        AdminPriceRowView: {
+            /**
+             * Brand Id
+             * Format: uuid
+             */
+            brand_id: string;
+            /** Brand Name */
+            brand_name: string;
+            /**
+             * Capture Mode
+             * @enum {string}
+             */
+            capture_mode: "PRODUCT_DIRECT" | "CLASS_CAPTURE";
+            /**
+             * Class Id
+             * Format: uuid
+             */
+            class_id: string;
+            /** Class Name */
+            class_name: string;
+            /** Currency Code */
+            currency_code: string;
+            /** Current Price */
+            current_price?: string | null;
+            /** Entity Code */
+            entity_code: string;
+            /**
+             * Entity Id
+             * Format: uuid
+             */
+            entity_id: string;
+            /** Entity Name */
+            entity_name: string;
+            /**
+             * Entity Type
+             * @enum {string}
+             */
+            entity_type: "product" | "class";
+            /**
+             * Health
+             * @enum {string}
+             */
+            health: "healthy" | "missing_price" | "warning" | "low_margin" | "negative_margin";
+            /** Margin Percent */
+            margin_percent?: string | null;
+            /** Price Cost Delta */
+            price_cost_delta?: string | null;
+            /**
+             * Price Owner
+             * @enum {string}
+             */
+            price_owner: "product_unit_price" | "class_capture_unit_price";
+            /**
+             * Related Class Id
+             * Format: uuid
+             */
+            related_class_id: string;
+            /** Related Product Id */
+            related_product_id?: string | null;
+            /** Standard Cost */
+            standard_cost?: string | null;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "active" | "inactive";
+            /** Updated At */
+            updated_at?: string | null;
+            warnings: components["schemas"]["AdminPriceWarningsView"];
+        };
+        /** AdminPriceUpdateRequest */
+        AdminPriceUpdateRequest: {
+            /** Price */
+            price: number | string;
+        };
+        /** AdminPriceWarningsView */
+        AdminPriceWarningsView: {
+            /** Codes */
+            codes: string[];
+            /** Messages */
+            messages: string[];
+        };
+        /** AdminPricesListResponse */
+        AdminPricesListResponse: {
+            filter_options: components["schemas"]["AdminPriceFilterOptionsView"];
+            /**
+             * Is Backend Connected
+             * @default true
+             */
+            is_backend_connected: boolean;
+            /** Items */
+            items: components["schemas"]["AdminPriceRowView"][];
+            metrics: components["schemas"]["AdminPriceMetricsView"];
+            /** Page */
+            page: number;
+            /** Page Size */
+            page_size: number;
+            /** Total */
+            total: number;
+        };
+        /** AdminProductAvailabilityRequest */
+        AdminProductAvailabilityRequest: {
+            /** Branch Ids */
+            branch_ids?: string[];
+            /**
+             * Visible In Pos
+             * @default true
+             */
+            visible_in_pos: boolean;
+        };
+        /** AdminProductAvailabilitySummaryView */
+        AdminProductAvailabilitySummaryView: {
+            /** Configured Branches Count */
+            configured_branches_count?: number | null;
+            /**
+             * State
+             * @default unknown
+             * @enum {string}
+             */
+            state: "available" | "not_available" | "not_configured" | "unknown";
+            /** Total Branches Count */
+            total_branches_count?: number | null;
+        };
+        /** AdminProductBranchAvailabilityView */
+        AdminProductBranchAvailabilityView: {
+            /**
+             * Branch Id
+             * Format: uuid
+             */
+            branch_id: string;
+            /** Branch Name */
+            branch_name: string;
+            /** Brand Id */
+            brand_id?: string | null;
+            /** Brand Name */
+            brand_name?: string | null;
+            /**
+             * State
+             * @enum {string}
+             */
+            state: "available" | "not_available" | "not_configured" | "unknown";
+            /** Updated At */
+            updated_at?: string | null;
+            /** Visible In Pos */
+            visible_in_pos: boolean;
+        };
+        /** AdminProductClassCreateRequest */
+        AdminProductClassCreateRequest: {
+            /**
+             * Brand Id
+             * Format: uuid
+             */
+            brand_id: string;
+            /**
+             * Capture Mode Default
+             * @enum {string}
+             */
+            capture_mode_default: "PRODUCT_DIRECT" | "CLASS_CAPTURE";
+            /** Class Capture Unit Price */
+            class_capture_unit_price?: number | string | null;
+            /** Code */
+            code: string;
+            /**
+             * Currency Code
+             * @default MXN
+             */
+            currency_code: string;
+            /**
+             * Display Order
+             * @default 1000
+             */
+            display_order: number;
+            /**
+             * Is Sellable
+             * @default true
+             */
+            is_sellable: boolean;
+            /** Name */
+            name: string;
+            /** Quick Name */
+            quick_name?: string | null;
+            /** Search Aliases */
+            search_aliases?: string | null;
+            /**
+             * Status
+             * @default active
+             * @enum {string}
+             */
+            status: "active" | "inactive";
+        };
+        /** AdminProductClassFilterOptionsView */
+        AdminProductClassFilterOptionsView: {
+            /** Brands */
+            brands: components["schemas"]["AdminProductFilterOptionView"][];
+        };
+        /** AdminProductClassMetricsView */
+        AdminProductClassMetricsView: {
+            /** Active Classes */
+            active_classes: number;
+            /** Class Capture */
+            class_capture: number;
+            /** Product Direct */
+            product_direct: number;
+            /** Total Classes */
+            total_classes: number;
+            /** With Warnings */
+            with_warnings: number;
+            /** Without Products */
+            without_products: number;
+        };
+        /** AdminProductClassProductSummaryView */
+        AdminProductClassProductSummaryView: {
+            /** Code */
+            code: string;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Name */
+            name: string;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "active" | "inactive";
+            /** Unit Price */
+            unit_price: string;
+            /** Updated At */
+            updated_at?: string | null;
+        };
+        /** AdminProductClassUpdateRequest */
+        AdminProductClassUpdateRequest: {
+            /** Brand Id */
+            brand_id?: string | null;
+            /** Capture Mode Default */
+            capture_mode_default?: ("PRODUCT_DIRECT" | "CLASS_CAPTURE") | null;
+            /** Class Capture Unit Price */
+            class_capture_unit_price?: number | string | null;
+            /** Code */
+            code?: string | null;
+            /** Currency Code */
+            currency_code?: string | null;
+            /** Display Order */
+            display_order?: number | null;
+            /** Is Sellable */
+            is_sellable?: boolean | null;
+            /** Name */
+            name?: string | null;
+            /** Quick Name */
+            quick_name?: string | null;
+            /** Search Aliases */
+            search_aliases?: string | null;
+            /** Status */
+            status?: ("active" | "inactive") | null;
+        };
+        /** AdminProductClassView */
+        AdminProductClassView: {
+            /** Active Product Count */
+            active_product_count: number;
+            /**
+             * Brand Id
+             * Format: uuid
+             */
+            brand_id: string;
+            /** Brand Name */
+            brand_name: string;
+            /**
+             * Capture Mode Default
+             * @enum {string}
+             */
+            capture_mode_default: "PRODUCT_DIRECT" | "CLASS_CAPTURE";
+            /** Class Capture Unit Price */
+            class_capture_unit_price?: string | null;
+            /** Code */
+            code: string;
+            /** Currency Code */
+            currency_code: string;
+            /** Display Order */
+            display_order: number;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Inactive Product Count */
+            inactive_product_count: number;
+            /** Is Sellable */
+            is_sellable: boolean;
+            /** Linked Products */
+            linked_products: components["schemas"]["AdminProductClassProductSummaryView"][];
+            /** Name */
+            name: string;
+            /** Product Count */
+            product_count: number;
+            /** Quick Name */
+            quick_name?: string | null;
+            /**
+             * Readiness
+             * @enum {string}
+             */
+            readiness: "ready" | "requires_attention" | "incomplete" | "pending_integration" | "unknown";
+            /** Search Aliases */
+            search_aliases?: string | null;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "active" | "inactive";
+            /** Updated At */
+            updated_at?: string | null;
+            warnings: components["schemas"]["AdminProductClassWarningsView"];
+        };
+        /** AdminProductClassWarningsView */
+        AdminProductClassWarningsView: {
+            /** Codes */
+            codes: string[];
+            /** Messages */
+            messages: string[];
+        };
+        /** AdminProductClassesListResponse */
+        AdminProductClassesListResponse: {
+            filter_options: components["schemas"]["AdminProductClassFilterOptionsView"];
+            /**
+             * Is Backend Connected
+             * @default true
+             */
+            is_backend_connected: boolean;
+            /** Items */
+            items: components["schemas"]["AdminProductClassView"][];
+            metrics: components["schemas"]["AdminProductClassMetricsView"];
+            /** Page */
+            page: number;
+            /** Page Size */
+            page_size: number;
+            /** Total */
+            total: number;
+        };
+        /** AdminProductCreateRequest */
+        AdminProductCreateRequest: {
+            /** Capture Mode */
+            capture_mode?: ("PRODUCT_DIRECT" | "CLASS_CAPTURE") | null;
+            /** Code */
+            code: string;
+            /** Name */
+            name: string;
+            /**
+             * Product Class Id
+             * Format: uuid
+             */
+            product_class_id: string;
+            /** Quick Name */
+            quick_name?: string | null;
+            /** Search Aliases */
+            search_aliases?: string | null;
+            /**
+             * Status
+             * @default active
+             * @enum {string}
+             */
+            status: "active" | "inactive";
+            /** Unit Price */
+            unit_price: number | string;
+        };
+        /** AdminProductFilterOptionView */
+        AdminProductFilterOptionView: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Label */
+            label: string;
+        };
+        /** AdminProductFilterOptionsView */
+        AdminProductFilterOptionsView: {
+            /** Branches */
+            branches: components["schemas"]["AdminProductFilterOptionView"][];
+            /** Brands */
+            brands: components["schemas"]["AdminProductFilterOptionView"][];
+            /** Classes */
+            classes: components["schemas"]["AdminProductFilterOptionView"][];
+        };
+        /** AdminProductMetricsView */
+        AdminProductMetricsView: {
+            /** Active Products */
+            active_products?: number | null;
+            /** Class Capture */
+            class_capture?: number | null;
+            /** Product Direct */
+            product_direct?: number | null;
+            /** Require Attention */
+            require_attention?: number | null;
+            /** Without Branch Availability */
+            without_branch_availability?: number | null;
+        };
+        /** AdminProductReadinessView */
+        AdminProductReadinessView: {
+            /** Missing Requirements */
+            missing_requirements: string[];
+            related: components["schemas"]["AdminProductRelatedReadinessView"];
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "ready" | "requires_attention" | "incomplete" | "pending_integration" | "unknown";
+        };
+        /** AdminProductRelatedReadinessView */
+        AdminProductRelatedReadinessView: {
+            /**
+             * Audit Trail
+             * @enum {string}
+             */
+            audit_trail: "ready" | "requires_attention" | "incomplete" | "pending_integration" | "unknown";
+            /**
+             * Branch Availability
+             * @enum {string}
+             */
+            branch_availability: "ready" | "requires_attention" | "incomplete" | "pending_integration" | "unknown";
+            /**
+             * Inventory
+             * @enum {string}
+             */
+            inventory: "ready" | "requires_attention" | "incomplete" | "pending_integration" | "unknown";
+            /**
+             * Pos Visibility
+             * @enum {string}
+             */
+            pos_visibility: "ready" | "requires_attention" | "incomplete" | "pending_integration" | "unknown";
+            /**
+             * Price
+             * @enum {string}
+             */
+            price: "ready" | "requires_attention" | "incomplete" | "pending_integration" | "unknown";
+            /**
+             * Recipe
+             * @enum {string}
+             */
+            recipe: "ready" | "requires_attention" | "incomplete" | "pending_integration" | "unknown";
+        };
+        /** AdminProductUpdateRequest */
+        AdminProductUpdateRequest: {
+            /** Capture Mode */
+            capture_mode?: ("PRODUCT_DIRECT" | "CLASS_CAPTURE") | null;
+            /** Code */
+            code?: string | null;
+            /** Name */
+            name?: string | null;
+            /** Product Class Id */
+            product_class_id?: string | null;
+            /** Quick Name */
+            quick_name?: string | null;
+            /** Search Aliases */
+            search_aliases?: string | null;
+            /** Status */
+            status?: ("active" | "inactive") | null;
+            /** Unit Price */
+            unit_price?: number | string | null;
+        };
+        /** AdminProductView */
+        AdminProductView: {
+            availability: components["schemas"]["AdminProductAvailabilitySummaryView"];
+            /** Branch Availability */
+            branch_availability: components["schemas"]["AdminProductBranchAvailabilityView"][];
+            /** Brand Id */
+            brand_id?: string | null;
+            /** Brand Name */
+            brand_name?: string | null;
+            /**
+             * Capture Mode
+             * @enum {string}
+             */
+            capture_mode: "PRODUCT_DIRECT" | "CLASS_CAPTURE";
+            /**
+             * Class Id
+             * Format: uuid
+             */
+            class_id: string;
+            /** Class Name */
+            class_name: string;
+            /** Code */
+            code: string;
+            /** Currency Code */
+            currency_code: string;
+            /** Description */
+            description?: string | null;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Name */
+            name: string;
+            /**
+             * Product Kind
+             * @default FINISHED_GOOD
+             * @enum {string}
+             */
+            product_kind: "FINISHED_GOOD" | "RAW_MATERIAL" | "CONSUMABLE" | "DISPOSABLE";
+            /** Quick Name */
+            quick_name?: string | null;
+            readiness: components["schemas"]["AdminProductReadinessView"];
+            /** Sku */
+            sku?: string | null;
+            /** Standard Cost */
+            standard_cost?: string | null;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "active" | "inactive";
+            /**
+             * Unit Of Measure
+             * @default piece
+             */
+            unit_of_measure: string;
+            /** Unit Price */
+            unit_price: string;
+            /** Updated At */
+            updated_at?: string | null;
+            /** Visible In Pos */
+            visible_in_pos: boolean;
+        };
+        /** AdminProductionActualConsumptionLineView */
+        AdminProductionActualConsumptionLineView: {
+            /** Consumed Qty */
+            consumed_qty?: string | null;
+            /** Difference Qty */
+            difference_qty?: string | null;
+            /** Expected Qty */
+            expected_qty: string;
+            /** Input Product Code */
+            input_product_code: string;
+            /**
+             * Input Product Id
+             * Format: uuid
+             */
+            input_product_id: string;
+            /** Input Product Name */
+            input_product_name: string;
+            /** Uom */
+            uom: string;
+        };
+        /** AdminProductionAvailableActionsView */
+        AdminProductionAvailableActionsView: {
+            /** Can Cancel */
+            can_cancel: boolean;
+            /** Can Complete */
+            can_complete: boolean;
+            /** Can Edit */
+            can_edit: boolean;
+            /** Can Start */
+            can_start: boolean;
+            /** Can View Movements */
+            can_view_movements: boolean;
+        };
+        /** AdminProductionBackendContractView */
+        AdminProductionBackendContractView: {
+            /**
+             * Cancel Endpoint
+             * @default POST /v1/admin/production/{production_id}/cancel
+             */
+            cancel_endpoint: string;
+            /**
+             * Complete Endpoint
+             * @default POST /v1/admin/production/{production_id}/complete
+             */
+            complete_endpoint: string;
+            /**
+             * Create Endpoint
+             * @default POST /v1/admin/production
+             */
+            create_endpoint: string;
+            /**
+             * Detail Endpoint
+             * @default GET /v1/admin/production/{production_id}
+             */
+            detail_endpoint: string;
+            /**
+             * List Endpoint
+             * @default GET /v1/admin/production
+             */
+            list_endpoint: string;
+            /**
+             * Start Endpoint
+             * @default POST /v1/admin/production/{production_id}/start
+             */
+            start_endpoint: string;
+            /**
+             * Update Endpoint
+             * @default PATCH /v1/admin/production/{production_id}
+             */
+            update_endpoint: string;
+        };
+        /** AdminProductionCancelRequest */
+        AdminProductionCancelRequest: {
+            /** Reason */
+            reason?: string | null;
+        };
+        /** AdminProductionCompleteRequest */
+        AdminProductionCompleteRequest: {
+            /** Actual Output Qty */
+            actual_output_qty: number | string;
+            /** Notes */
+            notes?: string | null;
+            /** Variance Reason */
+            variance_reason?: string | null;
+        };
+        /** AdminProductionCreateRequest */
+        AdminProductionCreateRequest: {
+            /**
+             * Branch Id
+             * Format: uuid
+             */
+            branch_id: string;
+            /** Notes */
+            notes?: string | null;
+            /** Planned At */
+            planned_at?: string | null;
+            /** Planned Output Qty */
+            planned_output_qty: number | string;
+            /**
+             * Product Id
+             * Format: uuid
+             */
+            product_id: string;
+            /** Recipe Id */
+            recipe_id?: string | null;
+        };
+        /** AdminProductionDetailView */
+        AdminProductionDetailView: {
+            /** Actual Consumption */
+            actual_consumption: components["schemas"]["AdminProductionActualConsumptionLineView"][];
+            available_actions: components["schemas"]["AdminProductionAvailableActionsView"];
+            inventory_impact: components["schemas"]["AdminProductionInventoryImpactView"];
+            output_yield: components["schemas"]["AdminProductionOutputYieldView"];
+            overview: components["schemas"]["AdminProductionOverviewView"];
+            /** Planned Inputs */
+            planned_inputs: components["schemas"]["AdminProductionInputLineView"][];
+            product_recipe: components["schemas"]["AdminProductionProductRecipeView"];
+            /** Related Documents */
+            related_documents: components["schemas"]["AdminProductionRelatedDocumentView"][];
+            /** Warnings */
+            warnings: components["schemas"]["AdminProductionWarningView"][];
+            waste_scrap: components["schemas"]["AdminProductionWasteScrapView"];
+        };
+        /** AdminProductionFilterOptionView */
+        AdminProductionFilterOptionView: {
+            /** Id */
+            id: string;
+            /** Label */
+            label: string;
+        };
+        /** AdminProductionFilterOptionsView */
+        AdminProductionFilterOptionsView: {
+            /** Branches */
+            branches: components["schemas"]["AdminProductionFilterOptionView"][];
+            /** Operators */
+            operators: components["schemas"]["AdminProductionFilterOptionView"][];
+            /** Products */
+            products: components["schemas"]["AdminProductionFilterOptionView"][];
+            /** Recipes */
+            recipes: components["schemas"]["AdminProductionFilterOptionView"][];
+            /** Statuses */
+            statuses: components["schemas"]["AdminProductionFilterOptionView"][];
+        };
+        /** AdminProductionInputLineView */
+        AdminProductionInputLineView: {
+            /** Available Qty */
+            available_qty?: string | null;
+            /** Input Product Code */
+            input_product_code: string;
+            /**
+             * Input Product Id
+             * Format: uuid
+             */
+            input_product_id: string;
+            /** Input Product Name */
+            input_product_name: string;
+            /** Required Qty */
+            required_qty: string;
+            /** Shortage Qty */
+            shortage_qty?: string | null;
+            /** Standard Cost */
+            standard_cost?: string | null;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "available" | "insufficient" | "unavailable";
+            /** Uom */
+            uom: string;
+        };
+        /** AdminProductionInventoryImpactView */
+        AdminProductionInventoryImpactView: {
+            /**
+             * Integration Available
+             * @default true
+             */
+            integration_available: boolean;
+            /** Movements */
+            movements: components["schemas"]["AdminProductionInventoryMovementView"][];
+            /** Notes */
+            notes?: string | null;
+        };
+        /** AdminProductionInventoryMovementView */
+        AdminProductionInventoryMovementView: {
+            /** Balance After */
+            balance_after?: string | null;
+            /**
+             * Branch Id
+             * Format: uuid
+             */
+            branch_id: string;
+            /** Direction */
+            direction: string;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Location Code */
+            location_code: string;
+            /** Movement Type */
+            movement_type: string;
+            /**
+             * Product Id
+             * Format: uuid
+             */
+            product_id: string;
+            /** Quantity */
+            quantity: string;
+            /** Source Document Id */
+            source_document_id?: string | null;
+            /** Source Document Type */
+            source_document_type?: string | null;
+            /** Unit Of Measure */
+            unit_of_measure: string;
+        };
+        /** AdminProductionListItemView */
+        AdminProductionListItemView: {
+            /** Actual Output Qty */
+            actual_output_qty?: string | null;
+            /**
+             * Branch Id
+             * Format: uuid
+             */
+            branch_id: string;
+            /** Branch Name */
+            branch_name: string;
+            /** Completed At */
+            completed_at?: string | null;
+            /** Folio */
+            folio: string;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Operator Name */
+            operator_name: string;
+            /** Planned At */
+            planned_at?: string | null;
+            /** Planned Output Qty */
+            planned_output_qty: string;
+            /** Product Code */
+            product_code: string;
+            /**
+             * Product Id
+             * Format: uuid
+             */
+            product_id: string;
+            /** Product Name */
+            product_name: string;
+            /**
+             * Recipe Id
+             * Format: uuid
+             */
+            recipe_id: string;
+            /** Recipe Name */
+            recipe_name: string;
+            /** Started At */
+            started_at?: string | null;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "DRAFT" | "IN_PROGRESS" | "COMPLETED" | "CANCELLED";
+            /** Variance Percent */
+            variance_percent?: string | null;
+            /** Variance Qty */
+            variance_qty?: string | null;
+            /** Warning State */
+            warning_state?: ("info" | "warning" | "critical") | null;
+            /** Warnings */
+            warnings: components["schemas"]["AdminProductionWarningView"][];
+        };
+        /** AdminProductionListResponse */
+        AdminProductionListResponse: {
+            backend_contract?: components["schemas"]["AdminProductionBackendContractView"];
+            filter_options: components["schemas"]["AdminProductionFilterOptionsView"];
+            /**
+             * Is Backend Connected
+             * @default true
+             */
+            is_backend_connected: boolean;
+            /** Items */
+            items: components["schemas"]["AdminProductionListItemView"][];
+            metrics: components["schemas"]["AdminProductionMetricsView"];
+            /** Page */
+            page: number;
+            /** Page Size */
+            page_size: number;
+            /** Total */
+            total: number;
+        };
+        /** AdminProductionMetricsView */
+        AdminProductionMetricsView: {
+            /** Completed Batches */
+            completed_batches: number;
+            /** In Progress Batches */
+            in_progress_batches: number;
+            /** Pending Batches */
+            pending_batches: number;
+            /** Produced Units */
+            produced_units: string;
+            /** Total Batches */
+            total_batches: number;
+            /** With Shortages */
+            with_shortages: number;
+            /** With Variance */
+            with_variance: number;
+        };
+        /** AdminProductionOutputYieldView */
+        AdminProductionOutputYieldView: {
+            /** Actual Output Qty */
+            actual_output_qty?: string | null;
+            /** Planned Output Qty */
+            planned_output_qty: string;
+            /** Uom */
+            uom: string;
+            /** Variance Percent */
+            variance_percent?: string | null;
+            /** Variance Qty */
+            variance_qty?: string | null;
+            /** Variance Reason */
+            variance_reason?: string | null;
+        };
+        /** AdminProductionOverviewView */
+        AdminProductionOverviewView: {
+            /** Actual Output Qty */
+            actual_output_qty?: string | null;
+            /**
+             * Branch Id
+             * Format: uuid
+             */
+            branch_id: string;
+            /** Branch Name */
+            branch_name: string;
+            /** Cancelled At */
+            cancelled_at?: string | null;
+            /** Completed At */
+            completed_at?: string | null;
+            /** Completed By User Id */
+            completed_by_user_id?: string | null;
+            /** Completed By User Name */
+            completed_by_user_name?: string | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /**
+             * Created By User Id
+             * Format: uuid
+             */
+            created_by_user_id: string;
+            /** Created By User Name */
+            created_by_user_name: string;
+            /** Folio */
+            folio: string;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Notes */
+            notes?: string | null;
+            /** Planned At */
+            planned_at?: string | null;
+            /** Planned Output Qty */
+            planned_output_qty: string;
+            /** Started At */
+            started_at?: string | null;
+            /** Started By User Id */
+            started_by_user_id?: string | null;
+            /** Started By User Name */
+            started_by_user_name?: string | null;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "DRAFT" | "IN_PROGRESS" | "COMPLETED" | "CANCELLED";
+            /** Variance Percent */
+            variance_percent?: string | null;
+            /** Variance Qty */
+            variance_qty?: string | null;
+            /** Variance Reason */
+            variance_reason?: string | null;
+            /** Warning State */
+            warning_state?: ("info" | "warning" | "critical") | null;
+        };
+        /** AdminProductionProductRecipeView */
+        AdminProductionProductRecipeView: {
+            /** Product Code */
+            product_code: string;
+            /**
+             * Product Id
+             * Format: uuid
+             */
+            product_id: string;
+            /** Product Is Active */
+            product_is_active: boolean;
+            /** Product Kind */
+            product_kind: string;
+            /** Product Name */
+            product_name: string;
+            /** Product Unit Of Measure */
+            product_unit_of_measure: string;
+            /**
+             * Recipe Id
+             * Format: uuid
+             */
+            recipe_id: string;
+            /** Recipe Is Active */
+            recipe_is_active: boolean;
+            /** Recipe Name */
+            recipe_name: string;
+            /** Recipe Yield Qty */
+            recipe_yield_qty: string;
+            /** Recipe Yield Uom */
+            recipe_yield_uom: string;
+        };
+        /** AdminProductionRelatedDocumentView */
+        AdminProductionRelatedDocumentView: {
+            /**
+             * Document Id
+             * Format: uuid
+             */
+            document_id: string;
+            /** Document Type */
+            document_type: string;
+            /** Folio */
+            folio: string;
+            /** Status */
+            status: string;
+        };
+        /** AdminProductionStartRequest */
+        AdminProductionStartRequest: {
+            /** Notes */
+            notes?: string | null;
+        };
+        /** AdminProductionUpdateRequest */
+        AdminProductionUpdateRequest: {
+            /** Notes */
+            notes?: string | null;
+            /** Planned At */
+            planned_at?: string | null;
+            /** Planned Output Qty */
+            planned_output_qty?: number | string | null;
+            /** Product Id */
+            product_id?: string | null;
+            /** Recipe Id */
+            recipe_id?: string | null;
+        };
+        /** AdminProductionWarningView */
+        AdminProductionWarningView: {
+            /** Code */
+            code: string;
+            /** Message */
+            message: string;
+            /**
+             * Severity
+             * @default warning
+             * @enum {string}
+             */
+            severity: "info" | "warning" | "critical";
+        };
+        /** AdminProductionWasteScrapView */
+        AdminProductionWasteScrapView: {
+            /**
+             * Integration Available
+             * @default false
+             */
+            integration_available: boolean;
+            /**
+             * Notes
+             * @default Waste/scrap is represented as production yield variance; dedicated merma documents are pending contract.
+             */
+            notes: string;
+            /** Records */
+            records?: {
+                [key: string]: string;
+            }[];
+        };
+        /** AdminProductsListResponse */
+        AdminProductsListResponse: {
+            filter_options: components["schemas"]["AdminProductFilterOptionsView"];
+            /**
+             * Is Backend Connected
+             * @default true
+             */
+            is_backend_connected: boolean;
+            /** Items */
+            items: components["schemas"]["AdminProductView"][];
+            metrics: components["schemas"]["AdminProductMetricsView"];
+            /** Page */
+            page: number;
+            /** Page Size */
+            page_size: number;
+            /** Total */
+            total: number;
+        };
+        /** AdminPurchaseAvailableActionsView */
+        AdminPurchaseAvailableActionsView: {
+            /** Can Cancel */
+            can_cancel: boolean;
+            /** Can Confirm */
+            can_confirm: boolean;
+            /** Can Edit */
+            can_edit: boolean;
+            /** Can Receive */
+            can_receive: boolean;
+            /** Can View Movements */
+            can_view_movements: boolean;
+        };
+        /** AdminPurchaseBackendContractView */
+        AdminPurchaseBackendContractView: {
+            /**
+             * Cancel Endpoint
+             * @default POST /v1/admin/purchases/{purchase_id}/cancel
+             */
+            cancel_endpoint: string;
+            /**
+             * Confirm Endpoint
+             * @default POST /v1/admin/purchases/{purchase_id}/confirm
+             */
+            confirm_endpoint: string;
+            /**
+             * Create Direct Entry Endpoint
+             * @default POST /v1/admin/purchases/direct-entry
+             */
+            create_direct_entry_endpoint: string;
+            /**
+             * Create Endpoint
+             * @default POST /v1/admin/purchases
+             */
+            create_endpoint: string;
+            /**
+             * Detail Endpoint
+             * @default GET /v1/admin/purchases/{purchase_id}
+             */
+            detail_endpoint: string;
+            /**
+             * List Endpoint
+             * @default GET /v1/admin/purchases
+             */
+            list_endpoint: string;
+            /**
+             * Receive Endpoint
+             * @default POST /v1/admin/purchases/{purchase_id}/receive
+             */
+            receive_endpoint: string;
+            /**
+             * Update Endpoint
+             * @default PATCH /v1/admin/purchases/{purchase_id}
+             */
+            update_endpoint: string;
+        };
+        /** AdminPurchaseBranchView */
+        AdminPurchaseBranchView: {
+            /** Branch Code */
+            branch_code: string;
+            /**
+             * Branch Id
+             * Format: uuid
+             */
+            branch_id: string;
+            /** Branch Is Active */
+            branch_is_active: boolean;
+            /** Branch Name */
+            branch_name: string;
+            /** Timezone */
+            timezone: string;
+        };
+        /** AdminPurchaseCancelRequest */
+        AdminPurchaseCancelRequest: {
+            /** Reason */
+            reason?: string | null;
+        };
+        /** AdminPurchaseCostSummaryView */
+        AdminPurchaseCostSummaryView: {
+            /** Currency */
+            currency: string;
+            /** Received Total */
+            received_total: string;
+            /** Subtotal */
+            subtotal: string;
+            /** Taxes */
+            taxes?: string | null;
+            /** Total */
+            total: string;
+        };
+        /** AdminPurchaseCreateRequest */
+        AdminPurchaseCreateRequest: {
+            /**
+             * Branch Id
+             * Format: uuid
+             */
+            branch_id: string;
+            /**
+             * Confirm Now
+             * @default false
+             */
+            confirm_now: boolean;
+            /** Document Date */
+            document_date?: string | null;
+            /** External Document Date */
+            external_document_date?: string | null;
+            /** External Document Number */
+            external_document_number?: string | null;
+            /** External Document Type */
+            external_document_type?: string | null;
+            /** Lines */
+            lines: components["schemas"]["AdminPurchaseLineInput"][];
+            /** Notes */
+            notes?: string | null;
+            /**
+             * Supplier Id
+             * Format: uuid
+             */
+            supplier_id: string;
+        };
+        /** AdminPurchaseDetailView */
+        AdminPurchaseDetailView: {
+            available_actions: components["schemas"]["AdminPurchaseAvailableActionsView"];
+            cost_summary: components["schemas"]["AdminPurchaseCostSummaryView"];
+            inventory_impact: components["schemas"]["AdminPurchaseInventoryImpactView"];
+            /** Lines */
+            lines: components["schemas"]["AdminPurchaseLineView"][];
+            overview: components["schemas"]["AdminPurchaseOverviewView"];
+            receipt: components["schemas"]["AdminPurchaseReceiptSummaryView"];
+            receiving_branch: components["schemas"]["AdminPurchaseBranchView"];
+            /** Related Documents */
+            related_documents: components["schemas"]["AdminPurchaseRelatedDocumentView"][];
+            supplier_context: components["schemas"]["AdminPurchaseSupplierContextView"];
+            /** Warnings */
+            warnings: components["schemas"]["AdminPurchaseWarningView"][];
+        };
+        /** AdminPurchaseDirectEntryLineInput */
+        AdminPurchaseDirectEntryLineInput: {
+            /** Notes */
+            notes?: string | null;
+            /**
+             * Product Id
+             * Format: uuid
+             */
+            product_id: string;
+            /** Received Quantity */
+            received_quantity: number | string;
+            /** Unit Cost */
+            unit_cost: number | string;
+        };
+        /** AdminPurchaseDirectEntryRequest */
+        AdminPurchaseDirectEntryRequest: {
+            /**
+             * Branch Id
+             * Format: uuid
+             */
+            branch_id: string;
+            /** Document Date */
+            document_date?: string | null;
+            /** External Document Date */
+            external_document_date?: string | null;
+            /** External Document Number */
+            external_document_number?: string | null;
+            /** External Document Type */
+            external_document_type?: string | null;
+            /** Lines */
+            lines: components["schemas"]["AdminPurchaseDirectEntryLineInput"][];
+            /** Notes */
+            notes?: string | null;
+            /**
+             * Supplier Id
+             * Format: uuid
+             */
+            supplier_id: string;
+        };
+        /** AdminPurchaseFilterOptionView */
+        AdminPurchaseFilterOptionView: {
+            /** Id */
+            id: string;
+            /** Label */
+            label: string;
+        };
+        /** AdminPurchaseFilterOptionsView */
+        AdminPurchaseFilterOptionsView: {
+            /** Branches */
+            branches: components["schemas"]["AdminPurchaseFilterOptionView"][];
+            /** Operators */
+            operators: components["schemas"]["AdminPurchaseFilterOptionView"][];
+            /** Product Kinds */
+            product_kinds: components["schemas"]["AdminPurchaseFilterOptionView"][];
+            /** Products */
+            products: components["schemas"]["AdminPurchaseFilterOptionView"][];
+            /** Statuses */
+            statuses: components["schemas"]["AdminPurchaseFilterOptionView"][];
+            /** Suppliers */
+            suppliers: components["schemas"]["AdminPurchaseFilterOptionView"][];
+        };
+        /** AdminPurchaseInventoryImpactView */
+        AdminPurchaseInventoryImpactView: {
+            /** Integration Available */
+            integration_available: boolean;
+            /** Movements */
+            movements: components["schemas"]["AdminPurchaseInventoryMovementView"][];
+            /** Notes */
+            notes?: string | null;
+        };
+        /** AdminPurchaseInventoryMovementView */
+        AdminPurchaseInventoryMovementView: {
+            /** Balance After */
+            balance_after?: string | null;
+            /**
+             * Branch Id
+             * Format: uuid
+             */
+            branch_id: string;
+            /** Direction */
+            direction: string;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Location Code */
+            location_code: string;
+            /** Movement Type */
+            movement_type: string;
+            /**
+             * Product Id
+             * Format: uuid
+             */
+            product_id: string;
+            /** Quantity */
+            quantity: string;
+            /** Source Document Id */
+            source_document_id?: string | null;
+            /** Source Document Type */
+            source_document_type?: string | null;
+            /** Unit Of Measure */
+            unit_of_measure: string;
+        };
+        /** AdminPurchaseLineInput */
+        AdminPurchaseLineInput: {
+            /** Notes */
+            notes?: string | null;
+            /** Ordered Quantity */
+            ordered_quantity: number | string;
+            /**
+             * Product Id
+             * Format: uuid
+             */
+            product_id: string;
+            /** Unit Cost */
+            unit_cost: number | string;
+        };
+        /** AdminPurchaseLineView */
+        AdminPurchaseLineView: {
+            /** Discrepancy */
+            discrepancy: string;
+            /** Discrepancy Reason */
+            discrepancy_reason?: string | null;
+            /** Line Status */
+            line_status: string;
+            /** Line Total */
+            line_total: string;
+            /** Notes */
+            notes?: string | null;
+            /** Ordered Quantity */
+            ordered_quantity: string;
+            /** Pending Quantity */
+            pending_quantity: string;
+            /** Product Code */
+            product_code: string;
+            /**
+             * Product Id
+             * Format: uuid
+             */
+            product_id: string;
+            /** Product Kind */
+            product_kind: string;
+            /** Product Name */
+            product_name: string;
+            /**
+             * Purchase Line Id
+             * Format: uuid
+             */
+            purchase_line_id: string;
+            /** Received Quantity */
+            received_quantity: string;
+            /** Standard Cost */
+            standard_cost?: string | null;
+            /** Supplier Last Known Price */
+            supplier_last_known_price?: string | null;
+            /** Unit Cost */
+            unit_cost: string;
+            /** Unit Of Measure */
+            unit_of_measure: string;
+        };
+        /** AdminPurchaseListItemView */
+        AdminPurchaseListItemView: {
+            /**
+             * Branch Id
+             * Format: uuid
+             */
+            branch_id: string;
+            /** Branch Name */
+            branch_name: string;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /**
+             * Document Date
+             * Format: date-time
+             */
+            document_date: string;
+            /**
+             * Document Type
+             * @enum {string}
+             */
+            document_type: "PURCHASE" | "DIRECT_ENTRY";
+            /** External Document Number */
+            external_document_number?: string | null;
+            /** Folio */
+            folio: string;
+            /** Has Discrepancy */
+            has_discrepancy: boolean;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Line Count */
+            line_count: number;
+            /** Operator Name */
+            operator_name: string;
+            /** Received At */
+            received_at?: string | null;
+            /** Received Unit Count */
+            received_unit_count: string;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "DRAFT" | "ORDERED" | "PARTIALLY_RECEIVED" | "RECEIVED" | "CANCELLED";
+            /**
+             * Supplier Id
+             * Format: uuid
+             */
+            supplier_id: string;
+            /** Supplier Name */
+            supplier_name: string;
+            /** Total Amount */
+            total_amount: string;
+            /** Warning State */
+            warning_state?: ("info" | "warning" | "critical") | null;
+            /** Warnings */
+            warnings: components["schemas"]["AdminPurchaseWarningView"][];
+        };
+        /** AdminPurchaseListResponse */
+        AdminPurchaseListResponse: {
+            backend_contract?: components["schemas"]["AdminPurchaseBackendContractView"];
+            filter_options: components["schemas"]["AdminPurchaseFilterOptionsView"];
+            /**
+             * Is Backend Connected
+             * @default true
+             */
+            is_backend_connected: boolean;
+            /** Items */
+            items: components["schemas"]["AdminPurchaseListItemView"][];
+            metrics: components["schemas"]["AdminPurchaseMetricsView"];
+            /** Page */
+            page: number;
+            /** Page Size */
+            page_size: number;
+            /** Total */
+            total: number;
+        };
+        /** AdminPurchaseMetricsView */
+        AdminPurchaseMetricsView: {
+            /** Active Suppliers Used */
+            active_suppliers_used: number;
+            /** Confirmed Entries */
+            confirmed_entries: number;
+            /** Partially Received */
+            partially_received: number;
+            /** Pending Receipt */
+            pending_receipt: number;
+            /** Total Amount */
+            total_amount: string;
+            /** Total Documents */
+            total_documents: number;
+            /** With Discrepancies */
+            with_discrepancies: number;
+        };
+        /** AdminPurchaseOverviewView */
+        AdminPurchaseOverviewView: {
+            /**
+             * Branch Id
+             * Format: uuid
+             */
+            branch_id: string;
+            /** Branch Name */
+            branch_name: string;
+            /** Confirmed At */
+            confirmed_at?: string | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /**
+             * Created By User Id
+             * Format: uuid
+             */
+            created_by_user_id: string;
+            /** Created By User Name */
+            created_by_user_name: string;
+            /**
+             * Document Date
+             * Format: date-time
+             */
+            document_date: string;
+            /**
+             * Document Type
+             * @enum {string}
+             */
+            document_type: "PURCHASE" | "DIRECT_ENTRY";
+            /** External Document Number */
+            external_document_number?: string | null;
+            /** External Document Type */
+            external_document_type?: string | null;
+            /** Folio */
+            folio: string;
+            /** Has Discrepancy */
+            has_discrepancy: boolean;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Line Count */
+            line_count: number;
+            /** Notes */
+            notes?: string | null;
+            /** Received At */
+            received_at?: string | null;
+            /** Received Unit Count */
+            received_unit_count: string;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "DRAFT" | "ORDERED" | "PARTIALLY_RECEIVED" | "RECEIVED" | "CANCELLED";
+            /**
+             * Supplier Id
+             * Format: uuid
+             */
+            supplier_id: string;
+            /** Supplier Name */
+            supplier_name: string;
+            /** Total Amount */
+            total_amount: string;
+            /** Warning State */
+            warning_state?: ("info" | "warning" | "critical") | null;
+        };
+        /** AdminPurchaseReceiptLineInput */
+        AdminPurchaseReceiptLineInput: {
+            /** Discrepancy Reason */
+            discrepancy_reason?: string | null;
+            /** Notes */
+            notes?: string | null;
+            /**
+             * Purchase Line Id
+             * Format: uuid
+             */
+            purchase_line_id: string;
+            /** Received Quantity */
+            received_quantity: number | string;
+            /** Unit Cost */
+            unit_cost?: number | string | null;
+        };
+        /** AdminPurchaseReceiptSummaryView */
+        AdminPurchaseReceiptSummaryView: {
+            /** Expected Quantity */
+            expected_quantity: string;
+            /** Has Discrepancy */
+            has_discrepancy: boolean;
+            /** Pending Quantity */
+            pending_quantity: string;
+            /** Receipt Count */
+            receipt_count: number;
+            /** Received Quantity */
+            received_quantity: string;
+            /** State */
+            state: string;
+        };
+        /** AdminPurchaseReceiveRequest */
+        AdminPurchaseReceiveRequest: {
+            /** Lines */
+            lines: components["schemas"]["AdminPurchaseReceiptLineInput"][];
+            /** Notes */
+            notes?: string | null;
+        };
+        /** AdminPurchaseRelatedDocumentView */
+        AdminPurchaseRelatedDocumentView: {
+            /**
+             * Document Id
+             * Format: uuid
+             */
+            document_id: string;
+            /** Document Type */
+            document_type: string;
+            /** Folio */
+            folio: string;
+            /** Status */
+            status: string;
+        };
+        /** AdminPurchaseSupplierContextView */
+        AdminPurchaseSupplierContextView: {
+            /** Commercial Name */
+            commercial_name?: string | null;
+            /** Lead Time Days */
+            lead_time_days: number;
+            /** Payment Terms Summary */
+            payment_terms_summary: string;
+            /** Primary Contact */
+            primary_contact?: string | null;
+            /** Status */
+            status: string;
+            /**
+             * Supplier Id
+             * Format: uuid
+             */
+            supplier_id: string;
+            /** Supplier Name */
+            supplier_name: string;
+        };
+        /** AdminPurchaseUpdateRequest */
+        AdminPurchaseUpdateRequest: {
+            /** Branch Id */
+            branch_id?: string | null;
+            /** Document Date */
+            document_date?: string | null;
+            /** External Document Date */
+            external_document_date?: string | null;
+            /** External Document Number */
+            external_document_number?: string | null;
+            /** External Document Type */
+            external_document_type?: string | null;
+            /** Lines */
+            lines?: components["schemas"]["AdminPurchaseLineInput"][] | null;
+            /** Notes */
+            notes?: string | null;
+            /** Supplier Id */
+            supplier_id?: string | null;
+        };
+        /** AdminPurchaseWarningView */
+        AdminPurchaseWarningView: {
+            /** Code */
+            code: string;
+            /** Message */
+            message: string;
+            /**
+             * Severity
+             * @enum {string}
+             */
+            severity: "info" | "warning" | "critical";
+        };
+        /** AdminRecipeCostDetailView */
+        AdminRecipeCostDetailView: {
+            active_recipe?: components["schemas"]["AdminRecipeView"] | null;
+            product: components["schemas"]["AdminRecipeCostProductSummaryView"];
+            /** Recipe Versions */
+            recipe_versions: components["schemas"]["AdminRecipeView"][];
+        };
+        /** AdminRecipeCostFilterOptionsView */
+        AdminRecipeCostFilterOptionsView: {
+            /** Brands */
+            brands: components["schemas"]["AdminProductFilterOptionView"][];
+            /** Classes */
+            classes: components["schemas"]["AdminProductFilterOptionView"][];
+            /** Raw Materials */
+            raw_materials: components["schemas"]["AdminProductFilterOptionView"][];
+        };
+        /** AdminRecipeCostMetricsView */
+        AdminRecipeCostMetricsView: {
+            /** High Variance */
+            high_variance: number;
+            /** Recently Updated */
+            recently_updated: number;
+            /** With Active Recipe */
+            with_active_recipe: number;
+            /** With Warnings */
+            with_warnings: number;
+            /** Without Recipe */
+            without_recipe: number;
+        };
+        /** AdminRecipeCostProductSummaryView */
+        AdminRecipeCostProductSummaryView: {
+            /** Active Recipe Id */
+            active_recipe_id?: string | null;
+            /** Active Recipe Updated At */
+            active_recipe_updated_at?: string | null;
+            /** Active Recipe Version Name */
+            active_recipe_version_name?: string | null;
+            /**
+             * Brand Id
+             * Format: uuid
+             */
+            brand_id: string;
+            /** Brand Name */
+            brand_name: string;
+            /** Calculated Unit Cost */
+            calculated_unit_cost?: string | null;
+            /**
+             * Class Id
+             * Format: uuid
+             */
+            class_id: string;
+            /** Class Name */
+            class_name: string;
+            /** Cost Variance */
+            cost_variance?: string | null;
+            /** Cost Variance Percent */
+            cost_variance_percent?: string | null;
+            /** Currency Code */
+            currency_code: string;
+            /**
+             * Health Status
+             * @enum {string}
+             */
+            health_status: "healthy" | "warning" | "incomplete" | "no_recipe";
+            /** Product Code */
+            product_code: string;
+            /**
+             * Product Id
+             * Format: uuid
+             */
+            product_id: string;
+            /** Product Name */
+            product_name: string;
+            /** Product Standard Cost */
+            product_standard_cost?: string | null;
+            /**
+             * Product Status
+             * @enum {string}
+             */
+            product_status: "active" | "inactive";
+            /** Product Unit Price */
+            product_unit_price: string;
+            /** Recipe Input Count */
+            recipe_input_count: number;
+            /** Total Batch Cost */
+            total_batch_cost?: string | null;
+            /** Unit Of Measure */
+            unit_of_measure: string;
+            /** Updated At */
+            updated_at?: string | null;
+            warnings: components["schemas"]["AdminRecipeCostWarningsView"];
+            /** Yield Qty */
+            yield_qty?: string | null;
+            /** Yield Uom */
+            yield_uom?: string | null;
+        };
+        /** AdminRecipeCostWarningsView */
+        AdminRecipeCostWarningsView: {
+            /** Codes */
+            codes: string[];
+            /** Messages */
+            messages: string[];
+        };
+        /** AdminRecipeCostsListResponse */
+        AdminRecipeCostsListResponse: {
+            filter_options: components["schemas"]["AdminRecipeCostFilterOptionsView"];
+            /**
+             * Is Backend Connected
+             * @default true
+             */
+            is_backend_connected: boolean;
+            /** Items */
+            items: components["schemas"]["AdminRecipeCostProductSummaryView"][];
+            metrics: components["schemas"]["AdminRecipeCostMetricsView"];
+            /** Page */
+            page: number;
+            /** Page Size */
+            page_size: number;
+            /** Total */
+            total: number;
+        };
+        /** AdminRecipeCreateRequest */
+        AdminRecipeCreateRequest: {
+            /**
+             * Activate
+             * @default true
+             */
+            activate: boolean;
+            /** Inputs */
+            inputs: components["schemas"]["AdminRecipeInputCreateRequest"][];
+            /**
+             * Product Id
+             * Format: uuid
+             */
+            product_id: string;
+            /** Version Name */
+            version_name?: string | null;
+            /** Yield Qty */
+            yield_qty: number | string;
+            /**
+             * Yield Uom
+             * @default piece
+             */
+            yield_uom: string;
+        };
+        /** AdminRecipeDuplicateRequest */
+        AdminRecipeDuplicateRequest: {
+            /**
+             * Activate
+             * @default false
+             */
+            activate: boolean;
+            /** Version Name */
+            version_name?: string | null;
+        };
+        /** AdminRecipeInputCreateRequest */
+        AdminRecipeInputCreateRequest: {
+            /**
+             * Input Product Id
+             * Format: uuid
+             */
+            input_product_id: string;
+            /** Quantity */
+            quantity: number | string;
+        };
+        /** AdminRecipeInputView */
+        AdminRecipeInputView: {
+            /** Extended Cost */
+            extended_cost?: string | null;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Input Product Code */
+            input_product_code: string;
+            /**
+             * Input Product Id
+             * Format: uuid
+             */
+            input_product_id: string;
+            /** Input Product Name */
+            input_product_name: string;
+            /** Quantity */
+            quantity: string;
+            /** Standard Cost */
+            standard_cost?: string | null;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "active" | "inactive";
+            /** Unit Of Measure */
+            unit_of_measure: string;
+        };
+        /** AdminRecipeView */
+        AdminRecipeView: {
+            /** Calculated Unit Cost */
+            calculated_unit_cost?: string | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Input Count */
+            input_count: number;
+            /** Inputs */
+            inputs: components["schemas"]["AdminRecipeInputView"][];
+            /** Is Active */
+            is_active: boolean;
+            /**
+             * Product Id
+             * Format: uuid
+             */
+            product_id: string;
+            /** Total Batch Cost */
+            total_batch_cost?: string | null;
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+            /** Version Name */
+            version_name?: string | null;
+            /** Yield Qty */
+            yield_qty: string;
+            /** Yield Uom */
+            yield_uom: string;
+        };
+        /** AdminReconciliationAvailableActionsView */
+        AdminReconciliationAvailableActionsView: {
+            /**
+             * Can Attach Evidence
+             * @default false
+             */
+            can_attach_evidence: boolean;
+            /**
+             * Can Copy Folio
+             * @default true
+             */
+            can_copy_folio: boolean;
+            /**
+             * Can Export Report
+             * @default false
+             */
+            can_export_report: boolean;
+            /**
+             * Can Open Source
+             * @default true
+             */
+            can_open_source: boolean;
+            /**
+             * Can Resolve
+             * @default false
+             */
+            can_resolve: boolean;
+            /**
+             * Can Save Notes
+             * @default false
+             */
+            can_save_notes: boolean;
+            /**
+             * Can Void
+             * @default false
+             */
+            can_void: boolean;
+            /** Note */
+            note?: string | null;
+        };
+        /** AdminReconciliationBackendContractView */
+        AdminReconciliationBackendContractView: {
+            /** Create Endpoint */
+            create_endpoint: string;
+            /** Detail Endpoint */
+            detail_endpoint: string;
+            /** Evidence Endpoint */
+            evidence_endpoint?: string | null;
+            /** Export Endpoint */
+            export_endpoint?: string | null;
+            /** List Endpoint */
+            list_endpoint: string;
+            /** Pending Endpoint */
+            pending_endpoint: string;
+            /** Resolve Endpoint */
+            resolve_endpoint: string;
+        };
+        /** AdminReconciliationCreateRequest */
+        AdminReconciliationCreateRequest: {
+            /** Evidence Note */
+            evidence_note?: string | null;
+            /**
+             * Final Status
+             * @default RECONCILED
+             */
+            final_status: string;
+            /** Notes */
+            notes?: string | null;
+            /** Reason Code */
+            reason_code: string;
+            /**
+             * Source Document Id
+             * Format: uuid
+             */
+            source_document_id: string;
+            /** Source Type */
+            source_type: string;
+        };
+        /** AdminReconciliationDetailView */
+        AdminReconciliationDetailView: {
+            available_actions: components["schemas"]["AdminReconciliationAvailableActionsView"];
+            backend_contract: components["schemas"]["AdminReconciliationBackendContractView"];
+            difference_breakdown: components["schemas"]["AdminReconciliationDifferenceBreakdownView"];
+            evidence: components["schemas"]["AdminReconciliationEvidenceView"];
+            explanation_reason: components["schemas"]["AdminReconciliationExplanationView"];
+            overview: components["schemas"]["AdminReconciliationOverviewView"];
+            /** Related Documents */
+            related_documents: components["schemas"]["AdminReconciliationRelatedDocumentView"][];
+            resolution: components["schemas"]["AdminReconciliationResolutionView"];
+            source_document_context: components["schemas"]["AdminReconciliationSourceContextView"];
+        };
+        /** AdminReconciliationDifferenceBreakdownView */
+        AdminReconciliationDifferenceBreakdownView: {
+            /** Actual Amount */
+            actual_amount: string;
+            /** Difference Amount */
+            difference_amount: string;
+            /** Direction */
+            direction: string;
+            /** Expected Amount */
+            expected_amount: string;
+            /** Payment Method */
+            payment_method: string;
+            /** Tolerance Note */
+            tolerance_note?: string | null;
+            /** Tolerance Status */
+            tolerance_status: string;
+        };
+        /** AdminReconciliationEvidenceView */
+        AdminReconciliationEvidenceView: {
+            /** Empty State */
+            empty_state: string;
+            /** Evidence Note */
+            evidence_note?: string | null;
+            /** Files */
+            files: string[];
+            /** Has Evidence */
+            has_evidence: boolean;
+            /** Is Supported */
+            is_supported: boolean;
+        };
+        /** AdminReconciliationExplanationView */
+        AdminReconciliationExplanationView: {
+            /** Notes */
+            notes?: string | null;
+            /** Reason Code */
+            reason_code?: string | null;
+            /** Reason Label */
+            reason_label?: string | null;
+            /** Responsible User Id */
+            responsible_user_id?: string | null;
+            /** Responsible User Name */
+            responsible_user_name?: string | null;
+            /** Timestamp */
+            timestamp?: string | null;
+        };
+        /** AdminReconciliationFilterOptionView */
+        AdminReconciliationFilterOptionView: {
+            /** Id */
+            id: string;
+            /** Label */
+            label: string;
+        };
+        /** AdminReconciliationFilterOptionsView */
+        AdminReconciliationFilterOptionsView: {
+            /** Branches */
+            branches: components["schemas"]["AdminReconciliationFilterOptionView"][];
+            /** Cashiers */
+            cashiers: components["schemas"]["AdminReconciliationFilterOptionView"][];
+            /** Discrepancy Types */
+            discrepancy_types: components["schemas"]["AdminReconciliationFilterOptionView"][];
+            /** Evidence States */
+            evidence_states: components["schemas"]["AdminReconciliationFilterOptionView"][];
+            /** Payment Methods */
+            payment_methods: components["schemas"]["AdminReconciliationFilterOptionView"][];
+            /** Reason Codes */
+            reason_codes: components["schemas"]["AdminReconciliationFilterOptionView"][];
+            /** Source Types */
+            source_types: components["schemas"]["AdminReconciliationFilterOptionView"][];
+            /** Statuses */
+            statuses: components["schemas"]["AdminReconciliationFilterOptionView"][];
+            /** Workstations */
+            workstations: components["schemas"]["AdminReconciliationFilterOptionView"][];
+        };
+        /** AdminReconciliationListItemView */
+        AdminReconciliationListItemView: {
+            /** Actual Amount */
+            actual_amount: string;
+            /**
+             * Branch Id
+             * Format: uuid
+             */
+            branch_id: string;
+            /** Branch Name */
+            branch_name: string;
+            /** Difference Amount */
+            difference_amount: string;
+            /** Difference Direction */
+            difference_direction: string;
+            /** Expected Amount */
+            expected_amount: string;
+            /** Folio */
+            folio: string;
+            /** Has Evidence */
+            has_evidence: boolean;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /**
+             * Occurred At
+             * Format: date-time
+             */
+            occurred_at: string;
+            /** Operator Id */
+            operator_id?: string | null;
+            /** Operator Name */
+            operator_name: string;
+            /** Payment Method */
+            payment_method: string;
+            /** Reason Code */
+            reason_code?: string | null;
+            /**
+             * Source Document Id
+             * Format: uuid
+             */
+            source_document_id: string;
+            /** Source Reference */
+            source_reference: string;
+            /** Source Type */
+            source_type: string;
+            /** Status */
+            status: string;
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+            /** Warning State */
+            warning_state: string;
+            /**
+             * Workstation Id
+             * Format: uuid
+             */
+            workstation_id: string;
+            /** Workstation Name */
+            workstation_name: string;
+        };
+        /** AdminReconciliationListResponse */
+        AdminReconciliationListResponse: {
+            backend_contract: components["schemas"]["AdminReconciliationBackendContractView"];
+            filter_options: components["schemas"]["AdminReconciliationFilterOptionsView"];
+            /**
+             * Is Backend Connected
+             * @default true
+             */
+            is_backend_connected: boolean;
+            /** Items */
+            items: components["schemas"]["AdminReconciliationListItemView"][];
+            metrics: components["schemas"]["AdminReconciliationMetricsView"];
+            /** Page */
+            page: number;
+            /** Page Size */
+            page_size: number;
+            /** Pending Discrepancies */
+            pending_discrepancies: components["schemas"]["AdminPendingDiscrepancyItemView"][];
+            /** Total */
+            total: number;
+        };
+        /** AdminReconciliationMetricsView */
+        AdminReconciliationMetricsView: {
+            /** Card Terminal Pending Count */
+            card_terminal_pending_count: number;
+            /** Cash Pending Count */
+            cash_pending_count: number;
+            /** Net Difference Amount */
+            net_difference_amount: string;
+            /** Overage Amount */
+            overage_amount: string;
+            /** Pending Count */
+            pending_count: number;
+            /** Reconciled Count */
+            reconciled_count: number;
+            /** Shortage Amount */
+            shortage_amount: string;
+            /** With Evidence Count */
+            with_evidence_count: number;
+        };
+        /** AdminReconciliationOverviewView */
+        AdminReconciliationOverviewView: {
+            /** Actual Amount */
+            actual_amount: string;
+            /**
+             * Branch Id
+             * Format: uuid
+             */
+            branch_id: string;
+            /** Branch Name */
+            branch_name: string;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Difference Amount */
+            difference_amount: string;
+            /** Difference Direction */
+            difference_direction: string;
+            /** Expected Amount */
+            expected_amount: string;
+            /** Folio */
+            folio: string;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Operator Id */
+            operator_id?: string | null;
+            /** Operator Name */
+            operator_name: string;
+            /** Payment Method */
+            payment_method: string;
+            /** Resolved At */
+            resolved_at?: string | null;
+            /**
+             * Source Document Id
+             * Format: uuid
+             */
+            source_document_id: string;
+            /** Source Reference */
+            source_reference: string;
+            /** Source Type */
+            source_type: string;
+            /** Status */
+            status: string;
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+            /** Warning State */
+            warning_state: string;
+            /**
+             * Workstation Id
+             * Format: uuid
+             */
+            workstation_id: string;
+            /** Workstation Name */
+            workstation_name: string;
+        };
+        /** AdminReconciliationRelatedDocumentView */
+        AdminReconciliationRelatedDocumentView: {
+            /** Amount */
+            amount?: string | null;
+            /** Document Type */
+            document_type: string;
+            /** Folio */
+            folio: string;
+            /** Id */
+            id: string;
+            /** Occurred At */
+            occurred_at?: string | null;
+            /** Route Hint */
+            route_hint?: string | null;
+            /** Status */
+            status: string;
+        };
+        /** AdminReconciliationResolutionView */
+        AdminReconciliationResolutionView: {
+            /** Can Resolve */
+            can_resolve: boolean;
+            /** Evidence Summary */
+            evidence_summary?: string | null;
+            /** Final Notes */
+            final_notes?: string | null;
+            /** Required Fields */
+            required_fields: string[];
+            /** Resolution Reason */
+            resolution_reason?: string | null;
+            /** Resolved At */
+            resolved_at?: string | null;
+            /** Resolved By User Id */
+            resolved_by_user_id?: string | null;
+            /** Resolved By User Name */
+            resolved_by_user_name?: string | null;
+            /** Status */
+            status: string;
+        };
+        /** AdminReconciliationResolveRequest */
+        AdminReconciliationResolveRequest: {
+            /** Evidence Note */
+            evidence_note?: string | null;
+            /** Notes */
+            notes?: string | null;
+            /** Reason Code */
+            reason_code: string;
+        };
+        /** AdminReconciliationSourceContextView */
+        AdminReconciliationSourceContextView: {
+            /** Closed At */
+            closed_at?: string | null;
+            /** Counted Cash Amount */
+            counted_cash_amount?: string | null;
+            /** Difference Amount */
+            difference_amount?: string | null;
+            /** Expected Cash Amount */
+            expected_cash_amount?: string | null;
+            /** External Reported Amount */
+            external_reported_amount?: string | null;
+            /** Note */
+            note?: string | null;
+            /** Opened At */
+            opened_at?: string | null;
+            /** Operational Payment Category */
+            operational_payment_category?: string | null;
+            /** Payment Method */
+            payment_method?: string | null;
+            /** Refund Original Ticket */
+            refund_original_ticket?: string | null;
+            /** Source Reference */
+            source_reference: string;
+            /** Source Route Hint */
+            source_route_hint?: string | null;
+            /** Source Type */
+            source_type: string;
+            /** Terminal Reference */
+            terminal_reference?: string | null;
+        };
+        /** AdminReportBackendContractView */
+        AdminReportBackendContractView: {
+            /**
+             * Async Jobs Supported
+             * @default false
+             */
+            async_jobs_supported: boolean;
+            /**
+             * Definitions Endpoint
+             * @default GET /v1/admin/reports
+             */
+            definitions_endpoint: string;
+            /**
+             * Export Endpoint
+             * @default POST /v1/admin/reports/{report_code}/export
+             */
+            export_endpoint: string;
+            /**
+             * Generation History Supported
+             * @default false
+             */
+            generation_history_supported: boolean;
+            /**
+             * Preview Endpoint
+             * @default POST /v1/admin/reports/{report_code}/preview
+             */
+            preview_endpoint: string;
+            /**
+             * Saved Configurations Supported
+             * @default false
+             */
+            saved_configurations_supported: boolean;
+            /** Supported Export Formats */
+            supported_export_formats?: string[];
+        };
+        /** AdminReportCatalogFilterOptionsView */
+        AdminReportCatalogFilterOptionsView: {
+            /** Categories */
+            categories: components["schemas"]["AdminReportFilterOptionView"][];
+            /** Export Formats */
+            export_formats: components["schemas"]["AdminReportFilterOptionView"][];
+            /** Sensitivities */
+            sensitivities: components["schemas"]["AdminReportFilterOptionView"][];
+            /** Source Modules */
+            source_modules: components["schemas"]["AdminReportFilterOptionView"][];
+            /** Statuses */
+            statuses: components["schemas"]["AdminReportFilterOptionView"][];
+        };
+        /** AdminReportCatalogMetricsView */
+        AdminReportCatalogMetricsView: {
+            /** Available Reports */
+            available_reports: number;
+            /** Category Count */
+            category_count: number;
+            /** Exportable Reports */
+            exportable_reports: number;
+            /** Pending Backend Reports */
+            pending_backend_reports: number;
+            /** Recently Generated Reports */
+            recently_generated_reports?: number | null;
+            /** Sensitive Reports */
+            sensitive_reports: number;
+        };
+        /** AdminReportColumnView */
+        AdminReportColumnView: {
+            /** Key */
+            key: string;
+            /**
+             * Kind
+             * @default text
+             */
+            kind: string;
+            /** Label */
+            label: string;
+        };
+        /** AdminReportDefinitionView */
+        AdminReportDefinitionView: {
+            /** Available Filters */
+            available_filters: components["schemas"]["AdminReportFilterDefinitionView"][];
+            /** Backend Endpoint */
+            backend_endpoint?: string | null;
+            /** Category */
+            category: string;
+            /** Category Label */
+            category_label: string;
+            /** Code */
+            code: string;
+            /** Description */
+            description: string;
+            /** Is Sensitive */
+            is_sensitive: boolean;
+            /** Name */
+            name: string;
+            /** Preview Kind */
+            preview_kind: string;
+            /** Required Permissions */
+            required_permissions: string[];
+            /** Source Modules */
+            source_modules: string[];
+            /** Status */
+            status: string;
+            /** Supported Exports */
+            supported_exports: string[];
+            /** Unavailable Reason */
+            unavailable_reason?: string | null;
+        };
+        /** AdminReportDefinitionsResponse */
+        AdminReportDefinitionsResponse: {
+            backend_contract?: components["schemas"]["AdminReportBackendContractView"];
+            /** Definitions */
+            definitions: components["schemas"]["AdminReportDefinitionView"][];
+            filter_options: components["schemas"]["AdminReportCatalogFilterOptionsView"];
+            /**
+             * Is Backend Connected
+             * @default true
+             */
+            is_backend_connected: boolean;
+            metrics: components["schemas"]["AdminReportCatalogMetricsView"];
+            /** Total */
+            total: number;
+        };
+        /** AdminReportExportRequest */
+        AdminReportExportRequest: {
+            /** Filters */
+            filters?: {
+                [key: string]: unknown;
+            };
+            /**
+             * Format
+             * @default json
+             */
+            format: string;
+        };
+        /** AdminReportExportResponse */
+        AdminReportExportResponse: {
+            /** Filters Applied */
+            filters_applied: {
+                [key: string]: string | null;
+            };
+            /** Format */
+            format: string;
+            /**
+             * Generated At
+             * Format: date-time
+             */
+            generated_at: string;
+            /** Report Code */
+            report_code: string;
+            /** Report Name */
+            report_name: string;
+            /** Rows */
+            rows: components["schemas"]["AdminReportRowView"][];
+            /** Total Rows */
+            total_rows: number;
+            /** Warnings */
+            warnings?: string[];
+        };
+        /** AdminReportFilterDefinitionView */
+        AdminReportFilterDefinitionView: {
+            /** Default Value */
+            default_value?: string | null;
+            /** Key */
+            key: string;
+            /** Label */
+            label: string;
+            /** Options */
+            options?: components["schemas"]["AdminReportFilterOptionView"][];
+            /** Options Source */
+            options_source?: string | null;
+            /**
+             * Required
+             * @default false
+             */
+            required: boolean;
+            /** Type */
+            type: string;
+        };
+        /** AdminReportFilterOptionView */
+        AdminReportFilterOptionView: {
+            /** Code */
+            code: string;
+            /** Label */
+            label: string;
+        };
+        /** AdminReportPreviewRequest */
+        AdminReportPreviewRequest: {
+            /** Filters */
+            filters?: {
+                [key: string]: unknown;
+            };
+        };
+        /** AdminReportPreviewResponse */
+        AdminReportPreviewResponse: {
+            /** Columns */
+            columns: components["schemas"]["AdminReportColumnView"][];
+            /** Filters Applied */
+            filters_applied: {
+                [key: string]: string | null;
+            };
+            /**
+             * Generated At
+             * Format: date-time
+             */
+            generated_at: string;
+            /** Related Links */
+            related_links: components["schemas"]["AdminReportRelatedLinkView"][];
+            /** Report Code */
+            report_code: string;
+            /** Report Name */
+            report_name: string;
+            /** Rows */
+            rows: components["schemas"]["AdminReportRowView"][];
+            /** Summary Cards */
+            summary_cards: components["schemas"]["AdminReportSummaryCardView"][];
+            /** Warnings */
+            warnings?: string[];
+        };
+        /** AdminReportRelatedLinkView */
+        AdminReportRelatedLinkView: {
+            /**
+             * Can Open
+             * @default true
+             */
+            can_open: boolean;
+            /** Document Id */
+            document_id?: string | null;
+            /** Document Type */
+            document_type?: string | null;
+            /** Label */
+            label: string;
+            /** Module */
+            module: string;
+            /** Reference */
+            reference?: string | null;
+            /** Route Hint */
+            route_hint?: string | null;
+        };
+        /** AdminReportRowView */
+        AdminReportRowView: {
+            /** Cells */
+            cells: {
+                [key: string]: string | null;
+            };
+            /** Id */
+            id: string;
+            /** Source Document Links */
+            source_document_links?: components["schemas"]["AdminReportRelatedLinkView"][];
+        };
+        /** AdminReportSummaryCardView */
+        AdminReportSummaryCardView: {
+            /** Helper Text */
+            helper_text?: string | null;
+            /** Label */
+            label: string;
+            /**
+             * Tone
+             * @default neutral
+             */
+            tone: string;
+            /** Value */
+            value: string;
+        };
+        /** AdminReturnAvailableActionsView */
+        AdminReturnAvailableActionsView: {
+            /**
+             * Can Create From Backoffice
+             * @default false
+             */
+            can_create_from_backoffice: boolean;
+            /**
+             * Can Open Original Ticket
+             * @default true
+             */
+            can_open_original_ticket: boolean;
+            /**
+             * Can Reprint
+             * @default false
+             */
+            can_reprint: boolean;
+            /** Creation Note */
+            creation_note: string;
+        };
+        /** AdminReturnCorrectionFilterOptionView */
+        AdminReturnCorrectionFilterOptionView: {
+            /** Id */
+            id: string;
+            /** Label */
+            label: string;
+        };
+        /** AdminReturnDetailView */
+        AdminReturnDetailView: {
+            audit_summary?: components["schemas"]["AuditSummaryView"] | null;
+            available_actions: components["schemas"]["AdminReturnAvailableActionsView"];
+            backend_contract: components["schemas"]["AdminReturnsBackendContractView"];
+            original_ticket: components["schemas"]["AdminReturnOriginalTicketView"];
+            overview: components["schemas"]["AdminReturnOverviewView"];
+            refund_impact: components["schemas"]["AdminReturnRefundImpactView"];
+            /** Related Documents */
+            related_documents: components["schemas"]["AdminReturnRelatedDocumentView"][];
+            /** Returned Lines */
+            returned_lines: components["schemas"]["AdminReturnedLineView"][];
+        };
+        /** AdminReturnFilterOptionsView */
+        AdminReturnFilterOptionsView: {
+            /** Branches */
+            branches: components["schemas"]["AdminReturnCorrectionFilterOptionView"][];
+            /** Operators */
+            operators: components["schemas"]["AdminReturnCorrectionFilterOptionView"][];
+            /** Refund Methods */
+            refund_methods: components["schemas"]["AdminReturnCorrectionFilterOptionView"][];
+            /** Statuses */
+            statuses: components["schemas"]["AdminReturnCorrectionFilterOptionView"][];
+        };
+        /** AdminReturnListItemView */
+        AdminReturnListItemView: {
+            /**
+             * Branch Id
+             * Format: uuid
+             */
+            branch_id: string;
+            /** Branch Name */
+            branch_name: string;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Folio */
+            folio: string;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /**
+             * Operator Id
+             * Format: uuid
+             */
+            operator_id: string;
+            /** Operator Name */
+            operator_name: string;
+            /**
+             * Original Sale Id
+             * Format: uuid
+             */
+            original_sale_id: string;
+            /** Original Ticket Folio */
+            original_ticket_folio: string;
+            /** Refund Method */
+            refund_method: string;
+            /** Refunded Amount */
+            refunded_amount: string;
+            /** Returned Line Count */
+            returned_line_count: number;
+            /** Status */
+            status: string;
+            /** Warning State */
+            warning_state?: string | null;
+            /** Workstation Code */
+            workstation_code: string;
+            /**
+             * Workstation Id
+             * Format: uuid
+             */
+            workstation_id: string;
+            /** Workstation Name */
+            workstation_name: string;
+        };
+        /** AdminReturnMetricsView */
+        AdminReturnMetricsView: {
+            /** Cash Refunded Amount */
+            cash_refunded_amount: string;
+            /** Pending Review Count */
+            pending_review_count: number;
+            /** Refunded Amount */
+            refunded_amount: string;
+            /** Returned Line Count */
+            returned_line_count: number;
+            /** Returns Count */
+            returns_count: number;
+        };
+        /** AdminReturnOriginalTicketView */
+        AdminReturnOriginalTicketView: {
+            /** Branch Name */
+            branch_name: string;
+            /**
+             * Cash Session Id
+             * Format: uuid
+             */
+            cash_session_id: string;
+            /** Cashier Name */
+            cashier_name: string;
+            /** Folio */
+            folio: string;
+            /** Payment Methods Label */
+            payment_methods_label: string;
+            /**
+             * Sale Date
+             * Format: date-time
+             */
+            sale_date: string;
+            /**
+             * Sale Id
+             * Format: uuid
+             */
+            sale_id: string;
+            /** Status */
+            status: string;
+            /** Total Amount */
+            total_amount: string;
+            /** Workstation Name */
+            workstation_name: string;
+        };
+        /** AdminReturnOverviewView */
+        AdminReturnOverviewView: {
+            /**
+             * Branch Id
+             * Format: uuid
+             */
+            branch_id: string;
+            /** Branch Name */
+            branch_name: string;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Folio */
+            folio: string;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Is Partial Return */
+            is_partial_return: boolean;
+            /** Notes */
+            notes?: string | null;
+            /**
+             * Operator Id
+             * Format: uuid
+             */
+            operator_id: string;
+            /** Operator Name */
+            operator_name: string;
+            /** Reason Code */
+            reason_code: string;
+            /** Reason Name */
+            reason_name: string;
+            /** Refund Method */
+            refund_method: string;
+            /** Status */
+            status: string;
+            /** Total Refund Amount */
+            total_refund_amount: string;
+            /** Workstation Code */
+            workstation_code: string;
+            /**
+             * Workstation Id
+             * Format: uuid
+             */
+            workstation_id: string;
+            /** Workstation Name */
+            workstation_name: string;
+        };
+        /** AdminReturnRefundImpactView */
+        AdminReturnRefundImpactView: {
+            /** Cash Impact Amount */
+            cash_impact_amount: string;
+            /**
+             * Cash Session Id
+             * Format: uuid
+             */
+            cash_session_id: string;
+            /** Currency Code */
+            currency_code: string;
+            /** Linked Cash Movement Id */
+            linked_cash_movement_id?: string | null;
+            /** Refund Amount */
+            refund_amount: string;
+            /** Refund Method */
+            refund_method: string;
+        };
+        /** AdminReturnRelatedDocumentView */
+        AdminReturnRelatedDocumentView: {
+            /** Amount */
+            amount?: string | null;
+            /** Document Type */
+            document_type: string;
+            /** Folio */
+            folio: string;
+            /** Id */
+            id: string;
+            /** Occurred At */
+            occurred_at?: string | null;
+            /** Route Hint */
+            route_hint?: string | null;
+            /** Status */
+            status: string;
+        };
+        /** AdminReturnedLineView */
+        AdminReturnedLineView: {
+            /** Disposition Code */
+            disposition_code: string;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Line Status */
+            line_status: string;
+            /** Original Quantity */
+            original_quantity: string;
+            /**
+             * Original Sale Line Id
+             * Format: uuid
+             */
+            original_sale_line_id: string;
+            /** Product Class Code */
+            product_class_code: string;
+            /** Product Class Name */
+            product_class_name: string;
+            /** Product Code */
+            product_code: string;
+            /** Product Name */
+            product_name: string;
+            /** Refund Amount */
+            refund_amount: string;
+            /** Returned Quantity */
+            returned_quantity: string;
+            /** Unit Price */
+            unit_price: string;
+        };
+        /** AdminReturnsBackendContractView */
+        AdminReturnsBackendContractView: {
+            /** Create Endpoint */
+            create_endpoint?: string | null;
+            /** Detail Endpoint */
+            detail_endpoint: string;
+            /** List Endpoint */
+            list_endpoint: string;
+            /** Reprint Endpoint */
+            reprint_endpoint?: string | null;
+        };
+        /** AdminReturnsListResponse */
+        AdminReturnsListResponse: {
+            backend_contract: components["schemas"]["AdminReturnsBackendContractView"];
+            filter_options: components["schemas"]["AdminReturnFilterOptionsView"];
+            /**
+             * Is Backend Connected
+             * @default true
+             */
+            is_backend_connected: boolean;
+            /** Items */
+            items: components["schemas"]["AdminReturnListItemView"][];
+            metrics: components["schemas"]["AdminReturnMetricsView"];
+            /** Page */
+            page: number;
+            /** Page Size */
+            page_size: number;
+            /** Total */
+            total: number;
+        };
+        /** AdminRoleAccessSurfacesView */
+        AdminRoleAccessSurfacesView: {
+            /** Backoffice Enabled */
+            backoffice_enabled: boolean;
+            /** Grants Both Surfaces */
+            grants_both_surfaces: boolean;
+            /** Note */
+            note: string;
+            /** Pos Enabled */
+            pos_enabled: boolean;
+            /** Surfaces */
+            surfaces: ("POS" | "BACKOFFICE")[];
+        };
+        /** AdminRoleAssignedUserView */
+        AdminRoleAssignedUserView: {
+            /**
+             * Assigned At
+             * Format: date-time
+             */
+            assigned_at: string;
+            /** Branch Summary */
+            branch_summary: string;
+            /** Email */
+            email: string;
+            /** Full Name */
+            full_name: string;
+            /** Status */
+            status: string;
+            /** Surfaces */
+            surfaces: ("POS" | "BACKOFFICE")[];
+            /**
+             * User Id
+             * Format: uuid
+             */
+            user_id: string;
+        };
+        /** AdminRoleAuditEventView */
+        AdminRoleAuditEventView: {
+            /** Action */
+            action: string;
+            /** Actor Id */
+            actor_id?: string | null;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Metadata */
+            metadata: {
+                [key: string]: unknown;
+            };
+            /**
+             * Occurred At
+             * Format: date-time
+             */
+            occurred_at: string;
+        };
+        /** AdminRoleAvailableActionsView */
+        AdminRoleAvailableActionsView: {
+            /** Can Activate */
+            can_activate: boolean;
+            /** Can Assign Users */
+            can_assign_users: boolean;
+            /** Can Deactivate */
+            can_deactivate: boolean;
+            /**
+             * Can Delete
+             * @default false
+             */
+            can_delete: boolean;
+            /**
+             * Can Duplicate
+             * @default false
+             */
+            can_duplicate: boolean;
+            /** Can Edit */
+            can_edit: boolean;
+            /**
+             * Can Open Audit
+             * @default true
+             */
+            can_open_audit: boolean;
+            /** Can Remove Users */
+            can_remove_users: boolean;
+        };
+        /** AdminRoleBackendContractView */
+        AdminRoleBackendContractView: {
+            /**
+             * Assign User Endpoint
+             * @default POST /v1/admin/roles/{id}/users/{user_id}
+             */
+            assign_user_endpoint: string;
+            /**
+             * Create Endpoint
+             * @default POST /v1/admin/roles
+             */
+            create_endpoint: string;
+            /**
+             * Destructive Delete Supported
+             * @default false
+             */
+            destructive_delete_supported: boolean;
+            /**
+             * Detail Endpoint
+             * @default GET /v1/admin/roles/{id}
+             */
+            detail_endpoint: string;
+            /**
+             * Duplicate Supported
+             * @default false
+             */
+            duplicate_supported: boolean;
+            /**
+             * List Endpoint
+             * @default GET /v1/admin/roles
+             */
+            list_endpoint: string;
+            /**
+             * Permissions Endpoint
+             * @default GET /v1/admin/roles/permissions
+             */
+            permissions_endpoint: string;
+            /**
+             * Remove User Endpoint
+             * @default POST /v1/admin/roles/{id}/users/{user_id}/remove
+             */
+            remove_user_endpoint: string;
+            /**
+             * Scoped Roles Supported
+             * @default false
+             */
+            scoped_roles_supported: boolean;
+            /**
+             * Status Endpoint
+             * @default POST /v1/admin/roles/{id}/status
+             */
+            status_endpoint: string;
+            /**
+             * Update Endpoint
+             * @default PATCH /v1/admin/roles/{id}
+             */
+            update_endpoint: string;
+        };
+        /** AdminRoleCreateRequest */
+        AdminRoleCreateRequest: {
+            /** Code */
+            code: string;
+            /**
+             * Confirmed High Risk Change
+             * @default false
+             */
+            confirmed_high_risk_change: boolean;
+            /** Description */
+            description?: string | null;
+            /**
+             * Is Active
+             * @default true
+             */
+            is_active: boolean;
+            /** Name */
+            name: string;
+            /** Permission Codes */
+            permission_codes: string[];
+            /** Surfaces */
+            surfaces: ("POS" | "BACKOFFICE")[];
+        };
+        /** AdminRoleDetailView */
+        AdminRoleDetailView: {
+            access_surfaces: components["schemas"]["AdminRoleAccessSurfacesView"];
+            /** Assigned Users */
+            assigned_users: components["schemas"]["AdminRoleAssignedUserView"][];
+            /** Audit History */
+            audit_history: components["schemas"]["AdminRoleAuditEventView"][];
+            available_actions: components["schemas"]["AdminRoleAvailableActionsView"];
+            overview: components["schemas"]["AdminRoleOverviewView"];
+            /** Permission Matrix */
+            permission_matrix: components["schemas"]["AdminPermissionGroupView"][];
+            scopes: components["schemas"]["AdminRoleScopeView"];
+            /** Sensitive Permissions */
+            sensitive_permissions: components["schemas"]["AdminPermissionView"][];
+            /** Warnings */
+            warnings: components["schemas"]["AdminRoleWarningView"][];
+        };
+        /** AdminRoleFilterOptionView */
+        AdminRoleFilterOptionView: {
+            /** Id */
+            id: string;
+            /** Label */
+            label: string;
+        };
+        /** AdminRoleFilterOptionsView */
+        AdminRoleFilterOptionsView: {
+            /** App Surfaces */
+            app_surfaces: components["schemas"]["AdminRoleFilterOptionView"][];
+            /** Has Users */
+            has_users: components["schemas"]["AdminRoleFilterOptionView"][];
+            /** High Privilege */
+            high_privilege: components["schemas"]["AdminRoleFilterOptionView"][];
+            /** Permission Modules */
+            permission_modules: components["schemas"]["AdminRoleFilterOptionView"][];
+            /** Statuses */
+            statuses: components["schemas"]["AdminRoleFilterOptionView"][];
+            /** System States */
+            system_states: components["schemas"]["AdminRoleFilterOptionView"][];
+            /** Warning States */
+            warning_states: components["schemas"]["AdminRoleFilterOptionView"][];
+        };
+        /** AdminRoleListItemView */
+        AdminRoleListItemView: {
+            /** Assigned User Count */
+            assigned_user_count: number;
+            /** Code */
+            code: string;
+            /** Description */
+            description?: string | null;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Is High Privilege */
+            is_high_privilege: boolean;
+            /** Is System */
+            is_system: boolean;
+            /** Name */
+            name: string;
+            /** Permission Count */
+            permission_count: number;
+            /** Scope Summary */
+            scope_summary: string;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "active" | "inactive";
+            /** Surfaces */
+            surfaces: ("POS" | "BACKOFFICE")[];
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+            /**
+             * Warning State
+             * @enum {string}
+             */
+            warning_state: "ready" | "warning" | "blocked";
+            /** Warnings */
+            warnings: components["schemas"]["AdminRoleWarningView"][];
+        };
+        /** AdminRoleMetricsView */
+        AdminRoleMetricsView: {
+            /** Active Roles */
+            active_roles: number;
+            /** Backoffice Roles */
+            backoffice_roles: number;
+            /** High Privilege */
+            high_privilege: number;
+            /** Inactive Roles */
+            inactive_roles: number;
+            /** Pos Roles */
+            pos_roles: number;
+            /** Total Roles */
+            total_roles: number;
+            /** With Users */
+            with_users: number;
+            /** With Warnings */
+            with_warnings: number;
+            /** Without Users */
+            without_users: number;
+        };
+        /** AdminRoleOverviewView */
+        AdminRoleOverviewView: {
+            /** Code */
+            code: string;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Description */
+            description?: string | null;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Is High Privilege */
+            is_high_privilege: boolean;
+            /** Is System */
+            is_system: boolean;
+            /** Name */
+            name: string;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "active" | "inactive";
+            /** Surfaces */
+            surfaces: ("POS" | "BACKOFFICE")[];
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+            /**
+             * Warning State
+             * @enum {string}
+             */
+            warning_state: "ready" | "warning" | "blocked";
+        };
+        /** AdminRoleScopeView */
+        AdminRoleScopeView: {
+            /**
+             * Is Supported
+             * @default false
+             */
+            is_supported: boolean;
+            /**
+             * Missing Contract Note
+             * @default Branch-scoped roles are not available yet.
+             */
+            missing_contract_note: string;
+            /**
+             * Scope Summary
+             * @default Sin restricciones de alcance configuradas.
+             */
+            scope_summary: string;
+        };
+        /** AdminRoleStatusChangeRequest */
+        AdminRoleStatusChangeRequest: {
+            /**
+             * Confirmed High Risk Change
+             * @default false
+             */
+            confirmed_high_risk_change: boolean;
+            /** Is Active */
+            is_active: boolean;
+        };
+        /** AdminRoleUpdateRequest */
+        AdminRoleUpdateRequest: {
+            /**
+             * Confirmed High Risk Change
+             * @default false
+             */
+            confirmed_high_risk_change: boolean;
+            /** Description */
+            description?: string | null;
+            /** Is Active */
+            is_active?: boolean | null;
+            /** Name */
+            name?: string | null;
+            /** Permission Codes */
+            permission_codes?: string[] | null;
+            /** Surfaces */
+            surfaces?: ("POS" | "BACKOFFICE")[] | null;
+        };
+        /** AdminRoleWarningView */
+        AdminRoleWarningView: {
+            /** Code */
+            code: string;
+            /** Message */
+            message: string;
+            /**
+             * Severity
+             * @enum {string}
+             */
+            severity: "info" | "warning" | "critical";
+        };
+        /** AdminRolesListResponse */
+        AdminRolesListResponse: {
+            backend_contract?: components["schemas"]["AdminRoleBackendContractView"];
+            filter_options: components["schemas"]["AdminRoleFilterOptionsView"];
+            /**
+             * Is Backend Connected
+             * @default true
+             */
+            is_backend_connected: boolean;
+            /** Items */
+            items: components["schemas"]["AdminRoleListItemView"][];
+            metrics: components["schemas"]["AdminRoleMetricsView"];
+            /** Page */
+            page: number;
+            /** Page Size */
+            page_size: number;
+            /** Total */
+            total: number;
+        };
+        /** AdminSalesTicketBackendContractView */
+        AdminSalesTicketBackendContractView: {
+            /** Detail Endpoint */
+            detail_endpoint: string;
+            /** List Endpoint */
+            list_endpoint: string;
+            /** Reprint Endpoint */
+            reprint_endpoint?: string | null;
+        };
+        /** AdminSalesTicketDetailView */
+        AdminSalesTicketDetailView: {
+            /** Lines */
+            lines: components["schemas"]["AdminSalesTicketLineView"][];
+            operational_context: components["schemas"]["AdminSalesTicketOperationalContextView"];
+            overview: components["schemas"]["AdminSalesTicketOverviewView"];
+            /** Payments */
+            payments: components["schemas"]["AdminSalesTicketPaymentView"][];
+            printable_ticket: components["schemas"]["AdminSalesTicketPrintableView"];
+            /** Related Documents */
+            related_documents: components["schemas"]["AdminSalesTicketRelatedDocumentView"][];
+        };
+        /** AdminSalesTicketFilterOptionView */
+        AdminSalesTicketFilterOptionView: {
+            /** Id */
+            id: string;
+            /** Label */
+            label: string;
+        };
+        /** AdminSalesTicketFilterOptionsView */
+        AdminSalesTicketFilterOptionsView: {
+            /** Branches */
+            branches: components["schemas"]["AdminSalesTicketFilterOptionView"][];
+            /** Cashiers */
+            cashiers: components["schemas"]["AdminSalesTicketFilterOptionView"][];
+            /** Payment Methods */
+            payment_methods: components["schemas"]["AdminSalesTicketFilterOptionView"][];
+            /** Statuses */
+            statuses: components["schemas"]["AdminSalesTicketFilterOptionView"][];
+            /** Workstations */
+            workstations: components["schemas"]["AdminSalesTicketFilterOptionView"][];
+        };
+        /** AdminSalesTicketLineView */
+        AdminSalesTicketLineView: {
+            /** Capture Mode */
+            capture_mode: string;
+            /** Catalog Code */
+            catalog_code: string;
+            /** Catalog Name */
+            catalog_name: string;
+            /** Discount Amount */
+            discount_amount: string;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Line Total Amount */
+            line_total_amount: string;
+            /** Physical Attribution Status */
+            physical_attribution_status: string;
+            /** Product Class Id */
+            product_class_id?: string | null;
+            /** Product Id */
+            product_id?: string | null;
+            /** Quantity */
+            quantity: string;
+            /** Sequence */
+            sequence: number;
+            /** Unit Price */
+            unit_price: string;
+        };
+        /** AdminSalesTicketListItemView */
+        AdminSalesTicketListItemView: {
+            /**
+             * Branch Id
+             * Format: uuid
+             */
+            branch_id: string;
+            /** Branch Name */
+            branch_name: string;
+            /**
+             * Cashier Id
+             * Format: uuid
+             */
+            cashier_id: string;
+            /** Cashier Name */
+            cashier_name: string;
+            /** Currency Code */
+            currency_code: string;
+            /** Folio */
+            folio: string;
+            /** Has Returns */
+            has_returns: boolean;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Item Count */
+            item_count: number;
+            /**
+             * Occurred At
+             * Format: date-time
+             */
+            occurred_at: string;
+            /** Payment Methods Label */
+            payment_methods_label: string;
+            /** Payment Summary */
+            payment_summary: components["schemas"]["AdminSalesTicketPaymentSummaryView"][];
+            /** Return Count */
+            return_count: number;
+            /** Return Status */
+            return_status: string;
+            /**
+             * Sale Id
+             * Format: uuid
+             */
+            sale_id: string;
+            /** Status */
+            status: string;
+            /** Total Amount */
+            total_amount: string;
+            /** Unit Count */
+            unit_count: string;
+            /** Workstation Code */
+            workstation_code: string;
+            /**
+             * Workstation Id
+             * Format: uuid
+             */
+            workstation_id: string;
+            /** Workstation Name */
+            workstation_name: string;
+        };
+        /** AdminSalesTicketMetricsView */
+        AdminSalesTicketMetricsView: {
+            /** Average Ticket Amount */
+            average_ticket_amount: string;
+            /** Card Amount */
+            card_amount: string;
+            /** Cash Amount */
+            cash_amount: string;
+            /** Ticket Count */
+            ticket_count: number;
+            /** Tickets With Returns */
+            tickets_with_returns: number;
+            /** Total Sales Amount */
+            total_sales_amount: string;
+        };
+        /** AdminSalesTicketOperationalContextView */
+        AdminSalesTicketOperationalContextView: {
+            /**
+             * Branch Id
+             * Format: uuid
+             */
+            branch_id: string;
+            /** Branch Name */
+            branch_name: string;
+            /**
+             * Cash Session Id
+             * Format: uuid
+             */
+            cash_session_id: string;
+            /** Cashier Email */
+            cashier_email: string;
+            /**
+             * Cashier Id
+             * Format: uuid
+             */
+            cashier_id: string;
+            /** Cashier Name */
+            cashier_name: string;
+            /**
+             * Confirmed At
+             * Format: date-time
+             */
+            confirmed_at: string;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /**
+             * Sale Id
+             * Format: uuid
+             */
+            sale_id: string;
+            /** Workstation Code */
+            workstation_code: string;
+            /**
+             * Workstation Id
+             * Format: uuid
+             */
+            workstation_id: string;
+            /** Workstation Name */
+            workstation_name: string;
+        };
+        /** AdminSalesTicketOverviewView */
+        AdminSalesTicketOverviewView: {
+            /** Change Amount */
+            change_amount: string;
+            /**
+             * Confirmed At
+             * Format: date-time
+             */
+            confirmed_at: string;
+            /** Currency Code */
+            currency_code: string;
+            /** Folio */
+            folio: string;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Item Count */
+            item_count: number;
+            /** Paid Amount */
+            paid_amount: string;
+            /** Return Count */
+            return_count: number;
+            /** Return Status */
+            return_status: string;
+            /** Returned Amount */
+            returned_amount: string;
+            /** Status */
+            status: string;
+            /** Subtotal Amount */
+            subtotal_amount: string;
+            /** Total Amount */
+            total_amount: string;
+            /** Unit Count */
+            unit_count: string;
+        };
+        /** AdminSalesTicketPaymentSummaryView */
+        AdminSalesTicketPaymentSummaryView: {
+            /** Amount */
+            amount: string;
+            /** Currency Code */
+            currency_code: string;
+            /** Payment Method Code */
+            payment_method_code: string;
+        };
+        /** AdminSalesTicketPaymentView */
+        AdminSalesTicketPaymentView: {
+            /** Applied Amount */
+            applied_amount: string;
+            /** Change Amount */
+            change_amount: string;
+            /** Currency Code */
+            currency_code: string;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Payment Method Code */
+            payment_method_code: string;
+            /**
+             * Received At
+             * Format: date-time
+             */
+            received_at: string;
+            /** Sequence */
+            sequence: number;
+            /** Tendered Amount */
+            tendered_amount: string;
+        };
+        /** AdminSalesTicketPrintableView */
+        AdminSalesTicketPrintableView: {
+            /** Can Reprint */
+            can_reprint: boolean;
+            /** Note */
+            note?: string | null;
+            /** Preview Available */
+            preview_available: boolean;
+        };
+        /** AdminSalesTicketRelatedDocumentView */
+        AdminSalesTicketRelatedDocumentView: {
+            /** Amount */
+            amount?: string | null;
+            /** Document Type */
+            document_type: string;
+            /** Folio */
+            folio: string;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Occurred At */
+            occurred_at?: string | null;
+            /** Route Hint */
+            route_hint?: string | null;
+            /** Status */
+            status: string;
+        };
+        /** AdminSalesTicketsListResponse */
+        AdminSalesTicketsListResponse: {
+            backend_contract: components["schemas"]["AdminSalesTicketBackendContractView"];
+            filter_options: components["schemas"]["AdminSalesTicketFilterOptionsView"];
+            /**
+             * Is Backend Connected
+             * @default true
+             */
+            is_backend_connected: boolean;
+            /** Items */
+            items: components["schemas"]["AdminSalesTicketListItemView"][];
+            metrics: components["schemas"]["AdminSalesTicketMetricsView"];
+            /** Page */
+            page: number;
+            /** Page Size */
+            page_size: number;
+            /** Total */
+            total: number;
+        };
+        /** AdminSanitaryAvailableActionsView */
+        AdminSanitaryAvailableActionsView: {
+            /** Can Add Evidence */
+            can_add_evidence: boolean;
+            /** Can Cancel */
+            can_cancel: boolean;
+            /** Can Complete */
+            can_complete: boolean;
+            /** Can Create Incident */
+            can_create_incident: boolean;
+            /** Can Edit */
+            can_edit: boolean;
+            /** Can Export */
+            can_export: boolean;
+            /** Can Print */
+            can_print: boolean;
+            /** Can Start */
+            can_start: boolean;
+            /** Note */
+            note?: string | null;
+        };
+        /** AdminSanitaryBackendContractView */
+        AdminSanitaryBackendContractView: {
+            /**
+             * Cancel Endpoint
+             * @default POST /v1/admin/sanitary-verifications/{verification_id}/cancel
+             */
+            cancel_endpoint: string;
+            /**
+             * Complete Endpoint
+             * @default POST /v1/admin/sanitary-verifications/{verification_id}/complete
+             */
+            complete_endpoint: string;
+            /**
+             * Create Endpoint
+             * @default POST /v1/admin/sanitary-verifications
+             */
+            create_endpoint: string;
+            /**
+             * Detail Endpoint
+             * @default GET /v1/admin/sanitary-verifications/{verification_id}
+             */
+            detail_endpoint: string;
+            /**
+             * Evidence Contract
+             * @default Evidence files are not supported yet; evidence is captured as evidence_note.
+             */
+            evidence_contract: string;
+            /**
+             * Incident Contract
+             * @default Incident creation is not supported yet; failed verifications expose action metadata.
+             */
+            incident_contract: string;
+            /**
+             * List Endpoint
+             * @default GET /v1/admin/sanitary-verifications
+             */
+            list_endpoint: string;
+            /**
+             * Start Endpoint
+             * @default POST /v1/admin/sanitary-verifications/{verification_id}/start
+             */
+            start_endpoint: string;
+            /**
+             * Templates Endpoint
+             * @default GET /v1/admin/sanitary-verifications/templates
+             */
+            templates_endpoint: string;
+        };
+        /** AdminSanitaryChecklistItemInput */
+        AdminSanitaryChecklistItemInput: {
+            /**
+             * Evidence Required On Failure
+             * @default false
+             */
+            evidence_required_on_failure: boolean;
+            /** Expected Standard */
+            expected_standard?: string | null;
+            /** Id */
+            id?: string | null;
+            /**
+             * Is Required
+             * @default true
+             */
+            is_required: boolean;
+            /** Label */
+            label: string;
+            /** Notes */
+            notes?: string | null;
+            /**
+             * Result
+             * @default PENDING
+             * @enum {string}
+             */
+            result: "PENDING" | "PASSED" | "FAILED" | "NOT_APPLICABLE";
+            /**
+             * Risk Level
+             * @default MEDIUM
+             * @enum {string}
+             */
+            risk_level: "LOW" | "MEDIUM" | "HIGH" | "CRITICAL";
+        };
+        /** AdminSanitaryChecklistItemView */
+        AdminSanitaryChecklistItemView: {
+            /** Display Order */
+            display_order: number;
+            /** Evidence Required On Failure */
+            evidence_required_on_failure: boolean;
+            /** Expected Standard */
+            expected_standard?: string | null;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Is Required */
+            is_required: boolean;
+            /** Label */
+            label: string;
+            /** Notes */
+            notes?: string | null;
+            /**
+             * Result
+             * @enum {string}
+             */
+            result: "PENDING" | "PASSED" | "FAILED" | "NOT_APPLICABLE";
+            /**
+             * Risk Level
+             * @enum {string}
+             */
+            risk_level: "LOW" | "MEDIUM" | "HIGH" | "CRITICAL";
+        };
+        /** AdminSanitaryChecklistTemplateView */
+        AdminSanitaryChecklistTemplateView: {
+            /** Area Type */
+            area_type: string;
+            /** Description */
+            description?: string | null;
+            /** Failed Items */
+            failed_items: number;
+            /** Frequency */
+            frequency?: string | null;
+            /** Pass Threshold Percent */
+            pass_threshold_percent: number;
+            /** Passed Items */
+            passed_items: number;
+            /** Process Type */
+            process_type: string;
+            /**
+             * Risk Level
+             * @enum {string}
+             */
+            risk_level: "LOW" | "MEDIUM" | "HIGH" | "CRITICAL";
+            /** Template Id */
+            template_id?: string | null;
+            /** Template Name */
+            template_name: string;
+            /** Total Items */
+            total_items: number;
+        };
+        /** AdminSanitaryEvidenceView */
+        AdminSanitaryEvidenceView: {
+            /**
+             * Empty State
+             * @default Esta verificacion no tiene evidencia adjunta.
+             */
+            empty_state: string;
+            /** Evidence Note */
+            evidence_note?: string | null;
+            /** Files */
+            files?: {
+                [key: string]: string;
+            }[];
+            /**
+             * Has Evidence
+             * @default false
+             */
+            has_evidence: boolean;
+            /**
+             * Is Supported
+             * @default true
+             */
+            is_supported: boolean;
+            /**
+             * Upload Supported
+             * @default false
+             */
+            upload_supported: boolean;
+        };
+        /** AdminSanitaryFilterOptionView */
+        AdminSanitaryFilterOptionView: {
+            /** Id */
+            id: string;
+            /** Label */
+            label: string;
+        };
+        /** AdminSanitaryFilterOptionsView */
+        AdminSanitaryFilterOptionsView: {
+            /** Area Types */
+            area_types: components["schemas"]["AdminSanitaryFilterOptionView"][];
+            /** Areas */
+            areas: components["schemas"]["AdminSanitaryFilterOptionView"][];
+            /** Branches */
+            branches: components["schemas"]["AdminSanitaryFilterOptionView"][];
+            /** Evidence States */
+            evidence_states: components["schemas"]["AdminSanitaryFilterOptionView"][];
+            /** Incident States */
+            incident_states: components["schemas"]["AdminSanitaryFilterOptionView"][];
+            /** Inspectors */
+            inspectors: components["schemas"]["AdminSanitaryFilterOptionView"][];
+            /** Process Types */
+            process_types: components["schemas"]["AdminSanitaryFilterOptionView"][];
+            /** Processes */
+            processes: components["schemas"]["AdminSanitaryFilterOptionView"][];
+            /** Results */
+            results: components["schemas"]["AdminSanitaryFilterOptionView"][];
+            /** Risk Levels */
+            risk_levels: components["schemas"]["AdminSanitaryFilterOptionView"][];
+            /** Statuses */
+            statuses: components["schemas"]["AdminSanitaryFilterOptionView"][];
+            /** Templates */
+            templates: components["schemas"]["AdminSanitaryFilterOptionView"][];
+        };
+        /** AdminSanitaryFindingsView */
+        AdminSanitaryFindingsView: {
+            /** Cancellation Reason */
+            cancellation_reason?: string | null;
+            /** Failed Required Count */
+            failed_required_count: number;
+            /** Findings Notes */
+            findings_notes?: string | null;
+            /** Follow Up Due At */
+            follow_up_due_at?: string | null;
+            /** Follow Up Required */
+            follow_up_required: boolean;
+            /** Notes */
+            notes?: string | null;
+        };
+        /** AdminSanitaryMetricsView */
+        AdminSanitaryMetricsView: {
+            /** Failed Count */
+            failed_count: number;
+            /** High Risk Count */
+            high_risk_count: number;
+            /** Passed Count */
+            passed_count: number;
+            /** Pending Count */
+            pending_count: number;
+            /** Requires Follow Up Count */
+            requires_follow_up_count: number;
+            /** Total Count */
+            total_count: number;
+            /** With Evidence Count */
+            with_evidence_count: number;
+            /** With Incident Count */
+            with_incident_count: number;
+        };
+        /** AdminSanitaryOverviewView */
+        AdminSanitaryOverviewView: {
+            /** Area Name */
+            area_name: string;
+            /**
+             * Branch Id
+             * Format: uuid
+             */
+            branch_id: string;
+            /** Branch Name */
+            branch_name: string;
+            /** Completed At */
+            completed_at?: string | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /**
+             * Created By User Id
+             * Format: uuid
+             */
+            created_by_user_id: string;
+            /** Created By User Name */
+            created_by_user_name: string;
+            /** Equipment Name */
+            equipment_name?: string | null;
+            /** Folio */
+            folio: string;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /**
+             * Inspector User Id
+             * Format: uuid
+             */
+            inspector_user_id: string;
+            /** Inspector User Name */
+            inspector_user_name: string;
+            /** Process Name */
+            process_name?: string | null;
+            /**
+             * Result
+             * @enum {string}
+             */
+            result: "NOT_EVALUATED" | "PASSED" | "FAILED" | "PARTIAL";
+            /**
+             * Risk Level
+             * @enum {string}
+             */
+            risk_level: "LOW" | "MEDIUM" | "HIGH" | "CRITICAL";
+            /**
+             * Scheduled At
+             * Format: date-time
+             */
+            scheduled_at: string;
+            /** Started At */
+            started_at?: string | null;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "SCHEDULED" | "PENDING" | "IN_PROGRESS" | "COMPLETED" | "CANCELLED" | "REQUIRES_FOLLOW_UP";
+            /** Warning State */
+            warning_state: string;
+        };
+        /** AdminSanitaryRelatedCleaningLogView */
+        AdminSanitaryRelatedCleaningLogView: {
+            /** Completed At */
+            completed_at?: string | null;
+            /** Folio */
+            folio: string;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Responsible User Name */
+            responsible_user_name: string;
+            /**
+             * Route Hint
+             * @default /admin/bitacoras-limpieza
+             */
+            route_hint: string | null;
+            /** Status */
+            status: string;
+        };
+        /** AdminSanitaryRelatedDocumentView */
+        AdminSanitaryRelatedDocumentView: {
+            /**
+             * Document Id
+             * Format: uuid
+             */
+            document_id: string;
+            /** Document Type */
+            document_type: string;
+            /** Folio */
+            folio: string;
+            /** Route Hint */
+            route_hint?: string | null;
+            /** Status */
+            status: string;
+        };
+        /** AdminSanitaryScopeView */
+        AdminSanitaryScopeView: {
+            /** Area Name */
+            area_name: string;
+            /** Area Type */
+            area_type: string;
+            /** Branch Code */
+            branch_code: string;
+            /**
+             * Branch Id
+             * Format: uuid
+             */
+            branch_id: string;
+            /** Branch Name */
+            branch_name: string;
+            /** Equipment Name */
+            equipment_name?: string | null;
+            /** Process Name */
+            process_name?: string | null;
+            /** Process Type */
+            process_type: string;
+        };
+        /** AdminSanitaryScoreResultView */
+        AdminSanitaryScoreResultView: {
+            /** Max Score */
+            max_score?: number | null;
+            /** Percentage */
+            percentage?: number | null;
+            /**
+             * Result
+             * @enum {string}
+             */
+            result: "NOT_EVALUATED" | "PASSED" | "FAILED" | "PARTIAL";
+            /** Score */
+            score?: number | null;
+            /** Threshold Percent */
+            threshold_percent: number;
+        };
+        /** AdminSanitaryTemplateItemView */
+        AdminSanitaryTemplateItemView: {
+            /** Description */
+            description?: string | null;
+            /** Display Order */
+            display_order: number;
+            /** Evidence Required On Failure */
+            evidence_required_on_failure: boolean;
+            /** Expected Standard */
+            expected_standard?: string | null;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Is Required */
+            is_required: boolean;
+            /** Label */
+            label: string;
+            /**
+             * Risk Level
+             * @enum {string}
+             */
+            risk_level: "LOW" | "MEDIUM" | "HIGH" | "CRITICAL";
+        };
+        /** AdminSanitaryTemplateView */
+        AdminSanitaryTemplateView: {
+            /** Area Type */
+            area_type: string;
+            /** Description */
+            description?: string | null;
+            /** Frequency */
+            frequency: string;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Is Active */
+            is_active: boolean;
+            /** Items */
+            items: components["schemas"]["AdminSanitaryTemplateItemView"][];
+            /** Name */
+            name: string;
+            /** Pass Threshold Percent */
+            pass_threshold_percent: number;
+            /** Process Type */
+            process_type: string;
+            /** Requires Evidence On Failure */
+            requires_evidence_on_failure: boolean;
+            /**
+             * Risk Level
+             * @enum {string}
+             */
+            risk_level: "LOW" | "MEDIUM" | "HIGH" | "CRITICAL";
+        };
+        /** AdminSanitaryVerificationCancelRequest */
+        AdminSanitaryVerificationCancelRequest: {
+            /** Reason */
+            reason: string;
+        };
+        /** AdminSanitaryVerificationCompleteRequest */
+        AdminSanitaryVerificationCompleteRequest: {
+            /** Checklist Results */
+            checklist_results?: components["schemas"]["AdminSanitaryChecklistItemInput"][];
+            /** Completed At */
+            completed_at?: string | null;
+            /** Evidence Note */
+            evidence_note?: string | null;
+            /** Findings Notes */
+            findings_notes?: string | null;
+            /** Notes */
+            notes?: string | null;
+        };
+        /** AdminSanitaryVerificationCreateRequest */
+        AdminSanitaryVerificationCreateRequest: {
+            /** Area Name */
+            area_name: string;
+            /**
+             * Area Type
+             * @default OTHER
+             */
+            area_type: string;
+            /**
+             * Branch Id
+             * Format: uuid
+             */
+            branch_id: string;
+            /** Checklist Results */
+            checklist_results?: components["schemas"]["AdminSanitaryChecklistItemInput"][];
+            /**
+             * Complete Immediately
+             * @default false
+             */
+            complete_immediately: boolean;
+            /** Completed At */
+            completed_at?: string | null;
+            /** Equipment Name */
+            equipment_name?: string | null;
+            /** Evidence Note */
+            evidence_note?: string | null;
+            /** Findings Notes */
+            findings_notes?: string | null;
+            /**
+             * Inspector User Id
+             * Format: uuid
+             */
+            inspector_user_id: string;
+            /** Notes */
+            notes?: string | null;
+            /** Process Name */
+            process_name?: string | null;
+            /**
+             * Process Type
+             * @default OTHER
+             */
+            process_type: string;
+            /**
+             * Risk Level
+             * @default MEDIUM
+             * @enum {string}
+             */
+            risk_level: "LOW" | "MEDIUM" | "HIGH" | "CRITICAL";
+            /**
+             * Scheduled At
+             * Format: date-time
+             */
+            scheduled_at: string;
+            /** Template Id */
+            template_id?: string | null;
+            /** Template Name */
+            template_name?: string | null;
+        };
+        /** AdminSanitaryVerificationDetailView */
+        AdminSanitaryVerificationDetailView: {
+            available_actions: components["schemas"]["AdminSanitaryAvailableActionsView"];
+            /** Checklist Results */
+            checklist_results: components["schemas"]["AdminSanitaryChecklistItemView"][];
+            checklist_template: components["schemas"]["AdminSanitaryChecklistTemplateView"];
+            evidence: components["schemas"]["AdminSanitaryEvidenceView"];
+            findings_observations: components["schemas"]["AdminSanitaryFindingsView"];
+            overview: components["schemas"]["AdminSanitaryOverviewView"];
+            /** Related Cleaning Logs */
+            related_cleaning_logs: components["schemas"]["AdminSanitaryRelatedCleaningLogView"][];
+            /** Related Documents */
+            related_documents: components["schemas"]["AdminSanitaryRelatedDocumentView"][];
+            scope: components["schemas"]["AdminSanitaryScopeView"];
+            score_result: components["schemas"]["AdminSanitaryScoreResultView"];
+            /** Warnings */
+            warnings: components["schemas"]["AdminSanitaryWarningView"][];
+        };
+        /** AdminSanitaryVerificationListItemView */
+        AdminSanitaryVerificationListItemView: {
+            /** Area Id */
+            area_id?: string | null;
+            /** Area Name */
+            area_name: string;
+            /**
+             * Branch Id
+             * Format: uuid
+             */
+            branch_id: string;
+            /** Branch Name */
+            branch_name: string;
+            /** Checklist Total Count */
+            checklist_total_count: number;
+            /** Completed At */
+            completed_at?: string | null;
+            /** Equipment Id */
+            equipment_id?: string | null;
+            /** Equipment Name */
+            equipment_name?: string | null;
+            /** Failed Count */
+            failed_count: number;
+            /** Folio */
+            folio: string;
+            /** Has Evidence */
+            has_evidence: boolean;
+            /** Has Incident */
+            has_incident: boolean;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /**
+             * Inspector User Id
+             * Format: uuid
+             */
+            inspector_user_id: string;
+            /** Inspector User Name */
+            inspector_user_name: string;
+            /** Passed Count */
+            passed_count: number;
+            /** Process Name */
+            process_name?: string | null;
+            /**
+             * Result
+             * @enum {string}
+             */
+            result: "NOT_EVALUATED" | "PASSED" | "FAILED" | "PARTIAL";
+            /**
+             * Risk Level
+             * @enum {string}
+             */
+            risk_level: "LOW" | "MEDIUM" | "HIGH" | "CRITICAL";
+            /**
+             * Scheduled At
+             * Format: date-time
+             */
+            scheduled_at: string;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "SCHEDULED" | "PENDING" | "IN_PROGRESS" | "COMPLETED" | "CANCELLED" | "REQUIRES_FOLLOW_UP";
+            /** Template Name */
+            template_name: string;
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+            /** Warning State */
+            warning_state: string;
+            /** Warnings */
+            warnings: components["schemas"]["AdminSanitaryWarningView"][];
+        };
+        /** AdminSanitaryVerificationListResponse */
+        AdminSanitaryVerificationListResponse: {
+            backend_contract?: components["schemas"]["AdminSanitaryBackendContractView"];
+            filter_options: components["schemas"]["AdminSanitaryFilterOptionsView"];
+            /**
+             * Is Backend Connected
+             * @default true
+             */
+            is_backend_connected: boolean;
+            /** Items */
+            items: components["schemas"]["AdminSanitaryVerificationListItemView"][];
+            metrics: components["schemas"]["AdminSanitaryMetricsView"];
+            /** Page */
+            page: number;
+            /** Page Size */
+            page_size: number;
+            /** Total */
+            total: number;
+        };
+        /** AdminSanitaryWarningView */
+        AdminSanitaryWarningView: {
+            /** Code */
+            code: string;
+            /** Message */
+            message: string;
+            /**
+             * Severity
+             * @default warning
+             * @enum {string}
+             */
+            severity: "info" | "warning" | "critical";
+        };
+        /** AdminSettingBackendContractView */
+        AdminSettingBackendContractView: {
+            /**
+             * Detail Endpoint
+             * @default GET /v1/admin/settings/{key}
+             */
+            detail_endpoint: string;
+            /**
+             * Export Supported
+             * @default false
+             */
+            export_supported: boolean;
+            /**
+             * History Supported
+             * @default true
+             */
+            history_supported: boolean;
+            /**
+             * List Endpoint
+             * @default GET /v1/admin/settings
+             */
+            list_endpoint: string;
+            /**
+             * Reset Endpoint
+             * @default POST /v1/admin/settings/{key}/reset
+             */
+            reset_endpoint: string;
+            /**
+             * Scoped Overrides Supported
+             * @default false
+             */
+            scoped_overrides_supported: boolean;
+            /**
+             * Secret Storage Supported
+             * @default false
+             */
+            secret_storage_supported: boolean;
+            /**
+             * Update Endpoint
+             * @default PATCH /v1/admin/settings/{key}
+             */
+            update_endpoint: string;
+        };
+        /** AdminSettingCategoryView */
+        AdminSettingCategoryView: {
+            /** Description */
+            description: string;
+            /** Id */
+            id: string;
+            /** Label */
+            label: string;
+        };
+        /** AdminSettingDefinitionView */
+        AdminSettingDefinitionView: {
+            /** Affects Modules */
+            affects_modules: string[];
+            /** Category */
+            category: string;
+            /** Category Label */
+            category_label: string;
+            /** Default Value */
+            default_value?: unknown | null;
+            /** Description */
+            description: string;
+            /** Is Readonly */
+            is_readonly: boolean;
+            /** Is Required */
+            is_required: boolean;
+            /** Is Sensitive */
+            is_sensitive: boolean;
+            /** Key */
+            key: string;
+            /** Label */
+            label: string;
+            /** Options */
+            options?: components["schemas"]["AdminSettingOptionView"][];
+            /** Requires Restart */
+            requires_restart: boolean;
+            /** Scope */
+            scope: string;
+            /** Supported Scopes */
+            supported_scopes: string[];
+            /** Type */
+            type: string;
+            /** Validation Rules */
+            validation_rules?: components["schemas"]["AdminSettingValidationRuleView"][];
+        };
+        /** AdminSettingDetailView */
+        AdminSettingDetailView: {
+            /** Available Actions */
+            available_actions?: string[];
+            definition: components["schemas"]["AdminSettingDefinitionView"];
+            /** History */
+            history?: components["schemas"]["AdminSettingHistoryItemView"][];
+            validation: components["schemas"]["AdminSettingValidationView"];
+            value: components["schemas"]["AdminSettingValueView"];
+            /** Warnings */
+            warnings?: components["schemas"]["AdminSettingWarningView"][];
+        };
+        /** AdminSettingFilterOptionsView */
+        AdminSettingFilterOptionsView: {
+            /** Categories */
+            categories: components["schemas"]["AdminSettingOptionView"][];
+            /** Modules */
+            modules: components["schemas"]["AdminSettingOptionView"][];
+            /** Readonly States */
+            readonly_states: components["schemas"]["AdminSettingOptionView"][];
+            /** Scopes */
+            scopes: components["schemas"]["AdminSettingOptionView"][];
+            /** Sensitivities */
+            sensitivities: components["schemas"]["AdminSettingOptionView"][];
+            /** Statuses */
+            statuses: components["schemas"]["AdminSettingOptionView"][];
+        };
+        /** AdminSettingHistoryItemView */
+        AdminSettingHistoryItemView: {
+            /**
+             * Changed At
+             * Format: date-time
+             */
+            changed_at: string;
+            /** Changed By */
+            changed_by?: string | null;
+            /** New Value Masked */
+            new_value_masked: string;
+            /** Note */
+            note?: string | null;
+            /** Old Value Masked */
+            old_value_masked: string;
+            /** Scope */
+            scope: string;
+        };
+        /** AdminSettingListItemView */
+        AdminSettingListItemView: {
+            /** Available Actions */
+            available_actions?: string[];
+            definition: components["schemas"]["AdminSettingDefinitionView"];
+            value: components["schemas"]["AdminSettingValueView"];
+            /** Warnings */
+            warnings?: components["schemas"]["AdminSettingWarningView"][];
+        };
+        /** AdminSettingMetricsView */
+        AdminSettingMetricsView: {
+            /** Active Settings */
+            active_settings: number;
+            /** Incomplete Required */
+            incomplete_required: number;
+            /** Integration Settings */
+            integration_settings: number;
+            /** Recent Changes */
+            recent_changes?: number | null;
+            /** Scoped Overrides */
+            scoped_overrides: number;
+            /** Sensitive Settings */
+            sensitive_settings: number;
+            /** Warning Settings */
+            warning_settings: number;
+        };
+        /** AdminSettingOptionView */
+        AdminSettingOptionView: {
+            /** Id */
+            id: string;
+            /** Label */
+            label: string;
+        };
+        /** AdminSettingResetRequest */
+        AdminSettingResetRequest: {
+            /** Change Note */
+            change_note?: string | null;
+            /**
+             * Confirm Sensitive
+             * @default false
+             */
+            confirm_sensitive: boolean;
+        };
+        /** AdminSettingUpdateRequest */
+        AdminSettingUpdateRequest: {
+            /** Change Note */
+            change_note?: string | null;
+            /**
+             * Confirm Sensitive
+             * @default false
+             */
+            confirm_sensitive: boolean;
+            /** Value */
+            value: unknown;
+        };
+        /** AdminSettingValidationRuleView */
+        AdminSettingValidationRuleView: {
+            /** Message */
+            message: string;
+            /** Rule */
+            rule: string;
+            /** Value */
+            value?: unknown | null;
+        };
+        /** AdminSettingValidationView */
+        AdminSettingValidationView: {
+            /** Is Valid */
+            is_valid: boolean;
+            /** Messages */
+            messages?: string[];
+        };
+        /** AdminSettingValueView */
+        AdminSettingValueView: {
+            /** Current Value */
+            current_value?: unknown | null;
+            /** Effective Value */
+            effective_value?: unknown | null;
+            /** Inherited From */
+            inherited_from?: string | null;
+            /** Key */
+            key: string;
+            /** Scope */
+            scope: string;
+            /** Scope Id */
+            scope_id?: string | null;
+            /** Status */
+            status: string;
+            /** Updated At */
+            updated_at?: string | null;
+            /** Updated By */
+            updated_by?: string | null;
+            /** Warning State */
+            warning_state: string;
+        };
+        /** AdminSettingWarningView */
+        AdminSettingWarningView: {
+            /** Code */
+            code: string;
+            /** Message */
+            message: string;
+            /** Severity */
+            severity: string;
+        };
+        /** AdminSettingsListResponse */
+        AdminSettingsListResponse: {
+            backend_contract?: components["schemas"]["AdminSettingBackendContractView"];
+            /** Categories */
+            categories: components["schemas"]["AdminSettingCategoryView"][];
+            filter_options: components["schemas"]["AdminSettingFilterOptionsView"];
+            /**
+             * Is Backend Connected
+             * @default true
+             */
+            is_backend_connected: boolean;
+            /** Items */
+            items: components["schemas"]["AdminSettingListItemView"][];
+            metrics: components["schemas"]["AdminSettingMetricsView"];
+            /** Total */
+            total: number;
+        };
+        /** AdminSupplierAvailableActionsView */
+        AdminSupplierAvailableActionsView: {
+            /**
+             * Can Add Contact
+             * @default true
+             */
+            can_add_contact: boolean;
+            /**
+             * Can Add Product
+             * @default true
+             */
+            can_add_product: boolean;
+            /**
+             * Can Block
+             * @default true
+             */
+            can_block: boolean;
+            /**
+             * Can Deactivate
+             * @default true
+             */
+            can_deactivate: boolean;
+            /**
+             * Can Edit
+             * @default true
+             */
+            can_edit: boolean;
+        };
+        /** AdminSupplierBackendContractView */
+        AdminSupplierBackendContractView: {
+            /**
+             * Contact Endpoint
+             * @default POST /v1/admin/suppliers/{supplier_id}/contacts
+             */
+            contact_endpoint: string;
+            /**
+             * Create Endpoint
+             * @default POST /v1/admin/suppliers
+             */
+            create_endpoint: string;
+            /**
+             * Detail Endpoint
+             * @default GET /v1/admin/suppliers/{supplier_id}
+             */
+            detail_endpoint: string;
+            /**
+             * List Endpoint
+             * @default GET /v1/admin/suppliers
+             */
+            list_endpoint: string;
+            /**
+             * Product Endpoint
+             * @default POST /v1/admin/suppliers/{supplier_id}/products
+             */
+            product_endpoint: string;
+            /**
+             * Status Endpoint
+             * @default POST /v1/admin/suppliers/{supplier_id}/status
+             */
+            status_endpoint: string;
+            /**
+             * Update Endpoint
+             * @default PATCH /v1/admin/suppliers/{supplier_id}
+             */
+            update_endpoint: string;
+        };
+        /** AdminSupplierBranchApplicabilityView */
+        AdminSupplierBranchApplicabilityView: {
+            /** Branch Code */
+            branch_code: string;
+            /**
+             * Branch Id
+             * Format: uuid
+             */
+            branch_id: string;
+            /** Branch Name */
+            branch_name: string;
+            /** Branch Status */
+            branch_status: string;
+            /** Delivery Notes */
+            delivery_notes?: string | null;
+            /** Is Active */
+            is_active: boolean;
+        };
+        /** AdminSupplierBranchRequest */
+        AdminSupplierBranchRequest: {
+            /**
+             * Branch Id
+             * Format: uuid
+             */
+            branch_id: string;
+            /** Delivery Notes */
+            delivery_notes?: string | null;
+            /**
+             * Is Active
+             * @default true
+             */
+            is_active: boolean;
+        };
+        /** AdminSupplierCommercialTermsView */
+        AdminSupplierCommercialTermsView: {
+            /** Credit Days */
+            credit_days: number;
+            /** Default Currency */
+            default_currency: string;
+            /** Delivery Notes */
+            delivery_notes?: string | null;
+            /** Lead Time Days */
+            lead_time_days: number;
+            /** Minimum Order Amount */
+            minimum_order_amount?: string | null;
+            /** Payment Terms Type */
+            payment_terms_type: string;
+            /** Purchase Notes */
+            purchase_notes?: string | null;
+            /** Summary */
+            summary: string;
+        };
+        /** AdminSupplierContactRequest */
+        AdminSupplierContactRequest: {
+            /** Email */
+            email?: string | null;
+            /**
+             * Is Primary
+             * @default false
+             */
+            is_primary: boolean;
+            /** Name */
+            name: string;
+            /** Notes */
+            notes?: string | null;
+            /** Phone */
+            phone?: string | null;
+            /** Role */
+            role?: string | null;
+            /** Whatsapp */
+            whatsapp?: string | null;
+        };
+        /** AdminSupplierContactView */
+        AdminSupplierContactView: {
+            /** Email */
+            email?: string | null;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Is Active */
+            is_active: boolean;
+            /** Is Primary */
+            is_primary: boolean;
+            /** Name */
+            name: string;
+            /** Notes */
+            notes?: string | null;
+            /** Phone */
+            phone?: string | null;
+            /** Role */
+            role?: string | null;
+            /** Whatsapp */
+            whatsapp?: string | null;
+        };
+        /** AdminSupplierCreateRequest */
+        AdminSupplierCreateRequest: {
+            /** Branch Ids */
+            branch_ids?: string[];
+            /**
+             * Category
+             * @default OTHER
+             */
+            category: string;
+            /** Code */
+            code?: string | null;
+            /** Commercial Name */
+            commercial_name?: string | null;
+            /** Contacts */
+            contacts?: components["schemas"]["AdminSupplierContactRequest"][];
+            /**
+             * Credit Days
+             * @default 0
+             */
+            credit_days: number;
+            /**
+             * Default Currency
+             * @default MXN
+             */
+            default_currency: string;
+            /** Delivery Notes */
+            delivery_notes?: string | null;
+            /** Fiscal Address */
+            fiscal_address?: string | null;
+            /** Fiscal Regime */
+            fiscal_regime?: string | null;
+            /**
+             * Lead Time Days
+             * @default 0
+             */
+            lead_time_days: number;
+            /** Legal Name */
+            legal_name: string;
+            /** Minimum Order Amount */
+            minimum_order_amount?: number | string | null;
+            /** Notes */
+            notes?: string | null;
+            /** Payment Fiscal Email */
+            payment_fiscal_email?: string | null;
+            /**
+             * Payment Terms Type
+             * @default CASH
+             */
+            payment_terms_type: string;
+            /** Product Relations */
+            product_relations?: components["schemas"]["AdminSupplierProductRequest"][];
+            /** Purchase Notes */
+            purchase_notes?: string | null;
+            /**
+             * Status
+             * @default ACTIVE
+             * @enum {string}
+             */
+            status: "ACTIVE" | "INACTIVE" | "BLOCKED";
+            /** Tax Id */
+            tax_id?: string | null;
+        };
+        /** AdminSupplierDetailView */
+        AdminSupplierDetailView: {
+            available_actions: components["schemas"]["AdminSupplierAvailableActionsView"];
+            /** Branch Applicability */
+            branch_applicability: components["schemas"]["AdminSupplierBranchApplicabilityView"][];
+            commercial_terms: components["schemas"]["AdminSupplierCommercialTermsView"];
+            /** Contacts */
+            contacts: components["schemas"]["AdminSupplierContactView"][];
+            fiscal_legal: components["schemas"]["AdminSupplierFiscalLegalView"];
+            operational_activity: components["schemas"]["AdminSupplierOperationalActivityView"];
+            overview: components["schemas"]["AdminSupplierOverviewView"];
+            /** Product Associations */
+            product_associations: components["schemas"]["AdminSupplierProductAssociationView"][];
+            /** Related Documents */
+            related_documents: components["schemas"]["AdminSupplierRelatedDocumentView"][];
+            /** Warnings */
+            warnings: components["schemas"]["AdminSupplierWarningView"][];
+        };
+        /** AdminSupplierFilterOptionView */
+        AdminSupplierFilterOptionView: {
+            /** Id */
+            id: string;
+            /** Label */
+            label: string;
+        };
+        /** AdminSupplierFilterOptionsView */
+        AdminSupplierFilterOptionsView: {
+            /** Branches */
+            branches: components["schemas"]["AdminSupplierFilterOptionView"][];
+            /** Categories */
+            categories: components["schemas"]["AdminSupplierFilterOptionView"][];
+            /** Product Kinds */
+            product_kinds: components["schemas"]["AdminSupplierFilterOptionView"][];
+            /** Products */
+            products: components["schemas"]["AdminSupplierFilterOptionView"][];
+            /** Statuses */
+            statuses: components["schemas"]["AdminSupplierFilterOptionView"][];
+            /** Warning States */
+            warning_states: components["schemas"]["AdminSupplierFilterOptionView"][];
+        };
+        /** AdminSupplierFiscalLegalView */
+        AdminSupplierFiscalLegalView: {
+            /** Fiscal Address */
+            fiscal_address?: string | null;
+            /** Fiscal Regime */
+            fiscal_regime?: string | null;
+            /** Legal Name */
+            legal_name: string;
+            /** Notes */
+            notes?: string | null;
+            /** Payment Fiscal Email */
+            payment_fiscal_email?: string | null;
+            /** Tax Id */
+            tax_id?: string | null;
+        };
+        /** AdminSupplierListItemView */
+        AdminSupplierListItemView: {
+            /** Branch Count */
+            branch_count: number;
+            /** Category */
+            category: string;
+            /** Code */
+            code: string;
+            /** Commercial Name */
+            commercial_name?: string | null;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Legal Name */
+            legal_name: string;
+            /** Primary Contact Email */
+            primary_contact_email?: string | null;
+            /** Primary Contact Name */
+            primary_contact_name?: string | null;
+            /** Primary Contact Phone */
+            primary_contact_phone?: string | null;
+            /** Product Count */
+            product_count: number;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "ACTIVE" | "INACTIVE" | "BLOCKED";
+            /** Tax Id */
+            tax_id?: string | null;
+            /** Terms Summary */
+            terms_summary: string;
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+            /** Warning State */
+            warning_state?: ("info" | "warning" | "critical") | null;
+            /** Warnings */
+            warnings: components["schemas"]["AdminSupplierWarningView"][];
+        };
+        /** AdminSupplierListResponse */
+        AdminSupplierListResponse: {
+            backend_contract?: components["schemas"]["AdminSupplierBackendContractView"];
+            filter_options: components["schemas"]["AdminSupplierFilterOptionsView"];
+            /**
+             * Is Backend Connected
+             * @default true
+             */
+            is_backend_connected: boolean;
+            /** Items */
+            items: components["schemas"]["AdminSupplierListItemView"][];
+            metrics: components["schemas"]["AdminSupplierMetricsView"];
+            /** Page */
+            page: number;
+            /** Page Size */
+            page_size: number;
+            /** Total */
+            total: number;
+        };
+        /** AdminSupplierMetricsView */
+        AdminSupplierMetricsView: {
+            /** Active Suppliers */
+            active_suppliers: number;
+            /** Blocked Suppliers */
+            blocked_suppliers: number;
+            /** Inactive Suppliers */
+            inactive_suppliers: number;
+            /** Suppliers With Recent Activity */
+            suppliers_with_recent_activity: number;
+            /** Suppliers With Warnings */
+            suppliers_with_warnings: number;
+            /** Suppliers Without Products */
+            suppliers_without_products: number;
+            /** Total Suppliers */
+            total_suppliers: number;
+        };
+        /** AdminSupplierOperationalActivityView */
+        AdminSupplierOperationalActivityView: {
+            /**
+             * Integration Available
+             * @default false
+             */
+            integration_available: boolean;
+            /**
+             * Notes
+             * @default Purchase orders, receipts, invoices and supplier payments are pending canonical backend modules.
+             */
+            notes: string;
+            /** Open Purchase Orders */
+            open_purchase_orders?: number | null;
+            /** Recent Purchase Orders */
+            recent_purchase_orders?: number | null;
+        };
+        /** AdminSupplierOverviewView */
+        AdminSupplierOverviewView: {
+            /** Category */
+            category: string;
+            /** Code */
+            code: string;
+            /** Commercial Name */
+            commercial_name?: string | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Legal Name */
+            legal_name: string;
+            /** Readiness State */
+            readiness_state?: ("info" | "warning" | "critical") | null;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "ACTIVE" | "INACTIVE" | "BLOCKED";
+            /** Tax Id */
+            tax_id?: string | null;
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+        };
+        /** AdminSupplierProductAssociationView */
+        AdminSupplierProductAssociationView: {
+            /** Conversion Factor */
+            conversion_factor?: string | null;
+            /** Currency */
+            currency: string;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Is Active */
+            is_active: boolean;
+            /** Last Known Price */
+            last_known_price?: string | null;
+            /** Lead Time Days */
+            lead_time_days: number;
+            /** Minimum Order Qty */
+            minimum_order_qty?: string | null;
+            /** Notes */
+            notes?: string | null;
+            /** Product Code */
+            product_code: string;
+            /**
+             * Product Id
+             * Format: uuid
+             */
+            product_id: string;
+            /** Product Kind */
+            product_kind: string;
+            /** Product Name */
+            product_name: string;
+            /** Purchase Uom */
+            purchase_uom: string;
+            /** Supplier Sku */
+            supplier_sku?: string | null;
+        };
+        /** AdminSupplierProductRequest */
+        AdminSupplierProductRequest: {
+            /** Conversion Factor */
+            conversion_factor?: number | string | null;
+            /**
+             * Currency
+             * @default MXN
+             */
+            currency: string;
+            /**
+             * Is Active
+             * @default true
+             */
+            is_active: boolean;
+            /** Last Known Price */
+            last_known_price?: number | string | null;
+            /**
+             * Lead Time Days
+             * @default 0
+             */
+            lead_time_days: number;
+            /** Minimum Order Qty */
+            minimum_order_qty?: number | string | null;
+            /** Notes */
+            notes?: string | null;
+            /**
+             * Product Id
+             * Format: uuid
+             */
+            product_id: string;
+            /** Purchase Uom */
+            purchase_uom?: string | null;
+            /** Supplier Sku */
+            supplier_sku?: string | null;
+        };
+        /** AdminSupplierRelatedDocumentView */
+        AdminSupplierRelatedDocumentView: {
+            /**
+             * Document Id
+             * Format: uuid
+             */
+            document_id: string;
+            /** Document Type */
+            document_type: string;
+            /** Folio */
+            folio: string;
+            /** Status */
+            status: string;
+        };
+        /** AdminSupplierStatusRequest */
+        AdminSupplierStatusRequest: {
+            /** Notes */
+            notes?: string | null;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "ACTIVE" | "INACTIVE" | "BLOCKED";
+        };
+        /** AdminSupplierUpdateRequest */
+        AdminSupplierUpdateRequest: {
+            /** Branch Ids */
+            branch_ids?: string[];
+            /**
+             * Category
+             * @default OTHER
+             */
+            category: string;
+            /** Code */
+            code?: string | null;
+            /** Commercial Name */
+            commercial_name?: string | null;
+            /** Contacts */
+            contacts?: components["schemas"]["AdminSupplierContactRequest"][];
+            /**
+             * Credit Days
+             * @default 0
+             */
+            credit_days: number;
+            /**
+             * Default Currency
+             * @default MXN
+             */
+            default_currency: string;
+            /** Delivery Notes */
+            delivery_notes?: string | null;
+            /** Fiscal Address */
+            fiscal_address?: string | null;
+            /** Fiscal Regime */
+            fiscal_regime?: string | null;
+            /**
+             * Lead Time Days
+             * @default 0
+             */
+            lead_time_days: number;
+            /** Legal Name */
+            legal_name: string;
+            /** Minimum Order Amount */
+            minimum_order_amount?: number | string | null;
+            /** Notes */
+            notes?: string | null;
+            /** Payment Fiscal Email */
+            payment_fiscal_email?: string | null;
+            /**
+             * Payment Terms Type
+             * @default CASH
+             */
+            payment_terms_type: string;
+            /** Product Relations */
+            product_relations?: components["schemas"]["AdminSupplierProductRequest"][];
+            /** Purchase Notes */
+            purchase_notes?: string | null;
+            /**
+             * Status
+             * @default ACTIVE
+             * @enum {string}
+             */
+            status: "ACTIVE" | "INACTIVE" | "BLOCKED";
+            /** Tax Id */
+            tax_id?: string | null;
+        };
+        /** AdminSupplierWarningView */
+        AdminSupplierWarningView: {
+            /** Code */
+            code: string;
+            /** Message */
+            message: string;
+            /**
+             * Severity
+             * @default warning
+             * @enum {string}
+             */
+            severity: "info" | "warning" | "critical";
+        };
+        /** AdminTransferAvailableActionsView */
+        AdminTransferAvailableActionsView: {
+            /** Can Cancel */
+            can_cancel: boolean;
+            /** Can Dispatch */
+            can_dispatch: boolean;
+            /** Can Edit */
+            can_edit: boolean;
+            /** Can Receive */
+            can_receive: boolean;
+            /** Can View Movements */
+            can_view_movements: boolean;
+        };
+        /** AdminTransferBackendContractView */
+        AdminTransferBackendContractView: {
+            /**
+             * Cancel Endpoint
+             * @default POST /v1/admin/transfers/{transfer_id}/cancel
+             */
+            cancel_endpoint: string;
+            /**
+             * Create Endpoint
+             * @default POST /v1/admin/transfers
+             */
+            create_endpoint: string;
+            /**
+             * Detail Endpoint
+             * @default GET /v1/admin/transfers/{transfer_id}
+             */
+            detail_endpoint: string;
+            /**
+             * Dispatch Endpoint
+             * @default POST /v1/admin/transfers/{transfer_id}/dispatch
+             */
+            dispatch_endpoint: string;
+            /**
+             * List Endpoint
+             * @default GET /v1/admin/transfers
+             */
+            list_endpoint: string;
+            /**
+             * Receive Endpoint
+             * @default POST /v1/admin/transfers/{transfer_id}/receive
+             */
+            receive_endpoint: string;
+            /**
+             * Update Endpoint
+             * @default PATCH /v1/admin/transfers/{transfer_id}
+             */
+            update_endpoint: string;
+        };
+        /** AdminTransferBranchView */
+        AdminTransferBranchView: {
+            /** Branch Code */
+            branch_code: string;
+            /**
+             * Branch Id
+             * Format: uuid
+             */
+            branch_id: string;
+            /** Branch Is Active */
+            branch_is_active: boolean;
+            /** Branch Name */
+            branch_name: string;
+            /** Timezone */
+            timezone: string;
+        };
+        /** AdminTransferCancelRequest */
+        AdminTransferCancelRequest: {
+            /** Reason */
+            reason?: string | null;
+        };
+        /** AdminTransferCreateRequest */
+        AdminTransferCreateRequest: {
+            /**
+             * Destination Branch Id
+             * Format: uuid
+             */
+            destination_branch_id: string;
+            /** Lines */
+            lines: components["schemas"]["AdminTransferLineInput"][];
+            /** Notes */
+            notes?: string | null;
+            /**
+             * Origin Branch Id
+             * Format: uuid
+             */
+            origin_branch_id: string;
+        };
+        /** AdminTransferDetailView */
+        AdminTransferDetailView: {
+            available_actions: components["schemas"]["AdminTransferAvailableActionsView"];
+            destination: components["schemas"]["AdminTransferBranchView"];
+            inventory_impact: components["schemas"]["AdminTransferInventoryImpactView"];
+            /** Lines */
+            lines: components["schemas"]["AdminTransferLineView"][];
+            origin: components["schemas"]["AdminTransferBranchView"];
+            overview: components["schemas"]["AdminTransferOverviewView"];
+            receipt: components["schemas"]["AdminTransferReceiptView"];
+            /** Related Documents */
+            related_documents: components["schemas"]["AdminTransferRelatedDocumentView"][];
+            /** Warnings */
+            warnings: components["schemas"]["AdminTransferWarningView"][];
+        };
+        /** AdminTransferDispatchRequest */
+        AdminTransferDispatchRequest: {
+            /** Notes */
+            notes?: string | null;
+        };
+        /** AdminTransferFilterOptionView */
+        AdminTransferFilterOptionView: {
+            /** Id */
+            id: string;
+            /** Label */
+            label: string;
+        };
+        /** AdminTransferFilterOptionsView */
+        AdminTransferFilterOptionsView: {
+            /** Branches */
+            branches: components["schemas"]["AdminTransferFilterOptionView"][];
+            /** Operators */
+            operators: components["schemas"]["AdminTransferFilterOptionView"][];
+            /** Products */
+            products: components["schemas"]["AdminTransferFilterOptionView"][];
+            /** Statuses */
+            statuses: components["schemas"]["AdminTransferFilterOptionView"][];
+        };
+        /** AdminTransferInventoryImpactView */
+        AdminTransferInventoryImpactView: {
+            /** Integration Available */
+            integration_available: boolean;
+            /** Movements */
+            movements: components["schemas"]["AdminTransferInventoryMovementView"][];
+            /** Notes */
+            notes?: string | null;
+        };
+        /** AdminTransferInventoryMovementView */
+        AdminTransferInventoryMovementView: {
+            /** Balance After */
+            balance_after?: string | null;
+            /**
+             * Branch Id
+             * Format: uuid
+             */
+            branch_id: string;
+            /** Direction */
+            direction: string;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Location Code */
+            location_code: string;
+            /** Movement Type */
+            movement_type: string;
+            /**
+             * Product Id
+             * Format: uuid
+             */
+            product_id: string;
+            /** Quantity */
+            quantity: string;
+            /** Source Document Id */
+            source_document_id?: string | null;
+            /** Source Document Type */
+            source_document_type?: string | null;
+            /** Unit Of Measure */
+            unit_of_measure: string;
+        };
+        /** AdminTransferLineInput */
+        AdminTransferLineInput: {
+            /** Notes */
+            notes?: string | null;
+            /**
+             * Product Id
+             * Format: uuid
+             */
+            product_id: string;
+            /** Quantity */
+            quantity: number | string;
+        };
+        /** AdminTransferLineView */
+        AdminTransferLineView: {
+            /** Difference */
+            difference?: string | null;
+            /** Line Status */
+            line_status: string;
+            /** Notes */
+            notes?: string | null;
+            /** Product Code */
+            product_code: string;
+            /**
+             * Product Id
+             * Format: uuid
+             */
+            product_id: string;
+            /** Product Kind */
+            product_kind: string;
+            /** Product Name */
+            product_name: string;
+            /** Received Quantity */
+            received_quantity?: string | null;
+            /** Requested Quantity */
+            requested_quantity: string;
+            /** Sent Quantity */
+            sent_quantity: string;
+            /**
+             * Shipment Line Id
+             * Format: uuid
+             */
+            shipment_line_id: string;
+            /** Unit Of Measure */
+            unit_of_measure: string;
+            /** Variance Reason */
+            variance_reason?: string | null;
+        };
+        /** AdminTransferListItemView */
+        AdminTransferListItemView: {
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Destination Branch Code */
+            destination_branch_code: string;
+            /**
+             * Destination Branch Id
+             * Format: uuid
+             */
+            destination_branch_id: string;
+            /** Destination Branch Name */
+            destination_branch_name: string;
+            /** Dispatched At */
+            dispatched_at?: string | null;
+            /** Folio */
+            folio: string;
+            /** Has Discrepancy */
+            has_discrepancy: boolean;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Line Count */
+            line_count: number;
+            /** Operator Name */
+            operator_name: string;
+            /** Origin Branch Code */
+            origin_branch_code: string;
+            /**
+             * Origin Branch Id
+             * Format: uuid
+             */
+            origin_branch_id: string;
+            /** Origin Branch Name */
+            origin_branch_name: string;
+            /** Received At */
+            received_at?: string | null;
+            /** Received Unit Count */
+            received_unit_count?: string | null;
+            /** Requested Unit Count */
+            requested_unit_count: string;
+            /** Sent Unit Count */
+            sent_unit_count: string;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "DRAFT" | "IN_TRANSIT" | "RECEIVED" | "RECEIVED_WITH_VARIANCE" | "CANCELLED";
+            /** Warning State */
+            warning_state?: ("info" | "warning" | "critical") | null;
+            /** Warnings */
+            warnings: components["schemas"]["AdminTransferWarningView"][];
+        };
+        /** AdminTransferListResponse */
+        AdminTransferListResponse: {
+            backend_contract?: components["schemas"]["AdminTransferBackendContractView"];
+            filter_options: components["schemas"]["AdminTransferFilterOptionsView"];
+            /**
+             * Is Backend Connected
+             * @default true
+             */
+            is_backend_connected: boolean;
+            /** Items */
+            items: components["schemas"]["AdminTransferListItemView"][];
+            metrics: components["schemas"]["AdminTransferMetricsView"];
+            /** Page */
+            page: number;
+            /** Page Size */
+            page_size: number;
+            /** Total */
+            total: number;
+        };
+        /** AdminTransferMetricsView */
+        AdminTransferMetricsView: {
+            /** Cancelled Transfers */
+            cancelled_transfers: number;
+            /** In Transit Transfers */
+            in_transit_transfers: number;
+            /** Pending Receipt Transfers */
+            pending_receipt_transfers: number;
+            /** Received Transfers */
+            received_transfers: number;
+            /** Total Transfers */
+            total_transfers: number;
+            /** Units In Transit */
+            units_in_transit: string;
+            /** With Discrepancies */
+            with_discrepancies: number;
+        };
+        /** AdminTransferOverviewView */
+        AdminTransferOverviewView: {
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /**
+             * Created By User Id
+             * Format: uuid
+             */
+            created_by_user_id: string;
+            /** Created By User Name */
+            created_by_user_name: string;
+            /** Dispatched At */
+            dispatched_at?: string | null;
+            /** Folio */
+            folio: string;
+            /** Has Discrepancy */
+            has_discrepancy: boolean;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Line Count */
+            line_count: number;
+            /** Notes */
+            notes?: string | null;
+            /** Received At */
+            received_at?: string | null;
+            /** Received By User Id */
+            received_by_user_id?: string | null;
+            /** Received By User Name */
+            received_by_user_name?: string | null;
+            /** Received Unit Count */
+            received_unit_count?: string | null;
+            /** Requested Unit Count */
+            requested_unit_count: string;
+            /** Sent Unit Count */
+            sent_unit_count: string;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "DRAFT" | "IN_TRANSIT" | "RECEIVED" | "RECEIVED_WITH_VARIANCE" | "CANCELLED";
+        };
+        /** AdminTransferReceiptLineInput */
+        AdminTransferReceiptLineInput: {
+            /** Notes */
+            notes?: string | null;
+            /** Received Quantity */
+            received_quantity: number | string;
+            /**
+             * Shipment Line Id
+             * Format: uuid
+             */
+            shipment_line_id: string;
+            /** Variance Reason */
+            variance_reason?: string | null;
+        };
+        /** AdminTransferReceiptView */
+        AdminTransferReceiptView: {
+            /** Difference */
+            difference?: string | null;
+            /** Discrepancy Reason Required */
+            discrepancy_reason_required: boolean;
+            /** Expected Total Quantity */
+            expected_total_quantity: string;
+            /** Has Discrepancy */
+            has_discrepancy: boolean;
+            /** Receipt Document Id */
+            receipt_document_id?: string | null;
+            /** Received Total Quantity */
+            received_total_quantity?: string | null;
+            /** State */
+            state: string;
+        };
+        /** AdminTransferReceiveRequest */
+        AdminTransferReceiveRequest: {
+            /** Lines */
+            lines: components["schemas"]["AdminTransferReceiptLineInput"][];
+            /** Notes */
+            notes?: string | null;
+        };
+        /** AdminTransferRelatedDocumentView */
+        AdminTransferRelatedDocumentView: {
+            /**
+             * Document Id
+             * Format: uuid
+             */
+            document_id: string;
+            /** Document Type */
+            document_type: string;
+            /** Folio */
+            folio: string;
+            /** Status */
+            status: string;
+        };
+        /** AdminTransferUpdateRequest */
+        AdminTransferUpdateRequest: {
+            /** Destination Branch Id */
+            destination_branch_id?: string | null;
+            /** Lines */
+            lines?: components["schemas"]["AdminTransferLineInput"][] | null;
+            /** Notes */
+            notes?: string | null;
+            /** Origin Branch Id */
+            origin_branch_id?: string | null;
+        };
+        /** AdminTransferWarningView */
+        AdminTransferWarningView: {
+            /** Code */
+            code: string;
+            /** Message */
+            message: string;
+            /**
+             * Severity
+             * @enum {string}
+             */
+            severity: "info" | "warning" | "critical";
+        };
+        /** AdminUserAccountStatusView */
+        AdminUserAccountStatusView: {
+            /** Active Sessions Count */
+            active_sessions_count?: number | null;
+            /**
+             * Active Sessions Supported
+             * @default false
+             */
+            active_sessions_supported: boolean;
+            /** Failed Login Count */
+            failed_login_count?: number | null;
+            /** Is Active */
+            is_active: boolean;
+            /** Is Locked */
+            is_locked: boolean;
+            /** Last Login At */
+            last_login_at?: string | null;
+            /** Lock Reason */
+            lock_reason?: string | null;
+            /** Password Reset Required */
+            password_reset_required: boolean;
+            /**
+             * Pending Invitation
+             * @default false
+             */
+            pending_invitation: boolean;
+        };
+        /** AdminUserAppAccessView */
+        AdminUserAppAccessView: {
+            /** Allowed Surfaces */
+            allowed_surfaces: ("POS" | "BACKOFFICE")[];
+            /** Backoffice Enabled */
+            backoffice_enabled: boolean;
+            /**
+             * Default Surface
+             * @enum {string}
+             */
+            default_surface: "POS" | "BACKOFFICE";
+            /** Has Both Surfaces */
+            has_both_surfaces: boolean;
+            /** Pos Enabled */
+            pos_enabled: boolean;
+        };
+        /** AdminUserAuditTimelineEventView */
+        AdminUserAuditTimelineEventView: {
+            /** Action */
+            action: string;
+            /** Actor Id */
+            actor_id?: string | null;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Metadata */
+            metadata: {
+                [key: string]: unknown;
+            };
+            /**
+             * Occurred At
+             * Format: date-time
+             */
+            occurred_at: string;
+        };
+        /** AdminUserAvailableActionsView */
+        AdminUserAvailableActionsView: {
+            /** Can Activate */
+            can_activate: boolean;
+            /** Can Deactivate */
+            can_deactivate: boolean;
+            /**
+             * Can Edit App Access
+             * @default true
+             */
+            can_edit_app_access: boolean;
+            /**
+             * Can Edit Branch Assignments
+             * @default true
+             */
+            can_edit_branch_assignments: boolean;
+            /**
+             * Can Edit Profile
+             * @default true
+             */
+            can_edit_profile: boolean;
+            /**
+             * Can Edit Role Assignments
+             * @default false
+             */
+            can_edit_role_assignments: boolean;
+            /** Can Lock */
+            can_lock: boolean;
+            /**
+             * Can Open Audit
+             * @default true
+             */
+            can_open_audit: boolean;
+            /** Can Unlock */
+            can_unlock: boolean;
+        };
+        /** AdminUserBackendContractView */
+        AdminUserBackendContractView: {
+            /**
+             * Branch Assignment Endpoint
+             * @default POST /v1/admin/users/{id}/branch-assignments
+             */
+            branch_assignment_endpoint: string;
+            /**
+             * Create Endpoint
+             * @default POST /v1/admin/users
+             */
+            create_endpoint: string;
+            /**
+             * Detail Endpoint
+             * @default GET /v1/admin/users/{id}
+             */
+            detail_endpoint: string;
+            /**
+             * Invitation Supported
+             * @default false
+             */
+            invitation_supported: boolean;
+            /**
+             * List Endpoint
+             * @default GET /v1/admin/users
+             */
+            list_endpoint: string;
+            /**
+             * Lock Endpoint
+             * @default POST /v1/admin/users/{id}/lock
+             */
+            lock_endpoint: string;
+            /**
+             * Password Reset Supported
+             * @default false
+             */
+            password_reset_supported: boolean;
+            /**
+             * Role Assignment Supported
+             * @default true
+             */
+            role_assignment_supported: boolean;
+            /**
+             * Session Revocation Supported
+             * @default false
+             */
+            session_revocation_supported: boolean;
+            /**
+             * Status Endpoint
+             * @default POST /v1/admin/users/{id}/status
+             */
+            status_endpoint: string;
+            /**
+             * Unlock Endpoint
+             * @default POST /v1/admin/users/{id}/unlock
+             */
+            unlock_endpoint: string;
+            /**
+             * Update Endpoint
+             * @default PATCH /v1/admin/users/{id}
+             */
+            update_endpoint: string;
+        };
+        /** AdminUserBranchAssignmentCommand */
+        AdminUserBranchAssignmentCommand: {
+            /**
+             * Branch Id
+             * Format: uuid
+             */
+            branch_id: string;
+            /**
+             * Is Default
+             * @default false
+             */
+            is_default: boolean;
+        };
+        /** AdminUserBranchAssignmentView */
+        AdminUserBranchAssignmentView: {
+            /**
+             * Assigned At
+             * Format: date-time
+             */
+            assigned_at: string;
+            /**
+             * Assignment Id
+             * Format: uuid
+             */
+            assignment_id: string;
+            /** Branch Code */
+            branch_code: string;
+            /**
+             * Branch Id
+             * Format: uuid
+             */
+            branch_id: string;
+            /** Branch Name */
+            branch_name: string;
+            /** Is Active */
+            is_active: boolean;
+            /** Is Default */
+            is_default: boolean;
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+        };
+        /** AdminUserBranchFilterOptionView */
+        AdminUserBranchFilterOptionView: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Label */
+            label: string;
+        };
+        /** AdminUserCreateRequest */
+        AdminUserCreateRequest: {
+            /** Allowed Surfaces */
+            allowed_surfaces: ("POS" | "BACKOFFICE")[];
+            /** Branch Assignments */
+            branch_assignments?: components["schemas"]["AdminUserBranchAssignmentCommand"][];
+            /** Default Surface */
+            default_surface?: ("POS" | "BACKOFFICE") | null;
+            /** Email */
+            email: string;
+            /** Full Name */
+            full_name: string;
+            /** Notes */
+            notes?: string | null;
+            /** Phone */
+            phone?: string | null;
+            /** Role Ids */
+            role_ids?: string[];
+            /**
+             * Send Invitation
+             * @default false
+             */
+            send_invitation: boolean;
+            /** Temporary Password */
+            temporary_password?: string | null;
+        };
+        /** AdminUserDetailView */
+        AdminUserDetailView: {
+            account_status: components["schemas"]["AdminUserAccountStatusView"];
+            app_access: components["schemas"]["AdminUserAppAccessView"];
+            /** Audit Timeline */
+            audit_timeline: components["schemas"]["AdminUserAuditTimelineEventView"][];
+            available_actions: components["schemas"]["AdminUserAvailableActionsView"];
+            /** Branch Assignments */
+            branch_assignments: components["schemas"]["AdminUserBranchAssignmentView"][];
+            operational_context: components["schemas"]["AdminUserOperationalContextView"];
+            overview: components["schemas"]["AdminUserOverviewView"];
+            profile: components["schemas"]["AdminUserProfileView"];
+            role_assignments: components["schemas"]["AdminUserRoleAssignmentsView"];
+            security_actions: components["schemas"]["AdminUserSecurityActionsView"];
+            /** Warnings */
+            warnings: components["schemas"]["AdminUserWarningView"][];
+        };
+        /** AdminUserFilterOptionView */
+        AdminUserFilterOptionView: {
+            /** Id */
+            id: string;
+            /** Label */
+            label: string;
+        };
+        /** AdminUserFilterOptionsView */
+        AdminUserFilterOptionsView: {
+            /** App Access */
+            app_access: components["schemas"]["AdminUserFilterOptionView"][];
+            /** Branches */
+            branches: components["schemas"]["AdminUserBranchFilterOptionView"][];
+            /** Last Login States */
+            last_login_states: components["schemas"]["AdminUserFilterOptionView"][];
+            /** Roles */
+            roles?: components["schemas"]["AdminUserFilterOptionView"][];
+            /** Statuses */
+            statuses: components["schemas"]["AdminUserFilterOptionView"][];
+            /** Warning States */
+            warning_states: components["schemas"]["AdminUserFilterOptionView"][];
+        };
+        /** AdminUserListItemView */
+        AdminUserListItemView: {
+            /** Allowed Surfaces */
+            allowed_surfaces: ("POS" | "BACKOFFICE")[];
+            /** Branch Count */
+            branch_count: number;
+            /** Branch Names */
+            branch_names: string[];
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /**
+             * Default Surface
+             * @enum {string}
+             */
+            default_surface: "POS" | "BACKOFFICE";
+            /** Email */
+            email: string;
+            /** Full Name */
+            full_name: string;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Last Login At */
+            last_login_at?: string | null;
+            /**
+             * Role Count
+             * @default 0
+             */
+            role_count: number;
+            /** Role Names */
+            role_names?: string[];
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "active" | "inactive" | "locked";
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+            /**
+             * Warning State
+             * @enum {string}
+             */
+            warning_state: "ready" | "warning" | "blocked";
+            /** Warnings */
+            warnings: components["schemas"]["AdminUserWarningView"][];
+        };
+        /** AdminUserLockRequest */
+        AdminUserLockRequest: {
+            /** Reason */
+            reason?: string | null;
+        };
+        /** AdminUserMetricsView */
+        AdminUserMetricsView: {
+            /** Active Users */
+            active_users: number;
+            /** Backoffice Users */
+            backoffice_users: number;
+            /** Inactive Users */
+            inactive_users: number;
+            /** Locked Users */
+            locked_users: number;
+            /**
+             * Pending Users
+             * @default 0
+             */
+            pending_users: number;
+            /** Pos Users */
+            pos_users: number;
+            /** Total Users */
+            total_users: number;
+            /** Without Branch */
+            without_branch: number;
+        };
+        /** AdminUserOperationalContextView */
+        AdminUserOperationalContextView: {
+            /**
+             * Active Sessions Supported
+             * @default false
+             */
+            active_sessions_supported: boolean;
+            /** Last Workstation Used */
+            last_workstation_used?: string | null;
+            /** Open Cash Sessions Count */
+            open_cash_sessions_count: number;
+            /** Recent Backoffice Activity Count */
+            recent_backoffice_activity_count: number;
+            /** Recent Pos Activity Count */
+            recent_pos_activity_count: number;
+            /** Recently Operated Branches */
+            recently_operated_branches: string[];
+        };
+        /** AdminUserOverviewView */
+        AdminUserOverviewView: {
+            /** Allowed Surfaces */
+            allowed_surfaces: ("POS" | "BACKOFFICE")[];
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /**
+             * Default Surface
+             * @enum {string}
+             */
+            default_surface: "POS" | "BACKOFFICE";
+            /** Email */
+            email: string;
+            /** Full Name */
+            full_name: string;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Last Login At */
+            last_login_at?: string | null;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "active" | "inactive" | "locked";
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+            /**
+             * Warning State
+             * @enum {string}
+             */
+            warning_state: "ready" | "warning" | "blocked";
+        };
+        /** AdminUserProfileView */
+        AdminUserProfileView: {
+            /** Display Name */
+            display_name?: string | null;
+            /** Email */
+            email: string;
+            /** Employee Code */
+            employee_code?: string | null;
+            /** Full Name */
+            full_name: string;
+            /** Notes */
+            notes?: string | null;
+            /** Phone */
+            phone?: string | null;
+        };
+        /** AdminUserRoleAssignmentRequest */
+        AdminUserRoleAssignmentRequest: {
+            /** Role Id */
+            role_id: string;
+        };
+        /** AdminUserRoleAssignmentView */
+        AdminUserRoleAssignmentView: {
+            /** Assigned At */
+            assigned_at?: string | null;
+            /** Role Description */
+            role_description?: string | null;
+            /** Role Id */
+            role_id: string;
+            /** Role Name */
+            role_name: string;
+            /** Scope */
+            scope?: string | null;
+        };
+        /** AdminUserRoleAssignmentsView */
+        AdminUserRoleAssignmentsView: {
+            /**
+             * Is Supported
+             * @default false
+             */
+            is_supported: boolean;
+            /** Items */
+            items?: components["schemas"]["AdminUserRoleAssignmentView"][];
+            /**
+             * Missing Contract Note
+             * @default Role assignment backend support is not available yet.
+             */
+            missing_contract_note: string;
+        };
+        /** AdminUserSecurityActionsView */
+        AdminUserSecurityActionsView: {
+            /** Can Activate */
+            can_activate: boolean;
+            /** Can Deactivate */
+            can_deactivate: boolean;
+            /** Can Lock */
+            can_lock: boolean;
+            /**
+             * Can Revoke Sessions
+             * @default false
+             */
+            can_revoke_sessions: boolean;
+            /**
+             * Can Send Invitation
+             * @default false
+             */
+            can_send_invitation: boolean;
+            /**
+             * Can Send Password Reset
+             * @default false
+             */
+            can_send_password_reset: boolean;
+            /** Can Unlock */
+            can_unlock: boolean;
+            /**
+             * Supports Invitation
+             * @default false
+             */
+            supports_invitation: boolean;
+            /**
+             * Supports Locking
+             * @default true
+             */
+            supports_locking: boolean;
+            /**
+             * Supports Password Reset
+             * @default false
+             */
+            supports_password_reset: boolean;
+            /**
+             * Supports Session Revocation
+             * @default false
+             */
+            supports_session_revocation: boolean;
+        };
+        /** AdminUserStatusChangeRequest */
+        AdminUserStatusChangeRequest: {
+            /** Is Active */
+            is_active: boolean;
+        };
+        /** AdminUserUpdateRequest */
+        AdminUserUpdateRequest: {
+            /** Allowed Surfaces */
+            allowed_surfaces?: ("POS" | "BACKOFFICE")[] | null;
+            /** Default Surface */
+            default_surface?: ("POS" | "BACKOFFICE") | null;
+            /** Email */
+            email?: string | null;
+            /** Full Name */
+            full_name?: string | null;
+            /** Notes */
+            notes?: string | null;
+            /** Phone */
+            phone?: string | null;
+        };
+        /** AdminUserWarningView */
+        AdminUserWarningView: {
+            /** Code */
+            code: string;
+            /** Message */
+            message: string;
+            /**
+             * Severity
+             * @enum {string}
+             */
+            severity: "info" | "warning" | "critical";
+        };
+        /** AdminUsersListResponse */
+        AdminUsersListResponse: {
+            backend_contract?: components["schemas"]["AdminUserBackendContractView"];
+            filter_options: components["schemas"]["AdminUserFilterOptionsView"];
+            /**
+             * Is Backend Connected
+             * @default true
+             */
+            is_backend_connected: boolean;
+            /** Items */
+            items: components["schemas"]["AdminUserListItemView"][];
+            metrics: components["schemas"]["AdminUserMetricsView"];
+            /** Page */
+            page: number;
+            /** Page Size */
+            page_size: number;
+            /** Total */
+            total: number;
+        };
+        /** AdminWasteAvailableActionsView */
+        AdminWasteAvailableActionsView: {
+            /**
+             * Can Create Correction
+             * @default true
+             */
+            can_create_correction: boolean;
+            /**
+             * Can Edit
+             * @default false
+             */
+            can_edit: boolean;
+            /**
+             * Can Open Inventory Movement
+             * @default true
+             */
+            can_open_inventory_movement: boolean;
+            /**
+             * Can Print
+             * @default false
+             */
+            can_print: boolean;
+        };
+        /** AdminWasteBackendContractView */
+        AdminWasteBackendContractView: {
+            /**
+             * Create Endpoint
+             * @default POST /v1/admin/waste
+             */
+            create_endpoint: string;
+            /**
+             * Detail Endpoint
+             * @default GET /v1/admin/waste/{waste_id}
+             */
+            detail_endpoint: string;
+            /**
+             * Inventory Movement Contract
+             * @default Confirmed waste creates WASTE_RECORD inventory movement.
+             */
+            inventory_movement_contract: string;
+            /**
+             * List Endpoint
+             * @default GET /v1/admin/waste
+             */
+            list_endpoint: string;
+            /**
+             * Reasons Endpoint
+             * @default GET /v1/admin/waste/reasons
+             */
+            reasons_endpoint: string;
+        };
+        /** AdminWasteCreateRequest */
+        AdminWasteCreateRequest: {
+            /**
+             * Branch Id
+             * Format: uuid
+             */
+            branch_id: string;
+            /**
+             * Location Code
+             * @default BACKROOM
+             * @enum {string}
+             */
+            location_code: "BACKROOM" | "COUNTER" | "IN_TRANSIT";
+            /** Notes */
+            notes?: string | null;
+            /**
+             * Product Id
+             * Format: uuid
+             */
+            product_id: string;
+            /** Quantity */
+            quantity: number | string;
+            /** Reason Code */
+            reason_code: string;
+        };
+        /** AdminWasteDetailView */
+        AdminWasteDetailView: {
+            available_actions: components["schemas"]["AdminWasteAvailableActionsView"];
+            evidence: components["schemas"]["AdminWasteEvidenceView"];
+            inventory_impact: components["schemas"]["AdminWasteInventoryImpactView"];
+            /** Lines */
+            lines: components["schemas"]["AdminWasteLineView"][];
+            overview: components["schemas"]["AdminWasteOverviewView"];
+            product_inventory_context: components["schemas"]["AdminWasteProductInventoryContextView"];
+            reason_classification: components["schemas"]["AdminWasteReasonClassificationView"];
+            /** Related Documents */
+            related_documents: components["schemas"]["AdminWasteRelatedDocumentView"][];
+            /** Warnings */
+            warnings: components["schemas"]["AdminWasteWarningView"][];
+        };
+        /** AdminWasteEvidenceView */
+        AdminWasteEvidenceView: {
+            /**
+             * Attachment Supported
+             * @default false
+             */
+            attachment_supported: boolean;
+            /** Evidence Items */
+            evidence_items?: {
+                [key: string]: string;
+            }[];
+            /** Notes */
+            notes?: string | null;
+        };
+        /** AdminWasteFilterOptionView */
+        AdminWasteFilterOptionView: {
+            /** Id */
+            id: string;
+            /** Label */
+            label: string;
+        };
+        /** AdminWasteFilterOptionsView */
+        AdminWasteFilterOptionsView: {
+            /** Branches */
+            branches: components["schemas"]["AdminWasteFilterOptionView"][];
+            /** Classes */
+            classes: components["schemas"]["AdminWasteFilterOptionView"][];
+            /** Evidence States */
+            evidence_states: components["schemas"]["AdminWasteFilterOptionView"][];
+            /** Impact Levels */
+            impact_levels: components["schemas"]["AdminWasteFilterOptionView"][];
+            /** Locations */
+            locations: components["schemas"]["AdminWasteFilterOptionView"][];
+            /** Operators */
+            operators: components["schemas"]["AdminWasteFilterOptionView"][];
+            /** Product Kinds */
+            product_kinds: components["schemas"]["AdminWasteFilterOptionView"][];
+            /** Products */
+            products: components["schemas"]["AdminWasteFilterOptionView"][];
+            /** Reasons */
+            reasons: components["schemas"]["AdminWasteReasonView"][];
+            /** Statuses */
+            statuses: components["schemas"]["AdminWasteFilterOptionView"][];
+        };
+        /** AdminWasteInventoryImpactView */
+        AdminWasteInventoryImpactView: {
+            /**
+             * Integration Available
+             * @default true
+             */
+            integration_available: boolean;
+            /** Movements */
+            movements: components["schemas"]["AdminWasteInventoryMovementView"][];
+            /** Notes */
+            notes?: string | null;
+        };
+        /** AdminWasteInventoryMovementView */
+        AdminWasteInventoryMovementView: {
+            /** Balance After */
+            balance_after?: string | null;
+            /** Direction */
+            direction: string;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Location Code */
+            location_code: string;
+            /** Movement Type */
+            movement_type: string;
+            /**
+             * Product Id
+             * Format: uuid
+             */
+            product_id: string;
+            /** Quantity */
+            quantity: string;
+            /** Source Document Id */
+            source_document_id?: string | null;
+            /** Source Document Type */
+            source_document_type?: string | null;
+            /** Unit Of Measure */
+            unit_of_measure: string;
+        };
+        /** AdminWasteLineView */
+        AdminWasteLineView: {
+            /** Estimated Value */
+            estimated_value?: string | null;
+            /** Line Number */
+            line_number: number;
+            /** Product Code */
+            product_code: string;
+            /**
+             * Product Id
+             * Format: uuid
+             */
+            product_id: string;
+            /**
+             * Product Kind
+             * @enum {string}
+             */
+            product_kind: "FINISHED_GOOD" | "RAW_MATERIAL" | "CONSUMABLE" | "DISPOSABLE";
+            /** Product Name */
+            product_name: string;
+            /** Quantity */
+            quantity: string;
+            /** Uom */
+            uom: string;
+        };
+        /** AdminWasteListItemView */
+        AdminWasteListItemView: {
+            /**
+             * Branch Id
+             * Format: uuid
+             */
+            branch_id: string;
+            /** Branch Name */
+            branch_name: string;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Estimated Value */
+            estimated_value?: string | null;
+            /** Folio */
+            folio: string;
+            /**
+             * Has Evidence
+             * @default false
+             */
+            has_evidence: boolean;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /**
+             * Impact Level
+             * @enum {string}
+             */
+            impact_level: "normal" | "high";
+            /** Line Count */
+            line_count: number;
+            /**
+             * Location Code
+             * @enum {string}
+             */
+            location_code: "BACKROOM" | "COUNTER" | "IN_TRANSIT";
+            /** Location Name */
+            location_name: string;
+            /** Operator Name */
+            operator_name: string;
+            /** Product Code */
+            product_code: string;
+            /**
+             * Product Id
+             * Format: uuid
+             */
+            product_id: string;
+            /**
+             * Product Kind
+             * @enum {string}
+             */
+            product_kind: "FINISHED_GOOD" | "RAW_MATERIAL" | "CONSUMABLE" | "DISPOSABLE";
+            /** Product Name */
+            product_name: string;
+            /** Quantity */
+            quantity: string;
+            /** Reason Code */
+            reason_code: string;
+            /** Reason Label */
+            reason_label: string;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "COMMITTED" | "CANCELLED";
+            /** Uom */
+            uom: string;
+            /** Warning State */
+            warning_state?: ("info" | "warning" | "critical") | null;
+            /** Warnings */
+            warnings: components["schemas"]["AdminWasteWarningView"][];
+        };
+        /** AdminWasteListResponse */
+        AdminWasteListResponse: {
+            backend_contract?: components["schemas"]["AdminWasteBackendContractView"];
+            filter_options: components["schemas"]["AdminWasteFilterOptionsView"];
+            /**
+             * Is Backend Connected
+             * @default true
+             */
+            is_backend_connected: boolean;
+            /** Items */
+            items: components["schemas"]["AdminWasteListItemView"][];
+            metrics: components["schemas"]["AdminWasteMetricsView"];
+            /** Page */
+            page: number;
+            /** Page Size */
+            page_size: number;
+            /** Total */
+            total: number;
+        };
+        /** AdminWasteMetricsView */
+        AdminWasteMetricsView: {
+            /** Contaminated Or Damaged */
+            contaminated_or_damaged: number;
+            /** Estimated Value */
+            estimated_value?: string | null;
+            /** Evidence Records */
+            evidence_records: number;
+            /** Expired Records */
+            expired_records: number;
+            /** High Impact Records */
+            high_impact_records: number;
+            /** Total Quantity */
+            total_quantity: string;
+            /** Total Records */
+            total_records: number;
+        };
+        /** AdminWasteOverviewView */
+        AdminWasteOverviewView: {
+            /**
+             * Branch Id
+             * Format: uuid
+             */
+            branch_id: string;
+            /** Branch Name */
+            branch_name: string;
+            /** Confirmed At */
+            confirmed_at?: string | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Folio */
+            folio: string;
+            /**
+             * Has Evidence
+             * @default false
+             */
+            has_evidence: boolean;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /**
+             * Impact Level
+             * @enum {string}
+             */
+            impact_level: "normal" | "high";
+            /**
+             * Location Code
+             * @enum {string}
+             */
+            location_code: "BACKROOM" | "COUNTER" | "IN_TRANSIT";
+            /** Location Name */
+            location_name: string;
+            /** Notes */
+            notes?: string | null;
+            /**
+             * Operator Id
+             * Format: uuid
+             */
+            operator_id: string;
+            /** Operator Name */
+            operator_name: string;
+            /** Quantity */
+            quantity: string;
+            /** Reason Code */
+            reason_code: string;
+            /** Reason Label */
+            reason_label: string;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "COMMITTED" | "CANCELLED";
+            /** Uom */
+            uom: string;
+            /** Warning State */
+            warning_state?: ("info" | "warning" | "critical") | null;
+            /** Workstation Code */
+            workstation_code?: string | null;
+            /** Workstation Name */
+            workstation_name?: string | null;
+        };
+        /** AdminWasteProductInventoryContextView */
+        AdminWasteProductInventoryContextView: {
+            /**
+             * Branch Id
+             * Format: uuid
+             */
+            branch_id: string;
+            /** Branch Name */
+            branch_name: string;
+            /**
+             * Class Id
+             * Format: uuid
+             */
+            class_id: string;
+            /** Class Name */
+            class_name: string;
+            /** Current Stock */
+            current_stock?: string | null;
+            /** Product Code */
+            product_code: string;
+            /**
+             * Product Id
+             * Format: uuid
+             */
+            product_id: string;
+            /** Product Is Active */
+            product_is_active: boolean;
+            /**
+             * Product Kind
+             * @enum {string}
+             */
+            product_kind: "FINISHED_GOOD" | "RAW_MATERIAL" | "CONSUMABLE" | "DISPOSABLE";
+            /** Product Name */
+            product_name: string;
+            /** Stock After */
+            stock_after?: string | null;
+            /** Stock Before */
+            stock_before?: string | null;
+            /** Uom */
+            uom: string;
+        };
+        /** AdminWasteReasonClassificationView */
+        AdminWasteReasonClassificationView: {
+            /** Category */
+            category: string;
+            /** Description */
+            description?: string | null;
+            /** Label */
+            label: string;
+            /**
+             * Requires Evidence
+             * @default false
+             */
+            requires_evidence: boolean;
+            /** Requires Note */
+            requires_note: boolean;
+        };
+        /** AdminWasteReasonView */
+        AdminWasteReasonView: {
+            /** Code */
+            code: string;
+            /** Display Order */
+            display_order: number;
+            /**
+             * High Impact Default
+             * @default false
+             */
+            high_impact_default: boolean;
+            /** Label */
+            label: string;
+            /**
+             * Requires Evidence
+             * @default false
+             */
+            requires_evidence: boolean;
+            /** Requires Note */
+            requires_note: boolean;
+        };
+        /** AdminWasteRelatedDocumentView */
+        AdminWasteRelatedDocumentView: {
+            /**
+             * Document Id
+             * Format: uuid
+             */
+            document_id: string;
+            /** Document Type */
+            document_type: string;
+            /** Folio */
+            folio: string;
+            /** Status */
+            status: string;
+        };
+        /** AdminWasteWarningView */
+        AdminWasteWarningView: {
+            /** Code */
+            code: string;
+            /** Message */
+            message: string;
+            /**
+             * Severity
+             * @default warning
+             * @enum {string}
+             */
+            severity: "info" | "warning" | "critical";
+        };
+        /** AdminWorkstationAccessContextView */
+        AdminWorkstationAccessContextView: {
+            /** Active Assigned User Count */
+            active_assigned_user_count: number;
+            /** Assigned User Count */
+            assigned_user_count: number;
+            /** Users */
+            users: components["schemas"]["AdminWorkstationAccessUserView"][];
+        };
+        /** AdminWorkstationAccessUserView */
+        AdminWorkstationAccessUserView: {
+            /** Is Active */
+            is_active: boolean;
+            /** User Email */
+            user_email: string;
+            /**
+             * User Id
+             * Format: uuid
+             */
+            user_id: string;
+            /** User Name */
+            user_name: string;
+        };
+        /** AdminWorkstationAvailableActionsView */
+        AdminWorkstationAvailableActionsView: {
+            /** Can Activate */
+            can_activate: boolean;
+            /** Can Deactivate */
+            can_deactivate: boolean;
+            /**
+             * Can Edit
+             * @default true
+             */
+            can_edit: boolean;
+            /**
+             * Can Open Branch
+             * @default true
+             */
+            can_open_branch: boolean;
+            /** Can Open Cash Session */
+            can_open_cash_session: boolean;
+        };
+        /** AdminWorkstationBackendContractView */
+        AdminWorkstationBackendContractView: {
+            /**
+             * Create Endpoint
+             * @default POST /v1/admin/workstations
+             */
+            create_endpoint: string;
+            /**
+             * Detail Endpoint
+             * @default GET /v1/admin/workstations/{id}
+             */
+            detail_endpoint: string;
+            /**
+             * List Endpoint
+             * @default GET /v1/admin/workstations
+             */
+            list_endpoint: string;
+            /**
+             * Update Endpoint
+             * @default PATCH /v1/admin/workstations/{id}
+             */
+            update_endpoint: string;
+        };
+        /** AdminWorkstationBranchRelationshipView */
+        AdminWorkstationBranchRelationshipView: {
+            /** Branch Code */
+            branch_code: string;
+            /**
+             * Branch Id
+             * Format: uuid
+             */
+            branch_id: string;
+            /** Branch Is Active */
+            branch_is_active: boolean;
+            /** Branch Name */
+            branch_name: string;
+            /** Branch Timezone */
+            branch_timezone: string;
+        };
+        /** AdminWorkstationCashSessionContextView */
+        AdminWorkstationCashSessionContextView: {
+            active_session?: components["schemas"]["AdminWorkstationCashSessionSummaryView"] | null;
+            last_closed_session?: components["schemas"]["AdminWorkstationCashSessionSummaryView"] | null;
+        };
+        /** AdminWorkstationCashSessionSummaryView */
+        AdminWorkstationCashSessionSummaryView: {
+            /** Closed At */
+            closed_at?: string | null;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /**
+             * Opened At
+             * Format: date-time
+             */
+            opened_at: string;
+            /** Opened By User Id */
+            opened_by_user_id?: string | null;
+            /** Opened By User Name */
+            opened_by_user_name?: string | null;
+            /** Opening Amount */
+            opening_amount: string;
+            /** Status */
+            status: string;
+        };
+        /** AdminWorkstationCreateRequest */
+        AdminWorkstationCreateRequest: {
+            /**
+             * Branch Id
+             * Format: uuid
+             */
+            branch_id: string;
+            /** Code */
+            code: string;
+            /**
+             * Is Active
+             * @default true
+             */
+            is_active: boolean;
+            /** Name */
+            name: string;
+        };
+        /** AdminWorkstationDetailView */
+        AdminWorkstationDetailView: {
+            access_context: components["schemas"]["AdminWorkstationAccessContextView"];
+            available_actions: components["schemas"]["AdminWorkstationAvailableActionsView"];
+            branch_relationship: components["schemas"]["AdminWorkstationBranchRelationshipView"];
+            cash_session_context: components["schemas"]["AdminWorkstationCashSessionContextView"];
+            operational_config: components["schemas"]["AdminWorkstationOperationalConfigView"];
+            overview: components["schemas"]["AdminWorkstationOverviewView"];
+            /** Warnings */
+            warnings: components["schemas"]["AdminBranchWarningView"][];
+        };
+        /** AdminWorkstationFilterOptionsView */
+        AdminWorkstationFilterOptionsView: {
+            /** Branches */
+            branches: components["schemas"]["AdminBranchFilterOptionView"][];
+        };
+        /** AdminWorkstationListItemView */
+        AdminWorkstationListItemView: {
+            /** Active Cash Session Id */
+            active_cash_session_id?: string | null;
+            /** Branch Code */
+            branch_code: string;
+            /**
+             * Branch Id
+             * Format: uuid
+             */
+            branch_id: string;
+            /** Branch Is Active */
+            branch_is_active: boolean;
+            /** Branch Name */
+            branch_name: string;
+            /** Code */
+            code: string;
+            /** Has Active Cash Session */
+            has_active_cash_session: boolean;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Last Closed At */
+            last_closed_at?: string | null;
+            /** Last Opened At */
+            last_opened_at?: string | null;
+            /** Name */
+            name: string;
+            /**
+             * Readiness
+             * @enum {string}
+             */
+            readiness: "ready" | "warning" | "blocked";
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "active" | "inactive";
+            /** Updated At */
+            updated_at?: string | null;
+            /** Warnings */
+            warnings: components["schemas"]["AdminBranchWarningView"][];
+        };
+        /** AdminWorkstationMetricsView */
+        AdminWorkstationMetricsView: {
+            /** Active Workstations */
+            active_workstations: number;
+            /** Inactive Workstations */
+            inactive_workstations: number;
+            /** Total Workstations */
+            total_workstations: number;
+            /** With Open Cash Session */
+            with_open_cash_session: number;
+            /** With Warnings */
+            with_warnings: number;
+            /** Without Active Branch */
+            without_active_branch: number;
+        };
+        /** AdminWorkstationOperationalConfigView */
+        AdminWorkstationOperationalConfigView: {
+            /** Is Active */
+            is_active: boolean;
+            /** Pos Enabled */
+            pos_enabled: boolean;
+        };
+        /** AdminWorkstationOverviewView */
+        AdminWorkstationOverviewView: {
+            /** Code */
+            code: string;
+            /** Created At */
+            created_at?: string | null;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Name */
+            name: string;
+            /**
+             * Readiness
+             * @enum {string}
+             */
+            readiness: "ready" | "warning" | "blocked";
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "active" | "inactive";
+            /** Updated At */
+            updated_at?: string | null;
+        };
+        /** AdminWorkstationUpdateRequest */
+        AdminWorkstationUpdateRequest: {
+            /** Branch Id */
+            branch_id?: string | null;
+            /** Code */
+            code?: string | null;
+            /** Is Active */
+            is_active?: boolean | null;
+            /** Name */
+            name?: string | null;
+        };
+        /** AdminWorkstationsListResponse */
+        AdminWorkstationsListResponse: {
+            backend_contract?: components["schemas"]["AdminWorkstationBackendContractView"];
+            filter_options: components["schemas"]["AdminWorkstationFilterOptionsView"];
+            /**
+             * Is Backend Connected
+             * @default true
+             */
+            is_backend_connected: boolean;
+            /** Items */
+            items: components["schemas"]["AdminWorkstationListItemView"][];
+            metrics: components["schemas"]["AdminWorkstationMetricsView"];
+            /** Page */
+            page: number;
+            /** Page Size */
+            page_size: number;
+            /** Total */
+            total: number;
+        };
         /** AppliedCorrectionLineSummaryView */
         AppliedCorrectionLineSummaryView: {
             /** Delta Quantity */
@@ -1135,6 +15540,14 @@ export interface components {
         };
         /** AuthenticatedUser */
         AuthenticatedUser: {
+            /** Allowed Surfaces */
+            allowed_surfaces?: ("POS" | "BACKOFFICE")[];
+            /**
+             * Default Surface
+             * @default POS
+             * @enum {string}
+             */
+            default_surface: "POS" | "BACKOFFICE";
             /** Email */
             email: string;
             /** Full Name */
@@ -1281,6 +15694,24 @@ export interface components {
              */
             product_id: string;
         };
+        /** CashCloseCounterClassAvailabilityView */
+        CashCloseCounterClassAvailabilityView: {
+            /** Available Quantity */
+            available_quantity: string;
+            /** Expected Quantity Before Deferred Attr */
+            expected_quantity_before_deferred_attr: string;
+            /** Pending Class Capture Quantity */
+            pending_class_capture_quantity: string;
+            /** Product Class Code */
+            product_class_code: string;
+            /**
+             * Product Class Id
+             * Format: uuid
+             */
+            product_class_id: string;
+            /** Product Class Name */
+            product_class_name: string;
+        };
         /** CashCloseDetailResponse */
         CashCloseDetailResponse: {
             branch: components["schemas"]["BranchSummary"];
@@ -1288,9 +15719,11 @@ export interface components {
             branch_brand_key?: string | null;
             cash_session: components["schemas"]["CashSessionView"];
             /** Cash Variance Amount */
-            cash_variance_amount: string;
+            cash_variance_amount?: string | null;
             /** Class Reconciliations */
             class_reconciliations: components["schemas"]["CashCloseClassReconciliationView"][];
+            /** Close Mode */
+            close_mode: string;
             /**
              * Closed At
              * Format: date-time
@@ -1298,9 +15731,11 @@ export interface components {
             closed_at: string;
             closed_by: components["schemas"]["AuthenticatedUser"] | null;
             /** Counted Cash Amount */
-            counted_cash_amount: string;
+            counted_cash_amount?: string | null;
             /** Counted Product Lines */
             counted_product_lines: components["schemas"]["CashCloseReconciliationProductView"][];
+            /** Counter Empty Confirmed */
+            counter_empty_confirmed: boolean;
             /** Currency Code */
             currency_code: string;
             /** Discrepancy Resolutions */
@@ -1460,7 +15895,7 @@ export interface components {
         /** CashClosePaymentMethodRowView */
         CashClosePaymentMethodRowView: {
             /** Counted Amount */
-            counted_amount: string;
+            counted_amount?: string | null;
             /** Currency Code */
             currency_code: string;
             /** Display Order */
@@ -1485,10 +15920,20 @@ export interface components {
         };
         /** CashClosePreviewRequest */
         CashClosePreviewRequest: {
+            /**
+             * Close Mode
+             * @default WITH_COUNT
+             */
+            close_mode: string;
             /** Counted Payment Methods */
             counted_payment_methods?: components["schemas"]["CashCloseCountedPaymentMethodRequest"][];
             /** Counted Product Lines */
             counted_product_lines?: components["schemas"]["CashCloseCountedProductLineRequest"][];
+            /**
+             * Counter Empty Confirmed
+             * @default false
+             */
+            counter_empty_confirmed: boolean;
             /** Discrepancy Resolutions */
             discrepancy_resolutions?: components["schemas"]["CashCloseDiscrepancyResolutionRequest"][];
             /** Manual Reconciliation Overrides */
@@ -1507,13 +15952,17 @@ export interface components {
             can_start_close: boolean;
             cash_session: components["schemas"]["CashSessionView"];
             /** Cash Variance Amount */
-            cash_variance_amount: string;
+            cash_variance_amount?: string | null;
             /** Class Reconciliations */
             class_reconciliations: components["schemas"]["CashCloseClassReconciliationView"][];
+            /** Close Mode */
+            close_mode: string;
             /** Counted Cash Amount */
-            counted_cash_amount: string;
+            counted_cash_amount?: string | null;
             /** Counted Product Lines */
             counted_product_lines: components["schemas"]["CashCloseReconciliationProductView"][];
+            /** Counter Empty Confirmed */
+            counter_empty_confirmed: boolean;
             /** Currency Code */
             currency_code: string;
             /** Discrepancy Resolutions */
@@ -1581,6 +16030,8 @@ export interface components {
             cash_session: components["schemas"]["CashSessionView"];
             /** Class Reconciliations */
             class_reconciliations: components["schemas"]["CashCloseClassReconciliationView"][];
+            /** Counter Class Availability */
+            counter_class_availability: components["schemas"]["CashCloseCounterClassAvailabilityView"][];
             pending_class_capture: components["schemas"]["CashClosePendingClassCaptureSummaryView"];
             /** Reconciliation Status */
             reconciliation_status: string;
@@ -4369,6 +18820,5618 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HealthResponse"];
+                };
+            };
+        };
+    };
+    list_admin_audit_events_v1_admin_audit_get: {
+        parameters: {
+            query?: {
+                date_from?: string | null;
+                date_to?: string | null;
+                search?: string | null;
+                actor_user_id?: string | null;
+                actor_email?: string | null;
+                module?: string | null;
+                action?: string | null;
+                entity_type?: string | null;
+                entity_id?: string | null;
+                branch_id?: string | null;
+                workstation?: string | null;
+                severity?: string | null;
+                sensitive?: string | null;
+                result?: string | null;
+                source_app?: string | null;
+                related_reference?: string | null;
+                warning_state?: string | null;
+                page?: number;
+                page_size?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminAuditEventsListResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    export_admin_audit_events_v1_admin_audit_export_get: {
+        parameters: {
+            query?: {
+                date_from?: string | null;
+                date_to?: string | null;
+                search?: string | null;
+                actor_user_id?: string | null;
+                actor_email?: string | null;
+                module?: string | null;
+                action?: string | null;
+                entity_type?: string | null;
+                entity_id?: string | null;
+                branch_id?: string | null;
+                workstation?: string | null;
+                severity?: string | null;
+                sensitive?: string | null;
+                result?: string | null;
+                source_app?: string | null;
+                related_reference?: string | null;
+                warning_state?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminAuditExportResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_admin_audit_event_detail_v1_admin_audit__event_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                event_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminAuditEventDetailView"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_admin_branches_v1_admin_branches_get: {
+        parameters: {
+            query?: {
+                brand_id?: string | null;
+                status?: string | null;
+                has_active_workstations?: string | null;
+                warning_state?: string | null;
+                search?: string | null;
+                page?: number;
+                page_size?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminBranchesListResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_admin_branch_v1_admin_branches_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AdminBranchCreateRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminBranchDetailView"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_admin_branch_detail_v1_admin_branches__branch_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                branch_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminBranchDetailView"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_admin_branch_v1_admin_branches__branch_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                branch_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AdminBranchUpdateRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminBranchDetailView"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_admin_cash_cuts_v1_admin_cash_cuts_get: {
+        parameters: {
+            query?: {
+                branch_id?: string | null;
+                workstation_id?: string | null;
+                cashier_id?: string | null;
+                payment_method?: string | null;
+                status?: string | null;
+                difference_state?: string | null;
+                search?: string | null;
+                has_refunds?: boolean | null;
+                has_operational_payments?: boolean | null;
+                date_from?: string | null;
+                date_to?: string | null;
+                page?: number;
+                page_size?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminCashCutsListResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_admin_cash_cut_detail_v1_admin_cash_cuts__cash_session_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                cash_session_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminCashCutDetailView"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_admin_cash_flow_movements_v1_admin_cash_flow_get: {
+        parameters: {
+            query?: {
+                amount_max?: number | string | null;
+                amount_min?: number | string | null;
+                branch_id?: string | null;
+                category?: string | null;
+                date_from?: string | null;
+                date_to?: string | null;
+                direction?: string | null;
+                operator_id?: string | null;
+                payment_method?: string | null;
+                reconciliation_state?: string | null;
+                search?: string | null;
+                source_type?: string | null;
+                workstation_id?: string | null;
+                page?: number;
+                page_size?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminCashFlowListResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_admin_cash_flow_movement_detail_v1_admin_cash_flow__movement_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                movement_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminCashFlowMovementDetailView"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_admin_cleaning_logs_v1_admin_cleaning_logs_get: {
+        parameters: {
+            query?: {
+                area_name?: string | null;
+                area_type?: string | null;
+                branch_id?: string | null;
+                cleaning_type?: string | null;
+                date_from?: string | null;
+                date_to?: string | null;
+                evidence_state?: string | null;
+                observation_state?: string | null;
+                page?: number;
+                page_size?: number;
+                responsible_user_id?: string | null;
+                risk_level?: string | null;
+                search?: string | null;
+                shift_code?: string | null;
+                status?: string | null;
+                template_id?: string | null;
+                warning_state?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminCleaningLogListResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_admin_cleaning_log_v1_admin_cleaning_logs_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                "X-Request-ID"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AdminCleaningLogCreateRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminCleaningLogDetailView"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_admin_cleaning_templates_v1_admin_cleaning_logs_templates_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminCleaningTemplateView"][];
+                };
+            };
+        };
+    };
+    get_admin_cleaning_log_detail_v1_admin_cleaning_logs__cleaning_log_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                cleaning_log_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminCleaningLogDetailView"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    cancel_admin_cleaning_log_v1_admin_cleaning_logs__cleaning_log_id__cancel_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                "X-Request-ID"?: string | null;
+            };
+            path: {
+                cleaning_log_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AdminCleaningLogCancelRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminCleaningLogDetailView"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    complete_admin_cleaning_log_v1_admin_cleaning_logs__cleaning_log_id__complete_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                "X-Request-ID"?: string | null;
+            };
+            path: {
+                cleaning_log_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AdminCleaningLogCompleteRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminCleaningLogDetailView"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_admin_discounts_v1_admin_discounts_get: {
+        parameters: {
+            query?: {
+                brand_id?: string | null;
+                class_id?: string | null;
+                status?: string | null;
+                discount_type?: string | null;
+                target_scope?: string | null;
+                validity?: string | null;
+                warning_state?: string | null;
+                search?: string | null;
+                page?: number;
+                page_size?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminCommercialDiscountsListResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_admin_discount_v1_admin_discounts_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AdminCommercialDiscountCreateRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminCommercialDiscountView"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_admin_discount_detail_v1_admin_discounts__discount_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                discount_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminCommercialDiscountView"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_admin_discount_v1_admin_discounts__discount_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                discount_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AdminCommercialDiscountUpdateRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminCommercialDiscountView"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    duplicate_admin_discount_v1_admin_discounts__discount_id__duplicate_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                discount_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AdminCommercialDiscountDuplicateRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminCommercialDiscountView"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_admin_equipment_v1_admin_equipment_maintenance_equipment_get: {
+        parameters: {
+            query?: {
+                area_name?: string | null;
+                area_type?: string | null;
+                branch_id?: string | null;
+                date_from?: string | null;
+                date_to?: string | null;
+                equipment_type?: string | null;
+                incident_state?: string | null;
+                maintenance_status?: string | null;
+                maintenance_type?: string | null;
+                operational_status?: string | null;
+                overdue_state?: string | null;
+                page?: number;
+                page_size?: number;
+                provider_name?: string | null;
+                risk_level?: string | null;
+                search?: string | null;
+                technician_name?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminEquipmentListResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_admin_equipment_v1_admin_equipment_maintenance_equipment_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                "X-Request-ID"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AdminEquipmentCreateRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminEquipmentDetailView"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_admin_equipment_detail_v1_admin_equipment_maintenance_equipment__equipment_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                equipment_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminEquipmentDetailView"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_admin_equipment_v1_admin_equipment_maintenance_equipment__equipment_id__patch: {
+        parameters: {
+            query?: never;
+            header?: {
+                "X-Request-ID"?: string | null;
+            };
+            path: {
+                equipment_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AdminEquipmentUpdateRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminEquipmentDetailView"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    change_admin_equipment_status_v1_admin_equipment_maintenance_equipment__equipment_id__status_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                "X-Request-ID"?: string | null;
+            };
+            path: {
+                equipment_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AdminEquipmentStatusRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminEquipmentDetailView"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_admin_equipment_maintenance_v1_admin_equipment_maintenance_maintenance_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                "X-Request-ID"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AdminMaintenanceCreateRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminEquipmentDetailView"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    cancel_admin_equipment_maintenance_v1_admin_equipment_maintenance_maintenance__maintenance_id__cancel_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                "X-Request-ID"?: string | null;
+            };
+            path: {
+                maintenance_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AdminMaintenanceCancelRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminEquipmentDetailView"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    complete_admin_equipment_maintenance_v1_admin_equipment_maintenance_maintenance__maintenance_id__complete_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                "X-Request-ID"?: string | null;
+            };
+            path: {
+                maintenance_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AdminMaintenanceCompleteRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminEquipmentDetailView"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    start_admin_equipment_maintenance_v1_admin_equipment_maintenance_maintenance__maintenance_id__start_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                "X-Request-ID"?: string | null;
+            };
+            path: {
+                maintenance_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminEquipmentDetailView"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_admin_incidents_v1_admin_incidents_get: {
+        parameters: {
+            query?: {
+                area_name?: string | null;
+                branch_id?: string | null;
+                date_from?: string | null;
+                date_to?: string | null;
+                due_state?: string | null;
+                evidence_state?: string | null;
+                incident_type?: string | null;
+                page?: number;
+                page_size?: number;
+                related_document_state?: string | null;
+                reported_by_user_id?: string | null;
+                responsible_user_id?: string | null;
+                search?: string | null;
+                severity?: string | null;
+                source_type?: string | null;
+                status?: string | null;
+                warning_state?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminIncidentListResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_admin_incident_v1_admin_incidents_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                "X-Request-ID"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AdminIncidentCreateRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminIncidentDetailView"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_admin_incident_detail_v1_admin_incidents__incident_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                incident_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminIncidentDetailView"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_admin_incident_v1_admin_incidents__incident_id__patch: {
+        parameters: {
+            query?: never;
+            header?: {
+                "X-Request-ID"?: string | null;
+            };
+            path: {
+                incident_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AdminIncidentUpdateRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminIncidentDetailView"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    add_admin_incident_follow_up_v1_admin_incidents__incident_id__follow_ups_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                "X-Request-ID"?: string | null;
+            };
+            path: {
+                incident_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AdminIncidentFollowUpCreateRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminIncidentDetailView"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    reopen_admin_incident_v1_admin_incidents__incident_id__reopen_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                "X-Request-ID"?: string | null;
+            };
+            path: {
+                incident_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AdminIncidentFollowUpCreateRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminIncidentDetailView"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    resolve_admin_incident_v1_admin_incidents__incident_id__resolve_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                "X-Request-ID"?: string | null;
+            };
+            path: {
+                incident_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AdminIncidentResolveRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminIncidentDetailView"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    change_admin_incident_status_v1_admin_incidents__incident_id__status_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                "X-Request-ID"?: string | null;
+            };
+            path: {
+                incident_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AdminIncidentStatusRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminIncidentDetailView"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_admin_inputs_supplies_v1_admin_inputs_supplies_get: {
+        parameters: {
+            query?: {
+                class_id?: string | null;
+                cost_state?: string | null;
+                inventory_tracked?: boolean | null;
+                page?: number;
+                page_size?: number;
+                product_kind?: string | null;
+                purchasable?: boolean | null;
+                recipe_usage?: string | null;
+                search?: string | null;
+                status?: string | null;
+                stock_state?: string | null;
+                supplier_id?: string | null;
+                usage_type?: string | null;
+                warning_state?: string | null;
+                without_supplier?: boolean | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminInputSupplyListResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_admin_input_supply_v1_admin_inputs_supplies_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AdminInputSupplyCreateRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminInputSupplyDetailView"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_admin_input_supply_detail_v1_admin_inputs_supplies__product_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                product_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminInputSupplyDetailView"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_admin_input_supply_v1_admin_inputs_supplies__product_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                product_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AdminInputSupplyUpdateRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminInputSupplyDetailView"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    change_admin_input_supply_status_v1_admin_inputs_supplies__product_id__status_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                product_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AdminInputSupplyStatusRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminInputSupplyDetailView"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    upsert_admin_input_supply_supplier_v1_admin_inputs_supplies__product_id__suppliers_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                product_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AdminInputSupplySupplierRelationRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminInputSupplyDetailView"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_admin_input_supply_supplier_v1_admin_inputs_supplies__product_id__suppliers__relation_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                product_id: string;
+                relation_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AdminInputSupplySupplierRelationRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminInputSupplyDetailView"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_admin_inventory_v1_admin_inventory_get: {
+        parameters: {
+            query?: {
+                branch_id?: string | null;
+                class_id?: string | null;
+                location_code?: string | null;
+                product_kind?: string | null;
+                product_status?: string | null;
+                stock_state?: string | null;
+                search?: string | null;
+                page?: number;
+                page_size?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminInventoryListResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_admin_inventory_adjustment_v1_admin_inventory_adjustments_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AdminInventoryAdjustmentRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminInventoryAdjustmentView"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_admin_inventory_detail_v1_admin_inventory__balance_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                balance_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminInventoryDetailView"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_admin_inventory_movements_v1_admin_inventory__balance_id__movements_get: {
+        parameters: {
+            query?: {
+                page?: number;
+                page_size?: number;
+            };
+            header?: never;
+            path: {
+                balance_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminInventoryMovementsResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_admin_orders_v1_admin_orders_get: {
+        parameters: {
+            query?: {
+                branch_id?: string | null;
+                cashier_id?: string | null;
+                date_from?: string | null;
+                date_to?: string | null;
+                page?: number;
+                page_size?: number;
+                payment_state?: string | null;
+                search?: string | null;
+                status?: string | null;
+                workstation_id?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminOrdersListResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_admin_order_detail_v1_admin_orders__order_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                order_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminOrderDetailView"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    cancel_admin_order_v1_admin_orders__order_id__cancel_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                order_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AdminOrderActionRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminOrderDetailView"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    deliver_admin_order_v1_admin_orders__order_id__deliver_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                order_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AdminOrderActionRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminOrderDetailView"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    mark_admin_order_ready_v1_admin_orders__order_id__mark_ready_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                order_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AdminOrderActionRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminOrderDetailView"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_admin_prices_v1_admin_prices_get: {
+        parameters: {
+            query?: {
+                brand_id?: string | null;
+                class_id?: string | null;
+                entity_type?: string | null;
+                capture_mode?: string | null;
+                status?: string | null;
+                price_health?: string | null;
+                updated_from?: string | null;
+                updated_to?: string | null;
+                search?: string | null;
+                page?: number;
+                page_size?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminPricesListResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_admin_price_detail_v1_admin_prices__entity_type___entity_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                entity_type: string;
+                entity_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminPriceDetailView"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_admin_price_v1_admin_prices__entity_type___entity_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                entity_type: string;
+                entity_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AdminPriceUpdateRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminPriceDetailView"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_admin_product_classes_v1_admin_product_classes_get: {
+        parameters: {
+            query?: {
+                brand_id?: string | null;
+                status?: string | null;
+                capture_mode?: string | null;
+                product_presence?: string | null;
+                search?: string | null;
+                page?: number;
+                page_size?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminProductClassesListResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_admin_product_class_v1_admin_product_classes_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AdminProductClassCreateRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminProductClassView"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_admin_product_class_detail_v1_admin_product_classes__class_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                class_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminProductClassView"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_admin_product_class_v1_admin_product_classes__class_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                class_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AdminProductClassUpdateRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminProductClassView"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_admin_production_v1_admin_production_get: {
+        parameters: {
+            query?: {
+                branch_id?: string | null;
+                date_from?: string | null;
+                date_to?: string | null;
+                operator_user_id?: string | null;
+                page?: number;
+                page_size?: number;
+                product_id?: string | null;
+                recipe_id?: string | null;
+                search?: string | null;
+                status?: string | null;
+                variance_state?: string | null;
+                warning_state?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminProductionListResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_admin_production_v1_admin_production_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                "X-Request-ID"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AdminProductionCreateRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminProductionDetailView"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_admin_production_detail_v1_admin_production__production_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                production_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminProductionDetailView"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_admin_production_v1_admin_production__production_id__patch: {
+        parameters: {
+            query?: never;
+            header?: {
+                "X-Request-ID"?: string | null;
+            };
+            path: {
+                production_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AdminProductionUpdateRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminProductionDetailView"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    cancel_admin_production_v1_admin_production__production_id__cancel_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                "X-Request-ID"?: string | null;
+            };
+            path: {
+                production_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AdminProductionCancelRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminProductionDetailView"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    complete_admin_production_v1_admin_production__production_id__complete_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                "X-Request-ID"?: string | null;
+            };
+            path: {
+                production_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AdminProductionCompleteRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminProductionDetailView"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    start_admin_production_v1_admin_production__production_id__start_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                "X-Request-ID"?: string | null;
+            };
+            path: {
+                production_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AdminProductionStartRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminProductionDetailView"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_admin_products_v1_admin_products_get: {
+        parameters: {
+            query?: {
+                brand_id?: string | null;
+                branch_id?: string | null;
+                status?: string | null;
+                class_id?: string | null;
+                capture_mode?: string | null;
+                readiness?: string | null;
+                search?: string | null;
+                page?: number;
+                page_size?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminProductsListResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_admin_product_v1_admin_products_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AdminProductCreateRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminProductView"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_admin_product_detail_v1_admin_products__product_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                product_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminProductView"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_admin_product_v1_admin_products__product_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                product_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AdminProductUpdateRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminProductView"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    configure_admin_product_availability_v1_admin_products__product_id__availability_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                product_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AdminProductAvailabilityRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminProductView"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_admin_purchases_v1_admin_purchases_get: {
+        parameters: {
+            query?: {
+                amount_max?: number | string | null;
+                amount_min?: number | string | null;
+                branch_id?: string | null;
+                date_from?: string | null;
+                date_to?: string | null;
+                discrepancy_state?: string | null;
+                operator_user_id?: string | null;
+                page?: number;
+                page_size?: number;
+                product_id?: string | null;
+                product_kind?: string | null;
+                search?: string | null;
+                status?: string | null;
+                supplier_id?: string | null;
+                warning_state?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminPurchaseListResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_admin_purchase_v1_admin_purchases_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                "X-Request-ID"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AdminPurchaseCreateRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminPurchaseDetailView"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_admin_direct_entry_v1_admin_purchases_direct_entry_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                "X-Request-ID"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AdminPurchaseDirectEntryRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminPurchaseDetailView"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_admin_purchase_detail_v1_admin_purchases__purchase_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                purchase_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminPurchaseDetailView"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_admin_purchase_v1_admin_purchases__purchase_id__patch: {
+        parameters: {
+            query?: never;
+            header?: {
+                "X-Request-ID"?: string | null;
+            };
+            path: {
+                purchase_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AdminPurchaseUpdateRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminPurchaseDetailView"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    cancel_admin_purchase_v1_admin_purchases__purchase_id__cancel_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                "X-Request-ID"?: string | null;
+            };
+            path: {
+                purchase_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AdminPurchaseCancelRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminPurchaseDetailView"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    confirm_admin_purchase_v1_admin_purchases__purchase_id__confirm_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                "X-Request-ID"?: string | null;
+            };
+            path: {
+                purchase_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminPurchaseDetailView"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    receive_admin_purchase_v1_admin_purchases__purchase_id__receive_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                "X-Request-ID"?: string | null;
+            };
+            path: {
+                purchase_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AdminPurchaseReceiveRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminPurchaseDetailView"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_admin_recipe_cost_products_v1_admin_recipes_costs_products_get: {
+        parameters: {
+            query?: {
+                brand_id?: string | null;
+                class_id?: string | null;
+                recipe_state?: string | null;
+                search?: string | null;
+                page?: number;
+                page_size?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminRecipeCostsListResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_admin_recipe_cost_product_detail_v1_admin_recipes_costs_products__product_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                product_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminRecipeCostDetailView"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_admin_recipe_v1_admin_recipes_costs_recipes_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AdminRecipeCreateRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminRecipeCostDetailView"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    activate_admin_recipe_v1_admin_recipes_costs_recipes__recipe_id__activate_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                recipe_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminRecipeCostDetailView"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    apply_admin_recipe_standard_cost_v1_admin_recipes_costs_recipes__recipe_id__apply_standard_cost_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                recipe_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminRecipeCostDetailView"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    duplicate_admin_recipe_v1_admin_recipes_costs_recipes__recipe_id__duplicate_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                recipe_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AdminRecipeDuplicateRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminRecipeCostDetailView"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_admin_reconciliations_v1_admin_reconciliation_get: {
+        parameters: {
+            query?: {
+                amount_max?: number | string | null;
+                amount_min?: number | string | null;
+                branch_id?: string | null;
+                workstation_id?: string | null;
+                cashier_id?: string | null;
+                date_from?: string | null;
+                date_to?: string | null;
+                discrepancy_type?: string | null;
+                evidence_state?: string | null;
+                payment_method?: string | null;
+                search?: string | null;
+                source_type?: string | null;
+                status?: string | null;
+                page?: number;
+                page_size?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminReconciliationListResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_admin_reconciliation_v1_admin_reconciliation_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                "X-Request-ID"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AdminReconciliationCreateRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminReconciliationDetailView"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_admin_pending_reconciliation_discrepancies_v1_admin_reconciliation_pending_get: {
+        parameters: {
+            query?: {
+                amount_max?: number | string | null;
+                amount_min?: number | string | null;
+                branch_id?: string | null;
+                workstation_id?: string | null;
+                cashier_id?: string | null;
+                date_from?: string | null;
+                date_to?: string | null;
+                discrepancy_type?: string | null;
+                payment_method?: string | null;
+                search?: string | null;
+                source_type?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminPendingDiscrepanciesResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_admin_reconciliation_detail_v1_admin_reconciliation__reconciliation_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                reconciliation_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminReconciliationDetailView"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    resolve_admin_reconciliation_v1_admin_reconciliation__reconciliation_id__resolve_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                "X-Request-ID"?: string | null;
+            };
+            path: {
+                reconciliation_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AdminReconciliationResolveRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminReconciliationDetailView"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_admin_reports_v1_admin_reports_get: {
+        parameters: {
+            query?: {
+                search?: string | null;
+                category?: string | null;
+                status?: string | null;
+                export_support?: string | null;
+                sensitivity?: string | null;
+                source_module?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminReportDefinitionsResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    export_admin_report_v1_admin_reports__report_code__export_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                "X-Request-ID"?: string | null;
+            };
+            path: {
+                report_code: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AdminReportExportRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminReportExportResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    preview_admin_report_v1_admin_reports__report_code__preview_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                report_code: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AdminReportPreviewRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminReportPreviewResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_admin_corrections_v1_admin_returns_corrections_corrections_get: {
+        parameters: {
+            query?: {
+                branch_id?: string | null;
+                operator_id?: string | null;
+                correction_type?: string | null;
+                target_document_type?: string | null;
+                reason_code?: string | null;
+                net_effect?: string | null;
+                status?: string | null;
+                search?: string | null;
+                date_from?: string | null;
+                date_to?: string | null;
+                page?: number;
+                page_size?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminCorrectionsListResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_admin_correction_detail_v1_admin_returns_corrections_corrections__correction_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                correction_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminCorrectionDetailView"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_admin_returns_v1_admin_returns_corrections_returns_get: {
+        parameters: {
+            query?: {
+                branch_id?: string | null;
+                operator_id?: string | null;
+                refund_method?: string | null;
+                status?: string | null;
+                search?: string | null;
+                date_from?: string | null;
+                date_to?: string | null;
+                min_amount?: number | null;
+                max_amount?: number | null;
+                page?: number;
+                page_size?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminReturnsListResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_admin_return_detail_v1_admin_returns_corrections_returns__return_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                return_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminReturnDetailView"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_admin_roles_v1_admin_roles_get: {
+        parameters: {
+            query?: {
+                search?: string | null;
+                status?: string | null;
+                app_surface?: string | null;
+                high_privilege?: string | null;
+                has_users?: string | null;
+                permission_module?: string | null;
+                warning_state?: string | null;
+                system_state?: string | null;
+                page?: number;
+                page_size?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminRolesListResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_admin_role_v1_admin_roles_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AdminRoleCreateRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminRoleDetailView"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_admin_role_permissions_v1_admin_roles_permissions_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminPermissionsResponse"];
+                };
+            };
+        };
+    };
+    get_admin_role_detail_v1_admin_roles__role_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                role_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminRoleDetailView"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_admin_role_v1_admin_roles__role_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                role_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AdminRoleUpdateRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminRoleDetailView"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    change_admin_role_status_v1_admin_roles__role_id__status_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                role_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AdminRoleStatusChangeRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminRoleDetailView"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    assign_admin_role_to_user_v1_admin_roles__role_id__users__user_id__post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                role_id: string;
+                user_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminRoleDetailView"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    remove_admin_role_from_user_v1_admin_roles__role_id__users__user_id__remove_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                role_id: string;
+                user_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminRoleDetailView"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_admin_sales_tickets_v1_admin_sales_tickets_get: {
+        parameters: {
+            query?: {
+                branch_id?: string | null;
+                workstation_id?: string | null;
+                cashier_id?: string | null;
+                payment_method?: string | null;
+                status?: string | null;
+                search?: string | null;
+                date_from?: string | null;
+                date_to?: string | null;
+                min_amount?: number | string | null;
+                max_amount?: number | string | null;
+                page?: number;
+                page_size?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminSalesTicketsListResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_admin_sales_ticket_detail_v1_admin_sales_tickets__ticket_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                ticket_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminSalesTicketDetailView"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    reprint_admin_sales_ticket_v1_admin_sales_tickets__ticket_id__reprint_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                ticket_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminSalesTicketDetailView"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_admin_sanitary_verifications_v1_admin_sanitary_verifications_get: {
+        parameters: {
+            query?: {
+                area_name?: string | null;
+                area_type?: string | null;
+                branch_id?: string | null;
+                date_from?: string | null;
+                date_to?: string | null;
+                evidence_state?: string | null;
+                incident_state?: string | null;
+                inspector_user_id?: string | null;
+                page?: number;
+                page_size?: number;
+                process_name?: string | null;
+                process_type?: string | null;
+                result?: string | null;
+                risk_level?: string | null;
+                search?: string | null;
+                status?: string | null;
+                template_id?: string | null;
+                warning_state?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminSanitaryVerificationListResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_admin_sanitary_verification_v1_admin_sanitary_verifications_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                "X-Request-ID"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AdminSanitaryVerificationCreateRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminSanitaryVerificationDetailView"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_admin_sanitary_templates_v1_admin_sanitary_verifications_templates_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminSanitaryTemplateView"][];
+                };
+            };
+        };
+    };
+    get_admin_sanitary_verification_detail_v1_admin_sanitary_verifications__verification_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                verification_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminSanitaryVerificationDetailView"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    cancel_admin_sanitary_verification_v1_admin_sanitary_verifications__verification_id__cancel_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                "X-Request-ID"?: string | null;
+            };
+            path: {
+                verification_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AdminSanitaryVerificationCancelRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminSanitaryVerificationDetailView"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    complete_admin_sanitary_verification_v1_admin_sanitary_verifications__verification_id__complete_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                "X-Request-ID"?: string | null;
+            };
+            path: {
+                verification_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AdminSanitaryVerificationCompleteRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminSanitaryVerificationDetailView"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    start_admin_sanitary_verification_v1_admin_sanitary_verifications__verification_id__start_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                "X-Request-ID"?: string | null;
+            };
+            path: {
+                verification_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminSanitaryVerificationDetailView"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_admin_settings_v1_admin_settings_get: {
+        parameters: {
+            query?: {
+                search?: string | null;
+                category?: string | null;
+                status?: string | null;
+                sensitivity?: string | null;
+                readonly?: string | null;
+                scope?: string | null;
+                affected_module?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminSettingsListResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_admin_setting_detail_v1_admin_settings__setting_key__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                setting_key: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminSettingDetailView"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_admin_setting_v1_admin_settings__setting_key__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                setting_key: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AdminSettingUpdateRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminSettingDetailView"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    reset_admin_setting_v1_admin_settings__setting_key__reset_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                setting_key: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AdminSettingResetRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminSettingDetailView"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_admin_suppliers_v1_admin_suppliers_get: {
+        parameters: {
+            query?: {
+                branch_id?: string | null;
+                category?: string | null;
+                page?: number;
+                page_size?: number;
+                product_kind?: string | null;
+                search?: string | null;
+                status?: string | null;
+                warning_state?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminSupplierListResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_admin_supplier_v1_admin_suppliers_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                "X-Request-ID"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AdminSupplierCreateRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminSupplierDetailView"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_admin_supplier_detail_v1_admin_suppliers__supplier_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                supplier_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminSupplierDetailView"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_admin_supplier_v1_admin_suppliers__supplier_id__patch: {
+        parameters: {
+            query?: never;
+            header?: {
+                "X-Request-ID"?: string | null;
+            };
+            path: {
+                supplier_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AdminSupplierUpdateRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminSupplierDetailView"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    upsert_admin_supplier_branch_v1_admin_suppliers__supplier_id__branches_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                "X-Request-ID"?: string | null;
+            };
+            path: {
+                supplier_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AdminSupplierBranchRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminSupplierDetailView"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_admin_supplier_contact_v1_admin_suppliers__supplier_id__contacts_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                "X-Request-ID"?: string | null;
+            };
+            path: {
+                supplier_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AdminSupplierContactRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminSupplierDetailView"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_admin_supplier_contact_v1_admin_suppliers__supplier_id__contacts__contact_id__patch: {
+        parameters: {
+            query?: never;
+            header?: {
+                "X-Request-ID"?: string | null;
+            };
+            path: {
+                supplier_id: string;
+                contact_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AdminSupplierContactRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminSupplierDetailView"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    upsert_admin_supplier_product_v1_admin_suppliers__supplier_id__products_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                "X-Request-ID"?: string | null;
+            };
+            path: {
+                supplier_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AdminSupplierProductRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminSupplierDetailView"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_admin_supplier_product_v1_admin_suppliers__supplier_id__products__relation_id__patch: {
+        parameters: {
+            query?: never;
+            header?: {
+                "X-Request-ID"?: string | null;
+            };
+            path: {
+                supplier_id: string;
+                relation_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AdminSupplierProductRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminSupplierDetailView"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    change_admin_supplier_status_v1_admin_suppliers__supplier_id__status_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                "X-Request-ID"?: string | null;
+            };
+            path: {
+                supplier_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AdminSupplierStatusRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminSupplierDetailView"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_admin_transfers_v1_admin_transfers_get: {
+        parameters: {
+            query?: {
+                date_from?: string | null;
+                date_to?: string | null;
+                destination_branch_id?: string | null;
+                discrepancy_state?: string | null;
+                operator_user_id?: string | null;
+                origin_branch_id?: string | null;
+                product_id?: string | null;
+                search?: string | null;
+                status?: string | null;
+                page?: number;
+                page_size?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminTransferListResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_admin_transfer_v1_admin_transfers_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AdminTransferCreateRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminTransferDetailView"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_admin_transfer_detail_v1_admin_transfers__transfer_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                transfer_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminTransferDetailView"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_admin_transfer_v1_admin_transfers__transfer_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                transfer_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AdminTransferUpdateRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminTransferDetailView"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    cancel_admin_transfer_v1_admin_transfers__transfer_id__cancel_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                transfer_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AdminTransferCancelRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminTransferDetailView"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    dispatch_admin_transfer_v1_admin_transfers__transfer_id__dispatch_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                transfer_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AdminTransferDispatchRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminTransferDetailView"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    receive_admin_transfer_v1_admin_transfers__transfer_id__receive_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                transfer_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AdminTransferReceiveRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminTransferDetailView"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_admin_users_v1_admin_users_get: {
+        parameters: {
+            query?: {
+                search?: string | null;
+                status?: string | null;
+                app_access?: string | null;
+                branch_id?: string | null;
+                role_id?: string | null;
+                last_login_state?: string | null;
+                warning_state?: string | null;
+                page?: number;
+                page_size?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminUsersListResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_admin_user_v1_admin_users_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AdminUserCreateRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminUserDetailView"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_admin_user_detail_v1_admin_users__user_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                user_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminUserDetailView"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_admin_user_v1_admin_users__user_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                user_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AdminUserUpdateRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminUserDetailView"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    add_admin_user_branch_assignment_v1_admin_users__user_id__branch_assignments_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                user_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AdminUserBranchAssignmentCommand"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminUserDetailView"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    deactivate_admin_user_branch_assignment_v1_admin_users__user_id__branch_assignments__branch_id__deactivate_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                user_id: string;
+                branch_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminUserDetailView"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    set_admin_user_default_branch_assignment_v1_admin_users__user_id__branch_assignments__branch_id__default_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                user_id: string;
+                branch_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminUserDetailView"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    lock_admin_user_v1_admin_users__user_id__lock_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                user_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AdminUserLockRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminUserDetailView"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    assign_admin_user_role_v1_admin_users__user_id__roles_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                user_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AdminUserRoleAssignmentRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminUserDetailView"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    remove_admin_user_role_v1_admin_users__user_id__roles__role_id__remove_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                user_id: string;
+                role_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminUserDetailView"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    change_admin_user_status_v1_admin_users__user_id__status_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                user_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AdminUserStatusChangeRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminUserDetailView"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    unlock_admin_user_v1_admin_users__user_id__unlock_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                user_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminUserDetailView"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_admin_waste_v1_admin_waste_get: {
+        parameters: {
+            query?: {
+                branch_id?: string | null;
+                class_id?: string | null;
+                date_from?: string | null;
+                date_to?: string | null;
+                evidence_state?: string | null;
+                impact_level?: string | null;
+                location_code?: string | null;
+                operator_user_id?: string | null;
+                page?: number;
+                page_size?: number;
+                product_id?: string | null;
+                product_kind?: string | null;
+                reason_code?: string | null;
+                search?: string | null;
+                status?: string | null;
+                warning_state?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminWasteListResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_admin_waste_v1_admin_waste_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                "X-Request-ID"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AdminWasteCreateRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminWasteDetailView"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_admin_waste_reasons_v1_admin_waste_reasons_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminWasteReasonView"][];
+                };
+            };
+        };
+    };
+    get_admin_waste_detail_v1_admin_waste__waste_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                waste_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminWasteDetailView"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_admin_workstations_v1_admin_workstations_get: {
+        parameters: {
+            query?: {
+                branch_id?: string | null;
+                status?: string | null;
+                cash_session_state?: string | null;
+                readiness?: string | null;
+                warning_state?: string | null;
+                search?: string | null;
+                page?: number;
+                page_size?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminWorkstationsListResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_admin_workstation_v1_admin_workstations_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AdminWorkstationCreateRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminWorkstationDetailView"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_admin_workstation_detail_v1_admin_workstations__workstation_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                workstation_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminWorkstationDetailView"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_admin_workstation_v1_admin_workstations__workstation_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                workstation_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AdminWorkstationUpdateRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminWorkstationDetailView"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };

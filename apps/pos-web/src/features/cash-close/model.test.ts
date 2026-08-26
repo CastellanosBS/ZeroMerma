@@ -12,6 +12,7 @@ import {
   getCashCloseBlockingReason,
   getCashCloseCountValueState,
   getCashCloseUiState,
+  getDraftCountedTotalCents,
   hasCashCloseExpectedPaymentCounts,
   selectClassForCashCloseCount,
   selectProductForCashCloseCount,
@@ -100,6 +101,8 @@ describe("cash close model", () => {
     ];
 
     expect(buildCashClosePreviewRequest("POS-01", draft)).toEqual({
+      close_mode: "WITH_COUNT",
+      counter_empty_confirmed: false,
       workstation_code: "POS-01",
       counted_payment_methods: [
         {
@@ -122,6 +125,100 @@ describe("cash close model", () => {
         },
       ],
     });
+  });
+
+  it("adds the optional close observation to the preview payload when present", () => {
+    const draft = createInitialCashCloseDraftState();
+    draft.countedPaymentAmounts = {
+      CASH: "180.00",
+    };
+    draft.observationText = "Caja sin centavos";
+
+    expect(buildCashClosePreviewRequest("POS-01", draft)).toEqual({
+      close_mode: "WITH_COUNT",
+      counter_empty_confirmed: false,
+      workstation_code: "POS-01",
+      counted_payment_methods: [
+        {
+          counted_amount: "180.00",
+          payment_method_code: "CASH",
+        },
+      ],
+      counted_product_lines: [],
+      notes: "Caja sin centavos",
+    });
+  });
+
+  it("normalizes empty cash or card values to zero when another payment amount is captured", () => {
+    const draft = syncCashCloseDraftState(createInitialCashCloseDraftState(), {
+      paymentMethodCatalog,
+    });
+    draft.countedPaymentAmounts.CARD = "180.00";
+
+    expect(buildCashClosePreviewRequest("POS-01", draft).counted_payment_methods).toEqual([
+      {
+        counted_amount: "0.00",
+        payment_method_code: "CASH",
+      },
+      {
+        counted_amount: "180.00",
+        payment_method_code: "CARD",
+      },
+    ]);
+  });
+
+  it("builds an explicit empty-counter payload while preserving money count", () => {
+    const draft = createInitialCashCloseDraftState();
+    draft.countedPaymentAmounts = {
+      CARD: "30.00",
+      CASH: "150.00",
+    };
+    draft.countedProductDraftLines = [
+      {
+        key: "line-1",
+        productClassCode: "PAN-DULCE",
+        productClassId: "class-1",
+        productClassName: "Pan dulce",
+        productCode: "CONCHA-VAN",
+        productId: "product-1",
+        productName: "Concha vainilla",
+        quantityMilliUnits: 2000,
+        quantityText: "2",
+      },
+    ];
+    draft.observationText = "Mostrador vacio al cierre";
+
+    expect(
+      buildCashClosePreviewRequest("POS-01", draft, {
+        counterEmptyConfirmed: true,
+      }),
+    ).toEqual({
+      workstation_code: "POS-01",
+      close_mode: "WITH_COUNT",
+      counter_empty_confirmed: true,
+      counted_payment_methods: [
+        {
+          counted_amount: "30.00",
+          payment_method_code: "CARD",
+        },
+        {
+          counted_amount: "150.00",
+          payment_method_code: "CASH",
+        },
+      ],
+      counted_product_lines: [],
+      notes: "Mostrador vacio al cierre",
+    });
+  });
+
+  it("calculates the counted financial total from cash and card only", () => {
+    expect(
+      getDraftCountedTotalCents({
+        CARD: "180.00",
+        CASH: "20.00",
+        TRANSFER: "99.00",
+      }),
+    ).toBe(20000);
   });
 
   it("builds counted product lines through the selection-driven close grammar", () => {
@@ -164,6 +261,12 @@ describe("cash close model", () => {
     expect(
       hasCashCloseExpectedPaymentCounts(paymentMethodCatalog, draft.countedPaymentAmounts),
     ).toBe(true);
+
+    draft.countedPaymentAmounts.CASH = "";
+    draft.countedPaymentAmounts.CARD = "180.00";
+    expect(
+      hasCashCloseExpectedPaymentCounts(paymentMethodCatalog, draft.countedPaymentAmounts),
+    ).toBe(true);
   });
 
   it("derives ui state and blocking reason canonically from draft and preview state", () => {
@@ -192,7 +295,7 @@ describe("cash close model", () => {
         paymentMethodCatalog,
         previewResult: null,
       }),
-    ).toBe("Falta capturar efectivo contado.");
+    ).toBe("Falta capturar efectivo o tarjeta.");
 
     draft.countedPaymentAmounts.CASH = "174.00";
     draft.countedProductDraftLines = [

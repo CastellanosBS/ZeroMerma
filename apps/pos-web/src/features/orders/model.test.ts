@@ -13,6 +13,7 @@ import {
   getOrderCreateBlockingMessage,
   getOrderCreateChecklistMessages,
   getOrderCreateUiState,
+  isOrderCustomerPhoneComplete,
   getOrderSubtotalCents,
   getRemainingBalanceCents,
   selectClassForOrder,
@@ -40,6 +41,11 @@ const americanoProduct: OrdersCatalogProductView = {
 };
 
 describe("orders model", () => {
+  it("requires a complete customer phone before enabling order capture", () => {
+    expect(isOrderCustomerPhoneComplete("662")).toBe(false);
+    expect(isOrderCustomerPhoneComplete("662-123-4567")).toBe(true);
+  });
+
   it("merges duplicate exact-product lines and computes totals", () => {
     const baseState = createInitialOrderCreateDraftState();
     const firstSelection = setPendingQuantityText(
@@ -178,7 +184,20 @@ describe("orders model", () => {
         lines: draft.lines,
         requestedForInput: "2026-04-15T12:00",
       }),
-    ).toBe("Captura el telefono antes de guardar.");
+    ).toBe("Captura el telefono completo antes de guardar.");
+
+    expect(
+      getOrderCreateBlockingMessage({
+        advanceAmountText: "0.00",
+        advancePaymentMethodCode: "",
+        customerName: "Cliente demo",
+        customerPhone: "662",
+        mixedCardAmountText: "",
+        mixedCashAmountText: "",
+        lines: draft.lines,
+        requestedForInput: "2026-04-15T12:00",
+      }),
+    ).toBe("Captura el telefono completo antes de guardar.");
 
     expect(
       getOrderCreateBlockingMessage({
@@ -281,7 +300,7 @@ describe("orders model", () => {
       }),
     ).toEqual([
       "Falta cliente.",
-      "Falta telefono.",
+      "Falta telefono completo.",
       "Falta fecha de recoleccion.",
       "Agrega al menos una linea.",
       "El anticipo no puede exceder el total.",
@@ -323,7 +342,7 @@ describe("orders model", () => {
     expect(
       getOrderCreateUiState({
         customerName: "Cliente demo",
-        customerPhone: "",
+        customerPhone: "662",
         hasBlockingMessage: true,
         isSaving: false,
         lineCount: 2,

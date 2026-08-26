@@ -33,6 +33,7 @@ from zeromerma_api.modules.cash_close.application.schemas import (
     CashCloseClassReconciliationView,
     CashCloseCountedPaymentMethodRequest,
     CashCloseCountedProductLineRequest,
+    CashCloseCounterClassAvailabilityView,
     CashCloseDetailResponse,
     CashCloseDiscrepancyResolutionRequest,
     CashCloseDiscrepancyResolutionView,
@@ -53,11 +54,11 @@ from zeromerma_api.modules.cash_close.domain.constants import (
     BRANCH_COUNTER_SNAPSHOT_TYPE_CLOSE_BASELINE,
     CASH_CLOSE_BLOCKER_INCONSISTENT_SESSION_CONTEXT,
     CASH_CLOSE_BLOCKER_INTERNAL_INTEGRITY_MISMATCH,
+    CASH_CLOSE_BLOCKER_INVALID_COUNT_PAYLOAD,
     CASH_CLOSE_BLOCKER_INVALID_DISCREPANCY_RESOLUTION,
     CASH_CLOSE_BLOCKER_INVALID_MANUAL_RECONCILIATION_OVERRIDE,
     CASH_CLOSE_BLOCKER_MISSING_COUNTED_CLOSING_STOCK,
     CASH_CLOSE_BLOCKER_MISSING_COUNTED_PAYMENT_TOTALS,
-    CASH_CLOSE_BLOCKER_MISSING_COUNTER_BASELINE,
     CASH_CLOSE_BLOCKER_NO_ACTIVE_OPEN_CASH_SESSION,
     CASH_CLOSE_BLOCKER_SESSION_ALREADY_CLOSED,
     CASH_CLOSE_BLOCKER_UNRESOLVED_CLASS_CAPTURE_MISMATCH,
@@ -66,15 +67,17 @@ from zeromerma_api.modules.cash_close.domain.constants import (
     CASH_CLOSE_CLASS_RESOLUTION_STATUS_MANUAL_RESOLVED,
     CASH_CLOSE_CLASS_RESOLUTION_STATUS_UNRESOLVED,
     CASH_CLOSE_CURRENCY_MXN,
-    CASH_CLOSE_DISCREPANCY_RESOLUTION_TYPE_CLOSE_COUNTER_ADJUSTMENT,
-    CASH_CLOSE_DISCREPANCY_RESOLUTION_TYPE_CLOSE_WASTE_ADJUSTMENT,
     CASH_CLOSE_DISCREPANCY_REASON_COUNTER_OVERAGE,
     CASH_CLOSE_DISCREPANCY_REASON_COUNTER_SHORTAGE,
+    CASH_CLOSE_DISCREPANCY_RESOLUTION_TYPE_CLOSE_COUNTER_ADJUSTMENT,
+    CASH_CLOSE_DISCREPANCY_RESOLUTION_TYPE_CLOSE_WASTE_ADJUSTMENT,
     CASH_CLOSE_ISSUE_LEVEL_WARNING,
+    CASH_CLOSE_MODE_WITH_COUNT,
     CASH_CLOSE_PAYMENT_METHOD_CARD,
     CASH_CLOSE_PAYMENT_METHOD_CASH,
     CASH_CLOSE_PAYMENT_METHOD_MIXED,
     CASH_CLOSE_RECONCILIATION_STATUS_BLOCKED,
+    CASH_CLOSE_RECONCILIATION_STATUS_NOT_EVALUATED,
     CASH_CLOSE_RECONCILIATION_STATUS_PENDING,
     CASH_CLOSE_RECONCILIATION_STATUS_READY,
     CASH_CLOSE_STATUS_COMMITTED,
@@ -90,6 +93,7 @@ from zeromerma_api.modules.cash_close.domain.constants import (
     OUTBOX_EVENT_CLOSE_DISCREPANCY_GENERATED_V1,
     VALID_CASH_CLOSE_DISCREPANCY_REASON_CODES,
     VALID_CASH_CLOSE_DISCREPANCY_RESOLUTION_TYPES,
+    VALID_CASH_CLOSE_MODES,
     VALID_CASH_CLOSE_PAYMENT_METHOD_CODES,
 )
 from zeromerma_api.modules.cash_close.domain.exceptions import (
@@ -134,6 +138,11 @@ from zeromerma_api.modules.operations.infrastructure.models import (
     OperationDocumentLine,
 )
 from zeromerma_api.modules.outbox.application.service import OutboxWriter
+from zeromerma_api.modules.returns.domain.constants import (
+    RETURN_DISPOSITION_RESTOCK_COUNTER,
+    RETURN_STATUS_COMMITTED,
+)
+from zeromerma_api.modules.returns.infrastructure.models import SaleReturn, SaleReturnLine
 from zeromerma_api.modules.sales.domain.constants import (
     CASH_MOVEMENT_DIRECTION_IN,
     CASH_MOVEMENT_DIRECTION_OUT,
@@ -238,6 +247,17 @@ class ResolvedProductState:
 
 
 @dataclass(frozen=True)
+class ResolvedCounterClassAvailability:
+    product_class_id: uuid.UUID
+    product_class_code: str
+    product_class_name: str
+    expected_quantity_before_deferred_attr: Decimal
+    pending_class_capture_quantity: Decimal
+    available_quantity: Decimal
+    display_order: int
+
+
+@dataclass(frozen=True)
 class ResolvedAttributionLine:
     identity: ProductIdentity
     attributed_quantity: Decimal
@@ -274,6 +294,7 @@ class ResolvedDiscrepancy:
 @dataclass(frozen=True)
 class CashCloseReconciliationComputation:
     products: list[ResolvedProductState]
+    counter_class_availability: list[ResolvedCounterClassAvailability]
     class_reconciliations: list[ResolvedClassReconciliation]
     discrepancy_resolutions: list[ResolvedDiscrepancy]
     blockers: list[CashCloseIssueView]
@@ -282,12 +303,14 @@ class CashCloseReconciliationComputation:
 @dataclass(frozen=True)
 class CashClosePreparedPreview:
     active_cash_session: CashSessionView
+    close_mode: str
+    counter_empty_confirmed: bool
     baseline_snapshot: CashCloseBaselineSnapshotSummaryView
     pending_class_capture: CashClosePendingClassCaptureSummaryView
     financial_summary: CashCloseFinancialSummary
     payment_method_rows: list[CashClosePaymentMethodRowView]
-    counted_cash_amount: Decimal
-    cash_variance_amount: Decimal
+    counted_cash_amount: Decimal | None
+    cash_variance_amount: Decimal | None
     warnings: list[CashCloseIssueView]
     blockers: list[CashCloseIssueView]
     reconciliation_status: str
@@ -476,6 +499,7 @@ class CashCloseQueryService:
             workstation_id=context_state.workstation_context.workstation_id,
             branch_id=context_state.workstation_context.branch_id,
             counted_product_lines=[],
+            counter_empty_confirmed=False,
             manual_reconciliation_overrides=[],
             discrepancy_resolutions=[],
         )
@@ -489,9 +513,10 @@ class CashCloseQueryService:
             warnings=warnings,
             can_commit=False,
             relevant_products=_to_product_views(computation.products),
-            class_reconciliations=_to_class_reconciliation_views(
-                computation.class_reconciliations
+            counter_class_availability=_to_counter_class_availability_views(
+                computation.counter_class_availability
             ),
+            class_reconciliations=_to_class_reconciliation_views(computation.class_reconciliations),
             reconciliation_status=_resolve_query_reconciliation_status(merged_blockers),
         )
 
@@ -509,6 +534,8 @@ class CashCloseQueryService:
         )
         return CashClosePreviewResponse(
             cash_session=prepared.active_cash_session,
+            close_mode=prepared.close_mode,
+            counter_empty_confirmed=prepared.counter_empty_confirmed,
             currency_code=prepared.financial_summary.currency_code,
             opening_amount=prepared.active_cash_session.opening_amount,
             total_cash_in=prepared.financial_summary.total_cash_in,
@@ -579,25 +606,20 @@ class CashCloseQueryService:
             else None
         )
 
-        payment_method_rows = (
-            [
-                dict(row)
-                for row in session.execute(
-                    select(
-                        CashSessionClosePaymentMethodCount.payment_method_code,
-                        CashSessionClosePaymentMethodCount.currency_code,
-                        CashSessionClosePaymentMethodCount.counted_amount,
-                        CashSessionClosePaymentMethodCount.expected_amount,
-                        CashSessionClosePaymentMethodCount.variance_amount,
-                    ).where(
-                        CashSessionClosePaymentMethodCount.cash_session_close_id
-                        == close_record.id
-                    )
-                )
-                .mappings()
-                .all()
-            ]
-        )
+        payment_method_rows = [
+            dict(row)
+            for row in session.execute(
+                select(
+                    CashSessionClosePaymentMethodCount.payment_method_code,
+                    CashSessionClosePaymentMethodCount.currency_code,
+                    CashSessionClosePaymentMethodCount.counted_amount,
+                    CashSessionClosePaymentMethodCount.expected_amount,
+                    CashSessionClosePaymentMethodCount.variance_amount,
+                ).where(CashSessionClosePaymentMethodCount.cash_session_close_id == close_record.id)
+            )
+            .mappings()
+            .all()
+        ]
         counted_product_rows = (
             session.execute(
                 select(
@@ -679,8 +701,7 @@ class CashCloseQueryService:
                     CashSessionCloseDiscrepancyResolution.generated_document_id,
                 )
                 .where(
-                    CashSessionCloseDiscrepancyResolution.cash_session_close_id
-                    == close_record.id
+                    CashSessionCloseDiscrepancyResolution.cash_session_close_id == close_record.id
                 )
                 .order_by(CashSessionCloseDiscrepancyResolution.product_code_snapshot.asc())
             )
@@ -716,9 +737,9 @@ class CashCloseQueryService:
             else []
         )
 
-        attribution_by_class: dict[
-            uuid.UUID, list[CashCloseAttributionLineView]
-        ] = defaultdict(list)
+        attribution_by_class: dict[uuid.UUID, list[CashCloseAttributionLineView]] = defaultdict(
+            list
+        )
         for row in attribution_rows:
             attribution_by_class[row["class_reconciliation_id"]].append(
                 CashCloseAttributionLineView(
@@ -760,6 +781,8 @@ class CashCloseQueryService:
         return CashCloseDetailResponse(
             id=close_record.id,
             cash_session=cash_session_view,
+            close_mode=close_record.close_mode,
+            counter_empty_confirmed=close_record.counter_empty_confirmed,
             branch=BranchSummary(
                 id=branch.id,
                 code=branch.code,
@@ -776,9 +799,7 @@ class CashCloseQueryService:
             branch_brand_key=_get_branch_brand_key(branch.code),
             opened_by=AuthenticatedUser.model_validate(opened_by),
             closed_by=(
-                AuthenticatedUser.model_validate(closed_by)
-                if closed_by is not None
-                else None
+                AuthenticatedUser.model_validate(closed_by) if closed_by is not None else None
             ),
             opened_at=cash_session_view.opened_at,
             closed_at=close_record.committed_at_utc or cash_session_view.opened_at,
@@ -789,8 +810,8 @@ class CashCloseQueryService:
             total_cash_in=close_record.total_cash_in,
             total_cash_out=close_record.total_cash_out,
             expected_cash_amount=close_record.expected_cash_amount,
-            counted_cash_amount=close_record.counted_cash_amount or ZERO_MONEY,
-            cash_variance_amount=close_record.cash_variance_amount or ZERO_MONEY,
+            counted_cash_amount=close_record.counted_cash_amount,
+            cash_variance_amount=close_record.cash_variance_amount,
             payment_method_rows=_to_payment_method_rows(
                 payment_method_rows,
                 expected_cash_amount=close_record.expected_cash_amount,
@@ -846,8 +867,7 @@ class CashCloseQueryService:
                 for row in generated_documents
             ],
             warnings=[
-                CashCloseIssueView(code=row["code"], message=row["message"])
-                for row in warning_rows
+                CashCloseIssueView(code=row["code"], message=row["message"]) for row in warning_rows
             ],
             notes=close_record.notes,
         )
@@ -884,14 +904,19 @@ class CashCloseQueryService:
             cash_session_id=active_cash_session.id,
             opening_amount=active_cash_session.opening_amount,
         )
-        payment_method_rows, counted_cash_amount, has_counted_cash_input = (
+        close_mode = _normalize_close_mode(command.close_mode)
+        counter_empty_confirmed = command.counter_empty_confirmed
+        payment_method_rows, counted_cash_amount, has_counted_monetary_input = (
             _build_preview_payment_method_rows(
+                close_mode=close_mode,
                 counted_payment_methods=command.counted_payment_methods,
                 expected_cash_amount=financial_summary.expected_cash_amount,
             )
         )
-        cash_variance_amount = _quantize_money(
-            counted_cash_amount - financial_summary.expected_cash_amount
+        cash_variance_amount = (
+            _quantize_money(counted_cash_amount - financial_summary.expected_cash_amount)
+            if counted_cash_amount is not None
+            else None
         )
         warnings = _build_warnings(
             session,
@@ -904,6 +929,7 @@ class CashCloseQueryService:
             context_state=context_state,
             baseline_snapshot=baseline_snapshot,
         )
+        blockers = _merge_issues(blockers, _build_physical_count_blockers(command))
 
         computation = _compute_reconciliation(
             session,
@@ -911,18 +937,25 @@ class CashCloseQueryService:
             workstation_id=context_state.workstation_context.workstation_id,
             branch_id=context_state.workstation_context.branch_id,
             counted_product_lines=command.counted_product_lines,
+            counter_empty_confirmed=counter_empty_confirmed,
             manual_reconciliation_overrides=command.manual_reconciliation_overrides,
             discrepancy_resolutions=command.discrepancy_resolutions,
         )
         blockers = _merge_issues(blockers, computation.blockers)
         is_ready_to_close = (
-            has_counted_cash_input
-            and (len(computation.products) == 0 or len(command.counted_product_lines) > 0)
+            has_counted_monetary_input
+            and (
+                counter_empty_confirmed
+                or len(computation.products) == 0
+                or len(command.counted_product_lines) > 0
+            )
             and len(blockers) == 0
         )
 
         return CashClosePreparedPreview(
             active_cash_session=active_cash_session,
+            close_mode=close_mode,
+            counter_empty_confirmed=counter_empty_confirmed,
             baseline_snapshot=baseline_snapshot,
             pending_class_capture=pending_summary,
             financial_summary=financial_summary,
@@ -980,6 +1013,7 @@ class CashCloseCommandService:
 
         committed_at = datetime.now(tz=UTC)
         resolved_request_id = request_id or str(uuid.uuid4())
+        has_count_capture = prepared.close_mode == CASH_CLOSE_MODE_WITH_COUNT
         active_cash_session = session.execute(
             select(CashSession).where(CashSession.id == prepared.active_cash_session.id)
         ).scalar_one()
@@ -990,13 +1024,19 @@ class CashCloseCommandService:
             workstation_id=active_cash_session.workstation_id,
             closed_by_user_id=current_user.id,
             status=CASH_CLOSE_STATUS_COMMITTED,
+            close_mode=prepared.close_mode,
+            counter_empty_confirmed=prepared.counter_empty_confirmed,
             opening_amount=prepared.active_cash_session.opening_amount,
             total_cash_in=prepared.financial_summary.total_cash_in,
             total_cash_out=prepared.financial_summary.total_cash_out,
             expected_cash_amount=prepared.financial_summary.expected_cash_amount,
             counted_cash_amount=prepared.counted_cash_amount,
             cash_variance_amount=prepared.cash_variance_amount,
-            reconciliation_status=CASH_CLOSE_RECONCILIATION_STATUS_READY,
+            reconciliation_status=(
+                CASH_CLOSE_RECONCILIATION_STATUS_READY
+                if has_count_capture
+                else CASH_CLOSE_RECONCILIATION_STATUS_NOT_EVALUATED
+            ),
             notes=prepared.notes,
             started_at_utc=committed_at,
             committed_at_utc=committed_at,
@@ -1007,6 +1047,8 @@ class CashCloseCommandService:
             session.flush()
 
             for row in prepared.payment_method_rows:
+                if row.counted_amount is None:
+                    continue
                 session.add(
                     CashSessionClosePaymentMethodCount(
                         cash_session_close_id=close_row.id,
@@ -1018,98 +1060,100 @@ class CashCloseCommandService:
                     )
                 )
 
-            for product_state in prepared.computation.products:
-                if product_state.counted_quantity is None:
-                    continue
-                session.add(
-                    CashSessionCloseProductCount(
-                        cash_session_close_id=close_row.id,
-                        product_id=product_state.identity.product_id,
-                        product_code_snapshot=product_state.identity.product_code,
-                        product_name_snapshot=product_state.identity.product_name,
-                        product_class_id=product_state.identity.product_class_id,
-                        product_class_code_snapshot=product_state.identity.product_class_code,
-                        product_class_name_snapshot=product_state.identity.product_class_name,
-                        quantity=product_state.counted_quantity,
-                        bucket_code=OPERATION_BUCKET_COUNTER,
-                        notes=product_state.notes,
-                    )
-                )
-
-            for class_state in prepared.computation.class_reconciliations:
-                class_row = CashSessionCloseClassReconciliation(
-                    cash_session_close_id=close_row.id,
-                    product_class_id=class_state.product_class_id,
-                    product_class_code_snapshot=class_state.product_class_code,
-                    product_class_name_snapshot=class_state.product_class_name,
-                    expected_quantity=class_state.pending_quantity,
-                    auto_attributed_quantity=class_state.auto_attributed_quantity,
-                    attributed_quantity=class_state.final_attributed_quantity,
-                    variance_quantity=class_state.discrepancy_quantity,
-                    resolution_status=class_state.resolution_status,
-                    notes=class_state.notes,
-                )
-                session.add(class_row)
-                session.flush()
-
-                for attribution in class_state.attribution_lines:
+            if has_count_capture:
+                for product_state in prepared.computation.products:
+                    if product_state.counted_quantity is None:
+                        continue
                     session.add(
-                        CashSessionCloseReconciliationAttribution(
+                        CashSessionCloseProductCount(
                             cash_session_close_id=close_row.id,
-                            class_reconciliation_id=class_row.id,
-                            product_id=attribution.identity.product_id,
-                            product_code_snapshot=attribution.identity.product_code,
-                            product_name_snapshot=attribution.identity.product_name,
-                            product_class_id=attribution.identity.product_class_id,
-                            product_class_code_snapshot=attribution.identity.product_class_code,
-                            product_class_name_snapshot=attribution.identity.product_class_name,
-                            attributed_quantity=attribution.attributed_quantity,
-                            notes=attribution.notes,
+                            product_id=product_state.identity.product_id,
+                            product_code_snapshot=product_state.identity.product_code,
+                            product_name_snapshot=product_state.identity.product_name,
+                            product_class_id=product_state.identity.product_class_id,
+                            product_class_code_snapshot=product_state.identity.product_class_code,
+                            product_class_name_snapshot=product_state.identity.product_class_name,
+                            quantity=product_state.counted_quantity,
+                            bucket_code=OPERATION_BUCKET_COUNTER,
+                            notes=product_state.notes,
                         )
                     )
 
+                for class_state in prepared.computation.class_reconciliations:
+                    class_row = CashSessionCloseClassReconciliation(
+                        cash_session_close_id=close_row.id,
+                        product_class_id=class_state.product_class_id,
+                        product_class_code_snapshot=class_state.product_class_code,
+                        product_class_name_snapshot=class_state.product_class_name,
+                        expected_quantity=class_state.pending_quantity,
+                        auto_attributed_quantity=class_state.auto_attributed_quantity,
+                        attributed_quantity=class_state.final_attributed_quantity,
+                        variance_quantity=class_state.discrepancy_quantity,
+                        resolution_status=class_state.resolution_status,
+                        notes=class_state.notes,
+                    )
+                    session.add(class_row)
+                    session.flush()
+
+                    for attribution in class_state.attribution_lines:
+                        session.add(
+                            CashSessionCloseReconciliationAttribution(
+                                cash_session_close_id=close_row.id,
+                                class_reconciliation_id=class_row.id,
+                                product_id=attribution.identity.product_id,
+                                product_code_snapshot=attribution.identity.product_code,
+                                product_name_snapshot=attribution.identity.product_name,
+                                product_class_id=attribution.identity.product_class_id,
+                                product_class_code_snapshot=attribution.identity.product_class_code,
+                                product_class_name_snapshot=attribution.identity.product_class_name,
+                                attributed_quantity=attribution.attributed_quantity,
+                                notes=attribution.notes,
+                            )
+                        )
+
             generated_documents: list[OperationDocument] = []
             discrepancy_payload_rows: list[dict[str, str | None]] = []
-            for discrepancy in prepared.computation.discrepancy_resolutions:
-                generated_document = _create_discrepancy_document(
-                    session,
-                    discrepancy=discrepancy,
-                    branch_id=active_cash_session.branch_id,
-                    workstation_id=active_cash_session.workstation_id,
-                    actor_id=current_user.id,
-                    close_id=close_row.id,
-                    committed_at=committed_at,
-                )
-                generated_documents.append(generated_document)
-                session.add(
-                    CashSessionCloseDiscrepancyResolution(
-                        cash_session_close_id=close_row.id,
-                        product_id=discrepancy.identity.product_id,
-                        product_code_snapshot=discrepancy.identity.product_code,
-                        product_name_snapshot=discrepancy.identity.product_name,
-                        product_class_id=discrepancy.identity.product_class_id,
-                        product_class_code_snapshot=discrepancy.identity.product_class_code,
-                        product_class_name_snapshot=discrepancy.identity.product_class_name,
-                        expected_quantity=discrepancy.expected_quantity,
-                        counted_quantity=discrepancy.counted_quantity,
-                        discrepancy_quantity=discrepancy.discrepancy_quantity,
-                        resolution_type=discrepancy.resolution_type,
-                        reason_code=discrepancy.reason_code or "",
-                        notes=discrepancy.notes,
-                        generated_document_id=generated_document.id,
+            if has_count_capture:
+                for discrepancy in prepared.computation.discrepancy_resolutions:
+                    generated_document = _create_discrepancy_document(
+                        session,
+                        discrepancy=discrepancy,
+                        branch_id=active_cash_session.branch_id,
+                        workstation_id=active_cash_session.workstation_id,
+                        actor_id=current_user.id,
+                        close_id=close_row.id,
+                        committed_at=committed_at,
                     )
-                )
-                discrepancy_payload_rows.append(
-                    {
-                        "product_id": str(discrepancy.identity.product_id),
-                        "product_code": discrepancy.identity.product_code,
-                        "product_name": discrepancy.identity.product_name,
-                        "discrepancy_quantity": str(discrepancy.discrepancy_quantity),
-                        "resolution_type": discrepancy.resolution_type,
-                        "reason_code": discrepancy.reason_code,
-                        "generated_document_id": str(generated_document.id),
-                    }
-                )
+                    generated_documents.append(generated_document)
+                    session.add(
+                        CashSessionCloseDiscrepancyResolution(
+                            cash_session_close_id=close_row.id,
+                            product_id=discrepancy.identity.product_id,
+                            product_code_snapshot=discrepancy.identity.product_code,
+                            product_name_snapshot=discrepancy.identity.product_name,
+                            product_class_id=discrepancy.identity.product_class_id,
+                            product_class_code_snapshot=discrepancy.identity.product_class_code,
+                            product_class_name_snapshot=discrepancy.identity.product_class_name,
+                            expected_quantity=discrepancy.expected_quantity,
+                            counted_quantity=discrepancy.counted_quantity,
+                            discrepancy_quantity=discrepancy.discrepancy_quantity,
+                            resolution_type=discrepancy.resolution_type,
+                            reason_code=discrepancy.reason_code or "",
+                            notes=discrepancy.notes,
+                            generated_document_id=generated_document.id,
+                        )
+                    )
+                    discrepancy_payload_rows.append(
+                        {
+                            "product_id": str(discrepancy.identity.product_id),
+                            "product_code": discrepancy.identity.product_code,
+                            "product_name": discrepancy.identity.product_name,
+                            "discrepancy_quantity": str(discrepancy.discrepancy_quantity),
+                            "resolution_type": discrepancy.resolution_type,
+                            "reason_code": discrepancy.reason_code,
+                            "generated_document_id": str(generated_document.id),
+                        }
+                    )
 
             for warning in prepared.warnings:
                 session.add(
@@ -1121,31 +1165,32 @@ class CashCloseCommandService:
                     )
                 )
 
-            closing_snapshot = BranchCounterSnapshot(
-                branch_id=active_cash_session.branch_id,
-                source_cash_session_close_id=close_row.id,
-                snapshot_type=BRANCH_COUNTER_SNAPSHOT_TYPE_CLOSE_BASELINE,
-                captured_by_user_id=current_user.id,
-                captured_at_utc=committed_at,
-            )
-            session.add(closing_snapshot)
-            session.flush()
-            for product_state in prepared.computation.products:
-                if product_state.counted_quantity is None:
-                    continue
-                session.add(
-                    BranchCounterSnapshotLine(
-                        snapshot_id=closing_snapshot.id,
-                        product_id=product_state.identity.product_id,
-                        product_code_snapshot=product_state.identity.product_code,
-                        product_name_snapshot=product_state.identity.product_name,
-                        product_class_id=product_state.identity.product_class_id,
-                        product_class_code_snapshot=product_state.identity.product_class_code,
-                        product_class_name_snapshot=product_state.identity.product_class_name,
-                        quantity=product_state.counted_quantity,
-                        bucket_code=OPERATION_BUCKET_COUNTER,
-                    )
+            if has_count_capture:
+                closing_snapshot = BranchCounterSnapshot(
+                    branch_id=active_cash_session.branch_id,
+                    source_cash_session_close_id=close_row.id,
+                    snapshot_type=BRANCH_COUNTER_SNAPSHOT_TYPE_CLOSE_BASELINE,
+                    captured_by_user_id=current_user.id,
+                    captured_at_utc=committed_at,
                 )
+                session.add(closing_snapshot)
+                session.flush()
+                for product_state in prepared.computation.products:
+                    if product_state.counted_quantity is None:
+                        continue
+                    session.add(
+                        BranchCounterSnapshotLine(
+                            snapshot_id=closing_snapshot.id,
+                            product_id=product_state.identity.product_id,
+                            product_code_snapshot=product_state.identity.product_code,
+                            product_name_snapshot=product_state.identity.product_name,
+                            product_class_id=product_state.identity.product_class_id,
+                            product_class_code_snapshot=product_state.identity.product_class_code,
+                            product_class_name_snapshot=product_state.identity.product_class_name,
+                            quantity=product_state.counted_quantity,
+                            bucket_code=OPERATION_BUCKET_COUNTER,
+                        )
+                    )
 
             pending_sale_lines = (
                 session.execute(
@@ -1162,8 +1207,11 @@ class CashCloseCommandService:
                 .scalars()
                 .all()
             )
-            for sale_line in pending_sale_lines:
-                sale_line.physical_attribution_status = SALE_LINE_PHYSICAL_ATTRIBUTION_RECONCILED
+            if has_count_capture:
+                for sale_line in pending_sale_lines:
+                    sale_line.physical_attribution_status = (
+                        SALE_LINE_PHYSICAL_ATTRIBUTION_RECONCILED
+                    )
 
             active_cash_session.status = CASH_SESSION_STATUS_CLOSED
             active_cash_session.closed_at = committed_at
@@ -1179,10 +1227,16 @@ class CashCloseCommandService:
                 metadata={
                     "cash_session_id": str(active_cash_session.id),
                     "workstation_id": str(active_cash_session.workstation_id),
+                    "close_mode": close_row.close_mode,
+                    "counter_empty_confirmed": close_row.counter_empty_confirmed,
                     "opening_amount": str(close_row.opening_amount),
                     "expected_cash_amount": str(close_row.expected_cash_amount),
-                    "counted_cash_amount": str(close_row.counted_cash_amount),
-                    "cash_variance_amount": str(close_row.cash_variance_amount),
+                    "counted_cash_amount": _optional_decimal_to_string(
+                        close_row.counted_cash_amount
+                    ),
+                    "cash_variance_amount": _optional_decimal_to_string(
+                        close_row.cash_variance_amount
+                    ),
                     "class_reconciliation_count": len(prepared.computation.class_reconciliations),
                     "generated_discrepancy_document_count": len(generated_documents),
                     "warning_codes": [warning.code for warning in prepared.warnings],
@@ -1199,40 +1253,49 @@ class CashCloseCommandService:
                     "branch_id": str(active_cash_session.branch_id),
                     "workstation_id": str(active_cash_session.workstation_id),
                     "closed_by_user_id": str(current_user.id),
+                    "close_mode": close_row.close_mode,
+                    "counter_empty_confirmed": close_row.counter_empty_confirmed,
                     "expected_cash_amount": str(close_row.expected_cash_amount),
-                    "counted_cash_amount": str(close_row.counted_cash_amount),
-                    "cash_variance_amount": str(close_row.cash_variance_amount),
+                    "counted_cash_amount": _optional_decimal_to_string(
+                        close_row.counted_cash_amount
+                    ),
+                    "cash_variance_amount": _optional_decimal_to_string(
+                        close_row.cash_variance_amount
+                    ),
                     "committed_at_utc": committed_at.isoformat(),
                 },
                 headers={"request_id": resolved_request_id},
             )
-            self._outbox_writer.append(
-                session,
-                aggregate_type="cash_session_close",
-                aggregate_id=str(close_row.id),
-                event_name=OUTBOX_EVENT_CLASS_CAPTURE_RECONCILED_V1,
-                payload={
-                    "close_id": str(close_row.id),
-                    "cash_session_id": str(active_cash_session.id),
-                    "pending_class_capture_classes_count": (
-                        prepared.pending_class_capture.pending_class_capture_classes_count
-                    ),
-                    "pending_class_capture_total_quantity": str(
-                        prepared.pending_class_capture.pending_class_capture_total_quantity
-                    ),
-                    "class_reconciliations": [
-                        {
-                            "product_class_id": str(class_state.product_class_id),
-                            "product_class_code": class_state.product_class_code,
-                            "pending_quantity": str(class_state.pending_quantity),
-                            "final_attributed_quantity": str(class_state.final_attributed_quantity),
-                            "resolution_status": class_state.resolution_status,
-                        }
-                        for class_state in prepared.computation.class_reconciliations
-                    ],
-                },
-                headers={"request_id": resolved_request_id},
-            )
+            if has_count_capture:
+                self._outbox_writer.append(
+                    session,
+                    aggregate_type="cash_session_close",
+                    aggregate_id=str(close_row.id),
+                    event_name=OUTBOX_EVENT_CLASS_CAPTURE_RECONCILED_V1,
+                    payload={
+                        "close_id": str(close_row.id),
+                        "cash_session_id": str(active_cash_session.id),
+                        "pending_class_capture_classes_count": (
+                            prepared.pending_class_capture.pending_class_capture_classes_count
+                        ),
+                        "pending_class_capture_total_quantity": str(
+                            prepared.pending_class_capture.pending_class_capture_total_quantity
+                        ),
+                        "class_reconciliations": [
+                            {
+                                "product_class_id": str(class_state.product_class_id),
+                                "product_class_code": class_state.product_class_code,
+                                "pending_quantity": str(class_state.pending_quantity),
+                                "final_attributed_quantity": str(
+                                    class_state.final_attributed_quantity
+                                ),
+                                "resolution_status": class_state.resolution_status,
+                            }
+                            for class_state in prepared.computation.class_reconciliations
+                        ],
+                    },
+                    headers={"request_id": resolved_request_id},
+                )
             if len(discrepancy_payload_rows) > 0:
                 self._outbox_writer.append(
                     session,
@@ -1334,9 +1397,7 @@ def _require_previewable_cash_session(
         raise CashCloseConflictError("No hay una sesion de caja abierta en esta estacion.")
 
     if current_open_cash_session.user_id != current_user.id:
-        raise CashCloseConflictError(
-            "La sesion abierta de esta caja pertenece a otro cajero."
-        )
+        raise CashCloseConflictError("La sesion abierta de esta caja pertenece a otro cajero.")
 
     if (
         current_open_cash_session.branch_id != context_state.workstation_context.branch_id
@@ -1363,11 +1424,19 @@ def _get_payment_method_catalog() -> list[CashClosePaymentMethodCatalogView]:
     ]
 
 
+def _normalize_close_mode(close_mode: str) -> str:
+    normalized = close_mode.strip().upper()
+    if normalized not in VALID_CASH_CLOSE_MODES:
+        raise CashCloseValidationError("El modo de cierre solicitado no es valido.")
+    return normalized
+
+
 def _build_preview_payment_method_rows(
     *,
+    close_mode: str,
     counted_payment_methods: Sequence[CashCloseCountedPaymentMethodRequest],
     expected_cash_amount: Decimal,
-) -> tuple[list[CashClosePaymentMethodRowView], Decimal, bool]:
+) -> tuple[list[CashClosePaymentMethodRowView], Decimal | None, bool]:
     catalog = _get_payment_method_catalog()
     input_amounts: dict[str, Decimal] = {}
 
@@ -1384,8 +1453,8 @@ def _build_preview_payment_method_rows(
         input_amounts[payment_method_code] = _quantize_money(count_row.counted_amount)
 
     preview_rows: list[CashClosePaymentMethodRowView] = []
-    counted_cash_amount = ZERO_MONEY
-    has_counted_cash_input = CASH_CLOSE_PAYMENT_METHOD_CASH in input_amounts
+    counted_cash_amount: Decimal | None = ZERO_MONEY
+    has_counted_monetary_input = len(input_amounts) > 0
 
     for catalog_row in catalog:
         counted_amount = input_amounts.get(catalog_row.payment_method_code, ZERO_MONEY)
@@ -1413,7 +1482,7 @@ def _build_preview_payment_method_rows(
         if catalog_row.payment_method_code == CASH_CLOSE_PAYMENT_METHOD_CASH:
             counted_cash_amount = counted_amount
 
-    return preview_rows, counted_cash_amount, has_counted_cash_input
+    return preview_rows, counted_cash_amount, has_counted_monetary_input
 
 
 def _get_financial_summary(
@@ -1527,9 +1596,7 @@ def _get_pending_class_capture_rows(
 def _build_pending_class_capture_summary(
     rows: Sequence[PendingClassCaptureRow],
 ) -> CashClosePendingClassCaptureSummaryView:
-    total_quantity = _quantize_quantity(
-        sum((row.pending_quantity for row in rows), ZERO_QUANTITY)
-    )
+    total_quantity = _quantize_quantity(sum((row.pending_quantity for row in rows), ZERO_QUANTITY))
     return CashClosePendingClassCaptureSummaryView(
         has_pending_class_capture=total_quantity > 0,
         pending_class_capture_classes_count=len(rows),
@@ -1613,9 +1680,7 @@ def _build_context_blockers(
             _append_issue(
                 blockers,
                 code=CASH_CLOSE_BLOCKER_SESSION_ALREADY_CLOSED,
-                message=(
-                    "Esta caja ya tiene un cierre registrado para su ultima sesion abierta."
-                ),
+                message=("Esta caja ya tiene un cierre registrado para su ultima sesion abierta."),
             )
         else:
             _append_issue(
@@ -1666,8 +1731,7 @@ def _build_warnings(
             CashCloseIssueView(
                 code=CASH_CLOSE_WARNING_PENDING_INBOUND_TRANSFERS,
                 message=(
-                    f"Hay {pending_inbound_count} envio(s) pendientes de recibir en esta "
-                    "sucursal."
+                    f"Hay {pending_inbound_count} envio(s) pendientes de recibir en esta sucursal."
                 ),
             )
         )
@@ -1728,6 +1792,7 @@ def _compute_reconciliation(
     workstation_id: uuid.UUID,
     branch_id: uuid.UUID,
     counted_product_lines: Sequence[CashCloseCountedProductLineRequest],
+    counter_empty_confirmed: bool,
     manual_reconciliation_overrides: Sequence[CashCloseManualReconciliationOverrideRequest],
     discrepancy_resolutions: Sequence[CashCloseDiscrepancyResolutionRequest],
 ) -> CashCloseReconciliationComputation:
@@ -1758,6 +1823,10 @@ def _compute_reconciliation(
         workstation_id=workstation_id,
         opened_at=cash_session.opened_at,
     )
+    counter_return_quantities = _get_counter_return_quantities(
+        session,
+        cash_session_id=cash_session.id,
+    )
     direct_sale_quantities = _get_product_direct_sale_quantities(
         session,
         cash_session_id=cash_session.id,
@@ -1771,6 +1840,7 @@ def _compute_reconciliation(
     relevant_product_ids = (
         set(baseline_quantities)
         | set(counter_transfer_quantities)
+        | set(counter_return_quantities)
         | set(counter_waste_quantities)
         | set(correction_deltas)
         | set(direct_sale_quantities)
@@ -1788,15 +1858,21 @@ def _compute_reconciliation(
         product_ids=relevant_product_ids | override_product_ids | resolution_product_ids,
     )
     relevant_identities = _sort_product_identities(
-        [
-            identities[product_id]
-            for product_id in relevant_product_ids
-            if product_id in identities
-        ]
+        [identities[product_id] for product_id in relevant_product_ids if product_id in identities]
     )
+    if counter_empty_confirmed and len(counted_inputs) == 0:
+        counted_inputs = {
+            product_id: CountedProductInput(counted_quantity=ZERO_QUANTITY, notes=None)
+            for product_id in relevant_product_ids
+        }
 
     expected_before_map: dict[uuid.UUID, Decimal] = defaultdict(lambda: ZERO_QUANTITY)
-    for source in (baseline_quantities, counter_transfer_quantities, correction_deltas):
+    for source in (
+        baseline_quantities,
+        counter_transfer_quantities,
+        counter_return_quantities,
+        correction_deltas,
+    ):
         for product_id, quantity in source.items():
             expected_before_map[product_id] = _quantize_quantity(
                 expected_before_map[product_id] + quantity
@@ -1813,9 +1889,7 @@ def _compute_reconciliation(
         _append_issue(
             blockers,
             code=CASH_CLOSE_BLOCKER_INTERNAL_INTEGRITY_MISMATCH,
-            message=(
-                "La base esperada del mostrador quedo en negativo para uno o mas productos."
-            ),
+            message=("La base esperada del mostrador quedo en negativo para uno o mas productos."),
         )
 
     counted_complete = len(relevant_product_ids) == 0 or len(counted_inputs) > 0
@@ -1850,9 +1924,15 @@ def _compute_reconciliation(
         can_resolve_discrepancies=can_resolve_discrepancies,
     )
     blockers = _merge_issues(blockers, discrepancy_blockers)
+    counter_class_availability = _build_counter_class_availability(
+        identities=relevant_identities,
+        expected_before_map=expected_before_map,
+        pending_rows=pending_rows,
+    )
 
     return CashCloseReconciliationComputation(
         products=products,
+        counter_class_availability=counter_class_availability,
         class_reconciliations=class_reconciliations,
         discrepancy_resolutions=resolved_discrepancies,
         blockers=blockers,
@@ -1883,16 +1963,30 @@ def _resolve_class_reconciliations(
                 if identity.product_class_id == pending_row.product_class_id
             ]
         )
-        auto_lines = [
-            ResolvedAttributionLine(
-                identity=identity,
-                attributed_quantity=auto_candidate_map.get(identity.product_id, ZERO_QUANTITY),
-                attribution_source="AUTO",
-                notes=None,
+        auto_lines: list[ResolvedAttributionLine] = []
+        remaining_auto_quantity = pending_row.pending_quantity
+        for identity in class_product_identities:
+            if remaining_auto_quantity <= 0:
+                break
+            candidate_quantity = auto_candidate_map.get(identity.product_id, ZERO_QUANTITY)
+            if candidate_quantity <= 0:
+                continue
+            attributed_quantity = _quantize_quantity(
+                min(candidate_quantity, remaining_auto_quantity)
             )
-            for identity in class_product_identities
-            if auto_candidate_map.get(identity.product_id, ZERO_QUANTITY) > 0
-        ]
+            if attributed_quantity <= 0:
+                continue
+            auto_lines.append(
+                ResolvedAttributionLine(
+                    identity=identity,
+                    attributed_quantity=attributed_quantity,
+                    attribution_source="AUTO",
+                    notes=None,
+                )
+            )
+            remaining_auto_quantity = _quantize_quantity(
+                remaining_auto_quantity - attributed_quantity
+            )
         auto_attributed_quantity = _quantize_quantity(
             sum((line.attributed_quantity for line in auto_lines), ZERO_QUANTITY)
         )
@@ -1941,8 +2035,7 @@ def _resolve_class_reconciliations(
                     blockers,
                     code=CASH_CLOSE_BLOCKER_UNRESOLVED_CLASS_CAPTURE_MISMATCH,
                     message=(
-                        "Hay ventas por clase que todavia no estan repartidas por producto "
-                        "exacto."
+                        "Hay ventas por clase que todavia no estan repartidas por producto exacto."
                     ),
                 )
                 resolution_status = CASH_CLOSE_CLASS_RESOLUTION_STATUS_UNRESOLVED
@@ -2047,8 +2140,7 @@ def _resolve_product_discrepancies(
             blockers,
             code=CASH_CLOSE_BLOCKER_INVALID_DISCREPANCY_RESOLUTION,
             message=(
-                "Se capturaron resoluciones para productos que no tienen diferencia en el "
-                "cierre."
+                "Se capturaron resoluciones para productos que no tienen diferencia en el cierre."
             ),
         )
 
@@ -2213,9 +2305,7 @@ def _get_snapshot_counter_quantities(
         .mappings()
         .all()
     )
-    return {
-        record["product_id"]: _quantize_quantity(record["quantity"]) for record in records
-    }
+    return {record["product_id"]: _quantize_quantity(record["quantity"]) for record in records}
 
 
 def _get_counter_transfer_quantities(
@@ -2330,6 +2420,36 @@ def _get_counter_correction_deltas(
     return dict(totals)
 
 
+def _get_counter_return_quantities(
+    session: Session,
+    *,
+    cash_session_id: uuid.UUID,
+) -> dict[uuid.UUID, Decimal]:
+    records = (
+        session.execute(
+            select(
+                SaleReturnLine.returned_product_id.label("product_id"),
+                func.coalesce(func.sum(SaleReturnLine.returned_quantity), 0).label("quantity"),
+            )
+            .select_from(SaleReturnLine)
+            .join(SaleReturn, SaleReturn.id == SaleReturnLine.sale_return_id)
+            .where(
+                SaleReturn.cash_session_id == cash_session_id,
+                SaleReturn.status == RETURN_STATUS_COMMITTED,
+                SaleReturnLine.disposition_code == RETURN_DISPOSITION_RESTOCK_COUNTER,
+            )
+            .group_by(SaleReturnLine.returned_product_id)
+        )
+        .mappings()
+        .all()
+    )
+    return {
+        record["product_id"]: _quantize_quantity(Decimal(record["quantity"]))
+        for record in records
+        if record["product_id"] is not None
+    }
+
+
 def _get_product_direct_sale_quantities(
     session: Session,
     *,
@@ -2354,7 +2474,8 @@ def _get_product_direct_sale_quantities(
         .all()
     )
     return {
-        record["product_id"]: _quantize_quantity(Decimal(record["quantity"])) for record in records
+        record["product_id"]: _quantize_quantity(Decimal(record["quantity"]))
+        for record in records
         if record["product_id"] is not None
     }
 
@@ -2374,6 +2495,62 @@ def _get_active_product_ids_for_classes(
         )
     ).all()
     return {record[0] for record in records}
+
+
+def _build_counter_class_availability(
+    *,
+    identities: Sequence[ProductIdentity],
+    expected_before_map: Mapping[uuid.UUID, Decimal],
+    pending_rows: Sequence[PendingClassCaptureRow],
+) -> list[ResolvedCounterClassAvailability]:
+    expected_totals: dict[uuid.UUID, Decimal] = defaultdict(lambda: ZERO_QUANTITY)
+    pending_totals: dict[uuid.UUID, Decimal] = {
+        row.product_class_id: row.pending_quantity for row in pending_rows
+    }
+    metadata: dict[uuid.UUID, tuple[str, str, int]] = {}
+
+    for identity in identities:
+        expected_totals[identity.product_class_id] = _quantize_quantity(
+            expected_totals[identity.product_class_id]
+            + expected_before_map.get(identity.product_id, ZERO_QUANTITY)
+        )
+        metadata.setdefault(
+            identity.product_class_id,
+            (
+                identity.product_class_code,
+                identity.product_class_name,
+                identity.class_display_order,
+            ),
+        )
+
+    for row in pending_rows:
+        metadata.setdefault(
+            row.product_class_id,
+            (row.product_class_code, row.product_class_name, row.display_order),
+        )
+
+    rows: list[ResolvedCounterClassAvailability] = []
+    for product_class_id, (class_code, class_name, display_order) in metadata.items():
+        expected_quantity = _quantize_quantity(expected_totals.get(product_class_id, ZERO_QUANTITY))
+        pending_quantity = _quantize_quantity(pending_totals.get(product_class_id, ZERO_QUANTITY))
+        available_quantity = _quantize_quantity(
+            max(expected_quantity - pending_quantity, ZERO_QUANTITY)
+        )
+        if expected_quantity == ZERO_QUANTITY and pending_quantity == ZERO_QUANTITY:
+            continue
+        rows.append(
+            ResolvedCounterClassAvailability(
+                product_class_id=product_class_id,
+                product_class_code=class_code,
+                product_class_name=class_name,
+                expected_quantity_before_deferred_attr=expected_quantity,
+                pending_class_capture_quantity=pending_quantity,
+                available_quantity=available_quantity,
+                display_order=display_order,
+            )
+        )
+
+    return sorted(rows, key=lambda row: (row.display_order, row.product_class_name))
 
 
 def _resolve_product_identities(
@@ -2551,31 +2728,54 @@ def _resolve_preview_reconciliation_status(
     return CASH_CLOSE_RECONCILIATION_STATUS_PENDING
 
 
+def _build_physical_count_blockers(
+    command: CashClosePreviewRequest,
+) -> list[CashCloseIssueView]:
+    blockers: list[CashCloseIssueView] = []
+    if not command.counter_empty_confirmed:
+        return blockers
+
+    if (
+        len(command.counted_product_lines) > 0
+        or len(command.manual_reconciliation_overrides) > 0
+        or len(command.discrepancy_resolutions) > 0
+    ):
+        _append_issue(
+            blockers,
+            code=CASH_CLOSE_BLOCKER_INVALID_COUNT_PAYLOAD,
+            message=(
+                "El cierre con mostrador vacio no puede incluir productos ni "
+                "conciliaciones fisicas capturadas."
+            ),
+        )
+
+    return blockers
+
+
 def _build_commit_blockers(
     *,
     command: CashClosePreviewRequest,
     prepared: CashClosePreparedPreview,
 ) -> list[CashCloseIssueView]:
     blockers = list(prepared.blockers)
-    has_counted_cash_input = any(
-        counted_payment.payment_method_code == CASH_CLOSE_PAYMENT_METHOD_CASH
-        for counted_payment in command.counted_payment_methods
-    )
+    has_counted_monetary_input = len(command.counted_payment_methods) > 0
 
-    if not has_counted_cash_input:
+    if not has_counted_monetary_input:
         _append_issue(
             blockers,
             code=CASH_CLOSE_BLOCKER_MISSING_COUNTED_PAYMENT_TOTALS,
-            message="Falta capturar el total contado de efectivo para poder cerrar.",
+            message="Falta capturar el conteo monetario para poder cerrar.",
         )
 
-    if len(prepared.computation.products) > 0 and len(command.counted_product_lines) == 0:
+    if (
+        not prepared.counter_empty_confirmed
+        and len(prepared.computation.products) > 0
+        and len(command.counted_product_lines) == 0
+    ):
         _append_issue(
             blockers,
             code=CASH_CLOSE_BLOCKER_MISSING_COUNTED_CLOSING_STOCK,
-            message=(
-                "Falta capturar el conteo final del mostrador antes de cerrar el turno."
-            ),
+            message=("Falta capturar el conteo final del mostrador antes de cerrar el turno."),
         )
 
     return blockers
@@ -2611,9 +2811,7 @@ def _to_payment_method_rows(
     *,
     expected_cash_amount: Decimal,
 ) -> list[CashClosePaymentMethodRowView]:
-    rows_by_code = {
-        str(row["payment_method_code"]): row for row in rows
-    }
+    rows_by_code = {str(row["payment_method_code"]): row for row in rows}
     result: list[CashClosePaymentMethodRowView] = []
     for catalog_row in _get_payment_method_catalog():
         row = rows_by_code.get(catalog_row.payment_method_code)
@@ -2675,6 +2873,22 @@ def _to_product_views(
     ]
 
 
+def _to_counter_class_availability_views(
+    rows: Sequence[ResolvedCounterClassAvailability],
+) -> list[CashCloseCounterClassAvailabilityView]:
+    return [
+        CashCloseCounterClassAvailabilityView(
+            product_class_id=row.product_class_id,
+            product_class_code=row.product_class_code,
+            product_class_name=row.product_class_name,
+            expected_quantity_before_deferred_attr=row.expected_quantity_before_deferred_attr,
+            pending_class_capture_quantity=row.pending_class_capture_quantity,
+            available_quantity=row.available_quantity,
+        )
+        for row in rows
+    ]
+
+
 def _to_class_reconciliation_views(
     class_reconciliations: Sequence[ResolvedClassReconciliation],
 ) -> list[CashCloseClassReconciliationView]:
@@ -2732,9 +2946,7 @@ def _to_discrepancy_views(
 
 
 def _format_blocker_error(blockers: Sequence[CashCloseIssueView]) -> str:
-    return "No se puede cerrar el turno: " + "; ".join(
-        blocker.message for blocker in blockers
-    )
+    return "No se puede cerrar el turno: " + "; ".join(blocker.message for blocker in blockers)
 
 
 def _get_branch_brand_key(branch_code: str) -> str | None:
@@ -2743,6 +2955,10 @@ def _get_branch_brand_key(branch_code: str) -> str | None:
 
 def _financial_currency_or_default(currencies: Sequence[str]) -> str:
     return currencies[0] if len(currencies) > 0 else CASH_CLOSE_CURRENCY_MXN
+
+
+def _optional_decimal_to_string(amount: Decimal | None) -> str | None:
+    return str(amount) if amount is not None else None
 
 
 def _quantize_money(amount: Decimal) -> Decimal:

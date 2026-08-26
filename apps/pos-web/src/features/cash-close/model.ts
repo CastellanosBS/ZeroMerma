@@ -16,6 +16,7 @@ export const CLOSE_SECTION_FINANCIAL = "FINANCIAL";
 export const CLOSE_SECTION_PHYSICAL = "PHYSICAL";
 export const CLOSE_SECTION_RECONCILIATION = "RECONCILIATION";
 export const CLOSE_SECTION_REVIEW = "REVIEW";
+export const CASH_CLOSE_MODE_WITH_COUNT = "WITH_COUNT";
 export const CLOSE_PHYSICAL_STATE_CLASS_SELECTION = "CLASS_SELECTION";
 export const CLOSE_PHYSICAL_STATE_PRODUCT_SELECTION = "PRODUCT_SELECTION";
 export const CLOSE_PHYSICAL_STATE_QUANTITY_CAPTURE = "QUANTITY_CAPTURE";
@@ -26,6 +27,8 @@ export type CashCloseSection =
   | typeof CLOSE_SECTION_PHYSICAL
   | typeof CLOSE_SECTION_RECONCILIATION
   | typeof CLOSE_SECTION_REVIEW;
+
+export type CashCloseMode = typeof CASH_CLOSE_MODE_WITH_COUNT;
 
 export type CashClosePhysicalControlState =
   | typeof CLOSE_PHYSICAL_STATE_CLASS_SELECTION
@@ -53,6 +56,7 @@ export interface CashCloseCountedProductLine {
 export interface CashCloseDraftState {
   countedPaymentAmounts: Record<string, string>;
   countedProductDraftLines: CashCloseCountedProductLine[];
+  observationText: string;
   physicalControlState: CashClosePhysicalControlState;
   physicalPendingSelection: CashClosePendingCountSelection | null;
   physicalSearchText: string;
@@ -90,6 +94,7 @@ export function createInitialCashCloseDraftState(): CashCloseDraftState {
   return {
     countedPaymentAmounts: {},
     countedProductDraftLines: [],
+    observationText: "",
     physicalControlState: CLOSE_PHYSICAL_STATE_CLASS_SELECTION,
     physicalPendingSelection: null,
     physicalSearchText: "",
@@ -98,6 +103,10 @@ export function createInitialCashCloseDraftState(): CashCloseDraftState {
 
 export function sanitizeMoneyInput(value: string): string {
   return sanitizeScaledDecimalInput(value, 2);
+}
+
+export function sanitizeCashCloseObservation(value: string): string {
+  return value.slice(0, 240);
 }
 
 export function sanitizeCloseQuantityInput(value: string): string {
@@ -150,9 +159,7 @@ export function selectProductForCashCloseCount(
   };
 }
 
-export function goBackFromCashClosePhysicalState(
-  state: CashCloseDraftState,
-): CashCloseDraftState {
+export function goBackFromCashClosePhysicalState(state: CashCloseDraftState): CashCloseDraftState {
   if (state.physicalControlState === CLOSE_PHYSICAL_STATE_PRODUCT_SELECTION) {
     return {
       ...state,
@@ -198,19 +205,12 @@ export function setCashClosePendingQuantityText(
   };
 }
 
-export function addCashClosePendingCountLine(
-  state: CashCloseDraftState,
-): CashCloseDraftState {
-  if (
-    state.physicalPendingSelection === null ||
-    state.physicalPendingSelection.product === null
-  ) {
+export function addCashClosePendingCountLine(state: CashCloseDraftState): CashCloseDraftState {
+  if (state.physicalPendingSelection === null || state.physicalPendingSelection.product === null) {
     throw new Error("Selecciona el producto exacto antes de agregar la linea.");
   }
 
-  const quantityMilliUnits = parseQuantityToMilliUnits(
-    state.physicalPendingSelection.quantityText,
-  );
+  const quantityMilliUnits = parseQuantityToMilliUnits(state.physicalPendingSelection.quantityText);
   if (quantityMilliUnits === null || quantityMilliUnits <= 0) {
     throw new Error("Captura una cantidad mayor que cero.");
   }
@@ -219,9 +219,7 @@ export function addCashClosePendingCountLine(
     state.physicalPendingSelection,
     quantityMilliUnits,
   );
-  const existingLine = state.countedProductDraftLines.find(
-    (line) => line.key === nextLine.key,
-  );
+  const existingLine = state.countedProductDraftLines.find((line) => line.key === nextLine.key);
   const nextLines = existingLine
     ? state.countedProductDraftLines.map((line) =>
         line.key === nextLine.key
@@ -263,9 +261,7 @@ export function removeCashCloseCountedLine(
 export function getCountedProductQuantityMap(
   lines: CashCloseCountedProductLine[],
 ): Record<string, string> {
-  return Object.fromEntries(
-    lines.map((line) => [line.productId, line.quantityText]),
-  );
+  return Object.fromEntries(lines.map((line) => [line.productId, line.quantityText]));
 }
 
 export function syncCashCloseDraftState(
@@ -275,6 +271,7 @@ export function syncCashCloseDraftState(
   const nextState: CashCloseDraftState = {
     countedPaymentAmounts: { ...currentState.countedPaymentAmounts },
     countedProductDraftLines: [...currentState.countedProductDraftLines],
+    observationText: currentState.observationText,
     physicalControlState: currentState.physicalControlState,
     physicalPendingSelection: currentState.physicalPendingSelection,
     physicalSearchText: currentState.physicalSearchText,
@@ -291,49 +288,65 @@ export function buildCashClosePreviewRequest(
   workstationCode: string,
   draftState: Pick<
     CashCloseDraftState,
-    "countedPaymentAmounts" | "countedProductDraftLines"
+    "countedPaymentAmounts" | "countedProductDraftLines" | "observationText"
   >,
+  options: {
+    counterEmptyConfirmed?: boolean;
+  } = {},
 ): CashClosePreviewRequest {
+  const counterEmptyConfirmed = options.counterEmptyConfirmed ?? false;
   const countedProductQuantities = getCountedProductQuantityMap(
     draftState.countedProductDraftLines,
   );
+  const notes = draftState.observationText.trim();
+
+  const parsedPaymentRows = Object.entries(draftState.countedPaymentAmounts).map(
+    ([paymentMethodCode, countedAmountText]) => ({
+      countedAmountCents: parseScaledDecimalToUnits(countedAmountText, 2),
+      paymentMethodCode,
+    }),
+  );
+  const hasAnyCapturedPayment = parsedPaymentRows.some((row) => row.countedAmountCents !== null);
 
   return {
     workstation_code: workstationCode,
-    counted_payment_methods: Object.entries(draftState.countedPaymentAmounts)
-      .map(([paymentMethodCode, countedAmountText]) => ({
-        countedAmountCents: parseScaledDecimalToUnits(countedAmountText, 2),
-        paymentMethodCode,
-      }))
-      .filter(
-        (
-          row,
-        ): row is {
-          countedAmountCents: number;
-          paymentMethodCode: string;
-        } => row.countedAmountCents !== null,
-      )
+    close_mode: CASH_CLOSE_MODE_WITH_COUNT,
+    counter_empty_confirmed: counterEmptyConfirmed,
+    counted_payment_methods: parsedPaymentRows
+      .filter((row) => {
+        if (row.countedAmountCents !== null) {
+          return true;
+        }
+
+        return (
+          hasAnyCapturedPayment &&
+          (row.paymentMethodCode === "CASH" || row.paymentMethodCode === "CARD")
+        );
+      })
       .map((row) => ({
         payment_method_code: row.paymentMethodCode,
-        counted_amount: formatMoneyFromCents(row.countedAmountCents),
+        counted_amount: formatMoneyFromCents(row.countedAmountCents ?? 0),
       })),
-    counted_product_lines: Object.entries(countedProductQuantities)
-      .map(([productId, quantityText]) => ({
-        productId,
-        quantityUnits: parseScaledDecimalToUnits(quantityText, 3),
-      }))
-      .filter(
-        (
-          row,
-        ): row is {
-          productId: string;
-          quantityUnits: number;
-        } => row.quantityUnits !== null,
-      )
-      .map((row) => ({
-        product_id: row.productId,
-        counted_quantity: formatQuantityFromMilliUnits(row.quantityUnits),
-      })),
+    counted_product_lines: counterEmptyConfirmed
+      ? []
+      : Object.entries(countedProductQuantities)
+          .map(([productId, quantityText]) => ({
+            productId,
+            quantityUnits: parseScaledDecimalToUnits(quantityText, 3),
+          }))
+          .filter(
+            (
+              row,
+            ): row is {
+              productId: string;
+              quantityUnits: number;
+            } => row.quantityUnits !== null,
+          )
+          .map((row) => ({
+            product_id: row.productId,
+            counted_quantity: formatQuantityFromMilliUnits(row.quantityUnits),
+          })),
+    ...(notes.length > 0 ? { notes } : {}),
   };
 }
 
@@ -343,8 +356,10 @@ export function getDraftPaymentMethodRows(
 ): CashCloseDisplayPaymentMethodRow[] {
   return paymentMethodCatalog.map((paymentMethod) => ({
     countedAmountCents:
-      parseScaledDecimalToUnits(countedPaymentAmounts[paymentMethod.payment_method_code] ?? "", 2) ??
-      0,
+      parseScaledDecimalToUnits(
+        countedPaymentAmounts[paymentMethod.payment_method_code] ?? "",
+        2,
+      ) ?? 0,
     countedAmountText: countedPaymentAmounts[paymentMethod.payment_method_code] ?? "",
     isExpectedSupported: paymentMethod.is_expected_supported,
     key: paymentMethod.payment_method_code,
@@ -359,19 +374,18 @@ export function hasCashCloseExpectedPaymentCounts(
   paymentMethodCatalog: CashClosePaymentMethodCatalogView[],
   countedPaymentAmounts: Record<string, string>,
 ): boolean {
-  const expectedPaymentMethods = paymentMethodCatalog.filter(
-    (paymentMethod) => paymentMethod.is_expected_supported,
+  const knownPaymentMethodCodes = new Set(
+    paymentMethodCatalog.map((paymentMethod) => paymentMethod.payment_method_code),
   );
 
-  if (expectedPaymentMethods.length === 0) {
+  if (knownPaymentMethodCodes.size === 0) {
     return false;
   }
 
-  return expectedPaymentMethods.every(
-    (paymentMethod) =>
-      getCashCloseCountValueState(
-        countedPaymentAmounts[paymentMethod.payment_method_code] ?? "",
-      ) === "CAPTURED",
+  return Object.entries(countedPaymentAmounts).some(
+    ([paymentMethodCode, countedAmount]) =>
+      knownPaymentMethodCodes.has(paymentMethodCode) &&
+      getCashCloseCountValueState(countedAmount) === "CAPTURED",
   );
 }
 
@@ -395,7 +409,7 @@ export function getCashCloseBlockingReason({
   }
 
   if (!hasCashCloseExpectedPaymentCounts(paymentMethodCatalog, draftState.countedPaymentAmounts)) {
-    return "Falta capturar efectivo contado.";
+    return "Falta capturar efectivo o tarjeta.";
   }
 
   if (!hasCashClosePhysicalCounts(draftState)) {
@@ -487,27 +501,22 @@ export function getCashCloseUiState({
   return "REVIEW_AND_CLOSE";
 }
 
-export function getDraftCountedCashCents(
-  countedPaymentAmounts: Record<string, string>,
-): number {
+export function getDraftCountedCashCents(countedPaymentAmounts: Record<string, string>): number {
   return parseScaledDecimalToUnits(countedPaymentAmounts.CASH ?? "", 2) ?? 0;
 }
 
-export function getDraftCountedTotalCents(
-  countedPaymentAmounts: Record<string, string>,
-): number {
-  return Object.values(countedPaymentAmounts).reduce((total, amountText) => {
-    return total + (parseScaledDecimalToUnits(amountText, 2) ?? 0);
-  }, 0);
+export function getDraftCountedTotalCents(countedPaymentAmounts: Record<string, string>): number {
+  return (
+    (parseScaledDecimalToUnits(countedPaymentAmounts.CASH ?? "", 2) ?? 0) +
+    (parseScaledDecimalToUnits(countedPaymentAmounts.CARD ?? "", 2) ?? 0)
+  );
 }
 
 export function getCountedProductRowCount(draftState: CashCloseDraftState): number {
   return draftState.countedProductDraftLines.length;
 }
 
-export function getCountedProductTotalQuantityText(
-  draftState: CashCloseDraftState,
-): string {
+export function getCountedProductTotalQuantityText(draftState: CashCloseDraftState): string {
   const totalMilliUnits = draftState.countedProductDraftLines.reduce(
     (runningTotal, line) => runningTotal + line.quantityMilliUnits,
     0,
@@ -520,10 +529,7 @@ export function absoluteDecimalString(value: string): string {
   return value.startsWith("-") ? value.slice(1) : value;
 }
 
-export function parseScaledDecimalToUnits(
-  value: string,
-  decimalPlaces: number,
-): number | null {
+export function parseScaledDecimalToUnits(value: string, decimalPlaces: number): number | null {
   const normalizedValue = value.trim();
   if (normalizedValue.length === 0) {
     return null;
@@ -540,8 +546,7 @@ export function parseScaledDecimalToUnits(
 
   const paddedDecimalPart = decimalPart.padEnd(decimalPlaces, "0");
   return (
-    Number.parseInt(wholePart, 10) * 10 ** decimalPlaces +
-    Number.parseInt(paddedDecimalPart, 10)
+    Number.parseInt(wholePart, 10) * 10 ** decimalPlaces + Number.parseInt(paddedDecimalPart, 10)
   );
 }
 
@@ -552,7 +557,7 @@ function sanitizeScaledDecimalInput(value: string, decimalPlaces: number): strin
   for (const character of value) {
     if (character >= "0" && character <= "9") {
       const currentDecimalPartLength = normalized.includes(".")
-        ? normalized.split(".")[1]?.length ?? 0
+        ? (normalized.split(".")[1]?.length ?? 0)
         : 0;
       if (!hasDecimalSeparator || currentDecimalPartLength < decimalPlaces) {
         normalized += character;

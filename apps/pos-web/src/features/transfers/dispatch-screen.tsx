@@ -1,31 +1,31 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Navigate } from "@tanstack/react-router";
 import {
+  DialogBody,
+  DialogFooter,
+  DialogHeader,
+  DialogSurface,
+} from "@zeromerma/ui";
+import {
   useCallback,
   useEffect,
   useMemo,
   useRef,
   useState,
   type ButtonHTMLAttributes,
-  type ReactNode,
   type Ref,
 } from "react";
 
 import { useAppShellRightPanel } from "../../components/app-shell-right-panel";
+import { CapturedProductLineList, CapturedProductLineRow } from "../../components/captured-product-lines";
 import { CatalogSelectionCard } from "../../components/catalog-selection-card";
-import { CatalogVisual } from "../../components/catalog-visual";
 import {
-  OperationConfirmationDialog,
-  OperationDocumentResult,
-  OperationDocumentSummaryPanel,
   OperationHistoryList,
-  type OperationDocumentAction,
   type OperationHistoryRecord,
-  type OperationLineSummaryItem,
 } from "../../components/operation-documents";
 import { OperationalStatus } from "../../components/operational-status";
-import { PosContextBanner, PosModuleLayout, PosSummaryPanel } from "../../components/pos-module-layout";
-import { PosFilterBar, PosHistoryView, PosRecordList } from "../../components/pos-records";
+import { PosModuleLayout, PosSummaryPanel } from "../../components/pos-module-layout";
+import { PosFilterBar, PosHistoryView } from "../../components/pos-records";
 import {
   CentralWorkspaceSheet,
   CompactPageHeader,
@@ -41,10 +41,7 @@ import {
   ClipboardIcon,
   HashIcon,
   PackageIcon,
-  PrinterIcon,
-  RotateCcwIcon,
   StoreIcon,
-  TrashIcon,
   TruckIcon,
   XIcon,
 } from "../../components/pos-icons";
@@ -52,12 +49,10 @@ import { Button } from "../../components/ui/button";
 import type {
   OperationHistoryFilterOptionView,
   OperationHistoryScopeView,
-  TransferDestinationBranchView,
   TransferDetailResponse,
   TransferDispatchCommitRequest,
   TransferDispatchHistoryResponse,
 } from "../../lib/api-contracts";
-import { getDocumentActionAvailability } from "../../lib/document-actions";
 import { formatCompactLocalDateTime } from "../../lib/formatters";
 import {
   getSelectionShortcutIndex,
@@ -87,6 +82,7 @@ import {
   setPendingQuantityText,
   sortOperationalClasses,
   sortOperationalProducts,
+  updateOperationLineQuantity,
   type OperationDraftState,
   type OperationLine,
 } from "../operations/model";
@@ -96,7 +92,12 @@ import {
   useOperationsClassProductsQuery,
 } from "../operations/queries";
 import { useRovingFocusGrid } from "../pos-shell/keyboard";
-import { formatQuantityFromMilliUnits, hasCapturedQuantity } from "../pos-terminal/model";
+import {
+  formatQuantityFromMilliUnits,
+  hasCapturedQuantity,
+  parseQuantityToMilliUnits,
+  sanitizeQuantityInput,
+} from "../pos-terminal/model";
 import { posInputClass, posOutlineButtonClass, posPrimaryButtonClass } from "../pos-theme/theme";
 import { useStatusMessageStore } from "../status-messages/store";
 import {
@@ -264,6 +265,21 @@ function getTransferDocumentStatusTone(status: string) {
   }
 }
 
+function getTransferDocumentStatusChipTone(status: string) {
+  switch (status) {
+    case "IN_TRANSIT":
+      return "warning" as const;
+    case "RECEIVED":
+      return "success" as const;
+    case "RECEIVED_WITH_VARIANCE":
+      return "warning" as const;
+    case "CANCELLED":
+      return "danger" as const;
+    default:
+      return "muted" as const;
+  }
+}
+
 function getRouteSuggestionLabel(
   originLabel: string,
   destinationLabel?: string | null,
@@ -292,25 +308,6 @@ function toTransferDispatchErrorMessage(error: unknown): string {
   }
 
   return message;
-}
-
-function buildDraftLineSummaryItems(lines: OperationLine[]): OperationLineSummaryItem[] {
-  return lines.map((line) => ({
-    key: line.key,
-    quantityText: line.quantityText,
-    title: line.productName,
-  }));
-}
-
-function buildTransferLineSummaryItems(
-  transfer: TransferDetailResponse["shipment"],
-): OperationLineSummaryItem[] {
-  return transfer.lines.map((line) => ({
-    key: line.id,
-    quantityText: formatQuantityFromMilliUnits(Number(line.quantity) * 1000),
-    secondaryText: line.product_class_name_snapshot,
-    title: line.product_name_snapshot,
-  }));
 }
 
 function buildTransferHistoryRecords(
@@ -350,45 +347,7 @@ function buildTransferHistoryRecords(
   );
 }
 
-function MovementBanner({
-  destinationLabel,
-  originLabel,
-}: {
-  destinationLabel?: string | null;
-  originLabel: string;
-}) {
-  const destinationText =
-    typeof destinationLabel === "string" && destinationLabel.trim().length > 0
-      ? destinationLabel
-      : EMPTY_DESTINATION_TEXT;
-
-  return (
-    <div
-      aria-label="Movimiento del envio"
-      className="inline-flex max-w-full items-center gap-2 rounded-[10px] border border-[var(--pos-shell-border)] bg-[var(--pos-shell-muted)] px-3 py-1.5"
-      role="note"
-    >
-      <span
-        className="max-w-[14rem] min-w-0 truncate whitespace-nowrap text-sm font-semibold text-slate-950"
-        title={originLabel}
-      >
-        {originLabel}
-      </span>
-      <span aria-hidden="true" className="text-sm font-semibold text-slate-400">
-        -&gt;
-      </span>
-      <span
-        className="max-w-[14rem] min-w-0 truncate whitespace-nowrap text-sm font-semibold text-[var(--pos-primary)]"
-        title={destinationText}
-      >
-        {destinationText}
-      </span>
-    </div>
-  );
-}
-
 function SelectionCard({
-  badge,
   buttonRef,
   code,
   isActive,
@@ -401,7 +360,6 @@ function SelectionCard({
   tabIndex,
   title,
 }: {
-  badge?: ReactNode;
   buttonRef?: Ref<HTMLButtonElement>;
   code: string;
   isActive: boolean;
@@ -416,7 +374,6 @@ function SelectionCard({
 }) {
   return (
     <CatalogSelectionCard
-      badge={badge}
       buttonRef={buttonRef}
       code={code}
       isActive={isActive}
@@ -436,66 +393,90 @@ function SelectionCard({
 function DispatchLineRow({
   disabled = false,
   line,
+  onQuantityChange,
+  onQuantityInvalid,
   onRemove,
 }: {
   disabled?: boolean;
   line: OperationLine;
+  onQuantityChange: (quantityMilliUnits: number) => void;
+  onQuantityInvalid: (message: string) => void;
   onRemove: () => void;
 }) {
+  const inputRef = useRef<HTMLInputElement>(null);
+  const [isEditing, setIsEditing] = useState(false);
+  const [quantityText, setQuantityText] = useState(line.quantityText);
+
+  useEffect(() => {
+    if (!isEditing) {
+      setQuantityText(line.quantityText);
+    }
+  }, [isEditing, line.quantityText]);
+
+  useEffect(() => {
+    if (!isEditing) {
+      return;
+    }
+
+    inputRef.current?.focus();
+    inputRef.current?.select();
+  }, [isEditing]);
+
+  function commitQuantity(nextQuantityText = quantityText) {
+    const normalizedQuantityText = sanitizeQuantityInput(nextQuantityText);
+    const quantityMilliUnits = parseQuantityToMilliUnits(normalizedQuantityText);
+    if (quantityMilliUnits === null || quantityMilliUnits <= 0) {
+      setQuantityText(line.quantityText);
+      setIsEditing(false);
+      onQuantityInvalid("Captura una cantidad mayor que cero.");
+      return;
+    }
+
+    setQuantityText(formatQuantityFromMilliUnits(quantityMilliUnits));
+    setIsEditing(false);
+    onQuantityChange(quantityMilliUnits);
+  }
+
+  function cancelQuantityEdit() {
+    setQuantityText(line.quantityText);
+    setIsEditing(false);
+  }
+
+  function adjustQuantity(deltaMilliUnits: number) {
+    const currentQuantityMilliUnits = parseQuantityToMilliUnits(quantityText) ?? line.quantityMilliUnits;
+    const nextQuantityMilliUnits = currentQuantityMilliUnits + deltaMilliUnits;
+    if (nextQuantityMilliUnits <= 0) {
+      onQuantityInvalid("La cantidad debe ser mayor que cero.");
+      return;
+    }
+
+    commitQuantity(formatQuantityFromMilliUnits(nextQuantityMilliUnits));
+  }
+
   return (
-    <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-2.5 border-t border-[var(--pos-shell-border)] px-3 py-2.5 first:border-t-0">
-      <div className="min-w-0">
-        <p
-          className="break-words text-sm font-medium leading-5 text-slate-950"
-          title={`${line.productName} x${line.quantityText}`}
-        >
-          {line.productName}{" "}
-          <span className="whitespace-nowrap text-slate-600 [font-variant-numeric:tabular-nums]">
-            x{line.quantityText}
-          </span>
-        </p>
-      </div>
-      <button
-        aria-label={`Eliminar ${line.productName}`}
-        className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-[var(--ui-color-danger)] transition hover:bg-[var(--ui-color-danger-soft)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--pos-ring)] disabled:pointer-events-none disabled:opacity-45"
-        disabled={disabled}
-        onClick={onRemove}
-        type="button"
-      >
-        <TrashIcon className="h-4 w-4" />
-      </button>
-    </div>
+    <CapturedProductLineRow
+      disabled={disabled}
+      inputRef={isEditing ? inputRef : null}
+      name={line.productName}
+      onBeginQuantityEdit={() => setIsEditing(true)}
+      onCancelQuantityEdit={cancelQuantityEdit}
+      onCommitQuantity={() => commitQuantity()}
+      onDecrement={() => adjustQuantity(-1000)}
+      onIncrement={() => adjustQuantity(1000)}
+      onQuantityChange={(value) => setQuantityText(sanitizeQuantityInput(value))}
+      onRemove={() => {
+        cancelQuantityEdit();
+        onRemove();
+      }}
+      quantityMode={isEditing ? "input" : "display"}
+      quantityText={isEditing ? quantityText : line.quantityText}
+    />
   );
 }
 
-function DestinationRecord({
-  branch,
-  isSelected,
-  originLabel,
-}: {
-  branch: TransferDestinationBranchView;
-  isSelected: boolean;
-  originLabel: string;
-}) {
-  return (
-    <div className="grid gap-2">
-      <div className="flex items-start justify-between gap-3">
-        <div className="min-w-0">
-          <p className="truncate text-sm font-semibold text-slate-950" title={branch.name}>
-            {branch.name}
-          </p>
-          <p className="mt-0.5 text-xs font-medium uppercase tracking-[0.08em] text-slate-500">
-            {branch.code}
-          </p>
-        </div>
-        {isSelected ? (
-          <span className="pos-chip" data-tone="primary">
-            Seleccionada
-          </span>
-        ) : null}
-      </div>
-      <p className="text-sm text-slate-600">Ruta sugerida: {originLabel} -&gt; {branch.name}</p>
-    </div>
+function getTransferShipmentTotalUnitsText(transfer: TransferDetailResponse["shipment"]): string {
+  return formatQuantityFromMilliUnits(
+    transfer.lines.reduce((total, line) => total + Number(line.quantity) * 1000, 0),
   );
 }
 
@@ -509,15 +490,15 @@ function TransferDispatchSummaryPanel({
   isNotesExpanded,
   lines,
   notes,
-  onClear,
   onCommit,
   onHistory,
+  onLineQuantityInvalid,
   onNotesChange,
   onRemoveLine,
   onToggleNotes,
+  onUpdateLineQuantity,
   originBranchLabel,
   routeLabel,
-  totalUnitsText,
   uiState,
 }: {
   commitBlockedReason: string | null;
@@ -529,108 +510,117 @@ function TransferDispatchSummaryPanel({
   isNotesExpanded: boolean;
   lines: OperationLine[];
   notes: string;
-  onClear: () => void;
   onCommit: () => void;
   onHistory: () => void;
+  onLineQuantityInvalid: (message: string) => void;
   onNotesChange: (value: string) => void;
   onRemoveLine: (lineKey: string) => void;
   onToggleNotes: () => void;
+  onUpdateLineQuantity: (lineKey: string, quantityMilliUnits: number) => void;
   originBranchLabel: string;
   routeLabel: string;
-  totalUnitsText: string;
   uiState: TransferDispatchUiState;
 }) {
-  const lineCount = getOperationLineCount(lines);
   const emptyStateMessage = hasDestination
     ? "Agrega al menos una linea."
     : "Selecciona una sucursal destino en el panel central.";
 
   return (
     <PosSummaryPanel
-      description="Resumen operativo del envio en construccion."
       stateLabel={getDispatchStatusLabel({ hasDestination, uiState })}
       stateTone={getDispatchStatusTone({ hasDestination, uiState })}
       title="Borrador de envio"
     >
-      <div className="grid h-full min-h-0 grid-rows-[auto_auto_auto_minmax(0,1fr)] gap-3">
+      <div className="grid h-full min-h-0 grid-rows-[auto_minmax(0,1fr)_auto] gap-3">
         <div className="grid gap-2">
           {commitErrorMessage ? <InlineNotice tone="error">{commitErrorMessage}</InlineNotice> : null}
-          <div className="rounded-xl border border-[var(--pos-shell-border)] bg-[var(--pos-shell-muted)]/80 px-3 py-3">
-            <p className="pos-label-text">Ruta sugerida</p>
-            <div className="mt-2">
-              <MovementBanner destinationLabel={destinationLabel} originLabel={originBranchLabel} />
+          <div className="grid gap-1.5 rounded-lg border border-[var(--pos-shell-border)] bg-[var(--pos-shell-muted)]/70 px-3 py-2 text-sm">
+            <div className="flex items-center justify-between gap-3">
+              <span className="font-medium text-slate-600">Origen</span>
+              <span className="min-w-0 truncate text-right font-semibold text-slate-950" title={originBranchLabel}>
+                {originBranchLabel}
+              </span>
             </div>
-            <p className="mt-2 text-sm text-slate-600">
-              {hasDestination
-                ? routeLabel
-                : "Selecciona una sucursal destino para habilitar el envio."}
-            </p>
-          </div>
-
-          <div className="grid grid-cols-2 gap-2">
-            <div className="rounded-xl border border-[var(--pos-shell-border)] bg-white px-3 py-2">
-              <p className="pos-label-text">Lineas</p>
-              <p className="mt-1 text-lg font-semibold text-slate-950 [font-variant-numeric:tabular-nums]">
-                {lineCount}
-              </p>
+            <div className="flex items-center justify-between gap-3">
+              <span className="font-medium text-slate-600">Destino</span>
+              <span
+                className="min-w-0 truncate text-right font-semibold text-[var(--pos-primary)]"
+                title={destinationLabel}
+              >
+                {destinationLabel}
+              </span>
             </div>
-            <div className="rounded-xl border border-[var(--pos-financial-border)] bg-[var(--pos-financial-bg)] px-3 py-2">
-              <p className="pos-label-text">Unidades</p>
-              <p className="mt-1 text-lg font-semibold text-slate-950 [font-variant-numeric:tabular-nums]">
-                {totalUnitsText}
-              </p>
-            </div>
+            {hasDestination ? (
+              <span className="sr-only" title={routeLabel}>
+                {routeLabel}
+              </span>
+            ) : null}
           </div>
 
           {commitBlockedReason ? <InlineNotice tone="warning">{commitBlockedReason}</InlineNotice> : null}
         </div>
 
-        <div className="rounded-xl border border-[var(--pos-shell-border)] bg-white">
-          <button
-            aria-expanded={isNotesExpanded}
-            className="flex w-full items-center justify-between gap-3 px-3 py-2.5 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--pos-ring)]"
-            disabled={isCommitPending}
-            onClick={onToggleNotes}
-            type="button"
-          >
-            <span className="text-sm font-semibold text-slate-900">Notas (opcional)</span>
-            <ArrowLeftIcon
-              className={cn("h-4 w-4 rotate-180 text-slate-400 transition", isNotesExpanded && "rotate-90")}
-            />
-          </button>
-          {isNotesExpanded ? (
-            <div className="border-t border-[var(--pos-shell-border)] px-3 pb-3 pt-2.5">
-              <textarea
-                className={cn("min-h-20 rounded-lg px-3 py-2 text-sm shadow-sm", posInputClass)}
-                disabled={isCommitPending}
-                onChange={(event) => onNotesChange(event.target.value)}
-                placeholder="Notas operativas"
-                value={notes}
-              />
-            </div>
-          ) : null}
-        </div>
-
-        <RightPanelBlock className="grid min-h-0 overflow-hidden" title="Lineas capturadas" tone="muted">
+        <RightPanelBlock
+          className="grid min-h-0 grid-rows-[auto_minmax(0,1fr)] overflow-hidden"
+          contentClassName="h-full min-h-0 overflow-hidden"
+          title="Productos"
+          tone="muted"
+        >
           {lines.length === 0 ? (
-            <div className="rounded-xl border border-dashed border-[var(--pos-shell-border)] bg-white px-4 py-5 text-sm text-slate-600">
+            <div className="rounded-lg border border-dashed border-[var(--pos-shell-border)] bg-white px-3 py-4 text-sm text-slate-600">
               {emptyStateMessage}
             </div>
           ) : (
             <ScrollPane className="h-full pr-1">
-              {lines.map((line) => (
-                <DispatchLineRow
-                  disabled={isCommitPending}
-                  key={line.key}
-                  line={line}
-                  onRemove={() => onRemoveLine(line.key)}
-                />
-              ))}
+              <CapturedProductLineList className="grid content-start">
+                {lines.map((line) => (
+                  <DispatchLineRow
+                    disabled={isCommitPending}
+                    key={line.key}
+                    line={line}
+                    onQuantityChange={(quantityMilliUnits) =>
+                      onUpdateLineQuantity(line.key, quantityMilliUnits)
+                    }
+                    onQuantityInvalid={onLineQuantityInvalid}
+                    onRemove={() => onRemoveLine(line.key)}
+                  />
+                ))}
+              </CapturedProductLineList>
             </ScrollPane>
           )}
         </RightPanelBlock>
 
         <div className="grid gap-2 border-t border-[var(--pos-shell-border)] pt-2">
+          <div className="rounded-lg border border-[var(--pos-shell-border)] bg-white">
+            <button
+              aria-expanded={isNotesExpanded}
+              className="flex w-full items-center justify-between gap-3 px-3 py-2 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--pos-ring)]"
+              disabled={isCommitPending}
+              onClick={onToggleNotes}
+              type="button"
+            >
+              <span className="truncate text-sm font-semibold text-slate-900">
+                {notes.trim().length > 0 ? "Observacion agregada" : "Agregar observacion"}
+              </span>
+              <ArrowLeftIcon
+                className={cn(
+                  "h-4 w-4 rotate-180 text-slate-400 transition",
+                  isNotesExpanded && "rotate-90",
+                )}
+              />
+            </button>
+            {isNotesExpanded ? (
+              <div className="border-t border-[var(--pos-shell-border)] px-3 pb-3 pt-2">
+                <textarea
+                  className={cn("min-h-16 rounded-lg px-3 py-2 text-sm shadow-sm", posInputClass)}
+                  disabled={isCommitPending}
+                  onChange={(event) => onNotesChange(event.target.value)}
+                  placeholder="Observacion opcional"
+                  value={notes}
+                />
+              </div>
+            ) : null}
+          </div>
           <Button
             className={cn(
               "h-10",
@@ -642,16 +632,7 @@ function TransferDispatchSummaryPanel({
             type="button"
             variant="outline"
           >
-            {isHistoryViewActive ? "Captura de envio" : "Ver historial"}
-          </Button>
-          <Button
-            className={cn("h-10", posOutlineButtonClass)}
-            disabled={lineCount === 0 || isCommitPending}
-            onClick={onClear}
-            type="button"
-            variant="outline"
-          >
-            Vaciar envio
+            {isHistoryViewActive ? "Captura" : "Historial"}
           </Button>
           <Button
             className={cn("h-11", posPrimaryButtonClass)}
@@ -659,11 +640,259 @@ function TransferDispatchSummaryPanel({
             onClick={onCommit}
             type="button"
           >
-            {isCommitPending ? "Registrando..." : "Registrar envio"}
+            {isCommitPending ? "Registrando..." : "Confirmar envio"}
           </Button>
         </div>
       </div>
     </PosSummaryPanel>
+  );
+}
+
+function TransferDispatchConfirmationDialog({
+  destinationLabel,
+  isOpen,
+  isPending,
+  lineCount,
+  lines,
+  onCancel,
+  onConfirm,
+  operatorLabel,
+  originBranchLabel,
+  routeLabel,
+  stationLabel,
+  totalUnitsText,
+}: {
+  destinationLabel: string;
+  isOpen: boolean;
+  isPending: boolean;
+  lineCount: number;
+  lines: OperationLine[];
+  onCancel: () => void;
+  onConfirm: () => void;
+  operatorLabel: string;
+  originBranchLabel: string;
+  routeLabel: string;
+  stationLabel: string;
+  totalUnitsText: string;
+}) {
+  if (!isOpen) {
+    return null;
+  }
+
+  const summaryItems = [
+    { key: "origin", label: "Sucursal", value: originBranchLabel },
+    { key: "station", label: "Estacion", value: stationLabel },
+    { key: "operator", label: "Operador", value: operatorLabel },
+    { key: "destination", label: "Destino", value: destinationLabel },
+    { key: "lines", label: "Lineas", value: String(lineCount) },
+    { key: "units", label: "Unidades", value: totalUnitsText },
+  ];
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/25 p-4">
+      <DialogSurface className="w-full max-w-2xl">
+        <DialogHeader>
+          <div className="min-w-0">
+            <p className="pos-label-text">Revision final</p>
+            <h2 className="mt-1 text-lg font-semibold text-slate-950">
+              Confirmar envio a sucursal
+            </h2>
+            <p className="mt-1 truncate text-sm font-medium text-slate-600" title={routeLabel}>
+              {routeLabel}
+            </p>
+          </div>
+          <span className="pos-chip" data-tone="warning">
+            Confirmacion
+          </span>
+        </DialogHeader>
+
+        <DialogBody className="grid gap-3">
+          <div className="flex flex-wrap gap-2">
+            {summaryItems.map((item) => (
+              <span
+                className="inline-flex max-w-full items-center gap-1.5 rounded-full border border-[var(--pos-shell-border)] bg-[var(--pos-shell-muted)] px-2.5 py-1 text-xs"
+                key={item.key}
+                title={`${item.label}: ${item.value}`}
+              >
+                <span className="font-medium text-slate-500">{item.label}</span>
+                <span className="max-w-[11rem] truncate font-semibold text-slate-950">
+                  {item.value}
+                </span>
+              </span>
+            ))}
+          </div>
+
+          <div className="overflow-hidden rounded-lg border border-[var(--pos-shell-border)] bg-white">
+            <table className="w-full table-fixed text-sm" aria-label="Productos del envio">
+              <thead className="border-b border-[var(--pos-shell-border)] bg-[var(--pos-shell-muted)] text-[10px] font-semibold uppercase tracking-[0.08em] text-slate-500">
+                <tr>
+                  <th className="px-3 py-2 text-left">Producto</th>
+                  <th className="w-24 px-3 py-2 text-right">Cantidad</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-[var(--pos-shell-border)]">
+                {lines.map((line) => (
+                  <tr key={line.key}>
+                    <td className="min-w-0 px-3 py-2">
+                      <span className="block truncate font-medium text-slate-950" title={line.productName}>
+                        {line.productName}
+                      </span>
+                    </td>
+                    <td className="px-3 py-2 text-right font-semibold text-slate-950 [font-variant-numeric:tabular-nums]">
+                      {line.quantityText}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </DialogBody>
+
+        <DialogFooter>
+          <Button
+            className={posOutlineButtonClass}
+            disabled={isPending}
+            onClick={onCancel}
+            type="button"
+            variant="outline"
+          >
+            Cancelar
+          </Button>
+          <Button
+            className={posPrimaryButtonClass}
+            disabled={isPending}
+            onClick={onConfirm}
+            type="button"
+          >
+            {isPending ? "Confirmando..." : "Confirmar envio"}
+          </Button>
+        </DialogFooter>
+      </DialogSurface>
+    </div>
+  );
+}
+
+function TransferDispatchHistoryDetailPanel({
+  onBackToCapture,
+  timeZone,
+  transferDetail,
+}: {
+  onBackToCapture: () => void;
+  timeZone: string;
+  transferDetail: TransferDetailResponse;
+}) {
+  const shipment = transferDetail.shipment;
+  const routeLabel = getRouteSuggestionLabel(
+    shipment.source_branch_name,
+    shipment.destination_branch_name,
+  );
+  const totalUnitsText = getTransferShipmentTotalUnitsText(shipment);
+
+  return (
+    <aside className="pos-shell-panel grid h-full min-h-0 grid-rows-[auto_minmax(0,1fr)_auto] gap-3 px-3.5 py-3">
+      <div className="flex min-w-0 items-start justify-between gap-3">
+        <div className="min-w-0">
+          <h2 className="truncate text-[1.05rem] font-semibold tracking-tight text-slate-950">
+            Envio seleccionado
+          </h2>
+          <p className="mt-1 truncate text-sm font-medium text-slate-600">
+            {shipment.folio}
+          </p>
+        </div>
+        <ModuleStateChip tone={getTransferDocumentStatusChipTone(shipment.status)}>
+          {getTransferDocumentStatusLabel(shipment.status)}
+        </ModuleStateChip>
+      </div>
+
+      <ScrollPane className="min-h-0">
+        <div className="grid gap-3">
+          <RightPanelBlock title="Movimiento">
+            <div className="grid gap-2 text-sm">
+              <TransferDetailRow label="Folio" value={shipment.folio} />
+              <TransferDetailRow
+                label="Fecha/hora"
+                value={formatCompactLocalDateTime(
+                  shipment.committed_at_utc ?? shipment.created_at_utc,
+                  timeZone,
+                )}
+              />
+              <TransferDetailRow label="Operador" value={shipment.created_by_user_full_name} />
+              <TransferDetailRow label="Estacion" value={shipment.workstation_name} />
+              <TransferDetailRow label="Origen" value={shipment.source_branch_name} />
+              <TransferDetailRow
+                label="Destino"
+                value={shipment.destination_branch_name ?? EMPTY_DESTINATION_TEXT}
+              />
+              <TransferDetailRow label="Ruta" value={routeLabel} />
+              <TransferDetailRow label="Lineas" value={String(shipment.lines.length)} />
+              <TransferDetailRow label="Unidades" value={totalUnitsText} />
+            </div>
+          </RightPanelBlock>
+
+          {transferDetail.receipt_summary ? (
+            <InlineNotice
+              tone={
+                transferDetail.receipt_summary.status === "RECEIVED_WITH_VARIANCE"
+                  ? "warning"
+                  : "success"
+              }
+            >
+              Recepcion vinculada: {transferDetail.receipt_summary.folio}.
+            </InlineNotice>
+          ) : null}
+
+          <RightPanelBlock title="Productos">
+            {shipment.lines.length === 0 ? (
+              <div className="rounded-lg border border-dashed border-[var(--pos-shell-border)] bg-white px-3 py-3 text-sm text-slate-600">
+                Sin lineas registradas.
+              </div>
+            ) : (
+              <div className="overflow-hidden rounded-lg border border-[var(--pos-shell-border)] bg-white">
+                {shipment.lines.map((line) => (
+                  <div
+                    className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-3 border-t border-[var(--pos-shell-border)] px-3 py-2 first:border-t-0"
+                    key={line.id}
+                  >
+                    <span
+                      className="block min-w-0 truncate text-sm font-semibold text-slate-950"
+                      title={line.product_name_snapshot}
+                    >
+                      {line.product_name_snapshot}
+                    </span>
+                    <span className="text-right text-sm font-semibold text-slate-950 [font-variant-numeric:tabular-nums]">
+                      {formatQuantityFromMilliUnits(Number(line.quantity) * 1000)}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </RightPanelBlock>
+        </div>
+      </ScrollPane>
+
+      <div className="grid gap-2">
+        <Button
+          className={cn("h-10 w-full", posOutlineButtonClass)}
+          onClick={onBackToCapture}
+          type="button"
+          variant="outline"
+        >
+          <ArrowLeftIcon className="h-4 w-4" />
+          Volver a captura
+        </Button>
+      </div>
+    </aside>
+  );
+}
+
+function TransferDetailRow({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="flex items-center justify-between gap-3">
+      <span className="font-medium text-slate-600">{label}</span>
+      <span className="min-w-0 truncate text-right font-semibold text-slate-950" title={value}>
+        {value}
+      </span>
+    </div>
   );
 }
 
@@ -679,13 +908,9 @@ export function TransferDispatchScreen() {
 
   const [draftState, setDraftState] = useState(createInitialOperationDraftState());
   const [destinationBranchId, setDestinationBranchId] = useState("");
-  const [destinationSearchText, setDestinationSearchText] = useState("");
   const [notes, setNotes] = useState("");
   const [selectionErrorMessage, setSelectionErrorMessage] = useState<string | null>(null);
   const [commitErrorMessage, setCommitErrorMessage] = useState<string | null>(null);
-  const [lastCommittedTransfer, setLastCommittedTransfer] = useState<TransferDetailResponse | null>(
-    null,
-  );
   const [isNotesExpanded, setIsNotesExpanded] = useState(false);
   const [isConfirmDialogOpen, setIsConfirmDialogOpen] = useState(false);
   const [centerView, setCenterView] = useState<TransferDispatchCenterView>("capture");
@@ -762,13 +987,12 @@ export function TransferDispatchScreen() {
       return commitTransferDispatch(accessToken, payload);
     },
     onSuccess: (detail) => {
-      setLastCommittedTransfer(detail);
       setDraftState(createInitialOperationDraftState());
       setSelectionErrorMessage(null);
       setCommitErrorMessage(null);
       setNotes("");
       setIsNotesExpanded(false);
-      setCenterView("capture");
+      setCenterView("history");
       setSelectedHistoryTransferId(detail.shipment.id);
       void queryClient.invalidateQueries({ queryKey: ["transfer-dispatch-history"] });
       showSuccess(`Envio registrado. Folio ${detail.shipment_summary.folio}.`);
@@ -783,8 +1007,7 @@ export function TransferDispatchScreen() {
         return;
       }
 
-      setLastCommittedTransfer(null);
-      setCommitErrorMessage(null);
+        setCommitErrorMessage(null);
       setDraftState((state) => selectClassForOperation(state, productClass));
     },
   });
@@ -796,8 +1019,7 @@ export function TransferDispatchScreen() {
         return;
       }
 
-      setLastCommittedTransfer(null);
-      setCommitErrorMessage(null);
+        setCommitErrorMessage(null);
       setDraftState((state) => selectProductForOperation(state, product));
     },
   });
@@ -817,20 +1039,6 @@ export function TransferDispatchScreen() {
     operationsBootstrapQuery.data?.destination_branches.find(
       (branch) => branch.id === destinationBranchId,
     ) ?? null;
-  const filteredDestinationBranches = useMemo(() => {
-    const branches = operationsBootstrapQuery.data?.destination_branches ?? [];
-    const normalizedQuery = destinationSearchText.trim().toLowerCase();
-
-    if (normalizedQuery.length === 0) {
-      return branches;
-    }
-
-    return branches.filter((branch) => {
-      const nameMatches = branch.name.toLowerCase().includes(normalizedQuery);
-      const codeMatches = branch.code.toLowerCase().includes(normalizedQuery);
-      return nameMatches || codeMatches;
-    });
-  }, [destinationSearchText, operationsBootstrapQuery.data?.destination_branches]);
   const destinationLabel = selectedDestinationBranch?.name ?? EMPTY_DESTINATION_TEXT;
   const originBranchLabel = operationsBootstrapQuery.data?.branch.name ?? "Sucursal actual";
   const routeSuggestionLabel = getRouteSuggestionLabel(
@@ -855,7 +1063,7 @@ export function TransferDispatchScreen() {
     lineCount,
   });
   const uiState = getTransferDispatchUiState({
-    hasCommittedTransfer: lastCommittedTransfer !== null,
+    hasCommittedTransfer: false,
     hasDestination,
     isCaptureInProgress: draftState.controlState !== CONTROL_STATE_CLASS_SELECTION,
     isCommitPending: commitMutation.isPending,
@@ -863,7 +1071,8 @@ export function TransferDispatchScreen() {
     lineCount,
   });
   const showSearch =
-    centerView === "capture" && displayControlState !== CONTROL_STATE_QUANTITY_CAPTURE;
+    centerView === "capture" &&
+    displayControlState !== CONTROL_STATE_QUANTITY_CAPTURE;
   const isSelectionLoading =
     centerView === "capture" &&
     ((displayControlState === CONTROL_STATE_CLASS_SELECTION && catalogQuery.isPending) ||
@@ -1048,7 +1257,6 @@ export function TransferDispatchScreen() {
         const productClass = sortedClasses[shortcutIndex];
         if (productClass) {
           event.preventDefault();
-          setLastCommittedTransfer(null);
           setDraftState((state) => selectClassForOperation(state, productClass));
         }
         return;
@@ -1058,7 +1266,6 @@ export function TransferDispatchScreen() {
         const product = sortedProducts[shortcutIndex];
         if (product) {
           event.preventDefault();
-          setLastCommittedTransfer(null);
           setDraftState((state) => selectProductForOperation(state, product));
         }
       }
@@ -1078,23 +1285,8 @@ export function TransferDispatchScreen() {
     sortedProducts,
   ]);
 
-  const clearDraft = useCallback(() => {
-    if (draftState.lines.length > 0 && !window.confirm("Vaciar el borrador actual del envio?")) {
-      return;
-    }
-
-    setDraftState(createInitialOperationDraftState());
-    setLastCommittedTransfer(null);
-    setSelectionErrorMessage(null);
-    setCommitErrorMessage(null);
-    setNotes("");
-    setIsNotesExpanded(false);
-    setCenterView("capture");
-  }, [draftState.lines.length]);
-
   const handleDestinationChange = useCallback((nextBranchId: string) => {
     setDestinationBranchId(nextBranchId);
-    setLastCommittedTransfer(null);
     setCommitErrorMessage(null);
     setSelectionErrorMessage(null);
     setDraftState((state) => ({
@@ -1113,7 +1305,6 @@ export function TransferDispatchScreen() {
 
     try {
       setDraftState((state) => addPendingSelectionLine(state));
-      setLastCommittedTransfer(null);
       setCommitErrorMessage(null);
       setSelectionErrorMessage(null);
     } catch (error) {
@@ -1146,7 +1337,6 @@ export function TransferDispatchScreen() {
   const openHistoryView = useCallback(() => {
     setCenterView((current) => (current === "history" ? "capture" : "history"));
   }, []);
-  const shipmentDocumentAvailability = getDocumentActionAvailability("branchShipmentDocument");
 
   const summaryPanel = useMemo(() => {
     if (centerView === "history") {
@@ -1169,96 +1359,10 @@ export function TransferDispatchScreen() {
 
       if (selectedHistoryTransfer !== null) {
         return (
-        <OperationDocumentSummaryPanel
-          actions={[
-              {
-                key: "back-to-capture",
-                label: "Enviar a sucursal",
-                leadingIcon: <RotateCcwIcon className="h-4 w-4" />,
-                onSelect: () => setCenterView("capture"),
-                variant: "primary",
-              },
-              {
-                availabilityNote: shipmentDocumentAvailability.print.unavailableReason,
-                disabled: !shipmentDocumentAvailability.print.isAvailable,
-                kind: "print",
-                key: "print-history",
-                label: shipmentDocumentAvailability.print.label,
-                leadingIcon: <PrinterIcon className="h-4 w-4" />,
-                onSelect: () => undefined,
-                variant: "neutral",
-            },
-          ]}
-          auditSummary={selectedHistoryTransfer.shipment.audit_summary}
-          context={{
-            branchName: selectedHistoryTransfer.shipment.source_branch_name,
-            userName: selectedHistoryTransfer.shipment.created_by_user_full_name,
-            workstationName: selectedHistoryTransfer.shipment.workstation_name,
-            }}
-            description="Detalle del envio seleccionado."
-            kind="branchShipment"
-            lines={buildTransferLineSummaryItems(selectedHistoryTransfer.shipment)}
-            metrics={[
-              {
-                key: "destination-branch",
-                label: "Destino",
-                value: selectedHistoryTransfer.shipment.destination_branch_name ?? EMPTY_DESTINATION_TEXT,
-              },
-              {
-                key: "route",
-                label: "Ruta",
-                value: getRouteSuggestionLabel(
-                  selectedHistoryTransfer.shipment.source_branch_name,
-                  selectedHistoryTransfer.shipment.destination_branch_name,
-                ),
-              },
-              {
-                key: "line-count",
-                label: "Lineas",
-                value: String(selectedHistoryTransfer.shipment.lines.length),
-              },
-              {
-                key: "units",
-                label: "Unidades",
-                tone: "financial",
-                value: formatQuantityFromMilliUnits(
-                  selectedHistoryTransfer.shipment.lines.reduce(
-                    (total, line) => total + Number(line.quantity) * 1000,
-                    0,
-                  ),
-                ),
-              },
-            ]}
-            notices={
-              selectedHistoryTransfer.receipt_summary ? (
-                <InlineNotice
-                  tone={
-                    selectedHistoryTransfer.receipt_summary.status === "RECEIVED_WITH_VARIANCE"
-                      ? "warning"
-                      : "success"
-                  }
-                >
-                  Recepcion vinculada: {selectedHistoryTransfer.receipt_summary.folio}.
-                </InlineNotice>
-              ) : undefined
-            }
-          referenceValue={selectedHistoryTransfer.shipment_summary.folio}
-          stateLabel={getTransferDocumentStatusLabel(selectedHistoryTransfer.shipment.status)}
-          stateTone={getTransferDocumentStatusTone(selectedHistoryTransfer.shipment.status)}
-          timeZone={operationsBootstrapQuery.data?.branch.timezone ?? "America/Hermosillo"}
-          timestamps={{
-              committedAtValue: selectedHistoryTransfer.shipment.committed_at_utc
-                ? formatCompactLocalDateTime(
-                    selectedHistoryTransfer.shipment.committed_at_utc,
-                    operationsBootstrapQuery.data?.branch.timezone ?? "America/Hermosillo",
-                  )
-                : null,
-              createdAtValue: formatCompactLocalDateTime(
-                selectedHistoryTransfer.shipment.created_at_utc,
-                operationsBootstrapQuery.data?.branch.timezone ?? "America/Hermosillo",
-              ),
-            }}
-            title="Envio seleccionado"
+          <TransferDispatchHistoryDetailPanel
+            onBackToCapture={() => setCenterView("capture")}
+            timeZone={operationsBootstrapQuery.data?.branch.timezone ?? "America/Hermosillo"}
+            transferDetail={selectedHistoryTransfer}
           />
         );
       }
@@ -1266,110 +1370,26 @@ export function TransferDispatchScreen() {
       return (
         <PosSummaryPanel
           description="Selecciona un envio del historial para revisar su folio y trazabilidad."
-            stateLabel={historyQuery.isPending || isSelectedHistoryTransferPending ? "Consultando" : "Sin seleccion"}
-            stateTone={historyQuery.isPending || isSelectedHistoryTransferPending ? "pending" : "draft"}
+          footer={
+            <Button
+              className={cn("h-10 w-full", posOutlineButtonClass)}
+              onClick={() => setCenterView("capture")}
+              type="button"
+              variant="outline"
+            >
+              Volver a captura
+            </Button>
+          }
+          stateLabel={historyQuery.isPending || isSelectedHistoryTransferPending ? "Consultando" : "Sin seleccion"}
+          stateTone={historyQuery.isPending || isSelectedHistoryTransferPending ? "pending" : "draft"}
           title="Historial de envios"
         >
           <div className="flex h-full items-center justify-center px-3 text-center">
             <p className="text-sm leading-6 text-slate-600">
-              Elige un envio del historial para ver destino, lineas y estado logístico.
+              Elige un envio del historial para ver destino, lineas y estado logistico.
             </p>
           </div>
         </PosSummaryPanel>
-      );
-    }
-
-    if (lastCommittedTransfer !== null) {
-      const resultActions: OperationDocumentAction[] = [
-        {
-          availabilityNote: shipmentDocumentAvailability.print.unavailableReason,
-          disabled: !shipmentDocumentAvailability.print.isAvailable,
-          kind: "print",
-          key: "print",
-          label: shipmentDocumentAvailability.print.label,
-          leadingIcon: <PrinterIcon className="h-4 w-4" />,
-          onSelect: () => undefined,
-          variant: "neutral",
-        },
-        {
-          key: "history",
-          label: "Ver historial",
-          leadingIcon: <RotateCcwIcon className="h-4 w-4" />,
-          onSelect: () => {
-            setSelectedHistoryTransferId(lastCommittedTransfer.shipment.id);
-            setCenterView("history");
-          },
-          variant: "neutral",
-        },
-        {
-          key: "new-shipment",
-          label: "Nuevo envio",
-          leadingIcon: <ClipboardIcon className="h-4 w-4" />,
-          onSelect: () => {
-            setLastCommittedTransfer(null);
-            setCenterView("capture");
-          },
-          variant: "primary",
-        },
-      ];
-
-      return (
-        <OperationDocumentResult
-          actions={resultActions}
-          auditSummary={lastCommittedTransfer.shipment.audit_summary}
-          context={{
-            branchName: lastCommittedTransfer.shipment.source_branch_name,
-            userName: lastCommittedTransfer.shipment.created_by_user_full_name,
-            workstationName: lastCommittedTransfer.shipment.workstation_name,
-          }}
-          description="El envio ya quedo confirmado. Puedes continuar con un nuevo documento o revisar el historial."
-          kind="branchShipment"
-          metrics={[
-            {
-              key: "destination-branch",
-              label: "Destino",
-              value: lastCommittedTransfer.shipment.destination_branch_name ?? EMPTY_DESTINATION_TEXT,
-            },
-            {
-              key: "route",
-              label: "Ruta",
-              value: getRouteSuggestionLabel(
-                lastCommittedTransfer.shipment.source_branch_name,
-                lastCommittedTransfer.shipment.destination_branch_name,
-              ),
-            },
-            {
-              key: "line-count",
-              label: "Lineas",
-              value: String(lastCommittedTransfer.shipment.lines.length),
-            },
-            {
-              key: "units",
-              label: "Unidades",
-              tone: "financial",
-              value: formatQuantityFromMilliUnits(
-                lastCommittedTransfer.shipment.lines.reduce(
-                  (total, line) => total + Number(line.quantity) * 1000,
-                  0,
-                ),
-              ),
-            },
-          ]}
-          referenceValue={lastCommittedTransfer.shipment_summary.folio}
-          timeZone={operationsBootstrapQuery.data?.branch.timezone ?? "America/Hermosillo"}
-          timestamps={{
-            committedAtValue: lastCommittedTransfer.shipment.committed_at_utc
-              ? formatCompactLocalDateTime(
-                  lastCommittedTransfer.shipment.committed_at_utc,
-                  operationsBootstrapQuery.data?.branch.timezone ?? "America/Hermosillo",
-                )
-              : null,
-            createdAtValue: formatCompactLocalDateTime(
-              lastCommittedTransfer.shipment.created_at_utc,
-              operationsBootstrapQuery.data?.branch.timezone ?? "America/Hermosillo",
-            ),
-          }}
-        />
       );
     }
 
@@ -1384,37 +1404,42 @@ export function TransferDispatchScreen() {
         isNotesExpanded={isNotesExpanded}
         lines={draftState.lines}
         notes={notes}
-        onClear={clearDraft}
         onCommit={() => {
           if (commitBlockedReason === null && !commitMutation.isPending) {
             setIsConfirmDialogOpen(true);
           }
         }}
         onHistory={openHistoryView}
+        onLineQuantityInvalid={(message) => setCommitErrorMessage(message)}
         onNotesChange={(value) => {
-          setLastCommittedTransfer(null);
           setNotes(value);
           if (value.trim().length > 0) {
             setIsNotesExpanded(true);
           }
         }}
         onRemoveLine={(lineKey) => {
-          setLastCommittedTransfer(null);
           setDraftState((state) => ({
             ...state,
             lines: removeOperationLine(state.lines, lineKey),
           }));
         }}
         onToggleNotes={() => setIsNotesExpanded((current) => !current)}
+        onUpdateLineQuantity={(lineKey, quantityMilliUnits) => {
+          setCommitErrorMessage(null);
+          setDraftState((state) => ({
+            ...state,
+            lines: state.lines.map((line) =>
+              line.key === lineKey ? updateOperationLineQuantity(line, quantityMilliUnits) : line,
+            ),
+          }));
+        }}
         originBranchLabel={originBranchLabel}
         routeLabel={routeSuggestionLabel}
-        totalUnitsText={totalUnitsText}
         uiState={uiState}
       />
     );
   }, [
     centerView,
-    clearDraft,
     commitBlockedReason,
     commitErrorMessage,
     commitMutation.isPending,
@@ -1423,7 +1448,6 @@ export function TransferDispatchScreen() {
     hasDestination,
     historyQuery.isPending,
     isNotesExpanded,
-    lastCommittedTransfer,
     notes,
     openHistoryView,
     operationsBootstrapQuery.data?.branch.timezone,
@@ -1432,10 +1456,6 @@ export function TransferDispatchScreen() {
     selectedHistoryTransfer,
     selectedHistoryTransferQuery.error,
     isSelectedHistoryTransferPending,
-    shipmentDocumentAvailability.print.isAvailable,
-    shipmentDocumentAvailability.print.label,
-    shipmentDocumentAvailability.print.unavailableReason,
-    totalUnitsText,
     uiState,
   ]);
   useAppShellRightPanel(summaryPanel);
@@ -1518,7 +1538,7 @@ export function TransferDispatchScreen() {
           {centerView === "history" ? "Consulta" : getDispatchStatusLabel({ hasDestination, uiState })}
         </ModuleStateChip>
       }
-      title="Enviar a sucursal"
+      title={centerView === "history" ? "Historial de envios" : "Enviar a sucursal"}
     >
       {centerView === "capture" ? (
         <FlowGuide
@@ -1547,7 +1567,7 @@ export function TransferDispatchScreen() {
             {
               icon: <ClipboardIcon className="h-3.5 w-3.5" />,
               key: "summary",
-              label: "Resumen",
+              label: "Revisar",
             },
           ]}
           variant="process"
@@ -1584,9 +1604,6 @@ export function TransferDispatchScreen() {
             inputClassName={cn("h-9 rounded-lg text-sm shadow-sm", posInputClass)}
             inputRef={searchInputRef}
             onChange={(value) => {
-              if (lastCommittedTransfer !== null) {
-                setLastCommittedTransfer(null);
-              }
               setDraftState((state) => ({
                 ...state,
                 searchText: value,
@@ -1605,51 +1622,21 @@ export function TransferDispatchScreen() {
 
   return (
     <>
-      <OperationConfirmationDialog
-        confirmLabel="Confirmar envio"
-        context={{
-          branchName: operationsBootstrapQuery.data.branch.name,
-          userName: operationsBootstrapQuery.data.user.full_name,
-          workstationName: operationsBootstrapQuery.data.workstation.name,
-        }}
-        description="Revisa destino, ruta y lineas antes de confirmar la salida desde fondo."
+      <TransferDispatchConfirmationDialog
+        destinationLabel={destinationLabel}
         isOpen={isConfirmDialogOpen}
         isPending={commitMutation.isPending}
-        kind="branchShipment"
-        lines={buildDraftLineSummaryItems(draftState.lines)}
-        metrics={[
-          {
-            key: "destination-branch",
-            label: "Destino",
-            value: destinationLabel,
-          },
-          {
-            key: "route",
-            label: "Ruta",
-            value: routeSuggestionLabel,
-          },
-          {
-            key: "line-count",
-            label: "Lineas",
-            value: String(lineCount),
-          },
-          {
-            key: "units",
-            label: "Unidades",
-            tone: "financial",
-            value: totalUnitsText,
-          },
-          {
-            key: "inventory-impact",
-            label: "Impacto",
-            value: "Fondo -> En transito",
-          },
-        ]}
+        lineCount={lineCount}
+        lines={draftState.lines}
         onCancel={() => setIsConfirmDialogOpen(false)}
         onConfirm={() => {
           void handleConfirmCommit();
         }}
-        title="Confirmar envio a sucursal"
+        operatorLabel={operationsBootstrapQuery.data.user.full_name}
+        originBranchLabel={operationsBootstrapQuery.data.branch.name}
+        routeLabel={routeSuggestionLabel}
+        stationLabel={operationsBootstrapQuery.data.workstation.name}
+        totalUnitsText={totalUnitsText}
       />
 
       <PosModuleLayout
@@ -1680,17 +1667,6 @@ export function TransferDispatchScreen() {
         >
           {centerView === "history" ? (
             <PosHistoryView
-              action={
-                <Button
-                  className={cn("h-10 px-3", posOutlineButtonClass)}
-                  onClick={() => setCenterView("capture")}
-                  type="button"
-                  variant="outline"
-                >
-                  <ArrowLeftIcon className="h-4 w-4" />
-                  Enviar a sucursal
-                </Button>
-              }
               description="Consulta los envios confirmados para esta estacion y filtra por turno, operador o destino."
               title="Historial de envios"
               toolbar={
@@ -1776,69 +1752,40 @@ export function TransferDispatchScreen() {
             </PosHistoryView>
           ) : (
             <>
-              <PosContextBanner
-                description="Selecciona la sucursal destino y agrega productos exactos para preparar el documento de salida desde fondo."
-                title={`Fondo -> ${selectedDestinationBranch?.name ?? "Sucursal destino"}`}
-              />
-
               <div
-                className="mt-3 grid gap-3 rounded-xl border border-[var(--pos-shell-border)] bg-white px-3.5 py-3.5"
+                className="grid gap-2 rounded-xl border border-[var(--pos-shell-border)] bg-white px-3 py-2.5 lg:grid-cols-[auto_minmax(14rem,20rem)_minmax(0,1fr)] lg:items-center"
                 data-transfer-destination-selector="true"
               >
-                <div className="grid gap-1">
-                  <p className="pos-label-text">Destino operativo</p>
-                  <h2 className="text-sm font-semibold text-slate-950">
-                    Selecciona la sucursal destino
-                  </h2>
-                  <p className="text-sm text-slate-600">
-                    Busca por nombre o codigo y confirma la ruta antes de capturar productos.
-                  </p>
-                </div>
-
-                <div className="grid gap-3 xl:grid-cols-[minmax(16rem,20rem)_minmax(0,1fr)] xl:items-end">
-                  <SearchField
-                    ariaLabel="Buscar sucursal destino"
-                    className="w-full"
-                    disabled={commitMutation.isPending}
-                    inputClassName={cn("h-10 rounded-lg text-sm shadow-sm", posInputClass)}
-                    onChange={setDestinationSearchText}
-                    placeholder="Buscar sucursal destino"
-                    value={destinationSearchText}
-                  />
-                  <div className="grid gap-2">
-                    <p className="pos-label-text">Ruta sugerida</p>
-                    <MovementBanner
-                      destinationLabel={selectedDestinationBranch?.name ?? null}
-                      originLabel={originBranchLabel}
-                    />
-                  </div>
-                </div>
-
-                <div className="grid gap-2">
-                  <p className="text-xs font-medium uppercase tracking-[0.08em] text-slate-500">
-                    Flechas: navegar · Enter: seleccionar
-                  </p>
-                  <PosRecordList
-                    className="max-h-[13rem]"
-                    emptyDescription="No hay sucursales destino para esta busqueda."
-                    emptyTitle="Sin sucursales"
-                    getKey={(branch) => branch.id}
-                    onSelect={(branch) => {
-                      if (commitMutation.isPending) {
-                        return;
-                      }
-                      handleDestinationChange(branch.id);
-                    }}
-                    records={filteredDestinationBranches}
-                    renderContent={(branch, state) => (
-                      <DestinationRecord
-                        branch={branch}
-                        isSelected={state.isSelected}
-                        originLabel={originBranchLabel}
-                      />
+                <label
+                  className="pos-label-text whitespace-nowrap"
+                  htmlFor="transfer-destination-branch"
+                >
+                  Sucursal destino
+                </label>
+                <select
+                  className={cn("h-10 rounded-lg px-3 text-sm shadow-sm", posInputClass)}
+                  disabled={commitMutation.isPending}
+                  id="transfer-destination-branch"
+                  onChange={(event) => handleDestinationChange(event.target.value)}
+                  value={destinationBranchId}
+                >
+                  <option value="">Seleccionar destino</option>
+                  {(operationsBootstrapQuery.data?.destination_branches ?? []).map((branch) => (
+                    <option key={branch.id} value={branch.id}>
+                      {branch.name}
+                    </option>
+                  ))}
+                </select>
+                <div className="min-w-0">
+                  <p
+                    className={cn(
+                      "truncate text-sm font-semibold",
+                      hasDestination ? "text-slate-950" : "text-slate-500",
                     )}
-                    selectedKey={destinationBranchId || null}
-                  />
+                    title={routeSuggestionLabel}
+                  >
+                    {hasDestination ? routeSuggestionLabel : "Selecciona destino para capturar productos"}
+                  </p>
                 </div>
               </div>
 
@@ -1875,9 +1822,6 @@ export function TransferDispatchScreen() {
               !selectionQueryError &&
               displayControlState === CONTROL_STATE_CLASS_SELECTION ? (
                 <div className="mt-3 grid gap-2.5">
-                  <p className="text-xs font-medium uppercase tracking-[0.08em] text-slate-500">
-                    Flechas: navegar · Enter: seleccionar · Esc: volver
-                  </p>
                   <div className="relative min-h-[14rem]">
                     <div
                       className={cn(
@@ -1901,7 +1845,6 @@ export function TransferDispatchScreen() {
                               onCardFocus={itemProps.onFocus}
                               onCardKeyDown={itemProps.onKeyDown}
                               onSelect={() => {
-                                setLastCommittedTransfer(null);
                                 setDraftState((state) =>
                                   selectClassForOperation(state, productClass),
                                 );
@@ -1934,9 +1877,6 @@ export function TransferDispatchScreen() {
               !selectionQueryError &&
               displayControlState === CONTROL_STATE_PRODUCT_SELECTION ? (
                 <div className="mt-3 grid gap-2.5">
-                  <p className="text-xs font-medium uppercase tracking-[0.08em] text-slate-500">
-                    Flechas: navegar · Enter: seleccionar · Esc: volver
-                  </p>
                   <div className="relative min-h-[14rem]">
                     <div
                       className={cn(
@@ -1951,11 +1891,6 @@ export function TransferDispatchScreen() {
 
                           return (
                             <SelectionCard
-                              badge={
-                                <span className="pos-chip" data-tone="muted">
-                                  Producto exacto
-                                </span>
-                              }
                               buttonRef={itemProps.ref}
                               code={product.code}
                               isActive={productActiveIndex === index}
@@ -1965,7 +1900,6 @@ export function TransferDispatchScreen() {
                               onCardFocus={itemProps.onFocus}
                               onCardKeyDown={itemProps.onKeyDown}
                               onSelect={() => {
-                                setLastCommittedTransfer(null);
                                 setDraftState((state) =>
                                   selectProductForOperation(state, product),
                                 );
@@ -1995,15 +1929,8 @@ export function TransferDispatchScreen() {
               ) : null}
 
               {quantitySelection !== null && quantityProduct !== null ? (
-                <div className="mt-3 w-full max-w-5xl justify-self-center rounded-xl border border-[var(--pos-shell-border)] bg-white p-3.5 shadow-sm">
-                  <div className="grid gap-4 lg:grid-cols-[11rem_minmax(0,1fr)]">
-                    <CatalogVisual
-                      className="min-h-[10.5rem]"
-                      code={quantityProduct.code}
-                      name={quantityProduct.name}
-                    />
-
-                    <div className="grid gap-3">
+                <div className="mt-3 w-full max-w-3xl justify-self-center rounded-xl border border-[var(--pos-shell-border)] bg-white p-3.5 shadow-sm">
+                  <div className="grid gap-3">
                       <div className="flex flex-wrap items-start justify-between gap-3">
                         <div className="min-w-0">
                           <div className="flex flex-wrap items-center gap-2">
@@ -2119,7 +2046,6 @@ export function TransferDispatchScreen() {
                           </InlineNotice>
                         ) : null}
                       </div>
-                    </div>
                   </div>
                 </div>
               ) : null}

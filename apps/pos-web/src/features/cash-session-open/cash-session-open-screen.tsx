@@ -1,26 +1,25 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { Navigate } from "@tanstack/react-router";
+import { Navigate, useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
 
 import { PosErrorState, PosLoadingState } from "../../components/pos-feedback";
 import { PosButton } from "../../components/pos-foundations";
 import { appEnv } from "../../env";
-import type { CashSessionView, OpenCashSessionRequest } from "../../lib/api-contracts";
+import type { OpenCashSessionRequest } from "../../lib/api-contracts";
 import { toOperationalErrorMessage } from "../../lib/http";
 import { usePosAuthStore } from "../auth/auth-store";
 import { bootstrapQueryKey, usePosBootstrapQuery } from "../pos-bootstrap/queries";
 import { useStatusMessageStore } from "../status-messages/store";
-import { CashSessionActiveState } from "./cash-session-active-state";
 import { openCashSession } from "./cash-session-api";
 import { CashSessionOpenForm } from "./cash-session-open-form";
 import { currentCashSessionQueryKey, useCurrentCashSessionQuery } from "./queries";
 
 export function CashSessionOpenScreen() {
+  const navigate = useNavigate();
   const accessToken = usePosAuthStore((state) => state.accessToken);
   const bootstrapQuery = usePosBootstrapQuery();
   const currentCashSessionQuery = useCurrentCashSessionQuery();
   const queryClient = useQueryClient();
-  const [openedSession, setOpenedSession] = useState<CashSessionView | null>(null);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const showSuccess = useStatusMessageStore((state) => state.showSuccess);
 
@@ -42,9 +41,12 @@ export function CashSessionOpenScreen() {
         requestId: createRequestId("cash-session-open"),
       }),
     onSuccess: async (cashSession) => {
-      setOpenedSession(cashSession);
       setSubmitError(null);
       showSuccess("Caja abierta \u00b7 Turno iniciado");
+      queryClient.setQueryData(
+        currentCashSessionQueryKey(appEnv.VITE_POS_WORKSTATION_CODE),
+        cashSession,
+      );
       await Promise.all([
         queryClient.invalidateQueries({
           queryKey: bootstrapQueryKey(appEnv.VITE_POS_WORKSTATION_CODE),
@@ -53,25 +55,12 @@ export function CashSessionOpenScreen() {
           queryKey: currentCashSessionQueryKey(appEnv.VITE_POS_WORKSTATION_CODE),
         }),
       ]);
+      await navigate({ to: "/pos" });
     },
   });
 
   if (!accessToken) {
     return <Navigate to="/login" />;
-  }
-
-  if (
-    openedSession &&
-    (currentCashSessionQuery.isPending || currentCashSessionQuery.data === null)
-  ) {
-    return (
-      <CashSessionActiveState
-        bootstrap={bootstrapQuery.data!}
-        cashSession={openedSession}
-        description="La apertura quedo registrada y la estacion esta lista para vender."
-        title="Caja abierta"
-      />
-    );
   }
 
   if (bootstrapQuery.isPending || currentCashSessionQuery.isPending) {
@@ -130,31 +119,13 @@ export function CashSessionOpenScreen() {
   }
 
   if (currentCashSessionQuery.data) {
-    return (
-      <CashSessionActiveState
-        bootstrap={bootstrapQuery.data}
-        cashSession={currentCashSessionQuery.data}
-        description="Esta caja ya esta abierta. Puedes continuar directamente al POS."
-        title="Caja abierta"
-      />
-    );
-  }
-
-  if (openedSession) {
-    return (
-      <CashSessionActiveState
-        bootstrap={bootstrapQuery.data}
-        cashSession={openedSession}
-        description="La apertura quedo registrada y la estacion esta lista para vender."
-        title="Caja abierta"
-      />
-    );
+    return <Navigate to="/pos" />;
   }
 
   return (
     <CashSessionOpenForm
       bootstrap={bootstrapQuery.data}
-      isSubmitDisabled={openCashSessionMutation.isPending || openedSession !== null}
+      isSubmitDisabled={openCashSessionMutation.isPending}
       onSubmit={async (values) => {
         openCashSessionMutation.reset();
         setSubmitError(null);

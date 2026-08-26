@@ -19,6 +19,16 @@ const showErrorMock = vi.fn();
 const showSuccessMock = vi.fn();
 const showWarningMock = vi.fn();
 let mockCounterAvailabilityData = {
+  counter_class_availability: [
+    {
+      available_quantity: "5.000",
+      expected_quantity_before_deferred_attr: "5.000",
+      pending_class_capture_quantity: "0.000",
+      product_class_code: "PAN-DULCE",
+      product_class_id: "class-1",
+      product_class_name: "Pan dulce",
+    },
+  ],
   relevant_products: [
     {
       counted_quantity: null,
@@ -85,6 +95,7 @@ const bootstrapResponse = {
 const counterTransferHistoryResponse = {
   available_destination_buckets: [{ label: "COUNTER", value: "COUNTER" }],
   available_scopes: [
+    { code: "ALL", label: "Todos" },
     { code: "CURRENT_SHIFT", label: "Turno actual" },
     { code: "TODAY", label: "Hoy" },
     { code: "RECENT", label: "Recientes" },
@@ -214,6 +225,7 @@ const wasteHistoryResponse = {
   available_products: [{ label: "BOL-STD · Standard Bolillo", value: "product-1" }],
   available_reasons: [{ label: "Old counter", value: "OLD_COUNTER" }],
   available_scopes: [
+    { code: "ALL", label: "Todos" },
     { code: "CURRENT_SHIFT", label: "Turno actual" },
     { code: "TODAY", label: "Hoy" },
     { code: "RECENT", label: "Recientes" },
@@ -608,7 +620,7 @@ async function addWasteLine(
 
   if (options?.notes) {
     const notesInput = container.querySelector<HTMLTextAreaElement>(
-      'textarea[placeholder="Describe evidencia o contexto operativo"]',
+      'textarea[placeholder="Observacion opcional"]',
     );
     if (!notesInput) {
       throw new Error("Expected notes textarea to exist.");
@@ -632,6 +644,16 @@ let mountedRoots: Array<() => void> = [];
 beforeEach(() => {
   rightPanelContent = null;
   mockCounterAvailabilityData = {
+    counter_class_availability: [
+      {
+        available_quantity: "5.000",
+        expected_quantity_before_deferred_attr: "5.000",
+        pending_class_capture_quantity: "0.000",
+        product_class_code: "PAN-DULCE",
+        product_class_id: "class-1",
+        product_class_name: "Pan dulce",
+      },
+    ],
     relevant_products: [
       {
         counted_quantity: null,
@@ -832,7 +854,6 @@ describe("OperationModuleScreen counter transfer", () => {
     await flush();
 
     expect(view.container.querySelector('input[aria-label="Cantidad"]')).toBeNull();
-    expect(view.container.textContent).toContain("Producto exacto");
     expect(view.container.textContent).toContain("Concha vainilla");
   });
 
@@ -855,6 +876,16 @@ describe("OperationModuleScreen counter transfer", () => {
 
   it("shows the real counter table after a successful transfer", async () => {
     mockCounterAvailabilityData = {
+      counter_class_availability: [
+        {
+          available_quantity: "5.000",
+          expected_quantity_before_deferred_attr: "5.000",
+          pending_class_capture_quantity: "0.000",
+          product_class_code: "BOLILLO",
+          product_class_id: "class-2",
+          product_class_name: "Bolillo",
+        },
+      ],
       relevant_products: [
         {
           counted_quantity: null,
@@ -888,11 +919,11 @@ describe("OperationModuleScreen counter transfer", () => {
     await flush();
 
     const availabilityTable = view.container.querySelector(
-      '[aria-label="Productos actualmente en mostrador"]',
+      '[aria-label="Clases y productos actualmente en mostrador"]',
     );
     expect(availabilityTable).not.toBeNull();
+    expect(availabilityTable?.textContent).toContain("Bolillo");
     expect(availabilityTable?.textContent).toContain("Bolillo de mostrador");
-    expect(availabilityTable?.textContent).not.toContain("Concha vainilla");
   });
 });
 
@@ -903,9 +934,19 @@ describe("OperationModuleScreen waste", () => {
     await flush();
 
     const rightPanel = view.container.querySelector('[data-testid="right-panel-probe"]');
-    expect(rightPanel?.textContent).toContain("Selecciona un origen para continuar.");
-    expect(rightPanel?.textContent).toContain("Selecciona un motivo para continuar.");
-    expect(rightPanel?.textContent).toContain("Agrega al menos una linea.");
+    expect(view.container.textContent).toContain("Contexto de la merma");
+    expect(view.container.textContent).toContain("Origen pendiente");
+    expect(view.container.textContent).toContain("Motivo pendiente");
+    expect(view.container.textContent).toContain("Buscar producto o clase");
+    expect(view.container.textContent).toContain("Selecciona origen y motivo para capturar productos.");
+    expect(rightPanel?.textContent).toContain("Selecciona origen y motivo para continuar.");
+    expect(rightPanel?.textContent).toContain("Agrega productos para construir el documento.");
+
+    const classCards = Array.from(
+      view.container.querySelectorAll<HTMLButtonElement>('button[data-pos-catalog-card="true"]'),
+    );
+    expect(classCards.length).toBeGreaterThan(0);
+    expect(classCards.every((button) => button.disabled)).toBe(true);
 
     const registerButton = Array.from(rightPanel?.querySelectorAll("button") ?? []).find((button) =>
       button.textContent?.includes("Registrar merma"),
@@ -946,7 +987,7 @@ describe("OperationModuleScreen waste", () => {
     expect(classButton?.disabled).toBe(false);
   });
 
-  it("opens and cancels confirmation without persisting", async () => {
+  it("registers waste directly without opening a confirmation dialog", async () => {
     const view = renderUi("waste");
     mountedRoots.push(view.unmount);
     await addWasteLine(view.container);
@@ -956,17 +997,17 @@ describe("OperationModuleScreen waste", () => {
       button.textContent?.includes("Registrar merma"),
     );
     click(registerButton ?? null);
-
-    expect(view.container.textContent).toContain("Confirmar merma");
-
-    const cancelButton = Array.from(view.container.querySelectorAll("button")).find((button) =>
-      button.textContent?.includes("Cancelar"),
-    );
-    click(cancelButton ?? null);
     await flush();
 
     expect(view.container.textContent).not.toContain("Confirmar merma");
-    expect(commitWasteRecord).not.toHaveBeenCalled();
+    expect(commitWasteRecord).toHaveBeenCalledWith("token", {
+      high_impact_acknowledged: false,
+      lines: [{ product_id: "product-1", quantity: "2" }],
+      notes: null,
+      reason_code: "OLD_COUNTER",
+      source_bucket_code: "COUNTER",
+      workstation_code: "POS-01",
+    });
   });
 
   it("registers waste and shows success folio with history access", async () => {
@@ -979,11 +1020,6 @@ describe("OperationModuleScreen waste", () => {
       button.textContent?.includes("Registrar merma"),
     );
     click(registerButton ?? null);
-
-    const confirmButton = Array.from(view.container.querySelectorAll("button")).find((button) =>
-      button.textContent?.includes("Confirmar merma"),
-    );
-    click(confirmButton ?? null);
     await flush();
 
     expect(commitWasteRecord).toHaveBeenCalledWith("token", {
@@ -995,7 +1031,6 @@ describe("OperationModuleScreen waste", () => {
       workstation_code: "POS-01",
     });
     expect(showSuccessMock).toHaveBeenCalledWith("Merma registrada. Folio WST-000001.");
-    expect(rightPanel?.textContent).toContain("WST-000001");
     expect(rightPanel?.textContent).toContain("Ver historial");
 
     const historyButton = Array.from(rightPanel?.querySelectorAll("button") ?? []).find((button) =>
@@ -1010,6 +1045,16 @@ describe("OperationModuleScreen waste", () => {
 
   it("blocks waste when quantity exceeds expected counter stock", async () => {
     mockCounterAvailabilityData = {
+      counter_class_availability: [
+        {
+          available_quantity: "1.000",
+          expected_quantity_before_deferred_attr: "1.000",
+          pending_class_capture_quantity: "0.000",
+          product_class_code: "PAN-DULCE",
+          product_class_id: "class-1",
+          product_class_name: "Pan dulce",
+        },
+      ],
       relevant_products: [
         {
           counted_quantity: null,
@@ -1086,6 +1131,16 @@ describe("OperationModuleScreen waste", () => {
 
   it("requires high-impact acknowledgement and passes it to the backend", async () => {
     mockCounterAvailabilityData = {
+      counter_class_availability: [
+        {
+          available_quantity: "20.000",
+          expected_quantity_before_deferred_attr: "20.000",
+          pending_class_capture_quantity: "0.000",
+          product_class_code: "PAN-DULCE",
+          product_class_id: "class-1",
+          product_class_name: "Pan dulce",
+        },
+      ],
       relevant_products: [
         {
           counted_quantity: null,
@@ -1127,11 +1182,6 @@ describe("OperationModuleScreen waste", () => {
       button.textContent?.includes("Registrar merma"),
     );
     click(registerButton ?? null);
-
-    const confirmButton = Array.from(view.container.querySelectorAll("button")).find((button) =>
-      button.textContent?.includes("Confirmar merma"),
-    );
-    click(confirmButton ?? null);
     await flush();
 
     expect(commitWasteRecord).toHaveBeenCalledWith("token", {

@@ -11,6 +11,8 @@ export type CashCloseBaselineSnapshotSummaryView =
 export type CashCloseBootstrapResponse = components["schemas"]["CashCloseBootstrapResponse"];
 export type CashCloseClassReconciliationView =
   components["schemas"]["CashCloseClassReconciliationView"];
+export type CashCloseCounterClassAvailabilityView =
+  components["schemas"]["CashCloseCounterClassAvailabilityView"];
 export type CashCloseCountedPaymentMethodRequest =
   components["schemas"]["CashCloseCountedPaymentMethodRequest"];
 export type CashCloseCountedProductLineRequest =

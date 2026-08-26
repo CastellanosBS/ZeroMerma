@@ -18,7 +18,6 @@ function assignRef<TValue>(targetRef: Ref<TValue> | undefined, value: TValue) {
 }
 
 export function CatalogSelectionCard({
-  badge,
   buttonRef,
   code,
   isActive = false,
@@ -33,6 +32,7 @@ export function CatalogSelectionCard({
   tabIndex,
   variant = "default",
 }: {
+  // Kept for caller compatibility; capture-mode/catalog badges are intentionally not rendered.
   badge?: ReactNode;
   buttonRef?: Ref<HTMLButtonElement>;
   code: string;
@@ -148,7 +148,6 @@ export function CatalogSelectionCard({
       </div>
 
       <div className="grid min-h-[1.85rem] min-w-0 gap-1 border-t border-[var(--pos-shell-border)] px-0.5 pt-1.5">
-        {badge ? <div className="flex min-w-0 items-center gap-1.5">{badge}</div> : null}
         <div className="flex min-w-0 items-center gap-2">
           <p className="min-w-0 flex-1 truncate text-[0.93rem] font-semibold leading-5 text-slate-950">
             {name}

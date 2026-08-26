@@ -7,6 +7,7 @@ from sqlalchemy import select
 
 from zeromerma_api.bootstrap.seed_local import (
     SEED_PRODUCT_BOLILLO_STD_CODE,
+    SEED_PRODUCT_CLASS_BEBIDAS_CODE,
     SEED_PRODUCT_CLASS_BOLILLO_CODE,
     SEED_PRODUCT_CLASS_PAN_DULCE_CODE,
     SEED_PRODUCT_COCA_355_CODE,
@@ -25,6 +26,7 @@ from zeromerma_api.modules.cash_close.infrastructure.models import (
     BranchCounterSnapshot,
     BranchCounterSnapshotLine,
     CashSessionClose,
+    CashSessionClosePaymentMethodCount,
 )
 from zeromerma_api.modules.catalog.infrastructure.models import Product, ProductClass
 from zeromerma_api.modules.identity.infrastructure.models import User
@@ -167,6 +169,26 @@ def test_cash_close_reconciliation_endpoint_and_preview_auto_resolve(client: Tes
     )
     assert reconciliation.status_code == 200
     reconciliation_payload = reconciliation.json()
+    availability_by_class = {
+        row["product_class_code"]: row
+        for row in reconciliation_payload["counter_class_availability"]
+    }
+    assert availability_by_class[SEED_PRODUCT_CLASS_BOLILLO_CODE] == {
+        "available_quantity": "8.000",
+        "expected_quantity_before_deferred_attr": "10.000",
+        "pending_class_capture_quantity": "2.000",
+        "product_class_code": SEED_PRODUCT_CLASS_BOLILLO_CODE,
+        "product_class_id": _get_product_class_id(SEED_PRODUCT_CLASS_BOLILLO_CODE),
+        "product_class_name": "Bolillo",
+    }
+    assert availability_by_class[SEED_PRODUCT_CLASS_BEBIDAS_CODE] == {
+        "available_quantity": "3.000",
+        "expected_quantity_before_deferred_attr": "3.000",
+        "pending_class_capture_quantity": "0.000",
+        "product_class_code": SEED_PRODUCT_CLASS_BEBIDAS_CODE,
+        "product_class_id": _get_product_class_id(SEED_PRODUCT_CLASS_BEBIDAS_CODE),
+        "product_class_name": "Bebidas",
+    }
     assert reconciliation_payload["class_reconciliations"] == [
         {
             "product_class_id": _get_product_class_id(SEED_PRODUCT_CLASS_BOLILLO_CODE),
@@ -250,6 +272,110 @@ def test_cash_close_commit_blocks_unresolved_class_capture_mismatch(
     assert "ventas por clase" in response.json()["detail"]
 
 
+def test_cash_close_commit_with_empty_counter_registers_zero_bread_count(
+    client: TestClient,
+) -> None:
+    _seed_counter_baseline([(SEED_PRODUCT_BOLILLO_STD_CODE, "10.000")])
+    _open_cash_session(client)
+    _confirm_sale(
+        client,
+        lines=[
+            {
+                "capture_mode": "CLASS_CAPTURE",
+                "product_class_id": _get_product_class_id(SEED_PRODUCT_CLASS_BOLILLO_CODE),
+                "quantity": "2",
+            }
+        ],
+        tendered_amount="10.00",
+    )
+
+    response = client.post(
+        "/v1/cash-close/commit",
+        headers=_authorization_header(client),
+        json={
+            "workstation_code": SEED_WORKSTATION_CODE,
+            "counter_empty_confirmed": True,
+            "counted_payment_methods": [
+                {"payment_method_code": "CASH", "counted_amount": "156.00"},
+            ],
+        },
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["close_mode"] == "WITH_COUNT"
+    assert payload["counter_empty_confirmed"] is True
+    assert payload["counted_cash_amount"] == "156.00"
+    assert payload["cash_variance_amount"] == "0.00"
+    assert payload["counted_product_lines"] != []
+    assert all(row["counted_quantity"] == "0.000" for row in payload["counted_product_lines"])
+    assert payload["class_reconciliations"][0]["resolution_status"] == "AUTO_RESOLVED"
+    assert payload["generated_discrepancy_documents"] != []
+    cash_row = next(
+        row for row in payload["payment_method_rows"] if row["payment_method_code"] == "CASH"
+    )
+    assert cash_row["expected_amount"] == payload["expected_cash_amount"]
+    assert cash_row["counted_amount"] == "156.00"
+    assert cash_row["variance_amount"] == "0.00"
+
+    with SessionLocal() as session:
+        cash_session = session.execute(select(CashSession)).scalar_one()
+        close_row = session.execute(select(CashSessionClose)).scalar_one()
+        snapshot_count = session.execute(
+            select(BranchCounterSnapshot).where(
+                BranchCounterSnapshot.source_cash_session_close_id == close_row.id
+            )
+        ).scalar_one()
+        snapshot_lines = (
+            session.execute(
+                select(BranchCounterSnapshotLine).where(
+                    BranchCounterSnapshotLine.snapshot_id == snapshot_count.id
+                )
+            )
+            .scalars()
+            .all()
+        )
+        payment_count = session.execute(
+            select(CashSessionClosePaymentMethodCount).where(
+                CashSessionClosePaymentMethodCount.cash_session_close_id == close_row.id,
+                CashSessionClosePaymentMethodCount.payment_method_code == "CASH",
+            )
+        ).scalar_one()
+        sale_lines = session.execute(select(SaleLine)).scalars().all()
+        event_names = session.execute(select(OutboxEvent.event_name)).scalars().all()
+
+    assert cash_session.status == CASH_SESSION_STATUS_CLOSED
+    assert close_row.close_mode == "WITH_COUNT"
+    assert close_row.counter_empty_confirmed is True
+    assert close_row.counted_cash_amount == Decimal("156.00")
+    assert close_row.cash_variance_amount == Decimal("0.00")
+    assert payment_count.counted_amount == Decimal("156.00")
+    assert all(line.quantity == Decimal("0.000") for line in snapshot_lines)
+    assert all(line.physical_attribution_status == "RECONCILED" for line in sale_lines)
+    assert "cash_session.closed.v1" in event_names
+    assert "class_capture.reconciled.v1" in event_names
+    assert "close_discrepancy.generated.v1" in event_names
+
+
+def test_cash_close_empty_counter_still_requires_money_count(
+    client: TestClient,
+) -> None:
+    _seed_counter_baseline([(SEED_PRODUCT_BOLILLO_STD_CODE, "10.000")])
+    _open_cash_session(client)
+
+    response = client.post(
+        "/v1/cash-close/commit",
+        headers=_authorization_header(client),
+        json={
+            "workstation_code": SEED_WORKSTATION_CODE,
+            "counter_empty_confirmed": True,
+        },
+    )
+
+    assert response.status_code == 400
+    assert "conteo monetario" in response.json()["detail"]
+
+
 def test_cash_close_commit_with_manual_override_and_auto_discrepancy_resolution(
     client: TestClient,
 ) -> None:
@@ -314,8 +440,7 @@ def test_cash_close_commit_with_manual_override_and_auto_discrepancy_resolution(
     assert payload["cash_session"]["status"] == "CLOSED"
     assert payload["class_reconciliations"][0]["resolution_status"] == "MANUAL_RESOLVED"
     assert (
-        payload["generated_discrepancy_documents"][0]["document_type"]
-        == "CLOSE_COUNTER_ADJUSTMENT"
+        payload["generated_discrepancy_documents"][0]["document_type"] == "CLOSE_COUNTER_ADJUSTMENT"
     )
 
     detail = client.get(

@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from datetime import datetime
+from decimal import Decimal
 from typing import Annotated
 from uuid import UUID
 
@@ -15,8 +17,15 @@ from zeromerma_api.modules.branches.domain.exceptions import (
     WorkstationNotFoundError,
 )
 from zeromerma_api.modules.identity.application.schemas import AuthenticatedUser
+from zeromerma_api.modules.identity.application.services import user_can_access_surface
+from zeromerma_api.modules.identity.domain.constants import IDENTITY_SURFACE_BACKOFFICE
 from zeromerma_api.modules.identity.presentation.dependencies import get_current_user
-from zeromerma_api.modules.sales.domain.exceptions import SaleNotFoundError
+from zeromerma_api.modules.sales.domain.exceptions import SaleNotFoundError, SaleValidationError
+from zeromerma_api.modules.tickets.application.admin_schemas import (
+    AdminSalesTicketDetailView,
+    AdminSalesTicketsListResponse,
+)
+from zeromerma_api.modules.tickets.application.admin_services import AdminSalesTicketService
 from zeromerma_api.modules.tickets.application.schemas import (
     TicketDetailResponse,
     TicketReprintRequest,
@@ -35,6 +44,15 @@ from zeromerma_api.modules.tickets.domain.exceptions import (
 )
 
 router = APIRouter(prefix="/v1/tickets", tags=["tickets"])
+admin_router = APIRouter(prefix="/v1/admin/sales/tickets", tags=["admin-sales-tickets"])
+
+
+def _require_backoffice_user(current_user: AuthenticatedUser) -> None:
+    if not user_can_access_surface(current_user, IDENTITY_SURFACE_BACKOFFICE):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Backoffice access is required.",
+        )
 
 
 def _to_http_exception(error: Exception) -> HTTPException:
@@ -47,10 +65,83 @@ def _to_http_exception(error: Exception) -> HTTPException:
     if isinstance(error, (BranchInactiveError, WorkstationInactiveError, TicketConflictError)):
         return HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(error))
 
-    if isinstance(error, (BranchAccessError, TicketValidationError, TicketError)):
+    if isinstance(
+        error,
+        (BranchAccessError, SaleValidationError, TicketValidationError, TicketError),
+    ):
         return HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(error))
 
     return HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(error))
+
+
+@admin_router.get("", response_model=AdminSalesTicketsListResponse)
+def list_admin_sales_tickets(
+    current_user: Annotated[AuthenticatedUser, Depends(get_current_user)],
+    session: Annotated[Session, Depends(get_session)],
+    branch_id: UUID | None = None,
+    workstation_id: UUID | None = None,
+    cashier_id: UUID | None = None,
+    payment_method: Annotated[str | None, Query(min_length=1)] = None,
+    status_filter: Annotated[str | None, Query(alias="status", min_length=1)] = None,
+    search: Annotated[str | None, Query(min_length=1)] = None,
+    date_from: datetime | None = None,
+    date_to: datetime | None = None,
+    min_amount: Decimal | None = None,
+    max_amount: Decimal | None = None,
+    page: Annotated[int, Query(ge=1)] = 1,
+    page_size: Annotated[int, Query(ge=1, le=100)] = 25,
+) -> AdminSalesTicketsListResponse:
+    _require_backoffice_user(current_user)
+    try:
+        return AdminSalesTicketService().list_tickets(
+            session,
+            branch_id=branch_id,
+            cashier_id=cashier_id,
+            date_from=date_from,
+            date_to=date_to,
+            max_amount=max_amount,
+            min_amount=min_amount,
+            page=page,
+            page_size=page_size,
+            payment_method=payment_method,
+            search=search,
+            status_filter=status_filter,
+            workstation_id=workstation_id,
+        )
+    except (SaleNotFoundError, SaleValidationError, TicketError) as error:
+        raise _to_http_exception(error) from error
+
+
+@admin_router.get("/{ticket_id}", response_model=AdminSalesTicketDetailView)
+def get_admin_sales_ticket_detail(
+    ticket_id: UUID,
+    current_user: Annotated[AuthenticatedUser, Depends(get_current_user)],
+    session: Annotated[Session, Depends(get_session)],
+) -> AdminSalesTicketDetailView:
+    _require_backoffice_user(current_user)
+    try:
+        return AdminSalesTicketService().get_ticket_detail(session, ticket_id=ticket_id)
+    except (SaleNotFoundError, SaleValidationError, TicketError) as error:
+        raise _to_http_exception(error) from error
+
+
+@admin_router.post("/{ticket_id}/reprint", response_model=AdminSalesTicketDetailView)
+def reprint_admin_sales_ticket(
+    ticket_id: UUID,
+    request: Request,
+    current_user: Annotated[AuthenticatedUser, Depends(get_current_user)],
+    session: Annotated[Session, Depends(get_session)],
+) -> AdminSalesTicketDetailView:
+    _require_backoffice_user(current_user)
+    try:
+        return AdminSalesTicketService().reprint_ticket(
+            session,
+            current_user=current_user,
+            request_id=request.headers.get("X-Request-ID"),
+            ticket_id=ticket_id,
+        )
+    except (SaleNotFoundError, SaleValidationError, TicketError) as error:
+        raise _to_http_exception(error) from error
 
 
 @router.get("/bootstrap", response_model=TicketsBootstrapResponse)
@@ -125,3 +216,4 @@ def reprint_ticket(
         )
     except (BranchAccessError, TicketError) as error:
         raise _to_http_exception(error) from error
+

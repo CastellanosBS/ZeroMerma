@@ -1,5 +1,5 @@
-import { OperationModuleScreen } from "../features/operations/operation-module-screen";
+import { CounterTransferScreen } from "../features/operations/counter-transfer-screen";
 
 export function PassToCounterRoutePage() {
-  return <OperationModuleScreen variant="counterTransfer" />;
+  return <CounterTransferScreen />;
 }

@@ -7,11 +7,9 @@ import { OperationalStatus } from "../../components/operational-status";
 import { PosAuditSummary } from "../../components/pos-audit-summary";
 import {
   PosConfirmationDialog,
-  PosEmptyState,
   PosErrorState,
   PosInlineValidationMessage,
   PosLoadingState,
-  PosOperationResultPanel,
 } from "../../components/pos-feedback";
 import { PosButton, PosFieldLabel, PosStatusBadge } from "../../components/pos-foundations";
 import { PosSummaryPanel } from "../../components/pos-module-layout";
@@ -21,17 +19,10 @@ import {
   PosRecordTable,
   type PosRecordColumn,
 } from "../../components/pos-records";
-import {
-  CardIcon,
-  CheckCircleIcon,
-  ClipboardIcon,
-  MoneyIcon,
-  PlusIcon,
-} from "../../components/pos-icons";
+import { PlusIcon } from "../../components/pos-icons";
 import {
   CentralWorkspaceSheet,
   CompactPageHeader,
-  FlowGuide,
   ModuleStateChip,
   ScrollPane,
 } from "../../components/pos-module-primitives";
@@ -44,7 +35,6 @@ import type {
   OperationalPaymentMethodView,
   OperationalPaymentScopeView,
 } from "../../lib/api-contracts";
-import { copyDocumentReferenceToClipboard } from "../../lib/document-actions";
 import {
   formatCompactLocalDateTime,
   formatCurrency,
@@ -52,11 +42,7 @@ import {
 } from "../../lib/formatters";
 import { toOperationalErrorMessage } from "../../lib/http";
 import { isEditableTarget } from "../../lib/keyboard-shortcuts";
-import {
-  createOperationResultMessage,
-  createToastAction,
-  posMessageCatalog,
-} from "../../lib/pos-messages";
+import { posMessageCatalog } from "../../lib/pos-messages";
 import { cn } from "../../lib/utils";
 import { usePosAuthStore } from "../auth/auth-store";
 import {
@@ -79,8 +65,6 @@ import {
   doesOperationalPaymentAffectCashDrawer,
   getOperationalPaymentAmountCents,
   getOperationalPaymentBlockedReason,
-  getOperationalPaymentBlockingMessages,
-  getOperationalPaymentCreateStepKey,
   getOperationalPaymentMethod,
   getOperationalPaymentMethodLabel,
   getOperationalPaymentUiState,
@@ -97,13 +81,6 @@ import {
 } from "./queries";
 
 type PaymentsMode = "create" | "list";
-
-const PAYMENT_CREATE_GUIDE_STEPS = [
-  { icon: <ClipboardIcon className="h-4 w-4" />, key: "details", label: "Datos" },
-  { icon: <MoneyIcon className="h-4 w-4" />, key: "amount", label: "Monto" },
-  { icon: <CardIcon className="h-4 w-4" />, key: "method", label: "Metodo" },
-  { icon: <CheckCircleIcon className="h-4 w-4" />, key: "save", label: "Guardar" },
-] as const;
 
 function createRequestId(scope: string): string {
   if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
@@ -191,20 +168,24 @@ function getCategoryLabel(
 function getScopeContextLabel(scope: string): string {
   switch (scope) {
     case "TODAY":
-      return "Mostrando pagos de hoy.";
+      return "Hoy";
     case "RECENT":
-      return "Mostrando pagos recientes de la estacion.";
+      return "Recientes";
     default:
-      return "Mostrando pagos del turno actual.";
+      return "Turno actual";
   }
 }
 
 function getEmptyListDescription(scopeLabel: string, query: string): string {
   if (query.trim().length > 0) {
-    return "No hay pagos con ese folio, referencia o beneficiario dentro del alcance actual.";
+    return "No hay pagos con ese folio, referencia o beneficiario.";
   }
 
-  return `${scopeLabel} Los pagos operativos registran salidas auditables como proveedores, servicios o logistica. Crea uno cuando necesites dejar trazabilidad del gasto.`;
+  return `Sin pagos registrados en ${scopeLabel.toLowerCase()}.`;
+}
+
+function getEmptyListTitle(query: string, hasActiveFilters: boolean): string {
+  return query.trim().length > 0 || hasActiveFilters ? "Sin resultados" : "Sin pagos registrados";
 }
 
 function getMethodFilterOptions(methods: OperationalPaymentMethodView[]) {
@@ -246,7 +227,7 @@ function PaymentMethodButton({
   return (
     <button
       className={cn(
-        "grid min-h-[4.25rem] gap-1.5 rounded-[var(--pos-radius-control)] border px-3 py-2.5 text-left transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--pos-ring)] focus-visible:ring-offset-2 focus-visible:ring-offset-white",
+        "grid min-h-[3.25rem] gap-0.5 rounded-[var(--pos-radius-control)] border px-3 py-2 text-left transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--pos-ring)] focus-visible:ring-offset-2 focus-visible:ring-offset-white",
         isActive
           ? "border-[var(--pos-primary)] bg-[var(--pos-primary-soft)]"
           : "border-[var(--pos-shell-border)] bg-white hover:border-[var(--pos-primary)] hover:bg-[var(--pos-shell-muted)]",
@@ -259,7 +240,7 @@ function PaymentMethodButton({
       <div className="min-w-0">
         <p className="text-sm font-semibold text-slate-950">{method.label}</p>
         {method.helper_text ? (
-          <p className="mt-0.5 line-clamp-2 text-xs leading-5 text-slate-600">
+          <p className="line-clamp-1 text-[11px] leading-4 text-slate-600">
             {method.helper_text}
           </p>
         ) : null}
@@ -297,29 +278,31 @@ function PaymentCaptureWorkspace({
   const affectsCash = doesOperationalPaymentAffectCashDrawer(draft.paymentMethodCode, methods);
 
   return (
-    <div className="grid h-full min-h-0 place-items-center py-4">
+    <div className="grid h-full min-h-0 content-start gap-3">
+      <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-[var(--pos-shell-border)] bg-white px-3 py-2.5 shadow-sm">
+        <div className="min-w-0">
+          <p className="pos-label-text">Nuevo pago</p>
+          <h2 className="text-base font-semibold text-slate-950">Registrar pago operativo</h2>
+        </div>
+        <PosStatusBadge status={affectsCash ? "warning" : "confirmed"}>
+          {selectedMethod ? getImpactTitle(affectsCash) : "Pendiente"}
+        </PosStatusBadge>
+      </div>
+
       <form
-        className="grid w-full max-w-4xl gap-4"
+        className="grid w-full gap-3"
         onSubmit={(event) => {
           event.preventDefault();
           onSubmit();
         }}
       >
-        <section className="grid gap-4 rounded-[var(--pos-radius-panel)] border border-[var(--pos-shell-border)] bg-[var(--pos-shell-surface)] px-4 py-4 shadow-[var(--pos-subtle-shadow)]">
-          <div className="grid gap-1">
-            <p className="pos-label-text">Nuevo pago</p>
-            <h2 className="text-lg font-semibold text-slate-950">Registrar pago operativo</h2>
-            <p className="text-sm text-slate-600">
-              Captura beneficiario, categoria, referencia, monto, metodo y notas operativas.
-            </p>
-          </div>
-
+        <section className="grid gap-3 rounded-[var(--pos-radius-panel)] border border-[var(--pos-shell-border)] bg-[var(--pos-shell-surface)] px-3 py-3 shadow-[var(--pos-subtle-shadow)]">
           {createError ? (
             <PosInlineValidationMessage tone="error">{createError}</PosInlineValidationMessage>
           ) : null}
 
-          <div className="grid gap-4 md:grid-cols-2">
-            <PosFieldLabel helper="Nombre de quien recibe el pago." required>
+          <div className="grid gap-3 md:grid-cols-2">
+            <PosFieldLabel required>
               Beneficiario
               <input
                 aria-label="Beneficiario del pago"
@@ -334,7 +317,7 @@ function PaymentCaptureWorkspace({
               />
             </PosFieldLabel>
 
-            <PosFieldLabel helper="Clasifica el pago para auditoria y filtros." required>
+            <PosFieldLabel required>
               Categoria
               <select
                 aria-label="Categoria del pago"
@@ -354,7 +337,7 @@ function PaymentCaptureWorkspace({
               </select>
             </PosFieldLabel>
 
-            <PosFieldLabel helper="Factura, folio externo o referencia interna." required>
+            <PosFieldLabel required>
               Referencia
               <input
                 aria-label="Referencia del pago"
@@ -368,7 +351,7 @@ function PaymentCaptureWorkspace({
               />
             </PosFieldLabel>
 
-            <PosFieldLabel helper="Monto total del pago." required>
+            <PosFieldLabel required>
               Monto
               <input
                 aria-label="Monto del pago"
@@ -384,7 +367,7 @@ function PaymentCaptureWorkspace({
             </PosFieldLabel>
 
             <div className="grid gap-2 md:col-span-2">
-              <PosFieldLabel helper="Selecciona como se registro el pago." required>
+              <PosFieldLabel required>
                 Metodo
               </PosFieldLabel>
               <div className="grid gap-2 sm:grid-cols-3">
@@ -399,22 +382,24 @@ function PaymentCaptureWorkspace({
               </div>
             </div>
 
-            <PosFieldLabel
-              className="md:col-span-2"
-              helper="Observaciones operativas. Se guardan en auditoria si capturas contenido."
+            <details
+              className="rounded-[var(--pos-radius-control)] border border-[var(--pos-shell-border)] bg-white px-3 py-2.5 md:col-span-2"
+              open={draft.notes.trim().length > 0}
             >
-              Notas
+              <summary className="cursor-pointer text-sm font-semibold text-slate-950">
+                {draft.notes.trim().length > 0 ? "Observacion" : "Agregar observacion"}
+              </summary>
               <textarea
                 aria-label="Notas del pago"
                 className={cn(
                   posInputClass,
-                  "mt-1 min-h-[7.5rem] w-full rounded-[var(--pos-radius-control)] px-3 py-2.5 text-sm",
+                  "mt-2 min-h-20 w-full rounded-[var(--pos-radius-control)] px-3 py-2.5 text-sm",
                 )}
                 onChange={(event) => onNotesChange(event.target.value)}
-                placeholder="Detalle adicional del gasto o evidencia textual."
+                placeholder="Detalle adicional del gasto."
                 value={draft.notes}
               />
-            </PosFieldLabel>
+            </details>
           </div>
 
           {selectedMethod ? (
@@ -433,6 +418,31 @@ function PaymentDetailSummary({
 }: {
   payment: OperationalPaymentDetailResponse;
 }) {
+  const detailRows = [
+    { key: "reference", label: "Referencia", value: payment.concept },
+    { key: "payee", label: "Beneficiario", value: payment.payee_name },
+    { key: "category", label: "Categoria", value: payment.category_name ?? "Sin categoria" },
+    {
+      key: "method",
+      label: "Metodo",
+      value: `${getOperationalPaymentMethodLabel(payment.payment_method_code)} - ${getImpactTitle(
+        payment.affects_cash_drawer,
+      )}`,
+    },
+    { key: "operator", label: "Operador", value: payment.created_by.full_name },
+    {
+      key: "time",
+      label: "Hora",
+      value: formatLocalDateTime(payment.committed_at_utc, payment.branch.timezone),
+    },
+    {
+      key: "branch",
+      label: "Sucursal",
+      value: `${payment.branch.name} - ${payment.workstation.name}`,
+    },
+    ...(payment.notes ? [{ key: "notes", label: "Observacion", value: payment.notes }] : []),
+  ];
+
   return (
     <div className="grid gap-3">
       <div className="rounded-[var(--pos-radius-control)] border border-[var(--pos-shell-border)] bg-[var(--pos-shell-muted)] px-3 py-3">
@@ -442,7 +452,23 @@ function PaymentDetailSummary({
         </p>
       </div>
 
-      <div className="grid gap-2 text-sm text-slate-700">
+      <div className="overflow-hidden rounded-[var(--pos-radius-control)] border border-[var(--pos-shell-border)] bg-white text-sm">
+        {detailRows.map((row) => (
+          <div
+            className="grid grid-cols-[6.25rem_minmax(0,1fr)] gap-2 border-t border-[var(--pos-shell-border)] px-3 py-2 first:border-t-0"
+            key={row.key}
+          >
+            <span className="text-xs font-semibold uppercase tracking-[0.08em] text-slate-500">
+              {row.label}
+            </span>
+            <span className="truncate text-right font-semibold text-slate-950" title={row.value}>
+              {row.value}
+            </span>
+          </div>
+        ))}
+      </div>
+
+      <div className="hidden gap-2 text-sm text-slate-700">
         <div className="grid gap-1 rounded-[var(--pos-radius-control)] border border-[var(--pos-shell-border)] bg-white px-3 py-2.5">
           <span className="pos-label-text">Referencia</span>
           <p className="font-semibold text-slate-950">{payment.concept}</p>
@@ -492,7 +518,6 @@ function PaymentDetailSummary({
 }
 
 export function PaymentsRightPanel({
-  blockedMessages,
   blockedReason,
   categories,
   createError,
@@ -503,10 +528,9 @@ export function PaymentsRightPanel({
   onCancelCreate,
   onCommitCreate,
   onResultAction,
+  paymentCount,
   paymentDetail,
-  recentCreatedPaymentId,
 }: {
-  blockedMessages: string[];
   blockedReason: string | null;
   categories: OperationalPaymentCategoryView[];
   createError: string | null;
@@ -517,16 +541,36 @@ export function PaymentsRightPanel({
   onCancelCreate: () => void;
   onCommitCreate: () => void;
   onResultAction: (actionKey: string) => void;
+  paymentCount: number;
   paymentDetail: OperationalPaymentDetailResponse | null;
-  recentCreatedPaymentId: string | null;
 }) {
   if (mode === "create") {
     const draftCategoryLabel = getCategoryLabel(draft.categoryCode, categories);
     const amountLabel = getDraftAmountLabel(draft.totalAmountText);
+    const draftRows = [
+      {
+        key: "payee",
+        label: "Beneficiario",
+        value: draft.payeeName.trim().length > 0 ? draft.payeeName.trim() : "Pendiente",
+      },
+      {
+        key: "reference",
+        label: "Referencia",
+        value: draft.concept.trim().length > 0 ? draft.concept.trim() : "Pendiente",
+      },
+      { key: "category", label: "Categoria", value: draftCategoryLabel ?? "Pendiente" },
+      {
+        key: "method",
+        label: "Metodo",
+        value:
+          draft.paymentMethodCode.length > 0
+            ? getOperationalPaymentMethodLabel(draft.paymentMethodCode)
+            : "Pendiente",
+      },
+    ];
 
     return (
       <PosSummaryPanel
-        description="Resume el pago antes de registrarlo."
         stateLabel="Captura activa"
         stateTone="draft"
         title="Nuevo pago"
@@ -556,38 +600,25 @@ export function PaymentsRightPanel({
             </p>
           </div>
 
-          <div className="grid gap-2 text-sm text-slate-700">
-            <div className="rounded-[var(--pos-radius-control)] border border-[var(--pos-shell-border)] bg-white px-3 py-2.5">
-              <span className="pos-label-text">Beneficiario</span>
-              <p className="font-semibold text-slate-950">
-                {draft.payeeName.trim().length > 0 ? draft.payeeName.trim() : "Pendiente"}
-              </p>
-            </div>
-            <div className="rounded-[var(--pos-radius-control)] border border-[var(--pos-shell-border)] bg-white px-3 py-2.5">
-              <span className="pos-label-text">Referencia</span>
-              <p className="font-semibold text-slate-950">
-                {draft.concept.trim().length > 0 ? draft.concept.trim() : "Pendiente"}
-              </p>
-            </div>
-            <div className="rounded-[var(--pos-radius-control)] border border-[var(--pos-shell-border)] bg-white px-3 py-2.5">
-              <span className="pos-label-text">Categoria</span>
-              <p className="font-semibold text-slate-950">{draftCategoryLabel ?? "Pendiente"}</p>
-            </div>
-            <div className="rounded-[var(--pos-radius-control)] border border-[var(--pos-shell-border)] bg-white px-3 py-2.5">
-              <span className="pos-label-text">Metodo</span>
-              <p className="font-semibold text-slate-950">
-                {draft.paymentMethodCode.length > 0
-                  ? getOperationalPaymentMethodLabel(draft.paymentMethodCode)
-                  : "Pendiente"}
-              </p>
-            </div>
+          <div className="overflow-hidden rounded-[var(--pos-radius-control)] border border-[var(--pos-shell-border)] bg-white text-sm">
+            {draftRows.map((row) => (
+              <div
+                className="grid grid-cols-[6rem_minmax(0,1fr)] gap-2 border-t border-[var(--pos-shell-border)] px-3 py-2 first:border-t-0"
+                key={row.key}
+              >
+                <span className="text-xs font-semibold uppercase tracking-[0.08em] text-slate-500">
+                  {row.label}
+                </span>
+                <span className="truncate text-right font-semibold text-slate-950" title={row.value}>
+                  {row.value}
+                </span>
+              </div>
+            ))}
           </div>
 
-          {blockedMessages.map((message) => (
-            <PosInlineValidationMessage key={message} tone="warning">
-              {message}
-            </PosInlineValidationMessage>
-          ))}
+          {blockedReason ? (
+            <PosInlineValidationMessage tone="warning">{blockedReason}</PosInlineValidationMessage>
+          ) : null}
         </ScrollPane>
       </PosSummaryPanel>
     );
@@ -612,35 +643,16 @@ export function PaymentsRightPanel({
   if (!paymentDetail) {
     return (
       <PosSummaryPanel
-        description="El panel derecho muestra el resumen operativo y el resultado del registro."
-        stateLabel="Sin seleccion"
+        stateLabel="Consulta"
         stateTone="draft"
-        title="Selecciona un pago"
+        title="Detalle del pago"
       >
-        <PosEmptyState
-          description="Selecciona un pago para revisar su contexto operativo o crea uno nuevo para registrar una salida auditada."
-          title="Sin pago seleccionado"
-        />
+        <div className="rounded-xl border border-dashed border-[var(--pos-shell-border)] bg-white px-3 py-3 text-sm text-slate-600">
+          {paymentCount > 0
+            ? "Selecciona un pago para revisar su informacion."
+            : "Registra un pago para comenzar."}
+        </div>
       </PosSummaryPanel>
-    );
-  }
-
-  if (paymentDetail.id === recentCreatedPaymentId) {
-    const resultMessage = createOperationResultMessage({
-      description: `Referencia ${paymentDetail.concept}. Usa el historial para seguir auditando el turno o registra un nuevo pago.`,
-      nextActions: [createToastAction("viewHistory"), createToastAction("newOperation")],
-      operationType: "payment",
-      referenceId: paymentDetail.folio,
-    });
-
-    return (
-      <div className="grid gap-3">
-        <PosOperationResultPanel message={resultMessage} onSelectAction={onResultAction} />
-        <PosAuditSummary
-          auditSummary={paymentDetail.audit_summary}
-          timeZone={paymentDetail.branch.timezone}
-        />
-      </div>
     );
   }
 
@@ -684,7 +696,6 @@ export function PaymentsScreen() {
   );
   const [createError, setCreateError] = useState<string | null>(null);
   const [isConfirmDialogOpen, setIsConfirmDialogOpen] = useState(false);
-  const [recentCreatedPaymentId, setRecentCreatedPaymentId] = useState<string | null>(null);
 
   const debouncedSearchText = useDebouncedValue(searchText, 220);
   const paymentsListQuery = usePaymentsListQuery(
@@ -714,18 +725,23 @@ export function PaymentsScreen() {
     () => paymentsResponse?.payments ?? [],
     [paymentsResponse?.payments],
   );
+  const totalPaymentsAmount = useMemo(
+    () => payments.reduce((sum, payment) => sum + Number(payment.total_amount), 0),
+    [payments],
+  );
   const availableUsers = useMemo(
     () => paymentsResponse?.available_users ?? [],
     [paymentsResponse?.available_users],
   );
+  const hasActiveAdvancedFilters =
+    selectedCategory.length > 0 ||
+    selectedMethodFilter.length > 0 ||
+    selectedCreatedByUserId.length > 0;
+  const hasActiveListFilters = searchText.trim().length > 0 || hasActiveAdvancedFilters;
+  const shouldShowAdvancedFilters = payments.length > 0 || hasActiveAdvancedFilters;
   const selectedPayment = paymentDetailQuery.data ?? null;
   const selectedMethod = getOperationalPaymentMethod(draftState.paymentMethodCode, methods);
   const affectsCash = doesOperationalPaymentAffectCashDrawer(draftState.paymentMethodCode, methods);
-  const createBlockedMessages = getOperationalPaymentBlockingMessages(
-    draftState,
-    methods,
-    categories,
-  );
   const createBlockedReason = getOperationalPaymentBlockedReason(
     draftState,
     methods,
@@ -816,7 +832,6 @@ export function PaymentsScreen() {
       setSelectedMethodFilter("");
       setSelectedCreatedByUserId("");
       setSelectedPaymentId(result.id);
-      setRecentCreatedPaymentId(result.id);
       setDraftState(createInitialOperationalPaymentDraftState());
       setCreateError(null);
       setIsConfirmDialogOpen(false);
@@ -958,7 +973,6 @@ export function PaymentsScreen() {
 
   useAppShellRightPanel(
     <PaymentsRightPanel
-      blockedMessages={createBlockedMessages}
       blockedReason={createBlockedReason}
       categories={categories}
       createError={createError}
@@ -969,17 +983,12 @@ export function PaymentsScreen() {
       onCancelCreate={handleCancelCreate}
       onCommitCreate={handleCommit}
       onResultAction={(actionKey) => {
-        if (actionKey === "viewHistory") {
-          setRecentCreatedPaymentId(null);
-          return;
-        }
-
         if (actionKey === "newOperation") {
           handleOpenCreate();
         }
       }}
+      paymentCount={payments.length}
       paymentDetail={selectedPayment}
-      recentCreatedPaymentId={recentCreatedPaymentId}
     />,
   );
 
@@ -1135,59 +1144,30 @@ export function PaymentsScreen() {
         header={
           <CompactPageHeader
             secondaryChips={
-              mode === "create" ? (
-                <ModuleStateChip tone={getCaptureStateTone(captureUiState)}>
-                  {getCaptureStateLabel(captureUiState)}
-                </ModuleStateChip>
-              ) : (
-                <ModuleStateChip>
-                  {searchText.trim().length > 0 ||
-                  selectedCategory.length > 0 ||
-                  selectedMethodFilter.length > 0 ||
-                  selectedCreatedByUserId.length > 0
-                    ? "Filtro activo"
-                    : getScopeContextLabel(selectedScope)}
-                </ModuleStateChip>
-              )
+              <div className="flex flex-wrap items-center gap-2">
+                {mode === "create" ? (
+                  <ModuleStateChip tone={getCaptureStateTone(captureUiState)}>
+                    {getCaptureStateLabel(captureUiState)}
+                  </ModuleStateChip>
+                ) : (
+                  <>
+                    <ModuleStateChip>
+                      {hasActiveListFilters ? "Filtro activo" : getScopeContextLabel(selectedScope)}
+                    </ModuleStateChip>
+                    <ModuleStateChip tone="muted">
+                      {payments.length} pagos - {formatCurrency(totalPaymentsAmount)} salidas
+                    </ModuleStateChip>
+                  </>
+                )}
+              </div>
             }
             stateChip={
               <ModuleStateChip tone={mode === "create" ? "primary" : "muted"}>
-                {mode === "create"
-                  ? "Captura activa"
-                  : selectedPaymentId
-                    ? "Pago en vista"
-                    : "Sin seleccion"}
+                {mode === "create" ? "Captura activa" : "Consulta"}
               </ModuleStateChip>
             }
-            title="Pagos operativos"
-          >
-            <FlowGuide
-              activeStepKey={
-                mode === "create"
-                  ? getOperationalPaymentCreateStepKey(draftState, methods, categories)
-                  : selectedPaymentId === null
-                    ? "list"
-                    : "detail"
-              }
-              steps={
-                mode === "create"
-                  ? [...PAYMENT_CREATE_GUIDE_STEPS]
-                  : [
-                      {
-                        key: "list",
-                        label: "Consulta",
-                        state: selectedPaymentId ? "completed" : "current",
-                      },
-                      {
-                        key: "detail",
-                        label: "Detalle",
-                        state: selectedPaymentId ? "current" : "upcoming",
-                      },
-                    ]
-              }
-              variant={mode === "create" ? "process" : "compact"}
-            />
-          </CompactPageHeader>
+            title={mode === "create" ? "Nuevo pago" : "Pagos operativos"}
+          />
         }
       >
         {mode === "create" ? (
@@ -1235,10 +1215,11 @@ export function PaymentsScreen() {
             }
           />
         ) : (
-          <div className="grid h-full min-h-0 gap-3">
+          <div className="grid h-full min-h-0 content-start gap-3">
             <PosFilterBar
               actions={
                 <PosButton
+                  className="h-10"
                   leadingIcon={<PlusIcon className="h-4 w-4" />}
                   onClick={handleOpenCreate}
                 >
@@ -1254,38 +1235,47 @@ export function PaymentsScreen() {
                 label: scope.label,
                 onSelect: () => setSelectedScope(scope.code),
               }))}
-              countLabel={<PosStatusBadge status="draft">{payments.length} pagos</PosStatusBadge>}
+              className="rounded-xl border border-[var(--pos-shell-border)] bg-white px-3 py-3 shadow-sm"
+              countLabel={
+                <PosStatusBadge status="draft">
+                  {payments.length} pagos - {formatCurrency(totalPaymentsAmount)}
+                </PosStatusBadge>
+              }
               searchInput={{
                 ariaLabel: "Buscar pago por folio, referencia o beneficiario",
                 hotkeyChords: ["Ctrl+F"],
                 inputRef: searchInputRef,
                 onChange: setSearchText,
-                placeholder: "Buscar por folio, referencia o beneficiario",
+                placeholder: "Buscar pago",
                 value: searchText,
               }}
-              selectFilters={[
-                {
-                  ariaLabel: "Filtrar pagos por categoria",
-                  key: "category",
-                  onChange: setSelectedCategory,
-                  options: getCategoryFilterOptions(categories),
-                  value: selectedCategory,
-                },
-                {
-                  ariaLabel: "Filtrar pagos por metodo",
-                  key: "method",
-                  onChange: setSelectedMethodFilter,
-                  options: getMethodFilterOptions(methods),
-                  value: selectedMethodFilter,
-                },
-                {
-                  ariaLabel: "Filtrar pagos por operador",
-                  key: "user",
-                  onChange: setSelectedCreatedByUserId,
-                  options: getUserFilterOptions(availableUsers),
-                  value: selectedCreatedByUserId,
-                },
-              ]}
+              selectFilters={
+                shouldShowAdvancedFilters
+                  ? [
+                      {
+                        ariaLabel: "Filtrar pagos por categoria",
+                        key: "category",
+                        onChange: setSelectedCategory,
+                        options: getCategoryFilterOptions(categories),
+                        value: selectedCategory,
+                      },
+                      {
+                        ariaLabel: "Filtrar pagos por metodo",
+                        key: "method",
+                        onChange: setSelectedMethodFilter,
+                        options: getMethodFilterOptions(methods),
+                        value: selectedMethodFilter,
+                      },
+                      {
+                        ariaLabel: "Filtrar pagos por operador",
+                        key: "user",
+                        onChange: setSelectedCreatedByUserId,
+                        options: getUserFilterOptions(availableUsers),
+                        value: selectedCreatedByUserId,
+                      },
+                    ]
+                  : []
+              }
               title="Pagos registrados"
             />
 
@@ -1305,38 +1295,16 @@ export function PaymentsScreen() {
             ) : (
               <PosRecordTable
                 columns={listColumns}
-                emptyAction={
-                  <PosButton
-                    leadingIcon={<PlusIcon className="h-4 w-4" />}
-                    onClick={handleOpenCreate}
-                  >
-                    Nuevo pago
-                  </PosButton>
-                }
                 emptyDescription={getEmptyListDescription(
                   getScopeContextLabel(selectedScope),
                   searchText,
                 )}
-                emptyTitle="Sin pagos para esta vista"
+                emptyTitle={getEmptyListTitle(searchText, hasActiveAdvancedFilters)}
                 getKey={(payment) => payment.id}
-                getRowActions={(payment) => [
-                  {
-                    key: `${payment.id}-copy-folio`,
-                    label: "Copiar folio",
-                    onSelect: () => {
-                      void copyDocumentReferenceToClipboard(payment.folio)
-                        .then(() => showSuccess("Folio copiado."))
-                        .catch(() => showError("No se pudo copiar el folio."));
-                    },
-                  },
-                ]}
                 loading={paymentsListQuery.isPending}
                 loadingTitle="Cargando pagos"
                 onSelect={(payment) => {
                   setSelectedPaymentId(payment.id);
-                  setRecentCreatedPaymentId((current) =>
-                    current === payment.id ? current : null,
-                  );
                 }}
                 records={payments}
                 selectedKey={selectedPaymentId}

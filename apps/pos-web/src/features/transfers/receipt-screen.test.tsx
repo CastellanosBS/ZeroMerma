@@ -487,9 +487,11 @@ function findInputByLabel(container: ParentNode, label: string): HTMLInputElemen
 }
 
 async function selectPendingShipmentWithKeyboard(container: HTMLElement) {
-  const shipmentButton = findButtonByText(container, "ENV-000001");
-  focus(shipmentButton ?? null);
-  keydown(shipmentButton, "Enter");
+  const shipmentRow = Array.from(container.querySelectorAll<HTMLTableRowElement>("tbody tr")).find(
+    (row) => row.textContent?.includes("ENV-000001"),
+  );
+  focus(shipmentRow ?? null);
+  keydown(shipmentRow, "Enter");
   await flush();
 }
 
@@ -627,7 +629,7 @@ describe("TransferReceiptScreen", () => {
     expect(receiveTransfer).not.toHaveBeenCalled();
   });
 
-  it("registers an exact receipt, shows the result, and opens history", async () => {
+  it("registers an exact receipt and opens history", async () => {
     const view = renderUi();
     mountedRoots.push(view.unmount);
     await flush();
@@ -657,15 +659,9 @@ describe("TransferReceiptScreen", () => {
       workstation_code: "POS-01",
     });
     expect(showSuccessMock).toHaveBeenCalledWith("Recepcion registrada. Folio REC-000001.");
-    expect(rightPanel?.textContent).toContain("REC-000001");
-    expect(rightPanel?.textContent).toContain("Ver historial");
-
-    const historyButton = findButtonByText(rightPanel ?? document, "Ver historial");
-    click(historyButton ?? null);
-    await flush();
-
     expect(view.container.textContent).toContain("Historial de recepciones");
     expect(view.container.textContent).toContain("REC-000001");
     expect(rightPanel?.textContent).toContain("Recepcion seleccionada");
+    expect(rightPanel?.textContent).toContain("Volver a pendientes");
   });
 });

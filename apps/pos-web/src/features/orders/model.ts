@@ -61,6 +61,16 @@ export type OrderCreateUiState =
   | "READY_TO_SAVE"
   | "SAVING";
 
+const ORDER_CUSTOMER_PHONE_REQUIRED_DIGITS = 10;
+
+export function getOrderCustomerPhoneDigitCount(customerPhone: string): number {
+  return customerPhone.replace(/\D/g, "").length;
+}
+
+export function isOrderCustomerPhoneComplete(customerPhone: string): boolean {
+  return getOrderCustomerPhoneDigitCount(customerPhone) >= ORDER_CUSTOMER_PHONE_REQUIRED_DIGITS;
+}
+
 export function createInitialOrderCreateDraftState(): OrderCreateDraftState {
   return {
     controlState: CONTROL_STATE_CLASS_SELECTION,
@@ -422,8 +432,8 @@ export function getOrderCreateBlockingMessage({
     return "Captura el cliente antes de guardar.";
   }
 
-  if (customerPhone.trim().length === 0) {
-    return "Captura el telefono antes de guardar.";
+  if (!isOrderCustomerPhoneComplete(customerPhone)) {
+    return "Captura el telefono completo antes de guardar.";
   }
 
   if (requestedForInput.trim().length === 0) {
@@ -471,8 +481,8 @@ export function getOrderCreateChecklistMessages({
     messages.push("Falta cliente.");
   }
 
-  if (customerPhone.trim().length === 0) {
-    messages.push("Falta telefono.");
+  if (!isOrderCustomerPhoneComplete(customerPhone)) {
+    messages.push("Falta telefono completo.");
   }
 
   if (requestedForInput.trim().length === 0) {
@@ -519,7 +529,7 @@ export function getOrderCreateUiState({
 
   if (
     customerName.trim().length === 0 &&
-    customerPhone.trim().length === 0 &&
+    !isOrderCustomerPhoneComplete(customerPhone) &&
     requestedForInput.trim().length === 0 &&
     lineCount === 0
   ) {
@@ -528,7 +538,7 @@ export function getOrderCreateUiState({
 
   if (
     customerName.trim().length === 0 ||
-    customerPhone.trim().length === 0 ||
+    !isOrderCustomerPhoneComplete(customerPhone) ||
     requestedForInput.trim().length === 0
   ) {
     return "DETAILS_PENDING";

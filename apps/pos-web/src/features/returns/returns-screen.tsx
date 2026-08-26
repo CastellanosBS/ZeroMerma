@@ -3,37 +3,23 @@ import { Navigate, useNavigate, useRouterState } from "@tanstack/react-router";
 import { useEffect, useMemo, useRef, useState } from "react";
 
 import { useAppShellRightPanel } from "../../components/app-shell-right-panel";
-import {
-  OperationConfirmationDialog,
-  OperationDocumentSummaryPanel,
-  OperationDocumentResult,
-  OperationHistoryList,
-  type OperationHistoryRecord,
-  type OperationDocumentAction,
-  type OperationDocumentMetric,
-  type OperationLineSummaryItem,
-} from "../../components/operation-documents";
 import { OperationalStatus } from "../../components/operational-status";
-import {
-  PosEmptyState,
-  PosInlineValidationMessage,
-} from "../../components/pos-feedback";
-import { PosButton, PosFieldLabel, PosStatusBadge } from "../../components/pos-foundations";
+import { PosInlineValidationMessage } from "../../components/pos-feedback";
+import { PosButton, PosStatusBadge } from "../../components/pos-foundations";
 import { PosSummaryPanel } from "../../components/pos-module-layout";
 import {
   CentralWorkspaceSheet,
   CompactPageHeader,
-  FlowGuide,
+  KeyValueRow,
   InlineNotice,
-  ListDetailColumn,
   ModuleStateChip,
-  ResponsivePaneLayout,
+  ProgressStepper,
+  ScrollPane,
+  type ProgressStepperStep,
 } from "../../components/pos-module-primitives";
 import {
   PosFilterBar,
   PosHistoryView,
-  PosRecordDetailPanel,
-  PosRecordList,
   PosRecordTable,
   type PosRecordColumn,
 } from "../../components/pos-records";
@@ -50,8 +36,6 @@ import type {
   SaleReturnDetailResponse,
 } from "../../lib/api-contracts";
 import { openBrowserPrintWindow } from "../../lib/browser-print";
-import { getCustomerCommunicationActionState } from "../../lib/customer-communication";
-import { getDocumentActionAvailability } from "../../lib/document-actions";
 import {
   formatCompactLocalDateTime,
   formatCurrency,
@@ -61,7 +45,6 @@ import { toOperationalErrorMessage } from "../../lib/http";
 import { usePosAuthStore } from "../auth/auth-store";
 import { useCurrentCashSessionQuery } from "../cash-session-open/queries";
 import {
-  formatQuantityFromMilliUnits,
   parseMoneyToCents,
   sanitizeQuantityInput,
 } from "../pos-terminal/model";
@@ -75,13 +58,12 @@ import {
   getReturnDraftBlockingMessages,
   getReturnDraftLineRefundCents,
   getReturnDraftTotalRefundCents,
-  getReturnLineCount,
-  getReturnTotalUnitsMilli,
+  incrementReturnDraftLineQuantity,
   removeReturnDraftLine,
   RETURN_DISPOSITION_RESTOCK_BACKROOM,
   RETURN_DISPOSITION_RESTOCK_COUNTER,
   RETURN_DISPOSITION_SEND_TO_WASTE,
-  setReturnDraftLineDisposition,
+  decrementReturnDraftLineQuantity,
   setReturnDraftLineExactProduct,
   setReturnDraftLineQuantityText,
   type ReturnDraftLine,
@@ -159,13 +141,6 @@ type ReturnsUiState =
   | "RETURN_CONFIRMED"
   | "RETURN_ERROR";
 
-const RETURN_PROCESS_STEPS = [
-  { key: "sale", label: "Venta" },
-  { key: "lines", label: "Lineas" },
-  { key: "refund", label: "Reembolso" },
-  { key: "confirm", label: "Confirmacion" },
-] as const;
-
 function createRequestId(scope: string): string {
   if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
     return `${scope}-${crypto.randomUUID()}`;
@@ -206,17 +181,6 @@ function getReturnableUnitsText(saleDetail: ReturnOriginalSaleDetailResponse): s
     0,
   );
   return formatQuantity(total);
-}
-
-function getDispositionLabel(code: string): string {
-  return RETURN_DISPOSITION_OPTIONS.find((option) => option.value === code)?.label ?? "Pendiente";
-}
-
-function getDispositionHint(code: string): string {
-  return (
-    RETURN_DISPOSITION_OPTIONS.find((option) => option.value === code)?.hint ??
-    "Selecciona el destino fisico de la linea."
-  );
 }
 
 function getSaleReturnStatusLabel(status: string): string | null {
@@ -276,73 +240,6 @@ function getReturnStatusTone(
   }
 }
 
-function buildCommittedReturnLineSummaryItems(
-  lines: SaleReturnDetailResponse["lines"],
-): OperationLineSummaryItem[] {
-  return lines.map((line) => ({
-    amountText: formatCurrency(line.refund_line_total_amount),
-    key: line.id,
-    quantityText: formatQuantity(line.returned_quantity),
-    secondaryText: line.returned_product_name_snapshot,
-    title: line.original_catalog_name_snapshot,
-    trailingNote: getDispositionLabel(line.disposition_code),
-  }));
-}
-
-function buildReturnDocumentMetrics(
-  returnDetail: SaleReturnDetailResponse,
-): OperationDocumentMetric[] {
-  return [
-    {
-      key: "refund-total",
-      label: "Total reembolsado",
-      tone: "financial",
-      value: formatCurrency(returnDetail.total_refund_amount),
-    },
-    {
-      key: "refund-method",
-      label: "Metodo",
-      value: getRefundMethodLabel(returnDetail.refund_method_code),
-    },
-    {
-      key: "line-count",
-      label: "Lineas",
-      value: String(returnDetail.lines.length),
-    },
-  ];
-}
-
-function buildReturnsHistoryRecords(
-  records: ReturnHistoryListItemView[],
-  timeZone: string,
-): OperationHistoryRecord[] {
-  return records.map((record) => ({
-    documentTypeLabel: "Devolucion",
-    folio: record.folio,
-    id: record.id,
-    locationLabel: `${record.branch_name} / ${record.workstation_name}`,
-    metrics: [
-      {
-        key: `${record.id}:refund`,
-        label: "Reembolso",
-        tone: "financial",
-        value: formatCurrency(record.total_refund_amount),
-      },
-      {
-        key: `${record.id}:lines`,
-        label: "Lineas",
-        value: String(record.line_count),
-      },
-    ],
-    primaryTimestampLabel: "Registrada",
-    primaryTimestampValue: formatCompactLocalDateTime(record.created_at_utc, timeZone),
-    statusLabel: getReturnStatusLabel(record.status),
-    statusTone: getReturnStatusTone(record.status),
-    subtitle: `Venta ${record.original_sale_folio} · ${getRefundMethodLabel(record.refund_method_code)}`,
-    title: record.reason_name,
-    userLabel: record.created_by_user_full_name,
-  }));
-}
 
 function getReturnUiStateLabel(uiState: ReturnsUiState): string {
   switch (uiState) {
@@ -406,52 +303,34 @@ function getReturnableRefundAmount(line: ReturnableSaleLineView): string {
   return formatRefundCurrency(refundCents);
 }
 
-function getDispositionSummary(lines: ReturnDraftLine[]): string | null {
-  if (lines.length === 0) {
-    return null;
-  }
-
-  const counts = new Map<string, number>();
-  for (const line of lines) {
-    const label = getDispositionLabel(line.dispositionCode);
-    counts.set(label, (counts.get(label) ?? 0) + 1);
-  }
-
-  return [...counts.entries()]
-    .map(
-      ([label, count]) =>
-        `${count} ${count === 1 ? "linea" : "lineas"} a ${label.toLowerCase()}`,
-    )
-    .join(" | ");
+function applyDefaultReturnDisposition(lines: ReturnDraftLine[]): ReturnDraftLine[] {
+  return lines.map((line) =>
+    line.dispositionCode.trim().length > 0
+      ? line
+      : {
+          ...line,
+          dispositionCode: RETURN_DISPOSITION_RESTOCK_COUNTER,
+        },
+  );
 }
 
-function getReasonLabel(
-  code: string,
-  reasonOptions: ReadonlyArray<{ code: string; label: string }>,
-): string {
-  return reasonOptions.find((reason) => reason.code === code)?.label ?? code;
-}
-
-function isSaleOlderThanThreshold(confirmedAt: string, thresholdDays: number): boolean {
+function isSaleOlderThanThreshold(
+  confirmedAt: string,
+  thresholdDays: number,
+  referenceTimestamp: string | null | undefined,
+): boolean {
   const saleDate = new Date(confirmedAt);
   if (Number.isNaN(saleDate.getTime())) {
     return false;
   }
+  const referenceDate = referenceTimestamp ? new Date(referenceTimestamp) : new Date();
+  if (Number.isNaN(referenceDate.getTime())) {
+    return false;
+  }
 
-  const diffMs = Date.now() - saleDate.getTime();
+  const diffMs = referenceDate.getTime() - saleDate.getTime();
   const diffDays = diffMs / (1000 * 60 * 60 * 24);
   return diffDays >= thresholdDays;
-}
-
-function buildReturnDraftLineSummary(lines: ReturnDraftLine[]): OperationLineSummaryItem[] {
-  return lines.map((line) => ({
-    amountText: formatRefundCurrency(getReturnDraftLineRefundCents(line)),
-    key: line.originalSaleLineId,
-    quantityText: formatQuantityFromMilliUnits(line.quantityMilliUnits),
-    secondaryText: line.exactProductName ?? line.fixedProductName ?? line.productClassName,
-    title: line.lineName,
-    trailingNote: getDispositionLabel(line.dispositionCode),
-  }));
 }
 
 function getReturnUiState({
@@ -492,175 +371,72 @@ function getReturnUiState({
   return blockedMessages.length === 0 ? "READY_TO_CONFIRM" : "DRAFT_IN_PROGRESS";
 }
 
-function getActiveProcessStepKey(
-  centerSection: ReturnsCenterSection,
-  draftLines: ReturnDraftLine[],
-  lastCommittedReturn: SaleReturnDetailResponse | null,
-  uiState: ReturnsUiState,
-): string {
-  if (centerSection === "history") {
-    return "confirm";
-  }
-
-  if (
-    uiState === "CONFIRMING" ||
-    uiState === "READY_TO_CONFIRM" ||
-    lastCommittedReturn
-  ) {
-    return "confirm";
-  }
-
-  if (draftLines.length > 0) {
-    return "refund";
-  }
-
-  return centerSection === "lines" ? "lines" : "sale";
-}
-
-function ReturnSaleCard({
-  isSelected,
-  sale,
-  timeZone,
-}: {
-  isSelected: boolean;
-  sale: ReturnSaleSearchItemView;
-  timeZone: string;
-}) {
-  return (
-    <div className="grid gap-2">
-      <div className="flex items-start justify-between gap-3">
-        <div className="min-w-0">
-          <div className="flex flex-wrap items-center gap-2">
-            <p className="truncate text-sm font-semibold text-slate-950">{sale.folio}</p>
-            {getSaleReturnStatusLabel(sale.return_status) ? (
-              <PosStatusBadge status={getSaleReturnStatusTone(sale.return_status)}>
-                {getSaleReturnStatusLabel(sale.return_status)}
-              </PosStatusBadge>
-            ) : null}
-          </div>
-          <p className="mt-1 text-xs text-slate-500">
-            {formatCompactLocalDateTime(sale.confirmed_at, timeZone)}
-          </p>
-          <p className="mt-1 truncate text-xs font-medium text-slate-700">
-            {sale.operator_full_name}
-          </p>
-        </div>
-
-        <div className="text-right">
-          <p className="text-sm font-semibold text-slate-950">
-            {formatCurrency(sale.total_amount)}
-          </p>
-          <p className="mt-1 text-xs text-slate-500">
-            {sale.has_returnable_quantity ? "Con saldo devolvible" : "Sin saldo devolvible"}
-          </p>
-        </div>
-      </div>
-
-      <div className="flex flex-wrap items-center gap-2 text-[11px] text-slate-500">
-        <span>{sale.item_count} lineas</span>
-        <span aria-hidden="true">|</span>
-        <span>{formatQuantity(sale.total_quantity)} unidades</span>
-        {sale.return_count > 0 ? (
-          <>
-            <span aria-hidden="true">|</span>
-            <span>Devuelto {formatCurrency(sale.returned_amount)}</span>
-          </>
-        ) : null}
-        {isSelected ? (
-          <>
-            <span aria-hidden="true">|</span>
-            <span className="font-semibold text-slate-700">Seleccionada</span>
-          </>
-        ) : null}
-      </div>
-    </div>
-  );
-}
-
 function SelectedSaleReferenceBar({
   saleDetail,
 }: {
   saleDetail: ReturnOriginalSaleDetailResponse;
 }) {
   return (
-    <div className="rounded-xl border border-[var(--pos-shell-border)] bg-white px-4 py-3">
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div className="min-w-0">
-          <div className="flex flex-wrap items-center gap-2">
-            <p className="text-sm font-semibold text-slate-950">{saleDetail.folio}</p>
-            {getSaleReturnStatusLabel(saleDetail.return_status) ? (
-              <PosStatusBadge status={getSaleReturnStatusTone(saleDetail.return_status)}>
-                {getSaleReturnStatusLabel(saleDetail.return_status)}
-              </PosStatusBadge>
-            ) : null}
-          </div>
-          <p className="mt-1 text-sm text-slate-600">
-            {formatLocalDateTime(saleDetail.confirmed_at, saleDetail.branch.timezone)}
-          </p>
-          <p className="mt-1 text-xs text-slate-500">
-            {saleDetail.branch.name} | {saleDetail.workstation.name} | {saleDetail.operator.full_name}
-          </p>
-        </div>
-
-        <div className="flex flex-wrap items-center justify-end gap-x-4 gap-y-1 text-sm text-slate-600">
-          <span>
-            Lineas con saldo{" "}
-            <span className="font-semibold text-slate-950">
-              {getReturnableLineCount(saleDetail)}
-            </span>
-          </span>
-          <span>
-            Disponible{" "}
-            <span className="font-semibold text-slate-950">
-              {getReturnableUnitsText(saleDetail)}
-            </span>
-          </span>
-          <span>
-            Devuelto{" "}
-            <span className="font-semibold text-slate-950">
-              {formatCurrency(saleDetail.returned_amount)}
-            </span>
-          </span>
-          <span className="text-base font-semibold text-slate-950">
-            {formatCurrency(saleDetail.total_amount)}
-          </span>
-        </div>
+    <div className="flex min-w-0 flex-wrap items-center justify-between gap-2 rounded-xl border border-[var(--pos-shell-border)] bg-white px-3 py-2">
+      <div className="flex min-w-0 items-center gap-2">
+        <span className="truncate text-sm font-semibold text-slate-950" title={saleDetail.folio}>
+          {saleDetail.folio}
+        </span>
+        {getSaleReturnStatusLabel(saleDetail.return_status) ? (
+          <PosStatusBadge status={getSaleReturnStatusTone(saleDetail.return_status)}>
+            {getSaleReturnStatusLabel(saleDetail.return_status)}
+          </PosStatusBadge>
+        ) : null}
+      </div>
+      <div className="flex min-w-0 flex-wrap items-center justify-end gap-x-3 gap-y-1 text-xs text-slate-600">
+        <span title={formatLocalDateTime(saleDetail.confirmed_at, saleDetail.branch.timezone)}>
+          {formatCompactLocalDateTime(saleDetail.confirmed_at, saleDetail.branch.timezone)}
+        </span>
+        <span className="truncate" title={saleDetail.operator.full_name}>
+          {saleDetail.operator.full_name}
+        </span>
+        <span>{getReturnableLineCount(saleDetail)} lineas</span>
+        <span>{getReturnableUnitsText(saleDetail)} disp.</span>
+        <span className="font-semibold text-slate-950">{formatCurrency(saleDetail.total_amount)}</span>
       </div>
     </div>
   );
 }
 
 function ReturnableLinesTable({
+  draftLines,
   lines,
+  onDecreaseQuantity,
+  onDraftQuantityChange,
+  onIncreaseQuantity,
+  onRemove,
   onSelect,
   selectedLineId,
 }: {
+  draftLines: ReturnDraftLine[];
   lines: ReturnableSaleLineView[];
+  onDecreaseQuantity: (line: ReturnableSaleLineView) => void;
+  onDraftQuantityChange: (line: ReturnableSaleLineView, value: string) => void;
+  onIncreaseQuantity: (line: ReturnableSaleLineView) => void;
+  onRemove: (originalSaleLineId: string) => void;
   onSelect: (line: ReturnableSaleLineView) => void;
   selectedLineId: string | null;
 }) {
+  const draftByOriginalLineId = useMemo(
+    () => new Map(draftLines.map((line) => [line.originalSaleLineId, line])),
+    [draftLines],
+  );
   const columns = useMemo<PosRecordColumn<ReturnableSaleLineView>[]>(
     () => [
       {
-        header: "#",
-        key: "sequence",
-        renderCell: (line) => <span className="text-slate-600">{line.sequence}</span>,
-        width: "4rem",
-      },
-      {
-        header: "Articulo",
+        header: "Producto",
         key: "article",
         renderCell: (line) => (
-          <div className="min-w-0">
-            <p className="truncate font-semibold text-slate-950">
-              {line.catalog_name_snapshot}
-            </p>
-            <p className="mt-0.5 truncate text-xs text-slate-500">
-              {line.product_name ?? line.product_class_name}
-              {line.requires_exact_product_selection ? " | Requiere producto exacto" : ""}
-            </p>
-          </div>
+          <span className="block truncate font-semibold text-slate-950" title={line.catalog_name_snapshot}>
+            {line.catalog_name_snapshot}
+          </span>
         ),
+        width: "31%",
       },
       {
         align: "right",
@@ -669,7 +445,7 @@ function ReturnableLinesTable({
         renderCell: (line) => (
           <span className="font-medium text-slate-900">{formatQuantity(line.quantity)}</span>
         ),
-        width: "6rem",
+        width: "12%",
       },
       {
         align: "right",
@@ -680,32 +456,94 @@ function ReturnableLinesTable({
             {formatQuantity(line.remaining_returnable_quantity)}
           </span>
         ),
-        width: "7rem",
+        width: "13%",
+      },
+      {
+        align: "center",
+        header: "A devolver",
+        key: "return-quantity",
+        renderCell: (line) => {
+          const draftLine = draftByOriginalLineId.get(line.id);
+          return (
+            <div
+              className="ml-auto grid max-w-[8.5rem] grid-cols-[1.9rem_minmax(0,1fr)_1.9rem] items-center overflow-hidden rounded-lg border border-[var(--pos-shell-border)] bg-white"
+              onClick={(event) => event.stopPropagation()}
+            >
+              <button
+                className="h-8 text-sm font-semibold text-slate-600 hover:bg-[var(--pos-shell-muted)]"
+                disabled={!draftLine}
+                onClick={() => onDecreaseQuantity(line)}
+                type="button"
+              >
+                -
+              </button>
+              <input
+                aria-label={`Cantidad a devolver de ${line.catalog_name_snapshot}`}
+                className="h-8 min-w-0 border-x border-[var(--pos-shell-border)] px-1 text-center text-sm font-semibold text-slate-950 outline-none [font-variant-numeric:tabular-nums]"
+                inputMode="decimal"
+                onChange={(event) => onDraftQuantityChange(line, sanitizeQuantityInput(event.target.value))}
+                onFocus={() => onSelect(line)}
+                value={draftLine?.quantityText ?? ""}
+              />
+              <button
+                className="h-8 text-sm font-semibold text-slate-600 hover:bg-[var(--pos-shell-muted)]"
+                onClick={() => onIncreaseQuantity(line)}
+                type="button"
+              >
+                +
+              </button>
+            </div>
+          );
+        },
+        width: "20%",
       },
       {
         align: "right",
-        header: "Devuelto",
-        key: "returned",
-        renderCell: (line) => (
-          <span className="text-slate-600">
-            {formatQuantity(line.already_returned_quantity)}
-          </span>
-        ),
-        width: "6rem",
-      },
-      {
-        align: "right",
-        header: "Reembolso",
+        header: "Importe",
         key: "refund",
-        renderCell: (line) => (
-          <span className="font-semibold text-slate-950">
-            {getReturnableRefundAmount(line)}
-          </span>
-        ),
-        width: "8rem",
+        renderCell: (line) => {
+          const draftLine = draftByOriginalLineId.get(line.id);
+          return (
+            <span className="font-semibold text-slate-950">
+              {draftLine
+                ? formatRefundCurrency(getReturnDraftLineRefundCents(draftLine))
+                : getReturnableRefundAmount(line)}
+            </span>
+          );
+        },
+        width: "14%",
+      },
+      {
+        align: "right",
+        header: "",
+        key: "remove",
+        renderCell: (line) => {
+          const draftLine = draftByOriginalLineId.get(line.id);
+          return draftLine ? (
+            <button
+              aria-label={`Quitar ${line.catalog_name_snapshot}`}
+              className="ml-auto grid h-8 w-8 place-items-center rounded-full text-[var(--ui-color-danger)] hover:bg-[var(--ui-color-danger-soft)]"
+              onClick={(event) => {
+                event.stopPropagation();
+                onRemove(line.id);
+              }}
+              type="button"
+            >
+              <TrashIcon className="h-4 w-4" />
+            </button>
+          ) : null;
+        },
+        width: "8%",
       },
     ],
-    [],
+    [
+      draftByOriginalLineId,
+      onDecreaseQuantity,
+      onDraftQuantityChange,
+      onIncreaseQuantity,
+      onRemove,
+      onSelect,
+    ],
   );
 
   return (
@@ -732,21 +570,14 @@ function ReturnSummaryPanel({
   exactProductsLoading,
   highRiskMessages,
   isHighRiskAcknowledgementRequired,
-  lastCommittedReturn,
-  lastCommittedReturnRequiresReview,
   onCommit,
-  onDispositionChangeSelectedLine,
+  onDispositionChangeAll,
   onExactProductChangeSelectedLine,
   onHighRiskAcknowledgedChange,
-  onNewReturn,
   onNotesChange,
-  onPrintReceipt,
-  onQuantityChangeSelectedLine,
   onReasonChange,
   onRefundMethodChange,
-  onRemoveSelectedLine,
   onViewHistory,
-  onViewTicket,
   reasonOptions,
   refundMethodOptions,
   saleDetail,
@@ -763,21 +594,14 @@ function ReturnSummaryPanel({
   exactProductsLoading: boolean;
   highRiskMessages: string[];
   isHighRiskAcknowledgementRequired: boolean;
-  lastCommittedReturn: SaleReturnDetailResponse | null;
-  lastCommittedReturnRequiresReview: boolean;
   onCommit: () => void;
-  onDispositionChangeSelectedLine: (value: string) => void;
+  onDispositionChangeAll: (value: string) => void;
   onExactProductChangeSelectedLine: (value: string) => void;
   onHighRiskAcknowledgedChange: (value: boolean) => void;
-  onNewReturn: () => void;
   onNotesChange: (value: string) => void;
-  onPrintReceipt: () => void;
-  onQuantityChangeSelectedLine: (value: string) => void;
   onReasonChange: (value: string) => void;
   onRefundMethodChange: (value: string) => void;
-  onRemoveSelectedLine: () => void;
   onViewHistory: () => void;
-  onViewTicket: () => void;
   reasonOptions: ReadonlyArray<{ code: string; label: string }>;
   refundMethodOptions: ReadonlyArray<{
     availability_note?: string | null;
@@ -790,125 +614,45 @@ function ReturnSummaryPanel({
   selectedLineValidationMessage: string | null;
   uiState: ReturnsUiState;
 }) {
-  const quantityInputRef = useRef<HTMLInputElement | null>(null);
-  const refundTotalText = formatRefundCurrency(
-    getReturnDraftTotalRefundCents(draftState.lines),
-  );
-  const selectedDraftLineKey = selectedDraftLine?.originalSaleLineId ?? null;
+  const [isNotesOpen, setNotesOpen] = useState(draftState.notes.trim().length > 0);
+  const refundTotalText = formatRefundCurrency(getReturnDraftTotalRefundCents(draftState.lines));
+  const currentDispositionCode =
+    draftState.lines.find((line) => line.dispositionCode.trim().length > 0)?.dispositionCode ??
+    RETURN_DISPOSITION_RESTOCK_COUNTER;
   const selectedRefundMethod = refundMethodOptions.find(
     (method) => method.code === draftState.refundMethodCode,
   );
 
   useEffect(() => {
-    if (!selectedDraftLineKey) {
-      return;
+    if (draftState.notes.trim().length > 0) {
+      setNotesOpen(true);
     }
+  }, [draftState.notes]);
 
-    quantityInputRef.current?.focus();
-    quantityInputRef.current?.select();
-  }, [selectedDraftLineKey]);
-
-  if (lastCommittedReturn) {
-    const returnDocumentAvailability = getDocumentActionAvailability("returnReceipt");
-    const sendReceiptByEmailAction = getCustomerCommunicationActionState({
-      channel: "email",
-      intent: "returnReceipt",
-    });
-    const sendReceiptBySmsAction = getCustomerCommunicationActionState({
-      channel: "sms",
-      intent: "returnReceipt",
-    });
-    const resultActions: OperationDocumentAction[] = [
-      {
-        kind: "print",
-        key: "print-return-receipt",
-        label: returnDocumentAvailability.print.label,
-        onSelect: onPrintReceipt,
-        availabilityNote: returnDocumentAvailability.print.unavailableReason,
-      },
-      {
-        key: "view-history",
-        label: "Ver historial",
-        onSelect: onViewHistory,
-        variant: "neutral",
-      },
-      {
-        key: "view-original-ticket",
-        label: "Ver ticket",
-        onSelect: onViewTicket,
-        variant: "neutral",
-      },
-      {
-        availabilityNote: sendReceiptByEmailAction.disabledReason,
-        disabled: sendReceiptByEmailAction.disabled,
-        key: "send-return-receipt-email",
-        label: sendReceiptByEmailAction.label,
-        onSelect: () => undefined,
-        placement: "menu",
-        variant: "ghost",
-      },
-      {
-        availabilityNote: sendReceiptBySmsAction.disabledReason,
-        disabled: sendReceiptBySmsAction.disabled,
-        key: "send-return-receipt-sms",
-        label: sendReceiptBySmsAction.label,
-        onSelect: () => undefined,
-        placement: "menu",
-        variant: "ghost",
-      },
-      {
-        key: "new-return",
-        label: "Nueva devolucion",
-        onSelect: onNewReturn,
-        variant: "neutral",
-      },
-    ];
-    const resultMetrics = buildReturnDocumentMetrics(lastCommittedReturn);
-
-    return (
-      <OperationDocumentResult
-        actions={resultActions}
-        auditSummary={lastCommittedReturn.audit_summary}
-        context={{
-          branchName: lastCommittedReturn.branch.name,
-          userName: lastCommittedReturn.created_by.full_name,
-          workstationName: lastCommittedReturn.workstation.name,
-        }}
-        description={
-          lastCommittedReturnRequiresReview
-            ? "La devolucion se registro y se preparo una revision de backoffice."
-            : "La devolucion quedo registrada y el ticket original ya refleja el nuevo estado."
-        }
-        kind="return"
-        metrics={resultMetrics}
-        referenceValue={lastCommittedReturn.folio}
-        timeZone={lastCommittedReturn.branch.timezone}
-        timestamps={{
-          committedAtValue: formatCompactLocalDateTime(
-            lastCommittedReturn.created_at_utc,
-            lastCommittedReturn.branch.timezone,
-          ),
-        }}
-      />
-    );
-  }
+  const footer = !saleDetail ? (
+    <PosButton onClick={onViewHistory} type="button" variant="neutral">
+      Ver historial
+    </PosButton>
+  ) : (
+    <div className="grid gap-2">
+      <PosButton
+        disabled={blockedMessages.length > 0 || commitPending}
+        leadingIcon={<MoneyIcon className="h-4 w-4" />}
+        onClick={onCommit}
+        type="button"
+      >
+        {commitPending ? "Registrando..." : "Confirmar devolucion"}
+      </PosButton>
+      <PosButton onClick={onViewHistory} type="button" variant="neutral">
+        Ver historial
+      </PosButton>
+    </div>
+  );
 
   return (
     <PosSummaryPanel
-      description={
-        saleDetail
-          ? "Captura la devolucion con el menor numero de pasos posible."
-          : "Selecciona una venta para comenzar."
-      }
-      footer={
-        <PosButton
-          disabled={blockedMessages.length > 0 || commitPending}
-          leadingIcon={<MoneyIcon className="h-4 w-4" />}
-          onClick={onCommit}
-        >
-          {commitPending ? "Registrando devolucion..." : "Confirmar devolucion"}
-        </PosButton>
-      }
+      description={saleDetail ? "Motivo, reembolso y confirmacion." : "Selecciona una venta para comenzar."}
+      footer={footer}
       stateLabel={getReturnUiStateLabel(uiState)}
       stateTone={
         uiState === "RETURN_CONFIRMED"
@@ -921,172 +665,93 @@ function ReturnSummaryPanel({
       }
       title="Devolucion"
     >
-      <div className="grid h-full min-h-0 gap-3 overflow-y-auto">
-        {commitError ? (
-          <PosInlineValidationMessage tone="error">{commitError}</PosInlineValidationMessage>
-        ) : null}
+      <div className="grid h-full min-h-0 gap-3 overflow-hidden">
+        {commitError ? <PosInlineValidationMessage tone="error">{commitError}</PosInlineValidationMessage> : null}
 
         {!saleDetail ? (
-          <PosEmptyState
-            description="Selecciona una venta original para preparar la devolucion."
-            title="Sin venta seleccionada"
-          />
+          <div className="rounded-xl border border-dashed border-[var(--pos-shell-border)] bg-[var(--pos-shell-muted)] px-3 py-4 text-sm text-slate-600">
+            Selecciona una venta para comenzar.
+          </div>
         ) : (
           <>
-            <div className="grid gap-2 rounded-xl border border-[var(--pos-shell-border)] bg-[var(--pos-shell-muted)] px-3 py-3">
-              <p className="pos-label-text">Venta original</p>
-              <p className="truncate text-sm font-semibold text-slate-950">{saleDetail.folio}</p>
-              <div className="grid gap-1 text-sm text-slate-600">
-                <div className="flex items-center justify-between gap-3">
-                  <span>Fecha</span>
-                  <span className="text-right font-medium text-slate-950">
-                    {formatLocalDateTime(saleDetail.confirmed_at, saleDetail.branch.timezone)}
-                  </span>
-                </div>
-                <div className="flex items-center justify-between gap-3">
-                  <span>Saldo devolvible</span>
-                  <span className="text-right font-semibold text-slate-950">
-                    {getReturnableUnitsText(saleDetail)}
-                  </span>
-                </div>
-                <div className="flex items-center justify-between gap-3">
-                  <span>Reembolso estimado</span>
-                  <span className="text-right font-semibold text-slate-950">{refundTotalText}</span>
-                </div>
-              </div>
+            <div className="grid gap-1 rounded-xl border border-[var(--pos-shell-border)] bg-[var(--pos-shell-muted)] px-3 py-2.5">
+              <KeyValueRow label="Ticket" title={saleDetail.folio} value={saleDetail.folio} />
+              <KeyValueRow label="Lineas" value={String(draftState.lines.length)} />
+              <KeyValueRow label="Monto a devolver" value={refundTotalText} />
             </div>
 
-            {selectedDraftLine ? (
-              <div className="grid gap-3 rounded-xl border border-[var(--pos-shell-border)] bg-white px-3 py-3">
-                <div className="grid gap-1">
-                  <p className="pos-label-text">Linea seleccionada</p>
-                  <p className="truncate text-sm font-semibold text-slate-950">
-                    {selectedDraftLine.lineName}
-                  </p>
-                  <p className="truncate text-xs text-slate-500">
-                    {selectedDraftLine.exactProductName ??
-                      selectedDraftLine.fixedProductName ??
-                      selectedDraftLine.productClassName}
-                  </p>
-                </div>
+            {selectedDraftLine?.exactProductRequired ? (
+              <div className="grid gap-2 rounded-xl border border-[var(--pos-shell-border)] bg-white px-3 py-2.5">
+                <p className="truncate text-sm font-semibold text-slate-950" title={selectedDraftLine.lineName}>
+                  {selectedDraftLine.lineName}
+                </p>
+                {selectedDraftLine.exactProductRequired ? (
+                  <select
+                    className={`${posInputClass} h-9 px-2 text-sm`}
+                    disabled={exactProductsLoading}
+                    onChange={(event) => onExactProductChangeSelectedLine(event.target.value)}
+                    value={selectedDraftLine.exactProductId}
+                  >
+                    <option value="">
+                      {exactProductsLoading ? "Cargando productos..." : "Producto exacto"}
+                    </option>
+                    {exactProductOptions.map((product) => (
+                      <option key={product.id} value={product.id}>
+                        {product.name}
+                      </option>
+                    ))}
+                  </select>
+                ) : null}
+                {selectedLineValidationMessage ? (
+                  <PosInlineValidationMessage tone="warning">{selectedLineValidationMessage}</PosInlineValidationMessage>
+                ) : null}
+                {exactProductsError ? (
+                  <PosInlineValidationMessage tone="error">{exactProductsError}</PosInlineValidationMessage>
+                ) : null}
+              </div>
+            ) : null}
 
-                <PosFieldLabel helper="Captura con teclado numerico." required>
-                  Cantidad a devolver
-                </PosFieldLabel>
-                <input
-                  className={posInputClass}
-                  inputMode="decimal"
-                  onChange={(event) =>
-                    onQuantityChangeSelectedLine(sanitizeQuantityInput(event.target.value))
-                  }
-                  ref={quantityInputRef}
-                  value={selectedDraftLine.quantityText}
-                />
-
-                <PosFieldLabel helper={getDispositionHint(selectedDraftLine.dispositionCode)} required>
-                  Destino fisico
-                </PosFieldLabel>
+            <div className="grid gap-2 rounded-xl border border-[var(--pos-shell-border)] bg-white px-3 py-2.5">
+              {draftState.lines.length > 0 ? (
                 <select
-                  className={posInputClass}
-                  onChange={(event) => onDispositionChangeSelectedLine(event.target.value)}
-                  value={selectedDraftLine.dispositionCode}
+                  aria-label="Destino fisico"
+                  className={`${posInputClass} h-9 px-2 text-sm`}
+                  onChange={(event) => onDispositionChangeAll(event.target.value)}
+                  value={currentDispositionCode}
                 >
-                  <option value="">Selecciona destino</option>
                   {RETURN_DISPOSITION_OPTIONS.map((option) => (
                     <option key={option.value} value={option.value}>
                       {option.label}
                     </option>
                   ))}
                 </select>
-
-                {selectedDraftLine.exactProductRequired ? (
-                  <>
-                    <PosFieldLabel helper="Confirma el producto exacto para esta linea." required>
-                      Producto exacto
-                    </PosFieldLabel>
-                    <select
-                      className={posInputClass}
-                      disabled={exactProductsLoading}
-                      onChange={(event) => onExactProductChangeSelectedLine(event.target.value)}
-                      value={selectedDraftLine.exactProductId}
-                    >
-                      <option value="">
-                        {exactProductsLoading ? "Cargando productos..." : "Selecciona un producto"}
-                      </option>
-                      {exactProductOptions.map((product) => (
-                        <option key={product.id} value={product.id}>
-                          {product.name}
-                        </option>
-                      ))}
-                    </select>
-                  </>
-                ) : null}
-
-                <div className="flex items-center justify-end">
-                  <PosButton
-                    leadingIcon={<TrashIcon className="h-4 w-4" />}
-                    onClick={onRemoveSelectedLine}
-                    variant="neutral"
-                  >
-                    Quitar linea
-                  </PosButton>
-                </div>
-              </div>
-            ) : (
-              <PosEmptyState
-                description="Selecciona una linea de la tabla central para capturar la devolucion."
-                title="Sin linea seleccionada"
-              />
-            )}
-
-            <div className="grid gap-2 rounded-xl border border-[var(--pos-shell-border)] bg-white px-3 py-3">
-              <PosFieldLabel required>Motivo</PosFieldLabel>
+              ) : null}
               <select
-                className={posInputClass}
+                aria-label="Motivo de devolucion"
+                className={`${posInputClass} h-9 px-2 text-sm`}
                 onChange={(event) => onReasonChange(event.target.value)}
                 value={draftState.reasonCode}
               >
-                <option value="">Selecciona motivo</option>
+                <option value="">Motivo</option>
                 {reasonOptions.map((reason) => (
                   <option key={reason.code} value={reason.code}>
                     {reason.label}
                   </option>
                 ))}
               </select>
-            </div>
-
-            <div className="grid gap-2 rounded-xl border border-[var(--pos-shell-border)] bg-white px-3 py-3">
-              <p className="pos-label-text">Metodo de reembolso</p>
-              <div className="grid gap-2">
-                {refundMethodOptions.map((method) => {
-                  const isSelected = draftState.refundMethodCode === method.code;
-                  return (
-                    <button
-                      aria-pressed={isSelected}
-                      className={[
-                        "rounded-lg border px-3 py-2 text-left transition",
-                        method.is_enabled
-                          ? isSelected
-                            ? "border-[var(--pos-primary)] bg-[var(--pos-primary-soft)]"
-                            : "border-[var(--pos-shell-border)] bg-white hover:border-[var(--pos-primary)]"
-                          : "cursor-not-allowed border-[var(--pos-shell-border)] bg-[var(--pos-shell-muted)] text-slate-400",
-                      ].join(" ")}
-                      disabled={!method.is_enabled}
-                      key={method.code}
-                      onClick={() => onRefundMethodChange(method.code)}
-                      type="button"
-                    >
-                      <div className="flex items-center justify-between gap-3">
-                        <span className="font-medium">{method.label}</span>
-                        {isSelected ? <PosStatusBadge status="ready">Seleccionado</PosStatusBadge> : null}
-                      </div>
-                      {method.availability_note ? (
-                        <p className="mt-1 text-xs text-slate-500">{method.availability_note}</p>
-                      ) : null}
-                    </button>
-                  );
-                })}
-              </div>
+              <select
+                aria-label="Metodo de reembolso"
+                className={`${posInputClass} h-9 px-2 text-sm`}
+                onChange={(event) => onRefundMethodChange(event.target.value)}
+                value={draftState.refundMethodCode}
+              >
+                <option value="">Metodo de reembolso</option>
+                {refundMethodOptions.map((method) => (
+                  <option disabled={!method.is_enabled} key={method.code} value={method.code}>
+                    {method.label}
+                  </option>
+                ))}
+              </select>
               {selectedRefundMethod?.availability_note ? (
                 <PosInlineValidationMessage tone="warning">
                   {selectedRefundMethod.availability_note}
@@ -1094,64 +759,45 @@ function ReturnSummaryPanel({
               ) : null}
             </div>
 
-            <div className="grid gap-2 rounded-xl border border-[var(--pos-shell-border)] bg-white px-3 py-3">
-              <PosFieldLabel helper="Describe el contexto de la devolucion.">
-                Notas
-              </PosFieldLabel>
-              <textarea
-                className={`${posInputClass} min-h-[5.5rem] resize-y px-3 py-2`}
-                onChange={(event) => onNotesChange(event.target.value)}
-                placeholder="Agrega una nota operativa si aplica."
-                value={draftState.notes}
-              />
+            <div className="rounded-xl border border-[var(--pos-shell-border)] bg-white">
+              <button
+                className="flex w-full items-center justify-between gap-2 px-3 py-2 text-left text-sm font-semibold text-slate-950"
+                onClick={() => setNotesOpen((current) => !current)}
+                type="button"
+              >
+                <span>{draftState.notes.trim().length > 0 ? "Observacion" : "Agregar observacion"}</span>
+                <span className="text-xs text-slate-500">{isNotesOpen ? "Ocultar" : "Abrir"}</span>
+              </button>
+              {isNotesOpen ? (
+                <div className="border-t border-[var(--pos-shell-border)] p-3 pt-2">
+                  <textarea
+                    className={`${posInputClass} min-h-[4.5rem] resize-y px-3 py-2 text-sm`}
+                    onChange={(event) => onNotesChange(event.target.value)}
+                    placeholder="Observacion opcional"
+                    value={draftState.notes}
+                  />
+                </div>
+              ) : null}
             </div>
 
             {isHighRiskAcknowledgementRequired ? (
-              <div className="grid gap-2 rounded-xl border border-[rgba(187,122,22,0.18)] bg-[var(--ui-color-warning-soft)] px-3 py-3">
-                <p className="pos-label-text">Validacion adicional</p>
-                <div className="grid gap-1.5">
-                  {highRiskMessages.map((message) => (
-                    <PosInlineValidationMessage key={message} tone="warning">
-                      {message}
-                    </PosInlineValidationMessage>
-                  ))}
-                </div>
+              <div className="grid gap-2 rounded-xl border border-[rgba(187,122,22,0.18)] bg-[var(--ui-color-warning-soft)] px-3 py-2.5">
+                {highRiskMessages.map((message) => (
+                  <PosInlineValidationMessage key={message} tone="warning">
+                    {message}
+                  </PosInlineValidationMessage>
+                ))}
                 <label className="flex items-start gap-2 text-sm text-slate-700">
                   <input
                     checked={draftState.highRiskAcknowledged}
                     onChange={(event) => onHighRiskAcknowledgedChange(event.target.checked)}
                     type="checkbox"
                   />
-                  <span>Confirmo que la devolucion fue validada y puede pasar a revision de backoffice.</span>
+                  <span>Confirmo que la devolucion fue validada.</span>
                 </label>
               </div>
             ) : null}
 
-            <div className="grid gap-2 rounded-xl border border-[var(--pos-shell-border)] bg-[var(--pos-shell-muted)] px-3 py-3">
-              <div className="flex items-center justify-between gap-3 text-sm">
-                <span className="font-medium text-slate-600">Lineas</span>
-                <span className="font-semibold text-slate-950">{getReturnLineCount(draftState.lines)}</span>
-              </div>
-              <div className="flex items-center justify-between gap-3 text-sm">
-                <span className="font-medium text-slate-600">Unidades</span>
-                <span className="font-semibold text-slate-950">
-                  {formatQuantityFromMilliUnits(getReturnTotalUnitsMilli(draftState.lines))}
-                </span>
-              </div>
-              <div className="flex items-center justify-between gap-3 text-sm">
-                <span className="font-medium text-slate-600">Total</span>
-                <span className="font-semibold text-slate-950">{refundTotalText}</span>
-              </div>
-            </div>
-
-            {selectedLineValidationMessage ? (
-              <PosInlineValidationMessage tone="warning">
-                {selectedLineValidationMessage}
-              </PosInlineValidationMessage>
-            ) : null}
-            {exactProductsError ? (
-              <PosInlineValidationMessage tone="error">{exactProductsError}</PosInlineValidationMessage>
-            ) : null}
             {blockedMessages.map((message) => (
               <PosInlineValidationMessage key={message} tone="warning">
                 {message}
@@ -1159,6 +805,107 @@ function ReturnSummaryPanel({
             ))}
           </>
         )}
+      </div>
+    </PosSummaryPanel>
+  );
+}
+
+function ReturnHistoryDetailPanel({
+  onNewReturn,
+  onPrintReceipt,
+  onViewTicket,
+  returnDetail,
+  selectedHistoryRecord,
+}: {
+  onNewReturn: () => void;
+  onPrintReceipt: () => void;
+  onViewTicket: () => void;
+  returnDetail: SaleReturnDetailResponse | null;
+  selectedHistoryRecord: ReturnHistoryListItemView | null;
+}) {
+  if (!returnDetail) {
+    return (
+      <PosSummaryPanel
+        description="Selecciona una devolucion para ver su detalle."
+        footer={
+          <PosButton onClick={onNewReturn} type="button" variant="neutral">
+            Nueva devolucion
+          </PosButton>
+        }
+        stateLabel="Historial"
+        stateTone="draft"
+        title="Detalle de devolucion"
+      >
+        <div className="rounded-xl border border-dashed border-[var(--pos-shell-border)] bg-[var(--pos-shell-muted)] px-3 py-4 text-sm text-slate-600">
+          Selecciona una devolucion del historial.
+        </div>
+      </PosSummaryPanel>
+    );
+  }
+
+  return (
+    <PosSummaryPanel
+      description={`Ticket original ${returnDetail.original_sale_folio}`}
+      footer={
+        <div className="grid gap-2">
+          <PosButton onClick={onPrintReceipt} type="button">
+            Reimprimir comprobante
+          </PosButton>
+          <div className="grid grid-cols-2 gap-2">
+            <PosButton onClick={onViewTicket} type="button" variant="neutral">
+              Ver ticket
+            </PosButton>
+            <PosButton onClick={onNewReturn} type="button" variant="neutral">
+              Nueva devolucion
+            </PosButton>
+          </div>
+        </div>
+      }
+      stateLabel={getReturnStatusLabel(selectedHistoryRecord?.status ?? "COMMITTED")}
+      stateTone={getReturnStatusTone(selectedHistoryRecord?.status ?? "COMMITTED")}
+      title="Detalle de devolucion"
+    >
+      <div className="grid h-full min-h-0 gap-3 overflow-hidden">
+        <div className="grid gap-1 rounded-xl border border-[var(--pos-shell-border)] bg-[var(--pos-shell-muted)] px-3 py-2.5">
+          <KeyValueRow label="Folio" title={returnDetail.folio} value={returnDetail.folio} />
+          <KeyValueRow
+            label="Fecha"
+            value={formatCompactLocalDateTime(
+              returnDetail.created_at_utc,
+              returnDetail.branch.timezone,
+            )}
+          />
+          <KeyValueRow label="Cajero" title={returnDetail.created_by.full_name} value={returnDetail.created_by.full_name} />
+          <KeyValueRow label="Monto" value={formatCurrency(returnDetail.total_refund_amount)} />
+          <KeyValueRow label="Metodo" value={getRefundMethodLabel(returnDetail.refund_method_code)} />
+          <KeyValueRow label="Motivo" title={returnDetail.reason_name} value={returnDetail.reason_name} />
+        </div>
+
+        <div className="min-h-0 overflow-hidden rounded-xl border border-[var(--pos-shell-border)] bg-white">
+          <div className="grid grid-cols-[minmax(0,1fr)_4.25rem_5rem] gap-2 border-b border-[var(--pos-shell-border)] bg-[var(--pos-shell-muted)] px-3 py-2 text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-500">
+            <span>Producto</span>
+            <span className="text-right">Cant.</span>
+            <span className="text-right">Importe</span>
+          </div>
+          <ScrollPane className="max-h-[18rem] divide-y divide-[var(--pos-shell-border)]">
+            {returnDetail.lines.map((line) => (
+              <div
+                className="grid grid-cols-[minmax(0,1fr)_4.25rem_5rem] items-center gap-2 px-3 py-2"
+                key={line.id}
+              >
+                <span className="truncate text-sm font-semibold text-slate-950" title={line.original_catalog_name_snapshot}>
+                  {line.original_catalog_name_snapshot}
+                </span>
+                <span className="text-right text-sm font-semibold text-slate-700 [font-variant-numeric:tabular-nums]">
+                  {formatQuantity(line.returned_quantity)}
+                </span>
+                <span className="text-right text-sm font-semibold text-slate-950 [font-variant-numeric:tabular-nums]">
+                  {formatCurrency(line.refund_line_total_amount)}
+                </span>
+              </div>
+            ))}
+          </ScrollPane>
+        </div>
       </div>
     </PosSummaryPanel>
   );
@@ -1190,10 +937,7 @@ export function ReturnsScreen() {
   const [lastCommittedReturn, setLastCommittedReturn] = useState<SaleReturnDetailResponse | null>(
     null,
   );
-  const [lastCommittedReturnRequiresReview, setLastCommittedReturnRequiresReview] =
-    useState(false);
   const [commitError, setCommitError] = useState<string | null>(null);
-  const [isConfirmDialogOpen, setConfirmDialogOpen] = useState(false);
   const routeSaleId = useRouterState({
     select: (state) => {
       const rawSaleId = (state.location.search as Record<string, unknown> | undefined)?.saleId;
@@ -1265,8 +1009,6 @@ export function ReturnsScreen() {
     setSelectedDraftLineId(null);
     setCommitError(null);
     setLastCommittedReturn(null);
-    setLastCommittedReturnRequiresReview(false);
-    setConfirmDialogOpen(false);
   }, [selectedSaleId]);
 
   useEffect(() => {
@@ -1316,7 +1058,6 @@ export function ReturnsScreen() {
     setDraftState((current) => updater(current));
     setCommitError(null);
     setLastCommittedReturn(null);
-    setLastCommittedReturnRequiresReview(false);
   };
 
   const classIdsNeedingExactProduct = useMemo(() => {
@@ -1393,6 +1134,27 @@ export function ReturnsScreen() {
     returnsBootstrapQuery.data?.refund_methods.length
       ? returnsBootstrapQuery.data.refund_methods
       : RETURN_REFUND_METHODS_FALLBACK;
+
+  useEffect(() => {
+    if (!selectedSale || draftState.refundMethodCode.trim().length > 0) {
+      return;
+    }
+
+    const defaultRefundMethod = refundMethodOptions.find((method) => method.is_enabled)?.code;
+    if (!defaultRefundMethod) {
+      return;
+    }
+
+    setDraftState((current) =>
+      current.refundMethodCode.trim().length > 0
+        ? current
+        : {
+            ...current,
+            refundMethodCode: defaultRefundMethod,
+          },
+    );
+  }, [draftState.refundMethodCode, refundMethodOptions, selectedSale]);
+
   const historyScopeOptions =
     returnsHistoryQuery.data?.available_scopes.length
       ? returnsHistoryQuery.data.available_scopes
@@ -1408,10 +1170,7 @@ export function ReturnsScreen() {
         }));
   const sales = returnSalesQuery.data?.sales ?? [];
   const branchTimeZone = returnsBootstrapQuery.data?.branch.timezone ?? "America/Hermosillo";
-  const historyRecords = buildReturnsHistoryRecords(
-    returnsHistoryQuery.data?.records ?? [],
-    branchTimeZone,
-  );
+  const historyRecords = returnsHistoryQuery.data?.records ?? [];
   const returnableLines =
     selectedSale?.lines.filter((line) => Number(line.remaining_returnable_quantity) > 0) ?? [];
   const refundTotalCents = getReturnDraftTotalRefundCents(draftState.lines);
@@ -1427,7 +1186,11 @@ export function ReturnsScreen() {
   const isOldSaleReturn =
     selectedSale !== null &&
     oldSaleDaysThreshold > 0 &&
-    isSaleOlderThanThreshold(selectedSale.confirmed_at, oldSaleDaysThreshold);
+    isSaleOlderThanThreshold(
+      selectedSale.confirmed_at,
+      oldSaleDaysThreshold,
+      returnsBootstrapQuery.data?.local_timestamp,
+    );
   const highRiskMessages = [
     isHighAmountReturn
       ? `El reembolso supera ${formatCurrency(
@@ -1467,12 +1230,6 @@ export function ReturnsScreen() {
     hasSelectedSale: selectedSale !== null,
     lastCommittedReturn,
   });
-  const processStepKey = getActiveProcessStepKey(
-    centerSection,
-    draftState.lines,
-    lastCommittedReturn,
-    uiState,
-  );
   const selectedLineValidationMessage = selectedDraftLine
     ? getDraftLineErrorMessage(selectedDraftLine)
     : null;
@@ -1481,7 +1238,7 @@ export function ReturnsScreen() {
     try {
       updateDraftState((current) => ({
         ...current,
-        lines: addReturnDraftLine(current.lines, line),
+        lines: applyDefaultReturnDisposition(addReturnDraftLine(current.lines, line)),
       }));
       setSelectedDraftLineId(line.id);
       setCenterSection("lines");
@@ -1490,6 +1247,49 @@ export function ReturnsScreen() {
         toOperationalErrorMessage(error, "No fue posible preparar la linea para devolucion."),
       );
     }
+  };
+
+  const handleReturnableLineQuantityChange = (
+    line: ReturnableSaleLineView,
+    value: string,
+  ) => {
+    try {
+      updateDraftState((current) => {
+        const nextLines = applyDefaultReturnDisposition(addReturnDraftLine(current.lines, line));
+        return {
+          ...current,
+          lines: setReturnDraftLineQuantityText(nextLines, line.id, value),
+        };
+      });
+      setSelectedDraftLineId(line.id);
+      setCenterSection("lines");
+    } catch (error) {
+      setCommitError(
+        toOperationalErrorMessage(error, "No fue posible ajustar la cantidad de devolucion."),
+      );
+    }
+  };
+
+  const handleIncrementReturnableLineQuantity = (line: ReturnableSaleLineView) => {
+    updateDraftState((current) => ({
+      ...current,
+      lines: incrementReturnDraftLineQuantity(
+        applyDefaultReturnDisposition(addReturnDraftLine(current.lines, line)),
+        line.id,
+      ),
+    }));
+    setSelectedDraftLineId(line.id);
+  };
+
+  const handleDecrementReturnableLineQuantity = (line: ReturnableSaleLineView) => {
+    updateDraftState((current) => ({
+      ...current,
+      lines: decrementReturnDraftLineQuantity(
+        applyDefaultReturnDisposition(addReturnDraftLine(current.lines, line)),
+        line.id,
+      ),
+    }));
+    setSelectedDraftLineId(line.id);
   };
 
   const handleRemoveSelectedDraftLine = (originalSaleLineId: string) => {
@@ -1528,13 +1328,12 @@ export function ReturnsScreen() {
     onSuccess: async (result) => {
       const requiresReview = isHighRiskAcknowledgementRequired;
       setLastCommittedReturn(result);
-      setLastCommittedReturnRequiresReview(requiresReview);
       setSelectedHistoryReturnId(result.id);
       setDraftState(createInitialReturnDraftState());
       setSelectedDraftLineId(null);
       setCommitError(null);
-      setConfirmDialogOpen(false);
-      setCenterSection("lines");
+      setSelectedSaleId(null);
+      setCenterSection("history");
       showSuccess(
         requiresReview
           ? `Devolucion registrada. Folio ${result.folio}. Se preparo revision de backoffice.`
@@ -1568,7 +1367,6 @@ export function ReturnsScreen() {
         "No fue posible registrar la devolucion.",
       );
       setCommitError(message);
-      setConfirmDialogOpen(false);
       showError(message);
     },
   });
@@ -1584,21 +1382,16 @@ export function ReturnsScreen() {
       exactProductsLoading={selectedDraftLineExactProductsLoading}
       highRiskMessages={highRiskMessages}
       isHighRiskAcknowledgementRequired={isHighRiskAcknowledgementRequired}
-      lastCommittedReturn={lastCommittedReturn}
-      lastCommittedReturnRequiresReview={lastCommittedReturnRequiresReview}
-      onCommit={() => setConfirmDialogOpen(true)}
-      onDispositionChangeSelectedLine={(value) => {
-        if (!selectedDraftLine) {
-          return;
-        }
-
+      onCommit={() => {
+        void commitMutation.mutateAsync();
+      }}
+      onDispositionChangeAll={(value) => {
         updateDraftState((current) => ({
           ...current,
-          lines: setReturnDraftLineDisposition(
-            current.lines,
-            selectedDraftLine.originalSaleLineId,
-            value,
-          ),
+          lines: current.lines.map((line) => ({
+            ...line,
+            dispositionCode: value,
+          })),
         }));
       }}
       onExactProductChangeSelectedLine={(productId) => {
@@ -1624,50 +1417,10 @@ export function ReturnsScreen() {
           highRiskAcknowledged: value,
         }));
       }}
-      onNewReturn={() => {
-        setSelectedSaleId(null);
-        setSearchText("");
-        setDateFrom("");
-        setDateTo("");
-        setDraftState(createInitialReturnDraftState());
-        setLastCommittedReturn(null);
-        setLastCommittedReturnRequiresReview(false);
-        setSelectedHistoryReturnId(null);
-        setSelectedDraftLineId(null);
-        setCenterSection("sales");
-        void navigate({ search: {} as never, to: "/devoluciones" });
-      }}
       onNotesChange={(value) => {
         updateDraftState((current) => ({
           ...current,
           notes: value,
-        }));
-      }}
-      onPrintReceipt={() => {
-        if (!lastCommittedReturn) {
-          return;
-        }
-
-        const printWindow = openBrowserPrintWindow();
-        if (!printWindow) {
-          showError("No se pudo abrir la ventana de impresion.");
-          return;
-        }
-
-        writeReturnReceiptToPrintWindow(printWindow, lastCommittedReturn);
-      }}
-      onQuantityChangeSelectedLine={(value) => {
-        if (!selectedDraftLine) {
-          return;
-        }
-
-        updateDraftState((current) => ({
-          ...current,
-          lines: setReturnDraftLineQuantityText(
-            current.lines,
-            selectedDraftLine.originalSaleLineId,
-            value,
-          ),
         }));
       }}
       onReasonChange={(value) => {
@@ -1682,29 +1435,11 @@ export function ReturnsScreen() {
           refundMethodCode: value,
         }));
       }}
-      onRemoveSelectedLine={() => {
-        if (!selectedDraftLine) {
-          return;
-        }
-
-        handleRemoveSelectedDraftLine(selectedDraftLine.originalSaleLineId);
-      }}
       onViewHistory={() => {
         setCenterSection("history");
         if (lastCommittedReturn) {
           setSelectedHistoryReturnId(lastCommittedReturn.id);
         }
-      }}
-      onViewTicket={() => {
-        const ticketId = lastCommittedReturn?.original_sale_id ?? selectedSaleId;
-        if (!ticketId) {
-          return;
-        }
-
-        void navigate({
-          search: { ticketId } as never,
-          to: "/tickets",
-        });
       }}
       reasonOptions={reasonOptions}
       refundMethodOptions={refundMethodOptions}
@@ -1721,105 +1456,55 @@ export function ReturnsScreen() {
       })}
     />
   );
-
   const selectedHistoryRecord =
     returnsHistoryQuery.data?.records.find((record) => record.id === selectedHistoryReturnId) ?? null;
-  const historySendReceiptByEmailAction = getCustomerCommunicationActionState({
-    channel: "email",
-    intent: "returnReceipt",
-  });
-  const historySendReceiptBySmsAction = getCustomerCommunicationActionState({
-    channel: "sms",
-    intent: "returnReceipt",
-  });
+
+  const handleNewReturn = () => {
+    setSelectedSaleId(null);
+    setSearchText("");
+    setDateFrom("");
+    setDateTo("");
+    setDraftState(createInitialReturnDraftState());
+    setLastCommittedReturn(null);
+    setSelectedHistoryReturnId(null);
+    setSelectedDraftLineId(null);
+    setCenterSection("sales");
+    void navigate({ search: {} as never, to: "/devoluciones" });
+  };
 
   const summaryPanel =
     centerSection === "history" ? (
-      selectedHistoryReturn ? (
-        <OperationDocumentSummaryPanel
-          actions={[
-            {
-              kind: "print",
-              key: "print-history-return",
-              label: getDocumentActionAvailability("returnReceipt").print.label,
-              onSelect: () => {
-                const printWindow = openBrowserPrintWindow();
-                if (!printWindow) {
-                  showError("No se pudo abrir la ventana de impresion.");
-                  return;
-                }
+      <ReturnHistoryDetailPanel
+        onNewReturn={handleNewReturn}
+        onPrintReceipt={() => {
+          if (!selectedHistoryReturn) {
+            return;
+          }
 
-                writeReturnReceiptToPrintWindow(printWindow, selectedHistoryReturn);
-              },
-              availabilityNote: getDocumentActionAvailability("returnReceipt").print.unavailableReason,
-            },
-            {
-              key: "view-history-ticket",
-              label: "Ver ticket",
-              onSelect: () => {
-                void navigate({
-                  search: { ticketId: selectedHistoryReturn.original_sale_id } as never,
-                  to: "/tickets",
-                });
-              },
-              variant: "neutral",
-            },
-            {
-              availabilityNote: historySendReceiptByEmailAction.disabledReason,
-              disabled: historySendReceiptByEmailAction.disabled,
-              key: "history-send-return-email",
-              label: historySendReceiptByEmailAction.label,
-              onSelect: () => undefined,
-              placement: "menu",
-              variant: "ghost",
-            },
-            {
-              availabilityNote: historySendReceiptBySmsAction.disabledReason,
-              disabled: historySendReceiptBySmsAction.disabled,
-              key: "history-send-return-sms",
-              label: historySendReceiptBySmsAction.label,
-              onSelect: () => undefined,
-              placement: "menu",
-              variant: "ghost",
-            },
-          ]}
-          auditSummary={selectedHistoryReturn.audit_summary}
-          blockers={[]}
-          context={{
-            branchName: selectedHistoryReturn.branch.name,
-            userName: selectedHistoryReturn.created_by.full_name,
-            workstationName: selectedHistoryReturn.workstation.name,
-          }}
-          description={`Venta original ${selectedHistoryReturn.original_sale_folio}`}
-          kind="return"
-          lines={buildCommittedReturnLineSummaryItems(selectedHistoryReturn.lines)}
-          metrics={buildReturnDocumentMetrics(selectedHistoryReturn)}
-          referenceValue={selectedHistoryReturn.folio}
-          stateLabel={getReturnStatusLabel(selectedHistoryRecord?.status ?? "COMMITTED")}
-          stateTone={getReturnStatusTone(selectedHistoryRecord?.status ?? "COMMITTED")}
-          timeZone={selectedHistoryReturn.branch.timezone}
-          timestamps={{
-            committedAtValue: formatCompactLocalDateTime(
-              selectedHistoryReturn.created_at_utc,
-              selectedHistoryReturn.branch.timezone,
-            ),
-            createdAtValue: formatCompactLocalDateTime(
-              selectedHistoryReturn.created_at_utc,
-              selectedHistoryReturn.branch.timezone,
-            ),
-          }}
-          title="Detalle de la devolucion"
-        />
-      ) : (
-        <PosEmptyState
-          description="Selecciona una devolucion registrada para revisar su auditoria y sus lineas."
-          title="Sin devolucion seleccionada"
-        />
-      )
+          const printWindow = openBrowserPrintWindow();
+          if (!printWindow) {
+            showError("No se pudo abrir la ventana de impresion.");
+            return;
+          }
+
+          writeReturnReceiptToPrintWindow(printWindow, selectedHistoryReturn);
+        }}
+        onViewTicket={() => {
+          if (!selectedHistoryReturn) {
+            return;
+          }
+
+          void navigate({
+            search: { ticketId: selectedHistoryReturn.original_sale_id } as never,
+            to: "/tickets",
+          });
+        }}
+        returnDetail={selectedHistoryReturn}
+        selectedHistoryRecord={selectedHistoryRecord}
+      />
     ) : (
       draftSummaryPanel
-    );
-  useAppShellRightPanel(summaryPanel);
+    );  useAppShellRightPanel(summaryPanel);
 
   const isBootstrapPending =
     returnsBootstrapQuery.isPending || currentCashSessionQuery.isPending;
@@ -1872,19 +1557,84 @@ export function ReturnsScreen() {
     );
   }
 
+  const salesColumns: PosRecordColumn<ReturnSaleSearchItemView>[] = [
+    {
+      header: "Ticket",
+      key: "folio",
+      renderCell: (sale) => <span className="font-semibold text-slate-950">{sale.folio}</span>,
+      width: "17%",
+    },
+    {
+      header: "Fecha/hora",
+      key: "date",
+      renderCell: (sale) =>
+        formatCompactLocalDateTime(sale.confirmed_at, returnsBootstrapQuery.data.branch.timezone),
+      width: "18%",
+    },
+    {
+      header: "Cajero",
+      key: "operator",
+      renderCell: (sale) => (
+        <span className="block truncate" title={sale.operator_full_name}>
+          {sale.operator_full_name}
+        </span>
+      ),
+      width: "22%",
+    },
+    {
+      align: "right",
+      header: "Total",
+      key: "total",
+      renderCell: (sale) => formatCurrency(sale.total_amount),
+      width: "12%",
+    },
+    {
+      align: "right",
+      header: "Disponible",
+      key: "available",
+      renderCell: (sale) => (
+        <span className="font-medium text-slate-950">
+          {sale.has_returnable_quantity ? "Si" : "No"}
+        </span>
+      ),
+      width: "13%",
+    },
+    {
+      align: "right",
+      header: "Estado",
+      key: "status",
+      renderCell: (sale) =>
+        getSaleReturnStatusLabel(sale.return_status) ? (
+          <PosStatusBadge status={getSaleReturnStatusTone(sale.return_status)}>
+            {getSaleReturnStatusLabel(sale.return_status)}
+          </PosStatusBadge>
+        ) : sale.has_returnable_quantity ? (
+          <PosStatusBadge status="ready">Devolvible</PosStatusBadge>
+        ) : (
+          <PosStatusBadge status="blocked">Sin saldo</PosStatusBadge>
+        ),
+      width: "18%",
+    },
+  ];
+
   const salesListPane = (
-    <ListDetailColumn
-      contentClassName="min-h-0"
-      description="Busca por folio o acota por rango de fechas."
-      title="Ventas confirmadas"
+    <PosHistoryView
+      action={
+        <PosButton onClick={() => setCenterSection("history")} type="button" variant="neutral">
+          Ver historial
+        </PosButton>
+      }
+      className="h-full"
+      description="Busca una venta confirmada y selecciona sus productos devolvibles."
+      title="Ventas para devolucion"
       toolbar={
         <PosFilterBar
           actions={
-            <div className="flex flex-wrap items-center gap-2">
+            <div className="flex flex-wrap items-end gap-2">
               <label className="grid gap-1 text-xs text-slate-500">
                 <span>Desde</span>
                 <input
-                  className={`${posInputClass} h-10 min-w-[9rem] px-3 py-2 text-sm`}
+                  className={`${posInputClass} h-10 min-w-[8.5rem] px-3 py-2 text-sm`}
                   onChange={(event) => setDateFrom(event.target.value)}
                   type="date"
                   value={dateFrom}
@@ -1893,7 +1643,7 @@ export function ReturnsScreen() {
               <label className="grid gap-1 text-xs text-slate-500">
                 <span>Hasta</span>
                 <input
-                  className={`${posInputClass} h-10 min-w-[9rem] px-3 py-2 text-sm`}
+                  className={`${posInputClass} h-10 min-w-[8.5rem] px-3 py-2 text-sm`}
                   onChange={(event) => setDateTo(event.target.value)}
                   type="date"
                   value={dateTo}
@@ -1919,7 +1669,6 @@ export function ReturnsScreen() {
             placeholder: "Buscar por folio",
             value: searchText,
           }}
-          title="Ventas disponibles"
         />
       }
     >
@@ -1933,7 +1682,8 @@ export function ReturnsScreen() {
           title="La busqueda no esta disponible"
         />
       ) : (
-        <PosRecordList
+        <PosRecordTable
+          columns={salesColumns}
           emptyDescription="No hay ventas confirmadas para los filtros actuales."
           emptyTitle="Sin ventas disponibles"
           getKey={(sale) => sale.id}
@@ -1944,30 +1694,32 @@ export function ReturnsScreen() {
             setCenterSection("lines");
           }}
           records={sales}
-          renderContent={(sale, state) => (
-            <ReturnSaleCard
-              isSelected={state.isSelected}
-              sale={sale}
-              timeZone={returnsBootstrapQuery.data.branch.timezone}
-            />
-          )}
           selectedKey={selectedSaleId}
+          tableAriaLabel="Ventas disponibles para devolucion"
         />
       )}
-    </ListDetailColumn>
+    </PosHistoryView>
   );
-
   const returnDetailPane = (
-    <ListDetailColumn
-      contentClassName="min-h-0 overflow-hidden"
-      description="Selecciona una linea y construye la devolucion desde el panel derecho."
-      title="Lineas devolvibles"
+    <PosHistoryView
+      action={
+        <div className="flex flex-wrap items-center gap-2">
+          <PosButton onClick={() => setCenterSection("sales")} type="button" variant="neutral">
+            Volver a ventas
+          </PosButton>
+          <PosButton onClick={() => setCenterSection("history")} type="button" variant="neutral">
+            Ver historial
+          </PosButton>
+        </div>
+      }
+      className="h-full"
+      description="Ajusta las cantidades directamente en la tabla."
+      title="Productos devolvibles"
     >
       {!selectedSaleId ? (
-        <PosEmptyState
-          description="Selecciona una venta original para revisar sus lineas devolvibles."
-          title="Sin venta seleccionada"
-        />
+        <div className="rounded-xl border border-dashed border-[var(--pos-shell-border)] bg-[var(--pos-shell-muted)] px-4 py-5 text-sm text-slate-600">
+          Selecciona una venta para ver sus productos devolvibles.
+        </div>
       ) : returnSaleDetailQuery.isPending ? (
         <OperationalStatus
           description="Cargando la venta original para preparar la devolucion."
@@ -1991,40 +1743,97 @@ export function ReturnsScreen() {
           ) : null}
 
           <ReturnableLinesTable
+            draftLines={draftState.lines}
             lines={returnableLines}
+            onDecreaseQuantity={handleDecrementReturnableLineQuantity}
+            onDraftQuantityChange={handleReturnableLineQuantityChange}
+            onIncreaseQuantity={handleIncrementReturnableLineQuantity}
+            onRemove={handleRemoveSelectedDraftLine}
             onSelect={handleSelectReturnableLine}
             selectedLineId={selectedDraftLineId}
           />
         </div>
       ) : (
-        <PosEmptyState
-          description="Selecciona una venta original."
-          title="Sin venta seleccionada"
-        />
+        <div className="rounded-xl border border-dashed border-[var(--pos-shell-border)] bg-[var(--pos-shell-muted)] px-4 py-5 text-sm text-slate-600">
+          Selecciona una venta para ver sus productos devolvibles.
+        </div>
       )}
-    </ListDetailColumn>
+    </PosHistoryView>
   );
+  const historyColumns: PosRecordColumn<ReturnHistoryListItemView>[] = [
+    {
+      header: "Folio devolucion",
+      key: "folio",
+      renderCell: (record) => (
+        <span className="block truncate font-semibold text-slate-950" title={record.folio}>
+          {record.folio}
+        </span>
+      ),
+      width: "18%",
+    },
+    {
+      header: "Ticket original",
+      key: "ticket",
+      renderCell: (record) => (
+        <span className="block truncate" title={record.original_sale_folio}>
+          {record.original_sale_folio}
+        </span>
+      ),
+      width: "17%",
+    },
+    {
+      header: "Fecha/hora",
+      key: "date",
+      renderCell: (record) => formatCompactLocalDateTime(record.created_at_utc, branchTimeZone),
+      width: "18%",
+    },
+    {
+      header: "Cajero",
+      key: "cashier",
+      renderCell: (record) => (
+        <span className="block truncate" title={record.created_by_user_full_name}>
+          {record.created_by_user_full_name}
+        </span>
+      ),
+      width: "22%",
+    },
+    {
+      align: "right",
+      header: "Monto devuelto",
+      key: "amount",
+      renderCell: (record) => formatCurrency(record.total_refund_amount),
+      width: "13%",
+    },
+    {
+      align: "right",
+      header: "Estado",
+      key: "status",
+      renderCell: (record) => (
+        <PosStatusBadge status={getReturnStatusTone(record.status)}>
+          {getReturnStatusLabel(record.status)}
+        </PosStatusBadge>
+      ),
+      width: "12%",
+    },
+  ];
 
   const historyPane = (
     <PosHistoryView
       action={
-        <PosButton
-          onClick={() => setCenterSection(selectedSaleId ? "lines" : "sales")}
-          variant="neutral"
-        >
-          {selectedSaleId ? "Volver a la venta" : "Volver a consulta"}
+        <PosButton onClick={handleNewReturn} type="button" variant="neutral">
+          Nueva devolucion
         </PosButton>
       }
-      description="Consulta devoluciones registradas sin exponer metadatos internos."
+      className="h-full"
       title="Historial de devoluciones"
       toolbar={
         <PosFilterBar
           actions={
-            <div className="flex flex-wrap items-center gap-2">
+            <div className="flex flex-wrap items-end gap-2">
               <label className="grid gap-1 text-xs text-slate-500">
                 <span>Desde</span>
                 <input
-                  className={`${posInputClass} h-10 min-w-[9rem] px-3 py-2 text-sm`}
+                  className={`${posInputClass} h-10 min-w-[8.5rem] px-3 py-2 text-sm`}
                   onChange={(event) => setHistoryDateFrom(event.target.value)}
                   type="date"
                   value={historyDateFrom}
@@ -2033,7 +1842,7 @@ export function ReturnsScreen() {
               <label className="grid gap-1 text-xs text-slate-500">
                 <span>Hasta</span>
                 <input
-                  className={`${posInputClass} h-10 min-w-[9rem] px-3 py-2 text-sm`}
+                  className={`${posInputClass} h-10 min-w-[8.5rem] px-3 py-2 text-sm`}
                   onChange={(event) => setHistoryDateTo(event.target.value)}
                   type="date"
                   value={historyDateTo}
@@ -2056,7 +1865,7 @@ export function ReturnsScreen() {
             ariaLabel: "Buscar devolucion",
             inputRef: historySearchInputRef,
             onChange: setHistorySearchText,
-            placeholder: "Buscar por folio, venta o motivo",
+            placeholder: "Buscar por folio o ticket",
             value: historySearchText,
           }}
           selectFilters={[
@@ -2065,7 +1874,7 @@ export function ReturnsScreen() {
               key: "history-user",
               onChange: setSelectedHistoryCreatedByUserId,
               options: [
-                { label: "Todos los usuarios", value: "" },
+                { label: "Todos los cajeros", value: "" },
                 ...historyUserOptions.map((option) => ({
                   label: option.label,
                   value: option.value,
@@ -2087,7 +1896,6 @@ export function ReturnsScreen() {
               value: selectedHistoryReasonCode,
             },
           ]}
-          title="Consulta"
         />
       }
     >
@@ -2101,145 +1909,64 @@ export function ReturnsScreen() {
           title="Historial no disponible"
         />
       ) : (
-        <div className="grid h-full min-h-0 gap-3 xl:grid-cols-[minmax(18rem,22rem)_minmax(0,1fr)]">
-          <OperationHistoryList
-            emptyDescription="No hay devoluciones registradas para este filtro."
-            loading={returnsHistoryQuery.isPending}
-            loadingTitle="Consultando devoluciones"
-            onSelect={(record) => setSelectedHistoryReturnId(record.id)}
-            records={historyRecords}
-            selectedRecordId={selectedHistoryReturnId}
-          />
-          <PosRecordDetailPanel
-            badge={
-              selectedHistoryRecord ? (
-                <ModuleStateChip tone="success">
-                  {getReturnStatusLabel(selectedHistoryRecord.status)}
-                </ModuleStateChip>
-              ) : undefined
-            }
-            description={
-              selectedHistoryRecord
-                ? `Venta original ${selectedHistoryRecord.original_sale_folio}`
-                : "Selecciona una devolucion para revisar su trazabilidad."
-            }
-            title={
-              selectedHistoryReturn
-                ? selectedHistoryReturn.folio
-                : "Sin devolucion seleccionada"
-            }
-          >
-            {selectedHistoryReturnQuery.isPending ? (
-              <OperationalStatus
-                description="Cargando la devolucion seleccionada."
-                title="Cargando detalle"
-              />
-            ) : selectedHistoryReturnQuery.error ? (
-              <OperationalStatus
-                action={
-                  <PosButton onClick={() => selectedHistoryReturnQuery.refetch()}>
-                    Reintentar
-                  </PosButton>
-                }
-                description={toOperationalErrorMessage(
-                  selectedHistoryReturnQuery.error,
-                  "No fue posible cargar la devolucion seleccionada.",
-                )}
-                title="Detalle no disponible"
-              />
-            ) : selectedHistoryReturn ? (
-              <OperationDocumentSummaryPanel
-                actions={[
-                  {
-                    kind: "print",
-                    key: "history-print-return",
-                    label: getDocumentActionAvailability("returnReceipt").print.label,
-                    onSelect: () => {
-                      const printWindow = openBrowserPrintWindow();
-                      if (!printWindow) {
-                        showError("No se pudo abrir la ventana de impresion.");
-                        return;
-                      }
-
-                      writeReturnReceiptToPrintWindow(printWindow, selectedHistoryReturn);
-                    },
-                    availabilityNote:
-                      getDocumentActionAvailability("returnReceipt").print.unavailableReason,
-                  },
-                  {
-                    key: "history-view-ticket",
-                    label: "Ver ticket",
-                    onSelect: () => {
-                      void navigate({
-                        search: { ticketId: selectedHistoryReturn.original_sale_id } as never,
-                        to: "/tickets",
-                      });
-                    },
-                    variant: "neutral",
-                  },
-                  {
-                    availabilityNote: historySendReceiptByEmailAction.disabledReason,
-                    disabled: historySendReceiptByEmailAction.disabled,
-                    key: "history-detail-send-return-email",
-                    label: historySendReceiptByEmailAction.label,
-                    onSelect: () => undefined,
-                    placement: "menu",
-                    variant: "ghost",
-                  },
-                  {
-                    availabilityNote: historySendReceiptBySmsAction.disabledReason,
-                    disabled: historySendReceiptBySmsAction.disabled,
-                    key: "history-detail-send-return-sms",
-                    label: historySendReceiptBySmsAction.label,
-                    onSelect: () => undefined,
-                    placement: "menu",
-                    variant: "ghost",
-                  },
-                ]}
-                auditSummary={selectedHistoryReturn.audit_summary}
-                blockers={[]}
-                context={{
-                  branchName: selectedHistoryReturn.branch.name,
-                  userName: selectedHistoryReturn.created_by.full_name,
-                  workstationName: selectedHistoryReturn.workstation.name,
-                }}
-                description={selectedHistoryReturn.reason_name}
-                kind="return"
-                lines={buildCommittedReturnLineSummaryItems(selectedHistoryReturn.lines)}
-                metrics={buildReturnDocumentMetrics(selectedHistoryReturn)}
-                notices={
-                  <InlineNotice tone="info">
-                    Venta original {selectedHistoryReturn.original_sale_folio}
-                  </InlineNotice>
-                }
-                referenceValue={selectedHistoryReturn.folio}
-                stateLabel={getReturnStatusLabel(selectedHistoryRecord?.status ?? "COMMITTED")}
-                stateTone={getReturnStatusTone(selectedHistoryRecord?.status ?? "COMMITTED")}
-                timeZone={selectedHistoryReturn.branch.timezone}
-                timestamps={{
-                  committedAtValue: formatCompactLocalDateTime(
-                    selectedHistoryReturn.created_at_utc,
-                    selectedHistoryReturn.branch.timezone,
-                  ),
-                  createdAtValue: formatCompactLocalDateTime(
-                    selectedHistoryReturn.created_at_utc,
-                    selectedHistoryReturn.branch.timezone,
-                  ),
-                }}
-                title="Detalle de la devolucion"
-              />
-            ) : (
-              <PosEmptyState
-                description="Selecciona una devolucion registrada para revisar su resumen auditado."
-                title="Sin devolucion seleccionada"
-              />
-            )}
-          </PosRecordDetailPanel>
-        </div>
+        <PosRecordTable
+          columns={historyColumns}
+          emptyDescription="No hay devoluciones registradas para este filtro."
+          emptyTitle="Sin historial"
+          getKey={(record) => record.id}
+          loading={returnsHistoryQuery.isPending}
+          loadingTitle="Consultando devoluciones"
+          onSelect={(record) => setSelectedHistoryReturnId(record.id)}
+          records={historyRecords}
+          selectedKey={selectedHistoryReturnId}
+          tableAriaLabel="Historial de devoluciones"
+        />
       )}
-      </PosHistoryView>
+    </PosHistoryView>
   );
-
+  const returnProgressStep =
+    selectedSale === null
+      ? 1
+      : draftState.lines.length === 0
+        ? 2
+        : blockingMessages.length > 0
+          ? 3
+          : 4;
+  const returnProgressSteps: ProgressStepperStep[] = [
+    {
+      id: "sale",
+      label: "Venta",
+      state: selectedSale === null ? "current" : "completed",
+    },
+    {
+      id: "lines",
+      label: "Lineas",
+      state:
+        selectedSale === null
+          ? "blocked"
+          : draftState.lines.length === 0
+            ? "current"
+            : "completed",
+    },
+    {
+      id: "refund",
+      label: "Reembolso",
+      state:
+        selectedSale === null || draftState.lines.length === 0
+          ? "blocked"
+          : blockingMessages.length > 0
+            ? "current"
+            : "completed",
+    },
+    {
+      id: "confirm",
+      label: "Confirmacion",
+      state:
+        selectedSale !== null && draftState.lines.length > 0 && blockingMessages.length === 0
+          ? "current"
+          : "upcoming",
+    },
+  ];
   return (
     <>
       <CentralWorkspaceSheet
@@ -2257,96 +1984,26 @@ export function ReturnsScreen() {
                 {getReturnUiStateLabel(uiState)}
               </ModuleStateChip>
             }
-            title="Devoluciones"
+            title={centerSection === "history" ? "Historial de devoluciones" : "Devoluciones"}
           >
-            <FlowGuide
-              activeStepKey={processStepKey}
-              steps={[...RETURN_PROCESS_STEPS]}
-              variant="process"
-            />
+            {centerSection === "history" ? null : (
+              <ProgressStepper
+                currentStep={returnProgressStep}
+                steps={returnProgressSteps}
+                variant="workflow"
+              />
+            )}
           </CompactPageHeader>
         }
       >
         {centerSection === "history" ? (
           historyPane
+        ) : centerSection === "lines" ? (
+          returnDetailPane
         ) : (
-          <ResponsivePaneLayout
-            className="h-full gap-2.5"
-            detail={returnDetailPane}
-            detailClassName="min-h-0"
-            list={salesListPane}
-            listClassName="min-h-0"
-          />
+          salesListPane
         )}
       </CentralWorkspaceSheet>
-
-      <OperationConfirmationDialog
-        actionsTitle="Lineas a devolver"
-        confirmLabel={commitMutation.isPending ? "Confirmando..." : "Confirmar devolucion"}
-        context={
-          selectedSale
-            ? {
-                branchName: returnsBootstrapQuery.data.branch.name,
-                userName: returnsBootstrapQuery.data.user.full_name,
-                workstationName: returnsBootstrapQuery.data.workstation.name,
-              }
-            : undefined
-        }
-        description={
-          selectedSale
-            ? `Motivo: ${getReasonLabel(draftState.reasonCode, reasonOptions)} | Metodo: ${getRefundMethodLabel(draftState.refundMethodCode)}.`
-            : undefined
-        }
-        isOpen={isConfirmDialogOpen}
-        isPending={commitMutation.isPending}
-        kind="return"
-        lines={buildReturnDraftLineSummary(draftState.lines)}
-        metrics={[
-          {
-            key: "refund-total",
-            label: "Total reembolsado",
-            tone: "financial",
-            value: formatRefundCurrency(refundTotalCents),
-          },
-          {
-            key: "refund-method",
-            label: "Metodo",
-            value: getRefundMethodLabel(draftState.refundMethodCode),
-          },
-          {
-            key: "line-count",
-            label: "Lineas",
-            value: String(getReturnLineCount(draftState.lines)),
-          },
-          {
-            key: "unit-count",
-            label: "Unidades",
-            value: formatQuantityFromMilliUnits(getReturnTotalUnitsMilli(draftState.lines)),
-          },
-          ...(getDispositionSummary(draftState.lines)
-            ? [
-                {
-                  key: "disposition-summary",
-                  label: "Destino fisico",
-                  value: getDispositionSummary(draftState.lines) ?? "",
-                },
-              ]
-            : []),
-          ...highRiskMessages.map((message, index) => ({
-            key: `high-risk-${index}`,
-            label: "Revision",
-            tone: "warning" as const,
-            value: message,
-          })),
-        ]}
-        onCancel={() => setConfirmDialogOpen(false)}
-        onConfirm={() => {
-          void commitMutation.mutateAsync();
-        }}
-        referenceLabel="Venta original"
-        referenceValue={selectedSale?.folio ?? null}
-        title="Confirmar devolucion"
-      />
     </>
   );
 }

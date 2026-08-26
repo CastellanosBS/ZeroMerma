@@ -794,13 +794,7 @@ svg {
   padding: 0.75rem 0.875rem;
   font-size: var(--pos-type-technical);
   font-family:
-    ui-monospace,
-    SFMono-Regular,
-    Menlo,
-    Monaco,
-    Consolas,
-    "Liberation Mono",
-    "Courier New",
+    ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New",
     monospace;
   font-weight: 700;
   letter-spacing: 0.07em;
@@ -826,6 +820,127 @@ svg {
 .pos-record-table__row:focus-visible {
   outline: none;
   box-shadow: inset 0 0 0 2px var(--pos-primary);
+}
+
+.pos-order-status-filter {
+  box-shadow: inset 0 0 0 1px rgb(255 255 255 / 0.58);
+}
+
+.pos-order-status-filter .pos-filter-button__count {
+  background: rgb(255 255 255 / 0.78);
+  color: inherit;
+}
+
+.pos-order-status-filter--pending {
+  border-color: rgb(148 98 0 / 0.24);
+  background: var(--ui-color-warning-soft);
+  color: var(--ui-color-warning);
+}
+
+.pos-order-status-filter--pending:hover,
+.pos-order-status-filter--pending[data-active="true"] {
+  border-color: rgb(148 98 0 / 0.42);
+  background: color-mix(in srgb, var(--ui-color-warning-soft) 78%, #ffffff);
+}
+
+.pos-order-status-filter--ready {
+  border-color: rgb(36 95 145 / 0.22);
+  background: var(--ui-color-info-soft);
+  color: var(--ui-color-info);
+}
+
+.pos-order-status-filter--ready:hover,
+.pos-order-status-filter--ready[data-active="true"] {
+  border-color: rgb(36 95 145 / 0.4);
+  background: color-mix(in srgb, var(--ui-color-info-soft) 76%, #ffffff);
+}
+
+.pos-order-status-filter--delivered {
+  border-color: rgb(18 122 90 / 0.22);
+  background: var(--ui-color-success-soft);
+  color: var(--ui-color-success);
+}
+
+.pos-order-status-filter--delivered:hover,
+.pos-order-status-filter--delivered[data-active="true"] {
+  border-color: rgb(18 122 90 / 0.4);
+  background: color-mix(in srgb, var(--ui-color-success-soft) 76%, #ffffff);
+}
+
+.pos-order-status-filter--canceled {
+  border-color: rgb(180 35 24 / 0.22);
+  background: var(--ui-color-danger-soft);
+  color: var(--ui-color-danger);
+}
+
+.pos-order-status-filter--canceled:hover,
+.pos-order-status-filter--canceled[data-active="true"] {
+  border-color: rgb(180 35 24 / 0.42);
+  background: color-mix(in srgb, var(--ui-color-danger-soft) 78%, #ffffff);
+}
+
+.pos-record-table__row.pos-order-status-row--pending {
+  background: var(--ui-color-warning-soft);
+  background: color-mix(in srgb, var(--ui-color-warning-soft) 62%, #ffffff);
+}
+
+.pos-record-table__row.pos-order-status-row--pending:hover,
+.pos-record-table__row.pos-order-status-row--pending[data-selected="true"] {
+  background: color-mix(in srgb, var(--ui-color-warning-soft) 86%, #ffffff);
+}
+
+.pos-record-table__row.pos-order-status-row--pending[data-selected="true"] {
+  box-shadow:
+    inset 3px 0 0 var(--ui-color-warning),
+    inset 0 0 0 1px rgb(148 98 0 / 0.12);
+}
+
+.pos-record-table__row.pos-order-status-row--ready {
+  background: var(--ui-color-info-soft);
+  background: color-mix(in srgb, var(--ui-color-info-soft) 58%, #ffffff);
+}
+
+.pos-record-table__row.pos-order-status-row--ready:hover,
+.pos-record-table__row.pos-order-status-row--ready[data-selected="true"] {
+  background: color-mix(in srgb, var(--ui-color-info-soft) 84%, #ffffff);
+}
+
+.pos-record-table__row.pos-order-status-row--ready[data-selected="true"] {
+  box-shadow:
+    inset 3px 0 0 var(--ui-color-info),
+    inset 0 0 0 1px rgb(36 95 145 / 0.12);
+}
+
+.pos-record-table__row.pos-order-status-row--delivered {
+  background: var(--ui-color-success-soft);
+  background: color-mix(in srgb, var(--ui-color-success-soft) 58%, #ffffff);
+}
+
+.pos-record-table__row.pos-order-status-row--delivered:hover,
+.pos-record-table__row.pos-order-status-row--delivered[data-selected="true"] {
+  background: color-mix(in srgb, var(--ui-color-success-soft) 84%, #ffffff);
+}
+
+.pos-record-table__row.pos-order-status-row--delivered[data-selected="true"] {
+  box-shadow:
+    inset 3px 0 0 var(--ui-color-success),
+    inset 0 0 0 1px rgb(18 122 90 / 0.12);
+}
+
+.pos-record-table__row.pos-order-status-row--canceled {
+  background: var(--ui-color-danger-soft);
+  background: color-mix(in srgb, var(--ui-color-danger-soft) 64%, #ffffff);
+}
+
+.pos-record-table__row.pos-order-status-row--canceled:hover,
+.pos-record-table__row.pos-order-status-row--canceled[data-selected="true"] {
+  background: color-mix(in srgb, var(--ui-color-danger-soft) 88%, #ffffff);
+}
+
+.pos-record-table__row.pos-order-status-row--canceled[data-selected="true"] {
+  box-shadow:
+    inset 3px 0 0 var(--ui-color-danger),
+    inset 0 0 0 1px rgb(180 35 24 / 0.12);
 }
 
 .pos-record-table__cell {
@@ -928,13 +1043,6 @@ svg {
 
 .pos-page-header-flow {
   min-width: 0;
-}
-
-[data-pos-flow-guide="true"] {
-  margin: 0;
-  min-width: 0;
-  padding: 0;
-  list-style: none;
 }
 
 .pos-chip[data-tone="muted"] {
@@ -1196,14 +1304,7 @@ svg {
 }
 
 [data-pos-workstation="true"]
-  :where(
-    button,
-    [href],
-    input,
-    select,
-    textarea,
-    [tabindex]:not([tabindex="-1"])
-  ) {
+  :where(button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])) {
   scroll-margin-top: var(--pos-scroll-focus-offset);
   scroll-margin-bottom: var(--pos-scroll-focus-offset);
 }

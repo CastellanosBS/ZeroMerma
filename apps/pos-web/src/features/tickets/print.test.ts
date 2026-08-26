@@ -69,7 +69,12 @@ describe("ticket print document", () => {
 
     expect(document).toContain("TCK-8AD4F881");
     expect(document).toContain("Pan dulce");
-    expect(document).toContain("Reimpresion");
+    expect(document).toContain("REIMPRESION");
     expect(document).toContain("Efectivo");
+    expect(document).toContain("@page");
+    expect(document).toContain("80mm");
+    expect(document).toContain("RFC: No configurado");
+    expect(document).toContain("Este ticket es comprobante de compra.");
+    expect(document).toContain("No sustituye un CFDI.");
   });
 });

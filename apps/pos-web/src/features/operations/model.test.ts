@@ -82,6 +82,30 @@ describe("operations model", () => {
     ]);
   });
 
+  it("merges repeated product captures into one operation line", () => {
+    const productClass = buildClass({});
+    const product = buildProduct({});
+    const firstCaptureState = setPendingQuantityText(
+      selectProductForOperation(
+        selectClassForOperation(createInitialOperationDraftState(), productClass),
+        product,
+      ),
+      "2",
+    );
+    const firstLineState = addPendingSelectionLine(firstCaptureState);
+    const secondCaptureState = setPendingQuantityText(
+      selectProductForOperation(selectClassForOperation(firstLineState, productClass), product),
+      "3",
+    );
+    const nextState = addPendingSelectionLine(secondCaptureState);
+
+    expect(getOperationLineCount(nextState.lines)).toBe(1);
+    expect(getOperationTotalUnitsMilli(nextState.lines)).toBe(5000);
+    expect(buildOperationCommitLines(nextState.lines)).toEqual([
+      { product_id: "product-1", quantity: "5" },
+    ]);
+  });
+
   it("backs from quantity capture to product selection", () => {
     const productSelectionState = selectClassForOperation(
       createInitialOperationDraftState(),

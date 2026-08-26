@@ -1,36 +1,34 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Navigate } from "@tanstack/react-router";
+import { DialogBody, DialogFooter, DialogHeader, DialogSurface } from "@zeromerma/ui";
 import {
-  DialogBody,
-  DialogFooter,
-  DialogHeader,
-  DialogSurface,
-} from "@zeromerma/ui";
-import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type KeyboardEvent as ReactKeyboardEvent,
+  type ReactNode,
+} from "react";
 
 import { useAppShellRightPanel } from "../../components/app-shell-right-panel";
+import { CapturedProductLineRow } from "../../components/captured-product-lines";
 import { CatalogSelectionCard } from "../../components/catalog-selection-card";
 import { CatalogVisual } from "../../components/catalog-visual";
 import { OperationalStatus } from "../../components/operational-status";
-import {
-  PosEmptyState,
-  PosErrorState,
-  PosInlineValidationMessage,
-  PosLoadingState,
-} from "../../components/pos-feedback";
+import { PosEmptyState, PosErrorState, PosLoadingState } from "../../components/pos-feedback";
 import { PosButton } from "../../components/pos-foundations";
 import {
   PosPaymentInputCard,
   PosPaymentMethodButton as SharedPosPaymentMethodButton,
   PosPaymentValueCard,
 } from "../../components/pos-payment-controls";
-import { PosFilterBar, PosRecordList } from "../../components/pos-records";
+import { PosFilterBar, PosRecordTable, type PosRecordColumn } from "../../components/pos-records";
 import {
   ContinuousWorkspaceSheet,
   FlowGuide,
   InlineNotice,
   ListDetailColumn,
-  ResponsivePaneLayout,
   ModuleStateChip,
   OperationalField,
   KeyValueGroup,
@@ -44,6 +42,7 @@ import {
   ArrowLeftIcon,
   CardIcon,
   CheckCircleIcon,
+  ChevronRightIcon,
   ClockIcon,
   ClipboardIcon,
   HashIcon,
@@ -53,7 +52,6 @@ import {
   PlusIcon,
   ReceiptIcon,
   SplitIcon,
-  TrashIcon,
   XIcon,
 } from "../../components/pos-icons";
 import { Button } from "../../components/ui/button";
@@ -73,7 +71,6 @@ import {
   getSelectionShortcutLabel,
   isEditableTarget,
 } from "../../lib/keyboard-shortcuts";
-import { getCustomerCommunicationActionState } from "../../lib/customer-communication";
 import { cn } from "../../lib/utils";
 import { usePosAuthStore } from "../auth/auth-store";
 import { useCurrentCashSessionQuery } from "../cash-session-open/queries";
@@ -88,6 +85,7 @@ import {
 } from "../pos-terminal/model";
 import { posInputClass, posOutlineButtonClass, posPrimaryButtonClass } from "../pos-theme/theme";
 import { useStatusMessageStore } from "../status-messages/store";
+import { getOrderDeliveryActionLabel } from "./delivery-action-labels";
 import { cancelOrder, createOrder, deliverOrder, markOrderReady } from "./orders-api";
 import {
   addPendingSelectionLine,
@@ -100,8 +98,8 @@ import {
   createInitialOrderCreateDraftState,
   getOrderAdvanceAmountCents,
   getOrderCreateBlockingMessage,
-  getOrderCreateChecklistMessages,
   getOrderCreateUiState,
+  isOrderCustomerPhoneComplete,
   getOrderLineCount,
   getOrderLineTotalCents,
   getOrderSubtotalCents,
@@ -251,7 +249,11 @@ function parsePickupHourInput(value: string): number | null {
   }
 
   const numericValue = Number.parseInt(sanitizedValue, 10);
-  if (Number.isNaN(numericValue) || numericValue < PICKUP_HOUR_MIN || numericValue > PICKUP_HOUR_MAX) {
+  if (
+    Number.isNaN(numericValue) ||
+    numericValue < PICKUP_HOUR_MIN ||
+    numericValue > PICKUP_HOUR_MAX
+  ) {
     return null;
   }
 
@@ -330,8 +332,7 @@ function getOrderGuidedFieldClass({
 }): string {
   return cn(
     "rounded-xl border border-[var(--pos-shell-border)] bg-[var(--pos-shell-muted)] px-3 py-2.5 transition focus-within:border-[var(--pos-primary)] focus-within:bg-white focus-within:shadow-sm",
-    isActive &&
-      "border-[var(--pos-primary)] bg-white shadow-[0_0_0_2px_var(--pos-primary-soft)]",
+    isActive && "border-[var(--pos-primary)] bg-white shadow-[0_0_0_2px_var(--pos-primary-soft)]",
     isLocked && "opacity-75",
   );
 }
@@ -367,15 +368,16 @@ function getStatusVisualConfig(status: string) {
           "border border-[var(--ui-color-info-soft)] bg-[var(--ui-color-info-soft)] text-[var(--ui-color-info)]",
         chipClass:
           "border-[var(--ui-color-info-soft)] bg-[var(--ui-color-info-soft)] text-[var(--ui-color-info)] hover:border-[var(--ui-color-info)]/35 hover:bg-[var(--ui-color-info-soft)]",
+        filterClass: "pos-order-status-filter pos-order-status-filter--ready",
         icon: <BagIcon className="h-3.5 w-3.5" />,
         iconClass: "bg-[var(--ui-color-info-soft)] text-[var(--ui-color-info)]",
         rowClass:
           "border-[var(--ui-color-info)]/25 bg-[var(--ui-color-info-soft)]/70 hover:border-[var(--ui-color-info)]/40 hover:bg-[var(--ui-color-info-soft)]",
         selectedRowClass:
           "border-[var(--ui-color-info)]/45 bg-[var(--ui-color-info-soft)] shadow-[0_0_0_1px_rgba(36,95,145,0.12)]",
-        rowIconClass:
-          "border-[var(--ui-color-info)]/20 bg-white/70 text-[var(--ui-color-info)]",
+        rowIconClass: "border-[var(--ui-color-info)]/20 bg-white/70 text-[var(--ui-color-info)]",
         summaryPillClass: "bg-white/75 text-[var(--ui-color-info)]",
+        tableRowClass: "pos-order-status-row pos-order-status-row--ready",
       };
     case "DELIVERED":
       return {
@@ -383,6 +385,7 @@ function getStatusVisualConfig(status: string) {
           "border border-[var(--ui-color-success-soft)] bg-[var(--ui-color-success-soft)] text-[var(--ui-color-success)]",
         chipClass:
           "border-[var(--ui-color-success-soft)] bg-[var(--ui-color-success-soft)] text-[var(--ui-color-success)] hover:border-[var(--ui-color-success)]/35 hover:bg-[var(--ui-color-success-soft)]",
+        filterClass: "pos-order-status-filter pos-order-status-filter--delivered",
         icon: <CheckCircleIcon className="h-3.5 w-3.5" />,
         iconClass: "bg-[var(--ui-color-success-soft)] text-[var(--ui-color-success)]",
         rowClass:
@@ -392,6 +395,7 @@ function getStatusVisualConfig(status: string) {
         rowIconClass:
           "border-[var(--ui-color-success)]/18 bg-white/75 text-[var(--ui-color-success)]",
         summaryPillClass: "bg-white/78 text-[var(--ui-color-success)]",
+        tableRowClass: "pos-order-status-row pos-order-status-row--delivered",
       };
     case "CANCELED":
       return {
@@ -399,6 +403,7 @@ function getStatusVisualConfig(status: string) {
           "border border-[var(--ui-color-danger-soft)] bg-[var(--ui-color-danger-soft)] text-[var(--ui-color-danger)]",
         chipClass:
           "border-[var(--ui-color-danger-soft)] bg-[var(--ui-color-danger-soft)] text-[var(--ui-color-danger)] hover:border-[var(--ui-color-danger)]/35 hover:bg-[var(--ui-color-danger-soft)]",
+        filterClass: "pos-order-status-filter pos-order-status-filter--canceled",
         icon: <XIcon className="h-3.5 w-3.5" />,
         iconClass: "bg-[var(--ui-color-danger-soft)] text-[var(--ui-color-danger)]",
         rowClass:
@@ -408,6 +413,7 @@ function getStatusVisualConfig(status: string) {
         rowIconClass:
           "border-[var(--ui-color-danger)]/18 bg-white/75 text-[var(--ui-color-danger)]",
         summaryPillClass: "bg-white/78 text-[var(--ui-color-danger)]",
+        tableRowClass: "pos-order-status-row pos-order-status-row--canceled",
       };
     default:
       return {
@@ -415,6 +421,7 @@ function getStatusVisualConfig(status: string) {
           "border border-[var(--ui-color-warning-soft)] bg-[var(--ui-color-warning-soft)] text-[var(--ui-color-warning)]",
         chipClass:
           "border-[var(--ui-color-warning-soft)] bg-[var(--ui-color-warning-soft)] text-[var(--ui-color-warning)] hover:border-[var(--ui-color-warning)]/35 hover:bg-[var(--ui-color-warning-soft)]",
+        filterClass: "pos-order-status-filter pos-order-status-filter--pending",
         icon: <ClockIcon className="h-3.5 w-3.5" />,
         iconClass: "bg-[var(--ui-color-warning-soft)] text-[var(--ui-color-warning)]",
         rowClass:
@@ -424,12 +431,36 @@ function getStatusVisualConfig(status: string) {
         rowIconClass:
           "border-[var(--ui-color-warning)]/18 bg-white/75 text-[var(--ui-color-warning)]",
         summaryPillClass: "bg-white/78 text-[var(--ui-color-warning)]",
+        tableRowClass: "pos-order-status-row pos-order-status-row--pending",
       };
   }
 }
 
 function getOrderStatusCount(counters: OrderStatusCounterView[], status: string): number {
   return counters.find((entry) => entry.status === status)?.count ?? 0;
+}
+
+function getOrderTotalCount(counters: OrderStatusCounterView[]): number {
+  return counters.reduce((sum, entry) => sum + entry.count, 0);
+}
+
+function getOrderListHasActiveFilters({
+  dateFrom,
+  dateTo,
+  searchText,
+  status,
+}: {
+  dateFrom: string;
+  dateTo: string;
+  searchText: string;
+  status: string;
+}): boolean {
+  return (
+    searchText.trim().length > 0 ||
+    dateFrom.trim().length > 0 ||
+    dateTo.trim().length > 0 ||
+    status !== "PENDING"
+  );
 }
 
 function getOrderCreateUiLabel(uiState: ReturnType<typeof getOrderCreateUiState>): string {
@@ -468,9 +499,7 @@ function formatOrderRequestedForLabel(
   requestedForAt: string | null | undefined,
   timezone: string,
 ): string {
-  return requestedForAt
-    ? formatLocalDateTime(requestedForAt, timezone)
-    : "Sin hora solicitada";
+  return requestedForAt ? formatLocalDateTime(requestedForAt, timezone) : "Sin hora solicitada";
 }
 
 function getDateKeyForTimeZone(date: Date, timeZone: string): string {
@@ -482,7 +511,10 @@ function getDateKeyForTimeZone(date: Date, timeZone: string): string {
   }).format(date);
 }
 
-function getOrderUrgency(order: CustomerOrderListItemView, timezone: string): {
+function getOrderUrgency(
+  order: CustomerOrderListItemView,
+  timezone: string,
+): {
   label: string | null;
   tone: "muted" | "warning" | "primary";
 } {
@@ -510,19 +542,43 @@ function getOrderUrgency(order: CustomerOrderListItemView, timezone: string): {
   return { label: null, tone: "muted" };
 }
 
+function getOrderEmptyListTitle({
+  hasActiveFilters,
+  hasAnyOrders,
+}: {
+  hasActiveFilters: boolean;
+  hasAnyOrders: boolean;
+}): string {
+  if (!hasAnyOrders) {
+    return "Aun no hay pedidos registrados";
+  }
+
+  if (hasActiveFilters) {
+    return "Sin resultados";
+  }
+
+  return "Sin pedidos";
+}
+
 function getOrderEmptyListDescription({
   dateFrom,
+  hasAnyOrders,
   dateTo,
   searchText,
   status,
 }: {
   dateFrom: string;
+  hasAnyOrders: boolean;
   dateTo: string;
   searchText: string;
   status: string;
 }): string {
+  if (!hasAnyOrders) {
+    return "Crea un pedido para apartados, encargos o entregas futuras.";
+  }
+
   if (searchText.trim().length > 0) {
-    return "No hay pedidos que coincidan con ese folio, cliente o telefono dentro del filtro actual.";
+    return "No hay pedidos que coincidan con ese folio, cliente o telefono.";
   }
 
   if (dateFrom.trim().length > 0 || dateTo.trim().length > 0) {
@@ -557,108 +613,29 @@ function StatusBadge({ status }: { status: string }) {
   );
 }
 
-function OrderOperationalChip({
-  icon,
-  label,
-  tone,
-}: {
-  icon?: ReactNode;
-  label: string;
-  tone: "muted" | "success" | "warning" | "danger" | "info";
-}) {
+function CatalogSubflow({ activeKey }: { activeKey: "class" | "product" | "quantity" }) {
   return (
-    <span
-      className={cn(
-        "inline-flex min-h-9 max-w-full items-center gap-2 rounded-xl border px-2.5 py-1.5 text-sm font-semibold leading-4 shadow-sm",
-        tone === "success"
-          ? "border-[#9fd3b3] bg-[#e8f8ef] text-[var(--ui-color-success)]"
-          : tone === "warning"
-            ? "border-[#e4bc67] bg-[#fff1cf] text-[var(--ui-color-warning)]"
-            : tone === "danger"
-              ? "border-[#e1a0a8] bg-[#fff1f3] text-[var(--ui-color-danger)]"
-              : tone === "info"
-                ? "border-[#a9c7eb] bg-[#edf5ff] text-[var(--ui-color-info)]"
-                : "border-[var(--pos-shell-border)] bg-[var(--pos-shell-muted)] text-slate-700",
-      )}
-    >
-      {icon ? <span className="flex shrink-0 items-center justify-center">{icon}</span> : null}
-      <span className="min-w-0 break-words">{label}</span>
-    </span>
-  );
-}
-
-function CatalogSubflow({
-  activeKey,
-}: {
-  activeKey: "class" | "product" | "quantity";
-}) {
-  const steps = [
-    { key: "class", label: "Clase" },
-    { key: "product", label: "Producto" },
-    { key: "quantity", label: "Cantidad" },
-  ] as const;
-  const activeIndex = steps.findIndex((step) => step.key === activeKey);
-
-  return (
-    <ol className="flex flex-wrap items-center gap-2" aria-label="Subflujo del catalogo">
-      {steps.map((step, index) => {
-        const isActive = index === activeIndex;
-        const isCompleted = index < activeIndex;
-
-        return (
-          <li className="flex items-center gap-2" key={step.key}>
-            {index > 0 ? (
-              <span
-                aria-hidden="true"
-                className={cn(
-                  "hidden h-px w-3 rounded-full lg:block",
-                  isCompleted || isActive ? "bg-[var(--pos-primary)]/35" : "bg-slate-300",
-                )}
-              />
-            ) : null}
-            <span
-              className={cn(
-                "inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-medium",
-                isActive
-                  ? "border-[var(--pos-primary)] bg-[var(--pos-primary-soft)] text-[var(--pos-primary)]"
-                  : isCompleted
-                    ? "border-transparent bg-[var(--pos-primary-soft)]/70 text-[var(--pos-primary)]"
-                    : "border-[var(--pos-shell-border)] bg-white text-slate-500",
-              )}
-            >
-              <span
-                className={cn(
-                  "inline-flex h-4.5 w-4.5 items-center justify-center rounded-full text-[10px]",
-                  isActive || isCompleted
-                    ? "bg-white text-[var(--pos-primary)]"
-                    : "bg-[var(--pos-shell-muted)] text-slate-500",
-                )}
-              >
-                {isCompleted ? <CheckCircleIcon className="h-3 w-3" /> : index + 1}
-              </span>
-              {step.label}
-            </span>
-          </li>
-        );
-      })}
-    </ol>
+    <FlowGuide
+      activeStepKey={activeKey}
+      ariaLabel="Subflujo del catalogo"
+      steps={[
+        { key: "class", label: "Clase" },
+        { key: "product", label: "Producto" },
+        { key: "quantity", label: "Cantidad" },
+      ]}
+      variant="process"
+    />
   );
 }
 
 export function OrderActionConfirmDialog({
-  cancelReason,
-  cancelReasonError,
   isPending,
   onCancel,
-  onCancelReasonChange,
   onConfirm,
   state,
 }: {
-  cancelReason: string;
-  cancelReasonError: string | null;
   isPending: boolean;
   onCancel: () => void;
-  onCancelReasonChange: (value: string) => void;
   onConfirm: () => void;
   state: OrderActionDialogState | null;
 }) {
@@ -697,50 +674,30 @@ export function OrderActionConfirmDialog({
         <DialogBody className="grid gap-3">
           {order !== null ? (
             <>
-              <div className="rounded-xl border border-[var(--pos-shell-border)] bg-[var(--pos-shell-muted)] px-3 py-3">
-                <p className="text-sm font-semibold text-slate-950">{order.folio}</p>
-                <p className="mt-1 text-sm text-slate-700">{order.customer_name}</p>
-                <p className="mt-1 text-sm text-slate-600">{getStatusLabel(order.status)}</p>
+              <div className="grid gap-2 rounded-xl border border-[var(--pos-shell-border)] bg-[var(--pos-shell-muted)] px-3 py-3">
+                <div className="flex items-center justify-between gap-3">
+                  <p className="truncate text-sm font-semibold text-slate-950" title={order.folio}>
+                    {order.folio}
+                  </p>
+                  <StatusBadge status={order.status} />
+                </div>
+                <p className="truncate text-sm text-slate-700" title={order.customer_name}>
+                  {order.customer_name}
+                </p>
               </div>
 
               {isCancel ? (
-                <div className="grid gap-3">
-                  <div className="rounded-xl border border-[var(--pos-shell-border)] bg-white px-3 py-3 text-sm leading-6 text-slate-700">
-                    <p className="font-medium text-slate-950">
-                      El pedido se cancelara de forma inmediata.
-                    </p>
-                    <p className="mt-1">
-                      {order.cancellation_refund_eligible
-                        ? `Se reembolsara el anticipo de ${formatCurrency(order.cancellation_refund_amount)} y se registrara el movimiento en caja.`
-                        : (parseMoneyToCents(order.advance_amount) ?? 0) > 0
-                          ? "El anticipo no se reembolsa porque la cancelacion ocurre despues del umbral de un dia previo a la entrega."
-                          : "No hay anticipo por devolver."}
-                    </p>
-                  </div>
-
-                  <label className="grid gap-2">
-                    <span className="text-sm font-semibold text-slate-950">
-                      Motivo de cancelacion
-                    </span>
-                    <textarea
-                      className={cn(
-                        posInputClass,
-                        "min-h-[5.5rem] rounded-xl px-3 py-2 text-sm leading-6 shadow-none",
-                      )}
-                      disabled={isPending}
-                      onChange={(event) => onCancelReasonChange(event.target.value)}
-                      placeholder="Describe por que se cancela el pedido."
-                      value={cancelReason}
-                    />
-                    <p className="text-xs leading-5 text-slate-500">
-                      Este motivo queda registrado en el pedido y en la trazabilidad operativa.
-                    </p>
-                    {cancelReasonError ? (
-                      <PosInlineValidationMessage>
-                        {cancelReasonError}
-                      </PosInlineValidationMessage>
-                    ) : null}
-                  </label>
+                <div className="rounded-xl border border-[var(--pos-shell-border)] bg-white px-3 py-3 text-sm leading-6 text-slate-700">
+                  <p className="font-medium text-slate-950">
+                    El pedido se cancelara de forma inmediata.
+                  </p>
+                  <p className="mt-1">
+                    {order.cancellation_refund_eligible
+                      ? `Se reembolsara el anticipo de ${formatCurrency(order.cancellation_refund_amount)} y se registrara el movimiento en caja.`
+                      : (parseMoneyToCents(order.advance_amount) ?? 0) > 0
+                        ? "El anticipo no se reembolsa porque la cancelacion ocurre despues del umbral de un dia previo a la entrega."
+                        : "No hay anticipo por devolver."}
+                  </p>
                 </div>
               ) : null}
             </>
@@ -762,7 +719,7 @@ export function OrderActionConfirmDialog({
           </Button>
           <Button
             className={cn("h-10 px-4", posPrimaryButtonClass)}
-            disabled={isPending || (isCancel && cancelReason.trim().length < 4)}
+            disabled={isPending}
             onClick={onConfirm}
             type="button"
           >
@@ -795,12 +752,7 @@ export function OrderRecordCard({
   const hasPhone = Boolean(order.customer_phone && order.customer_phone.trim().length > 0);
 
   return (
-    <div
-      className={cn(
-        "grid gap-2",
-        isSelected ? "text-slate-950" : "text-slate-900",
-      )}
-    >
+    <div className={cn("grid gap-2", isSelected ? "text-slate-950" : "text-slate-900")}>
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <p className="pos-label-text">Entrega</p>
@@ -836,10 +788,7 @@ export function OrderRecordCard({
             {order.customer_name}
           </span>
           {hasPhone ? (
-            <span
-              className="truncate text-slate-500"
-              title={order.customer_phone ?? undefined}
-            >
+            <span className="truncate text-slate-500" title={order.customer_phone ?? undefined}>
               | {order.customer_phone}
             </span>
           ) : null}
@@ -853,15 +802,30 @@ export function OrderRecordCard({
       </div>
 
       <div className="flex flex-wrap items-center gap-1.5 text-xs font-medium text-slate-600">
-        <span className={cn("inline-flex items-center gap-1 rounded-full px-1.5 py-0.5", config.summaryPillClass)}>
+        <span
+          className={cn(
+            "inline-flex items-center gap-1 rounded-full px-1.5 py-0.5",
+            config.summaryPillClass,
+          )}
+        >
           <PackageIcon className="h-3.5 w-3.5" />
           {order.line_count} lineas
         </span>
-        <span className={cn("inline-flex items-center gap-1 rounded-full px-1.5 py-0.5", config.summaryPillClass)}>
+        <span
+          className={cn(
+            "inline-flex items-center gap-1 rounded-full px-1.5 py-0.5",
+            config.summaryPillClass,
+          )}
+        >
           <HashIcon className="h-3.5 w-3.5" />
           {Number(order.total_units).toFixed(3)} uds
         </span>
-        <span className={cn("inline-flex items-center gap-1 rounded-full px-1.5 py-0.5", config.summaryPillClass)}>
+        <span
+          className={cn(
+            "inline-flex items-center gap-1 rounded-full px-1.5 py-0.5",
+            config.summaryPillClass,
+          )}
+        >
           <MoneyIcon className="h-3.5 w-3.5" />
           Saldo {formatCurrency(order.remaining_balance_amount)}
         </span>
@@ -882,70 +846,49 @@ function DraftLineRow({
   onRemove: () => void;
 }) {
   return (
-    <div className="grid grid-cols-[minmax(0,1fr)_auto_auto_auto] items-center gap-1 border-t border-[var(--pos-shell-border)] px-2 py-1.5 first:border-t-0">
-      <p
-        className="truncate pr-1 text-[12px] font-medium leading-4 text-slate-950"
-        title={line.productName}
-      >
-        {line.productName}
-      </p>
-
-      <div className="flex items-center gap-0 rounded-md border border-[var(--pos-shell-border)] bg-[var(--pos-shell-muted)] px-0 py-0.5">
-        <button
-          className="flex h-6 w-6 items-center justify-center rounded-sm text-[12px] font-medium text-slate-900 hover:bg-white"
-          onClick={onDecrement}
-          type="button"
-        >
-          -
-        </button>
-        <span className="min-w-4 px-0.5 text-center text-[12px] font-semibold text-slate-950 [font-variant-numeric:tabular-nums]">
-          {line.quantityText}
-        </span>
-        <button
-          className="flex h-6 w-6 items-center justify-center rounded-sm text-[12px] font-medium text-slate-900 hover:bg-white"
-          onClick={onIncrement}
-          type="button"
-        >
-          +
-        </button>
-      </div>
-
-      <span className="min-w-[3.75rem] text-right text-[12px] font-semibold text-slate-950 [font-variant-numeric:tabular-nums]">
-        {formatCurrency(formatMoneyFromCents(getOrderLineTotalCents(line)))}
-      </span>
-
-      <button
-        aria-label={`Eliminar ${line.productName}`}
-        className="flex h-6 w-6 items-center justify-center rounded-md text-[var(--ui-color-danger)] transition hover:bg-[var(--ui-color-danger-soft)] hover:text-[var(--ui-color-danger)]"
-        onClick={onRemove}
-        type="button"
-      >
-        <TrashIcon className="h-3 w-3" />
-      </button>
-    </div>
+    <CapturedProductLineRow
+      amount={formatCurrency(formatMoneyFromCents(getOrderLineTotalCents(line)))}
+      name={line.productName}
+      onDecrement={onDecrement}
+      onIncrement={onIncrement}
+      onRemove={onRemove}
+      quantityText={line.quantityText}
+    />
   );
 }
 
 function OrderPaymentMethodButton({
+  className,
   icon,
   isActive,
   label,
   onClick,
 }: {
+  className?: string;
   icon: ReactNode;
   isActive: boolean;
   label: string;
   onClick: () => void;
 }) {
-  return <SharedPosPaymentMethodButton icon={icon} isActive={isActive} label={label} onClick={onClick} />;
+  return (
+    <SharedPosPaymentMethodButton
+      className={className}
+      icon={icon}
+      isActive={isActive}
+      label={label}
+      onClick={onClick}
+    />
+  );
 }
 
 function OrderPaymentMetricTile({
+  className,
   icon,
   label,
   tone,
   value,
 }: {
+  className?: string;
   icon: ReactNode;
   label: string;
   tone: "advance" | "financial" | "pending" | "success";
@@ -953,6 +896,7 @@ function OrderPaymentMetricTile({
 }) {
   return (
     <PosPaymentValueCard
+      className={className}
       icon={icon}
       label={label}
       tone={
@@ -971,11 +915,9 @@ function OrderPaymentMetricTile({
 
 function OrdersDecisionPanel({
   bootstrap,
-  createChecklistMessages,
   createOrderBlockingMessage,
   createOrderDisabled,
   createUiState,
-  deliverySettlementFlowActive,
   deliveryMixedCardAmountText,
   deliveryMixedCashAmountText,
   deliveryPaymentMethodCode,
@@ -986,7 +928,9 @@ function OrdersDecisionPanel({
   draftAdvancePaymentMethodCode,
   draftCustomerName,
   draftLines,
+  draftNotes,
   draftRequestedForLabel,
+  isDraftNotesExpanded,
   isCreateSaving,
   isSelectedOrderPending,
   mode,
@@ -1003,20 +947,21 @@ function OrdersDecisionPanel({
   onRequestCancelDraft,
   onRequestCancelOrder,
   onRequestDeliverOrder,
+  onSetDraftNotes,
   onSetAdvanceAmountText,
   onSetMixedAdvanceCardAmountText,
   onSetMixedAdvanceCashAmountText,
   onSetAdvancePaymentMethodCode,
+  onToggleDraftNotes,
+  onStartNewOrder,
   orderDetail,
   orderDetailError,
   orderDetailIsPending,
 }: {
   bootstrap: ReturnType<typeof useOrdersBootstrapQuery>["data"];
-  createChecklistMessages: string[];
   createOrderBlockingMessage: string | null;
   createOrderDisabled: boolean;
   createUiState: ReturnType<typeof getOrderCreateUiState>;
-  deliverySettlementFlowActive: boolean;
   deliveryMixedCardAmountText: string;
   deliveryMixedCashAmountText: string;
   deliveryPaymentMethodCode: string;
@@ -1027,7 +972,9 @@ function OrdersDecisionPanel({
   draftAdvancePaymentMethodCode: string;
   draftCustomerName: string;
   draftLines: ReturnType<typeof createInitialOrderCreateDraftState>["lines"];
+  draftNotes: string;
   draftRequestedForLabel: string;
+  isDraftNotesExpanded: boolean;
   isCreateSaving: boolean;
   isSelectedOrderPending: boolean;
   mode: OrdersMode;
@@ -1044,10 +991,13 @@ function OrdersDecisionPanel({
   onRequestCancelDraft: () => void;
   onRequestCancelOrder: () => void;
   onRequestDeliverOrder: () => void;
+  onSetDraftNotes: (value: string) => void;
   onSetAdvanceAmountText: (value: string) => void;
   onSetMixedAdvanceCardAmountText: (value: string) => void;
   onSetMixedAdvanceCashAmountText: (value: string) => void;
   onSetAdvancePaymentMethodCode: (value: string) => void;
+  onToggleDraftNotes: () => void;
+  onStartNewOrder: () => void;
   orderDetail: CustomerOrderDetailResponse | null | undefined;
   orderDetailError: unknown;
   orderDetailIsPending: boolean;
@@ -1056,9 +1006,14 @@ function OrdersDecisionPanel({
   const deliveryMixedCashInputRef = useRef<HTMLInputElement>(null);
   const deliveryReceivedInputRef = useRef<HTMLInputElement>(null);
   const mixedAdvanceCashInputRef = useRef<HTMLInputElement>(null);
+  const canAutofocusDeliverySettlement =
+    mode === "list" &&
+    orderDetail?.can_deliver === true &&
+    orderDetail.requires_settlement_on_delivery &&
+    orderDetail.remaining_balance_amount !== "0.00";
 
   useEffect(() => {
-    if (mode !== "list" || !deliverySettlementFlowActive) {
+    if (!canAutofocusDeliverySettlement || deliveryPaymentMethodCode.trim().length === 0) {
       return;
     }
 
@@ -1072,7 +1027,7 @@ function OrdersDecisionPanel({
       deliveryReceivedInputRef.current?.focus();
       deliveryReceivedInputRef.current?.select();
     });
-  }, [deliveryPaymentMethodCode, deliverySettlementFlowActive, mode]);
+  }, [canAutofocusDeliverySettlement, deliveryPaymentMethodCode, orderDetail?.id]);
 
   if (!bootstrap) {
     return null;
@@ -1099,23 +1054,30 @@ function OrdersDecisionPanel({
         onSetAdvancePaymentMethodCode(CASH_PAYMENT_METHOD_CODE);
       }
     };
+    const submitOrderFromPaymentInput = (event: ReactKeyboardEvent<HTMLInputElement>) => {
+      if (event.key !== "Enter") {
+        return;
+      }
+
+      event.preventDefault();
+      if (createOrderDisabled || isCreateSaving) {
+        return;
+      }
+
+      onCreateOrder();
+    };
 
     return (
-      <div className="pos-shell-panel grid h-full min-h-0 grid-rows-[auto_auto_minmax(0,1fr)_auto] gap-[var(--pos-section-gap)] p-[var(--pos-shell-workstation-padding)]">
+      <div className="pos-shell-panel grid h-full min-h-0 grid-rows-[auto_minmax(0,1fr)_auto] gap-3 p-[var(--pos-shell-workstation-padding)]">
         <div className="grid gap-2">
           <div className="flex flex-wrap items-start justify-between gap-2.5">
             <div className="min-w-0">
-              <p className="pos-label-text">Pedido</p>
-              <h2 className="mt-0.5 text-base font-semibold text-slate-950">
-                Pedido en construcción
-              </h2>
+              <p className="pos-label-text">Nuevo pedido</p>
+              <h2 className="mt-0.5 text-base font-semibold text-slate-950">Resumen del pedido</h2>
             </div>
             <div className="flex flex-wrap items-center justify-end gap-2">
               <span className="pos-chip" data-tone={getOrderCreateUiTone(createUiState)}>
                 {getOrderCreateUiLabel(createUiState)}
-              </span>
-              <span className="pos-chip" data-tone="muted">
-                {getOrderLineCount(draftLines)} lineas
               </span>
             </div>
           </div>
@@ -1133,174 +1095,197 @@ function OrdersDecisionPanel({
           </KeyValueGroup>
         </div>
 
-        <div className="grid gap-2.5">
-          <div className="grid gap-3 rounded-xl border border-[var(--pos-shell-border)] bg-white p-3 shadow-[var(--ui-shadow-subtle)]">
-            <div className="flex items-center justify-between gap-3">
-              <div className="flex min-w-0 items-center gap-2">
-                <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[var(--pos-shell-muted)] text-[var(--pos-primary)]">
-                  <MoneyIcon className="h-4 w-4" />
-                </span>
-                <p className="truncate whitespace-nowrap text-[15px] font-semibold leading-5 text-slate-950">
-                  Cobro del pedido
-                </p>
-              </div>
-            </div>
-
-            {paymentStateChip ? (
-              <div className="flex justify-start">
-                <span className="pos-chip" data-tone={paymentStateChip.tone}>
-                  {paymentStateChip.label}
-                </span>
-              </div>
-            ) : null}
-
-            <div className="grid grid-cols-3 gap-2">
-              {PAYMENT_METHOD_OPTIONS.map((option) => (
-                <OrderPaymentMethodButton
-                  icon={
-                    option.value === CASH_PAYMENT_METHOD_CODE ? (
-                      <MoneyIcon className="h-5 w-5" />
-                    ) : option.value === MIXED_PAYMENT_METHOD_CODE ? (
-                      <SplitIcon className="h-5 w-5" />
-                    ) : (
-                      <CardIcon className="h-5 w-5" />
-                    )
-                  }
-                  isActive={draftAdvancePaymentMethodCode === option.value}
-                  key={option.value}
-                  label={option.label}
-                  onClick={() => {
-                    onSetAdvancePaymentMethodCode(option.value);
-                    if (advanceCents <= 0) {
-                      if (option.value === MIXED_PAYMENT_METHOD_CODE) {
-                        mixedAdvanceCashInputRef.current?.focus();
-                        mixedAdvanceCashInputRef.current?.select();
-                        return;
-                      }
-                      advanceInputRef.current?.focus();
-                      advanceInputRef.current?.select();
-                    }
-                  }}
-                />
-              ))}
-            </div>
-
-            {isMixedAdvance ? (
-              <div className="grid gap-2">
-                <div className="grid gap-2">
-                  <PosPaymentInputCard icon={<MoneyIcon className="h-5 w-5" />} label="Efectivo">
-                    <div className="relative w-full">
-                      <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm font-semibold text-slate-500">
-                        $
-                      </span>
-                      <input
-                        className={cn(
-                          "h-11 w-full rounded-xl pl-7 pr-3 text-right text-[1.15rem] font-semibold leading-none tracking-tight [font-variant-numeric:tabular-nums]",
-                          posInputClass,
-                        )}
-                        inputMode="decimal"
-                        onChange={(event) => onSetMixedAdvanceCashAmountText(event.target.value)}
-                        placeholder="0.00"
-                        ref={mixedAdvanceCashInputRef}
-                        value={draftMixedAdvanceCashAmountText}
-                      />
-                    </div>
-                  </PosPaymentInputCard>
-
-                  <PosPaymentInputCard icon={<CardIcon className="h-5 w-5" />} label="Tarjeta">
-                    <div className="relative w-full">
-                      <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm font-semibold text-slate-500">
-                        $
-                      </span>
-                      <input
-                        className={cn(
-                          "h-11 w-full rounded-xl pl-7 pr-3 text-right text-[1.15rem] font-semibold leading-none tracking-tight [font-variant-numeric:tabular-nums]",
-                          posInputClass,
-                        )}
-                        inputMode="decimal"
-                        onChange={(event) => onSetMixedAdvanceCardAmountText(event.target.value)}
-                        placeholder="0.00"
-                        value={draftMixedAdvanceCardAmountText}
-                      />
-                    </div>
-                  </PosPaymentInputCard>
-                </div>
-              </div>
-            ) : (
-              <PosPaymentInputCard icon={<MoneyIcon className="h-5 w-5" />} label="Anticipo">
-                <div className="relative w-full">
-                  <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm font-semibold text-slate-500">
-                    $
+        <div className="grid min-h-0 content-start gap-2 overflow-y-auto pr-1">
+          <div className="order-2 grid gap-2.5">
+            <div className="grid gap-3 rounded-xl border border-[var(--pos-shell-border)] bg-white p-3 shadow-[var(--ui-shadow-subtle)]">
+              <div className="flex items-center justify-between gap-3">
+                <div className="flex min-w-0 items-center gap-2">
+                  <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[var(--pos-shell-muted)] text-[var(--pos-primary)]">
+                    <MoneyIcon className="h-4 w-4" />
                   </span>
-                  <input
-                    className={cn(
-                      "h-11 w-full rounded-xl pl-7 pr-3 text-right text-[1.2rem] font-semibold leading-none tracking-tight [font-variant-numeric:tabular-nums]",
-                      posInputClass,
-                    )}
-                    inputMode="decimal"
-                    onChange={(event) => onSetAdvanceAmountText(event.target.value)}
-                    onFocus={ensureDefaultAdvanceMethod}
-                    placeholder="0.00"
-                    ref={advanceInputRef}
-                    value={draftAdvanceAmountText}
-                  />
+                  <p className="truncate whitespace-nowrap text-[15px] font-semibold leading-5 text-slate-950">
+                    Cobro del pedido
+                  </p>
                 </div>
-              </PosPaymentInputCard>
-            )}
+              </div>
 
-            <div className="grid gap-2">
-              <OrderPaymentMetricTile
-                icon={<ReceiptIcon className="h-5 w-5" />}
-                label="Total"
-                tone="financial"
-                value={formatCurrency(formatMoneyFromCents(subtotalCents))}
-              />
-              <OrderPaymentMetricTile
-                icon={<ClockIcon className="h-5 w-5" />}
-                label="Pendiente"
-                tone="pending"
-                value={formatCurrency(formatMoneyFromCents(remainingCents))}
-              />
+              {paymentStateChip ? (
+                <div className="flex justify-start">
+                  <span className="pos-chip" data-tone={paymentStateChip.tone}>
+                    {paymentStateChip.label}
+                  </span>
+                </div>
+              ) : null}
+
+              <div className="grid grid-cols-3 gap-2">
+                {PAYMENT_METHOD_OPTIONS.map((option) => (
+                  <OrderPaymentMethodButton
+                    icon={
+                      option.value === CASH_PAYMENT_METHOD_CODE ? (
+                        <MoneyIcon className="h-5 w-5" />
+                      ) : option.value === MIXED_PAYMENT_METHOD_CODE ? (
+                        <SplitIcon className="h-5 w-5" />
+                      ) : (
+                        <CardIcon className="h-5 w-5" />
+                      )
+                    }
+                    isActive={draftAdvancePaymentMethodCode === option.value}
+                    key={option.value}
+                    label={option.label}
+                    onClick={() => {
+                      onSetAdvancePaymentMethodCode(option.value);
+                      if (advanceCents <= 0) {
+                        if (option.value === MIXED_PAYMENT_METHOD_CODE) {
+                          mixedAdvanceCashInputRef.current?.focus();
+                          mixedAdvanceCashInputRef.current?.select();
+                          return;
+                        }
+                        advanceInputRef.current?.focus();
+                        advanceInputRef.current?.select();
+                      }
+                    }}
+                  />
+                ))}
+              </div>
+
+              {isMixedAdvance ? (
+                <div className="grid gap-2">
+                  <div className="grid gap-2">
+                    <PosPaymentInputCard icon={<MoneyIcon className="h-5 w-5" />} label="Efectivo">
+                      <div className="relative w-full">
+                        <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm font-semibold text-slate-500">
+                          $
+                        </span>
+                        <input
+                          className={cn(
+                            "h-11 w-full rounded-xl pl-7 pr-3 text-right text-[1.15rem] font-semibold leading-none tracking-tight [font-variant-numeric:tabular-nums]",
+                            posInputClass,
+                          )}
+                          inputMode="decimal"
+                          onChange={(event) => onSetMixedAdvanceCashAmountText(event.target.value)}
+                          onKeyDown={submitOrderFromPaymentInput}
+                          placeholder="0.00"
+                          ref={mixedAdvanceCashInputRef}
+                          value={draftMixedAdvanceCashAmountText}
+                        />
+                      </div>
+                    </PosPaymentInputCard>
+
+                    <PosPaymentInputCard icon={<CardIcon className="h-5 w-5" />} label="Tarjeta">
+                      <div className="relative w-full">
+                        <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm font-semibold text-slate-500">
+                          $
+                        </span>
+                        <input
+                          className={cn(
+                            "h-11 w-full rounded-xl pl-7 pr-3 text-right text-[1.15rem] font-semibold leading-none tracking-tight [font-variant-numeric:tabular-nums]",
+                            posInputClass,
+                          )}
+                          inputMode="decimal"
+                          onChange={(event) => onSetMixedAdvanceCardAmountText(event.target.value)}
+                          onKeyDown={submitOrderFromPaymentInput}
+                          placeholder="0.00"
+                          value={draftMixedAdvanceCardAmountText}
+                        />
+                      </div>
+                    </PosPaymentInputCard>
+                  </div>
+                </div>
+              ) : (
+                <PosPaymentInputCard icon={<MoneyIcon className="h-5 w-5" />} label="Anticipo">
+                  <div className="relative w-full">
+                    <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm font-semibold text-slate-500">
+                      $
+                    </span>
+                    <input
+                      className={cn(
+                        "h-11 w-full rounded-xl pl-7 pr-3 text-right text-[1.2rem] font-semibold leading-none tracking-tight [font-variant-numeric:tabular-nums]",
+                        posInputClass,
+                      )}
+                      inputMode="decimal"
+                      onChange={(event) => onSetAdvanceAmountText(event.target.value)}
+                      onFocus={ensureDefaultAdvanceMethod}
+                      onKeyDown={submitOrderFromPaymentInput}
+                      placeholder="0.00"
+                      ref={advanceInputRef}
+                      value={draftAdvanceAmountText}
+                    />
+                  </div>
+                </PosPaymentInputCard>
+              )}
+
+              <div className="grid gap-2">
+                <OrderPaymentMetricTile
+                  icon={<ReceiptIcon className="h-5 w-5" />}
+                  label="Total"
+                  tone="financial"
+                  value={formatCurrency(formatMoneyFromCents(subtotalCents))}
+                />
+                <OrderPaymentMetricTile
+                  icon={<ClockIcon className="h-5 w-5" />}
+                  label="Pendiente"
+                  tone="pending"
+                  value={formatCurrency(formatMoneyFromCents(remainingCents))}
+                />
+              </div>
             </div>
           </div>
-        </div>
 
-        <div className="grid min-h-0 grid-rows-[minmax(0,1fr)_auto] gap-2.5">
-          <div className="min-h-0 overflow-hidden rounded-xl border border-[var(--pos-shell-border)] bg-white">
-            {draftLines.length === 0 ? (
-              <div className="flex min-h-[7rem] items-center justify-center px-4 py-4 text-center text-sm leading-6 text-slate-600">
-                Agrega productos desde el catalogo para formar el pedido.
-              </div>
-            ) : (
-              <ScrollPane className="h-full">
-                {draftLines.map((line) => (
-                  <DraftLineRow
-                    key={line.key}
-                    line={line}
-                    onDecrement={() => onDraftLineDecrement(line.key)}
-                    onIncrement={() => onDraftLineIncrement(line.key)}
-                    onRemove={() => onDraftLineRemove(line.key)}
-                  />
-                ))}
-              </ScrollPane>
-            )}
+          <div className="order-3 grid gap-2 rounded-xl border border-[var(--pos-shell-border)] bg-white p-2.5">
+            <button
+              className="flex h-9 items-center justify-between gap-3 rounded-lg px-2 text-left text-sm font-semibold text-slate-950 transition hover:bg-[var(--pos-shell-muted)]"
+              onClick={onToggleDraftNotes}
+              type="button"
+            >
+              <span>
+                {draftNotes.trim().length > 0 ? "Observacion agregada" : "Agregar observacion"}
+              </span>
+              <ChevronRightIcon
+                className={cn(
+                  "h-4 w-4 text-slate-500 transition",
+                  isDraftNotesExpanded && "rotate-90",
+                )}
+              />
+            </button>
+            {isDraftNotesExpanded || draftNotes.trim().length > 0 ? (
+              <textarea
+                className={cn(
+                  "min-h-[4.25rem] resize-none rounded-lg px-3 py-2 text-sm leading-6 shadow-none",
+                  posInputClass,
+                )}
+                onChange={(event) => onSetDraftNotes(event.target.value)}
+                placeholder="Observacion opcional"
+                value={draftNotes}
+              />
+            ) : null}
           </div>
 
-          <div className="grid gap-1.5">
-            {createChecklistMessages.length > 0 ? (
-              <div className="grid gap-1.5">
-                {createChecklistMessages.slice(0, 4).map((message) => (
-                  <InlineNotice key={message} tone="warning">
-                    {message}
-                  </InlineNotice>
-                ))}
+          <div className="order-1 grid min-h-0 gap-2.5">
+            <div className="min-h-0 overflow-hidden rounded-xl border border-[var(--pos-shell-border)] bg-white">
+              <div className="flex items-center justify-between gap-3 border-b border-[var(--pos-shell-border)] px-3 py-2">
+                <p className="text-sm font-semibold text-slate-950">Productos</p>
+                <span className="pos-chip" data-tone="muted">
+                  {getOrderLineCount(draftLines)} lineas
+                </span>
               </div>
-            ) : (
-              <InlineNotice tone="success">Pedido listo para guardar.</InlineNotice>
-            )}
-            {createOrderBlockingMessage && createChecklistMessages.length === 0 ? (
-              <InlineNotice tone="warning">{createOrderBlockingMessage}</InlineNotice>
-            ) : null}
+              {draftLines.length === 0 ? (
+                <div className="px-3 py-4 text-sm leading-6 text-slate-600">
+                  Agrega productos desde el area central.
+                </div>
+              ) : (
+                <ScrollPane className="max-h-[15rem]">
+                  {draftLines.map((line) => (
+                    <DraftLineRow
+                      key={line.key}
+                      line={line}
+                      onDecrement={() => onDraftLineDecrement(line.key)}
+                      onIncrement={() => onDraftLineIncrement(line.key)}
+                      onRemove={() => onDraftLineRemove(line.key)}
+                    />
+                  ))}
+                </ScrollPane>
+              )}
+            </div>
           </div>
         </div>
 
@@ -1318,6 +1303,7 @@ function OrdersDecisionPanel({
               className={cn("h-11", posPrimaryButtonClass)}
               disabled={createOrderDisabled || isCreateSaving}
               onClick={onCreateOrder}
+              title={createOrderBlockingMessage ?? undefined}
               type="button"
             >
               {isCreateSaving ? "Guardando..." : "Guardar pedido"}
@@ -1331,7 +1317,10 @@ function OrdersDecisionPanel({
   if (orderDetailIsPending) {
     return (
       <div className="pos-shell-panel grid h-full min-h-0 p-[var(--pos-shell-workstation-padding)]">
-        <OperationalStatus description="Cargando el pedido seleccionado." title="Pedido seleccionado" />
+        <OperationalStatus
+          description="Consultando el detalle del pedido."
+          title="Pedido seleccionado"
+        />
       </div>
     );
   }
@@ -1352,28 +1341,47 @@ function OrdersDecisionPanel({
 
   if (!orderDetail) {
     return (
-      <div className="pos-shell-panel grid h-full min-h-0 p-[var(--pos-shell-workstation-padding)]">
-        <div className="grid h-full place-items-center rounded-xl border border-dashed border-[var(--pos-shell-border)] bg-[var(--pos-shell-muted)] px-4 py-8 text-center">
-          <div className="grid max-w-xs gap-2">
-            <p className="text-sm font-semibold text-slate-950">Sin pedido seleccionado.</p>
-            <p className="text-sm leading-6 text-slate-600">
-              Selecciona un pedido para revisar el resumen y ejecutar la siguiente acción.
-            </p>
+      <div className="pos-shell-panel grid h-full min-h-0 grid-rows-[auto_minmax(0,1fr)_auto] gap-3 p-[var(--pos-shell-workstation-padding)]">
+        <div className="flex flex-wrap items-start justify-between gap-2">
+          <div className="min-w-0">
+            <p className="pos-label-text">Pedidos</p>
+            <h2 className="mt-0.5 text-base font-semibold text-slate-950">
+              Sin pedido seleccionado
+            </h2>
           </div>
+        </div>
+
+        <div className="grid content-start gap-3 rounded-xl border border-dashed border-[var(--pos-shell-border)] bg-[var(--pos-shell-muted)] px-4 py-4">
+          <p className="text-sm leading-6 text-slate-600">
+            Selecciona un pedido para ver el detalle, cobrar saldo o marcarlo como entregado.
+          </p>
+          <div className="grid gap-1.5 rounded-lg border border-[var(--pos-shell-border)] bg-white px-3 py-2.5 text-sm text-slate-600">
+            <span>Consulta pedidos por folio, cliente, telefono, estado o fecha.</span>
+            <span>Las acciones aparecen aqui cuando eliges un pedido.</span>
+          </div>
+        </div>
+
+        <div className="grid gap-2">
+          <Button
+            className={cn("h-10", posOutlineButtonClass)}
+            onClick={onStartNewOrder}
+            type="button"
+            variant="outline"
+          >
+            <PlusIcon className="mr-2 h-4 w-4" />
+            Nuevo pedido
+          </Button>
         </div>
       </div>
     );
   }
 
   const requiresSettlement =
-    orderDetail.requires_settlement_on_delivery &&
-    orderDetail.remaining_balance_amount !== "0.00";
-  const showDeliverySettlementFlow =
-    orderDetail.can_deliver && requiresSettlement && deliverySettlementFlowActive;
+    orderDetail.requires_settlement_on_delivery && orderDetail.remaining_balance_amount !== "0.00";
+  const showDeliverySettlementFlow = orderDetail.can_deliver && requiresSettlement;
   const remainingBalanceCents = parseMoneyToCents(orderDetail.remaining_balance_amount) ?? 0;
   const sanitizedDeliveryReceivedAmount = sanitizeMoneyInput(deliveryReceivedAmountText);
-  const deliveryReceivedAmountCents =
-    parseMoneyToCents(sanitizedDeliveryReceivedAmount) ?? 0;
+  const deliveryReceivedAmountCents = parseMoneyToCents(sanitizedDeliveryReceivedAmount) ?? 0;
   const deliveryMixedSettlementPayments = buildDeliverOrderSettlementPayments({
     mixedCardAmountText: deliveryMixedCardAmountText,
     mixedCashAmountText: deliveryMixedCashAmountText,
@@ -1391,7 +1399,9 @@ function OrdersDecisionPanel({
     ? 0
     : Math.max(deliveryCapturedAmountCents - remainingBalanceCents, 0);
   const deliveryMissingCents = Math.max(remainingBalanceCents - deliveryCapturedAmountCents, 0);
-  const deliveryMixedDifferenceCents = Math.abs(deliveryCapturedAmountCents - remainingBalanceCents);
+  const deliveryMixedDifferenceCents = Math.abs(
+    deliveryCapturedAmountCents - remainingBalanceCents,
+  );
   const isMixedDeliverySettlementReady =
     deliveryMixedSettlementPayments.length === 2 &&
     deliveryCapturedAmountCents === remainingBalanceCents;
@@ -1401,77 +1411,19 @@ function OrdersDecisionPanel({
     (isMixedDeliverySettlement
       ? isMixedDeliverySettlementReady
       : sanitizedDeliveryReceivedAmount.length > 0 && deliveryMissingCents === 0);
-  const primaryActionLabel = orderDetail.can_mark_ready
-    ? "Marcar listo para entrega"
-    : orderDetail.can_deliver
-      ? showDeliverySettlementFlow
-        ? "Cobrar y entregar"
-        : requiresSettlement
-          ? "Cobrar saldo para entregar"
-          : "Entregar pedido"
-      : null;
-  const primaryActionTone =
-    orderDetail.can_mark_ready
-      ? "info"
-      : orderDetail.can_deliver
-        ? requiresSettlement
-          ? "warning"
-          : "success"
-        : orderDetail.status === "DELIVERED"
-          ? "success"
-        : orderDetail.status === "CANCELED"
-          ? "warning"
-          : "info";
-  const operationalStateTone =
-    orderDetail.can_deliver
-      ? requiresSettlement
-        ? "danger"
-        : "success"
-      : orderDetail.can_mark_ready
-        ? "warning"
-        : orderDetail.status === "DELIVERED"
-          ? "success"
-          : orderDetail.status === "CANCELED"
-            ? "danger"
-            : "info";
-  const operationalStateLabel =
-    orderDetail.can_deliver
-      ? requiresSettlement
-        ? "Pago pendiente"
-        : "Pedido liquidado"
-      : orderDetail.can_mark_ready
-        ? "Pendiente"
-        : orderDetail.status === "DELIVERED"
-          ? "Pedido entregado"
-          : orderDetail.status === "CANCELED"
-            ? "Pedido cancelado"
-            : "Sin accion";
-  const operationalActionTone =
-    primaryActionTone === "warning"
-      ? "warning"
-      : primaryActionTone === "success"
-        ? "success"
-        : "info";
-  const readyNotificationAction = getCustomerCommunicationActionState({
-    customerPhone: orderDetail.customer_phone,
-    intent: "orderReady",
-  });
-
   return (
-    <div className="pos-shell-panel grid h-full min-h-0 grid-rows-[auto_minmax(0,1fr)_auto] gap-[var(--pos-section-gap)] p-[var(--pos-shell-workstation-padding)]">
-      <div className="grid gap-2">
+    <div className="pos-shell-panel grid h-full min-h-0 grid-rows-[auto_minmax(0,1fr)_auto] gap-2 p-[var(--pos-shell-workstation-padding)]">
+      <div className="grid gap-1.5">
         <div className="flex flex-wrap items-start justify-between gap-2.5">
           <div className="min-w-0">
             <p className="pos-label-text">Operacion</p>
-            <h2 className="mt-0.5 text-base font-semibold text-slate-950">
-              Entrega y cobro
-            </h2>
+            <h2 className="mt-0.5 text-base font-semibold text-slate-950">Entrega y cobro</h2>
           </div>
           <StatusBadge status={orderDetail.status} />
         </div>
       </div>
 
-      <div className="grid min-h-0 content-start gap-2 overflow-y-auto pr-1">
+      <div className="grid min-h-0 content-start gap-1.5 overflow-hidden">
         <KeyValueGroup tone="muted">
           <div className="min-w-0">
             <p className="truncate text-sm font-semibold text-slate-950" title={orderDetail.folio}>
@@ -1485,252 +1437,255 @@ function OrdersDecisionPanel({
           />
           <KeyValueRow
             label="Recoleccion"
-            title={formatOrderRequestedForLabel(orderDetail.requested_for_at, orderDetail.branch.timezone)}
-            value={formatOrderRequestedForLabel(orderDetail.requested_for_at, orderDetail.branch.timezone)}
+            title={formatOrderRequestedForLabel(
+              orderDetail.requested_for_at,
+              orderDetail.branch.timezone,
+            )}
+            value={formatOrderRequestedForLabel(
+              orderDetail.requested_for_at,
+              orderDetail.branch.timezone,
+            )}
           />
         </KeyValueGroup>
 
-        <div className="grid gap-2 rounded-xl border border-[var(--pos-shell-border)] bg-white px-3 py-3">
-          <div className="flex flex-wrap gap-2">
-            <OrderOperationalChip
-              icon={
-                orderDetail.can_deliver ? (
-                  requiresSettlement ? (
-                    <ClockIcon className="h-4 w-4" />
-                  ) : (
-                    <CheckCircleIcon className="h-4 w-4" />
-                  )
-                ) : orderDetail.can_mark_ready ? (
-                  <BagIcon className="h-4 w-4" />
-                ) : orderDetail.status === "CANCELED" ? (
-                  <XIcon className="h-4 w-4" />
-                ) : (
-                  <CheckCircleIcon className="h-4 w-4" />
-                )
-              }
-              label={operationalStateLabel}
-              tone={operationalStateTone}
-            />
-            <OrderOperationalChip
-              icon={
-                showDeliverySettlementFlow ? (
-                  <MoneyIcon className="h-4 w-4" />
-                ) : orderDetail.can_mark_ready ? (
-                  <BagIcon className="h-4 w-4" />
-                ) : orderDetail.can_deliver ? (
-                  requiresSettlement ? (
-                    <MoneyIcon className="h-4 w-4" />
-                  ) : (
-                    <CheckCircleIcon className="h-4 w-4" />
-                  )
-                ) : orderDetail.status === "CANCELED" ? (
-                  <XIcon className="h-4 w-4" />
-                ) : (
-                  <CheckCircleIcon className="h-4 w-4" />
-                )
-              }
-              label={primaryActionLabel ?? "Sin accion disponible"}
-              tone={operationalActionTone}
-            />
-            {orderDetail.can_deliver && !requiresSettlement ? (
-              <OrderOperationalChip
-                icon={<CheckCircleIcon className="h-4 w-4" />}
-                label="Entrega directa"
-                tone="success"
-              />
-            ) : null}
+        <div className="grid gap-1.5 rounded-xl border border-[var(--pos-shell-border)] bg-white px-2.5 py-2">
+          <div className="flex items-center justify-between gap-3 border-b border-[var(--pos-shell-border)] pb-1.5">
+            <p className="text-sm font-semibold text-slate-950">Productos</p>
+            <span className="pos-chip" data-tone="muted">
+              {orderDetail.items.length} lineas
+            </span>
+          </div>
+          <div className="overflow-hidden rounded-lg border border-[var(--pos-shell-border)]">
+            <ScrollPane className="max-h-[4.75rem]">
+              {orderDetail.items.map((item) => (
+                <div
+                  className="grid grid-cols-[minmax(0,1fr)_3rem_4.5rem] items-center gap-2 border-t border-[var(--pos-shell-border)] px-2.5 py-1.5 first:border-t-0"
+                  key={item.id}
+                >
+                  <span
+                    className="truncate text-sm font-medium text-slate-950"
+                    title={item.product_name_snapshot}
+                  >
+                    {item.product_name_snapshot}
+                  </span>
+                  <span className="text-right text-sm font-semibold text-slate-700 [font-variant-numeric:tabular-nums]">
+                    {item.quantity}
+                  </span>
+                  <span className="text-right text-sm font-semibold text-slate-950 [font-variant-numeric:tabular-nums]">
+                    {formatCurrency(item.line_total_amount)}
+                  </span>
+                </div>
+              ))}
+            </ScrollPane>
           </div>
 
-        {requiresSettlement ? (
-          showDeliverySettlementFlow ? (
-            <div className="grid gap-3 rounded-xl border border-[var(--ui-color-warning-soft)] bg-[var(--ui-color-warning-soft)] px-3 py-3">
-              <div className="flex items-center justify-between gap-3">
-                <div className="flex min-w-0 items-center gap-2">
-                  <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-white text-[var(--ui-color-warning)]">
-                    <MoneyIcon className="h-4 w-4" />
-                  </span>
-                  <p className="truncate text-[15px] font-semibold leading-5 text-slate-950">
-                    Cobro de entrega
-                  </p>
+          {requiresSettlement ? (
+            showDeliverySettlementFlow ? (
+              <div className="grid gap-2 rounded-xl border border-[var(--ui-color-info)]/20 bg-[var(--ui-color-info-soft)] px-2.5 py-2">
+                <div className="flex items-center justify-between gap-3">
+                  <div className="flex min-w-0 items-center gap-2">
+                    <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-white text-[var(--ui-color-info)]">
+                      <MoneyIcon className="h-4 w-4" />
+                    </span>
+                    <p className="truncate text-sm font-semibold leading-5 text-slate-950">
+                      Cobro de entrega
+                    </p>
+                  </div>
                 </div>
-              </div>
 
-              <div className="grid grid-cols-3 gap-2">
-                {PAYMENT_METHOD_OPTIONS.map((option) => (
-                  <OrderPaymentMethodButton
+                <div className="grid grid-cols-3 gap-2">
+                  {PAYMENT_METHOD_OPTIONS.map((option) => (
+                    <OrderPaymentMethodButton
+                      className="min-h-[3.65rem] gap-1 rounded-lg py-2 text-[13px]"
+                      icon={
+                        option.value === CASH_PAYMENT_METHOD_CODE ? (
+                          <MoneyIcon className="h-5 w-5" />
+                        ) : option.value === MIXED_PAYMENT_METHOD_CODE ? (
+                          <SplitIcon className="h-5 w-5" />
+                        ) : (
+                          <CardIcon className="h-5 w-5" />
+                        )
+                      }
+                      isActive={deliveryPaymentMethodCode === option.value}
+                      key={option.value}
+                      label={option.label}
+                      onClick={() => onDeliveryPaymentMethodChange(option.value)}
+                    />
+                  ))}
+                </div>
+
+                <div className="grid gap-2">
+                  {isMixedDeliverySettlement ? (
+                    <div className="grid gap-2">
+                      <PosPaymentInputCard
+                        className="rounded-lg px-2.5 py-2"
+                        icon={<MoneyIcon className="h-5 w-5" />}
+                        label="Efectivo"
+                      >
+                        <div className="relative w-full">
+                          <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm font-semibold text-slate-500">
+                            $
+                          </span>
+                          <input
+                            className={cn(
+                              "h-10 w-full rounded-xl pl-7 pr-3 text-right text-[1.15rem] font-semibold leading-none tracking-tight [font-variant-numeric:tabular-nums]",
+                              posInputClass,
+                            )}
+                            inputMode="decimal"
+                            onChange={(event) =>
+                              onSetDeliveryMixedCashAmountText(
+                                event.target.value.includes("-")
+                                  ? ""
+                                  : sanitizeMoneyInput(event.target.value),
+                              )
+                            }
+                            placeholder="0.00"
+                            ref={deliveryMixedCashInputRef}
+                            value={deliveryMixedCashAmountText}
+                          />
+                        </div>
+                      </PosPaymentInputCard>
+
+                      <PosPaymentInputCard
+                        className="rounded-lg px-2.5 py-2"
+                        icon={<CardIcon className="h-5 w-5" />}
+                        label="Tarjeta"
+                      >
+                        <div className="relative w-full">
+                          <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm font-semibold text-slate-500">
+                            $
+                          </span>
+                          <input
+                            className={cn(
+                              "h-10 w-full rounded-xl pl-7 pr-3 text-right text-[1.15rem] font-semibold leading-none tracking-tight [font-variant-numeric:tabular-nums]",
+                              posInputClass,
+                            )}
+                            inputMode="decimal"
+                            onChange={(event) =>
+                              onSetDeliveryMixedCardAmountText(
+                                event.target.value.includes("-")
+                                  ? ""
+                                  : sanitizeMoneyInput(event.target.value),
+                              )
+                            }
+                            placeholder="0.00"
+                            value={deliveryMixedCardAmountText}
+                          />
+                        </div>
+                      </PosPaymentInputCard>
+                    </div>
+                  ) : (
+                    <PosPaymentInputCard
+                      className="rounded-lg px-2.5 py-2"
+                      icon={<MoneyIcon className="h-5 w-5" />}
+                      label="Pago"
+                    >
+                      <div className="relative w-full">
+                        <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm font-semibold text-slate-500">
+                          $
+                        </span>
+                        <input
+                          className={cn(
+                            "h-10 w-full rounded-xl pl-7 pr-3 text-right text-[1.18rem] font-semibold leading-none tracking-tight [font-variant-numeric:tabular-nums]",
+                            posInputClass,
+                          )}
+                          inputMode="decimal"
+                          onChange={(event) =>
+                            onSetDeliveryReceivedAmountText(
+                              event.target.value.includes("-")
+                                ? ""
+                                : sanitizeMoneyInput(event.target.value),
+                            )
+                          }
+                          placeholder={orderDetail.remaining_balance_amount}
+                          ref={deliveryReceivedInputRef}
+                          value={deliveryReceivedAmountText}
+                        />
+                      </div>
+                    </PosPaymentInputCard>
+                  )}
+
+                  <OrderPaymentMetricTile
+                    className="rounded-lg px-2.5 py-2"
+                    icon={<MoneyIcon className="h-5 w-5" />}
+                    label="Saldo"
+                    tone="advance"
+                    value={formatCurrency(orderDetail.remaining_balance_amount)}
+                  />
+                  <OrderPaymentMetricTile
+                    className="rounded-lg px-2.5 py-2"
                     icon={
-                      option.value === CASH_PAYMENT_METHOD_CODE ? (
-                        <MoneyIcon className="h-5 w-5" />
-                      ) : option.value === MIXED_PAYMENT_METHOD_CODE ? (
-                        <SplitIcon className="h-5 w-5" />
+                      (
+                        isMixedDeliverySettlement
+                          ? deliveryCapturedAmountCents !== remainingBalanceCents
+                          : deliveryMissingCents > 0
+                      ) ? (
+                        <ClockIcon className="h-5 w-5" />
                       ) : (
-                        <CardIcon className="h-5 w-5" />
+                        <CheckCircleIcon className="h-5 w-5" />
                       )
                     }
-                    isActive={deliveryPaymentMethodCode === option.value}
-                    key={option.value}
-                    label={option.label}
-                    onClick={() => onDeliveryPaymentMethodChange(option.value)}
-                  />
-                ))}
-              </div>
-
-              <div className="grid gap-2">
-                {isMixedDeliverySettlement ? (
-                  <div className="grid gap-2">
-                    <PosPaymentInputCard icon={<MoneyIcon className="h-5 w-5" />} label="Efectivo">
-                      <div className="relative w-full">
-                        <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm font-semibold text-slate-500">
-                          $
-                        </span>
-                        <input
-                          className={cn(
-                            "h-11 w-full rounded-xl pl-7 pr-3 text-right text-[1.15rem] font-semibold leading-none tracking-tight [font-variant-numeric:tabular-nums]",
-                            posInputClass,
-                          )}
-                          inputMode="decimal"
-                          onChange={(event) =>
-                            onSetDeliveryMixedCashAmountText(
-                              event.target.value.includes("-")
-                                ? ""
-                                : sanitizeMoneyInput(event.target.value),
-                            )
-                          }
-                          placeholder="0.00"
-                          ref={deliveryMixedCashInputRef}
-                          value={deliveryMixedCashAmountText}
-                        />
-                      </div>
-                    </PosPaymentInputCard>
-
-                    <PosPaymentInputCard icon={<CardIcon className="h-5 w-5" />} label="Tarjeta">
-                      <div className="relative w-full">
-                        <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm font-semibold text-slate-500">
-                          $
-                        </span>
-                        <input
-                          className={cn(
-                            "h-11 w-full rounded-xl pl-7 pr-3 text-right text-[1.15rem] font-semibold leading-none tracking-tight [font-variant-numeric:tabular-nums]",
-                            posInputClass,
-                          )}
-                          inputMode="decimal"
-                          onChange={(event) =>
-                            onSetDeliveryMixedCardAmountText(
-                              event.target.value.includes("-")
-                                ? ""
-                                : sanitizeMoneyInput(event.target.value),
-                            )
-                          }
-                          placeholder="0.00"
-                          value={deliveryMixedCardAmountText}
-                        />
-                      </div>
-                    </PosPaymentInputCard>
-                  </div>
-                ) : (
-                  <PosPaymentInputCard icon={<MoneyIcon className="h-5 w-5" />} label="Recibe">
-                    <div className="relative w-full">
-                      <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm font-semibold text-slate-500">
-                        $
-                      </span>
-                      <input
-                        className={cn(
-                          "h-11 w-full rounded-xl pl-7 pr-3 text-right text-[1.2rem] font-semibold leading-none tracking-tight [font-variant-numeric:tabular-nums]",
-                          posInputClass,
-                        )}
-                        inputMode="decimal"
-                        onChange={(event) =>
-                          onSetDeliveryReceivedAmountText(
-                            event.target.value.includes("-")
-                              ? ""
-                              : sanitizeMoneyInput(event.target.value),
-                          )
-                        }
-                        placeholder={orderDetail.remaining_balance_amount}
-                        ref={deliveryReceivedInputRef}
-                        value={deliveryReceivedAmountText}
-                      />
-                    </div>
-                  </PosPaymentInputCard>
-                )}
-
-                <OrderPaymentMetricTile
-                  icon={<MoneyIcon className="h-5 w-5" />}
-                  label="Saldo a cobrar"
-                  tone="advance"
-                  value={formatCurrency(orderDetail.remaining_balance_amount)}
-                />
-                <OrderPaymentMetricTile
-                  icon={
-                    (isMixedDeliverySettlement
-                      ? deliveryCapturedAmountCents !== remainingBalanceCents
-                      : deliveryMissingCents > 0) ? (
-                      <ClockIcon className="h-5 w-5" />
-                    ) : (
-                      <CheckCircleIcon className="h-5 w-5" />
-                    )
-                  }
-                  label={
-                    isMixedDeliverySettlement
-                      ? deliveryCapturedAmountCents < remainingBalanceCents
-                        ? "Por asignar"
-                        : deliveryCapturedAmountCents > remainingBalanceCents
-                          ? "Excedente"
-                          : "Cuadre"
-                      : deliveryMissingCents > 0
-                        ? "Falta"
-                        : deliveryChangeCents > 0
-                          ? "Cambio"
-                          : "Exacto"
-                  }
-                  tone={
-                    isMixedDeliverySettlement
-                      ? deliveryCapturedAmountCents === remainingBalanceCents
-                        ? "success"
-                        : "pending"
-                      : deliveryMissingCents > 0
-                        ? "pending"
-                        : "success"
-                  }
-                  value={formatCurrency(
-                    formatMoneyFromCents(
+                    label={
                       isMixedDeliverySettlement
-                        ? deliveryMixedDifferenceCents
+                        ? deliveryCapturedAmountCents < remainingBalanceCents
+                          ? "Falta"
+                          : deliveryCapturedAmountCents > remainingBalanceCents
+                            ? "Excedente"
+                            : "Cuadre"
                         : deliveryMissingCents > 0
-                          ? deliveryMissingCents
-                          : deliveryChangeCents,
-                    ),
-                  )}
-                />
+                          ? "Falta"
+                          : deliveryChangeCents > 0
+                            ? "Cambio"
+                            : "Exacto"
+                    }
+                    tone={
+                      isMixedDeliverySettlement
+                        ? deliveryCapturedAmountCents === remainingBalanceCents
+                          ? "success"
+                          : "pending"
+                        : deliveryMissingCents > 0
+                          ? "pending"
+                          : "success"
+                    }
+                    value={formatCurrency(
+                      formatMoneyFromCents(
+                        isMixedDeliverySettlement
+                          ? deliveryMixedDifferenceCents
+                          : deliveryMissingCents > 0
+                            ? deliveryMissingCents
+                            : deliveryChangeCents,
+                      ),
+                    )}
+                  />
+                </div>
               </div>
-            </div>
-          ) : null
-        ) : null}
+            ) : null
+          ) : null}
 
-        <div className="grid gap-1 rounded-xl border border-[var(--pos-shell-border)] bg-[var(--pos-shell-muted)] px-3 py-2.5">
-          <div className="flex items-center justify-between gap-3 text-sm">
-            <span className="font-medium text-slate-600">Total</span>
-            <span className="text-right font-semibold text-slate-950">
-              {formatCurrency(orderDetail.total_amount)}
-            </span>
+          <div className="grid grid-cols-3 gap-1 rounded-lg border border-[var(--pos-shell-border)] bg-[var(--pos-shell-muted)] px-2 py-1.5">
+            <div className="min-w-0">
+              <p className="truncate text-[11px] font-medium text-slate-600">Total</p>
+              <p className="truncate text-sm font-semibold text-slate-950">
+                {formatCurrency(orderDetail.total_amount)}
+              </p>
+            </div>
+            <div className="min-w-0">
+              <p className="truncate text-[11px] font-medium text-slate-600">Anticipo</p>
+              <p className="truncate text-sm font-semibold text-slate-950">
+                {formatCurrency(orderDetail.advance_amount)}
+              </p>
+            </div>
+            <div className="min-w-0 text-right">
+              <p className="truncate text-[11px] font-medium text-slate-600">Saldo</p>
+              <p className="truncate text-sm font-semibold text-slate-950">
+                {formatCurrency(orderDetail.remaining_balance_amount)}
+              </p>
+            </div>
           </div>
-          <div className="flex items-center justify-between gap-3 text-sm">
-            <span className="font-medium text-slate-600">Anticipo</span>
-            <span className="text-right font-semibold text-slate-950">
-              {formatCurrency(orderDetail.advance_amount)}
-            </span>
-          </div>
-          <div className="flex items-center justify-between gap-3 text-sm">
-            <span className="font-medium text-slate-600">Saldo</span>
-            <span className="text-right font-semibold text-slate-950">
-              {formatCurrency(orderDetail.remaining_balance_amount)}
-            </span>
-          </div>
-        </div>
         </div>
       </div>
 
-      <div className="grid gap-2 border-t border-[var(--pos-shell-border)] pt-2">
+      <div className="grid gap-1.5 border-t border-[var(--pos-shell-border)] pt-2">
         {orderDetail.can_mark_ready ? (
           <Button
             className={cn("h-12 text-base font-semibold", posPrimaryButtonClass)}
@@ -1746,7 +1701,7 @@ function OrdersDecisionPanel({
           showDeliverySettlementFlow ? (
             <div className="grid grid-cols-[1fr_1fr] gap-2">
               <Button
-                className={cn("h-10", posOutlineButtonClass)}
+                className={cn("h-12 text-base font-semibold", posOutlineButtonClass)}
                 disabled={isSelectedOrderPending}
                 onClick={onDismissDeliverySettlementFlow}
                 type="button"
@@ -1760,7 +1715,10 @@ function OrdersDecisionPanel({
                 onClick={onRequestDeliverOrder}
                 type="button"
               >
-                {isSelectedOrderPending ? "Cobrando..." : "Cobrar y entregar"}
+                {getOrderDeliveryActionLabel({
+                  isPending: isSelectedOrderPending,
+                  requiresSettlement: true,
+                })}
               </Button>
             </div>
           ) : (
@@ -1770,30 +1728,12 @@ function OrdersDecisionPanel({
               onClick={onRequestDeliverOrder}
               type="button"
             >
-              {isSelectedOrderPending
-                ? "Entregando..."
-                : requiresSettlement
-                  ? "Cobrar saldo para entregar"
-                  : "Entregar pedido"}
+              {getOrderDeliveryActionLabel({
+                isPending: isSelectedOrderPending,
+                requiresSettlement,
+              })}
             </Button>
           )
-        ) : null}
-
-        {orderDetail.status === "READY" ? (
-          <div className="grid gap-1">
-            <Button
-              className={cn("h-10", posOutlineButtonClass)}
-              disabled={readyNotificationAction.disabled}
-              title={readyNotificationAction.disabledReason}
-              type="button"
-              variant="outline"
-            >
-              {readyNotificationAction.label}
-            </Button>
-            <p className="text-xs leading-5 text-slate-500">
-              {readyNotificationAction.disabledReason || readyNotificationAction.helperText}
-            </p>
-          </div>
         ) : null}
 
         {orderDetail.can_cancel ? (
@@ -1812,7 +1752,7 @@ function OrdersDecisionPanel({
   );
 }
 
-function OrderConsultationDetailSurface({
+export function OrderConsultationDetailSurface({
   onRequestCancelOrder,
   orderDetail,
   orderDetailError,
@@ -1860,11 +1800,11 @@ function OrderConsultationDetailSurface({
     return (
       <ListDetailColumn
         contentClassName="min-h-0 overflow-hidden"
-        description="Selecciona un pedido para revisar lineas, estado y saldo pendiente."
-        title="Detalle del pedido"
+        description="Selecciona un pedido para ver el detalle, cobrar saldo o marcarlo como entregado."
+        title="Sin pedido seleccionado"
       >
         <PosEmptyState
-          description="Selecciona un pedido de la lista para revisar el detalle y decidir la siguiente accion."
+          description="Usa la tabla central para elegir un pedido. Las acciones disponibles se muestran en este panel."
           title="Sin pedido seleccionado"
         />
       </ListDetailColumn>
@@ -1875,11 +1815,9 @@ function OrderConsultationDetailSurface({
     const quantity = Number(item.quantity);
     return Number.isFinite(quantity) ? sum + quantity : sum;
   }, 0);
-  const canShowCancelAction =
-    orderDetail.status === "PENDING" || orderDetail.status === "READY";
+  const canShowCancelAction = orderDetail.status === "PENDING" || orderDetail.status === "READY";
   const requiresSettlement =
-    orderDetail.requires_settlement_on_delivery &&
-    orderDetail.remaining_balance_amount !== "0.00";
+    orderDetail.requires_settlement_on_delivery && orderDetail.remaining_balance_amount !== "0.00";
 
   return (
     <ListDetailColumn
@@ -1892,7 +1830,9 @@ function OrderConsultationDetailSurface({
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div className="min-w-0">
               <div className="flex flex-wrap items-center gap-2">
-                <p className="text-base font-semibold text-slate-950">{orderDetail.customer_name}</p>
+                <p className="text-base font-semibold text-slate-950">
+                  {orderDetail.customer_name}
+                </p>
                 <StatusBadge status={orderDetail.status} />
               </div>
               <div className="mt-2 grid gap-1.5 text-sm text-slate-600">
@@ -1995,7 +1935,9 @@ function OrderConsultationDetailSurface({
               <div className="flex items-center justify-between gap-3 border-b border-[var(--pos-shell-border)] pb-2.5">
                 <p className="text-sm font-semibold text-slate-950">Notas</p>
                 <span className="pos-chip" data-tone="muted">
-                  {orderDetail.notes && orderDetail.notes.trim().length > 0 ? "Activas" : "Sin notas"}
+                  {orderDetail.notes && orderDetail.notes.trim().length > 0
+                    ? "Activas"
+                    : "Sin notas"}
                 </span>
               </div>
               <ScrollPane className="mt-3 text-sm leading-6 text-slate-700">
@@ -2034,9 +1976,6 @@ export function OrdersScreen() {
   const [deliveryMixedCardAmountText, setDeliveryMixedCardAmountText] = useState("");
   const [deliveryReceivedAmountText, setDeliveryReceivedAmountText] = useState("");
   const [orderActionDialog, setOrderActionDialog] = useState<OrderActionDialogState | null>(null);
-  const [cancelReason, setCancelReason] = useState("");
-  const [cancelReasonError, setCancelReasonError] = useState<string | null>(null);
-  const [isDeliverySettlementFlowActive, setIsDeliverySettlementFlowActive] = useState(false);
   const [hasNegativeAdvanceAttempt, setHasNegativeAdvanceAttempt] = useState(false);
   const [selectionErrorMessage, setSelectionErrorMessage] = useState<string | null>(null);
   const [draftState, setDraftState] = useState(createInitialOrderCreateDraftState());
@@ -2053,12 +1992,11 @@ export function OrdersScreen() {
 
   const openCancelDialog = useCallback((order: CancelableOrderSummary) => {
     setSelectedOrderId(order.id);
-    setCancelReason("");
-    setCancelReasonError(null);
     setOrderActionDialog({ kind: "cancel", order });
   }, []);
   const [pickupKeyboardStage, setPickupKeyboardStage] = useState<"hour" | "minute" | null>(null);
   const [orderNotes, setOrderNotes] = useState("");
+  const [isOrderNotesExpanded, setIsOrderNotesExpanded] = useState(false);
   const [advanceAmountText, setAdvanceAmountText] = useState("");
   const [mixedAdvanceCashAmountText, setMixedAdvanceCashAmountText] = useState("");
   const [mixedAdvanceCardAmountText, setMixedAdvanceCardAmountText] = useState("");
@@ -2111,28 +2049,32 @@ export function OrdersScreen() {
         mixedCashAmountText: mixedAdvanceCashAmountText,
         paymentMethodCode: advancePaymentMethodCode,
       }),
-    [advanceAmountText, advancePaymentMethodCode, mixedAdvanceCardAmountText, mixedAdvanceCashAmountText],
+    [
+      advanceAmountText,
+      advancePaymentMethodCode,
+      mixedAdvanceCardAmountText,
+      mixedAdvanceCashAmountText,
+    ],
   );
   const requestedForInput = useMemo(
     () => buildRequestedForInput(requestedForDraft),
     [requestedForDraft],
   );
   const hasCustomerName = customerName.trim().length > 0;
-  const hasCustomerPhone = customerPhone.trim().length > 0;
+  const hasCustomerPhone = isOrderCustomerPhoneComplete(customerPhone);
   const hasRequestedFor = requestedForInput.trim().length > 0;
   const hasAnyAdvanceCapture =
     advanceAmountText.trim().length > 0 ||
     mixedAdvanceCashAmountText.trim().length > 0 ||
     mixedAdvanceCardAmountText.trim().length > 0;
   const areCustomerDetailsComplete = hasCustomerName && hasCustomerPhone && hasRequestedFor;
-  const activeCreateTarget =
-    !hasCustomerName
-      ? "customer"
-      : !hasCustomerPhone
-        ? "phone"
-        : !hasRequestedFor || pickupKeyboardStage !== null
-          ? "pickup"
-          : "products";
+  const activeCreateTarget = !hasCustomerName
+    ? "customer"
+    : !hasCustomerPhone
+      ? "phone"
+      : !hasRequestedFor || pickupKeyboardStage !== null
+        ? "pickup"
+        : "products";
 
   const openPickupDatePicker = useCallback(() => {
     const input = pickupDateInputRef.current;
@@ -2164,6 +2106,25 @@ export function OrdersScreen() {
       catalogSearchInputRef.current?.focus();
     });
   }, []);
+  const selectFirstOrderCatalogTarget = useCallback(() => {
+    const firstCatalogCard = document.querySelector<HTMLButtonElement>(
+      "[data-pos-catalog-card='true']:not(:disabled)",
+    );
+
+    if (!firstCatalogCard) {
+      return false;
+    }
+
+    firstCatalogCard.click();
+    return true;
+  }, []);
+  const canEnableOrderCatalogForRequestedDraft = useCallback(
+    (nextRequestedForDraft: RequestedForDraftState) =>
+      hasCustomerName &&
+      isOrderCustomerPhoneComplete(customerPhone) &&
+      buildRequestedForInput(nextRequestedForDraft).trim().length > 0,
+    [customerPhone, hasCustomerName],
+  );
   const requestedForLabel = useMemo(() => {
     if (requestedForInput.trim().length === 0) {
       return "Sin fecha de recoleccion";
@@ -2203,13 +2164,13 @@ export function OrdersScreen() {
     );
     setPickupKeyboardStage(null);
     setOrderNotes("");
+    setIsOrderNotesExpanded(false);
     setAdvanceAmountText("");
     setMixedAdvanceCashAmountText("");
     setMixedAdvanceCardAmountText("");
     setAdvancePaymentMethodCode("");
     setHasNegativeAdvanceAttempt(false);
     setOrderActionDialog(null);
-    setIsDeliverySettlementFlowActive(false);
     setSelectionErrorMessage(null);
   }, [ordersBootstrapQuery.data?.local_timestamp]);
 
@@ -2241,18 +2202,12 @@ export function OrdersScreen() {
       return;
     }
 
-    const firstOrderId = ordersListQuery.data?.orders[0]?.id ?? null;
-    if (selectedOrderId === null && firstOrderId !== null) {
-      setSelectedOrderId(firstOrderId);
-      return;
-    }
-
     if (
       selectedOrderId !== null &&
       ordersListQuery.data !== undefined &&
       ordersListQuery.data.orders.every((order) => order.id !== selectedOrderId)
     ) {
-      setSelectedOrderId(firstOrderId);
+      setSelectedOrderId(null);
     }
   }, [mode, ordersListQuery.data, selectedOrderId]);
 
@@ -2262,12 +2217,32 @@ export function OrdersScreen() {
     setDeliveryMixedCardAmountText("");
     setDeliveryReceivedAmountText("");
     setOrderActionDialog(null);
-    setIsDeliverySettlementFlowActive(false);
   }, [selectedOrderId]);
 
   useEffect(() => {
+    const order = orderDetailQuery.data;
     if (
-      !isDeliverySettlementFlowActive ||
+      mode !== "list" ||
+      order === undefined ||
+      !order.can_deliver ||
+      !order.requires_settlement_on_delivery ||
+      order.remaining_balance_amount === "0.00"
+    ) {
+      return;
+    }
+
+    setDeliveryPaymentMethodCode((currentValue) =>
+      currentValue.trim().length > 0 ? currentValue : CASH_PAYMENT_METHOD_CODE,
+    );
+    setDeliveryReceivedAmountText((currentValue) =>
+      currentValue.trim().length > 0
+        ? currentValue
+        : sanitizeMoneyInput(order.remaining_balance_amount),
+    );
+  }, [mode, orderDetailQuery.data]);
+
+  useEffect(() => {
+    if (
       orderDetailQuery.data === undefined ||
       deliveryPaymentMethodCode.trim().length === 0 ||
       deliveryPaymentMethodCode === MIXED_PAYMENT_METHOD_CODE ||
@@ -2277,13 +2252,10 @@ export function OrdersScreen() {
       return;
     }
 
-    setDeliveryReceivedAmountText(sanitizeMoneyInput(orderDetailQuery.data.remaining_balance_amount));
-  }, [
-    deliveryPaymentMethodCode,
-    deliveryReceivedAmountText,
-    isDeliverySettlementFlowActive,
-    orderDetailQuery.data,
-  ]);
+    setDeliveryReceivedAmountText(
+      sanitizeMoneyInput(orderDetailQuery.data.remaining_balance_amount),
+    );
+  }, [deliveryPaymentMethodCode, deliveryReceivedAmountText, orderDetailQuery.data]);
 
   useEffect(() => {
     if (advanceCents <= 0 && !hasAnyAdvanceCapture) {
@@ -2306,16 +2278,6 @@ export function OrdersScreen() {
       if (orderActionDialog !== null && event.key === "Escape") {
         event.preventDefault();
         setOrderActionDialog(null);
-        return;
-      }
-
-      if (isDeliverySettlementFlowActive && event.key === "Escape") {
-        event.preventDefault();
-        setIsDeliverySettlementFlowActive(false);
-        setDeliveryPaymentMethodCode("");
-        setDeliveryMixedCashAmountText("");
-        setDeliveryMixedCardAmountText("");
-        setDeliveryReceivedAmountText("");
         return;
       }
 
@@ -2403,7 +2365,6 @@ export function OrdersScreen() {
     draftState.lines.length,
     draftState.searchText,
     areCustomerDetailsComplete,
-    isDeliverySettlementFlowActive,
     mode,
     orderActionDialog,
     customerName,
@@ -2582,7 +2543,6 @@ export function OrdersScreen() {
       setSelectedStatus(orderDetail.status);
       setSelectedOrderId(orderDetail.id);
       setOrderActionDialog(null);
-      setIsDeliverySettlementFlowActive(false);
       setDeliveryPaymentMethodCode("");
       setDeliveryMixedCashAmountText("");
       setDeliveryMixedCardAmountText("");
@@ -2610,7 +2570,7 @@ export function OrdersScreen() {
       }
 
       const payload: CancelCustomerOrderRequest = {
-        cancellation_reason: cancelReason.trim(),
+        cancellation_reason: "Cancelacion operativa desde POS",
         workstation_code: ordersBootstrapQuery.data.workstation.code,
       };
 
@@ -2626,9 +2586,6 @@ export function OrdersScreen() {
       setSelectedStatus(orderDetail.status);
       setSelectedOrderId(orderDetail.id);
       setOrderActionDialog(null);
-      setCancelReason("");
-      setCancelReasonError(null);
-      setIsDeliverySettlementFlowActive(false);
       setDeliveryPaymentMethodCode("");
       setDeliveryMixedCashAmountText("");
       setDeliveryMixedCardAmountText("");
@@ -2666,17 +2623,6 @@ export function OrdersScreen() {
     lines: draftState.lines,
     requestedForInput,
   });
-  const createChecklistMessages = getOrderCreateChecklistMessages({
-    advanceAmountText,
-    advancePaymentMethodCode,
-    customerName,
-    customerPhone,
-    mixedCardAmountText: mixedAdvanceCardAmountText,
-    mixedCashAmountText: mixedAdvanceCashAmountText,
-    hasNegativeAdvanceAttempt,
-    lines: draftState.lines,
-    requestedForInput,
-  });
   const createUiState = getOrderCreateUiState({
     customerName,
     customerPhone,
@@ -2686,16 +2632,39 @@ export function OrdersScreen() {
     requestedForInput,
   });
   const saveOrderDisabled = createOrderBlockingMessage !== null;
+  const visibleOrderCount = ordersListQuery.data?.orders.length ?? 0;
+  const hasAnyOrders = getOrderTotalCount(ordersBootstrapQuery.data?.status_counters ?? []) > 0;
+  const hasActiveOrderFilters = getOrderListHasActiveFilters({
+    dateFrom: requestedDateFrom,
+    dateTo: requestedDateTo,
+    searchText,
+    status: selectedStatus,
+  });
+  const startNewOrderCapture = useCallback(() => {
+    resetCreateDraft();
+    setSelectedOrderId(null);
+    setMode("create");
+  }, [resetCreateDraft]);
+  const openDatePicker = useCallback((input: HTMLInputElement) => {
+    input.focus();
+    if (typeof input.showPicker !== "function") {
+      return;
+    }
+
+    try {
+      input.showPicker();
+    } catch {
+      // Some browsers reject showPicker outside direct user activation.
+    }
+  }, []);
 
   const summaryPanel = useMemo(
     () => (
       <OrdersDecisionPanel
         bootstrap={ordersBootstrapQuery.data}
-        createChecklistMessages={createChecklistMessages}
         createOrderBlockingMessage={createOrderBlockingMessage}
         createOrderDisabled={saveOrderDisabled}
         createUiState={createUiState}
-        deliverySettlementFlowActive={isDeliverySettlementFlowActive}
         deliveryMixedCardAmountText={deliveryMixedCardAmountText}
         deliveryMixedCashAmountText={deliveryMixedCashAmountText}
         deliveryPaymentMethodCode={deliveryPaymentMethodCode}
@@ -2706,7 +2675,9 @@ export function OrdersScreen() {
         draftAdvancePaymentMethodCode={advancePaymentMethodCode}
         draftCustomerName={customerName}
         draftLines={draftState.lines}
+        draftNotes={orderNotes}
         draftRequestedForLabel={requestedForLabel}
+        isDraftNotesExpanded={isOrderNotesExpanded}
         isCreateSaving={createOrderMutation.isPending}
         isSelectedOrderPending={
           markReadyMutation.isPending || deliverMutation.isPending || cancelMutation.isPending
@@ -2716,7 +2687,6 @@ export function OrdersScreen() {
           void createOrderMutation.mutateAsync();
         }}
         onDismissDeliverySettlementFlow={() => {
-          setIsDeliverySettlementFlowActive(false);
           setDeliveryPaymentMethodCode("");
           setDeliveryMixedCashAmountText("");
           setDeliveryMixedCardAmountText("");
@@ -2792,28 +2762,10 @@ export function OrdersScreen() {
         }}
         onRequestDeliverOrder={() => {
           if (orderDetailQuery.data) {
-            const requiresSettlement =
-              orderDetailQuery.data.requires_settlement_on_delivery &&
-              orderDetailQuery.data.remaining_balance_amount !== "0.00";
-
-            if (requiresSettlement && !isDeliverySettlementFlowActive) {
-              setIsDeliverySettlementFlowActive(true);
-              setDeliveryPaymentMethodCode((currentValue) =>
-                currentValue.trim().length > 0 ? currentValue : CASH_PAYMENT_METHOD_CODE,
-              );
-              setDeliveryMixedCashAmountText("");
-              setDeliveryMixedCardAmountText("");
-              setDeliveryReceivedAmountText((currentValue) =>
-                currentValue.trim().length > 0
-                  ? currentValue
-                  : sanitizeMoneyInput(orderDetailQuery.data.remaining_balance_amount),
-              );
-              return;
-            }
-
             void deliverMutation.mutateAsync();
           }
         }}
+        onSetDraftNotes={setOrderNotes}
         onSetAdvanceAmountText={(value) => {
           const hasNegativeValue = value.includes("-");
           setHasNegativeAdvanceAttempt(hasNegativeValue);
@@ -2830,6 +2782,8 @@ export function OrdersScreen() {
           setMixedAdvanceCashAmountText(hasNegativeValue ? "" : sanitizeMoneyInput(value));
         }}
         onSetAdvancePaymentMethodCode={setAdvancePaymentMethodCode}
+        onToggleDraftNotes={() => setIsOrderNotesExpanded((state) => !state)}
+        onStartNewOrder={startNewOrderCapture}
         orderDetail={orderDetailQuery.data}
         orderDetailError={orderDetailQuery.error}
         orderDetailIsPending={orderDetailQuery.isPending}
@@ -2839,13 +2793,12 @@ export function OrdersScreen() {
       advanceAmountText,
       advancePaymentMethodCode,
       cancelMutation.isPending,
-      createChecklistMessages,
       createOrderBlockingMessage,
       createOrderMutation,
       createUiState,
       customerName,
       deliverMutation,
-      isDeliverySettlementFlowActive,
+      isOrderNotesExpanded,
       deliveryMixedCardAmountText,
       deliveryMixedCashAmountText,
       deliveryPaymentMethodCode,
@@ -2856,12 +2809,14 @@ export function OrdersScreen() {
       mixedAdvanceCashAmountText,
       mode,
       openCancelDialog,
+      orderNotes,
       orderDetailQuery.data,
       orderDetailQuery.error,
       orderDetailQuery.isPending,
       ordersBootstrapQuery.data,
       requestedForLabel,
       saveOrderDisabled,
+      startNewOrderCapture,
     ],
   );
   useAppShellRightPanel(summaryPanel);
@@ -2949,12 +2904,66 @@ export function OrdersScreen() {
       : draftState.controlState === CONTROL_STATE_QUANTITY_CAPTURE
         ? "quantity"
         : "class";
-  const createGuideStepKey =
-    !areCustomerDetailsComplete
-      ? "details"
-      : draftState.lines.length === 0
-        ? "products"
-        : "summary";
+  const createGuideStepKey = !areCustomerDetailsComplete
+    ? "details"
+    : draftState.lines.length === 0
+      ? "products"
+      : "summary";
+  const orderColumns: PosRecordColumn<CustomerOrderListItemView>[] = [
+    {
+      header: "Folio",
+      key: "folio",
+      renderCell: (order) => <span className="font-semibold text-slate-950">{order.folio}</span>,
+      width: "13%",
+    },
+    {
+      header: "Cliente",
+      key: "customer",
+      renderCell: (order) => (
+        <span className="block truncate" title={order.customer_name}>
+          {order.customer_name}
+        </span>
+      ),
+      width: "22%",
+    },
+    {
+      header: "Entrega",
+      key: "delivery",
+      renderCell: (order) =>
+        formatOrderRequestedForLabel(
+          order.requested_for_at,
+          ordersBootstrapQuery.data.branch.timezone,
+        ),
+      width: "18%",
+    },
+    {
+      header: "Estado",
+      key: "status",
+      renderCell: (order) => <StatusBadge status={order.status} />,
+      width: "13%",
+    },
+    {
+      align: "right",
+      header: "Total",
+      key: "total",
+      renderCell: (order) => formatCurrency(order.total_amount),
+      width: "11%",
+    },
+    {
+      align: "right",
+      header: "Anticipo",
+      key: "advance",
+      renderCell: (order) => formatCurrency(order.advance_amount),
+      width: "11%",
+    },
+    {
+      align: "right",
+      header: "Pendiente",
+      key: "pending",
+      renderCell: (order) => formatCurrency(order.remaining_balance_amount),
+      width: "12%",
+    },
+  ];
 
   return (
     <ContinuousWorkspaceSheet
@@ -2962,24 +2971,25 @@ export function OrdersScreen() {
       contentClassName="min-h-0 overflow-hidden px-3 pb-3 pt-2"
       header={
         <CompactPageHeader
-        secondaryChips={
-          mode === "create" ? (
-            <ModuleStateChip tone="muted">
-              {draftState.lines.length} lineas
+          secondaryChips={
+            mode === "create" ? (
+              <ModuleStateChip tone="muted">{draftState.lines.length} lineas</ModuleStateChip>
+            ) : (
+              <ModuleStateChip tone="muted">{visibleOrderCount} pedidos visibles</ModuleStateChip>
+            )
+          }
+          stateChip={
+            <ModuleStateChip
+              tone={mode === "create" ? "primary" : selectedOrderId ? "primary" : "muted"}
+            >
+              {mode === "create"
+                ? "Captura activa"
+                : selectedOrderId
+                  ? "1 seleccionado"
+                  : "Sin seleccion"}
             </ModuleStateChip>
-          ) : (
-            <ModuleStateChip tone="muted">
-              {getOrderStatusCount(ordersBootstrapQuery.data.status_counters, selectedStatus)} en
-              vista
-            </ModuleStateChip>
-          )
-        }
-        stateChip={
-          <ModuleStateChip tone={mode === "create" ? "primary" : selectedOrderId ? "primary" : "muted"}>
-            {mode === "create" ? "Captura activa" : selectedOrderId ? "1 en vista" : "Sin seleccion"}
-          </ModuleStateChip>
-        }
-        title="Pedidos"
+          }
+          title={mode === "create" ? "Nuevo pedido" : "Pedidos"}
         >
           <FlowGuide
             activeStepKey={
@@ -3011,25 +3021,24 @@ export function OrdersScreen() {
         </CompactPageHeader>
       }
       toolbar={
-        <div className="flex justify-end">
+        <div className="flex flex-wrap items-center justify-between gap-3">
           {mode === "list" ? (
-            <PosButton
-              onClick={() => {
-                resetCreateDraft();
-                setMode("create");
-              }}
-              type="button"
-              variant="primary"
-            >
-              <PlusIcon className="mr-2 h-4 w-4" />
-              Nuevo pedido
-            </PosButton>
+            <>
+              <p className="min-w-0 text-sm leading-6 text-slate-600">
+                Consulta y administra pedidos pendientes, listos, entregados o cancelados.
+              </p>
+              <PosButton
+                className="h-11 rounded-xl px-5 text-[0.95rem] font-semibold shadow-[0_12px_24px_rgba(11,76,120,0.18)] hover:shadow-[0_14px_28px_rgba(11,76,120,0.24)] focus-visible:ring-2 focus-visible:ring-[var(--pos-primary)] focus-visible:ring-offset-2"
+                leadingIcon={<PlusIcon className="h-4 w-4" />}
+                onClick={startNewOrderCapture}
+                type="button"
+                variant="primary"
+              >
+                Nuevo pedido
+              </PosButton>
+            </>
           ) : (
-            <PosButton
-              onClick={() => setMode("list")}
-              type="button"
-              variant="neutral"
-            >
+            <PosButton onClick={() => setMode("list")} type="button" variant="neutral">
               Cancelar captura
             </PosButton>
           )}
@@ -3038,145 +3047,97 @@ export function OrdersScreen() {
     >
       <div className="grid min-h-0 gap-3 lg:h-full lg:overflow-hidden">
         {mode === "list" ? (
-            <ResponsivePaneLayout
-              className="h-full gap-2.5"
-              compactMode="stack"
-              detail={
-                <OrderConsultationDetailSurface
-                  onRequestCancelOrder={() => {
-                    if (!orderDetailQuery.data) {
-                      return;
-                    }
-
-                    openCancelDialog({
-                      advance_amount: orderDetailQuery.data.advance_amount,
-                      cancellation_refund_amount: orderDetailQuery.data.cancellation_refund_amount,
-                      cancellation_refund_eligible: orderDetailQuery.data.cancellation_refund_eligible,
-                      customer_name: orderDetailQuery.data.customer_name,
-                      folio: orderDetailQuery.data.folio,
-                      id: orderDetailQuery.data.id,
-                      status: orderDetailQuery.data.status,
-                    });
-                  }}
-                  orderDetail={orderDetailQuery.data}
-                  orderDetailError={orderDetailQuery.error}
-                  orderDetailIsPending={selectedOrderId !== null && orderDetailQuery.isPending}
-                />
+          <div className="grid h-full min-h-0 grid-rows-[auto_minmax(0,1fr)] gap-3">
+            <PosFilterBar
+              actions={
+                <div className="flex flex-wrap items-end justify-end gap-2">
+                  <label className="grid gap-1">
+                    <span className="pos-label-text text-[0.65rem]">Desde</span>
+                    <input
+                      aria-label="Fecha inicial de entrega"
+                      className={cn("h-9 w-[8.75rem] rounded-lg px-3 text-sm", posInputClass)}
+                      onClick={(event) => openDatePicker(event.currentTarget)}
+                      onChange={(event) => setRequestedDateFrom(event.target.value)}
+                      type="date"
+                      value={requestedDateFrom}
+                    />
+                  </label>
+                  <label className="grid gap-1">
+                    <span className="pos-label-text text-[0.65rem]">Hasta</span>
+                    <input
+                      aria-label="Fecha final de entrega"
+                      className={cn("h-9 w-[8.75rem] rounded-lg px-3 text-sm", posInputClass)}
+                      onClick={(event) => openDatePicker(event.currentTarget)}
+                      onChange={(event) => setRequestedDateTo(event.target.value)}
+                      type="date"
+                      value={requestedDateTo}
+                    />
+                  </label>
+                </div>
               }
-              detailClassName="min-h-0"
-              list={
-                <ListDetailColumn
-                  contentClassName="min-h-0 overflow-hidden"
-                  title="Resultados"
-                  toolbar={
-                    <PosFilterBar
-                      actions={
-                        <div className="flex flex-wrap items-center gap-2">
-                          <input
-                            aria-label="Fecha inicial de entrega"
-                            className={cn("h-10 min-w-[9.75rem] rounded-lg px-3 text-sm", posInputClass)}
-                            onChange={(event) => setRequestedDateFrom(event.target.value)}
-                            type="date"
-                            value={requestedDateFrom}
-                          />
-                          <input
-                            aria-label="Fecha final de entrega"
-                            className={cn("h-10 min-w-[9.75rem] rounded-lg px-3 text-sm", posInputClass)}
-                            onChange={(event) => setRequestedDateTo(event.target.value)}
-                            type="date"
-                            value={requestedDateTo}
-                          />
-                        </div>
-                      }
-                      chipFilters={ORDER_STATUS_OPTIONS.map((option) => ({
-                        count: getOrderStatusCount(
-                          ordersBootstrapQuery.data.status_counters,
-                          option.status,
-                        ),
-                        isActive: selectedStatus === option.status,
-                        key: option.status,
-                        label: option.label,
-                        onSelect: () => {
-                          setSelectedStatus(option.status);
-                          setSelectedOrderId(null);
-                        },
-                      }))}
-                      countLabel={
-                        <ModuleStateChip tone="muted">
-                          {ordersListQuery.data?.orders.length ?? 0} pedidos
-                        </ModuleStateChip>
-                      }
-                      searchInput={{
-                        ariaLabel: "Buscar pedido por folio, cliente o telefono",
-                        className: "min-w-[18rem]",
-                        onChange: setSearchText,
-                        placeholder: "Buscar por folio, cliente o telefono",
-                        value: searchText,
-                      }}
-                      title="Pedidos registrados"
-                    />
-                  }
-                  tone="muted"
-                >
-                  {hasInvalidRequestedDateRange ? (
-                    <PosEmptyState
-                      description="La fecha inicial no puede ser mayor que la fecha final."
-                      title="Rango de entrega invalido"
-                    />
-                  ) : ordersListQuery.error ? (
-                    <OperationalStatus
-                      action={
-                        <PosButton onClick={() => ordersListQuery.refetch()}>
-                          Reintentar
-                        </PosButton>
-                      }
-                      description={toOperationalErrorMessage(
-                        ordersListQuery.error,
-                        "No fue posible consultar la lista de pedidos actual.",
-                      )}
-                      title="La lista no esta disponible"
-                    />
-                  ) : (
-                    <PosRecordList
-                      emptyAction={
-                        <PosButton
-                          onClick={() => {
-                            resetCreateDraft();
-                            setMode("create");
-                          }}
-                          type="button"
-                          variant="primary"
-                        >
-                          <PlusIcon className="mr-2 h-4 w-4" />
-                          Nuevo pedido
-                        </PosButton>
-                      }
-                      emptyDescription={getOrderEmptyListDescription({
-                        dateFrom: requestedDateFrom,
-                        dateTo: requestedDateTo,
-                        searchText,
-                        status: selectedStatus,
-                      })}
-                      emptyTitle="Sin pedidos para esta vista"
-                      getKey={(order) => order.id}
-                      loading={ordersListQuery.isPending}
-                      loadingTitle="Consultando pedidos"
-                      onSelect={(order) => setSelectedOrderId(order.id)}
-                      records={ordersListQuery.data?.orders ?? []}
-                      renderContent={(order, state) => (
-                        <OrderRecordCard
-                          isSelected={state.isSelected}
-                          order={order}
-                          timezone={ordersBootstrapQuery.data.branch.timezone}
-                        />
-                      )}
-                      selectedKey={selectedOrderId}
-                    />
-                  )}
-                </ListDetailColumn>
-              }
-              listClassName="min-h-0"
+              chipFilters={ORDER_STATUS_OPTIONS.map((option) => ({
+                className: getStatusVisualConfig(option.status).filterClass,
+                count: getOrderStatusCount(
+                  ordersBootstrapQuery.data.status_counters,
+                  option.status,
+                ),
+                isActive: selectedStatus === option.status,
+                key: option.status,
+                label: option.label,
+                onSelect: () => {
+                  setSelectedStatus(option.status);
+                  setSelectedOrderId(null);
+                },
+              }))}
+              searchInput={{
+                ariaLabel: "Buscar pedido por folio, cliente o telefono",
+                className: "min-w-[22rem]",
+                onChange: setSearchText,
+                placeholder: "Buscar por folio, cliente o telefono",
+                value: searchText,
+              }}
+              title="Pedidos registrados"
             />
+
+            {hasInvalidRequestedDateRange ? (
+              <PosEmptyState
+                description="La fecha inicial no puede ser mayor que la fecha final."
+                title="Rango de entrega invalido"
+              />
+            ) : ordersListQuery.error ? (
+              <OperationalStatus
+                action={<PosButton onClick={() => ordersListQuery.refetch()}>Reintentar</PosButton>}
+                description={toOperationalErrorMessage(
+                  ordersListQuery.error,
+                  "No fue posible consultar la lista de pedidos.",
+                )}
+                title="La lista no esta disponible"
+              />
+            ) : (
+              <PosRecordTable
+                columns={orderColumns}
+                emptyDescription={getOrderEmptyListDescription({
+                  dateFrom: requestedDateFrom,
+                  hasAnyOrders,
+                  dateTo: requestedDateTo,
+                  searchText,
+                  status: selectedStatus,
+                })}
+                emptyTitle={getOrderEmptyListTitle({
+                  hasActiveFilters: hasActiveOrderFilters,
+                  hasAnyOrders,
+                })}
+                getKey={(order) => order.id}
+                getRowClassName={(order) => getStatusVisualConfig(order.status).tableRowClass}
+                loading={ordersListQuery.isPending}
+                loadingTitle="Consultando pedidos"
+                onSelect={(order) => setSelectedOrderId(order.id)}
+                records={ordersListQuery.data?.orders ?? []}
+                selectedKey={selectedOrderId}
+                tableAriaLabel="Tabla de pedidos"
+              />
+            )}
+          </div>
         ) : (
           <div className="grid min-h-0 gap-3 lg:h-full lg:grid-rows-[auto_minmax(0,1fr)]">
             <div className="grid gap-3 xl:grid-cols-[minmax(0,1.1fr)_minmax(0,0.9fr)_minmax(0,1.25fr)]">
@@ -3216,6 +3177,7 @@ export function OrdersScreen() {
               >
                 <input
                   className={cn("h-10 rounded-lg px-3 text-sm shadow-none", posInputClass)}
+                  inputMode="tel"
                   onChange={(event) => setCustomerPhone(event.target.value)}
                   onKeyDown={(event) => {
                     if (event.key !== "Enter") {
@@ -3223,7 +3185,7 @@ export function OrdersScreen() {
                     }
 
                     event.preventDefault();
-                    if (event.currentTarget.value.trim().length === 0) {
+                    if (!isOrderCustomerPhoneComplete(event.currentTarget.value)) {
                       return;
                     }
 
@@ -3350,15 +3312,18 @@ export function OrdersScreen() {
                       }
 
                       event.preventDefault();
-                      setRequestedForDraft((state) => ({
-                        ...state,
+                      const nextRequestedForDraft = {
+                        ...requestedForDraft,
                         minute: finalizePickupMinuteInput(
-                          state.minute,
+                          requestedForDraft.minute,
                           initialRequestedForDraft.minute,
                         ),
-                      }));
+                      };
+                      setRequestedForDraft(nextRequestedForDraft);
                       setPickupKeyboardStage(null);
-                      focusFirstOrderCatalogTarget();
+                      if (canEnableOrderCatalogForRequestedDraft(nextRequestedForDraft)) {
+                        focusFirstOrderCatalogTarget();
+                      }
                     }}
                     placeholder="00"
                     ref={pickupMinuteInputRef}
@@ -3407,7 +3372,7 @@ export function OrdersScreen() {
                           {activeCreateTarget === "customer"
                             ? "Captura el nombre del cliente para habilitar productos."
                             : activeCreateTarget === "phone"
-                              ? "Captura el telefono para habilitar productos."
+                              ? "Captura el telefono completo para habilitar productos."
                               : "Captura la fecha de recoleccion para habilitar productos."}
                         </p>
                       ) : null}
@@ -3430,6 +3395,14 @@ export function OrdersScreen() {
                           searchText: value,
                         }))
                       }
+                      onKeyDown={(event) => {
+                        if (event.key !== "Enter" || !areCustomerDetailsComplete) {
+                          return;
+                        }
+
+                        event.preventDefault();
+                        selectFirstOrderCatalogTarget();
+                      }}
                       placeholder={catalogSearchPlaceholder}
                       value={draftState.searchText}
                     />
@@ -3579,6 +3552,7 @@ export function OrdersScreen() {
                                   try {
                                     setDraftState((state) => addPendingSelectionLine(state));
                                     setSelectionErrorMessage(null);
+                                    focusFirstOrderCatalogTarget();
                                   } catch (error) {
                                     setSelectionErrorMessage(
                                       toOperationalErrorMessage(
@@ -3613,6 +3587,7 @@ export function OrdersScreen() {
                                 try {
                                   setDraftState((state) => addPendingSelectionLine(state));
                                   setSelectionErrorMessage(null);
+                                  focusFirstOrderCatalogTarget();
                                 } catch (error) {
                                   setSelectionErrorMessage(
                                     toOperationalErrorMessage(
@@ -3641,14 +3616,11 @@ export function OrdersScreen() {
                   ) : null}
                 </ScrollPane>
               </section>
-
             </div>
           </div>
         )}
       </div>
       <OrderActionConfirmDialog
-        cancelReason={cancelReason}
-        cancelReasonError={cancelReasonError}
         isPending={
           createOrderMutation.isPending ||
           markReadyMutation.isPending ||
@@ -3657,14 +3629,6 @@ export function OrdersScreen() {
         }
         onCancel={() => {
           setOrderActionDialog(null);
-          setCancelReason("");
-          setCancelReasonError(null);
-        }}
-        onCancelReasonChange={(value) => {
-          setCancelReason(value);
-          if (cancelReasonError !== null) {
-            setCancelReasonError(null);
-          }
         }}
         onConfirm={() => {
           if (orderActionDialog === null) {
@@ -3677,11 +3641,6 @@ export function OrdersScreen() {
             return;
           }
 
-          if (cancelReason.trim().length < 4) {
-            setCancelReasonError("Captura un motivo claro antes de cancelar el pedido.");
-            return;
-          }
-
           void cancelMutation.mutateAsync();
         }}
         state={orderActionDialog}
@@ -3689,4 +3648,3 @@ export function OrdersScreen() {
     </ContinuousWorkspaceSheet>
   );
 }
-

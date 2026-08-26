@@ -21,7 +21,7 @@ import { PosBlockerPanel, PosConfirmationDialog } from "./pos-feedback";
 import { PosAuditSummary } from "./pos-audit-summary";
 import { PosButton, PosCard, PosPanel, PosSectionTitle, PosStatusBadge } from "./pos-foundations";
 import { PosSummaryPanel } from "./pos-module-layout";
-import { type PosRecordAction, PosRecordList } from "./pos-records";
+import { PosRecordTable, type PosRecordColumn } from "./pos-records";
 import {
   CheckCircleIcon,
   ClockIcon,
@@ -465,11 +465,11 @@ export function OperationLineSummary({
         <div className="overflow-hidden rounded-[var(--pos-radius-panel)] border border-[var(--pos-shell-border)] bg-white">
           {lines.map((line) => (
             <div
-              className="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-3 border-t border-[var(--pos-shell-border)] px-3 py-2.5 first:border-t-0"
+              className="grid min-h-10 grid-cols-[minmax(0,1fr)_auto] items-center gap-3 border-t border-[var(--pos-shell-border)] px-3 py-2 first:border-t-0"
               key={line.key}
             >
               <div className="min-w-0">
-                <div className="flex flex-wrap items-center gap-2">
+                <div className="flex min-w-0 items-center gap-2">
                   <p className="truncate text-sm font-semibold text-slate-950" title={line.title}>
                     {line.title}
                   </p>
@@ -486,7 +486,7 @@ export function OperationLineSummary({
                 ) : null}
               </div>
 
-              <div className="flex flex-col items-end gap-1 text-right text-sm">
+              <div className="flex min-w-[4.5rem] items-center justify-end gap-2 text-right text-sm">
                 {line.quantityText ? (
                   <span className="font-semibold text-slate-950 [font-variant-numeric:tabular-nums]">
                     {line.quantityText}
@@ -498,7 +498,12 @@ export function OperationLineSummary({
                   </span>
                 ) : null}
                 {line.trailingNote ? (
-                  <span className="text-xs text-slate-500">{line.trailingNote}</span>
+                  <span
+                    className="max-w-[7rem] truncate text-xs text-slate-500"
+                    title={line.trailingNote}
+                  >
+                    {line.trailingNote}
+                  </span>
                 ) : null}
               </div>
             </div>
@@ -689,95 +694,9 @@ export function OperationDocumentResult({
   );
 }
 
-function OperationHistoryRecordCard({
-  isSelected,
-  record,
-}: {
-  isSelected: boolean;
-  record: OperationHistoryRecord;
-}) {
-  const metadataRows = [
-    { key: "type", label: "Tipo", value: record.documentTypeLabel },
-    { key: "user", label: "Usuario", value: record.userLabel },
-    { key: "location", label: "Sucursal / estacion", value: record.locationLabel },
-  ].filter((row): row is { key: string; label: string; value: string } => Boolean(row.value));
-
-  return (
-    <div className="grid gap-2">
-      <div className="flex items-start justify-between gap-3">
-        <div className="min-w-0">
-          <p className="truncate text-sm font-semibold text-slate-950" title={record.title}>
-            {record.title}
-          </p>
-          <p className="mt-0.5 text-xs font-medium uppercase tracking-[0.08em] text-slate-500">
-            {formatRecordReference(record.folio)}
-          </p>
-        </div>
-        {record.statusLabel ? (
-          <PosStatusBadge status={record.statusTone ?? "draft"}>
-            {record.statusLabel}
-          </PosStatusBadge>
-        ) : null}
-      </div>
-
-      {record.subtitle ? (
-        <p className="text-sm text-slate-700">{record.subtitle}</p>
-      ) : null}
-
-      {metadataRows.length > 0 ? (
-        <div className="grid gap-1 text-xs text-slate-500">
-          {metadataRows.map((row) => (
-            <p key={row.key}>
-              <span className="font-medium text-slate-700">{row.label}:</span> {row.value}
-            </p>
-          ))}
-        </div>
-      ) : null}
-
-      <div className="grid gap-1 text-xs text-slate-500">
-        {record.primaryTimestampValue ? (
-          <p>
-            <span className="font-medium text-slate-700">
-              {record.primaryTimestampLabel ?? "Confirmado"}:
-            </span>{" "}
-            {record.primaryTimestampValue}
-          </p>
-        ) : null}
-        {record.secondaryTimestampValue ? (
-          <p>
-            <span className="font-medium text-slate-700">
-              {record.secondaryTimestampLabel ?? "Creado"}:
-            </span>{" "}
-            {record.secondaryTimestampValue}
-          </p>
-        ) : null}
-      </div>
-
-      {record.metrics && record.metrics.length > 0 ? (
-        <div className="flex flex-wrap gap-2">
-          {record.metrics.map((metric) => (
-            <span
-              className={cn(
-                "rounded-full border px-2.5 py-1 text-xs font-medium [font-variant-numeric:tabular-nums]",
-                isSelected
-                  ? "border-[var(--pos-primary)]/20 bg-white text-slate-700"
-                  : "border-[var(--pos-shell-border)] bg-[var(--pos-shell-muted)] text-slate-600",
-              )}
-              key={metric.key}
-            >
-              {metric.label}: {metric.value}
-            </span>
-          ))}
-        </div>
-      ) : null}
-    </div>
-  );
-}
-
 export function OperationHistoryList({
   emptyDescription = "No hay documentos historicos para este filtro.",
   emptyTitle = "Sin historial",
-  getRecordActions,
   loading = false,
   loadingTitle = "Consultando historial",
   onSelect,
@@ -786,42 +705,101 @@ export function OperationHistoryList({
 }: {
   emptyDescription?: string;
   emptyTitle?: string;
-  getRecordActions?: (record: OperationHistoryRecord) => PosRecordAction[];
   loading?: boolean;
   loadingTitle?: string;
   onSelect: (record: OperationHistoryRecord) => void;
   records: OperationHistoryRecord[];
   selectedRecordId?: string | null;
 }) {
-  const showError = useStatusMessageStore((state) => state.showError);
-  const showSuccess = useStatusMessageStore((state) => state.showSuccess);
+  const columns: PosRecordColumn<OperationHistoryRecord>[] = [
+    {
+      header: "Folio",
+      key: "folio",
+      renderCell: (record) => (
+        <div className="min-w-0">
+          <p className="truncate font-semibold text-slate-950" title={record.title}>
+            {formatRecordReference(record.folio)}
+          </p>
+          {record.documentTypeLabel ? (
+            <p className="truncate text-xs text-slate-500">{record.documentTypeLabel}</p>
+          ) : null}
+        </div>
+      ),
+      width: "17%",
+    },
+    {
+      header: "Fecha/hora",
+      key: "date",
+      renderCell: (record) => record.primaryTimestampValue ?? record.secondaryTimestampValue ?? "--",
+      width: "18%",
+    },
+    {
+      header: "Operador",
+      key: "operator",
+      renderCell: (record) => (
+        <span className="block truncate" title={record.userLabel ?? undefined}>
+          {record.userLabel ?? "--"}
+        </span>
+      ),
+      width: "20%",
+    },
+    {
+      header: "Sucursal",
+      key: "location",
+      renderCell: (record) => (
+        <span className="block truncate" title={record.locationLabel ?? undefined}>
+          {record.locationLabel ?? record.subtitle ?? "--"}
+        </span>
+      ),
+      width: "20%",
+    },
+    {
+      header: "Resumen",
+      key: "summary",
+      renderCell: (record) => {
+        const summary = record.metrics
+          ?.slice(0, 2)
+          .map((metric) => `${metric.label}: ${metric.value}`)
+          .join(" | ");
+        const fullSummary = record.metrics
+          ?.map((metric) => `${metric.label}: ${metric.value}`)
+          .join(" | ");
+
+        return (
+          <span className="block truncate text-slate-600" title={fullSummary}>
+            {summary ?? "--"}
+          </span>
+        );
+      },
+      width: "15%",
+    },
+    {
+      align: "right",
+      header: "Estado",
+      key: "status",
+      renderCell: (record) =>
+        record.statusLabel ? (
+          <PosStatusBadge status={record.statusTone ?? "draft"}>{record.statusLabel}</PosStatusBadge>
+        ) : (
+          "--"
+        ),
+      width: "10%",
+    },
+  ];
 
   return (
     <div data-operation-history-list="true">
-      <PosRecordList
+      <PosRecordTable
+        columns={columns}
         emptyDescription={emptyDescription}
         emptyTitle={emptyTitle}
         getKey={(record) => record.id}
-        getRowActions={(record) => [
-          {
-            key: `${record.id}-copy-folio`,
-            label: "Copiar folio",
-            onSelect: () => {
-              void copyDocumentReferenceToClipboard(record.folio)
-                .then(() => showSuccess("Folio copiado."))
-                .catch(() => showError("No se pudo copiar el folio."));
-            },
-          },
-          ...(getRecordActions?.(record) ?? []),
-        ]}
         loading={loading}
         loadingTitle={loadingTitle}
         onSelect={onSelect}
         records={records}
-        renderContent={(record, state) => (
-          <OperationHistoryRecordCard isSelected={state.isSelected} record={record} />
-        )}
         selectedKey={selectedRecordId}
+        tableAriaLabel="Historial operativo"
       />
     </div>
   );

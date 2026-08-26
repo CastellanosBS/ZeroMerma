@@ -90,6 +90,7 @@ const bootstrapResponse = {
   local_timestamp: "2026-04-22T18:00:00Z",
   payment_registration_allowed: true,
   user: {
+    default_surface: "POS",
     email: "cashier@zeromerma.local",
     full_name: "Main Branch Cashier",
     id: "user-1",
@@ -500,13 +501,13 @@ afterEach(() => {
 });
 
 describe("PaymentsScreen", () => {
-  it("shows an explanatory empty state and opens create from the registered shortcut", async () => {
+  it("shows a compact empty state and opens create from the registered shortcut", async () => {
     seededPayments = [];
     const view = renderUi(<PaymentsScreen />);
     mountedRoots.push(view.unmount);
 
-    expect(view.container.textContent).toContain("Sin pagos para esta vista");
-    expect(view.container.textContent).toContain("Los pagos operativos registran salidas auditables");
+    expect(view.container.textContent).toContain("Sin pagos registrados");
+    expect(view.container.textContent).toContain("Sin pagos registrados en turno actual.");
 
     triggerShortcut("payments-new");
     await flushPromises();
@@ -550,7 +551,7 @@ describe("PaymentsScreen", () => {
     dispatchElementKey(secondRow, "Enter");
     await flushPromises();
 
-    expect(view.container.textContent).toContain("Pago en vista");
+    expect(secondRow.getAttribute("aria-selected")).toBe("true");
   });
 
   it("creates a cash payment with confirmation and success feedback", async () => {
@@ -614,10 +615,6 @@ describe("PaymentsRightPanel", () => {
   it("shows validation blockers in create mode", () => {
     const view = renderUi(
       <PaymentsRightPanel
-        blockedMessages={[
-          "Captura el beneficiario del pago.",
-          "Selecciona la categoria del pago.",
-        ]}
         blockedReason="Captura el beneficiario del pago."
         categories={[...bootstrapResponse.active_categories]}
         createError={null}
@@ -628,18 +625,18 @@ describe("PaymentsRightPanel", () => {
         onCancelCreate={() => undefined}
         onCommitCreate={() => undefined}
         onResultAction={() => undefined}
+        paymentCount={0}
         paymentDetail={null}
-        recentCreatedPaymentId={null}
       />,
     );
     mountedRoots.push(view.unmount);
 
     expect(view.container.textContent).toContain("Nuevo pago");
     expect(view.container.textContent).toContain("Captura el beneficiario del pago.");
-    expect(view.container.textContent).toContain("Selecciona la categoria del pago.");
+    expect(view.container.textContent).toContain("Monto");
   });
 
-  it("shows success result with history action for a newly created payment", () => {
+  it("shows compact detail for a selected payment", () => {
     const detail = toPaymentDetail({
       ...basePayments[0]!,
       concept: "REF-9001",
@@ -652,7 +649,6 @@ describe("PaymentsRightPanel", () => {
 
     const view = renderUi(
       <PaymentsRightPanel
-        blockedMessages={[]}
         blockedReason={null}
         categories={[...bootstrapResponse.active_categories]}
         createError={null}
@@ -663,22 +659,21 @@ describe("PaymentsRightPanel", () => {
         onCancelCreate={() => undefined}
         onCommitCreate={() => undefined}
         onResultAction={onResultAction}
+        paymentCount={1}
         paymentDetail={detail}
-        recentCreatedPaymentId="payment-new"
       />,
     );
     mountedRoots.push(view.unmount);
 
-    expect(view.container.textContent).toContain("Pago registrado");
     expect(view.container.textContent).toContain("PAG-NEW001");
-    expect(view.container.textContent).toContain("Ver historial");
+    expect(view.container.textContent).toContain("Proveedor Norte");
 
     click(
       Array.from(view.container.querySelectorAll("button")).find((button) =>
-        button.textContent?.includes("Ver historial"),
+        button.textContent?.includes("Nuevo pago"),
       ),
     );
 
-    expect(onResultAction).toHaveBeenCalledWith("viewHistory");
+    expect(onResultAction).toHaveBeenCalledWith("newOperation");
   });
 });

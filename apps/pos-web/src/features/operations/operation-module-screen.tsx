@@ -12,6 +12,7 @@ import {
 } from "react";
 
 import { useAppShellRightPanel } from "../../components/app-shell-right-panel";
+import { CapturedProductLineList, CapturedProductLineRow } from "../../components/captured-product-lines";
 import { CatalogSelectionCard } from "../../components/catalog-selection-card";
 import { CatalogVisual } from "../../components/catalog-visual";
 import {
@@ -25,14 +26,11 @@ import {
   type OperationLineSummaryItem,
 } from "../../components/operation-documents";
 import { OperationalStatus } from "../../components/operational-status";
-import { PosContextBanner, PosModuleLayout, PosSummaryPanel } from "../../components/pos-module-layout";
-import { PosBlockerPanel, PosInlineValidationMessage } from "../../components/pos-feedback";
+import { PosModuleLayout, PosSummaryPanel } from "../../components/pos-module-layout";
+import { PosBlockerPanel } from "../../components/pos-feedback";
 import {
   PosButton,
   PosCard,
-  PosFieldLabel,
-  PosPanel,
-  PosSectionTitle,
   PosStatusBadge,
 } from "../../components/pos-foundations";
 import {
@@ -49,18 +47,16 @@ import {
   ArrowLeftIcon,
   ClipboardIcon,
   HashIcon,
-  MinusIcon,
   PackageIcon,
-  PlusIcon,
   PrinterIcon,
   RotateCcwIcon,
   StoreIcon,
-  TrashIcon,
   XIcon,
 } from "../../components/pos-icons";
 import { Button } from "../../components/ui/button";
 import { appEnv } from "../../env";
 import type {
+  CashCloseCounterClassAvailabilityView,
   CashCloseReconciliationProductView,
   CounterTransferCommitRequest,
   OperationHistoryFilterOptionView,
@@ -95,7 +91,6 @@ import {
   CONTROL_STATE_CLASS_SELECTION,
   CONTROL_STATE_PRODUCT_SELECTION,
   CONTROL_STATE_QUANTITY_CAPTURE,
-  type OperationControlState,
   createInitialOperationDraftState,
   decrementPendingOperationQuantity,
   getWasteDocumentBlockedReason,
@@ -167,6 +162,7 @@ const operationModuleConfig: Record<OperationModuleVariant, OperationModuleConfi
 };
 
 const COUNTER_TRANSFER_HISTORY_SCOPE_LABELS: Record<string, string> = {
+  ALL: "Todos",
   CURRENT_SHIFT: "Turno actual",
   RECENT: "Recientes",
   TODAY: "Hoy",
@@ -174,7 +170,6 @@ const COUNTER_TRANSFER_HISTORY_SCOPE_LABELS: Record<string, string> = {
 
 type CounterTransferShiftFilter = "ALL" | "AFTERNOON" | "MORNING" | "NIGHT";
 
-const WASTE_TRACEABILITY_OVERLAY_MESSAGE = "Selecciona origen y motivo para comenzar.";
 const WASTE_TRACEABILITY_BLOCK_MESSAGE = "Selecciona origen y motivo para continuar.";
 
 function getCounterTransferHistoryScopeLabel(scope: string): string {
@@ -448,31 +443,6 @@ function getWasteUiStateTone(
   }
 }
 
-function getWastePanelTitle(
-  state: ReturnType<typeof getWasteDocumentUiState>,
-): string {
-  switch (state) {
-    case "TRACEABILITY_INCOMPLETE":
-    case "BLOCKED_MISSING_ORIGIN":
-    case "BLOCKED_MISSING_REASON":
-      return "Traceabilidad pendiente";
-    case "READY_TO_CAPTURE":
-    case "DOCUMENT_BUILDING":
-    case "BLOCKED_NO_LINES":
-      return "Merma en construccion";
-    case "READY_TO_REGISTER":
-      return "Merma lista para registrar";
-    case "REGISTERING":
-      return "Registrando merma";
-    case "REGISTERED_SUCCESS":
-      return "Merma registrada";
-    case "ERROR":
-      return "Error al registrar";
-    default:
-      return "Merma en construccion";
-  }
-}
-
 function getWasteReasonName(
   wasteReasons: WasteReasonView[],
   reasonCode: string,
@@ -591,98 +561,21 @@ function OperationLineRow({
   quantity: string;
 }) {
   return (
-    <div
-      aria-selected={isSelected}
-      className={cn(
-        "grid grid-cols-[minmax(0,1fr)_auto_auto] items-center gap-1.5 border-t border-[var(--pos-shell-border)] px-2 py-1.5 first:border-t-0",
-        isSelected && "bg-[var(--pos-primary-soft)]/70",
-      )}
-      onClick={onSelect}
-      onFocusCapture={onSelect}
-      role="row"
-      tabIndex={0}
-    >
-      <div className="min-w-0">
-        <p className="truncate text-[13px] font-medium leading-5 text-slate-950">{name}</p>
-      </div>
-
-      <div className="flex items-center gap-0 rounded-md border border-[var(--pos-shell-border)] bg-[var(--pos-shell-muted)] px-0.5 py-0.5">
-        <button
-          className="flex h-7 w-7 items-center justify-center rounded-sm text-slate-900 transition hover:bg-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--pos-ring)]"
-          onClick={(event) => {
-            event.stopPropagation();
-            onDecrement();
-          }}
-          type="button"
-        >
-          <MinusIcon className="h-3 w-3" />
-        </button>
-        <div className="w-[3.1rem]">
-          {isEditing ? (
-            <input
-              aria-label={`Cantidad de ${name}`}
-              className={cn(
-                "h-7 w-full rounded-sm px-1 text-center text-[13px] font-semibold text-slate-950 [font-variant-numeric:tabular-nums]",
-                posInputClass,
-              )}
-              inputMode="decimal"
-              onBlur={onCommitEdit}
-              onChange={(event) => onEditingQuantityChange(event.target.value)}
-              onClick={(event) => event.stopPropagation()}
-              onKeyDown={(event) => {
-                event.stopPropagation();
-                if (event.key === "Enter" || event.key === "NumpadEnter") {
-                  event.preventDefault();
-                  onCommitEdit();
-                  return;
-                }
-
-                if (event.key === "Escape") {
-                  event.preventDefault();
-                  onCancelEdit();
-                }
-              }}
-              ref={inputRef}
-              value={editingQuantityText}
-            />
-          ) : (
-            <button
-              aria-label={`Editar cantidad de ${name}`}
-              className="h-7 w-full rounded-sm px-1 text-center text-[13px] font-semibold text-slate-950 transition hover:bg-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--pos-ring)] [font-variant-numeric:tabular-nums]"
-              onClick={(event) => {
-                event.stopPropagation();
-                onBeginEdit();
-              }}
-              type="button"
-            >
-              {quantity}
-            </button>
-          )}
-        </div>
-        <button
-          className="flex h-7 w-7 items-center justify-center rounded-sm text-slate-900 transition hover:bg-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--pos-ring)]"
-          onClick={(event) => {
-            event.stopPropagation();
-            onIncrement();
-          }}
-          type="button"
-        >
-          <PlusIcon className="h-3 w-3" />
-        </button>
-      </div>
-
-      <button
-        aria-label={`Eliminar ${name}`}
-        className="flex h-7 w-7 items-center justify-center rounded-md text-[var(--ui-color-danger)] transition hover:bg-[var(--ui-color-danger-soft)] hover:text-[var(--ui-color-danger)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--pos-ring)]"
-        onClick={(event) => {
-          event.stopPropagation();
-          onRemove();
-        }}
-        type="button"
-      >
-        <TrashIcon className="h-3.5 w-3.5" />
-      </button>
-    </div>
+    <CapturedProductLineRow
+      inputRef={isEditing ? inputRef : null}
+      isSelected={isSelected}
+      name={name}
+      onBeginQuantityEdit={onBeginEdit}
+      onCancelQuantityEdit={onCancelEdit}
+      onCommitQuantity={onCommitEdit}
+      onDecrement={onDecrement}
+      onIncrement={onIncrement}
+      onQuantityChange={onEditingQuantityChange}
+      onRemove={onRemove}
+      onSelect={onSelect}
+      quantityMode={isEditing ? "input" : "display"}
+      quantityText={isEditing ? editingQuantityText : quantity}
+    />
   );
 }
 
@@ -707,15 +600,29 @@ function CounterMovementSummaryCard({
   );
 }
 
-function CompactOperationLineSection({
+type CounterAvailabilityGroup = {
+  classId: string;
+  className: string;
+  pendingClassCaptureQuantity: number;
+  realAvailableQuantity: number;
+  products: Array<{
+    productId: string;
+    productName: string;
+    trackedQuantity: number;
+  }>;
+};
+
+function GroupedCounterAvailabilitySection({
   badgeLabel,
+  containerAriaLabel,
   emptyMessage,
-  lines,
+  groups,
   title,
 }: {
   badgeLabel?: string;
+  containerAriaLabel?: string;
   emptyMessage: string;
-  lines: OperationLineSummaryItem[];
+  groups: CounterAvailabilityGroup[];
   title: string;
 }) {
   return (
@@ -728,24 +635,52 @@ function CompactOperationLineSection({
           </span>
         ) : null}
       </div>
-      {lines.length === 0 ? (
+      {groups.length === 0 ? (
         <PosCard className="px-3 py-2.5">
           <p className="text-sm text-slate-600">{emptyMessage}</p>
         </PosCard>
       ) : (
-        <div className="overflow-hidden rounded-[var(--pos-radius-panel)] border border-[var(--pos-shell-border)] bg-white">
-          {lines.map((line) => (
-            <div
-              className="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-3 border-t border-[var(--pos-shell-border)] px-3 py-2 first:border-t-0"
-              key={line.key}
-            >
-              <p className="truncate text-sm font-semibold text-slate-950" title={line.title}>
-                {line.title}
-              </p>
-              {line.quantityText ? (
+        <div
+          aria-label={containerAriaLabel}
+          className="overflow-hidden rounded-[var(--pos-radius-panel)] border border-[var(--pos-shell-border)] bg-white"
+        >
+          {groups.map((group) => (
+            <div className="border-t border-[var(--pos-shell-border)] first:border-t-0" key={group.classId}>
+              <div className="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-3 bg-slate-50 px-3 py-2">
+                <div className="min-w-0">
+                  <p className="truncate text-sm font-semibold text-slate-950" title={group.className}>
+                    {group.className}
+                  </p>
+                  {group.pendingClassCaptureQuantity > 0 ? (
+                    <p className="mt-0.5 truncate text-[11px] font-medium text-amber-700">
+                      Venta por clase pendiente:{" "}
+                      {formatOperationQuantity(group.pendingClassCaptureQuantity)}
+                    </p>
+                  ) : null}
+                </div>
                 <span className="font-semibold text-slate-950 [font-variant-numeric:tabular-nums]">
-                  {line.quantityText}
+                  {formatOperationQuantity(group.realAvailableQuantity)}
                 </span>
+              </div>
+              {group.products.length > 0 ? (
+                <div className="border-t border-[var(--pos-shell-border)]/80 bg-white">
+                  {group.products.map((product) => (
+                    <div
+                      className="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-3 border-t border-[var(--pos-shell-border)]/70 px-3 py-2 first:border-t-0"
+                      key={product.productId}
+                    >
+                      <p
+                        className="truncate pl-3 text-sm font-medium text-slate-700"
+                        title={product.productName}
+                      >
+                        {product.productName}
+                      </p>
+                      <span className="text-sm font-medium text-slate-700 [font-variant-numeric:tabular-nums]">
+                        {formatOperationQuantity(product.trackedQuantity)}
+                      </span>
+                    </div>
+                  ))}
+                </div>
               ) : null}
             </div>
           ))}
@@ -757,6 +692,7 @@ function CompactOperationLineSection({
 
 function CounterAvailabilitySection({
   branchName,
+  classRows,
   containerRef,
   onRetry,
   products,
@@ -764,47 +700,30 @@ function CounterAvailabilitySection({
   queryPending,
 }: {
   branchName: string;
+  classRows: CashCloseCounterClassAvailabilityView[];
   containerRef?: Ref<HTMLDivElement>;
   onRetry: () => void;
   products: CashCloseReconciliationProductView[];
   queryErrorMessage: string | null;
   queryPending: boolean;
 }) {
-  const columns = useMemo<PosRecordColumn<CashCloseReconciliationProductView>[]>(
-    () => [
-      {
-        header: "Producto",
-        key: "product",
-        renderCell: (product) => (
-          <div className="min-w-0">
-            <p className="truncate text-sm font-semibold text-slate-950">{product.product_name}</p>
-            <p className="mt-1 truncate text-xs font-medium text-slate-500">
-              {product.product_class_name}
-            </p>
-          </div>
-        ),
-      },
-      {
-        header: "Codigo",
-        key: "code",
-        renderCell: (product) => (
-          <span className="font-medium text-slate-700">{product.product_code}</span>
-        ),
-        width: "8rem",
-      },
-      {
-        align: "right",
-        header: "Disponible",
-        key: "quantity",
-        renderCell: (product) => (
-          <span className="font-semibold text-slate-950 [font-variant-numeric:tabular-nums]">
-            {formatOperationQuantity(getCounterAvailableQuantity(product))}
-          </span>
-        ),
-        width: "7rem",
-      },
-    ],
-    [],
+  const groupedAvailability = useMemo<CounterAvailabilityGroup[]>(
+    () =>
+      classRows.map((classRow) => ({
+        classId: classRow.product_class_id,
+        className: classRow.product_class_name,
+        pendingClassCaptureQuantity: Number(classRow.pending_class_capture_quantity),
+        realAvailableQuantity: Number(classRow.available_quantity),
+        products: products
+          .filter((product) => product.product_class_id === classRow.product_class_id)
+          .map((product) => ({
+            productId: product.product_id,
+            productName: product.product_name,
+            trackedQuantity: getCounterAvailableQuantity(product),
+          }))
+          .filter((product) => product.trackedQuantity > 0),
+      })),
+    [classRows, products],
   );
 
   return (
@@ -812,18 +731,18 @@ function CounterAvailabilitySection({
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0">
           <h2 className="text-sm font-semibold text-slate-950">
-            Productos en mostrador
+            Clases en mostrador
           </h2>
           <p className="mt-1 text-sm text-slate-600">
-            Vista operativa del saldo actual esperado en mostrador para {branchName}. Refleja el
-            estado confirmado del mostrador, incluyendo traspasos, mermas y otros ajustes ya
-            registrados.
+            Vista operativa del saldo real esperado en mostrador para {branchName}. Agrupa el
+            disponible por clase y muestra la composicion interna de referencia antes de la
+            adjudicacion exacta del cierre.
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <ModuleStateChip tone="info">Vista de consulta</ModuleStateChip>
           <span className="pos-chip" data-tone="muted">
-            {products.length} productos
+            {classRows.length} clases
           </span>
         </div>
       </div>
@@ -844,14 +763,12 @@ function CounterAvailabilitySection({
       ) : null}
 
       {!queryPending && !queryErrorMessage ? (
-        <PosRecordTable
-          columns={columns}
-          emptyDescription="Aun no hay productos disponibles en mostrador para esta sucursal."
-          emptyTitle="Mostrador sin productos"
-          getKey={(product) => product.product_id}
-          onSelect={() => undefined}
-          records={products}
-          tableAriaLabel="Productos actualmente en mostrador"
+        <GroupedCounterAvailabilitySection
+          badgeLabel="Aprox. hasta cierre"
+          containerAriaLabel="Clases y productos actualmente en mostrador"
+          emptyMessage="Aun no hay clases con saldo operativo disponible en mostrador para esta sucursal."
+          groups={groupedAvailability}
+          title="Mostrador actual"
         />
       ) : null}
     </div>
@@ -859,13 +776,10 @@ function CounterAvailabilitySection({
 }
 
 function WasteTraceabilitySection({
-  controlState,
   getOriginItemProps,
   getReasonItemProps,
   isCommitPending,
-  isSearchDisabled,
   originActiveIndex,
-  onGoBack,
   onReasonChange,
   onSourceBucketChange,
   reasonActiveIndex,
@@ -874,7 +788,6 @@ function WasteTraceabilitySection({
   sourceBucketCode,
   wasteReasons,
 }: {
-  controlState: OperationControlState;
   getOriginItemProps: (index: number) => {
     onFocus: () => void;
     onKeyDown: ComponentPropsWithoutRef<"button">["onKeyDown"];
@@ -888,9 +801,7 @@ function WasteTraceabilitySection({
     tabIndex: number;
   };
   isCommitPending: boolean;
-  isSearchDisabled: boolean;
   originActiveIndex: number;
-  onGoBack: () => void;
   onReasonChange: (value: string) => void;
   onSourceBucketChange: (value: string) => void;
   reasonActiveIndex: number;
@@ -900,21 +811,43 @@ function WasteTraceabilitySection({
   wasteReasons: WasteReasonView[];
 }) {
   const isTraceabilityReady = sourceBucketCode.trim().length > 0 && reasonCode.trim().length > 0;
+  const originLabel = sourceBucketCode
+    ? getWasteSourceBucketLabel(sourceBucketCode)
+    : "Origen pendiente";
+  const reasonLabel = reasonCode
+    ? getWasteReasonName(wasteReasons, reasonCode)
+    : "Motivo pendiente";
 
   return (
-    <PosPanel className="grid gap-4 px-4 py-4">
-      <PosSectionTitle
-        description="Selecciona origen y motivo antes de habilitar la captura de productos."
-        eyebrow="1. Trazabilidad"
-        title="Define el contexto de la merma"
-      />
+    <div className="grid gap-3 rounded-xl border border-[var(--pos-shell-border)] bg-white px-3 py-3 shadow-sm">
+      <div className="flex min-w-0 flex-wrap items-start justify-between gap-3">
+        <div className="min-w-0">
+          <p className="text-sm font-semibold text-slate-950">Contexto de la merma</p>
+          <p className="mt-0.5 text-xs leading-5 text-slate-500">
+            Selecciona el origen y el motivo para habilitar la captura de productos.
+          </p>
+        </div>
+        <div className="flex min-w-0 flex-wrap items-center justify-end gap-2">
+          <PosStatusBadge status={sourceBucketCode ? "ready" : "draft"}>
+            {originLabel}
+          </PosStatusBadge>
+          <PosStatusBadge status={reasonCode ? "ready" : "draft"}>
+            {reasonLabel}
+          </PosStatusBadge>
+        </div>
+      </div>
 
-      <div className="grid gap-3 xl:grid-cols-[minmax(0,16rem)_minmax(0,1fr)]">
-        <PosCard className="px-3.5 py-3">
-          <PosFieldLabel helper="Usa flechas y Enter para seleccionar." required>
-            Origen
-          </PosFieldLabel>
-          <div className="mt-2 grid grid-cols-2 gap-2">
+      <div className="grid items-start gap-3 lg:grid-cols-[minmax(13rem,0.8fr)_minmax(0,1.35fr)]">
+        <div className="min-w-0 rounded-xl border border-[var(--pos-shell-border)] bg-[var(--pos-shell-muted)] px-3 py-2.5">
+          <div className="mb-2 flex items-center justify-between gap-2">
+            <span className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">
+              1. Origen
+            </span>
+            <span className="text-[11px] font-semibold text-slate-500">
+              {sourceBucketCode ? getWasteSourceBucketLabel(sourceBucketCode) : "Pendiente"}
+            </span>
+          </div>
+          <div className="grid grid-cols-2 gap-2">
             {WASTE_SOURCE_BUCKET_OPTIONS.map((option, index) => {
               const isActive = sourceBucketCode === option.value;
               const itemProps = getOriginItemProps(index);
@@ -936,20 +869,31 @@ function WasteTraceabilitySection({
               );
             })}
           </div>
-        </PosCard>
+        </div>
 
-        <PosCard className="px-3.5 py-3">
-          <PosFieldLabel helper="Usa flechas y Enter para seleccionar." required>
-            Motivo
-          </PosFieldLabel>
-          <div className="mt-2 grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
+        <div className="min-w-0 rounded-xl border border-[var(--pos-shell-border)] bg-[var(--pos-shell-muted)] px-3 py-2.5">
+          <div className="mb-2 flex items-center justify-between gap-2">
+            <span className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">
+              2. Motivo
+            </span>
+            <span
+              className="truncate text-right text-[11px] font-semibold text-slate-500"
+              title={reasonLabel}
+            >
+              {reasonCode ? reasonLabel : "Pendiente"}
+            </span>
+          </div>
+          <div className="flex flex-wrap gap-2">
             {wasteReasons.map((reason, index) => {
               const isActive = reasonCode === reason.code;
               const itemProps = getReasonItemProps(index);
 
               return (
                 <PosButton
-                  className={cn(reasonActiveIndex === index && "ring-2 ring-[var(--pos-ring)]")}
+                  className={cn(
+                    "h-9 max-w-full px-3 text-sm",
+                    reasonActiveIndex === index && "ring-2 ring-[var(--pos-ring)]",
+                  )}
                   disabled={isCommitPending}
                   key={reason.code}
                   onClick={() => onReasonChange(reason.code)}
@@ -965,44 +909,32 @@ function WasteTraceabilitySection({
               );
             })}
           </div>
-        </PosCard>
+        </div>
       </div>
 
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div className="flex flex-wrap items-center gap-2">
-          <PosStatusBadge status={isTraceabilityReady ? "ready" : "blocked"}>
-            {isTraceabilityReady ? "Captura habilitada" : "Faltan origen y motivo"}
-          </PosStatusBadge>
-          {!isTraceabilityReady ? (
-            <span className="text-sm text-slate-600">
-              Selecciona origen y motivo para habilitar productos.
+      {searchField ? (
+        <div className="grid gap-1.5 border-t border-[var(--pos-shell-border)] pt-2.5">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <span className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">
+              Buscar producto o clase
             </span>
+            <span className="text-[11px] font-semibold text-slate-500">
+              {isTraceabilityReady ? "Captura habilitada" : "Captura pendiente"}
+            </span>
+          </div>
+          <div className="w-full min-w-0">{searchField}</div>
+          {!isTraceabilityReady ? (
+            <InlineNotice tone="warning">
+              Selecciona origen y motivo para capturar productos.
+            </InlineNotice>
           ) : null}
         </div>
-
-        {searchField ? (
-          <div className="flex w-full flex-wrap items-center justify-end gap-2 lg:max-w-xl">
-            {controlState === CONTROL_STATE_PRODUCT_SELECTION ? (
-              <Button
-                aria-label="Regresar"
-                className={cn("h-10 px-3", posOutlineButtonClass)}
-                disabled={isCommitPending}
-                onClick={onGoBack}
-                title="Regresar"
-                type="button"
-              >
-                <ArrowLeftIcon className="h-4 w-4" />
-              </Button>
-            ) : null}
-            <div className="w-full min-w-0 lg:max-w-sm">{searchField}</div>
-          </div>
-        ) : null}
-      </div>
-
-      {isSearchDisabled ? (
-        <InlineNotice tone="warning">{WASTE_TRACEABILITY_BLOCK_MESSAGE}</InlineNotice>
+      ) : !isTraceabilityReady ? (
+        <InlineNotice tone="warning">
+          Selecciona origen y motivo para capturar productos.
+        </InlineNotice>
       ) : null}
-    </PosPanel>
+    </div>
   );
 }
 
@@ -1032,7 +964,6 @@ export function OperationModuleScreen({ variant }: { variant: OperationModuleVar
     useState(false);
   const [scannerText, setScannerText] = useState("");
   const [pendingScannerCode, setPendingScannerCode] = useState<string | null>(null);
-  const [isWasteConfirmDialogOpen, setIsWasteConfirmDialogOpen] = useState(false);
   const [wasteCenterView, setWasteCenterView] = useState<"capture" | "history">("capture");
   const [counterTransferCenterView, setCounterTransferCenterView] = useState<
     "capture" | "counterAvailability" | "history"
@@ -1320,6 +1251,9 @@ export function OperationModuleScreen({ variant }: { variant: OperationModuleVar
 
       setLastCommittedDocument(null);
       setSourceBucketCode(option.value);
+      if (reasonCode.trim().length > 0) {
+        requestAnimationFrame(() => searchInputRef.current?.focus());
+      }
     },
   });
   const wasteReasonGridFocus = useRovingFocusGrid({
@@ -1333,6 +1267,9 @@ export function OperationModuleScreen({ variant }: { variant: OperationModuleVar
 
       setLastCommittedDocument(null);
       setReasonCode(reason.code);
+      if (sourceBucketCode.trim().length > 0) {
+        requestAnimationFrame(() => searchInputRef.current?.focus());
+      }
     },
   });
   const {
@@ -1347,10 +1284,12 @@ export function OperationModuleScreen({ variant }: { variant: OperationModuleVar
   } = productGridFocus;
   const {
     activeIndex: wasteOriginActiveIndex,
+    focusIndex: focusWasteOriginIndex,
     getItemProps: getWasteOriginItemProps,
   } = wasteOriginGridFocus;
   const {
     activeIndex: wasteReasonActiveIndex,
+    focusIndex: focusWasteReasonIndex,
     getItemProps: getWasteReasonItemProps,
   } = wasteReasonGridFocus;
   const totalUnitsText = formatQuantityFromMilliUnits(
@@ -1520,10 +1459,31 @@ export function OperationModuleScreen({ variant }: { variant: OperationModuleVar
     ],
   );
   const isWasteTraceabilityReady = variant !== "waste" || (hasWasteOrigin && hasWasteReason);
-  const showWasteCaptureOverlay =
-    variant === "waste" &&
-    !isWasteTraceabilityReady &&
-    draftState.controlState !== CONTROL_STATE_QUANTITY_CAPTURE;
+  const focusFirstMissingWasteContext = useCallback(() => {
+    if (variant !== "waste") {
+      return;
+    }
+
+    requestAnimationFrame(() => {
+      if (!hasWasteOrigin) {
+        focusWasteOriginIndex(0);
+        return;
+      }
+
+      if (!hasWasteReason) {
+        focusWasteReasonIndex(0);
+        return;
+      }
+
+      searchInputRef.current?.focus();
+    });
+  }, [
+    focusWasteOriginIndex,
+    focusWasteReasonIndex,
+    hasWasteOrigin,
+    hasWasteReason,
+    variant,
+  ]);
   const isCounterTransferAvailabilityView =
     variant === "counterTransfer" && counterTransferCenterView === "counterAvailability";
   const activeGridKey = useMemo(() => {
@@ -1548,12 +1508,27 @@ export function OperationModuleScreen({ variant }: { variant: OperationModuleVar
     draftState.pendingSelection,
     isCounterTransferAvailabilityView,
   ]);
-  const availableCounterProducts = useMemo(
+  const availableCounterClasses = useMemo(
+    () => counterAvailabilityQuery.data?.counter_class_availability ?? [],
+    [counterAvailabilityQuery.data?.counter_class_availability],
+  );
+  const groupedCounterAvailability = useMemo<CounterAvailabilityGroup[]>(
     () =>
-      (counterAvailabilityQuery.data?.relevant_products ?? []).filter(
-        (product) => getCounterAvailableQuantity(product) > 0,
-      ),
-    [counterAvailabilityQuery.data?.relevant_products],
+      availableCounterClasses.map((classRow) => ({
+        classId: classRow.product_class_id,
+        className: classRow.product_class_name,
+        pendingClassCaptureQuantity: Number(classRow.pending_class_capture_quantity),
+        realAvailableQuantity: Number(classRow.available_quantity),
+        products: (counterAvailabilityQuery.data?.relevant_products ?? [])
+          .filter((product) => product.product_class_id === classRow.product_class_id)
+          .map((product) => ({
+            productId: product.product_id,
+            productName: product.product_name,
+            trackedQuantity: getCounterAvailableQuantity(product),
+          }))
+          .filter((product) => product.trackedQuantity > 0),
+      })),
+    [availableCounterClasses, counterAvailabilityQuery.data?.relevant_products],
   );
   const counterAvailabilityErrorMessage = counterAvailabilityQuery.error
     ? toOperationalErrorMessage(
@@ -1740,13 +1715,12 @@ export function OperationModuleScreen({ variant }: { variant: OperationModuleVar
     },
     onSuccess: (document) => {
       const wasteAlertRequested = variant === "waste" && isWasteHighImpact;
-      setLastCommittedDocument(variant === "waste" ? document : null);
+      setLastCommittedDocument(null);
       setLastWasteHighImpactAlertRequested(wasteAlertRequested);
       setSelectionErrorMessage(null);
       setCommitErrorMessage(null);
       setDraftState(createInitialOperationDraftState());
       setIsWasteHighImpactAcknowledged(false);
-      setIsWasteConfirmDialogOpen(false);
       setIsCounterTransferConfirmDialogOpen(false);
       if (variant === "counterTransfer") {
         setCounterTransferCenterView("counterAvailability");
@@ -1802,7 +1776,6 @@ export function OperationModuleScreen({ variant }: { variant: OperationModuleVar
           : "No fue posible registrar el traspaso.",
       );
       setCommitErrorMessage(message);
-      setIsWasteConfirmDialogOpen(false);
       setIsCounterTransferConfirmDialogOpen(false);
       showError(message);
     },
@@ -1906,16 +1879,6 @@ export function OperationModuleScreen({ variant }: { variant: OperationModuleVar
     ],
     [operationsBootstrapQuery.data?.branch.timezone],
   );
-  const counterTransferCurrentCounterLines = useMemo<OperationLineSummaryItem[]>(
-    () =>
-      availableCounterProducts.map((product) => ({
-        key: product.product_id,
-        quantityText: formatOperationQuantity(getCounterAvailableQuantity(product)),
-        title: product.product_name,
-      })),
-    [availableCounterProducts],
-  );
-
   useEffect(() => {
     if (editingCounterTransferDraftLineKey === null) {
       return;
@@ -1975,6 +1938,7 @@ export function OperationModuleScreen({ variant }: { variant: OperationModuleVar
   function handleAddLine() {
     if (variant === "waste" && !isWasteTraceabilityReady) {
       setSelectionErrorMessage(WASTE_TRACEABILITY_BLOCK_MESSAGE);
+      focusFirstMissingWasteContext();
       return;
     }
 
@@ -2046,10 +2010,7 @@ export function OperationModuleScreen({ variant }: { variant: OperationModuleVar
 
       if (!isEditableTarget(event.target)) {
         if ((event.ctrlKey && event.key.toLowerCase() === "f") || event.key === "/") {
-          if (
-            draftState.controlState !== CONTROL_STATE_QUANTITY_CAPTURE &&
-            !(variant === "waste" && !isWasteTraceabilityReady)
-          ) {
+          if (draftState.controlState !== CONTROL_STATE_QUANTITY_CAPTURE) {
             event.preventDefault();
             searchInputRef.current?.focus();
             searchInputRef.current?.select();
@@ -2112,8 +2073,12 @@ export function OperationModuleScreen({ variant }: { variant: OperationModuleVar
 
       if (draftState.controlState === CONTROL_STATE_CLASS_SELECTION) {
         if (variant === "waste" && !isWasteTraceabilityReady) {
+          event.preventDefault();
+          setSelectionErrorMessage(WASTE_TRACEABILITY_BLOCK_MESSAGE);
+          focusFirstMissingWasteContext();
           return;
         }
+
         const productClass = sortedClasses[shortcutIndex];
         if (productClass) {
           event.preventDefault();
@@ -2125,8 +2090,12 @@ export function OperationModuleScreen({ variant }: { variant: OperationModuleVar
 
       if (draftState.controlState === CONTROL_STATE_PRODUCT_SELECTION) {
         if (variant === "waste" && !isWasteTraceabilityReady) {
+          event.preventDefault();
+          setSelectionErrorMessage(WASTE_TRACEABILITY_BLOCK_MESSAGE);
+          focusFirstMissingWasteContext();
           return;
         }
+
         const product = sortedProducts[shortcutIndex];
         if (product) {
           event.preventDefault();
@@ -2143,6 +2112,7 @@ export function OperationModuleScreen({ variant }: { variant: OperationModuleVar
     counterAvailabilityQuery,
     draftState.controlState,
     draftState.searchText,
+    focusFirstMissingWasteContext,
     counterTransferCenterView,
     isCounterTransferConfirmDialogOpen,
     isWasteTraceabilityReady,
@@ -2173,7 +2143,9 @@ export function OperationModuleScreen({ variant }: { variant: OperationModuleVar
   const handleCommit = useCallback(() => {
     if (variant === "waste") {
       if (wasteBlockedReason === null) {
-        setIsWasteConfirmDialogOpen(true);
+        runCommit();
+      } else {
+        showWarning(wasteBlockedReason);
       }
       return;
     }
@@ -2184,7 +2156,7 @@ export function OperationModuleScreen({ variant }: { variant: OperationModuleVar
     }
 
     setIsCounterTransferConfirmDialogOpen(true);
-  }, [draftState.lines.length, showWarning, variant, wasteBlockedReason]);
+  }, [draftState.lines.length, runCommit, showWarning, variant, wasteBlockedReason]);
 
   useEffect(() => {
     if (
@@ -2240,36 +2212,6 @@ export function OperationModuleScreen({ variant }: { variant: OperationModuleVar
   }, [counterTransferCenterView, isCounterTransferConfirmDialogOpen, variant]);
 
   const summaryPanel = useMemo(() => {
-    const clearDraft = () => {
-      if (
-        draftState.lines.length > 0 &&
-        !window.confirm(
-          variant === "counterTransfer"
-            ? "Vaciar el borrador actual del traspaso?"
-            : "Vaciar el documento actual?",
-        )
-      ) {
-        return;
-      }
-
-      setDraftState(createInitialOperationDraftState());
-      setSelectionErrorMessage(null);
-      setCommitErrorMessage(null);
-      setLastCommittedDocument(null);
-      setLastWasteHighImpactAlertRequested(false);
-      setSelectedHistoryDocumentId(null);
-      if (variant === "counterTransfer") {
-        setCounterTransferCenterView("capture");
-      }
-      if (variant === "waste") {
-        setIsWasteHighImpactAcknowledged(false);
-        setSourceBucketCode("");
-        setReasonCode("");
-        setNotes("");
-        setWasteCenterView("capture");
-        setWasteHistorySearchText("");
-      }
-    };
     const counterTransferDocumentAvailability =
       getDocumentActionAvailability("counterTransferReceipt");
     const wasteDocumentAvailability = getDocumentActionAvailability("wasteDocument");
@@ -2406,10 +2348,10 @@ export function OperationModuleScreen({ variant }: { variant: OperationModuleVar
                     )
                   }
                 />
-                <CompactOperationLineSection
+                <GroupedCounterAvailabilitySection
                   badgeLabel="Aprox. hasta cierre"
                   emptyMessage="Aun no hay productos confirmados en mostrador."
-                  lines={counterTransferCurrentCounterLines}
+                  groups={groupedCounterAvailability}
                   title="Mostrador actual"
                 />
               </div>
@@ -2436,10 +2378,10 @@ export function OperationModuleScreen({ variant }: { variant: OperationModuleVar
           >
             <div className="grid h-full min-h-0 auto-rows-max content-start gap-1.5">
               <CounterMovementSummaryCard />
-              <CompactOperationLineSection
+              <GroupedCounterAvailabilitySection
                 badgeLabel="Aprox. hasta cierre"
                 emptyMessage="Aun no hay productos confirmados en mostrador."
-                lines={counterTransferCurrentCounterLines}
+                groups={groupedCounterAvailability}
                 title="Mostrador actual"
               />
             </div>
@@ -2807,9 +2749,35 @@ export function OperationModuleScreen({ variant }: { variant: OperationModuleVar
       );
     }
 
+    const visibleWasteBlockers = wasteBlockedMessages.filter(
+      (message) =>
+        message !== "Selecciona un origen para continuar." &&
+        message !== "Selecciona un motivo para continuar." &&
+        message !== "Agrega al menos una linea.",
+    );
+
     return (
       <PosSummaryPanel
-        description="Resumen operativo de la merma en construccion."
+        footer={
+          <div className="grid gap-2">
+            <Button
+              className={cn("h-10 w-full", posOutlineButtonClass)}
+              onClick={() => setWasteCenterView("history")}
+              type="button"
+              variant="outline"
+            >
+              Ver historial
+            </Button>
+            <Button
+              className={cn("h-11 w-full", posPrimaryButtonClass)}
+              disabled={wasteBlockedReason !== null || commitMutation.isPending}
+              onClick={handleCommit}
+              type="button"
+            >
+              {commitMutation.isPending ? "Registrando..." : config.commitButtonLabel}
+            </Button>
+          </div>
+        }
         stateLabel={getWasteUiStateLabel(wasteDocumentState)}
         stateTone={
           wasteDocumentState === "REGISTERED_SUCCESS"
@@ -2820,100 +2788,167 @@ export function OperationModuleScreen({ variant }: { variant: OperationModuleVar
                 ? "blocked"
                 : "draft"
         }
-        title={getWastePanelTitle(wasteDocumentState)}
+        title="Resumen de merma"
       >
-        <div className="grid h-full min-h-0 grid-rows-[auto_minmax(0,1fr)] gap-3">
-          <div className="grid gap-3">
+        <div className="grid h-full min-h-0 content-start gap-3">
+          <div className="grid gap-2">
             {commitErrorMessage ? <InlineNotice tone="error">{commitErrorMessage}</InlineNotice> : null}
-            <div className="grid gap-2 sm:grid-cols-2">
-              <PosCard className="px-3 py-2.5">
-                <p className="pos-label-text">Origen</p>
-                <p className="mt-1 text-sm font-semibold text-slate-950">
+            <div className="grid gap-2 rounded-xl border border-[var(--pos-shell-border)] bg-[var(--pos-shell-muted)] px-3 py-2.5 text-sm">
+              <div className="grid grid-cols-[4.25rem_minmax(0,1fr)] items-center gap-2">
+                <span className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">
+                  Origen
+                </span>
+                <span className="truncate text-right font-semibold text-slate-950">
                   {hasWasteOrigin ? getWasteSourceBucketLabel(sourceBucketCode) : "Pendiente"}
-                </p>
-              </PosCard>
-              <PosCard className="px-3 py-2.5">
-                <p className="pos-label-text">Motivo</p>
-                <p className="mt-1 text-sm font-semibold text-slate-950">
+                </span>
+              </div>
+              <div className="grid grid-cols-[4.25rem_minmax(0,1fr)] items-center gap-2">
+                <span className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">
+                  Motivo
+                </span>
+                <span className="truncate text-right font-semibold text-slate-950">
                   {hasWasteReason
                     ? getWasteReasonName(operationsBootstrapQuery.data?.waste_reasons ?? [], reasonCode)
                     : "Pendiente"}
-                </p>
-              </PosCard>
-              <PosCard className="px-3 py-2.5">
-                <p className="pos-label-text">Lineas</p>
-                <p className="mt-1 text-base font-semibold text-slate-950 [font-variant-numeric:tabular-nums]">
-                  {getOperationLineCount(draftState.lines)}
-                </p>
-              </PosCard>
-              <PosCard className="px-3 py-2.5" tone="warning">
-                <p className="pos-label-text">Unidades</p>
-                <p className="mt-1 text-base font-semibold text-slate-950 [font-variant-numeric:tabular-nums]">
-                  {totalUnitsText}
-                </p>
-              </PosCard>
+                </span>
+              </div>
+              {!isWasteTraceabilityReady ? (
+                <InlineNotice tone="warning">
+                  Selecciona origen y motivo para continuar.
+                </InlineNotice>
+              ) : null}
               {isWasteHighImpact ? (
-                <PosCard
-                  className="px-3 py-2.5"
-                  tone={isWasteHighImpactAcknowledged ? "warning" : "danger"}
-                >
-                  <p className="pos-label-text">Control</p>
-                  <p className="mt-1 text-sm font-semibold text-slate-950">
+                <div className="grid grid-cols-[4.25rem_minmax(0,1fr)] items-center gap-2">
+                  <span className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">
+                    Control
+                  </span>
+                  <span className="truncate text-right font-semibold text-slate-950">
                     {isWasteHighImpactAcknowledged
                       ? "Alto impacto confirmado"
                       : "Falta confirmar alto impacto"}
-                  </p>
-                </PosCard>
+                  </span>
+                </div>
               ) : null}
             </div>
-            <PosCard className="px-3 py-2.5">
-              <p className="pos-label-text">Notas y evidencia</p>
-              <p className="mt-1 text-sm text-slate-700">
-                {notes.trim().length > 0 ? notes.trim() : "Sin notas operativas registradas."}
-              </p>
-            </PosCard>
           </div>
 
-          <div className="grid min-h-0 grid-rows-[auto_minmax(0,1fr)] gap-3">
+          {draftState.lines.length === 0 ? (
+            <div className="rounded-xl border border-dashed border-[var(--pos-shell-border)] bg-white px-3 py-3 text-sm text-slate-600">
+              Agrega productos para construir el documento.
+            </div>
+          ) : (
+            <div className="grid gap-2">
+              <p className="text-sm font-semibold text-slate-950">Productos</p>
+              <CapturedProductLineList>
+                {draftState.lines.map((line) => (
+                  <CapturedProductLineRow
+                    disabled={commitMutation.isPending}
+                    key={line.key}
+                    name={line.productName}
+                    onDecrement={() => {
+                      setLastCommittedDocument(null);
+                      setDraftState((state) => ({
+                        ...state,
+                        lines: state.lines.map((currentLine) =>
+                          currentLine.key === line.key
+                            ? updateOperationLineQuantity(
+                                currentLine,
+                                Math.max(currentLine.quantityMilliUnits - 1000, 1000),
+                              )
+                            : currentLine,
+                        ),
+                      }));
+                    }}
+                    onIncrement={() => {
+                      setLastCommittedDocument(null);
+                      setDraftState((state) => ({
+                        ...state,
+                        lines: state.lines.map((currentLine) =>
+                          currentLine.key === line.key
+                            ? updateOperationLineQuantity(
+                                currentLine,
+                                currentLine.quantityMilliUnits + 1000,
+                              )
+                            : currentLine,
+                        ),
+                      }));
+                    }}
+                    onRemove={() => {
+                      setLastCommittedDocument(null);
+                      setDraftState((state) => ({
+                        ...state,
+                        lines: removeOperationLine(state.lines, line.key),
+                      }));
+                    }}
+                    quantityText={line.quantityText}
+                  />
+                ))}
+              </CapturedProductLineList>
+            </div>
+          )}
+
+          <details
+            className="rounded-xl border border-[var(--pos-shell-border)] bg-white px-3 py-2.5"
+            open={wasteRequiresEvidenceNote || notes.trim().length > 0}
+          >
+            <summary className="cursor-pointer text-sm font-semibold text-slate-950">
+              {notes.trim().length > 0 ? "Observacion" : "Agregar observacion"}
+            </summary>
+            <div className="mt-2 grid gap-2">
+              <textarea
+                className={cn("min-h-20 rounded-lg px-3 py-2 text-sm shadow-sm", posInputClass)}
+                disabled={commitMutation.isPending}
+                onChange={(event) => {
+                  setLastCommittedDocument(null);
+                  setNotes(event.target.value);
+                }}
+                placeholder="Observacion opcional"
+                value={notes}
+              />
+              {wasteRequiresEvidenceNote ? (
+                <InlineNotice tone="warning">
+                  Este motivo o volumen requiere una observacion.
+                </InlineNotice>
+              ) : null}
+            </div>
+          </details>
+
+          {isWasteHighImpact ? (
+            <div className="grid gap-2 rounded-xl border border-[rgba(187,122,22,0.22)] bg-[var(--ui-color-warning-soft)] px-3 py-2.5">
+              <div className="flex items-center justify-between gap-2">
+                <span className="text-sm font-semibold text-slate-950">Merma de alto impacto</span>
+                <span className="text-xs font-medium text-slate-700">
+                  Umbral {formatQuantityFromMilliUnits(wasteHighImpactThresholdMilli)}
+                </span>
+              </div>
+              <label className="flex items-center gap-2 text-sm font-medium text-slate-800">
+                <input
+                  checked={isWasteHighImpactAcknowledged}
+                  className="h-4 w-4 rounded border-[var(--pos-shell-border)] text-[var(--pos-accent-strong)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--pos-ring)] focus-visible:ring-offset-2"
+                  disabled={commitMutation.isPending}
+                  onChange={(event) => setIsWasteHighImpactAcknowledged(event.target.checked)}
+                  type="checkbox"
+                />
+                <span>Confirmo la notificacion operativa.</span>
+              </label>
+            </div>
+          ) : null}
+
+          {wasteStockWarningMessage ? (
+            <InlineNotice tone="warning">{wasteStockWarningMessage}</InlineNotice>
+          ) : null}
+          {wasteCounterAvailabilityWarningMessage ? (
+            <InlineNotice tone="warning">{wasteCounterAvailabilityWarningMessage}</InlineNotice>
+          ) : null}
+          {visibleWasteBlockers.length > 0 ? (
             <PosBlockerPanel
-              blockers={wasteBlockedMessages.map((message) => ({
+              blockers={visibleWasteBlockers.map((message) => ({
                 key: message,
                 message,
                 tone: "warning" as const,
               }))}
             />
-            <OperationLineSummary
-              emptyMessage="Agrega productos para construir el documento."
-              lines={draftState.lines.map((line) => ({
-                key: line.key,
-                quantityText: line.quantityText,
-                secondaryText: line.productClassCode,
-                title: line.productName,
-              }))}
-              title="Lineas del documento"
-            />
-          </div>
-        </div>
-        <div className="grid gap-2">
-          <div className="grid grid-cols-2 gap-2">
-            <PosButton onClick={() => setWasteCenterView("history")} variant="neutral">
-              Ver historial
-            </PosButton>
-            <PosButton
-              disabled={draftState.lines.length === 0 || commitMutation.isPending}
-              onClick={clearDraft}
-              variant="neutral"
-            >
-              Vaciar documento
-            </PosButton>
-          </div>
-          <PosButton
-            disabled={wasteBlockedReason !== null || commitMutation.isPending}
-            onClick={handleCommit}
-            variant="primary"
-          >
-            {commitMutation.isPending ? "Registrando..." : config.commitButtonLabel}
-          </PosButton>
+          ) : null}
         </div>
       </PosSummaryPanel>
     );
@@ -2922,7 +2957,7 @@ export function OperationModuleScreen({ variant }: { variant: OperationModuleVar
     commitMutation.isPending,
     config.commitButtonLabel,
     counterTransferCenterView,
-    counterTransferCurrentCounterLines,
+    groupedCounterAvailability,
     beginCounterTransferInlineEdit,
     cancelCounterTransferInlineEdit,
     commitCounterTransferInlineEdit,
@@ -2935,11 +2970,11 @@ export function OperationModuleScreen({ variant }: { variant: OperationModuleVar
     handleOpenCounterTransferHistory,
     hasWasteOrigin,
     hasWasteReason,
+    isWasteTraceabilityReady,
     isWasteHighImpact,
     isWasteHighImpactAcknowledged,
     lastCommittedDocument,
     lastWasteHighImpactAlertRequested,
-    notes,
     operationsBootstrapQuery.data?.branch.timezone,
     operationsBootstrapQuery.data?.waste_reasons,
     reasonCode,
@@ -2949,13 +2984,17 @@ export function OperationModuleScreen({ variant }: { variant: OperationModuleVar
     selectedHistoryDocumentQuery.error,
     selectedHistoryDocumentQuery.isPending,
     sourceBucketCode,
-    totalUnitsText,
     variant,
     wasteCenterView,
     wasteBlockedMessages,
     wasteBlockedReason,
+    wasteCounterAvailabilityWarningMessage,
     wasteDocumentState,
     wasteHistoryQuery.isPending,
+    wasteHighImpactThresholdMilli,
+    wasteRequiresEvidenceNote,
+    wasteStockWarningMessage,
+    notes,
   ]);
   useAppShellRightPanel(summaryPanel);
 
@@ -3023,7 +3062,6 @@ export function OperationModuleScreen({ variant }: { variant: OperationModuleVar
     variant === "counterTransfer" &&
     (draftState.controlState === CONTROL_STATE_PRODUCT_SELECTION ||
       draftState.controlState === CONTROL_STATE_QUANTITY_CAPTURE);
-  const isWasteSearchDisabled = variant === "waste" && !isWasteTraceabilityReady;
   const quantitySelection =
     draftState.controlState === CONTROL_STATE_QUANTITY_CAPTURE &&
     draftState.pendingSelection !== null
@@ -3032,7 +3070,8 @@ export function OperationModuleScreen({ variant }: { variant: OperationModuleVar
   const quantityProduct = quantitySelection?.product ?? null;
   const isQuantityReady =
     quantitySelection !== null && hasCapturedQuantity(quantitySelection.quantityText);
-  const isWasteQuantityBlocked = variant === "waste" && !isWasteTraceabilityReady;
+  const isWasteCaptureBlocked = variant === "waste" && !isWasteTraceabilityReady;
+  const isWasteQuantityBlocked = isWasteCaptureBlocked;
   const quantityPresets = ["1", "2", "3", "6", "12"];
   const quantityShortcuts = [
     { label: "Enter", value: "Agrega" },
@@ -3042,11 +3081,6 @@ export function OperationModuleScreen({ variant }: { variant: OperationModuleVar
     variant === "counterTransfer" && draftState.lines.length > 0
       ? `${draftState.lines.length} ${draftState.lines.length === 1 ? "linea" : "lineas"} en documento`
       : null;
-  const wasteOriginLabel = getWasteSourceBucketLabel(sourceBucketCode);
-  const wasteReasonLabel = getWasteReasonName(
-    operationsBootstrapQuery.data?.waste_reasons ?? [],
-    reasonCode,
-  );
   const selectedCounterTransferClass =
     variant === "counterTransfer" ? draftState.pendingSelection?.productClass ?? null : null;
   const pageHeader =
@@ -3130,11 +3164,9 @@ export function OperationModuleScreen({ variant }: { variant: OperationModuleVar
       <CompactPageHeader
         secondaryChips={
           <ModuleStateChip
-            tone={wasteCenterView === "history" ? "info" : isWasteTraceabilityReady ? "primary" : "muted"}
+            tone={wasteCenterView === "history" ? "info" : "primary"}
           >
-            {wasteCenterView === "history"
-              ? "Historial de merma"
-              : `${wasteOriginLabel} - ${wasteReasonLabel}`}
+            {wasteCenterView === "history" ? "Historial de merma" : "Captura de merma"}
           </ModuleStateChip>
         }
         stateChip={
@@ -3144,37 +3176,66 @@ export function OperationModuleScreen({ variant }: { variant: OperationModuleVar
         }
         title="Registrar merma"
       >
-        <FlowGuide
-          activeStepKey={flowActiveStepKey}
-          steps={[
-            {
-              icon: <ClipboardIcon className="h-3.5 w-3.5" />,
-              key: "traceability",
-              label: "Trazabilidad",
-            },
-            {
-              icon: <StoreIcon className="h-3.5 w-3.5" />,
-              key: "class",
-              label: "Clase",
-            },
-            {
-              icon: <PackageIcon className="h-3.5 w-3.5" />,
-              key: "product",
-              label: "Producto",
-            },
-            {
-              icon: <HashIcon className="h-3.5 w-3.5" />,
-              key: "quantity",
-              label: "Cantidad",
-            },
-            {
-              icon: <PackageIcon className="h-3.5 w-3.5" />,
-              key: "summary",
-              label: "Resumen",
-            },
-          ]}
-          variant="process"
-        />
+        {wasteCenterView !== "history" ? (
+          <FlowGuide
+            activeStepKey={flowActiveStepKey}
+            steps={[
+              {
+                key: "traceability",
+                label: "Origen y motivo",
+                state: isWasteTraceabilityReady ? "completed" : "current",
+              },
+              {
+                key: "class",
+                label: "Clase",
+                state:
+                  !isWasteTraceabilityReady
+                    ? "blocked"
+                    : flowActiveStepKey === "class"
+                      ? "current"
+                      : draftState.pendingSelection !== null || draftState.lines.length > 0
+                        ? "completed"
+                        : "upcoming",
+              },
+              {
+                key: "product",
+                label: "Producto",
+                state:
+                  !isWasteTraceabilityReady
+                    ? "blocked"
+                    : flowActiveStepKey === "product"
+                      ? "current"
+                      : draftState.controlState === CONTROL_STATE_QUANTITY_CAPTURE ||
+                          draftState.lines.length > 0
+                        ? "completed"
+                        : "upcoming",
+              },
+              {
+                key: "quantity",
+                label: "Cantidad",
+                state:
+                  !isWasteTraceabilityReady
+                    ? "blocked"
+                    : flowActiveStepKey === "quantity"
+                      ? "current"
+                      : draftState.lines.length > 0
+                        ? "completed"
+                        : "upcoming",
+              },
+              {
+                key: "summary",
+                label: "Resumen",
+                state:
+                  draftState.lines.length > 0
+                    ? flowActiveStepKey === "summary"
+                      ? "current"
+                      : "completed"
+                    : "upcoming",
+              },
+            ]}
+            variant="process"
+          />
+        ) : null}
       </CompactPageHeader>
     );
   const stageToolbar =
@@ -3249,77 +3310,6 @@ export function OperationModuleScreen({ variant }: { variant: OperationModuleVar
 
   return (
     <>
-      {variant === "waste" ? (
-        <OperationConfirmationDialog
-          actionsTitle="Lineas a registrar"
-          confirmLabel="Confirmar merma"
-          context={{
-            branchName: operationsBootstrapQuery.data.branch.name,
-            userName: operationsBootstrapQuery.data.user.full_name,
-            workstationName: operationsBootstrapQuery.data.workstation.name,
-          }}
-          description={
-            isWasteHighImpact
-              ? "Revisa origen, motivo, cantidades y evidencia antes de confirmar. Esta merma supera el umbral operativo y generara una alerta para backoffice."
-              : "Revisa origen, motivo y cantidades antes de confirmar la merma. Esta accion reducira inventario disponible."
-          }
-          isOpen={isWasteConfirmDialogOpen}
-          isPending={commitMutation.isPending}
-          kind="waste"
-          lines={draftState.lines.map((line) => ({
-            key: line.key,
-            quantityText: line.quantityText,
-            secondaryText: line.productClassName,
-            title: line.productName,
-          }))}
-          metrics={[
-            {
-              key: "origin",
-              label: "Origen",
-              value: wasteOriginLabel,
-            },
-            {
-              key: "reason",
-              label: "Motivo",
-              value: wasteReasonLabel,
-            },
-            {
-              key: "line-count",
-              label: "Lineas",
-              value: String(getOperationLineCount(draftState.lines)),
-            },
-            {
-              key: "total-units",
-              label: "Unidades",
-              tone: "financial",
-              value: totalUnitsText,
-            },
-            ...(isWasteHighImpact
-              ? [
-                  {
-                    key: "high-impact",
-                    label: "Control",
-                    tone: "warning" as const,
-                    value: "Alto impacto",
-                  },
-                ]
-              : []),
-            ...(notes.trim().length > 0
-              ? [
-                  {
-                    key: "notes",
-                    label: "Notas",
-                    value: notes.trim(),
-                  },
-                ]
-              : []),
-          ]}
-          onCancel={() => setIsWasteConfirmDialogOpen(false)}
-          onConfirm={runCommit}
-          title="Confirmar merma"
-        />
-      ) : null}
-
       {variant === "counterTransfer" ? (
         <OperationConfirmationDialog
           actionsTitle="Lineas a transferir"
@@ -3409,20 +3399,23 @@ export function OperationModuleScreen({ variant }: { variant: OperationModuleVar
           {variant === "waste" ? (
             <div className="grid gap-3 border-b border-[var(--pos-shell-border)] pb-3">
               <WasteTraceabilitySection
-                controlState={draftState.controlState}
                 getOriginItemProps={getWasteOriginItemProps}
                 getReasonItemProps={getWasteReasonItemProps}
                 isCommitPending={commitMutation.isPending}
-                isSearchDisabled={isWasteSearchDisabled}
                 originActiveIndex={wasteOriginActiveIndex}
-                onGoBack={() => setDraftState((state) => goBackFromOperationalState(state))}
                 onReasonChange={(value) => {
                   setLastCommittedDocument(null);
                   setReasonCode(value);
+                  if (hasWasteOrigin) {
+                    requestAnimationFrame(() => searchInputRef.current?.focus());
+                  }
                 }}
                 onSourceBucketChange={(value) => {
                   setLastCommittedDocument(null);
                   setSourceBucketCode(value);
+                  if (hasWasteReason) {
+                    requestAnimationFrame(() => searchInputRef.current?.focus());
+                  }
                 }}
                 reasonActiveIndex={wasteReasonActiveIndex}
                 reasonCode={reasonCode}
@@ -3431,7 +3424,6 @@ export function OperationModuleScreen({ variant }: { variant: OperationModuleVar
                     <SearchField
                       ariaLabel="Buscar catalogo operativo"
                       className="w-full"
-                      disabled={isWasteSearchDisabled}
                       inputClassName={cn("h-9 rounded-lg text-sm shadow-sm", posInputClass)}
                       inputRef={searchInputRef}
                       onChange={(value) =>
@@ -3576,6 +3568,7 @@ export function OperationModuleScreen({ variant }: { variant: OperationModuleVar
                 <PosFilterBar
                   chipFilters={(
                     wasteHistoryQuery.data?.available_scopes ?? [
+                      { code: "ALL", label: "Todos" },
                       { code: "CURRENT_SHIFT", label: "Turno actual" },
                       { code: "TODAY", label: "Hoy" },
                       { code: "RECENT", label: "Recientes" },
@@ -3677,9 +3670,10 @@ export function OperationModuleScreen({ variant }: { variant: OperationModuleVar
           ) : isCounterTransferAvailabilityView ? (
             <CounterAvailabilitySection
               branchName={operationsBootstrapQuery.data.branch.name}
+              classRows={availableCounterClasses}
               containerRef={counterTransferAvailabilityRef}
               onRetry={() => void counterAvailabilityQuery.refetch()}
-              products={availableCounterProducts}
+              products={counterAvailabilityQuery.data?.relevant_products ?? []}
               queryErrorMessage={counterAvailabilityErrorMessage}
               queryPending={counterAvailabilityQuery.isPending}
             />
@@ -3728,21 +3722,17 @@ export function OperationModuleScreen({ variant }: { variant: OperationModuleVar
                 </div>
               ) : null}
 
+              {isWasteCaptureBlocked && draftState.controlState !== CONTROL_STATE_QUANTITY_CAPTURE ? (
+                <InlineNotice tone="warning">
+                  Selecciona origen y motivo para capturar productos.
+                </InlineNotice>
+              ) : null}
+
               {!isSelectionLoading && !selectionError ? (
                 <>
                   {draftState.controlState === CONTROL_STATE_CLASS_SELECTION ? (
                     sortedClasses.length > 0 ? (
                       <div className="grid gap-2.5">
-                        <div className="flex flex-wrap items-center justify-between gap-2">
-                          <div className="flex flex-wrap items-center gap-2 text-xs text-slate-500">
-                            <span className="pos-chip" data-tone="muted">
-                              Captura por clase
-                            </span>
-                            <span className="pos-chip" data-tone="primary">
-                              Producto directo
-                            </span>
-                          </div>
-                        </div>
                         <div className="grid gap-2.5 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
                           {sortedClasses.map((productClass, index) => {
                             const itemProps = getClassItemProps(index);
@@ -3752,7 +3742,7 @@ export function OperationModuleScreen({ variant }: { variant: OperationModuleVar
                                 buttonRef={itemProps.ref}
                                 code={productClass.code}
                                 isActive={classActiveIndex === index}
-                                isDisabled={commitMutation.isPending}
+                                isDisabled={commitMutation.isPending || isWasteCaptureBlocked}
                                 key={productClass.id}
                                 name={productClass.name}
                                 onCardFocus={itemProps.onFocus}
@@ -3781,16 +3771,13 @@ export function OperationModuleScreen({ variant }: { variant: OperationModuleVar
                   {draftState.controlState === CONTROL_STATE_PRODUCT_SELECTION ? (
                     sortedProducts.length > 0 ? (
                       <div className="grid gap-2.5">
-                        <div className="flex flex-wrap items-center justify-between gap-2">
-                          <div className="flex flex-wrap items-center gap-2 text-xs text-slate-500">
-                            <span className="font-medium text-slate-700">
-                              {selectedCounterTransferClass?.name}
-                            </span>
-                            <span className="pos-chip" data-tone="primary">
-                              Producto exacto
-                            </span>
+                          <div className="flex flex-wrap items-center justify-between gap-2">
+                            <div className="flex flex-wrap items-center gap-2 text-xs text-slate-500">
+                              <span className="font-medium text-slate-700">
+                                {selectedCounterTransferClass?.name}
+                              </span>
+                            </div>
                           </div>
-                        </div>
                         <div className="grid gap-2.5 sm:grid-cols-2 xl:grid-cols-3">
                           {sortedProducts.map((product, index) => {
                             const itemProps = getProductItemProps(index);
@@ -3800,7 +3787,7 @@ export function OperationModuleScreen({ variant }: { variant: OperationModuleVar
                                 buttonRef={itemProps.ref}
                                 code={product.code}
                                 isActive={productActiveIndex === index}
-                                isDisabled={commitMutation.isPending}
+                                isDisabled={commitMutation.isPending || isWasteCaptureBlocked}
                                 key={product.id}
                                 name={product.name}
                                 onCardFocus={itemProps.onFocus}
@@ -3843,9 +3830,6 @@ export function OperationModuleScreen({ variant }: { variant: OperationModuleVar
                                 <p className="text-base font-semibold text-slate-950">
                                   {quantityProduct.name}
                                 </p>
-                                <span className="pos-chip" data-tone="primary">
-                                  Producto exacto
-                                </span>
                               </div>
                               <p className="mt-1 text-sm text-slate-600">
                                 {quantitySelection.productClass.name}
@@ -3978,11 +3962,6 @@ export function OperationModuleScreen({ variant }: { variant: OperationModuleVar
             </>
           ) : (
             <>
-              <PosContextBanner
-                description="Documenta origen, motivo y productos exactos para registrar la merma con trazabilidad completa."
-                title="Trazabilidad -> Merma"
-              />
-
               {isSelectionLoading ? (
                 <OperationalStatus
                   description="Cargando el catalogo operativo actual."
@@ -4012,17 +3991,18 @@ export function OperationModuleScreen({ variant }: { variant: OperationModuleVar
                 />
               ) : null}
 
+              {isWasteCaptureBlocked && draftState.controlState !== CONTROL_STATE_QUANTITY_CAPTURE ? (
+                <InlineNotice tone="warning">
+                  Selecciona origen y motivo para capturar productos.
+                </InlineNotice>
+              ) : null}
+
               {!isSelectionLoading &&
               !selectionError &&
               draftState.controlState === CONTROL_STATE_CLASS_SELECTION ? (
                 <div className="grid gap-2.5">
                   <h2 className="text-sm font-semibold text-slate-950">Selecciona una clase</h2>
-                  <div className="relative min-h-[14rem]">
-                  <div
-                    className={cn(
-                      showWasteCaptureOverlay && "pointer-events-none select-none opacity-45",
-                    )}
-                  >
+                  <div className="min-h-[14rem]">
                     {sortedClasses.length > 0 ? (
                       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
                         {sortedClasses.map((productClass, index) => {
@@ -4033,7 +4013,7 @@ export function OperationModuleScreen({ variant }: { variant: OperationModuleVar
                               buttonRef={itemProps.ref}
                               code={productClass.code}
                               isActive={classActiveIndex === index}
-                              isDisabled={showWasteCaptureOverlay}
+                              isDisabled={commitMutation.isPending || isWasteCaptureBlocked}
                               key={productClass.id}
                               onCardFocus={itemProps.onFocus}
                               onCardKeyDown={itemProps.onKeyDown}
@@ -4056,14 +4036,6 @@ export function OperationModuleScreen({ variant }: { variant: OperationModuleVar
                       </div>
                     )}
                   </div>
-                  {showWasteCaptureOverlay ? (
-                    <div className="absolute inset-0 z-10 flex items-center justify-center rounded-xl border border-dashed border-[var(--pos-shell-border)] bg-white/90 px-4 text-center">
-                      <div className="max-w-sm rounded-xl border border-[var(--ui-color-warning-soft)] bg-[var(--ui-color-warning-soft)] px-4 py-3 text-sm font-medium text-[var(--ui-color-warning)]">
-                        {WASTE_TRACEABILITY_OVERLAY_MESSAGE}
-                      </div>
-                      </div>
-                    ) : null}
-                  </div>
                 </div>
               ) : null}
 
@@ -4072,12 +4044,7 @@ export function OperationModuleScreen({ variant }: { variant: OperationModuleVar
               draftState.controlState === CONTROL_STATE_PRODUCT_SELECTION ? (
                 <div className="grid gap-2.5">
                   <h2 className="text-sm font-semibold text-slate-950">Selecciona un producto</h2>
-                  <div className="relative min-h-[14rem]">
-                  <div
-                    className={cn(
-                      showWasteCaptureOverlay && "pointer-events-none select-none opacity-45",
-                    )}
-                  >
+                  <div className="min-h-[14rem]">
                     {sortedProducts.length > 0 ? (
                       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
                         {sortedProducts.map((product, index) => {
@@ -4088,7 +4055,7 @@ export function OperationModuleScreen({ variant }: { variant: OperationModuleVar
                               buttonRef={itemProps.ref}
                               code={product.code}
                               isActive={productActiveIndex === index}
-                              isDisabled={showWasteCaptureOverlay}
+                              isDisabled={commitMutation.isPending || isWasteCaptureBlocked}
                               key={product.id}
                               onCardFocus={itemProps.onFocus}
                               onCardKeyDown={itemProps.onKeyDown}
@@ -4111,144 +4078,7 @@ export function OperationModuleScreen({ variant }: { variant: OperationModuleVar
                       </div>
                     )}
                   </div>
-                  {showWasteCaptureOverlay ? (
-                    <div className="absolute inset-0 z-10 flex items-center justify-center rounded-xl border border-dashed border-[var(--pos-shell-border)] bg-white/90 px-4 text-center">
-                      <div className="max-w-sm rounded-xl border border-[var(--ui-color-warning-soft)] bg-[var(--ui-color-warning-soft)] px-4 py-3 text-sm font-medium text-[var(--ui-color-warning)]">
-                        {WASTE_TRACEABILITY_OVERLAY_MESSAGE}
-                      </div>
-                      </div>
-                    ) : null}
-                  </div>
                 </div>
-              ) : null}
-
-              {quantitySelection !== null && quantityProduct !== null ? (
-            <div className="w-full max-w-5xl justify-self-center rounded-xl border border-[var(--pos-shell-border)] bg-white p-3 shadow-sm">
-              <div className="grid gap-3 lg:grid-cols-[12rem_minmax(0,1fr)]">
-                <CatalogVisual
-                  className="min-h-[11.5rem]"
-                  code={quantityProduct.code}
-                  name={quantityProduct.name}
-                />
-
-                <div className="grid gap-2.5">
-                  <div className="flex flex-wrap items-start justify-between gap-3">
-                    <div>
-                      <div className="flex flex-wrap items-center gap-2">
-                        <p className="text-base font-semibold text-slate-950">{quantityProduct.name}</p>
-                        {!isQuantityReady ? (
-                          <span className="pos-chip" data-tone="warning">
-                            Pendiente
-                          </span>
-                        ) : null}
-                      </div>
-                      <p className="mt-1 text-sm text-slate-600">
-                        {quantitySelection.productClass.name}
-                      </p>
-                    </div>
-
-                    <Button
-                      aria-label="Regresar"
-                      className={cn("h-10 px-3", posOutlineButtonClass)}
-                      onClick={() => setDraftState((state) => goBackFromOperationalState(state))}
-                      title="Regresar"
-                      type="button"
-                    >
-                      <ArrowLeftIcon className="h-4 w-4" />
-                    </Button>
-                  </div>
-
-                  <div className="grid gap-2">
-                    <input
-                      aria-label="Cantidad"
-                      className={cn(
-                        "h-16 rounded-xl px-4 text-[2.25rem] font-semibold tracking-tight shadow-sm",
-                        posInputClass,
-                      )}
-                      disabled={isWasteQuantityBlocked}
-                      inputMode="decimal"
-                      onChange={(event) =>
-                        setDraftState((state) => setPendingQuantityText(state, event.target.value))
-                      }
-                      onKeyDown={(event) => {
-                        if (event.key === "Enter") {
-                          event.preventDefault();
-                          handleAddLine();
-                        }
-
-                        if (event.key === "Escape") {
-                          event.preventDefault();
-                          event.stopPropagation();
-                          setDraftState((state) => goBackFromOperationalState(state));
-                        }
-                      }}
-                      placeholder="0"
-                      ref={quantityInputRef}
-                      value={quantitySelection.quantityText}
-                    />
-                    {isWasteQuantityBlocked ? (
-                      <InlineNotice tone="warning">
-                        {WASTE_TRACEABILITY_BLOCK_MESSAGE}
-                      </InlineNotice>
-                    ) : null}
-                    <div className="flex flex-wrap items-center gap-2">
-                      <div className="flex items-center gap-2">
-                        <Button
-                          className={cn("h-10 px-3", posOutlineButtonClass)}
-                          disabled={isWasteQuantityBlocked}
-                          onClick={() =>
-                            setDraftState((state) => decrementPendingOperationQuantity(state))
-                          }
-                          type="button"
-                        >
-                          -1
-                        </Button>
-                        <Button
-                          className={cn("h-10 px-3", posOutlineButtonClass)}
-                          disabled={isWasteQuantityBlocked}
-                          onClick={() =>
-                            setDraftState((state) => incrementPendingOperationQuantity(state))
-                          }
-                          type="button"
-                        >
-                          +1
-                        </Button>
-                      </div>
-                      <div className="flex flex-wrap items-center gap-2">
-                        {quantityShortcuts.map((shortcut) => (
-                          <span className="pos-chip" data-tone="muted" key={shortcut.label}>
-                            {shortcut.label} {shortcut.value}
-                          </span>
-                        ))}
-                      </div>
-                    </div>
-                    <div className="flex flex-wrap items-center justify-end gap-3">
-                      <Button
-                        className={cn("h-10 px-5", posPrimaryButtonClass)}
-                        disabled={!isQuantityReady || isWasteQuantityBlocked}
-                        onClick={handleAddLine}
-                        type="button"
-                      >
-                        Agregar
-                      </Button>
-                    </div>
-                    {selectionErrorMessage ? (
-                      <div className="flex items-start justify-between gap-3 rounded-lg border border-[var(--ui-color-danger-soft)] bg-[var(--ui-color-danger-soft)] px-3 py-2 text-sm text-[var(--ui-color-danger)]">
-                        <p className="leading-6">{selectionErrorMessage}</p>
-                        <button
-                          aria-label="Cerrar error"
-                          className="flex h-8 w-8 items-center justify-center rounded-full text-[var(--ui-color-danger)] transition hover:bg-[var(--ui-color-danger-soft)] hover:text-[var(--ui-color-danger)]"
-                          onClick={() => setSelectionErrorMessage(null)}
-                          type="button"
-                        >
-                          <XIcon className="h-4 w-4" />
-                        </button>
-                      </div>
-                    ) : null}
-                  </div>
-                </div>
-              </div>
-            </div>
               ) : null}
 
               {quantitySelection !== null && quantityProduct !== null ? (
@@ -4377,83 +4207,6 @@ export function OperationModuleScreen({ variant }: { variant: OperationModuleVar
                 </div>
               </div>
             </div>
-              ) : null}
-
-              {variant === "waste" ? (
-                <PosPanel className="mt-3 grid gap-3 px-4 py-4">
-                  <PosSectionTitle
-                    description="Registra notas operativas. Los archivos adjuntos quedan como dependencia futura."
-                    eyebrow="3. Notas y evidencia"
-                    title="Contexto adicional"
-                  />
-                  <div className="grid gap-2">
-                    <PosFieldLabel
-                      helper={
-                        wasteRequiresEvidenceNote
-                          ? "Requerida para este motivo o por alto impacto. La nota queda auditada."
-                          : "Este campo es opcional y queda auditado con el documento."
-                      }
-                      required={wasteRequiresEvidenceNote}
-                    >
-                      Notas operativas
-                    </PosFieldLabel>
-                    <textarea
-                      className={cn("min-h-24 rounded-lg px-3 py-2 text-sm shadow-sm", posInputClass)}
-                      disabled={commitMutation.isPending}
-                      onChange={(event) => {
-                        setLastCommittedDocument(null);
-                        setNotes(event.target.value);
-                      }}
-                      placeholder="Describe evidencia o contexto operativo"
-                      value={notes}
-                    />
-                    {wasteRequiresEvidenceNote ? (
-                      <PosInlineValidationMessage tone="warning">
-                        Este motivo requiere evidencia en notas. Los archivos adjuntos aun no estan
-                        disponibles en este flujo.
-                      </PosInlineValidationMessage>
-                    ) : null}
-                    {wasteStockWarningMessage ? (
-                      <PosInlineValidationMessage tone="warning">
-                        {wasteStockWarningMessage}
-                      </PosInlineValidationMessage>
-                    ) : null}
-                    {wasteCounterAvailabilityWarningMessage ? (
-                      <PosInlineValidationMessage tone="warning">
-                        {wasteCounterAvailabilityWarningMessage}
-                      </PosInlineValidationMessage>
-                    ) : null}
-                    {isWasteHighImpact ? (
-                      <div className="grid gap-2 rounded-[var(--pos-radius-control)] border border-[rgba(187,122,22,0.22)] bg-[var(--ui-color-warning-soft)] px-3 py-3">
-                        <div className="flex flex-wrap items-center justify-between gap-2">
-                          <PosStatusBadge status="warning">Alto impacto</PosStatusBadge>
-                          <span className="text-xs font-medium text-slate-700">
-                            Umbral {formatQuantityFromMilliUnits(wasteHighImpactThresholdMilli)}
-                          </span>
-                        </div>
-                        <p className="text-sm leading-6 text-slate-700">
-                          Esta merma supera el umbral operativo y generara una alerta para backoffice
-                          al confirmar.
-                        </p>
-                        <label className="flex items-start gap-3 text-sm text-slate-800">
-                          <input
-                            checked={isWasteHighImpactAcknowledged}
-                            className="mt-1 h-4 w-4 rounded border-[var(--pos-shell-border)] text-[var(--pos-accent-strong)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--pos-ring)] focus-visible:ring-offset-2"
-                            disabled={commitMutation.isPending}
-                            onChange={(event) =>
-                              setIsWasteHighImpactAcknowledged(event.target.checked)
-                            }
-                            type="checkbox"
-                          />
-                          <span>
-                            Confirmo la merma de alto impacto y la notificacion operativa a
-                            backoffice.
-                          </span>
-                        </label>
-                      </div>
-                    ) : null}
-                  </div>
-                </PosPanel>
               ) : null}
             </>
           )}

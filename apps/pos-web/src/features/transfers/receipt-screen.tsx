@@ -12,39 +12,32 @@ import {
 import { useAppShellRightPanel } from "../../components/app-shell-right-panel";
 import {
   OperationConfirmationDialog,
-  OperationDocumentResult,
   OperationDocumentSummaryPanel,
   OperationHistoryList,
-  OperationLineSummary,
   type OperationDocumentMetric,
   type OperationHistoryRecord,
   type OperationLineSummaryItem,
 } from "../../components/operation-documents";
 import { OperationalStatus } from "../../components/operational-status";
-import { PosBlockerPanel } from "../../components/pos-feedback";
 import { PosSummaryPanel } from "../../components/pos-module-layout";
 import {
   PosFilterBar,
   PosHistoryView,
-  PosRecordList,
+  PosRecordTable,
+  type PosRecordColumn,
 } from "../../components/pos-records";
-import { PosScannerInput } from "../../components/pos-scanner-input";
 import {
   CentralWorkspaceSheet,
   FlowGuide,
   InlineNotice,
-  ListDetailColumn,
   ModuleStateChip,
   CompactPageHeader,
-  ResponsivePaneLayout,
+  SearchField,
   ScrollPane,
 } from "../../components/pos-module-primitives";
 import {
   ArrowLeftIcon,
   ChevronRightIcon,
-  ClipboardIcon,
-  PrinterIcon,
-  RotateCcwIcon,
 } from "../../components/pos-icons";
 import { Button } from "../../components/ui/button";
 import type {
@@ -55,7 +48,6 @@ import type {
   TransferDetailResponse,
   TransferReceiptHistoryResponse,
 } from "../../lib/api-contracts";
-import { getDocumentActionAvailability } from "../../lib/document-actions";
 import { formatCompactLocalDateTime, formatLocalDateTime } from "../../lib/formatters";
 import { toOperationalErrorMessage } from "../../lib/http";
 import { matchesScannerValue, normalizeScannerText, parseShipmentScannerValue } from "../../lib/scanner";
@@ -253,10 +245,6 @@ function isTransferReceivable(detail: TransferDetailResponse | null): boolean {
   );
 }
 
-function formatLineCountLabel(lineCount: number): string {
-  return `${lineCount} lineas`;
-}
-
 function formatDifferenceLabel(varianceMilli: number): string {
   if (varianceMilli === 0) {
     return "0";
@@ -407,136 +395,14 @@ function buildReceiptHistoryRecords(
     }));
 }
 
-function MovementBanner({
-  destinationLabel,
-  originLabel,
-}: {
-  destinationLabel?: string | null;
-  originLabel: string;
-}) {
-  const destinationText =
-    typeof destinationLabel === "string" && destinationLabel.trim().length > 0
-      ? destinationLabel
-      : EMPTY_VALUE_TEXT;
-
-  return (
-    <div
-      aria-label="Movimiento del envio"
-      className="inline-flex max-w-full items-center gap-2 rounded-[10px] border border-[var(--pos-shell-border)] bg-[var(--pos-shell-muted)] px-3 py-1.5"
-      role="note"
-    >
-      <span
-        className="max-w-[14rem] min-w-0 truncate whitespace-nowrap text-sm font-semibold text-slate-950"
-        title={originLabel}
-      >
-        {originLabel}
-      </span>
-      <span aria-hidden="true" className="text-sm font-semibold text-slate-400">
-        -&gt;
-      </span>
-      <span
-        className="max-w-[14rem] min-w-0 truncate whitespace-nowrap text-sm font-semibold text-[var(--pos-primary)]"
-        title={destinationText}
-      >
-        {destinationText}
-      </span>
-    </div>
-  );
-}
-
-function SummaryCell({
-  label,
-  tone = "default",
-  value,
-}: {
-  label: string;
-  tone?: "default" | "warning";
-  value: string;
-}) {
-  return (
-    <div
-      className={cn(
-        "min-w-0 rounded-xl border px-3 py-2.5",
-        tone === "warning"
-          ? "border-[var(--ui-color-warning-soft)] bg-[var(--ui-color-warning-soft)]"
-          : "border-[var(--pos-shell-border)] bg-white",
-      )}
-    >
-      <p className="pos-label-text">{label}</p>
-      <p
-        className="mt-1 truncate whitespace-nowrap text-sm font-semibold text-slate-950"
-        title={value}
-      >
-        {value}
-      </p>
-    </div>
-  );
-}
-
-function PendingInboundRecord({
-  shipment,
-  timezone,
-}: {
-  shipment: PendingInboundTransferView;
-  timezone: string;
-}) {
-  return (
-    <div className="grid gap-2">
-      <div className="flex items-start justify-between gap-3">
-        <div className="min-w-0">
-          <p
-            className="truncate text-sm font-semibold text-slate-950"
-            title={shipment.folio}
-          >
-            {shipment.folio}
-          </p>
-          <p
-            className="mt-0.5 truncate text-sm text-slate-700"
-            title={`${shipment.source_branch_name} (${shipment.source_branch_code})`}
-          >
-            {shipment.source_branch_name}
-          </p>
-        </div>
-        <span
-          className="pos-chip shrink-0"
-          data-tone="pending"
-        >
-          Pendiente
-        </span>
-      </div>
-
-      <div className="grid gap-1 text-xs text-slate-500">
-        <p>
-          <span className="font-medium text-slate-700">Origen:</span>{" "}
-          {shipment.source_branch_code}
-        </p>
-        <p>
-          <span className="font-medium text-slate-700">Enviado:</span>{" "}
-          {formatCompactLocalDateTime(
-            shipment.committed_at_utc ?? shipment.created_at_utc,
-            timezone,
-          )}
-        </p>
-        <div className="flex flex-wrap gap-2">
-          <span className="rounded-full border border-[var(--pos-shell-border)] bg-[var(--pos-shell-muted)] px-2.5 py-1 font-medium text-slate-600">
-            {shipment.line_count} lineas
-          </span>
-          <span className="rounded-full border border-[var(--pos-shell-border)] bg-[var(--pos-shell-muted)] px-2.5 py-1 font-medium text-slate-600">
-            {formatQuantityFromMilliUnits(Number(shipment.expected_total_quantity) * 1000)} uds
-          </span>
-        </div>
-      </div>
-    </div>
-  );
-}
-
 function LineComparisonHeader() {
   return (
-    <div className="hidden grid-cols-[minmax(0,1.6fr)_5.5rem_7.5rem_7rem] gap-3 border-b border-[var(--pos-shell-border)] px-3 pb-2 text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-500 md:grid">
+    <div className="grid grid-cols-[minmax(0,1.4fr)_5rem_6.5rem_6rem_minmax(7rem,0.8fr)] gap-3 border-b border-[var(--pos-shell-border)] bg-[var(--pos-shell-muted)] px-3 py-2 text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-500">
       <span>Producto</span>
-      <span className="text-right">Esperado</span>
-      <span className="text-right">Recibido</span>
-      <span className="text-right">Delta</span>
+      <span className="text-right">Enviada</span>
+      <span className="text-right">Recibida</span>
+      <span className="text-right">Diferencia</span>
+      <span>Motivo</span>
     </div>
   );
 }
@@ -558,7 +424,6 @@ function ReceiptLineRow({
   const didSelectRef = useRef(false);
   const hasVariance = hasTransferReceiptLineVariance(line);
   const varianceMilli = getTransferReceiptLineVarianceMilli(line);
-  const differenceText = formatDifferenceLabel(varianceMilli);
   const differenceSummary = formatDifferenceSummary(varianceMilli);
 
   useEffect(() => {
@@ -594,111 +459,60 @@ function ReceiptLineRow({
   return (
     <div
       className={cn(
-        "rounded-xl border px-3 py-3",
-        hasVariance
-          ? "border-[var(--ui-color-warning-soft)] bg-[var(--ui-color-warning-soft)]/45"
-          : "border-[var(--pos-shell-border)] bg-white",
+        "grid min-h-12 grid-cols-[minmax(0,1.4fr)_5rem_6.5rem_6rem_minmax(7rem,0.8fr)] items-center gap-3 border-t border-[var(--pos-shell-border)] px-3 py-2 first:border-t-0",
+        hasVariance && "bg-[var(--ui-color-warning-soft)]/35",
       )}
     >
-      <div className="grid gap-3 md:grid-cols-[minmax(0,1.6fr)_5.5rem_7.5rem_7rem]">
-        <div className="min-w-0">
-          <p
-            className="truncate text-sm font-semibold text-slate-950"
-            title={line.productName}
-          >
-            {line.productName}
-          </p>
-          <p
-            className="mt-1 truncate text-xs text-slate-500"
-            title={`${line.productClassName} / ${line.productCode}`}
-          >
-            {line.productClassName} / {line.productCode}
-          </p>
-        </div>
-
-        <div className="text-right">
-          <p className="pos-label-text md:hidden">Esperado</p>
-          <p className="mt-1 text-base font-semibold text-slate-950 [font-variant-numeric:tabular-nums] md:mt-0">
-            {line.expectedQuantityText}
-          </p>
-        </div>
-
-        <label className="grid gap-1">
-          <span className="pos-label-text text-slate-800 md:hidden">Recibido</span>
-          <input
-            aria-label={`Cantidad recibida de ${line.productName}`}
-            className={cn(
-              "h-11 rounded-xl px-3 text-right text-lg font-semibold tracking-tight shadow-sm [font-variant-numeric:tabular-nums]",
-              posInputClass,
-            )}
-            inputMode="decimal"
-            onChange={(event) =>
-              onReceivedQuantityChange(line.shipmentLineId, event.target.value)
-            }
-            onFocus={handleInputFocus}
-            ref={inputRef}
-            value={line.receivedQuantityText}
-          />
-        </label>
-
-        <div className="text-right">
-          <p className="pos-label-text md:hidden">Delta</p>
-          <span
-            className={cn(
-              "inline-flex min-w-[5rem] justify-center rounded-full border px-2.5 py-1 text-sm font-semibold [font-variant-numeric:tabular-nums]",
-              hasVariance
-                ? "border-[var(--ui-color-warning-soft)] bg-[var(--ui-color-warning-soft)] text-[var(--ui-color-warning)]"
-                : "border-[var(--ui-color-success-soft)] bg-[var(--ui-color-success-soft)] text-[var(--ui-color-success)]",
-            )}
-          >
-            {differenceText}
-          </span>
-          <p
-            className={cn(
-              "mt-1 text-xs font-medium",
-              hasVariance ? "text-[var(--ui-color-warning)]" : "text-[var(--ui-color-success)]",
-            )}
-          >
-            {differenceSummary}
-          </p>
-        </div>
-      </div>
-
+      <span
+        className="min-w-0 truncate text-sm font-semibold text-slate-950"
+        title={`${line.productName} - ${line.productClassName} / ${line.productCode}`}
+      >
+        {line.productName}
+      </span>
+      <span className="text-right text-sm font-semibold text-slate-950 [font-variant-numeric:tabular-nums]">
+        {line.expectedQuantityText}
+      </span>
+      <input
+        aria-label={`Cantidad recibida de ${line.productName}`}
+        className={cn(
+          "h-9 rounded-lg px-2 text-right text-sm font-semibold shadow-sm [font-variant-numeric:tabular-nums]",
+          posInputClass,
+        )}
+        inputMode="decimal"
+        onChange={(event) =>
+          onReceivedQuantityChange(line.shipmentLineId, event.target.value)
+        }
+        onFocus={handleInputFocus}
+        ref={inputRef}
+        value={line.receivedQuantityText}
+      />
+      <span
+        className={cn(
+          "text-right text-sm font-semibold [font-variant-numeric:tabular-nums]",
+          hasVariance ? "text-[var(--ui-color-warning)]" : "text-slate-400",
+        )}
+      >
+        {hasVariance ? differenceSummary : EMPTY_VALUE_TEXT}
+      </span>
       {hasVariance ? (
-        <div className="mt-3 grid gap-2 border-t border-[var(--ui-color-warning-soft)] pt-3">
-          <div className="flex flex-wrap gap-1.5">
-            {VARIANCE_REASON_SUGGESTIONS.map((reason) => {
-              const isActive = line.varianceReason.trim() === reason;
-
-              return (
-                <button
-                  className={cn(
-                    "rounded-full border px-2.5 py-1 text-xs font-medium transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--pos-ring)]",
-                    isActive
-                      ? "border-[var(--pos-primary)] bg-white text-[var(--pos-primary)]"
-                      : "border-[var(--pos-shell-border)] bg-white text-slate-700 hover:border-[var(--pos-primary)]",
-                  )}
-                  key={reason}
-                  onClick={() => onVarianceReasonChange(line.shipmentLineId, reason)}
-                  type="button"
-                >
-                  {reason}
-                </button>
-              );
-            })}
-          </div>
-
-          <input
-            aria-label={`Motivo de diferencia de ${line.productName}`}
-            className={cn("h-10 rounded-lg px-3 text-sm shadow-sm", posInputClass)}
-            onChange={(event) =>
-              onVarianceReasonChange(line.shipmentLineId, event.target.value)
-            }
-            placeholder="Motivo de la diferencia"
-            value={line.varianceReason}
-          />
-        </div>
-      ) : null}
+        <input
+          aria-label={`Motivo de diferencia de ${line.productName}`}
+          className={cn("h-9 rounded-lg px-2 text-sm shadow-sm", posInputClass)}
+          list={`variance-reasons-${line.shipmentLineId}`}
+          onChange={(event) =>
+            onVarianceReasonChange(line.shipmentLineId, event.target.value)
+          }
+          placeholder="Motivo"
+          value={line.varianceReason}
+        />
+      ) : (
+        <span className="truncate text-sm text-slate-400">{EMPTY_VALUE_TEXT}</span>
+      )}
+      <datalist id={`variance-reasons-${line.shipmentLineId}`}>
+        {VARIANCE_REASON_SUGGESTIONS.map((reason) => (
+          <option key={reason} value={reason} />
+        ))}
+      </datalist>
     </div>
   );
 }
@@ -779,13 +593,10 @@ function ReceiptSummaryPanel({
   commitBlockedReason,
   commitErrorMessage,
   detail,
-  detailTimezone,
   differenceTotalText,
   expectedUnitsText,
   isCommitPending,
   isNotesExpanded,
-  lastReceivedTransfer,
-  lineSummaryItems,
   notes,
   onClearSelection,
   onCommit,
@@ -800,13 +611,10 @@ function ReceiptSummaryPanel({
   commitBlockedReason: string | null;
   commitErrorMessage: string | null;
   detail: TransferDetailResponse | null;
-  detailTimezone: string;
   differenceTotalText: string;
   expectedUnitsText: string;
   isCommitPending: boolean;
   isNotesExpanded: boolean;
-  lastReceivedTransfer: TransferDetailResponse | null;
-  lineSummaryItems: OperationLineSummaryItem[];
   notes: string;
   onClearSelection: () => void;
   onCommit: () => void;
@@ -817,25 +625,11 @@ function ReceiptSummaryPanel({
   uiState: TransferReceiptUiState;
   varianceLineCount: number;
 }) {
-  const activeDetail = detail ?? lastReceivedTransfer;
-  const summaryLineCount =
-    detail?.shipment.lines.length ??
-    lastReceivedTransfer?.shipment.lines.length ??
-    lineSummaryItems.length;
-  const blockers =
-    commitBlockedReason === null
-      ? []
-      : [
-          {
-            key: "receipt-blocker",
-            message: commitBlockedReason,
-            tone: "warning" as const,
-          },
-        ];
+  const showBlockingNotice = detail !== null && commitBlockedReason !== null;
 
   return (
     <PosSummaryPanel
-      description="Resumen operativo de la recepcion en curso."
+      description="Resumen operativo"
       stateLabel={getReceiptUiStateLabel(uiState)}
       stateTone={
         uiState === "WITH_VARIANCES" || uiState === "RECEIPT_ERROR"
@@ -851,75 +645,42 @@ function ReceiptSummaryPanel({
       <div className="grid h-full min-h-0 grid-rows-[auto_auto_minmax(0,1fr)_auto] gap-3">
         <div className="grid gap-2">
           {commitErrorMessage ? <InlineNotice tone="error">{commitErrorMessage}</InlineNotice> : null}
-          <div className="grid gap-2.5 rounded-xl border border-[var(--pos-shell-border)] bg-[var(--pos-shell-muted)]/80 px-3 py-3">
-            <div className="flex flex-wrap items-center gap-2">
-              <MovementBanner
-                destinationLabel={activeDetail?.shipment.destination_branch_name ?? null}
-                originLabel={activeDetail?.shipment.source_branch_name ?? "Origen pendiente"}
+          {detail ? (
+            <div className="grid gap-2 rounded-lg border border-[var(--pos-shell-border)] bg-[var(--pos-shell-muted)]/70 px-3 py-2 text-sm">
+              <ReceiptSummaryRow label="Origen" value={detail.shipment.source_branch_name} />
+              <ReceiptSummaryRow label="Folio" value={detail.shipment_summary.folio} />
+              <ReceiptSummaryRow label="Total esperado" value={expectedUnitsText} />
+              <ReceiptSummaryRow label="Total recibido" value={receivedUnitsText} />
+              <ReceiptSummaryRow
+                label="Diferencia"
+                tone={varianceLineCount > 0 ? "warning" : "default"}
+                value={differenceTotalText}
               />
-              {activeDetail ? (
-                <span
-                  className="pos-chip"
-                  data-tone={getTransferStatusTone(activeDetail.shipment.status)}
-                >
-                  {getTransferStatusLabel(activeDetail.shipment.status)}
-                </span>
-              ) : null}
             </div>
+          ) : (
+            <div className="rounded-lg border border-dashed border-[var(--pos-shell-border)] bg-white px-3 py-4 text-sm text-slate-600">
+              {uiState === "NO_PENDING_SHIPMENTS"
+                ? "No hay envios pendientes para esta sucursal."
+                : "Selecciona o escanea un envio pendiente."}
+            </div>
+          )}
 
-            {activeDetail ? (
-              <div className="grid gap-2 md:grid-cols-2">
-                <SummaryCell label="Folio" value={activeDetail.shipment_summary.folio} />
-                <SummaryCell
-                  label="Destino"
-                  value={activeDetail.shipment.destination_branch_name ?? EMPTY_VALUE_TEXT}
-                />
-                <SummaryCell label="Origen" value={activeDetail.shipment.source_branch_name} />
-                <SummaryCell
-                  label="Fecha"
-                  value={formatLocalDateTime(
-                    activeDetail.shipment.committed_at_utc ??
-                      activeDetail.shipment.created_at_utc,
-                    detailTimezone,
-                  )}
-                />
-              </div>
-            ) : (
-              <p className="text-sm leading-6 text-slate-600">
-                {uiState === "NO_PENDING_SHIPMENTS"
-                  ? "No hay envios pendientes para esta sucursal."
-                  : "Selecciona un envio pendiente."}
-              </p>
-            )}
-          </div>
-
-          <div className="grid grid-cols-2 gap-2">
-            <SummaryCell label="Esperado" value={expectedUnitsText} />
-            <SummaryCell label="Recibido" value={receivedUnitsText} />
-            <SummaryCell
-              label="Diferencia"
-              tone={varianceLineCount > 0 ? "warning" : "default"}
-              value={differenceTotalText}
-            />
-            <SummaryCell
-              label="Lineas"
-              tone={varianceLineCount > 0 ? "warning" : "default"}
-              value={formatLineCountLabel(summaryLineCount)}
-            />
-          </div>
-
-          <PosBlockerPanel blockers={blockers} title="Bloqueos" />
+          {showBlockingNotice ? (
+            <InlineNotice tone="warning">{commitBlockedReason}</InlineNotice>
+          ) : null}
         </div>
 
-        <div className="rounded-xl border border-[var(--pos-shell-border)] bg-[var(--pos-shell-muted)]/80">
+        <div className="rounded-lg border border-[var(--pos-shell-border)] bg-white">
           <button
             aria-expanded={isNotesExpanded}
-            className="flex w-full items-center justify-between gap-3 px-3 py-2.5 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--pos-ring)]"
+            className="flex w-full items-center justify-between gap-3 px-3 py-2 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--pos-ring)]"
             disabled={detail === null || isCommitPending}
             onClick={onToggleNotes}
             type="button"
           >
-            <span className="text-sm font-semibold text-slate-900">Notas (opcional)</span>
+            <span className="truncate text-sm font-semibold text-slate-900">
+              {notes.trim().length > 0 ? "Observacion agregada" : "Agregar observacion"}
+            </span>
             <ChevronRightIcon
               className={cn(
                 "h-4 w-4 text-slate-400 transition",
@@ -928,29 +689,20 @@ function ReceiptSummaryPanel({
             />
           </button>
           {isNotesExpanded ? (
-            <div className="border-t border-[var(--pos-shell-border)] px-3 pb-3 pt-2.5">
+            <div className="border-t border-[var(--pos-shell-border)] px-3 pb-3 pt-2">
               <textarea
                 aria-label="Notas de recepcion"
-                className={cn(
-                  "min-h-20 rounded-lg px-3 py-2 text-sm shadow-sm",
-                  posInputClass,
-                )}
+                className={cn("min-h-16 rounded-lg px-3 py-2 text-sm shadow-sm", posInputClass)}
                 disabled={detail === null || isCommitPending}
                 onChange={(event) => onNotesChange(event.target.value)}
-                placeholder="Notas operativas"
+                placeholder="Observacion opcional"
                 value={notes}
               />
             </div>
           ) : null}
         </div>
 
-        <ScrollPane className="min-h-0 pr-1">
-          <OperationLineSummary
-            emptyMessage="Selecciona un envio pendiente para comenzar."
-            lines={lineSummaryItems}
-            title="Captura de recepcion"
-          />
-        </ScrollPane>
+        <div className="min-h-0" />
 
         <div className="grid gap-2 border-t border-[var(--pos-shell-border)] pt-2">
           <Button
@@ -964,17 +716,19 @@ function ReceiptSummaryPanel({
             type="button"
             variant="outline"
           >
-            {centerView === "history" ? "Pendientes" : "Ver historial"}
+            {centerView === "history" ? "Volver a pendientes" : "Ver historial"}
           </Button>
-          <Button
-            className={cn("h-10", posOutlineButtonClass)}
-            disabled={detail === null || isCommitPending}
-            onClick={onClearSelection}
-            type="button"
-            variant="outline"
-          >
-            Volver a pendientes
-          </Button>
+          {detail ? (
+            <Button
+              className={cn("h-10", posOutlineButtonClass)}
+              disabled={isCommitPending}
+              onClick={onClearSelection}
+              type="button"
+              variant="outline"
+            >
+              Volver a pendientes
+            </Button>
+          ) : null}
           <Button
             className={cn("h-11", posPrimaryButtonClass)}
             disabled={commitBlockedReason !== null || isCommitPending}
@@ -989,13 +743,38 @@ function ReceiptSummaryPanel({
   );
 }
 
+function ReceiptSummaryRow({
+  label,
+  tone = "default",
+  value,
+}: {
+  label: string;
+  tone?: "default" | "warning";
+  value: string;
+}) {
+  return (
+    <div className="flex items-center justify-between gap-3">
+      <span className="font-medium text-slate-600">{label}</span>
+      <span
+        className={cn(
+          "min-w-0 truncate text-right font-semibold [font-variant-numeric:tabular-nums]",
+          tone === "warning" ? "text-[var(--ui-color-warning)]" : "text-slate-950",
+        )}
+        title={value}
+      >
+        {value}
+      </span>
+    </div>
+  );
+}
+
 function ReceiptDetailSurface({
   detail,
   focusToken,
   isLoading,
   isReceivable,
   lines,
-  pendingShipmentCount,
+  onBackToPending,
   queryError,
   timezone,
   onReceivedQuantityChange,
@@ -1007,7 +786,7 @@ function ReceiptDetailSurface({
   isLoading: boolean;
   isReceivable: boolean;
   lines: TransferReceiptLineDraft[];
-  pendingShipmentCount: number;
+  onBackToPending: () => void;
   queryError: unknown;
   timezone: string;
   onReceivedQuantityChange: (shipmentLineId: string, quantityText: string) => void;
@@ -1016,131 +795,109 @@ function ReceiptDetailSurface({
 }) {
   if (isLoading) {
     return (
-      <ListDetailColumn contentClassName="min-h-0 overflow-hidden" title="Detalle del envio">
-        <OperationalStatus
-          description="Consultando lineas, cantidades esperadas y estado actual del envio."
-          title="Cargando envio"
-        />
-      </ListDetailColumn>
+      <OperationalStatus
+        description="Consultando productos y cantidades enviadas."
+        title="Cargando envio"
+      />
     );
   }
 
   if (queryError) {
     return (
-      <ListDetailColumn contentClassName="min-h-0 overflow-hidden" title="Detalle del envio">
-        <OperationalStatus
-          description={toTransferReceiptErrorMessage(
-            queryError,
-            "Confirma que el envio siga pendiente y disponible para esta sucursal.",
-          )}
-          title="Envio no disponible"
-        />
-      </ListDetailColumn>
+      <OperationalStatus
+        description={toTransferReceiptErrorMessage(
+          queryError,
+          "Confirma que el envio siga pendiente y disponible para esta sucursal.",
+        )}
+        title="Envio no disponible"
+      />
     );
   }
 
   if (!detail) {
     return (
-      <ListDetailColumn contentClassName="min-h-0 overflow-hidden" title="Detalle del envio">
-        <div className="grid h-full min-h-0 place-items-center rounded-xl border border-dashed border-[var(--pos-shell-border)] bg-[var(--pos-shell-muted)] px-4 py-6 text-center">
-          <div className="grid max-w-md gap-1.5">
-            <p className="text-base font-semibold text-slate-950">
-              {pendingShipmentCount === 0
-                ? "No hay envios pendientes para esta sucursal."
-                : "Selecciona un envio pendiente."}
-            </p>
-            <p className="text-sm leading-6 text-slate-600">
-              {pendingShipmentCount === 0
-                ? "Cuando llegue un envio en transito, aparecera aqui."
-                : "Elige el envio correcto para comenzar la recepcion."}
-            </p>
-          </div>
+      <div className="grid h-full min-h-0 place-items-center rounded-xl border border-dashed border-[var(--pos-shell-border)] bg-white px-4 py-6 text-center">
+        <div className="grid max-w-md gap-1.5">
+          <p className="text-base font-semibold text-slate-950">Selecciona un envio pendiente.</p>
+          <p className="text-sm leading-6 text-slate-600">
+            Elige el envio correcto para comenzar la recepcion.
+          </p>
         </div>
-      </ListDetailColumn>
+      </div>
     );
   }
 
   return (
-    <ListDetailColumn
-      contentClassName="min-h-0 overflow-hidden"
-      title={detail.shipment_summary.folio}
-    >
-      <div className="grid h-full min-h-0 grid-rows-[auto_minmax(0,1fr)] gap-2.5">
-        <div className="grid gap-2.5">
-          <div className="flex flex-wrap items-start justify-between gap-3">
-            <div className="min-w-0">
-              <MovementBanner
-                destinationLabel={detail.shipment.destination_branch_name}
-                originLabel={detail.shipment.source_branch_name}
-              />
-            </div>
+    <div className="grid h-full min-h-0 grid-rows-[auto_minmax(0,1fr)] gap-3">
+      <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-[var(--pos-shell-border)] bg-white px-3 py-2.5">
+        <div className="min-w-0">
+          <p className="pos-label-text">Detalle del envio</p>
+          <h2 className="truncate text-base font-semibold text-slate-950">
+            {detail.shipment_summary.folio}
+          </h2>
+          <p className="mt-0.5 truncate text-sm text-slate-600">
+            {detail.shipment.source_branch_name} -&gt;{" "}
+            {detail.shipment.destination_branch_name ?? EMPTY_VALUE_TEXT}
+          </p>
+        </div>
+        <div className="flex shrink-0 items-center gap-2">
+          <span className="pos-chip" data-tone={getTransferStatusTone(detail.shipment.status)}>
+            {getTransferStatusLabel(detail.shipment.status)}
+          </span>
+          <Button
+            className={cn("h-9 px-3", posOutlineButtonClass)}
+            onClick={onBackToPending}
+            type="button"
+            variant="outline"
+          >
+            <ArrowLeftIcon className="h-4 w-4" />
+            Volver a pendientes
+          </Button>
+        </div>
+      </div>
 
-            <span
-              className="pos-chip shrink-0"
-              data-tone={getTransferStatusTone(detail.shipment.status)}
-            >
-              {getTransferStatusLabel(detail.shipment.status)}
-            </span>
-          </div>
-
-          <div className="grid gap-2 md:grid-cols-4">
-            <SummaryCell label="Origen" value={detail.shipment.source_branch_name} />
-            <SummaryCell
-              label="Destino"
-              value={detail.shipment.destination_branch_name ?? EMPTY_VALUE_TEXT}
-            />
-            <SummaryCell
-              label="Fecha"
-              value={formatLocalDateTime(
+      <div className="grid min-h-0 grid-rows-[auto_minmax(0,1fr)] overflow-hidden rounded-xl border border-[var(--pos-shell-border)] bg-white">
+        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[var(--pos-shell-border)] px-3 py-2">
+          <div className="min-w-0">
+            <h3 className="text-sm font-semibold text-slate-950">Productos enviados</h3>
+            <p className="truncate text-xs text-slate-500">
+              Enviado{" "}
+              {formatCompactLocalDateTime(
                 detail.shipment.committed_at_utc ?? detail.shipment.created_at_utc,
                 timezone,
               )}
-            />
-            <SummaryCell label="Estado" value={getTransferStatusLabel(detail.shipment.status)} />
+            </p>
           </div>
-
-          {detail.shipment.notes?.trim() ? (
-            <details className="rounded-xl border border-[var(--pos-shell-border)] bg-white px-3 py-2.5">
-              <summary className="cursor-pointer text-sm font-semibold text-slate-900">
-                Notas del envio
-              </summary>
-              <p className="mt-2 text-sm leading-6 text-slate-700">{detail.shipment.notes}</p>
-            </details>
-          ) : null}
-
-          {!isReceivable ? (
-            <InlineNotice tone="warning">
-              Este envio ya no esta disponible para recepcion. Revisa su estado actual antes de
-              continuar.
-            </InlineNotice>
-          ) : null}
-
-          {varianceLineCount > 0 ? (
-            <InlineNotice tone="warning">
-              Hay diferencias capturadas. Documenta el motivo en cada linea antes de confirmar.
-            </InlineNotice>
-          ) : null}
+          <div className="flex items-center gap-2">
+            {varianceLineCount > 0 ? (
+              <span className="pos-chip" data-tone="warning">
+                {varianceLineCount} con diferencia
+              </span>
+            ) : null}
+            {!isReceivable ? (
+              <span className="pos-chip" data-tone="warning">
+                No disponible
+              </span>
+            ) : null}
+          </div>
         </div>
-
-        <div className="grid min-h-0 grid-rows-[auto_minmax(0,1fr)] gap-2.5 rounded-xl border border-[var(--pos-shell-border)] bg-[var(--pos-shell-surface)] p-3">
+        <ScrollPane className="h-full">
+          <div className="min-w-[42rem]">
           <LineComparisonHeader />
-          <div className="min-h-0 overflow-y-auto pr-1">
-            <div className="grid gap-2.5">
-              {lines.map((line, index) => (
-                <ReceiptLineRow
-                  focusToken={focusToken}
-                  isPrimaryControl={index === 0}
-                  key={line.shipmentLineId}
-                  line={line}
-                  onReceivedQuantityChange={onReceivedQuantityChange}
-                  onVarianceReasonChange={onVarianceReasonChange}
-                />
-              ))}
-            </div>
+          {lines.map((line, index) => (
+            <ReceiptLineRow
+              focusToken={focusToken}
+              isPrimaryControl={index === 0}
+              key={line.shipmentLineId}
+              line={line}
+              onReceivedQuantityChange={onReceivedQuantityChange}
+              onVarianceReasonChange={onVarianceReasonChange}
+            />
+          ))}
           </div>
-        </div>
+        </ScrollPane>
       </div>
-    </ListDetailColumn>
+    </div>
   );
 }
 
@@ -1266,11 +1023,12 @@ export function TransferReceiptScreen() {
       });
     },
     onSuccess: async (detail) => {
-      setLastReceivedTransfer(detail);
+      setLastReceivedTransfer(null);
       setSelectedHistoryTransferId(detail.shipment.id);
       setCommitErrorMessage(null);
       setIsConfirmDialogOpen(false);
       clearSelection();
+      setCenterView("history");
       showSuccess(`Recepcion registrada. Folio ${detail.receipt_summary?.folio ?? "REC"}.`);
 
       await Promise.all([
@@ -1385,6 +1143,65 @@ export function TransferReceiptScreen() {
       return haystack.includes(normalizedSearch);
     });
   }, [debouncedPendingSearch, pendingOriginBranchId, pendingTransfers]);
+  const pendingTransferColumns = useMemo<PosRecordColumn<PendingInboundTransferView>[]>(
+    () => [
+      {
+        header: "Folio",
+        key: "folio",
+        renderCell: (shipment) => (
+          <span className="font-semibold text-slate-950">{shipment.folio}</span>
+        ),
+        width: "18%",
+      },
+      {
+        header: "Origen",
+        key: "source",
+        renderCell: (shipment) => (
+          <span className="block truncate" title={shipment.source_branch_name}>
+            {shipment.source_branch_name}
+          </span>
+        ),
+        width: "25%",
+      },
+      {
+        header: "Enviado",
+        key: "sent",
+        renderCell: (shipment) =>
+          formatCompactLocalDateTime(
+            shipment.committed_at_utc ?? shipment.created_at_utc,
+            activeTimezone,
+          ),
+        width: "20%",
+      },
+      {
+        align: "right",
+        header: "Lineas",
+        key: "lines",
+        renderCell: (shipment) => shipment.line_count,
+        width: "10%",
+      },
+      {
+        align: "right",
+        header: "Unidades",
+        key: "units",
+        renderCell: (shipment) =>
+          formatQuantityFromMilliUnits(Number(shipment.expected_total_quantity) * 1000),
+        width: "14%",
+      },
+      {
+        align: "right",
+        header: "Estado",
+        key: "status",
+        renderCell: () => (
+          <span className="pos-chip" data-tone="pending">
+            Pendiente
+          </span>
+        ),
+        width: "13%",
+      },
+    ],
+    [activeTimezone],
+  );
 
   useEffect(() => {
     if (pendingScannerFolio === null) {
@@ -1478,7 +1295,7 @@ export function TransferReceiptScreen() {
           actions={[
             {
               key: "history-back",
-              label: "Recibir envio",
+              label: "Volver a pendientes",
               leadingIcon: <ArrowLeftIcon className="h-4 w-4" />,
               onSelect: () => setCenterView("pending"),
               variant: "neutral",
@@ -1563,109 +1380,16 @@ export function TransferReceiptScreen() {
           </div>
         </PosSummaryPanel>
       )
-    ) : lastReceivedTransfer?.receipt && lastReceivedTransfer.receipt_summary ? (
-      <OperationDocumentResult
-        actions={[
-          {
-            availabilityNote:
-              getDocumentActionAvailability("branchReceiptDocument").print.unavailableReason,
-            disabled: !getDocumentActionAvailability("branchReceiptDocument").print.isAvailable,
-            kind: "print",
-            key: "receipt-print-disabled",
-            label: getDocumentActionAvailability("branchReceiptDocument").print.label,
-            leadingIcon: <PrinterIcon className="h-4 w-4" />,
-            onSelect: () => undefined,
-            variant: "neutral",
-          },
-          {
-            key: "receipt-view-history",
-            label: "Ver historial",
-            leadingIcon: <RotateCcwIcon className="h-4 w-4" />,
-            onSelect: () => {
-              setCenterView("history");
-              setSelectedHistoryTransferId(lastReceivedTransfer.shipment.id);
-            },
-            variant: "secondary",
-          },
-          {
-            key: "receipt-new",
-            label: "Nueva recepcion",
-            leadingIcon: <ClipboardIcon className="h-4 w-4" />,
-            onSelect: () => setLastReceivedTransfer(null),
-            variant: "primary",
-          },
-        ]}
-        auditSummary={lastReceivedTransfer.receipt.audit_summary}
-        context={{
-          branchName:
-            lastReceivedTransfer.receipt.destination_branch_name ??
-            operationsBootstrapQuery.data.branch.name,
-          userName: lastReceivedTransfer.receipt.created_by_user_full_name,
-          workstationName: lastReceivedTransfer.receipt.workstation_name,
-        }}
-        description={
-          lastReceivedTransfer.receipt_summary.quantity_summary.has_variance
-            ? "La recepcion quedo registrada con diferencias y motivos capturados."
-            : "La recepcion quedo confirmada y el envio ya no aparece como pendiente."
-        }
-        kind="branchReceipt"
-        metrics={buildReceiptMetrics({
-          differenceLineCount:
-            lastReceivedTransfer.receipt_summary.quantity_summary.variance_line_count,
-          differenceTotalText: formatDifferenceLabel(
-            Math.round(
-              (Number(
-                lastReceivedTransfer.receipt_summary.quantity_summary.received_total_quantity ??
-                  "0",
-              ) -
-                Number(
-                  lastReceivedTransfer.receipt_summary.quantity_summary.expected_total_quantity,
-                )) * 1000,
-            ),
-          ),
-          expectedUnitsText: formatQuantityFromMilliUnits(
-            Number(
-              lastReceivedTransfer.receipt_summary.quantity_summary.expected_total_quantity,
-            ) * 1000,
-          ),
-          lineCount: lastReceivedTransfer.receipt_summary.quantity_summary.line_count,
-          receivedUnitsText: formatQuantityFromMilliUnits(
-            Number(
-              lastReceivedTransfer.receipt_summary.quantity_summary.received_total_quantity ??
-                "0",
-            ) * 1000,
-          ),
-        })}
-        referenceValue={lastReceivedTransfer.receipt_summary.folio}
-        timeZone={activeTimezone}
-        timestamps={{
-          committedAtLabel: "Confirmado",
-          committedAtValue: lastReceivedTransfer.receipt.committed_at_utc
-            ? formatLocalDateTime(
-                lastReceivedTransfer.receipt.committed_at_utc,
-                activeTimezone,
-              )
-            : null,
-          createdAtLabel: "Creado",
-          createdAtValue: formatLocalDateTime(
-            lastReceivedTransfer.receipt.created_at_utc,
-            activeTimezone,
-          ),
-        }}
-      />
     ) : (
       <ReceiptSummaryPanel
         centerView={centerView}
         commitBlockedReason={commitBlockedReason}
         commitErrorMessage={commitErrorMessage}
         detail={selectedDetail}
-        detailTimezone={activeTimezone}
         differenceTotalText={differenceTotalText}
         expectedUnitsText={expectedUnitsText}
         isCommitPending={commitMutation.isPending}
         isNotesExpanded={isNotesExpanded}
-        lastReceivedTransfer={lastReceivedTransfer}
-        lineSummaryItems={lineSummaryItems}
         notes={notes}
         onClearSelection={clearSelection}
         onCommit={() => {
@@ -1774,7 +1498,7 @@ export function TransferReceiptScreen() {
                   {centerView === "history" ? "Historial" : getReceiptUiStateLabel(uiState)}
                 </ModuleStateChip>
               }
-              title="Recibir envio"
+              title={centerView === "history" ? "Historial de recepciones" : "Recibir envio"}
             >
               {centerView === "pending" ? (
                 <FlowGuide
@@ -1823,7 +1547,7 @@ export function TransferReceiptScreen() {
                   variant="outline"
                 >
                   <ArrowLeftIcon className="h-4 w-4" />
-                  Recibir envio
+                  Volver a pendientes
                 </Button>
               }
               description="Consulta las recepciones confirmadas para esta estacion y filtra por turno, origen o estado."
@@ -1915,121 +1639,121 @@ export function TransferReceiptScreen() {
                 />
               )}
             </PosHistoryView>
-          ) : (
-            <ResponsivePaneLayout
-              className="h-full gap-2.5"
-              detail={
-                <ReceiptDetailSurface
-                  detail={selectedDetail}
-                  focusToken={selectedTransferId}
-                  isLoading={selectedTransferId !== null && transferDetailQuery.isPending}
-                  isReceivable={selectedDetailReceivable}
-                  lines={receiptLines}
-                  onReceivedQuantityChange={(shipmentLineId, quantityText) => {
-                    if (commitErrorMessage !== null) {
-                      setCommitErrorMessage(null);
-                    }
-                    if (lastReceivedTransfer !== null) {
-                      setLastReceivedTransfer(null);
-                    }
-                    setReceiptLines((state) =>
-                      updateTransferReceiptLineQuantity(state, shipmentLineId, quantityText),
-                    );
-                  }}
-                  onVarianceReasonChange={(shipmentLineId, varianceReason) => {
-                    if (commitErrorMessage !== null) {
-                      setCommitErrorMessage(null);
-                    }
-                    if (lastReceivedTransfer !== null) {
-                      setLastReceivedTransfer(null);
-                    }
-                    setReceiptLines((state) =>
-                      updateTransferReceiptLineVarianceReason(
-                        state,
-                        shipmentLineId,
-                        varianceReason,
-                      ),
-                    );
-                  }}
-                  pendingShipmentCount={filteredPendingTransfers.length}
-                  queryError={transferDetailQuery.error}
-                  timezone={activeTimezone}
-                  varianceLineCount={varianceLineCount}
-                />
-              }
-              list={
-                <ListDetailColumn
-                  contentClassName="min-h-0 overflow-hidden"
-                  title="Pendientes"
-                  tone="muted"
-                >
-                  <div className="grid h-full min-h-0 grid-rows-[auto_minmax(0,1fr)] gap-3">
-                    <div className="grid gap-3">
-                      <PosScannerInput
-                        ariaLabel="Escanear folio de envio"
-                        inputRef={pendingScannerInputRef}
-                        modeLabel="Escaneo de envio"
-                        onChange={setPendingScannerText}
-                        onSubmit={handlePendingShipmentScanSubmit}
-                        placeholder="Escanear folio de envio"
-                        submitLabel="Abrir envio"
-                        value={pendingScannerText}
-                      />
-                      <PosFilterBar
-                        countLabel={
-                          <span className="pos-chip" data-tone="muted">
-                            {filteredPendingTransfers.length} visibles
-                          </span>
-                        }
-                        searchInput={{
-                          ariaLabel: "Buscar envio pendiente",
-                          onChange: (value) => {
-                            setPendingScannerFolio(null);
-                            setPendingSearchText(value);
-                          },
-                          placeholder: "Buscar por folio u origen",
-                          value: pendingSearchText,
-                        }}
-                        selectFilters={[
-                          {
-                            ariaLabel: "Filtrar pendientes por origen",
-                            key: "pending-origin",
-                            onChange: setPendingOriginBranchId,
-                            options: [
-                              { label: "Todos los origenes", value: "ALL" },
-                              ...pendingOriginOptions,
-                            ],
-                            value: pendingOriginBranchId,
-                          },
-                        ]}
-                        title="Envios pendientes"
-                      />
-                    </div>
-
-                    <div className="min-h-0 overflow-hidden pr-1">
-                      <PosRecordList
-                        emptyDescription="No hay envios pendientes para los filtros actuales."
-                        emptyTitle="Sin pendientes"
-                        getKey={(shipment) => shipment.id}
-                        onSelect={(shipment) => {
-                          setSelectedTransferId(shipment.id);
-                          setLastReceivedTransfer(null);
-                          setCommitErrorMessage(null);
-                        }}
-                        records={filteredPendingTransfers}
-                        renderContent={(shipment) => (
-                          <PendingInboundRecord
-                            shipment={shipment}
-                            timezone={activeTimezone}
-                          />
-                        )}
-                        selectedKey={selectedTransferId}
-                      />
-                    </div>
-                  </div>
-                </ListDetailColumn>
-              }
+          ) : selectedTransferId !== null ? (
+            <ReceiptDetailSurface
+              detail={selectedDetail}
+              focusToken={selectedTransferId}
+              isLoading={transferDetailQuery.isPending}
+              isReceivable={selectedDetailReceivable}
+              lines={receiptLines}
+              onBackToPending={clearSelection}
+              onReceivedQuantityChange={(shipmentLineId, quantityText) => {
+                if (commitErrorMessage !== null) {
+                  setCommitErrorMessage(null);
+                }
+                if (lastReceivedTransfer !== null) {
+                  setLastReceivedTransfer(null);
+                }
+                setReceiptLines((state) =>
+                  updateTransferReceiptLineQuantity(state, shipmentLineId, quantityText),
+                );
+              }}
+              onVarianceReasonChange={(shipmentLineId, varianceReason) => {
+                if (commitErrorMessage !== null) {
+                  setCommitErrorMessage(null);
+                }
+                if (lastReceivedTransfer !== null) {
+                  setLastReceivedTransfer(null);
+                }
+                setReceiptLines((state) =>
+                  updateTransferReceiptLineVarianceReason(
+                    state,
+                    shipmentLineId,
+                    varianceReason,
+                  ),
+                );
+              }}
+              queryError={transferDetailQuery.error}
+              timezone={activeTimezone}
+              varianceLineCount={varianceLineCount}
             />
+          ) : (
+            <div className="grid h-full min-h-0 grid-rows-[auto_minmax(0,1fr)] gap-3">
+              <div className="grid gap-3 rounded-xl border border-[var(--pos-shell-border)] bg-white px-3 py-2.5 xl:grid-cols-[minmax(18rem,24rem)_minmax(0,1fr)] xl:items-center">
+                <div className="flex min-w-0 items-center gap-2">
+                  <SearchField
+                    ariaLabel="Escanear folio de envio"
+                    className="min-w-0 flex-1"
+                    inputClassName={cn("h-10 rounded-lg text-sm shadow-sm", posInputClass)}
+                    inputRef={pendingScannerInputRef}
+                    onChange={setPendingScannerText}
+                    onKeyDown={(event) => {
+                      if (event.key === "Enter" || event.key === "NumpadEnter") {
+                        event.preventDefault();
+                        handlePendingShipmentScanSubmit();
+                      }
+                    }}
+                    placeholder="Escanear o escribir folio"
+                    value={pendingScannerText}
+                  />
+                  <Button
+                    className={cn("h-10 shrink-0 px-3", posOutlineButtonClass)}
+                    disabled={pendingScannerText.trim().length === 0}
+                    onClick={handlePendingShipmentScanSubmit}
+                    type="button"
+                    variant="outline"
+                  >
+                    Abrir
+                  </Button>
+                </div>
+                <PosFilterBar
+                  countLabel={
+                    <span className="pos-chip" data-tone="muted">
+                      {filteredPendingTransfers.length} visibles
+                    </span>
+                  }
+                  searchInput={{
+                    ariaLabel: "Buscar envio pendiente",
+                    onChange: (value) => {
+                      setPendingScannerFolio(null);
+                      setPendingSearchText(value);
+                    },
+                    placeholder: "Buscar por folio u origen",
+                    value: pendingSearchText,
+                  }}
+                  selectFilters={[
+                    {
+                      ariaLabel: "Filtrar pendientes por origen",
+                      key: "pending-origin",
+                      onChange: setPendingOriginBranchId,
+                      options: [
+                        { label: "Todos los origenes", value: "ALL" },
+                        ...pendingOriginOptions,
+                      ],
+                      value: pendingOriginBranchId,
+                    },
+                  ]}
+                  title="Envios pendientes"
+                />
+              </div>
+
+              <div className="min-h-0 overflow-hidden rounded-xl border border-[var(--pos-shell-border)] bg-white">
+                <PosRecordTable
+                  columns={pendingTransferColumns}
+                  emptyDescription="No hay envios pendientes para los filtros actuales."
+                  emptyTitle="Sin pendientes"
+                  getKey={(shipment) => shipment.id}
+                  onSelect={(shipment) => {
+                    setSelectedTransferId(shipment.id);
+                    setLastReceivedTransfer(null);
+                    setCommitErrorMessage(null);
+                  }}
+                  records={filteredPendingTransfers}
+                  selectedKey={selectedTransferId}
+                  tableAriaLabel="Envios pendientes"
+                />
+              </div>
+            </div>
           )}
         </CentralWorkspaceSheet>
 

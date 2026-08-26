@@ -1,6 +1,7 @@
 from __future__ import annotations
 
-from datetime import date
+from datetime import UTC, date, datetime, time
+from decimal import Decimal
 from typing import Annotated
 from uuid import UUID
 
@@ -21,7 +22,14 @@ from zeromerma_api.modules.catalog.domain.exceptions import (
     ProductNotFoundError,
 )
 from zeromerma_api.modules.identity.application.schemas import AuthenticatedUser
+from zeromerma_api.modules.identity.application.services import user_can_access_surface
+from zeromerma_api.modules.identity.domain.constants import IDENTITY_SURFACE_BACKOFFICE
 from zeromerma_api.modules.identity.presentation.dependencies import get_current_user
+from zeromerma_api.modules.returns.application.admin_schemas import (
+    AdminReturnDetailView,
+    AdminReturnsListResponse,
+)
+from zeromerma_api.modules.returns.application.admin_services import AdminReturnsService
 from zeromerma_api.modules.returns.application.schemas import (
     ReturnCommitRequest,
     ReturnOriginalSaleDetailResponse,
@@ -43,6 +51,19 @@ from zeromerma_api.modules.returns.domain.exceptions import (
 )
 
 router = APIRouter(prefix="/v1/returns", tags=["returns"])
+admin_router = APIRouter(
+    prefix="/v1/admin/returns-corrections/returns",
+    tags=["admin-returns-corrections"],
+)
+
+
+def _require_backoffice_user(current_user: AuthenticatedUser) -> AuthenticatedUser:
+    if not user_can_access_surface(current_user, IDENTITY_SURFACE_BACKOFFICE):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Backoffice access is required.",
+        )
+    return current_user
 
 
 def _to_http_exception(error: Exception) -> HTTPException:
@@ -70,6 +91,57 @@ def _to_http_exception(error: Exception) -> HTTPException:
         return HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(error))
 
     return HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(error))
+
+
+@admin_router.get("", response_model=AdminReturnsListResponse)
+def list_admin_returns(
+    current_user: Annotated[AuthenticatedUser, Depends(get_current_user)],
+    session: Annotated[Session, Depends(get_session)],
+    branch_id: UUID | None = None,
+    operator_id: UUID | None = None,
+    refund_method: Annotated[str | None, Query(min_length=1)] = None,
+    status_filter: Annotated[str | None, Query(alias="status", min_length=1)] = None,
+    search: Annotated[str | None, Query(min_length=1)] = None,
+    date_from: date | None = None,
+    date_to: date | None = None,
+    min_amount: Annotated[float | None, Query(ge=0)] = None,
+    max_amount: Annotated[float | None, Query(ge=0)] = None,
+    page: Annotated[int, Query(ge=1)] = 1,
+    page_size: Annotated[int, Query(alias="page_size", ge=1, le=100)] = 25,
+) -> AdminReturnsListResponse:
+    _require_backoffice_user(current_user)
+    try:
+        return AdminReturnsService().list_returns(
+            session,
+            branch_id=branch_id,
+            date_from=(
+                None if date_from is None else datetime.combine(date_from, time.min, tzinfo=UTC)
+            ),
+            date_to=None if date_to is None else datetime.combine(date_to, time.max, tzinfo=UTC),
+            max_amount=None if max_amount is None else Decimal(str(max_amount)),
+            min_amount=None if min_amount is None else Decimal(str(min_amount)),
+            operator_id=operator_id,
+            page=page,
+            page_size=page_size,
+            refund_method=refund_method,
+            search=search,
+            status_filter=status_filter,
+        )
+    except SaleReturnError as error:
+        raise _to_http_exception(error) from error
+
+
+@admin_router.get("/{return_id}", response_model=AdminReturnDetailView)
+def get_admin_return_detail(
+    return_id: UUID,
+    current_user: Annotated[AuthenticatedUser, Depends(get_current_user)],
+    session: Annotated[Session, Depends(get_session)],
+) -> AdminReturnDetailView:
+    _require_backoffice_user(current_user)
+    try:
+        return AdminReturnsService().get_return_detail(session, return_id=return_id)
+    except SaleReturnError as error:
+        raise _to_http_exception(error) from error
 
 
 @router.get("/bootstrap", response_model=ReturnsBootstrapResponse)
@@ -216,3 +288,4 @@ def get_sale_return_detail(
         )
     except (BranchAccessError, CatalogError, SaleReturnError) as error:
         raise _to_http_exception(error) from error
+

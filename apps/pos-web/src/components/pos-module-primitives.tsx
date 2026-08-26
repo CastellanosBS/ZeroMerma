@@ -2,12 +2,15 @@ import type { KeyboardEvent, ReactNode, Ref } from "react";
 
 import { focusEdgeItem, focusRelativeItem } from "../lib/keyboard-shortcuts";
 import { cn } from "../lib/utils";
-import { CheckCircleIcon, ChevronRightIcon, SearchIcon } from "./pos-icons";
+import { SearchIcon } from "./pos-icons";
 
 type MetricTone = "default" | "financial" | "info" | "muted" | "negative" | "positive" | "warning";
 type NoticeTone = "error" | "info" | "success" | "warning";
 
-function getToneDataAttribute<TTone extends string>(tone: TTone, fallback: TTone): TTone | undefined {
+function getToneDataAttribute<TTone extends string>(
+  tone: TTone,
+  fallback: TTone,
+): TTone | undefined {
   return tone === fallback ? undefined : tone;
 }
 
@@ -195,7 +198,9 @@ export function CentralWorkspaceSheet({
         className,
       )}
     >
-      <div className="px-[var(--pos-panel-padding-x)] py-[var(--pos-header-padding-y)]">{header}</div>
+      <div className="px-[var(--pos-panel-padding-x)] py-[var(--pos-header-padding-y)]">
+        {header}
+      </div>
       {toolbar ? (
         <div
           className={cn(
@@ -222,7 +227,12 @@ export function CentralWorkspaceSheet({
 export const ContinuousWorkspaceSheet = CentralWorkspaceSheet;
 
 export function SectionDivider({ className }: { className?: string }) {
-  return <div aria-hidden="true" className={cn("border-t border-[var(--pos-shell-border)]", className)} />;
+  return (
+    <div
+      aria-hidden="true"
+      className={cn("border-t border-[var(--pos-shell-border)]", className)}
+    />
+  );
 }
 
 export function ModuleStateChip({
@@ -274,6 +284,7 @@ export function RightPanelBlock({
   action,
   children,
   className,
+  contentClassName,
   description,
   title,
   tone = "default",
@@ -281,6 +292,7 @@ export function RightPanelBlock({
   action?: ReactNode;
   children?: ReactNode;
   className?: string;
+  contentClassName?: string;
   description?: string;
   title: string;
   tone?: "default" | "muted";
@@ -291,7 +303,9 @@ export function RightPanelBlock({
       data-tone={getToneDataAttribute(tone, "default")}
     >
       <SectionHeader action={action} description={description} title={title} />
-      {children ? <div className="mt-[var(--pos-stack-gap)] min-w-0">{children}</div> : null}
+      {children ? (
+        <div className={cn("mt-[var(--pos-stack-gap)] min-w-0", contentClassName)}>{children}</div>
+      ) : null}
     </section>
   );
 }
@@ -391,13 +405,7 @@ export function KeyValueRow({
   );
 }
 
-export function ScrollPane({
-  children,
-  className,
-}: {
-  children: ReactNode;
-  className?: string;
-}) {
+export function ScrollPane({ children, className }: { children: ReactNode; className?: string }) {
   return <div className={cn("pos-scroll-pane", className)}>{children}</div>;
 }
 
@@ -642,7 +650,10 @@ export function SummaryMetric({
   value: ReactNode;
 }) {
   return (
-    <div className="pos-tonal-surface px-3 py-2.5" data-tone={getToneDataAttribute(tone, "default")}>
+    <div
+      className="pos-tonal-surface px-3 py-2.5"
+      data-tone={getToneDataAttribute(tone, "default")}
+    >
       <div className="flex items-center gap-2 text-[13px] font-semibold text-slate-700">
         {icon ? <span className="text-[var(--pos-primary)]">{icon}</span> : null}
         <span>{label}</span>
@@ -667,7 +678,10 @@ export function MetricCard({
   value: ReactNode;
 }) {
   return (
-    <div className="pos-tonal-surface px-3 py-2.5" data-tone={getToneDataAttribute(tone, "default")}>
+    <div
+      className="pos-tonal-surface px-3 py-2.5"
+      data-tone={getToneDataAttribute(tone, "default")}
+    >
       <div className="flex items-center gap-2 text-[13px] font-semibold text-slate-700">
         {icon ? <span className="text-[var(--pos-primary)]">{icon}</span> : null}
         {helper ? <span>{helper}</span> : null}
@@ -719,6 +733,145 @@ export function SearchField({
   );
 }
 
+export type ProgressStepperStep = {
+  completed?: boolean;
+  disabled?: boolean;
+  id: string;
+  label: string;
+  state?: "blocked" | "completed" | "current" | "upcoming";
+};
+
+export function ProgressStepper({
+  ariaLabel = "Progreso del flujo",
+  className,
+  clickable = false,
+  currentLabel,
+  currentStep,
+  onStepClick,
+  onStepSelect,
+  steps,
+  stepLabels,
+  totalSteps,
+  variant = "progress",
+}: {
+  ariaLabel?: string;
+  className?: string;
+  clickable?: boolean;
+  currentLabel?: string;
+  currentStep: number;
+  onStepClick?: (stepId: string) => void;
+  onStepSelect?: (stepIndex: number) => void;
+  steps?: ProgressStepperStep[];
+  stepLabels?: string[];
+  totalSteps?: number;
+  variant?: "navigation" | "progress" | "workflow";
+}) {
+  const safeTotal = Math.max(1, steps?.length ?? totalSteps ?? stepLabels?.length ?? 1);
+  const safeCurrentStep = Math.min(Math.max(1, currentStep), safeTotal);
+  const normalizedSteps = Array.from({ length: safeTotal }, (_, index) => {
+    const explicitStep = steps?.[index];
+    const stepNumber = index + 1;
+    const state = explicitStep?.state;
+
+    return {
+      completed:
+        explicitStep?.completed ?? (state ? state === "completed" : stepNumber < safeCurrentStep),
+      disabled: explicitStep?.disabled ?? state === "blocked",
+      id: explicitStep?.id ?? String(stepNumber),
+      label: explicitStep?.label ?? stepLabels?.[index] ?? `Paso ${stepNumber}`,
+      state,
+    };
+  });
+  const activeStep = normalizedSteps[safeCurrentStep - 1];
+  const resolvedLabel = currentLabel ?? activeStep?.label ?? "";
+
+  return (
+    <div
+      aria-label={ariaLabel}
+      aria-valuemax={clickable ? undefined : safeTotal}
+      aria-valuemin={clickable ? undefined : 1}
+      aria-valuenow={clickable ? undefined : safeCurrentStep}
+      className={cn("grid gap-2", variant === "navigation" && "gap-2.5", className)}
+      role={clickable ? undefined : "progressbar"}
+    >
+      <div className="flex min-w-0 items-center justify-between gap-3">
+        <p className="min-w-0 truncate text-[12px] font-semibold uppercase tracking-[0.08em] text-slate-500">
+          Paso {safeCurrentStep} de {safeTotal}
+          {resolvedLabel ? (
+            <>
+              {" \u00b7 "}
+              <span className="text-slate-700">{resolvedLabel}</span>
+            </>
+          ) : null}
+        </p>
+      </div>
+
+      <ol className="grid min-w-0 grid-flow-col gap-1.5" data-pos-progress-stepper="true">
+        {normalizedSteps.map((step, index) => {
+          const stepNumber = index + 1;
+          const isCompleted = step.completed || stepNumber < safeCurrentStep;
+          const isCurrent = step.state === "current" || stepNumber === safeCurrentStep;
+          const isDisabled = step.disabled;
+          const activateStep = () => {
+            if (isDisabled) {
+              return;
+            }
+
+            onStepClick?.(step.id);
+            onStepSelect?.(stepNumber);
+          };
+          const segmentClassName = cn(
+            "h-1.5 rounded-full transition-colors",
+            isCompleted
+              ? "bg-[var(--pos-primary)]/70"
+              : isCurrent
+                ? "bg-[var(--pos-primary)]"
+                : isDisabled
+                  ? "bg-slate-200/70"
+                  : "bg-slate-200",
+          );
+
+          return (
+            <li className="min-w-0" key={step.id}>
+              {clickable ? (
+                <button
+                  aria-disabled={isDisabled || undefined}
+                  aria-current={isCurrent ? "step" : undefined}
+                  aria-label={`${step.label} (${stepNumber} de ${safeTotal})`}
+                  className={cn(
+                    "block w-full rounded-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--pos-ring)] focus-visible:ring-offset-2 focus-visible:ring-offset-white",
+                    segmentClassName,
+                    isDisabled && "cursor-not-allowed",
+                  )}
+                  disabled={isDisabled}
+                  onClick={activateStep}
+                  onKeyDown={(event) => {
+                    if (event.key !== "Enter" && event.key !== " ") {
+                      return;
+                    }
+
+                    event.preventDefault();
+                    activateStep();
+                  }}
+                  title={step.label}
+                  type="button"
+                />
+              ) : (
+                <span
+                  aria-current={isCurrent ? "step" : undefined}
+                  aria-label={`${step.label} (${stepNumber} de ${safeTotal})`}
+                  className={cn("block w-full", segmentClassName)}
+                  title={step.label}
+                />
+              )}
+            </li>
+          );
+        })}
+      </ol>
+    </div>
+  );
+}
+
 export function FlowGuide({
   activeStepKey,
   ariaLabel = "Flujo operativo",
@@ -739,207 +892,47 @@ export function FlowGuide({
   variant?: "compact" | "default" | "process" | "stepper";
 }) {
   const activeStepIndex = steps.findIndex((step) => step.key === activeStepKey);
+  const safeActiveStepIndex = activeStepIndex >= 0 ? activeStepIndex : 0;
+  const normalizedSteps = steps.map((step, index) => {
+    const derivedState =
+      step.state ??
+      (step.key === activeStepKey
+        ? "current"
+        : step.isBlocked
+          ? "blocked"
+          : activeStepIndex >= 0 && index < activeStepIndex
+            ? "completed"
+            : "upcoming");
+
+    return {
+      completed: derivedState === "completed",
+      disabled: derivedState === "blocked",
+      id: step.key,
+      label: step.label,
+      state: derivedState,
+    };
+  });
 
   return (
-    <ol
-      aria-label={ariaLabel}
-      data-pos-flow-guide="true"
-      className={cn(
-        "flex flex-wrap items-center gap-2",
-        variant === "process" && "gap-1.5",
-        variant === "compact" && "gap-1.5",
-        variant === "stepper" &&
-          "rounded-[var(--pos-radius-control)] border border-[var(--pos-shell-border)] bg-[var(--pos-shell-muted)] p-1",
-      )}
-    >
-      {steps.map((step, index) => {
-        const derivedState =
-          step.state ??
-          (step.key === activeStepKey
-            ? "current"
-            : step.isBlocked
-              ? "blocked"
-              : activeStepIndex >= 0 && index < activeStepIndex
-                ? "completed"
-                : "upcoming");
-        const isActive = derivedState === "current";
-        const isCompleted = derivedState === "completed";
-        const isBlocked = derivedState === "blocked";
-        const isUpcoming = derivedState === "upcoming";
-
-        return (
-          <li className="flex items-center gap-2" key={step.key}>
-            {index > 0 ? (
-              variant === "process" ? (
-                <span
-                  aria-hidden="true"
-                  className={cn(
-                    "hidden h-px w-4 rounded-full lg:block",
-                    isCompleted || isActive ? "bg-[var(--pos-primary)]/40" : "bg-slate-300",
-                  )}
-                />
-              ) : variant === "compact" ? (
-                <span
-                  aria-hidden="true"
-                  className={cn(
-                    "hidden h-px w-3 rounded-full sm:block",
-                    isCompleted || isActive ? "bg-[var(--pos-primary)]/35" : "bg-slate-300",
-                  )}
-                />
-              ) : variant === "stepper" ? (
-                <span
-                  aria-hidden="true"
-                  className={cn(
-                    "hidden h-px w-3 rounded-full lg:block",
-                    isCompleted || isActive ? "bg-[var(--pos-primary)]/35" : "bg-slate-300",
-                  )}
-                />
-              ) : (
-                <ChevronRightIcon className="h-4 w-4 text-slate-300" />
-              )
-            ) : null}
-
-            <button
-              aria-current={isActive ? "step" : undefined}
-              aria-disabled={isBlocked || undefined}
-              className={cn(
-                "inline-flex min-h-10 items-center gap-2 rounded-[var(--pos-radius-control)] px-3 py-2 text-sm font-medium transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--pos-ring)] focus-visible:ring-offset-2 focus-visible:ring-offset-white",
-                variant === "process"
-                  ? isActive
-                    ? "bg-[var(--pos-primary-soft)] text-slate-950"
-                    : isCompleted
-                      ? "text-[var(--pos-primary)]"
-                      : isBlocked
-                        ? "cursor-not-allowed text-slate-400"
-                        : isUpcoming
-                        ? "text-slate-700"
-                        : "text-slate-400"
-                  : variant === "compact"
-                    ? isActive
-                      ? "border border-[var(--pos-primary)] bg-[var(--pos-primary-soft)] text-slate-950"
-                      : isCompleted
-                        ? "border border-transparent bg-[var(--pos-shell-muted)] text-[var(--pos-primary)]"
-                        : isBlocked
-                          ? "border border-dashed border-[var(--pos-shell-border)] bg-transparent text-slate-400"
-                          : "border border-[var(--pos-shell-border)] bg-white text-slate-700"
-                  : variant === "stepper"
-                  ? isActive
-                    ? "border border-[var(--pos-primary)] bg-white text-slate-950 shadow-sm"
-                    : isCompleted
-                      ? "border border-transparent bg-[var(--pos-primary-soft)] text-[var(--pos-primary)]"
-                      : isBlocked
-                        ? "border border-dashed border-[var(--pos-shell-border)] bg-transparent text-slate-400"
-                        : isUpcoming
-                        ? "border border-transparent bg-white/75 text-slate-700"
-                        : "border border-transparent text-slate-400"
-                  : isActive
-                    ? "border border-[var(--pos-primary)] bg-[var(--pos-primary-soft)] text-[var(--pos-primary)]"
-                  : "border border-[var(--pos-shell-border)] bg-white text-slate-600",
-              )}
-              data-pos-flow-step="true"
-              disabled={isBlocked}
-              onClick={() => onStepSelect?.(step.key)}
-              onKeyDown={(event) => {
-                if (event.key === "ArrowRight" || event.key === "ArrowDown") {
-                  if (
-                    focusRelativeItem({
-                      currentTarget: event.currentTarget,
-                      direction: 1,
-                      scope: event.currentTarget.closest("[data-pos-flow-guide='true']"),
-                      selector: "[data-pos-flow-step='true']",
-                    })
-                  ) {
-                    event.preventDefault();
-                  }
-                  return;
-                }
-
-                if (event.key === "ArrowLeft" || event.key === "ArrowUp") {
-                  if (
-                    focusRelativeItem({
-                      currentTarget: event.currentTarget,
-                      direction: -1,
-                      scope: event.currentTarget.closest("[data-pos-flow-guide='true']"),
-                      selector: "[data-pos-flow-step='true']",
-                    })
-                  ) {
-                    event.preventDefault();
-                  }
-                  return;
-                }
-
-                if (event.key === "Home") {
-                  if (
-                    focusEdgeItem({
-                      currentTarget: event.currentTarget,
-                      edge: "first",
-                      scope: event.currentTarget.closest("[data-pos-flow-guide='true']"),
-                      selector: "[data-pos-flow-step='true']",
-                    })
-                  ) {
-                    event.preventDefault();
-                  }
-                  return;
-                }
-
-                if (event.key === "End") {
-                  if (
-                    focusEdgeItem({
-                      currentTarget: event.currentTarget,
-                      edge: "last",
-                      scope: event.currentTarget.closest("[data-pos-flow-guide='true']"),
-                      selector: "[data-pos-flow-step='true']",
-                    })
-                  ) {
-                    event.preventDefault();
-                  }
-                }
-              }}
-              type="button"
-            >
-              {variant === "process" || variant === "compact" ? (
-                <span
-                  className={cn(
-                    "flex h-6 w-6 shrink-0 items-center justify-center rounded-full border text-[11px]",
-                    isActive
-                      ? "border-[var(--pos-primary)] bg-white text-[var(--pos-primary)]"
-                      : isCompleted
-                        ? "border-transparent bg-[var(--pos-primary-soft)] text-[var(--pos-primary)]"
-                        : isBlocked
-                          ? "border-[var(--pos-shell-border)] bg-transparent text-slate-400"
-                          : isUpcoming
-                          ? "border-[var(--pos-shell-border)] bg-white text-slate-700"
-                          : "border-[var(--pos-shell-border)] bg-transparent text-slate-400",
-                  )}
-                >
-                  {isCompleted ? (
-                    <CheckCircleIcon className="h-3.5 w-3.5 shrink-0" />
-                  ) : step.icon ? (
-                    <span className="shrink-0">{step.icon}</span>
-                  ) : (
-                    index + 1
-                  )}
-                </span>
-              ) : variant === "stepper" && isCompleted ? (
-                <CheckCircleIcon className="h-4 w-4 shrink-0" />
-              ) : step.icon ? (
-                <span className="shrink-0">{step.icon}</span>
-              ) : null}
-              <span>{step.label}</span>
-            </button>
-          </li>
-        );
-      })}
-    </ol>
+    <ProgressStepper
+      ariaLabel={ariaLabel}
+      clickable={Boolean(onStepSelect)}
+      currentStep={safeActiveStepIndex + 1}
+      onStepClick={onStepSelect}
+      steps={normalizedSteps}
+      variant={onStepSelect ? "navigation" : variant === "process" ? "workflow" : "progress"}
+    />
   );
 }
 
 export function FilterButton({
+  className,
   count,
   isActive,
   label,
   onClick,
 }: {
+  className?: string;
   count?: number;
   isActive: boolean;
   label: string;
@@ -952,7 +945,9 @@ export function FilterButton({
         isActive
           ? "border-[var(--pos-primary)] bg-[var(--pos-primary-soft)] text-[var(--pos-primary)]"
           : "border-[var(--pos-shell-border)] bg-white text-slate-700 hover:border-[var(--pos-primary)] hover:bg-[var(--pos-shell-muted)]",
+        className,
       )}
+      data-active={isActive || undefined}
       onClick={onClick}
       type="button"
     >
@@ -960,7 +955,7 @@ export function FilterButton({
       {typeof count === "number" ? (
         <span
           className={cn(
-            "rounded-full px-1.5 py-0.5 text-[12px] font-semibold",
+            "pos-filter-button__count rounded-full px-1.5 py-0.5 text-[12px] font-semibold",
             isActive ? "bg-white/80" : "bg-[var(--pos-shell-muted)] text-slate-500",
           )}
         >

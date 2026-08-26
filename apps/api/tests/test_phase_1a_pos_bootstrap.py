@@ -7,6 +7,8 @@ from fastapi.testclient import TestClient
 from sqlalchemy import select
 
 from zeromerma_api.bootstrap.seed_local import (
+    SEED_ADMIN_EMAIL,
+    SEED_ADMIN_PASSWORD,
     SEED_BRANCH_CODE,
     SEED_USER_EMAIL,
     SEED_USER_PASSWORD,
@@ -30,6 +32,7 @@ def _login(client: TestClient) -> str:
     payload = response.json()
     assert payload["token_type"] == "bearer"
     assert payload["user"]["email"] == SEED_USER_EMAIL
+    assert payload["user"]["default_surface"] == "POS"
     return str(payload["access_token"])
 
 
@@ -46,7 +49,24 @@ def test_login_and_auth_me_return_authenticated_user(client: TestClient) -> None
     )
 
     assert response.status_code == 200
-    assert response.json()["email"] == SEED_USER_EMAIL
+    payload = response.json()
+    assert payload["email"] == SEED_USER_EMAIL
+    assert payload["default_surface"] == "POS"
+
+
+def test_seeded_admin_can_login_for_backoffice(client: TestClient) -> None:
+    response = client.post(
+        "/v1/auth/login",
+        json={"email": SEED_ADMIN_EMAIL, "password": SEED_ADMIN_PASSWORD},
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["token_type"] == "bearer"
+    assert payload["user"]["email"] == SEED_ADMIN_EMAIL
+    assert payload["user"]["full_name"] == "ZeroMerma Admin"
+    assert payload["user"]["default_surface"] == "BACKOFFICE"
+    assert payload["access_token"]
 
 
 def test_login_cors_preflight_allows_supported_local_pos_origin(client: TestClient) -> None:

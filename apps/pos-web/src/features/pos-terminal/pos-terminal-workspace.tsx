@@ -533,10 +533,6 @@ export function PosTerminalWorkspace() {
               <div className="grid gap-2.5">
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <p className="text-xs font-medium text-slate-500">{selectionKeyboardHint}</p>
-                  <div className="flex flex-wrap items-center gap-2 text-xs text-slate-500">
-                    <span className="pos-chip" data-tone="muted">Captura por clase</span>
-                    <span className="pos-chip" data-tone="primary">Producto directo</span>
-                  </div>
                 </div>
                 <div className="grid gap-2.5 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
                   {sortedClasses.map((productClass, index) => {
@@ -544,20 +540,6 @@ export function PosTerminalWorkspace() {
 
                     return (
                       <CatalogSelectionCard
-                        badge={
-                          <span
-                            className="pos-chip"
-                            data-tone={
-                              productClass.capture_mode_default === PRODUCT_DIRECT_MODE
-                                ? "primary"
-                                : "muted"
-                            }
-                          >
-                            {productClass.capture_mode_default === PRODUCT_DIRECT_MODE
-                              ? "Producto directo"
-                              : "Captura por clase"}
-                          </span>
-                        }
                         buttonRef={itemProps.ref}
                         code={productClass.code}
                         isActive={classActiveIndex === index}
@@ -596,9 +578,6 @@ export function PosTerminalWorkspace() {
                   <div className="flex flex-wrap items-center gap-2 text-xs text-slate-500">
                     <span className="font-medium text-slate-700">
                       {pendingSelection?.productClass.name}
-                    </span>
-                    <span className="pos-chip" data-tone="primary">
-                      Producto directo
                     </span>
                   </div>
                   <p className="text-xs font-medium text-slate-500">{selectionKeyboardHint}</p>
@@ -659,16 +638,6 @@ export function PosTerminalWorkspace() {
                             ? pendingSelection.product?.name
                             : pendingSelection.productClass.name}
                         </p>
-                        <span
-                          className="pos-chip"
-                          data-tone={
-                            pendingSelection.captureMode === PRODUCT_DIRECT_MODE ? "primary" : "muted"
-                          }
-                        >
-                          {pendingSelection.captureMode === PRODUCT_DIRECT_MODE
-                            ? "Producto directo"
-                            : "Captura por clase"}
-                        </span>
                         {isQuantityPending ? (
                           <span className="pos-chip" data-tone="warning">
                             Pendiente

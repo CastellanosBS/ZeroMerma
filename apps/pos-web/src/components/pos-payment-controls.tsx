@@ -61,6 +61,7 @@ function getValueClass(tone: PosPaymentSurfaceTone): string {
 }
 
 export function PosPaymentMethodButton({
+  className,
   disabled = false,
   icon,
   isActive,
@@ -68,6 +69,7 @@ export function PosPaymentMethodButton({
   onClick,
   shortcutLabel,
 }: {
+  className?: string;
   disabled?: boolean;
   icon: ReactNode;
   isActive: boolean;
@@ -85,6 +87,7 @@ export function PosPaymentMethodButton({
           : "border-[var(--pos-shell-border)] bg-white text-slate-700 hover:border-[var(--pos-primary)] hover:bg-[var(--pos-shell-muted)] hover:text-slate-950",
         disabled &&
           "cursor-not-allowed opacity-60 hover:border-[var(--pos-shell-border)] hover:bg-white hover:text-slate-700",
+        className,
       )}
       data-shortcut={shortcutLabel ?? undefined}
       data-shortcut-tone={isActive ? "primary" : "default"}

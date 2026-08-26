@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from datetime import UTC, datetime
+
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
@@ -10,6 +12,10 @@ from zeromerma_api.modules.identity.domain.exceptions import (
     InvalidCredentialsError,
 )
 from zeromerma_api.modules.identity.infrastructure.models import User
+
+
+def user_can_access_surface(user: AuthenticatedUser, surface: str) -> bool:
+    return surface in user.allowed_surfaces
 
 
 class AuthService:
@@ -32,11 +38,14 @@ class AuthService:
         user = session.execute(
             select(User).where(User.email == normalized_email)
         ).scalar_one_or_none()
-        if user is None or not user.is_active:
+        if user is None or not user.is_active or user.is_locked:
             raise InvalidCredentialsError("Invalid email or password.")
 
         if not self._password_hasher.verify_password(password, user.password_hash):
             raise InvalidCredentialsError("Invalid email or password.")
+
+        user.last_login_at = datetime.now(tz=UTC)
+        session.flush()
 
         return self._token_service.issue_access_token(
             user.id
@@ -45,7 +54,7 @@ class AuthService:
     def get_authenticated_user(self, session: Session, token: str) -> AuthenticatedUser:
         user_id = self._token_service.read_user_id(token)
         user = session.get(User, user_id)
-        if user is None or not user.is_active:
+        if user is None or not user.is_active or user.is_locked:
             raise AuthenticationError("Authenticated user is no longer active.")
 
         return AuthenticatedUser.model_validate(user)

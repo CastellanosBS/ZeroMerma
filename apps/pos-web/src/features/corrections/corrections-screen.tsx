@@ -4,42 +4,36 @@ import { useEffect, useMemo, useRef, useState } from "react";
 
 import { useAppShellRightPanel } from "../../components/app-shell-right-panel";
 import {
-  OperationConfirmationDialog,
-  OperationDocumentResult,
-  OperationDocumentSummaryPanel,
   OperationHistoryList,
-  type OperationDocumentAction,
-  type OperationDocumentMetric,
   type OperationHistoryRecord,
-  type OperationLineSummaryItem,
 } from "../../components/operation-documents";
 import {
   CentralWorkspaceSheet,
-  FlowGuide,
   InlineNotice,
-  ListDetailColumn,
+  KeyValueRow,
   ModuleStateChip,
   CompactPageHeader,
-  ResponsivePaneLayout,
   ScrollPane,
-  SearchField,
 } from "../../components/pos-module-primitives";
 import { OperationalStatus } from "../../components/operational-status";
-import { PosContextBanner, PosSummaryPanel } from "../../components/pos-module-layout";
-import { PosFilterBar, PosHistoryView, PosRecordDetailPanel, PosRecordList } from "../../components/pos-records";
+import { PosSummaryPanel } from "../../components/pos-module-layout";
+import {
+  PosFilterBar,
+  PosHistoryView,
+  PosRecordTable,
+  type PosRecordColumn,
+} from "../../components/pos-records";
 import { Button } from "../../components/ui/button";
 import { appEnv } from "../../env";
 import type {
   CorrectionDocumentView,
   CorrectionHistoryListItemView,
-  CorrectionProductOptionView,
   CorrectionSearchDocumentView,
   CorrectionTargetDetailResponse,
   OperationDocumentLineView,
   TransferDestinationBranchView,
 } from "../../lib/api-contracts";
-import { getDocumentActionAvailability } from "../../lib/document-actions";
-import { formatLocalDateTime } from "../../lib/formatters";
+import { formatCompactLocalDateTime, formatLocalDateTime } from "../../lib/formatters";
 import { toOperationalErrorMessage } from "../../lib/http";
 import { isEditableTarget } from "../../lib/keyboard-shortcuts";
 import { cn } from "../../lib/utils";
@@ -58,15 +52,12 @@ import {
   createInitialCorrectionDraftState,
   getCorrectionDraftBlockingMessages,
   getCorrectionDraftBlockedReason,
-  getCorrectionDraftLineDirection,
-  getCorrectionDraftLineMagnitudeText,
   getCorrectionDraftNetQuantityMilliUnits,
   getCorrectionDraftTotalAdjustedQuantityMilliUnits,
   hasCorrectionDraftInvalidQuantity,
   hasCorrectionDraftMissingReason,
   parseSignedQuantityToMilliUnits,
   removeCorrectionDraftLine,
-  upsertAddedProductDraftAdjustment,
   upsertTargetLineDraftAdjustment,
   type CorrectionDirection,
   type CorrectionDraftLine,
@@ -75,7 +66,6 @@ import {
   correctionTargetDetailQueryKey,
   correctionsBootstrapQueryKey,
   useCorrectionDocumentDetailQuery,
-  useCorrectionProductsQuery,
   useCorrectionTargetDetailQuery,
   useCorrectionTargetsQuery,
   useCorrectionsBootstrapQuery,
@@ -87,11 +77,6 @@ const DOCUMENT_TYPE_FILTERS = [
   { code: "COUNTER_TRANSFER", label: "Paso a mostrador" },
   { code: "WASTE_RECORD", label: "Merma" },
   { code: "BRANCH_TRANSFER_SHIPMENT", label: "Envio a sucursal" },
-] as const;
-
-const CORRECTION_PROCESS_STEPS = [
-  { key: "documents", label: "Documento" },
-  { key: "history", label: "Historial" },
 ] as const;
 
 const WRONG_DESTINATION_REASON_CODE = "WRONG_DESTINATION";
@@ -213,41 +198,20 @@ function getSignedEffectLabel(value: number): string {
   return `${prefix}${formatQuantityFromMilliUnits(Math.abs(value))} unidades`;
 }
 
-function getCorrectionHighImpactLabel(thresholdText: string): string {
-  return `Ajuste alto impacto a partir de ${thresholdText} unidades ajustadas.`;
+function getCorrectionTargetTotalQuantityText(target: CorrectionTargetDetailResponse | null): string {
+  if (!target) {
+    return "-";
+  }
+
+  const totalMilliUnits = target.target_document.lines.reduce(
+    (total, line) => total + (parseSignedQuantityToMilliUnits(String(line.quantity)) ?? 0),
+    0,
+  );
+  return formatQuantityFromMilliUnits(totalMilliUnits);
 }
 
-function buildDraftLineSummaryItems({
-  draftLines,
-  targetLines,
-}: {
-  draftLines: CorrectionDraftLine[];
-  targetLines: OperationDocumentLineView[];
-}): OperationLineSummaryItem[] {
-  const targetLineById = new Map(targetLines.map((line) => [line.id, line]));
-
-  return draftLines.map((line) => {
-    const deltaMilliUnits = parseSignedQuantityToMilliUnits(line.deltaQuantityText) ?? 0;
-    const originalLine = line.targetLineId ? targetLineById.get(line.targetLineId) ?? null : null;
-    const originalMilliUnits = originalLine ? Number(originalLine.quantity) * 1000 : 0;
-    const resultMilliUnits = originalMilliUnits + deltaMilliUnits;
-
-    return {
-      key: line.key,
-      quantityText:
-        deltaMilliUnits === 0 ? "Pendiente" : getSignedEffectLabel(deltaMilliUnits),
-      secondaryText:
-        line.targetLineId !== null
-          ? `Original ${formatQuantityFromMilliUnits(originalMilliUnits)} -> Resultado ${formatQuantityFromMilliUnits(
-              resultMilliUnits,
-            )}`
-          : `Nuevo producto -> Resultado ${formatQuantityFromMilliUnits(resultMilliUnits)}`,
-      statusLabel: line.targetLineId ? "Linea original" : "Producto agregado",
-      statusTone: line.targetLineId ? "warning" : "ready",
-      title: line.productName,
-      trailingNote: line.notes.trim().length > 0 ? line.notes.trim() : undefined,
-    };
-  });
+function getCorrectionHighImpactLabel(thresholdText: string): string {
+  return `Ajuste alto impacto a partir de ${thresholdText} unidades ajustadas.`;
 }
 
 function buildCorrectionsHistoryRecords(
@@ -279,7 +243,7 @@ function buildCorrectionsHistoryRecords(
     secondaryTimestampValue: formatLocalDateTime(correction.created_at_utc, timeZone),
     statusLabel: correction.status === "COMMITTED" ? "Registrada" : correction.status,
     statusTone: correction.status === "COMMITTED" ? "confirmed" : "draft",
-    subtitle: `Documento ${correction.target_document_folio} · ${getCorrectionReasonLabel(
+    subtitle: `Movimiento ${correction.target_document_folio} · ${getCorrectionReasonLabel(
       correction.reason_code,
       correction.reason_name,
     )}`,
@@ -288,61 +252,14 @@ function buildCorrectionsHistoryRecords(
   }));
 }
 
-function buildCorrectionLineSummaryItems(
-  correction: CorrectionDocumentView | null,
-): OperationLineSummaryItem[] {
-  if (!correction) {
-    return [];
-  }
-
-  return correction.lines.map((line) => ({
-    key: `${correction.id}:${line.line_number}:${line.product_code_snapshot}`,
-    quantityText: formatSignedHistoryQuantity(line.delta_quantity),
-    secondaryText: line.product_code_snapshot,
-    title: line.product_name_snapshot,
-    trailingNote: `Linea ${line.line_number}`,
-  }));
-}
-
-function buildCorrectionMetrics(
-  correction: CorrectionDocumentView | null,
-): OperationDocumentMetric[] {
-  if (!correction) {
-    return [];
-  }
-
-  const netEffectMilliUnits = correction.lines.reduce(
+function getCorrectionNetEffectMilliUnits(correction: CorrectionDocumentView): number {
+  return correction.lines.reduce(
     (sum, line) => sum + Number(line.delta_quantity) * 1000,
     0,
   );
-
-  const metrics: OperationDocumentMetric[] = [
-    {
-      key: "line-count",
-      label: "Lineas",
-      value: String(correction.lines.length),
-    },
-    {
-      key: "net-effect",
-      label: "Efecto neto",
-      tone: netEffectMilliUnits === 0 ? "warning" : "financial",
-      value: getSignedEffectLabel(netEffectMilliUnits),
-    },
-  ];
-
-  if (correction.corrected_destination_branch_name) {
-    metrics.push({
-      key: "destination",
-      label: "Destino corregido",
-      value: correction.corrected_destination_branch_name,
-    });
-  }
-
-  return metrics;
 }
 
 function getCorrectionUiState({
-  centerSection,
   commitError,
   hasDraftWork,
   hasCommitted,
@@ -351,7 +268,6 @@ function getCorrectionUiState({
   isCommitPending,
   isReasonMissing,
 }: {
-  centerSection: CorrectionsCenterSection;
   commitError: string | null;
   hasDraftWork: boolean;
   hasCommitted: boolean;
@@ -376,10 +292,6 @@ function getCorrectionUiState({
     return "NO_DOC_SELECTED";
   }
 
-  if (centerSection !== "history") {
-    return hasDraftWork ? "DRAFT_BUILDING" : "DOC_SELECTED";
-  }
-
   if (!hasDraftWork) {
     return "DOC_SELECTED";
   }
@@ -398,19 +310,19 @@ function getCorrectionUiState({
 function getCorrectionUiStateLabel(state: CorrectionUiState): string {
   switch (state) {
     case "NO_DOC_SELECTED":
-      return "Sin documento";
+      return "Sin movimiento";
     case "DOC_SELECTED":
-      return "En revision";
+      return "Movimiento seleccionado";
     case "DRAFT_EMPTY":
       return "Borrador vacio";
     case "DRAFT_BUILDING":
-      return "Borrador en captura";
+      return "Editando";
     case "BLOCKED_MISSING_REASON":
       return "Falta motivo";
     case "BLOCKED_INVALID_SIGN":
       return "Revisa cantidades";
     case "READY_TO_CONFIRM":
-      return "Lista para confirmar";
+      return "Lista para guardar";
     case "CONFIRMING":
       return "Registrando...";
     case "CONFIRMED":
@@ -454,75 +366,74 @@ function getCorrectionSummaryStateTone(state: CorrectionUiState) {
   }
 }
 
-function getOriginalDocumentLabel(documentTitle: string | null): string {
-  return documentTitle ?? "Sin documento seleccionado";
-}
-
-function SelectionPreview({
+function CorrectionsSummaryPanel({
+  blockedMessages,
+  commitError,
   correctedDestinationBranchId,
+  correctedDestinationLabel,
   correctionReasons,
   destinationBranches,
+  documentReference,
   draftLines,
-  isCommitPending,
-  isProductSearchPending,
+  isHighImpactAcknowledged,
+  isHighImpactAdjustment,
+  netEffectMilliUnits,
+  onAcknowledgeHighImpact,
+  onCommit,
   onCommitTargetLineAdjustment,
   onCorrectedDestinationBranchChange,
-  onOpenHistory,
-  onProductSearchTextChange,
-  onSelectExactProduct,
-  onRemoveDraftLine,
   onReasonChange,
-  productSearchError,
-  productSearchResults,
-  productSearchText,
+  onRemoveDraftLine,
   reasonCode,
-  selectedDocument,
   selectedTarget,
   selectedTargetError,
   selectedTargetPending,
-  timeZone,
+  totalAdjustedQuantityMilliUnits,
+  uiState,
 }: {
+  blockedMessages: string[];
+  commitError: string | null;
   correctedDestinationBranchId: string | null;
+  correctedDestinationLabel: string | null;
   correctionReasons: Array<{ code: string; name: string }>;
   destinationBranches: TransferDestinationBranchView[];
+  documentReference: string | null;
   draftLines: CorrectionDraftLine[];
-  isCommitPending: boolean;
-  isProductSearchPending: boolean;
+  isHighImpactAcknowledged: boolean;
+  isHighImpactAdjustment: boolean;
+  netEffectMilliUnits: number;
+  onAcknowledgeHighImpact: (checked: boolean) => void;
+  onCommit: () => void;
   onCommitTargetLineAdjustment: (
     line: OperationDocumentLineView,
     direction: CorrectionDirection,
     magnitudeText: string,
   ) => void;
   onCorrectedDestinationBranchChange: (destinationBranchId: string | null) => void;
-  onOpenHistory: () => void;
-  onProductSearchTextChange: (value: string) => void;
-  onSelectExactProduct: (product: CorrectionProductOptionView, magnitudeText: string) => void;
-  onRemoveDraftLine: (draftLineKey: string) => void;
   onReasonChange: (reasonCode: string) => void;
-  productSearchError: string | null;
-  productSearchResults: CorrectionProductOptionView[];
-  productSearchText: string;
+  onRemoveDraftLine: (draftLineKey: string) => void;
   reasonCode: string;
-  selectedDocument: CorrectionSearchDocumentView | null;
   selectedTarget: CorrectionTargetDetailResponse | null;
   selectedTargetError: string | null;
   selectedTargetPending: boolean;
-  timeZone: string;
+  totalAdjustedQuantityMilliUnits: number;
+  uiState: CorrectionUiState;
 }) {
-  const [editingLineIds, setEditingLineIds] = useState<string[]>([]);
-  const [pendingEdits, setPendingEdits] = useState<Record<string, PendingTargetLineEdit>>({});
-  const [isAddingProduct, setIsAddingProduct] = useState(false);
-  const [selectedProductToAdd, setSelectedProductToAdd] = useState<CorrectionProductOptionView | null>(null);
-  const [newProductQuantityText, setNewProductQuantityText] = useState("1");
+  const [editingLineId, setEditingLineId] = useState<string | null>(null);
+  const [editingQuantityText, setEditingQuantityText] = useState("");
+  const [editingError, setEditingError] = useState<string | null>(null);
+  const quantityInputRef = useRef<HTMLInputElement | null>(null);
+  const reasonSelectRef = useRef<HTMLSelectElement | null>(null);
+  const previousDraftLineCountRef = useRef(draftLines.length);
 
-  useEffect(() => {
-    setEditingLineIds([]);
-    setPendingEdits({});
-    setIsAddingProduct(false);
-    setSelectedProductToAdd(null);
-    setNewProductQuantityText("1");
-  }, [selectedTarget?.target_document.id]);
-
+  const hasDraftWork = draftLines.length > 0 || correctedDestinationLabel !== null;
+  const originalQuantityMilliUnits =
+    selectedTarget?.target_document.lines.reduce(
+      (total, line) => total + (parseSignedQuantityToMilliUnits(String(line.quantity)) ?? 0),
+      0,
+    ) ?? 0;
+  const adjustedQuantityMilliUnits = originalQuantityMilliUnits + netEffectMilliUnits;
+  const visibleBlockingMessages = selectedTarget && hasDraftWork ? blockedMessages : [];
   const supportsDestinationCorrection =
     selectedTarget?.target_document.document_type === "BRANCH_TRANSFER_SHIPMENT";
   const availableReasonOptions = correctionReasons.filter(
@@ -533,1088 +444,477 @@ function SelectionPreview({
     (branch) => branch.id !== selectedTarget?.target_document.destination_branch_id,
   );
   const isWrongDestinationReason = reasonCode === WRONG_DESTINATION_REASON_CODE;
-  const isEditingDisabled = isCommitPending || !selectedTarget?.is_correctable;
-  const addedDraftLines = draftLines.filter((line) => line.sourceKind === "ADDED_PRODUCT");
-  const parsedNewProductQuantity = parseSignedQuantityToMilliUnits(newProductQuantityText);
-  const newProductQuantityError =
-    selectedProductToAdd !== null && parsedNewProductQuantity === null
-      ? "Captura una cantidad mayor que cero."
-      : null;
+  const isEditingDisabled =
+    uiState === "CONFIRMING" || !selectedTarget?.is_correctable || isWrongDestinationReason;
 
   useEffect(() => {
-    if (!isAddingProduct) {
+    setEditingLineId(null);
+    setEditingQuantityText("");
+    setEditingError(null);
+  }, [selectedTarget?.target_document.id]);
+
+  useEffect(() => {
+    if (!editingLineId) {
       return;
     }
-    if (isWrongDestinationReason || isEditingDisabled) {
-      setIsAddingProduct(false);
-      setSelectedProductToAdd(null);
-      setNewProductQuantityText("1");
-      onProductSearchTextChange("");
-    }
-  }, [isAddingProduct, isEditingDisabled, isWrongDestinationReason, onProductSearchTextChange]);
 
-  if (selectedDocument === null) {
-    return (
-      <ListDetailColumn
-        description="Selecciona un documento para revisar su detalle sin alterar el original."
-        title="Sin seleccion"
-        tone="muted"
-      >
-        <div className="grid h-full min-h-0 place-items-center rounded-xl border border-dashed border-[var(--pos-shell-border)] bg-white px-5 py-10 text-center">
-          <div className="grid max-w-sm gap-2">
-            <p className="text-base font-semibold text-slate-950">Selecciona un documento original.</p>
-            <p className="text-sm leading-6 text-slate-600">
-              El ajuste crea un documento nuevo y auditable. Aqui solo eliges el caso correcto.
-            </p>
-          </div>
-        </div>
-      </ListDetailColumn>
+    window.setTimeout(() => quantityInputRef.current?.focus(), 0);
+  }, [editingLineId]);
+
+  useEffect(() => {
+    const previousLineCount = previousDraftLineCountRef.current;
+    previousDraftLineCountRef.current = draftLines.length;
+
+    if (draftLines.length <= previousLineCount || reasonCode.trim().length > 0) {
+      return;
+    }
+
+    window.setTimeout(() => reasonSelectRef.current?.focus(), 0);
+  }, [draftLines.length, reasonCode]);
+
+  const getDraftLineForTarget = (lineId: string) =>
+    draftLines.find((candidate) => candidate.targetLineId === lineId) ?? null;
+
+  const startLineEdit = (line: OperationDocumentLineView) => {
+    if (isEditingDisabled) {
+      return;
+    }
+
+    const draftLine = getDraftLineForTarget(line.id);
+    const originalQuantityMilliUnits =
+      parseSignedQuantityToMilliUnits(String(line.quantity)) ?? 0;
+    const draftQuantityMilliUnits = draftLine
+      ? parseSignedQuantityToMilliUnits(draftLine.deltaQuantityText) ?? 0
+      : 0;
+
+    setEditingLineId(line.id);
+    setEditingQuantityText(
+      formatQuantityFromMilliUnits(originalQuantityMilliUnits + draftQuantityMilliUnits),
     );
-  }
+    setEditingError(null);
+  };
+
+  const cancelLineEdit = () => {
+    setEditingLineId(null);
+    setEditingQuantityText("");
+    setEditingError(null);
+  };
+
+  const commitLineEdit = (line: OperationDocumentLineView) => {
+    const correctedQuantityMilliUnits = parseSignedQuantityToMilliUnits(editingQuantityText);
+    const originalQuantityMilliUnits = parseSignedQuantityToMilliUnits(String(line.quantity));
+
+    if (
+      correctedQuantityMilliUnits === null ||
+      originalQuantityMilliUnits === null ||
+      correctedQuantityMilliUnits < 0
+    ) {
+      setEditingError("Cantidad invalida.");
+      return;
+    }
+
+    const draftLine = getDraftLineForTarget(line.id);
+    const deltaQuantityMilliUnits = correctedQuantityMilliUnits - originalQuantityMilliUnits;
+
+    if (deltaQuantityMilliUnits === 0) {
+      if (draftLine) {
+        onRemoveDraftLine(draftLine.key);
+      }
+      cancelLineEdit();
+      return;
+    }
+
+    onCommitTargetLineAdjustment(
+      line,
+      deltaQuantityMilliUnits < 0 ? "DECREASE" : "INCREASE",
+      formatQuantityFromMilliUnits(Math.abs(deltaQuantityMilliUnits)),
+    );
+    cancelLineEdit();
+  };
+
+  const getDeltaLabel = (deltaMilliUnits: number | null) => {
+    if (deltaMilliUnits === null || deltaMilliUnits === 0) {
+      return "0";
+    }
+
+    const prefix = deltaMilliUnits > 0 ? "+" : "-";
+    return `${prefix}${formatQuantityFromMilliUnits(Math.abs(deltaMilliUnits))}`;
+  };
 
   return (
-    <ListDetailColumn
-      action={
-        <Button
-          className={cn("h-10 px-4", posOutlineButtonClass)}
-          disabled={selectedTarget === null || selectedTargetPending}
-          onClick={onOpenHistory}
-          type="button"
-          variant="outline"
-        >
-            Historial de ajustes
-        </Button>
+    <PosSummaryPanel
+      description={selectedTarget ? documentReference ?? undefined : undefined}
+      footer={
+        selectedTarget && hasDraftWork ? (
+          <Button
+            className={cn("h-11 w-full font-semibold shadow-sm", posPrimaryButtonClass)}
+            disabled={visibleBlockingMessages.length > 0 || uiState === "CONFIRMING"}
+            onClick={onCommit}
+            type="button"
+          >
+            {uiState === "CONFIRMING" ? "Registrando..." : "Guardar ajuste"}
+          </Button>
+        ) : undefined
       }
-      description="Selecciona el documento correcto y agrega ajustes sin abrir una pantalla separada de detalle."
-      title="Documento seleccionado"
-      tone="muted"
+      stateLabel={getCorrectionUiStateLabel(uiState)}
+      stateTone={getCorrectionSummaryStateTone(uiState)}
+      title="Ajuste"
     >
       {selectedTargetPending ? (
         <OperationalStatus
-          description="Consultando elegibilidad y lineas originales."
-          title="Cargando documento"
+          description="Consultando lineas del movimiento."
+          title="Cargando movimiento"
         />
       ) : selectedTargetError ? (
         <OperationalStatus
           description={selectedTargetError}
-          title="No fue posible revisar el documento"
+          title="No fue posible cargar el movimiento"
         />
-      ) : selectedTarget ? (
-        <div className="flex h-full min-h-0 flex-col gap-3">
-          <div className="rounded-xl border border-[var(--pos-shell-border)] bg-white px-4 py-3.5">
-            <div className="flex min-w-0 items-start justify-between gap-3">
-              <div className="min-w-0 flex-1">
-                <p className="break-words text-sm font-semibold text-slate-950">
-                  {selectedTarget.document_title}
-                </p>
-                <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-slate-600">
-                  <span className="min-w-0 break-words">
-                    {selectedTarget.target_document.source_branch_name}
-                  </span>
-                  <span aria-hidden="true" className="text-slate-400">
-                    |
-                  </span>
-                  <span className="min-w-0 break-words">
-                    {selectedTarget.target_document.workstation_name}
-                  </span>
-                </div>
-              </div>
-              <span className="inline-flex min-h-9 shrink-0 items-center rounded-full border border-sky-200 bg-sky-50 px-3 py-1.5 text-sm font-medium text-sky-700">
-                Solo lectura. El original no se altera.
+      ) : !selectedTarget ? (
+        <div className="rounded-xl border border-dashed border-[var(--pos-shell-border)] bg-[var(--pos-shell-muted)] px-3 py-4 text-sm text-slate-600">
+          Selecciona un movimiento para ajustar.
+        </div>
+      ) : (
+        <div className="grid h-full min-h-0 gap-2.5 overflow-hidden">
+          {commitError ? <InlineNotice tone="error">{commitError}</InlineNotice> : null}
+
+          <div className="rounded-xl border border-[var(--pos-shell-border)] bg-white px-3 py-2">
+            <div className="flex min-w-0 items-center justify-between gap-2">
+              <span className="min-w-0 truncate text-sm font-semibold text-slate-950" title={documentReference ?? undefined}>
+                {documentReference ?? "Movimiento"}
               </span>
+              <ModuleStateChip tone={selectedTarget.is_correctable ? "success" : "warning"}>
+                {selectedTarget.is_correctable ? "Listo" : "Bloqueado"}
+              </ModuleStateChip>
             </div>
-
-            <div className="mt-3 grid gap-2 text-sm text-slate-600 md:grid-cols-2 xl:grid-cols-4">
-              <div className="min-w-0">
-                <span className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">
-                  Documento
+            <p className="mt-1 truncate text-xs text-slate-600">
+              {getDocumentTypeLabel(selectedTarget.target_document.document_type)}
+              {selectedTarget.target_document.destination_branch_name
+                ? ` · ${selectedTarget.target_document.destination_branch_name}`
+                : ""}
+            </p>
+            <div className="mt-2 grid grid-cols-3 gap-1 text-center text-xs">
+              <div className="rounded-lg bg-slate-50 px-2 py-1">
+                <span className="block font-semibold text-slate-950">
+                  {formatQuantityFromMilliUnits(originalQuantityMilliUnits)}
                 </span>
-                <p className="mt-1 break-words">{getDocumentTypeLabel(selectedTarget.target_document.document_type)}</p>
+                <span className="text-slate-500">Original</span>
               </div>
-              <div className="min-w-0">
-                <span className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">
-                  Fecha
+              <div className="rounded-lg bg-slate-50 px-2 py-1">
+                <span className="block font-semibold text-slate-950">
+                  {formatQuantityFromMilliUnits(adjustedQuantityMilliUnits)}
                 </span>
-                <p className="mt-1 break-words">
-                  {selectedTarget.target_document.committed_at_utc
-                    ? formatLocalDateTime(selectedTarget.target_document.committed_at_utc, timeZone)
-                    : "Sin hora"}
-                </p>
+                <span className="text-slate-500">Nuevo</span>
               </div>
-              <div className="min-w-0">
-                <span className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">
-                  Ajustes registrados
+              <div className="rounded-lg bg-slate-50 px-2 py-1">
+                <span className="block font-semibold text-slate-950">
+                  {getDeltaLabel(netEffectMilliUnits)}
                 </span>
-                <p className="mt-1 break-words">
-                  {selectedTarget.applied_corrections.length} registradas
-                </p>
-              </div>
-              <div className="min-w-0">
-                <span className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">
-                  Estado
-                </span>
-                <p className="mt-1 break-words">
-                  {selectedTarget.is_correctable ? "Corregible" : "No corregible"}
-                </p>
+                <span className="text-slate-500">Dif.</span>
               </div>
             </div>
-
-            {selectedTarget.target_document.destination_branch_name ? (
-              <div className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-slate-600">
-                <span className="font-medium text-slate-700">Destino:</span>
-                <span className="min-w-0 break-words">
-                  {selectedTarget.target_document.destination_branch_name}
-                </span>
-              </div>
-            ) : null}
-
             {selectedTarget.blocking_reason ? (
-              <div className="mt-3">
+              <div className="mt-2">
                 <InlineNotice tone="error">{selectedTarget.blocking_reason}</InlineNotice>
               </div>
             ) : null}
           </div>
 
-          <div className="grid min-h-0 gap-3">
-            <div className="rounded-xl border border-[var(--pos-shell-border)] bg-[var(--pos-shell-muted)] px-4 py-3">
-              <div
+          <div className="grid gap-2 rounded-xl border border-[var(--pos-shell-border)] bg-[var(--pos-shell-muted)] px-3 py-2.5">
+            <label className="grid gap-1">
+              <span className="text-xs font-semibold text-slate-700">Motivo</span>
+              <select
+                ref={reasonSelectRef}
                 className={cn(
-                  "grid items-center gap-3",
-                  isWrongDestinationReason
-                    ? "xl:grid-cols-[auto_minmax(14rem,18rem)_auto_minmax(16rem,1fr)]"
-                    : "xl:grid-cols-[auto_minmax(16rem,22rem)]",
+                  "h-9 w-full rounded-lg px-2.5 text-sm shadow-sm",
+                  posInputClass,
+                  reasonCode.trim().length === 0 &&
+                    hasDraftWork &&
+                    "border-[var(--ui-color-danger)] text-[var(--ui-color-danger)]",
                 )}
+                disabled={uiState === "CONFIRMING" || !selectedTarget.is_correctable}
+                onChange={(event) => onReasonChange(event.target.value)}
+                value={reasonCode}
               >
-                <span className="text-[13px] font-semibold text-slate-700">Motivo</span>
-                <label className="min-w-0">
-                  <select
-                    className={cn(
-                      "h-10 w-full rounded-lg px-3 text-sm shadow-sm",
-                      posInputClass,
-                      reasonCode.trim().length === 0 &&
-                        "border-[var(--ui-color-danger)] text-[var(--ui-color-danger)]",
-                    )}
-                    disabled={isEditingDisabled}
-                    onChange={(event) => onReasonChange(event.target.value)}
-                    value={reasonCode}
-                  >
-                    <option value="">Selecciona un motivo</option>
-                    {availableReasonOptions.map((reason) => (
-                      <option key={reason.code} value={reason.code}>
-                        {getCorrectionReasonLabel(reason.code, reason.name)}
-                      </option>
-                    ))}
-                  </select>
-                </label>
+                <option value="">Selecciona motivo</option>
+                {availableReasonOptions.map((reason) => (
+                  <option key={reason.code} value={reason.code}>
+                    {getCorrectionReasonLabel(reason.code, reason.name)}
+                  </option>
+                ))}
+              </select>
+            </label>
 
-                {isWrongDestinationReason ? (
-                  <>
-                    <span className="text-[13px] font-semibold text-slate-700">
-                      Sucursal destino corregida
-                    </span>
-                    <label className="min-w-0">
-                    <select
-                      className={cn(
-                        "h-10 w-full rounded-lg px-3 text-sm shadow-sm",
-                        posInputClass,
-                        correctedDestinationBranchId === null &&
-                          "border-[var(--ui-color-danger)] text-[var(--ui-color-danger)]",
-                      )}
-                      disabled={isEditingDisabled}
-                      onChange={(event) =>
-                        onCorrectedDestinationBranchChange(
-                          event.target.value.length > 0 ? event.target.value : null,
-                        )
-                      }
-                      value={correctedDestinationBranchId ?? ""}
-                    >
-                      <option value="">Selecciona una sucursal</option>
-                      {availableDestinationBranches.map((branch) => (
-                        <option key={branch.id} value={branch.id}>
-                          {branch.name}
-                        </option>
-                        ))}
-                      </select>
-                    </label>
-                  </>
-                ) : null}
-              </div>
-            </div>
-
-            <div className="rounded-xl border border-[var(--pos-shell-border)] bg-white">
-              <div className="flex flex-wrap items-start justify-between gap-3 border-b border-[var(--pos-shell-border)] px-4 py-3">
-                <div>
-                  <p className="text-sm font-semibold text-slate-950">Lineas originales</p>
-                  <p className="mt-1 text-sm text-slate-600">
-                    Ajusta cantidades aqui mismo. El borrador se actualiza sin salir de esta vista.
-                  </p>
-                </div>
-
-                <Button
-                  className={cn("h-9 px-3", posOutlineButtonClass)}
-                  disabled={isEditingDisabled || isWrongDestinationReason}
-                  onClick={() => {
-                    setIsAddingProduct((current) => !current);
-                    setSelectedProductToAdd(null);
-                    setNewProductQuantityText("1");
-                    onProductSearchTextChange("");
-                  }}
-                  type="button"
-                  variant="outline"
+            {isWrongDestinationReason ? (
+              <label className="grid gap-1">
+                <span className="text-xs font-semibold text-slate-700">Destino corregido</span>
+                <select
+                  className={cn(
+                    "h-9 w-full rounded-lg px-2.5 text-sm shadow-sm",
+                    posInputClass,
+                    correctedDestinationBranchId === null &&
+                      "border-[var(--ui-color-danger)] text-[var(--ui-color-danger)]",
+                  )}
+                  disabled={uiState === "CONFIRMING" || !selectedTarget.is_correctable}
+                  onChange={(event) =>
+                    onCorrectedDestinationBranchChange(
+                      event.target.value.length > 0 ? event.target.value : null,
+                    )
+                  }
+                  value={correctedDestinationBranchId ?? ""}
                 >
-                  Agregar producto
-                </Button>
-              </div>
-
-              <div className="min-h-0 overflow-hidden">
-                {isAddingProduct ? (
-                  <div className="grid gap-3 border-b border-[var(--pos-shell-border)] bg-[var(--pos-shell-muted)] px-4 py-3">
-                    <SearchField
-                      ariaLabel="Buscar producto para agregar"
-                      className="w-full"
-                      disabled={isEditingDisabled}
-                      inputClassName={cn("h-10 rounded-lg text-sm shadow-sm", posInputClass)}
-                      onChange={onProductSearchTextChange}
-                      placeholder="Buscar por nombre o codigo"
-                      value={productSearchText}
-                    />
-
-                    {selectedProductToAdd ? (
-                      <div className="grid gap-3 rounded-xl border border-[var(--pos-shell-border)] bg-white px-4 py-3 sm:grid-cols-[minmax(0,1fr)_8rem_auto] sm:items-end">
-                        <div className="min-w-0">
-                          <p className="break-words text-sm font-semibold text-slate-950">
-                            {selectedProductToAdd.name}
-                          </p>
-                          <p className="mt-1 break-words text-sm text-slate-600">
-                            {selectedProductToAdd.product_class_name} | {selectedProductToAdd.code}
-                          </p>
-                        </div>
-
-                        <label className="grid gap-1">
-                          <span className="text-xs font-semibold text-slate-700">Cantidad</span>
-                          <input
-                            className={cn(
-                              "h-10 rounded-lg px-3 text-sm shadow-sm",
-                              posInputClass,
-                              newProductQuantityError &&
-                                "border-[var(--ui-color-danger)] text-[var(--ui-color-danger)]",
-                            )}
-                            disabled={isEditingDisabled}
-                            inputMode="decimal"
-                            onChange={(event) => setNewProductQuantityText(event.target.value)}
-                            placeholder="1"
-                            value={newProductQuantityText}
-                          />
-                        </label>
-
-                        <div className="flex flex-wrap items-center gap-2">
-                          <Button
-                            className={cn("h-10 px-3", posOutlineButtonClass)}
-                            disabled={isEditingDisabled}
-                            onClick={() => {
-                              setSelectedProductToAdd(null);
-                              setNewProductQuantityText("1");
-                            }}
-                            type="button"
-                            variant="outline"
-                          >
-                            Cambiar
-                          </Button>
-                          <Button
-                            className={cn("h-10 px-3", posPrimaryButtonClass)}
-                            disabled={isEditingDisabled || newProductQuantityError !== null}
-                            onClick={() => {
-                              if (!selectedProductToAdd || newProductQuantityError !== null) {
-                                return;
-                              }
-                              onSelectExactProduct(selectedProductToAdd, newProductQuantityText);
-                              setIsAddingProduct(false);
-                              setSelectedProductToAdd(null);
-                              setNewProductQuantityText("1");
-                            }}
-                            type="button"
-                          >
-                            Agregar
-                          </Button>
-                        </div>
-
-                        {newProductQuantityError ? (
-                          <p className="sm:col-span-3 text-xs leading-5 text-[var(--ui-color-danger)]">
-                            {newProductQuantityError}
-                          </p>
-                        ) : null}
-                      </div>
-                    ) : productSearchText.trim().length === 0 ? (
-                      <div className="rounded-xl border border-dashed border-[var(--pos-shell-border)] bg-white px-4 py-5 text-sm text-slate-600">
-                        Busca el producto y luego captura la cantidad a agregar.
-                      </div>
-                    ) : isProductSearchPending ? (
-                      <div className="rounded-xl border border-dashed border-[var(--pos-shell-border)] bg-white px-4 py-5 text-sm text-slate-600">
-                        Buscando productos...
-                      </div>
-                    ) : productSearchError ? (
-                      <InlineNotice tone="error">{productSearchError}</InlineNotice>
-                    ) : productSearchResults.length === 0 ? (
-                      <div className="rounded-xl border border-dashed border-[var(--pos-shell-border)] bg-white px-4 py-5 text-sm text-slate-600">
-                        No hay productos que coincidan con la busqueda.
-                      </div>
-                    ) : (
-                      <ScrollPane className="max-h-56">
-                        <div className="grid gap-2">
-                          {productSearchResults.map((product) => (
-                            <button
-                              className="grid gap-1 rounded-xl border border-[var(--pos-shell-border)] bg-white px-4 py-3 text-left transition hover:border-[var(--pos-primary)]/35 hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--pos-ring)]"
-                              key={product.id}
-                              onClick={() => setSelectedProductToAdd(product)}
-                              type="button"
-                            >
-                              <span className="break-words text-sm font-semibold text-slate-950">
-                                {product.name}
-                              </span>
-                              <span className="break-words text-sm text-slate-600">
-                                {product.product_class_name} | {product.code}
-                              </span>
-                            </button>
-                          ))}
-                        </div>
-                      </ScrollPane>
-                    )}
-                  </div>
-                ) : null}
-
-                <ScrollPane className="min-h-0">
-                  <table className="w-full border-separate border-spacing-0">
-                    <thead className="bg-slate-50">
-                      <tr className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">
-                        <th className="px-3 py-2 text-left">Linea</th>
-                        <th className="px-3 py-2 text-left">Articulo</th>
-                        <th className="px-3 py-2 text-right">Original</th>
-                        <th className="px-3 py-2 text-left">Ajuste</th>
-                        <th className="px-3 py-2 text-left">Efecto</th>
-                        <th className="px-3 py-2 text-right">Accion</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-[var(--pos-shell-border)]">
-                      {selectedTarget.target_document.lines.map((line) => {
-                        const draftLine =
-                          draftLines.find((candidate) => candidate.targetLineId === line.id) ?? null;
-                        const isEditing = editingLineIds.includes(line.id);
-                        const editState =
-                          pendingEdits[line.id] ??
-                          (isEditing ? createPendingTargetLineEdit(draftLine) : null);
-
-                        return (
-                          <OriginalLineTableRow
-                            disabled={!selectedTarget.is_correctable || isCommitPending}
-                            draftLine={draftLine}
-                            editState={editState}
-                            isEditing={isEditing}
-                            key={line.id}
-                            line={line}
-                            onCancel={() => {
-                              setEditingLineIds((current) =>
-                                current.filter((lineId) => lineId !== line.id),
-                              );
-                              setPendingEdits((current) => {
-                                const nextState = { ...current };
-                                delete nextState[line.id];
-                                return nextState;
-                              });
-                            }}
-                            onConfirm={() => {
-                              if (!editState) {
-                                return;
-                              }
-
-                              onCommitTargetLineAdjustment(
-                                line,
-                                editState.direction,
-                                editState.magnitudeText,
-                              );
-                              setEditingLineIds((current) =>
-                                current.filter((lineId) => lineId !== line.id),
-                              );
-                              setPendingEdits((current) => {
-                                const nextState = { ...current };
-                                delete nextState[line.id];
-                                return nextState;
-                              });
-                            }}
-                            onEditChange={(nextState) =>
-                              setPendingEdits((current) => ({
-                                ...current,
-                                [line.id]: nextState,
-                              }))
-                            }
-                            onRemove={() => {
-                              if (draftLine) {
-                                onRemoveDraftLine(draftLine.key);
-                              }
-                            }}
-                            onStartEditing={() => {
-                              setEditingLineIds((current) =>
-                                current.includes(line.id) ? current : [...current, line.id],
-                              );
-                              setPendingEdits((current) =>
-                                current[line.id]
-                                  ? current
-                                  : {
-                                      ...current,
-                                      [line.id]: createPendingTargetLineEdit(draftLine),
-                                    },
-                              );
-                            }}
-                          />
-                        );
-                      })}
-                      {addedDraftLines.map((draftLine) => {
-                        const parsedQuantity =
-                          parseSignedQuantityToMilliUnits(draftLine.deltaQuantityText);
-                        const effectLabel =
-                          parsedQuantity === null
-                            ? "Pendiente"
-                            : getSignedEffectLabel(parsedQuantity);
-
-                        return (
-                          <tr className="align-top transition hover:bg-slate-50/80" key={draftLine.key}>
-                            <td className="px-3 py-3 text-sm text-slate-600">Nuevo</td>
-                            <td className="min-w-0 px-3 py-3">
-                              <div className="min-w-0">
-                                <p className="break-words text-sm font-semibold text-slate-950">
-                                  {draftLine.productName}
-                                </p>
-                                <p className="mt-1 break-words text-xs leading-5 text-slate-500">
-                                  {draftLine.productClassName} | {draftLine.productCode}
-                                </p>
-                              </div>
-                            </td>
-                            <td className="px-3 py-3 text-right text-sm font-semibold text-slate-400">
-                              --
-                            </td>
-                            <td className="px-3 py-3">
-                              <span className="inline-flex min-h-9 items-center rounded-full bg-slate-100 px-3 text-sm font-medium text-slate-700">
-                                Suma {getCorrectionDraftLineMagnitudeText(draftLine)}
-                              </span>
-                            </td>
-                            <td className="px-3 py-3">
-                              <span className="inline-flex min-h-9 items-center rounded-full bg-emerald-50 px-3 text-sm font-semibold text-emerald-700">
-                                {effectLabel}
-                              </span>
-                            </td>
-                            <td className="px-3 py-3 text-right">
-                              <Button
-                                className={cn("h-9 px-3", posOutlineButtonClass)}
-                                disabled={isEditingDisabled}
-                                onClick={() => onRemoveDraftLine(draftLine.key)}
-                                type="button"
-                                variant="outline"
-                              >
-                                Quitar
-                              </Button>
-                            </td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
-                </ScrollPane>
-              </div>
-            </div>
+                  <option value="">Selecciona sucursal</option>
+                  {availableDestinationBranches.map((branch) => (
+                    <option key={branch.id} value={branch.id}>
+                      {branch.name}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            ) : null}
           </div>
-        </div>
-      ) : null}
-    </ListDetailColumn>
-  );
-}
 
-function TargetDocumentRecordContent({
-  document,
-  eligibility,
-  timeZone,
-}: {
-  document: CorrectionSearchDocumentView;
-  eligibility:
-    | {
-        blockingReason: string | null;
-        isCorrectable: boolean;
-        isPending: boolean;
-      }
-    | undefined;
-  timeZone: string;
-}) {
-  return (
-    <div className="grid gap-1.5 px-1 py-0.5">
-      <div className="min-w-0">
-        <div className="flex flex-wrap items-center gap-2">
-          <p className="break-words text-sm font-semibold leading-5 text-slate-950">
-            {document.display_title}
-          </p>
-          <span className="pos-chip" data-tone="muted">
-            {getDocumentTypeLabel(document.document_type)}
-          </span>
-          <span className="pos-chip" data-tone="primary">
-            {document.folio}
-          </span>
-        </div>
-        <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs leading-5 text-slate-500">
-          <span>
-            {document.committed_at_utc
-              ? formatLocalDateTime(document.committed_at_utc, timeZone)
-              : "Sin hora de confirmacion"}
-          </span>
-          <span aria-hidden="true" className="text-slate-400">
-            |
-          </span>
-          <span>{document.workstation_name}</span>
-          <span aria-hidden="true" className="text-slate-400">
-            |
-          </span>
-          <span>{document.correction_count} ajustes</span>
-          {eligibility && !eligibility.isPending ? (
-            <>
-              <span aria-hidden="true" className="text-slate-400">
-                |
-              </span>
-              <span
-                className={cn(
-                  "font-medium",
-                  eligibility.isCorrectable ? "text-emerald-700" : "text-rose-600",
+          <div className="min-h-0 overflow-hidden rounded-xl border border-[var(--pos-shell-border)] bg-white">
+            <div className="grid grid-cols-[minmax(0,1fr)_2.8rem_4.2rem_3.2rem] gap-2 border-b border-[var(--pos-shell-border)] bg-slate-50 px-3 py-2 text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-500">
+              <span>Producto</span>
+              <span className="text-right">Orig.</span>
+              <span className="text-right">Nuevo</span>
+              <span className="text-right">Dif.</span>
+            </div>
+            <ScrollPane className="max-h-[17rem] divide-y divide-[var(--pos-shell-border)]">
+              {selectedTarget.target_document.lines.map((line) => {
+                const draftLine = getDraftLineForTarget(line.id);
+                const originalLineQuantityMilliUnits =
+                  parseSignedQuantityToMilliUnits(String(line.quantity)) ?? 0;
+                const draftLineDeltaMilliUnits = draftLine
+                  ? parseSignedQuantityToMilliUnits(draftLine.deltaQuantityText) ?? 0
+                  : 0;
+                const isEditing = editingLineId === line.id;
+                const shownDeltaMilliUnits =
+                  isEditing
+                    ? (() => {
+                        const editedQuantity = parseSignedQuantityToMilliUnits(editingQuantityText);
+                        return editedQuantity === null
+                          ? null
+                          : editedQuantity - originalLineQuantityMilliUnits;
+                      })()
+                    : draftLineDeltaMilliUnits;
+                const correctedLineQuantityMilliUnits =
+                  originalLineQuantityMilliUnits + draftLineDeltaMilliUnits;
+
+                return (
+                  <div
+                    className="grid grid-cols-[minmax(0,1fr)_2.8rem_4.2rem_3.2rem] items-center gap-2 px-3 py-2 text-sm"
+                    data-correction-line-row={line.id}
+                    key={line.id}
+                  >
+                    <span className="min-w-0 truncate font-semibold text-slate-950" title={line.product_name_snapshot}>
+                      {line.product_name_snapshot}
+                    </span>
+                    <span className="text-right font-semibold text-slate-600">
+                      {formatQuantity(line.quantity)}
+                    </span>
+                    <span className="text-right">
+                      {isEditing ? (
+                        <input
+                          ref={quantityInputRef}
+                          className={cn(
+                            "h-8 w-full rounded-lg px-2 text-right text-sm font-semibold shadow-sm",
+                            posInputClass,
+                            editingError &&
+                              "border-[var(--ui-color-danger)] text-[var(--ui-color-danger)]",
+                          )}
+                          disabled={isEditingDisabled}
+                          inputMode="decimal"
+                          onBlur={() => commitLineEdit(line)}
+                          onChange={(event) => {
+                            setEditingQuantityText(event.target.value);
+                            setEditingError(null);
+                          }}
+                          onKeyDown={(event) => {
+                            if (event.key === "Enter") {
+                              event.preventDefault();
+                              commitLineEdit(line);
+                            }
+                            if (event.key === "Escape") {
+                              event.preventDefault();
+                              cancelLineEdit();
+                            }
+                          }}
+                          value={editingQuantityText}
+                        />
+                      ) : (
+                        <button
+                          aria-label={`Editar cantidad de ${line.product_name_snapshot}`}
+                          className={cn(
+                            "inline-flex h-8 min-w-10 items-center justify-end rounded-lg px-2 text-sm font-semibold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--pos-ring)]",
+                            draftLine
+                              ? "bg-sky-50 text-sky-700 hover:bg-sky-100"
+                              : "bg-slate-100 text-slate-700 hover:bg-slate-200",
+                            isEditingDisabled && "cursor-not-allowed opacity-70",
+                          )}
+                          data-correction-line-quantity-button={line.id}
+                          disabled={isEditingDisabled}
+                          onClick={() => startLineEdit(line)}
+                          type="button"
+                        >
+                          {formatQuantityFromMilliUnits(correctedLineQuantityMilliUnits)}
+                        </button>
+                      )}
+                    </span>
+                    <span
+                      className={cn(
+                        "text-right text-xs font-semibold",
+                        shownDeltaMilliUnits === null || shownDeltaMilliUnits === 0
+                          ? "text-slate-400"
+                          : shownDeltaMilliUnits > 0
+                            ? "text-emerald-700"
+                            : "text-amber-700",
+                      )}
+                    >
+                      {getDeltaLabel(shownDeltaMilliUnits)}
+                    </span>
+                  </div>
+                );
+              })}
+            </ScrollPane>
+          </div>
+
+          {editingError ? (
+            <p className="text-xs leading-5 text-[var(--ui-color-danger)]">{editingError}</p>
+          ) : null}
+
+          {isHighImpactAdjustment ? (
+            <div className="rounded-xl border border-[rgba(187,122,22,0.2)] bg-[var(--ui-color-warning-soft)] px-3 py-3">
+              <p className="text-sm font-semibold text-slate-950">
+                {getCorrectionHighImpactLabel(
+                  formatQuantityFromMilliUnits(totalAdjustedQuantityMilliUnits),
                 )}
-                title={eligibility.blockingReason ?? undefined}
-              >
-                {eligibility.isCorrectable ? "Lista" : "Bloqueado"}
-              </span>
-            </>
+              </p>
+              <label className="mt-2 flex items-start gap-2 text-sm text-slate-700">
+                <input
+                  checked={isHighImpactAcknowledged}
+                  className="mt-0.5 h-4 w-4 rounded border-slate-300 text-[var(--pos-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--pos-focus-ring)]"
+                  onChange={(event) => onAcknowledgeHighImpact(event.target.checked)}
+                  type="checkbox"
+                />
+                <span>Confirmo que el ajuste fue verificado.</span>
+              </label>
+            </div>
+          ) : null}
+
+          {visibleBlockingMessages.map((message) => (
+            <InlineNotice key={message} tone="warning">
+              {message}
+            </InlineNotice>
+          ))}
+
+          {!hasDraftWork ? (
+            <InlineNotice tone="info">
+              Da click en una cantidad nueva para editarla.
+            </InlineNotice>
           ) : null}
         </div>
-      </div>
-
-      <div className="grid gap-1 text-xs leading-5 text-slate-500">
-        <div className="min-w-0 break-words" title={document.source_branch_name}>
-          {document.source_branch_name}
-          {document.destination_branch_name ? ` -> ${document.destination_branch_name}` : ""}
-        </div>
-      </div>
-    </div>
+      )}
+    </PosSummaryPanel>
   );
 }
 
-type PendingTargetLineEdit = {
-  direction: CorrectionDirection;
-  magnitudeText: string;
-};
-
-function createPendingTargetLineEdit(
-  draftLine: CorrectionDraftLine | null,
-): PendingTargetLineEdit {
-  return {
-    direction: draftLine ? getCorrectionDraftLineDirection(draftLine) : "DECREASE",
-    magnitudeText: draftLine ? getCorrectionDraftLineMagnitudeText(draftLine) : "1",
-  };
-}
-
-function parsePendingTargetLineEdit(edit: PendingTargetLineEdit): number | null {
-  const trimmedMagnitude = edit.magnitudeText.trim();
-  if (trimmedMagnitude.length === 0) {
-    return null;
-  }
-
-  return parseSignedQuantityToMilliUnits(
-    edit.direction === "DECREASE" ? `-${trimmedMagnitude}` : trimmedMagnitude,
-  );
-}
-
-function getPendingTargetLineSummary(edit: PendingTargetLineEdit | null): string {
-  if (edit === null) {
-    return "Sin ajuste";
-  }
-
-  const parsedQuantity = parsePendingTargetLineEdit(edit);
-  if (parsedQuantity === null) {
-    return "Pendiente";
-  }
-
-  return `${edit.direction === "DECREASE" ? "Resta" : "Suma"} ${formatQuantityFromMilliUnits(
-    Math.abs(parsedQuantity),
-  )}`;
-}
-
-function OriginalLineTableRow({
-  disabled,
-  draftLine,
-  editState,
-  isEditing,
-  line,
-  onCancel,
-  onConfirm,
-  onEditChange,
-  onRemove,
-  onStartEditing,
-}: {
-  disabled: boolean;
-  draftLine: CorrectionDraftLine | null;
-  editState: PendingTargetLineEdit | null;
-  isEditing: boolean;
-  line: OperationDocumentLineView;
-  onCancel: () => void;
-  onConfirm: () => void;
-  onEditChange: (nextState: PendingTargetLineEdit) => void;
-  onRemove: () => void;
-  onStartEditing: () => void;
-}) {
-  const parsedEditQuantity = editState ? parsePendingTargetLineEdit(editState) : null;
-  const parsedDraftQuantity = draftLine
-    ? parseSignedQuantityToMilliUnits(draftLine.deltaQuantityText)
-    : null;
-  const validationMessage =
-    isEditing && parsedEditQuantity === null ? "Captura una cantidad mayor que cero." : null;
-  const effectLabel =
-    draftLine && !isEditing
-      ? parsedDraftQuantity === null
-        ? "Pendiente"
-        : getSignedEffectLabel(parsedDraftQuantity)
-      : parsedEditQuantity === null
-        ? "Pendiente"
-        : getSignedEffectLabel(parsedEditQuantity);
-  const hasEffect = parsedDraftQuantity !== null || parsedEditQuantity !== null;
-
-  return (
-    <tr
-      className="align-top transition hover:bg-slate-50/80"
-      data-correction-line-row={line.id}
-    >
-      <td className="px-3 py-3 text-sm text-slate-600">{line.line_number}</td>
-      <td className="min-w-0 px-3 py-3">
-        <div className="min-w-0">
-          <p className="break-words text-sm font-semibold text-slate-950">
-            {line.product_name_snapshot}
-          </p>
-          <p className="mt-1 break-words text-xs leading-5 text-slate-500">
-            {line.product_class_name_snapshot} | {line.product_code_snapshot}
-          </p>
-        </div>
-      </td>
-      <td className="px-3 py-3 text-right text-sm font-semibold text-slate-950">
-        {formatQuantity(line.quantity)}
-      </td>
-      <td className="px-3 py-3">
-        {isEditing && editState ? (
-          <div className="grid gap-2 sm:grid-cols-[7.5rem_minmax(6rem,7rem)]">
-            <select
-              className={cn("h-9 w-full rounded-lg px-3 text-sm shadow-sm", posInputClass)}
-              disabled={disabled}
-              onChange={(event) =>
-                onEditChange({
-                  ...editState,
-                  direction: event.target.value as CorrectionDirection,
-                })
-              }
-              value={editState.direction}
-            >
-              <option value="DECREASE">Restar</option>
-              <option value="INCREASE">Sumar</option>
-            </select>
-            <input
-              className={cn(
-                "h-9 w-full rounded-lg px-3 text-sm shadow-sm",
-                posInputClass,
-                validationMessage &&
-                  "border-[var(--ui-color-danger)] text-[var(--ui-color-danger)]",
-              )}
-              disabled={disabled}
-              inputMode="decimal"
-              onChange={(event) =>
-                onEditChange({
-                  ...editState,
-                  magnitudeText: event.target.value,
-                })
-              }
-              placeholder="1"
-              value={editState.magnitudeText}
-            />
-          </div>
-        ) : (
-          <span
-            className={cn(
-              "inline-flex min-h-9 items-center rounded-full px-3 text-sm font-medium",
-              draftLine === null ? "bg-slate-100 text-slate-500" : "bg-slate-100 text-slate-700",
-            )}
-          >
-            {draftLine
-              ? getPendingTargetLineSummary(createPendingTargetLineEdit(draftLine))
-              : "Sin ajuste"}
-          </span>
-        )}
-        {validationMessage ? (
-          <p className="mt-1 text-xs leading-5 text-[var(--ui-color-danger)]">
-            {validationMessage}
-          </p>
-        ) : null}
-      </td>
-      <td className="px-3 py-3">
-        <span
-          className={cn(
-            "inline-flex min-h-9 items-center rounded-full px-3 text-sm font-semibold",
-            !hasEffect
-              ? "bg-slate-100 text-slate-500"
-              : effectLabel.startsWith("+")
-                ? "bg-emerald-50 text-emerald-700"
-                : effectLabel.startsWith("-")
-                  ? "bg-amber-50 text-amber-700"
-                  : "bg-slate-100 text-slate-700",
-          )}
-        >
-          {effectLabel}
-        </span>
-      </td>
-      <td className="px-3 py-3">
-        <div className="flex flex-wrap items-center justify-end gap-2">
-          {isEditing ? (
-            <>
-              <Button
-                className={cn("h-9 px-3", posOutlineButtonClass)}
-                disabled={disabled}
-                onClick={onCancel}
-                type="button"
-                variant="outline"
-              >
-                Cancelar
-              </Button>
-              <Button
-                className={cn("h-9 px-3", posPrimaryButtonClass)}
-                disabled={disabled || validationMessage !== null}
-                onClick={onConfirm}
-                type="button"
-              >
-                Confirmar
-              </Button>
-            </>
-          ) : (
-            <>
-              <Button
-                className={cn("h-9 px-3", posOutlineButtonClass)}
-                disabled={disabled}
-                onClick={onStartEditing}
-                type="button"
-                variant="outline"
-              >
-                Ajustar
-              </Button>
-              {draftLine ? (
-                <Button
-                  className={cn("h-9 px-3", posOutlineButtonClass)}
-                  disabled={disabled}
-                  onClick={onRemove}
-                  type="button"
-                  variant="outline"
-                >
-                  Quitar
-                </Button>
-              ) : null}
-            </>
-          )}
-        </div>
-      </td>
-    </tr>
-  );
-}
-
-function CorrectionConfirmationDialog({
-  affectedDocumentLabel,
-  branchName,
-  documentReference,
-  documentTitle,
-  isOpen,
-  isHighImpact,
-  isPending,
-  lineSummaryItems,
-  lineCount,
-  netEffectLabel,
-  onCancel,
-  onConfirm,
-  reasonLabel,
-  userName,
-  workstationName,
-}: {
-  affectedDocumentLabel?: string | null;
-  branchName?: string;
-  documentReference: string;
-  documentTitle: string;
-  isOpen: boolean;
-  isHighImpact: boolean;
-  isPending: boolean;
-  lineSummaryItems: OperationLineSummaryItem[];
-  lineCount: number;
-  netEffectLabel: string;
-  onCancel: () => void;
-  onConfirm: () => void;
-  reasonLabel: string;
-  userName?: string;
-  workstationName?: string;
-}) {
-  return (
-    <OperationConfirmationDialog
-      confirmLabel={isPending ? "Registrando..." : "Confirmar ajuste"}
-      confirmationTone={isHighImpact ? "danger" : "warning"}
-      context={{
-        branchName,
-        userName,
-        workstationName,
-      }}
-      description={
-        isHighImpact
-          ? "Este ajuste supera el umbral de alto impacto y dejara una alerta para backoffice."
-          : "Se registrara un ajuste nuevo y auditable sin alterar el documento original."
-      }
-      isOpen={isOpen}
-      isPending={isPending}
-      kind="correction"
-      lines={lineSummaryItems}
-      metrics={[
-        {
-          key: "document-title",
-          label: "Documento",
-          value: documentTitle,
-        },
-        {
-          key: "line-count",
-          label: "Lineas",
-          value: String(lineCount),
-        },
-        {
-          key: "reason",
-          label: "Motivo",
-          value: reasonLabel,
-        },
-        {
-          key: "net-effect",
-          label: "Efecto neto",
-          tone: "financial",
-          value: netEffectLabel,
-        },
-        ...(affectedDocumentLabel
-          ? [
-              {
-                key: "affected-document-type",
-                label: "Documento afectado",
-                value: affectedDocumentLabel,
-              } satisfies OperationDocumentMetric,
-            ]
-          : []),
-      ]}
-      onCancel={onCancel}
-      onConfirm={onConfirm}
-      referenceLabel="Folio documento"
-      referenceValue={documentReference}
-      title="Confirmar ajuste auditado"
-    />
-  );
-}
-
-function CorrectionsSummaryPanel({
-  blockedMessages,
-  branchName,
-  commitError,
-  correctedDestinationLabel,
-  documentReference,
-  documentTitle,
-  draftSummaryLines,
-  draftReasonLabel,
-  isHighImpactAcknowledged,
-  isHighImpactAdjustment,
-  lastHighImpactAlertRequested,
-  lastCommittedCorrection,
-  netEffectMilliUnits,
-  onAcknowledgeHighImpact,
-  onCommit,
-  onResultAction,
-  originalDateText,
-  selectedTarget,
+function CorrectionsHistorySummaryPanel({
+  correction,
+  onReviewTarget,
+  selectedHistoryRecord,
   timeZone,
-  totalAdjustedQuantityMilliUnits,
-  uiState,
-  userName,
-  workstationName,
 }: {
-  blockedMessages: string[];
-  branchName: string;
-  commitError: string | null;
-  correctedDestinationLabel: string | null;
-  documentReference: string | null;
-  documentTitle: string | null;
-  draftSummaryLines: OperationLineSummaryItem[];
-  draftReasonLabel: string | null;
-  isHighImpactAcknowledged: boolean;
-  isHighImpactAdjustment: boolean;
-  lastHighImpactAlertRequested: boolean;
-  lastCommittedCorrection: CorrectionDocumentView | null;
-  netEffectMilliUnits: number;
-  onAcknowledgeHighImpact: (checked: boolean) => void;
-  onCommit: () => void;
-  onResultAction: OperationDocumentAction[];
-  originalDateText: string;
-  selectedTarget: CorrectionTargetDetailResponse | null;
+  correction: CorrectionDocumentView | null;
+  onReviewTarget: () => void;
+  selectedHistoryRecord: CorrectionHistoryListItemView | null;
   timeZone: string;
-  totalAdjustedQuantityMilliUnits: number;
-  uiState: CorrectionUiState;
-  userName: string;
-  workstationName: string;
 }) {
-  if (lastCommittedCorrection) {
+  if (!correction) {
     return (
-      <OperationDocumentResult
-        actions={onResultAction}
-        auditSummary={lastCommittedCorrection.audit_summary}
-        context={{
-          branchName,
-          userName,
-          workstationName,
-        }}
-        description={
-          lastHighImpactAlertRequested
-            ? "El ajuste ya quedo auditado y se preparo una alerta para backoffice."
-            : "El ajuste quedo registrado y auditado."
-        }
-        kind="correction"
-        metrics={[
-          {
-            key: "reason",
-            label: "Motivo",
-            value: getCorrectionReasonLabel(
-              lastCommittedCorrection.reason_code,
-              lastCommittedCorrection.reason_name,
-            ),
-          },
-          {
-            key: "line-count",
-            label: "Lineas",
-            value: String(lastCommittedCorrection.lines.length),
-          },
-          ...(lastHighImpactAlertRequested
-            ? [
-                {
-                  key: "alert",
-                  label: "Alerta",
-                  tone: "warning",
-                  value: "Backoffice",
-                } satisfies OperationDocumentMetric,
-              ]
-            : []),
-        ]}
-        referenceValue={getCorrectionReference(lastCommittedCorrection)}
-        timeZone={timeZone}
-        timestamps={{
-          committedAtValue: lastCommittedCorrection.committed_at_utc
-            ? formatLocalDateTime(lastCommittedCorrection.committed_at_utc, timeZone)
-            : null,
-          createdAtValue: formatLocalDateTime(lastCommittedCorrection.created_at_utc, timeZone),
-        }}
-        title="Ajuste auditado registrado"
-      />
+      <PosSummaryPanel
+        description="Selecciona un ajuste registrado."
+        stateLabel="Historial"
+        stateTone="draft"
+        title="Detalle del ajuste"
+      >
+        <div className="rounded-xl border border-dashed border-[var(--pos-shell-border)] bg-[var(--pos-shell-muted)] px-3 py-4 text-sm text-slate-600">
+          Selecciona un ajuste del historial para ver su detalle.
+        </div>
+      </PosSummaryPanel>
     );
   }
 
-  const notices = (
-    <div className="grid gap-2">
-      {commitError ? <InlineNotice tone="error">{commitError}</InlineNotice> : null}
-      {isHighImpactAdjustment ? (
-        <div className="rounded-xl border border-[rgba(187,122,22,0.2)] bg-[var(--ui-color-warning-soft)] px-3 py-3">
-          <p className="text-sm font-semibold text-slate-950">
-            {getCorrectionHighImpactLabel(
-              formatQuantityFromMilliUnits(totalAdjustedQuantityMilliUnits),
-            )}
-          </p>
-          <p className="mt-1 text-sm text-slate-700">
-            El ajuste puede registrarse con este cajero, pero debe quedar reconocido y enviara una alerta a backoffice.
-          </p>
-          <label className="mt-3 flex items-start gap-2 text-sm text-slate-700">
-            <input
-              checked={isHighImpactAcknowledged}
-              className="mt-0.5 h-4 w-4 rounded border-slate-300 text-[var(--pos-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--pos-focus-ring)]"
-              onChange={(event) => onAcknowledgeHighImpact(event.target.checked)}
-              type="checkbox"
-            />
-            <span>Confirmo que este ajuste de alto impacto fue verificado antes de registrarlo.</span>
-          </label>
-        </div>
-      ) : null}
-    </div>
-  );
-
   return (
-    <OperationDocumentSummaryPanel
-      actions={[
-        {
-          disabled: blockedMessages.length > 0 || uiState === "CONFIRMING",
-          key: "confirm-correction",
-          label: uiState === "CONFIRMING" ? "Registrando ajuste..." : "Confirmar ajuste",
-          onSelect: onCommit,
-          variant: "primary",
-        },
-      ]}
-      blockers={[
-        ...(selectedTarget?.blocking_reason
-          ? [{ key: "target-blocking-reason", message: selectedTarget.blocking_reason }]
-          : []),
-        ...blockedMessages.map((message, index) => ({
-          key: `draft-blocker-${index}`,
-          message,
-        })),
-      ]}
-      auditSummary={selectedTarget?.target_document.audit_summary}
-      context={{
-        branchName,
-        userName,
-        workstationName,
-      }}
+    <PosSummaryPanel
       description={
-        <span>
-          Documento original: {getOriginalDocumentLabel(documentTitle)}
-          {originalDateText ? ` · ${originalDateText}` : ""}
-        </span>
+        selectedHistoryRecord
+          ? `Movimiento ${selectedHistoryRecord.target_document_folio}`
+          : "Ajuste registrado"
       }
-      kind="correction"
-      lines={draftSummaryLines}
-      metrics={[
-        {
-          key: "document-reference",
-          label: "Documento",
-          value: documentReference ?? "Pendiente",
-        },
-        {
-          key: "reason",
-          label: "Motivo",
-          value: draftReasonLabel ?? "Pendiente",
-        },
-        ...(correctedDestinationLabel
-          ? [
-              {
-                key: "destination",
-                label: "Destino corregido",
-                value: correctedDestinationLabel,
-              } satisfies OperationDocumentMetric,
-            ]
-          : []),
-        {
-          key: "line-count",
-          label: "Lineas",
-          value: String(draftSummaryLines.length),
-        },
-        {
-          key: "net-effect",
-          label: "Efecto neto",
-          tone: "financial",
-          value: getSignedEffectLabel(netEffectMilliUnits),
-        },
-      ]}
-      notices={notices}
-      referenceLabel="Folio documento"
-      referenceValue={documentReference}
-      stateLabel={getCorrectionUiStateLabel(uiState)}
-      stateTone={getCorrectionSummaryStateTone(uiState)}
-      timeZone={timeZone}
-      title="Resumen del ajuste"
-    />
+      footer={
+        <Button
+          className={cn("h-11 w-full font-semibold shadow-sm", posPrimaryButtonClass)}
+          onClick={onReviewTarget}
+          type="button"
+        >
+          Revisar movimiento
+        </Button>
+      }
+      stateLabel={correction.status === "COMMITTED" ? "Registrada" : correction.status}
+      stateTone="success"
+      title="Detalle del ajuste"
+    >
+      <div className="grid h-full min-h-0 gap-3 overflow-hidden">
+        <div className="grid gap-1 rounded-xl border border-[var(--pos-shell-border)] bg-white px-3 py-2.5">
+          <KeyValueRow label="Ajuste" title={correction.folio} value={correction.folio} />
+          <KeyValueRow
+            label="Motivo"
+            value={getCorrectionReasonLabel(correction.reason_code, correction.reason_name)}
+          />
+          <KeyValueRow
+            label="Fecha"
+            value={
+              correction.committed_at_utc
+                ? formatCompactLocalDateTime(correction.committed_at_utc, timeZone)
+                : formatCompactLocalDateTime(correction.created_at_utc, timeZone)
+            }
+          />
+          <KeyValueRow
+            label="Diferencia"
+            value={getSignedEffectLabel(getCorrectionNetEffectMilliUnits(correction))}
+          />
+        </div>
+
+        <div className="min-h-0 overflow-hidden rounded-xl border border-[var(--pos-shell-border)] bg-white">
+          <div className="border-b border-[var(--pos-shell-border)] bg-[var(--pos-shell-muted)] px-3 py-2 text-sm font-semibold text-slate-950">
+            Lineas
+          </div>
+          <ScrollPane className="max-h-[14rem] divide-y divide-[var(--pos-shell-border)]">
+            {correction.lines.map((line) => (
+              <div
+                className="grid grid-cols-[minmax(0,1fr)_5.5rem] items-center gap-2 px-3 py-2"
+                key={line.id}
+              >
+                <span className="truncate text-sm font-semibold text-slate-950" title={line.product_name_snapshot}>
+                  {line.product_name_snapshot}
+                </span>
+                <span className="text-right text-sm font-semibold text-slate-950">
+                  {formatSignedHistoryQuantity(line.delta_quantity)}
+                </span>
+              </div>
+            ))}
+          </ScrollPane>
+        </div>
+
+        {correction.corrected_destination_branch_name ? (
+          <InlineNotice tone="info">
+            Destino corregido a {correction.corrected_destination_branch_name}.
+          </InlineNotice>
+        ) : null}
+      </div>
+    </PosSummaryPanel>
   );
 }
 
@@ -1638,16 +938,13 @@ export function CorrectionsScreen() {
   const [draftState, setDraftState] = useState(createInitialCorrectionDraftState);
   const [lastCommittedCorrection, setLastCommittedCorrection] =
     useState<CorrectionDocumentView | null>(null);
-  const [lastHighImpactAlertRequested, setLastHighImpactAlertRequested] = useState(false);
   const [isHighImpactAcknowledged, setIsHighImpactAcknowledged] = useState(false);
   const [commitError, setCommitError] = useState<string | null>(null);
-  const [isConfirmDialogOpen, setIsConfirmDialogOpen] = useState(false);
   const [selectedHistoryCorrectionId, setSelectedHistoryCorrectionId] = useState<string | null>(null);
   const searchInputRef = useRef<HTMLInputElement | null>(null);
   const debouncedSearchText = useDebouncedValue(searchText, 220);
   const historySearchInputRef = useRef<HTMLInputElement | null>(null);
   const debouncedHistorySearchText = useDebouncedValue(historySearchText, 220);
-  const debouncedProductSearchText = useDebouncedValue(draftState.productSearchText, 220);
   const correctionTargetsQuery = useCorrectionTargetsQuery(
     selectedDocumentType,
     debouncedSearchText,
@@ -1661,7 +958,6 @@ export function CorrectionsScreen() {
   );
   const correctionHistoryDetailQuery = useCorrectionDocumentDetailQuery(selectedHistoryCorrectionId);
   const correctionTargetDetailQuery = useCorrectionTargetDetailQuery(selectedTargetId);
-  const correctionProductsQuery = useCorrectionProductsQuery(debouncedProductSearchText);
   const allDocuments = useMemo(
     () => correctionTargetsQuery.data?.documents ?? [],
     [correctionTargetsQuery.data?.documents],
@@ -1707,6 +1003,7 @@ export function CorrectionsScreen() {
         blockingReason: string | null;
         isCorrectable: boolean;
         isPending: boolean;
+        totalQuantityText: string;
       }
     >();
 
@@ -1717,6 +1014,7 @@ export function CorrectionsScreen() {
             blockingReason: correctionTargetDetailQuery.data.blocking_reason,
             isCorrectable: correctionTargetDetailQuery.data.is_correctable,
             isPending: false,
+            totalQuantityText: getCorrectionTargetTotalQuantityText(correctionTargetDetailQuery.data),
           });
           return;
         }
@@ -1725,17 +1023,19 @@ export function CorrectionsScreen() {
           blockingReason: null,
           isCorrectable: false,
           isPending: correctionTargetDetailQuery.isPending,
+          totalQuantityText: "-",
         });
         return;
       }
 
       const query = eligibilityQueries[index];
       if (query?.data) {
-        map.set(document.id, {
-          blockingReason: query.data.blocking_reason,
-          isCorrectable: query.data.is_correctable,
-          isPending: false,
-        });
+          map.set(document.id, {
+            blockingReason: query.data.blocking_reason,
+            isCorrectable: query.data.is_correctable,
+            isPending: false,
+            totalQuantityText: getCorrectionTargetTotalQuantityText(query.data),
+          });
         return;
       }
 
@@ -1743,6 +1043,7 @@ export function CorrectionsScreen() {
         blockingReason: null,
         isCorrectable: false,
         isPending: Boolean(query?.isPending || query?.isFetching),
+        totalQuantityText: "-",
       });
     });
 
@@ -1800,9 +1101,7 @@ export function CorrectionsScreen() {
     setDraftState(createInitialCorrectionDraftState());
     setCommitError(null);
     setLastCommittedCorrection(null);
-    setLastHighImpactAlertRequested(false);
     setIsHighImpactAcknowledged(false);
-    setIsConfirmDialogOpen(false);
     setSelectedHistoryCorrectionId(null);
   }, [selectedTargetId]);
 
@@ -1868,14 +1167,8 @@ export function CorrectionsScreen() {
         event.target instanceof HTMLElement &&
         event.target.closest("button, a, [role=\"button\"], summary") !== null;
 
-      if (event.key === "Enter" && !isConfirmDialogOpen) {
+      if (event.key === "Enter") {
         if (isInteractiveTrigger) {
-          return;
-        }
-
-        if (centerSection === "documents" && selectedTarget?.is_correctable) {
-          event.preventDefault();
-          setCenterSection("history");
           return;
         }
 
@@ -1883,12 +1176,6 @@ export function CorrectionsScreen() {
       }
 
       if (event.key !== "Escape") {
-        return;
-      }
-
-      if (isConfirmDialogOpen) {
-        event.preventDefault();
-        setIsConfirmDialogOpen(false);
         return;
       }
 
@@ -1900,7 +1187,7 @@ export function CorrectionsScreen() {
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [blockedReason, centerSection, isConfirmDialogOpen, selectedTarget]);
+  }, [centerSection]);
 
   const updateDraftState = (
     updater: (
@@ -1915,7 +1202,7 @@ export function CorrectionsScreen() {
   const commitMutation = useMutation({
     mutationFn: async () => {
       if (!accessToken || !selectedTargetId) {
-        throw new Error("Selecciona un documento antes de confirmar el ajuste.");
+        throw new Error("Selecciona un movimiento antes de guardar el ajuste.");
       }
 
       return commitCorrection({
@@ -1942,12 +1229,10 @@ export function CorrectionsScreen() {
       const correctionAlertRequested =
         isHighImpactAdjustment && result.lines.length > 0;
       setLastCommittedCorrection(result);
-      setLastHighImpactAlertRequested(correctionAlertRequested);
       setSelectedHistoryCorrectionId(result.id);
       setDraftState(createInitialCorrectionDraftState());
       setCommitError(null);
       setIsHighImpactAcknowledged(false);
-      setIsConfirmDialogOpen(false);
       setCenterSection("documents");
       showSuccess(
         correctionAlertRequested
@@ -1983,15 +1268,10 @@ export function CorrectionsScreen() {
         "No fue posible registrar el ajuste.",
       );
       setCommitError(message);
-      setIsConfirmDialogOpen(false);
       showError(message);
     },
   });
 
-  const selectedReasonLabel =
-    draftState.reasonCode.trim().length > 0
-      ? getCorrectionReasonLabel(draftState.reasonCode)
-      : null;
   const correctedDestinationLabel =
     draftState.correctedDestinationBranchId !== null
       ? correctionsBootstrapQuery.data?.destination_branches.find(
@@ -2000,7 +1280,6 @@ export function CorrectionsScreen() {
       : null;
   const netEffectMilliUnits = getCorrectionDraftNetQuantityMilliUnits(draftState.lines);
   const uiState = getCorrectionUiState({
-    centerSection,
     commitError,
     hasDraftWork,
     hasCommitted: lastCommittedCorrection !== null,
@@ -2009,13 +1288,6 @@ export function CorrectionsScreen() {
     isCommitPending: commitMutation.isPending,
     isReasonMissing,
   });
-  const originalDateText =
-    selectedTarget?.target_document.committed_at_utc
-      ? formatLocalDateTime(
-          selectedTarget.target_document.committed_at_utc,
-          correctionsBootstrapQuery.data?.branch.timezone ?? "UTC",
-        )
-      : "Sin hora";
   const draftBlockingMessages = getCorrectionDraftBlockingMessages({
     hasHighImpactAcknowledgement: isHighImpactAcknowledged,
     correctedDestinationBranchId: draftState.correctedDestinationBranchId,
@@ -2025,10 +1297,6 @@ export function CorrectionsScreen() {
     lines: draftState.lines,
     reasonAllowsDestinationCorrection: isWrongDestinationReason,
     reasonCode: draftState.reasonCode,
-  });
-  const draftSummaryLines = buildDraftLineSummaryItems({
-    draftLines: draftState.lines,
-    targetLines: selectedTarget?.target_document.lines ?? [],
   });
   const historyScopeOptions = correctionsHistoryQuery.data?.available_scopes ?? [
     { code: "CURRENT_SHIFT", label: "Turno actual" },
@@ -2047,102 +1315,93 @@ export function CorrectionsScreen() {
       (correction) => correction.id === selectedHistoryCorrectionId,
     ) ?? null;
   const selectedHistoryCorrection = correctionHistoryDetailQuery.data ?? null;
-  const correctionResultActions: OperationDocumentAction[] = useMemo(
-    () => {
-      const correctionDocumentAvailability = getDocumentActionAvailability("correctionDocument");
-
-      return [
-        {
-          availabilityNote: correctionDocumentAvailability.print.unavailableReason,
-          disabled: !correctionDocumentAvailability.print.isAvailable,
-          kind: "print",
-          key: "print-correction",
-          label: correctionDocumentAvailability.print.label,
-          variant: "neutral",
-          onSelect: () => undefined,
-        },
-        {
-          key: "open-history",
-          label: "Ver historial",
-          variant: "neutral",
-          onSelect: () => {
-            setCenterSection("history");
-            if (lastCommittedCorrection) {
-              setSelectedHistoryCorrectionId(lastCommittedCorrection.id);
-            }
-          },
-        },
-        {
-          key: "new-correction",
-          label: "Nuevo ajuste",
-          variant: "primary",
-          onSelect: () => {
-            setLastCommittedCorrection(null);
-            setLastHighImpactAlertRequested(false);
-            setCommitError(null);
-            setDraftState(createInitialCorrectionDraftState());
-            setIsHighImpactAcknowledged(false);
-            setCenterSection("documents");
-            setIsConfirmDialogOpen(false);
-          },
-        },
-      ];
-    },
-    [lastCommittedCorrection],
-  );
 
   const draftSummaryPanel = useMemo(
     () => (
       <CorrectionsSummaryPanel
         blockedMessages={draftBlockingMessages}
-        branchName={correctionsBootstrapQuery.data?.branch.name ?? "Sucursal"}
         commitError={commitError}
+        correctedDestinationBranchId={draftState.correctedDestinationBranchId}
         correctedDestinationLabel={correctedDestinationLabel}
+        correctionReasons={correctionsBootstrapQuery.data?.correction_reasons ?? []}
+        destinationBranches={correctionsBootstrapQuery.data?.destination_branches ?? []}
         documentReference={selectedSearchDocument?.folio ?? null}
-        documentTitle={selectedTarget?.document_title ?? null}
-        draftSummaryLines={draftSummaryLines}
-        draftReasonLabel={selectedReasonLabel}
+        draftLines={draftState.lines}
         isHighImpactAcknowledged={isHighImpactAcknowledged}
         isHighImpactAdjustment={isHighImpactAdjustment}
-        lastHighImpactAlertRequested={lastHighImpactAlertRequested}
-        lastCommittedCorrection={lastCommittedCorrection}
         netEffectMilliUnits={netEffectMilliUnits}
         onAcknowledgeHighImpact={setIsHighImpactAcknowledged}
         onCommit={() => {
           if (blockedReason === null) {
-            setIsConfirmDialogOpen(true);
+            void commitMutation.mutateAsync();
           }
         }}
-        onResultAction={correctionResultActions}
-        originalDateText={originalDateText}
+        onCommitTargetLineAdjustment={(line, direction, magnitudeText) => {
+          updateDraftState((current) => ({
+            ...current,
+            lines: upsertTargetLineDraftAdjustment(
+              current.lines,
+              line,
+              direction,
+              magnitudeText,
+            ),
+          }));
+        }}
+        onCorrectedDestinationBranchChange={(destinationBranchId) =>
+          updateDraftState((current) => ({
+            ...current,
+            correctedDestinationBranchId: destinationBranchId,
+          }))
+        }
+        onReasonChange={(reasonCode) =>
+          updateDraftState((current) => ({
+            ...current,
+            correctedDestinationBranchId:
+              reasonCode === WRONG_DESTINATION_REASON_CODE
+                ? current.correctedDestinationBranchId
+                : null,
+            reasonCode,
+          }))
+        }
+        onRemoveDraftLine={(draftLineKey) =>
+          updateDraftState((current) => ({
+            ...current,
+            lines: removeCorrectionDraftLine(current.lines, draftLineKey),
+          }))
+        }
+        reasonCode={draftState.reasonCode}
         selectedTarget={selectedTarget}
-        timeZone={timeZone}
+        selectedTargetError={
+          correctionTargetDetailQuery.error
+            ? toOperationalErrorMessage(
+                correctionTargetDetailQuery.error,
+                "No fue posible revisar el movimiento seleccionado.",
+              )
+            : null
+        }
+        selectedTargetPending={correctionTargetDetailQuery.isPending}
         totalAdjustedQuantityMilliUnits={totalAdjustedQuantityMilliUnits}
         uiState={uiState}
-        userName={correctionsBootstrapQuery.data?.user.full_name ?? "Cajero"}
-        workstationName={correctionsBootstrapQuery.data?.workstation.name ?? "Estacion"}
       />
     ),
     [
       blockedReason,
-      correctionResultActions,
-      correctionsBootstrapQuery.data?.branch.name,
-      correctionsBootstrapQuery.data?.user.full_name,
-      correctionsBootstrapQuery.data?.workstation.name,
+      commitMutation,
       commitError,
       correctedDestinationLabel,
+      correctionsBootstrapQuery.data?.correction_reasons,
+      correctionsBootstrapQuery.data?.destination_branches,
+      correctionTargetDetailQuery.error,
+      correctionTargetDetailQuery.isPending,
       draftBlockingMessages,
-      draftSummaryLines,
+      draftState.correctedDestinationBranchId,
+      draftState.lines,
+      draftState.reasonCode,
       isHighImpactAcknowledged,
       isHighImpactAdjustment,
-      lastHighImpactAlertRequested,
-      lastCommittedCorrection,
       netEffectMilliUnits,
-      originalDateText,
-      selectedReasonLabel,
       selectedSearchDocument?.folio,
       selectedTarget,
-      timeZone,
       totalAdjustedQuantityMilliUnits,
       uiState,
     ],
@@ -2151,85 +1410,18 @@ export function CorrectionsScreen() {
   const summaryPanel = useMemo(
     () =>
       centerSection === "history" ? (
-        selectedHistoryCorrection ? (
-          <OperationDocumentSummaryPanel
-            actions={[
-              {
-                availabilityNote:
-                  getDocumentActionAvailability("correctionDocument").print.unavailableReason,
-                disabled: !getDocumentActionAvailability("correctionDocument").print.isAvailable,
-                kind: "print",
-                key: "history-print-correction",
-                label: getDocumentActionAvailability("correctionDocument").print.label,
-                onSelect: () => undefined,
-                variant: "neutral",
-              },
-              {
-                key: "history-review-target",
-                label: "Revisar documento",
-                onSelect: () => {
-                  setSelectedTargetId(selectedHistoryCorrection.target_document_id);
-                  setCenterSection("documents");
-                },
-                variant: "neutral",
-              },
-            ]}
-            auditSummary={selectedHistoryCorrection.audit_summary}
-            blockers={[]}
-            context={{
-              branchName: selectedHistoryCorrection.source_branch_name,
-              userName: selectedHistoryCorrection.created_by_user_full_name,
-              workstationName: selectedHistoryCorrection.workstation_name,
-            }}
-            description={
-              selectedHistoryRecord
-                ? `Documento ${selectedHistoryRecord.target_document_folio}`
-                : getCorrectionReasonLabel(
-                    selectedHistoryCorrection.reason_code,
-                    selectedHistoryCorrection.reason_name,
-                  )
+        <CorrectionsHistorySummaryPanel
+          correction={selectedHistoryCorrection}
+          onReviewTarget={() => {
+            if (!selectedHistoryCorrection) {
+              return;
             }
-            kind="correction"
-            lines={buildCorrectionLineSummaryItems(selectedHistoryCorrection)}
-            metrics={buildCorrectionMetrics(selectedHistoryCorrection)}
-            notices={
-              selectedHistoryCorrection.corrected_destination_branch_name ? (
-                <InlineNotice tone="info">
-                  Destino corregido a {selectedHistoryCorrection.corrected_destination_branch_name}.
-                </InlineNotice>
-              ) : undefined
-            }
-            referenceValue={selectedHistoryCorrection.folio}
-            stateLabel={
-              selectedHistoryCorrection.status === "COMMITTED"
-                ? "Registrada"
-                : selectedHistoryCorrection.status
-            }
-            stateTone="confirmed"
-            timeZone={timeZone}
-            timestamps={{
-              committedAtValue: selectedHistoryCorrection.committed_at_utc
-                ? formatLocalDateTime(selectedHistoryCorrection.committed_at_utc, timeZone)
-                : null,
-              createdAtValue: formatLocalDateTime(
-                selectedHistoryCorrection.created_at_utc,
-                timeZone,
-              ),
-            }}
-            title="Detalle del ajuste"
-          />
-        ) : (
-          <PosSummaryPanel
-            description="Selecciona un ajuste para revisar su trazabilidad."
-            stateLabel="Sin seleccion"
-            stateTone="draft"
-            title="Detalle del ajuste"
-          >
-            <InlineNotice tone="info">
-              El historial es global para la sucursal actual y no expone metadatos internos.
-            </InlineNotice>
-          </PosSummaryPanel>
-        )
+            setSelectedTargetId(selectedHistoryCorrection.target_document_id);
+            setCenterSection("documents");
+          }}
+          selectedHistoryRecord={selectedHistoryRecord}
+          timeZone={timeZone}
+        />
       ) : (
         draftSummaryPanel
       ),
@@ -2250,7 +1442,7 @@ export function CorrectionsScreen() {
     return (
       <OperationalStatus
         description="Consultando la caja activa y la configuracion operativa de Ajustes."
-        title="Cargando ajustes auditados"
+        title="Cargando ajustes"
       />
     );
   }
@@ -2294,17 +1486,75 @@ export function CorrectionsScreen() {
     );
   }
 
-  const processStepKey = centerSection === "history" ? "history" : "documents";
-  const selectedTargetErrorMessage = correctionTargetDetailQuery.error
-    ? toOperationalErrorMessage(
-        correctionTargetDetailQuery.error,
-        "No fue posible revisar el documento seleccionado.",
-      )
-    : null;
+  const documentColumns: PosRecordColumn<CorrectionSearchDocumentView>[] = [
+    {
+      header: "Folio",
+      key: "folio",
+      renderCell: (document) => (
+        <span className="block truncate font-semibold text-slate-950" title={document.folio}>
+          {document.folio}
+        </span>
+      ),
+      width: "22%",
+    },
+    {
+      header: "Tipo",
+      key: "type",
+      renderCell: (document) => (
+        <span className="block truncate" title={getDocumentTypeLabel(document.document_type)}>
+          {getDocumentTypeLabel(document.document_type)}
+        </span>
+      ),
+      width: "24%",
+    },
+    {
+      header: "Fecha/hora",
+      key: "date",
+      renderCell: (document) =>
+        document.committed_at_utc
+          ? formatCompactLocalDateTime(document.committed_at_utc, timeZone)
+          : "Sin confirmar",
+      width: "20%",
+    },
+    {
+      align: "right",
+      header: "Unidades",
+      key: "units",
+      renderCell: (document) =>
+        eligibilityByDocumentId.get(document.id)?.totalQuantityText ?? "-",
+      width: "14%",
+    },
+    {
+      align: "right",
+      header: "Estado",
+      key: "status",
+      renderCell: (document) => {
+        const eligibility = eligibilityByDocumentId.get(document.id);
+
+        if (!eligibility || eligibility.isPending) {
+          return (
+            <span className="pos-chip" data-tone="muted">
+              Revisando
+            </span>
+          );
+        }
+
+        return (
+          <span
+            className="pos-chip"
+            data-tone={eligibility.isCorrectable ? "success" : "danger"}
+            title={eligibility.blockingReason ?? undefined}
+          >
+            {eligibility.isCorrectable ? "Listo" : "Bloqueado"}
+          </span>
+        );
+      },
+      width: "20%",
+    },
+  ];
   const documentsListPane = (
     <PosHistoryView
-      description="Busca por folio, documento o producto y selecciona el original que vas a ajustar."
-      title="Documentos originales"
+      title="Movimientos"
       toolbar={
         <PosFilterBar
           chipFilters={[
@@ -2327,15 +1577,14 @@ export function CorrectionsScreen() {
           ]}
           countLabel={<ModuleStateChip tone="muted">{documents.length} visibles</ModuleStateChip>}
           searchInput={{
-            ariaLabel: "Buscar documento",
+            ariaLabel: "Buscar movimiento",
             className: "min-w-[16rem] max-w-md",
-            hotkeyLabel: "Buscar documento en ajustes",
+            hotkeyLabel: "Buscar movimiento en ajustes",
             inputRef: searchInputRef,
             onChange: setSearchText,
-            placeholder: "Buscar folio, documento o producto",
+            placeholder: "Buscar movimiento",
             value: searchText,
           }}
-          title="Consulta"
         />
       }
     >
@@ -2344,136 +1593,28 @@ export function CorrectionsScreen() {
           action={<Button onClick={() => correctionTargetsQuery.refetch()}>Reintentar</Button>}
           description={toOperationalErrorMessage(
             correctionTargetsQuery.error,
-            "No fue posible consultar los documentos operativos.",
+            "No fue posible consultar los movimientos operativos.",
           )}
           title="La busqueda no esta disponible"
         />
       ) : (
-        <PosRecordList
-          emptyDescription="No hay documentos auditables para este filtro. Usa Devoluciones para ventas confirmadas y Merma para bajas definitivas."
-          emptyTitle="Sin documentos elegibles"
+        <PosRecordTable
+          columns={documentColumns}
+          emptyDescription="No hay movimientos ajustables para este filtro."
+          emptyTitle="Sin movimientos elegibles"
           getKey={(record) => record.id}
           loading={correctionTargetsQuery.isFetching && documents.length === 0}
-          loadingTitle="Buscando documentos"
+          loadingTitle="Buscando movimientos"
           onSelect={(record) => setSelectedTargetId(record.id)}
           records={documents}
-          renderContent={(document) => (
-            <TargetDocumentRecordContent
-              document={document}
-              eligibility={eligibilityByDocumentId.get(document.id)}
-              timeZone={timeZone}
-            />
-          )}
           selectedKey={selectedTargetId}
+          tableAriaLabel="Movimientos ajustables"
         />
       )}
     </PosHistoryView>
   );
-  const correctionDetailPane =
-    centerSection === "documents" ? (
-      <div className="grid h-full min-h-0 gap-3">
-        <PosContextBanner
-          description="Usa ajustes auditados para corregir documentos operativos confirmados. Usa Devoluciones para ventas confirmadas y Merma para bajas definitivas."
-          title="Ajustes auditados"
-        />
-        <SelectionPreview
-          correctedDestinationBranchId={draftState.correctedDestinationBranchId}
-          correctionReasons={correctionsBootstrapQuery.data.correction_reasons}
-          destinationBranches={correctionsBootstrapQuery.data.destination_branches}
-          draftLines={draftState.lines}
-          isCommitPending={commitMutation.isPending}
-          isProductSearchPending={correctionProductsQuery.isPending}
-          onCommitTargetLineAdjustment={(line, direction, magnitudeText) => {
-            updateDraftState((current) => ({
-              ...current,
-              lines: upsertTargetLineDraftAdjustment(
-                current.lines,
-                line,
-                direction,
-                magnitudeText,
-              ),
-            }));
-            window.setTimeout(() => {
-              const row = document.querySelector<HTMLElement>(
-                `[data-correction-line-row="${line.id}"]`,
-              );
-              if (row && typeof row.scrollIntoView === "function") {
-                row.scrollIntoView({ block: "start", behavior: "instant" });
-              }
-            }, 0);
-          }}
-          onCorrectedDestinationBranchChange={(destinationBranchId) =>
-            updateDraftState((current) => ({
-              ...current,
-              correctedDestinationBranchId: destinationBranchId,
-            }))
-          }
-          onOpenHistory={() => {
-            setCenterSection("history");
-            if (lastCommittedCorrection) {
-              setSelectedHistoryCorrectionId(lastCommittedCorrection.id);
-            }
-          }}
-          onProductSearchTextChange={(value) =>
-            updateDraftState((current) => ({
-              ...current,
-              productSearchText: value,
-            }))
-          }
-          onSelectExactProduct={(product, magnitudeText) =>
-            updateDraftState((current) => ({
-              ...current,
-              lines: upsertAddedProductDraftAdjustment(current.lines, product, magnitudeText),
-              productSearchText: "",
-            }))
-          }
-          onRemoveDraftLine={(draftLineKey) =>
-            updateDraftState((current) => ({
-              ...current,
-              lines: removeCorrectionDraftLine(current.lines, draftLineKey),
-            }))
-          }
-          onReasonChange={(reasonCode) =>
-            updateDraftState((current) => ({
-              ...current,
-              correctedDestinationBranchId:
-                reasonCode === WRONG_DESTINATION_REASON_CODE
-                  ? current.correctedDestinationBranchId
-                  : null,
-              reasonCode,
-            }))
-          }
-          productSearchError={
-            correctionProductsQuery.error
-              ? toOperationalErrorMessage(
-                  correctionProductsQuery.error,
-                  "No fue posible buscar productos para este ajuste.",
-                )
-              : null
-          }
-          productSearchResults={correctionProductsQuery.data?.products ?? []}
-          productSearchText={draftState.productSearchText}
-          reasonCode={draftState.reasonCode}
-          selectedDocument={selectedSearchDocument}
-          selectedTarget={selectedTarget}
-          selectedTargetError={selectedTargetErrorMessage}
-          selectedTargetPending={correctionTargetDetailQuery.isPending}
-          timeZone={timeZone}
-        />
-      </div>
-    ) : (
+  const historyPane = (
       <PosHistoryView
-        action={
-          <Button
-            className={cn("h-10 px-4", posOutlineButtonClass)}
-            onClick={() => setCenterSection("documents")}
-            type="button"
-            variant="outline"
-          >
-            Revisar documento
-          </Button>
-        }
-        description="Consulta los ajustes auditados de la sucursal actual sin exponer payloads internos."
         title="Historial de ajustes"
         toolbar={
           <PosFilterBar
@@ -2494,7 +1635,7 @@ export function CorrectionsScreen() {
               hotkeyLabel: "Buscar ajuste en historial",
               inputRef: historySearchInputRef,
               onChange: setHistorySearchText,
-              placeholder: "Buscar folio, documento o motivo",
+              placeholder: "Buscar folio, movimiento o motivo",
               value: historySearchText,
             }}
             selectFilters={[
@@ -2503,7 +1644,7 @@ export function CorrectionsScreen() {
                 key: "history-user",
                 onChange: setSelectedHistoryCreatedByUserId,
                 options: [
-                  { label: "Todos los usuarios", value: "" },
+                  { label: "Todos los cajeros", value: "" },
                   ...historyUserOptions.map((option) => ({
                     label: option.label,
                     value: option.value,
@@ -2512,13 +1653,13 @@ export function CorrectionsScreen() {
                 value: selectedHistoryCreatedByUserId,
               },
               {
-                ariaLabel: "Filtrar historial por tipo de documento",
+                ariaLabel: "Filtrar historial por tipo de movimiento",
                 key: "history-document-type",
                 onChange: setSelectedHistoryTargetDocumentType,
                 options: [
                   { label: "Todos los tipos", value: "" },
                   ...historyDocumentTypeOptions.map((option) => ({
-                    label: option.label,
+                    label: getDocumentTypeLabel(option.value),
                     value: option.value,
                   })),
                 ],
@@ -2531,7 +1672,7 @@ export function CorrectionsScreen() {
                 options: [
                   { label: "Todos los motivos", value: "" },
                   ...historyReasonOptions.map((option) => ({
-                    label: option.label,
+                    label: getCorrectionReasonLabel(option.value, option.label),
                     value: option.value,
                   })),
                 ],
@@ -2552,161 +1693,65 @@ export function CorrectionsScreen() {
             title="Historial no disponible"
           />
         ) : (
-          <div className="grid h-full min-h-0 gap-3 xl:grid-cols-[minmax(18rem,22rem)_minmax(0,1fr)]">
-            <OperationHistoryList
-              emptyDescription="No hay ajustes auditados para este filtro."
-              loading={correctionsHistoryQuery.isPending}
-              loadingTitle="Consultando ajustes"
-              onSelect={(record) => setSelectedHistoryCorrectionId(record.id)}
-              records={historyRecords}
-              selectedRecordId={selectedHistoryCorrectionId}
-            />
-            <PosRecordDetailPanel
-              badge={
-                selectedHistoryCorrection ? (
-                  <ModuleStateChip tone="success">
-                    {selectedHistoryCorrection.status === "COMMITTED"
-                      ? "Registrada"
-                      : selectedHistoryCorrection.status}
-                  </ModuleStateChip>
-                ) : undefined
-              }
-              description={
-                selectedHistoryRecord
-                  ? `Documento ${selectedHistoryRecord.target_document_folio}`
-                  : "Selecciona un ajuste para revisar su efecto."
-              }
-              title={
-                selectedHistoryCorrection
-                  ? getCorrectionReference(selectedHistoryCorrection)
-                  : "Sin ajuste seleccionado"
-              }
-            >
-              {correctionHistoryDetailQuery.isPending ? (
-                <OperationalStatus
-                  description="Cargando el ajuste seleccionado."
-                  title="Cargando detalle"
-                />
-              ) : correctionHistoryDetailQuery.error ? (
-                <OperationalStatus
-                  action={<Button onClick={() => correctionHistoryDetailQuery.refetch()}>Reintentar</Button>}
-                  description={toOperationalErrorMessage(
-                    correctionHistoryDetailQuery.error,
-                    "No fue posible cargar el ajuste seleccionado.",
-                  )}
-                  title="Detalle no disponible"
-                />
-              ) : selectedHistoryCorrection ? (
-                <OperationDocumentSummaryPanel
-                  blockers={[]}
-                  auditSummary={selectedHistoryCorrection.audit_summary}
-                  context={{
-                    branchName: selectedHistoryCorrection.source_branch_name,
-                    userName: selectedHistoryCorrection.created_by_user_full_name,
-                    workstationName: selectedHistoryCorrection.workstation_name,
-                  }}
-                  description={getCorrectionReasonLabel(
-                    selectedHistoryCorrection.reason_code,
-                    selectedHistoryCorrection.reason_name,
-                  )}
-                  kind="correction"
-                  lines={buildCorrectionLineSummaryItems(selectedHistoryCorrection)}
-                  metrics={buildCorrectionMetrics(selectedHistoryCorrection)}
-                  notices={
-                    selectedHistoryCorrection.corrected_destination_branch_name ? (
-                      <InlineNotice tone="info">
-                        Destino corregido a {selectedHistoryCorrection.corrected_destination_branch_name}.
-                      </InlineNotice>
-                    ) : undefined
-                  }
-                  referenceValue={getCorrectionReference(selectedHistoryCorrection)}
-                  stateLabel={
-                    selectedHistoryCorrection.status === "COMMITTED"
-                      ? "Registrada"
-                      : selectedHistoryCorrection.status
-                  }
-                  stateTone="confirmed"
-                  timeZone={timeZone}
-                  timestamps={{
-                    committedAtValue: selectedHistoryCorrection.committed_at_utc
-                      ? formatLocalDateTime(selectedHistoryCorrection.committed_at_utc, timeZone)
-                      : null,
-                    createdAtValue: formatLocalDateTime(
-                      selectedHistoryCorrection.created_at_utc,
-                      timeZone,
-                    ),
-                  }}
-                  title="Detalle del ajuste"
-                />
-              ) : (
-                <div className="grid h-full place-items-center rounded-xl border border-dashed border-[var(--pos-shell-border)] bg-white px-4 py-8 text-center text-sm text-slate-600">
-                  Selecciona un ajuste registrado para revisar su efecto.
-                </div>
-              )}
-            </PosRecordDetailPanel>
-          </div>
+          <OperationHistoryList
+            emptyDescription="No hay ajustes para este filtro."
+            loading={correctionsHistoryQuery.isPending}
+            loadingTitle="Consultando ajustes"
+            onSelect={(record) => setSelectedHistoryCorrectionId(record.id)}
+            records={historyRecords}
+            selectedRecordId={selectedHistoryCorrectionId}
+          />
         )}
       </PosHistoryView>
     );
   return (
-    <>
-      <CorrectionConfirmationDialog
-        affectedDocumentLabel={
-          selectedSearchDocument
-            ? getDocumentTypeLabel(selectedSearchDocument.document_type)
-            : null
-        }
-        branchName={correctionsBootstrapQuery.data.branch.name}
-        documentReference={selectedSearchDocument?.folio ?? "Pendiente"}
-        documentTitle={selectedTarget?.document_title ?? "Sin documento"}
-        isOpen={isConfirmDialogOpen}
-        isHighImpact={isHighImpactAdjustment}
-        isPending={commitMutation.isPending}
-        lineSummaryItems={draftSummaryLines}
-        lineCount={draftState.lines.length}
-        netEffectLabel={getSignedEffectLabel(netEffectMilliUnits)}
-        onCancel={() => setIsConfirmDialogOpen(false)}
-        onConfirm={() => {
-          void commitMutation.mutateAsync();
-        }}
-        reasonLabel={selectedReasonLabel ?? "Pendiente"}
-        userName={correctionsBootstrapQuery.data.user.full_name}
-        workstationName={correctionsBootstrapQuery.data.workstation.name}
-      />
-
-      <CentralWorkspaceSheet
-        className="lg:h-full"
-        contentClassName="min-h-0 overflow-hidden px-3 pb-3 pt-2"
-        header={
-          <CompactPageHeader
-            secondaryChips={
-              selectedTarget ? (
-                <ModuleStateChip tone="primary">
-                  {selectedTarget.document_title}
-                </ModuleStateChip>
-              ) : null
-            }
-            stateChip={
-              <ModuleStateChip tone={getCorrectionUiStateTone(uiState)}>
-                {getCorrectionUiStateLabel(uiState)}
+    <CentralWorkspaceSheet
+      className="lg:h-full"
+      contentClassName="min-h-0 overflow-hidden px-3 pb-3 pt-2"
+      header={
+        <CompactPageHeader
+          secondaryChips={
+            selectedTarget ? (
+              <ModuleStateChip tone="primary">
+                {selectedTarget.document_title}
               </ModuleStateChip>
-            }
-            title="Ajustes auditados"
-          >
-            <FlowGuide activeStepKey={processStepKey} steps={[...CORRECTION_PROCESS_STEPS]} variant="process" />
-          </CompactPageHeader>
-        }
-      >
-        <ResponsivePaneLayout
-          className="h-full gap-2.5"
-          detail={correctionDetailPane}
-          detailClassName="min-h-0"
-          list={documentsListPane}
-          listClassName="min-h-0"
-          splitVariant="narrow-list"
-        />
-      </CentralWorkspaceSheet>
-    </>
+            ) : null
+          }
+          stateChip={
+            <ModuleStateChip tone={getCorrectionUiStateTone(uiState)}>
+              {getCorrectionUiStateLabel(uiState)}
+            </ModuleStateChip>
+          }
+          title="Ajustes"
+        >
+          <div className="flex flex-wrap items-center gap-2">
+            <Button
+              className={cn(
+                "h-9 px-4 font-semibold shadow-sm",
+                centerSection === "history" ? posPrimaryButtonClass : posOutlineButtonClass,
+              )}
+              onClick={() => {
+                if (centerSection === "history") {
+                  setCenterSection("documents");
+                  return;
+                }
+
+                setCenterSection("history");
+                if (lastCommittedCorrection) {
+                  setSelectedHistoryCorrectionId(lastCommittedCorrection.id);
+                }
+              }}
+              type="button"
+              variant={centerSection === "history" ? undefined : "outline"}
+            >
+              {centerSection === "history" ? "Volver a ajustes" : "Historial de ajustes"}
+            </Button>
+          </div>
+        </CompactPageHeader>
+      }
+    >
+      {centerSection === "history" ? historyPane : documentsListPane}
+    </CentralWorkspaceSheet>
   );
 }
 

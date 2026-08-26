@@ -7,11 +7,9 @@ import { OperationalStatus } from "../../components/operational-status";
 import { PosAuditSummary } from "../../components/pos-audit-summary";
 import {
   PosConfirmationDialog,
-  PosEmptyState,
   PosErrorState,
   PosInlineValidationMessage,
   PosLoadingState,
-  PosOperationResultPanel,
 } from "../../components/pos-feedback";
 import { PosButton, PosFieldLabel, PosStatusBadge } from "../../components/pos-foundations";
 import { PosSummaryPanel } from "../../components/pos-module-layout";
@@ -21,17 +19,10 @@ import {
   PosRecordTable,
   type PosRecordColumn,
 } from "../../components/pos-records";
-import {
-  CardIcon,
-  CheckCircleIcon,
-  ClipboardIcon,
-  MoneyIcon,
-  PlusIcon,
-} from "../../components/pos-icons";
+import { PlusIcon } from "../../components/pos-icons";
 import {
   CentralWorkspaceSheet,
   CompactPageHeader,
-  FlowGuide,
   ModuleStateChip,
   ScrollPane,
 } from "../../components/pos-module-primitives";
@@ -45,7 +36,6 @@ import type {
   OperationalDiscountMethodView,
   OperationalDiscountScopeView,
 } from "../../lib/api-contracts";
-import { copyDocumentReferenceToClipboard } from "../../lib/document-actions";
 import {
   formatCompactLocalDateTime,
   formatCurrency,
@@ -53,11 +43,7 @@ import {
 } from "../../lib/formatters";
 import { toOperationalErrorMessage } from "../../lib/http";
 import { isEditableTarget } from "../../lib/keyboard-shortcuts";
-import {
-  createOperationResultMessage,
-  createToastAction,
-  posMessageCatalog,
-} from "../../lib/pos-messages";
+import { posMessageCatalog } from "../../lib/pos-messages";
 import { cn } from "../../lib/utils";
 import { usePosAuthStore } from "../auth/auth-store";
 import {
@@ -80,9 +66,7 @@ import {
   doesOperationalDiscountAffectCashDrawer,
   getOperationalDiscountAmountCents,
   getOperationalDiscountBlockedReason,
-  getOperationalDiscountBlockingMessages,
   getOperationalDiscountCategoryLabel,
-  getOperationalDiscountCreateStepKey,
   getOperationalDiscountMethod,
   getOperationalDiscountMethodLabel,
   getOperationalDiscountUiState,
@@ -100,13 +84,6 @@ import {
 } from "./queries";
 
 type DiscountsMode = "create" | "list";
-
-const DISCOUNT_CREATE_GUIDE_STEPS = [
-  { icon: <ClipboardIcon className="h-4 w-4" />, key: "details", label: "Datos" },
-  { icon: <MoneyIcon className="h-4 w-4" />, key: "amount", label: "Monto" },
-  { icon: <CardIcon className="h-4 w-4" />, key: "method", label: "Metodo" },
-  { icon: <CheckCircleIcon className="h-4 w-4" />, key: "save", label: "Guardar" },
-] as const;
 
 function createRequestId(scope: string): string {
   if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
@@ -194,20 +171,26 @@ function getCategoryLabel(
 function getScopeContextLabel(scope: string): string {
   switch (scope) {
     case "TODAY":
-      return "Mostrando descuentos de hoy.";
+      return "Hoy";
     case "RECENT":
-      return "Mostrando descuentos recientes de la estacion.";
+      return "Recientes";
     default:
-      return "Mostrando descuentos del turno actual.";
+      return "Turno actual";
   }
 }
 
 function getEmptyListDescription(scopeLabel: string, query: string): string {
   if (query.trim().length > 0) {
-    return "No hay descuentos con ese folio, referencia, persona o categoria dentro del alcance actual.";
+    return "No hay descuentos con ese folio, referencia, persona o categoria.";
   }
 
-  return `${scopeLabel} Los descuentos operativos registran cobros internos auditables como prestamos, seguros o cargos al personal. Crea uno cuando necesites dejar trazabilidad del descuento aplicado.`;
+  return `Sin descuentos registrados en ${scopeLabel.toLowerCase()}.`;
+}
+
+function getEmptyListTitle(query: string, hasActiveFilters: boolean): string {
+  return query.trim().length > 0 || hasActiveFilters
+    ? "Sin resultados"
+    : "Sin descuentos registrados";
 }
 
 function getMethodFilterOptions(methods: OperationalDiscountMethodView[]) {
@@ -249,7 +232,7 @@ function PaymentMethodButton({
   return (
     <button
       className={cn(
-        "grid min-h-[4.25rem] gap-1.5 rounded-[var(--pos-radius-control)] border px-3 py-2.5 text-left transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--pos-ring)] focus-visible:ring-offset-2 focus-visible:ring-offset-white",
+        "grid min-h-[3.25rem] gap-0.5 rounded-[var(--pos-radius-control)] border px-3 py-2 text-left transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--pos-ring)] focus-visible:ring-offset-2 focus-visible:ring-offset-white",
         isActive
           ? "border-[var(--pos-primary)] bg-[var(--pos-primary-soft)]"
           : "border-[var(--pos-shell-border)] bg-white hover:border-[var(--pos-primary)] hover:bg-[var(--pos-shell-muted)]",
@@ -262,7 +245,7 @@ function PaymentMethodButton({
       <div className="min-w-0">
         <p className="text-sm font-semibold text-slate-950">{method.label}</p>
         {method.helper_text ? (
-          <p className="mt-0.5 line-clamp-2 text-xs leading-5 text-slate-600">
+          <p className="line-clamp-1 text-[11px] leading-4 text-slate-600">
             {method.helper_text}
           </p>
         ) : null}
@@ -305,29 +288,34 @@ function DiscountCaptureWorkspace({
   const isHighValue = isOperationalDiscountHighValue(draft, controls);
 
   return (
-    <div className="grid h-full min-h-0 place-items-center py-4">
+    <div className="grid h-full min-h-0 content-start gap-3">
+      <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-[var(--pos-shell-border)] bg-white px-3 py-2.5 shadow-sm">
+        <div className="min-w-0">
+          <p className="pos-label-text">Nuevo descuento</p>
+          <h2 className="text-base font-semibold text-slate-950">Registrar descuento operativo</h2>
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          {isHighValue ? <PosStatusBadge status="warning">Descuento alto</PosStatusBadge> : null}
+          <PosStatusBadge status={affectsCash ? "warning" : "confirmed"}>
+            {selectedMethod ? getImpactTitle(affectsCash) : "Pendiente"}
+          </PosStatusBadge>
+        </div>
+      </div>
+
       <form
-        className="grid w-full max-w-4xl gap-4"
+        className="grid w-full gap-3"
         onSubmit={(event) => {
           event.preventDefault();
           onSubmit();
         }}
       >
-        <section className="grid gap-4 rounded-[var(--pos-radius-panel)] border border-[var(--pos-shell-border)] bg-[var(--pos-shell-surface)] px-4 py-4 shadow-[var(--pos-subtle-shadow)]">
-          <div className="grid gap-1">
-            <p className="pos-label-text">Nuevo descuento</p>
-            <h2 className="text-lg font-semibold text-slate-950">Registrar descuento operativo</h2>
-            <p className="text-sm text-slate-600">
-              Captura persona o entidad, categoria, motivo o referencia, monto, metodo y notas operativas.
-            </p>
-          </div>
-
+        <section className="grid gap-3 rounded-[var(--pos-radius-panel)] border border-[var(--pos-shell-border)] bg-[var(--pos-shell-surface)] px-3 py-3 shadow-[var(--pos-subtle-shadow)]">
           {createError ? (
             <PosInlineValidationMessage tone="error">{createError}</PosInlineValidationMessage>
           ) : null}
 
-          <div className="grid gap-4 md:grid-cols-2">
-            <PosFieldLabel helper="Nombre de la persona o entidad a la que se aplica." required>
+          <div className="grid gap-3 md:grid-cols-2">
+            <PosFieldLabel required>
               Persona o entidad
               <input
                 aria-label="Persona o entidad del descuento"
@@ -342,7 +330,7 @@ function DiscountCaptureWorkspace({
               />
             </PosFieldLabel>
 
-            <PosFieldLabel helper="Clasifica el descuento para auditoria y filtros." required>
+            <PosFieldLabel required>
               Categoria
               <select
                 aria-label="Categoria del descuento"
@@ -362,7 +350,7 @@ function DiscountCaptureWorkspace({
               </select>
             </PosFieldLabel>
 
-            <PosFieldLabel helper="Motivo operativo o referencia que justifica el descuento." required>
+            <PosFieldLabel required>
               Motivo o referencia
               <input
                 aria-label="Motivo o referencia del descuento"
@@ -376,7 +364,7 @@ function DiscountCaptureWorkspace({
               />
             </PosFieldLabel>
 
-            <PosFieldLabel helper="Monto total del descuento." required>
+            <PosFieldLabel required>
               Monto
               <input
                 aria-label="Monto del descuento"
@@ -392,7 +380,7 @@ function DiscountCaptureWorkspace({
             </PosFieldLabel>
 
             <div className="grid gap-2 md:col-span-2">
-              <PosFieldLabel helper="Selecciona como se registro el descuento." required>
+              <PosFieldLabel required>
                 Metodo
               </PosFieldLabel>
               <div className="grid gap-2 sm:grid-cols-3">
@@ -407,22 +395,24 @@ function DiscountCaptureWorkspace({
               </div>
             </div>
 
-            <PosFieldLabel
-              className="md:col-span-2"
-              helper="Observaciones operativas. Se guardan en auditoria si capturas contenido."
+            <details
+              className="rounded-[var(--pos-radius-control)] border border-[var(--pos-shell-border)] bg-white px-3 py-2.5 md:col-span-2"
+              open={draft.notes.trim().length > 0}
             >
-              Notas
+              <summary className="cursor-pointer text-sm font-semibold text-slate-950">
+                {draft.notes.trim().length > 0 ? "Observacion" : "Agregar observacion"}
+              </summary>
               <textarea
                 aria-label="Notas del descuento"
                 className={cn(
                   posInputClass,
-                  "mt-1 min-h-[7.5rem] w-full rounded-[var(--pos-radius-control)] px-3 py-2.5 text-sm",
+                  "mt-2 min-h-20 w-full rounded-[var(--pos-radius-control)] px-3 py-2.5 text-sm",
                 )}
                 onChange={(event) => onNotesChange(event.target.value)}
-                placeholder="Detalle adicional del descuento o evidencia textual."
+                placeholder="Detalle adicional del descuento."
                 value={draft.notes}
               />
-            </PosFieldLabel>
+            </details>
 
             {isHighValue ? (
               <label className="grid gap-2 rounded-[var(--pos-radius-control)] border border-[var(--ui-color-warning)] bg-amber-50 px-3 py-3 text-sm text-slate-700 md:col-span-2">
@@ -458,6 +448,31 @@ function DiscountDetailSummary({
 }: {
   discount: OperationalDiscountDetailResponse;
 }) {
+  const detailRows = [
+    { key: "concept", label: "Motivo", value: discount.concept },
+    { key: "subject", label: "Persona", value: discount.subject_name },
+    { key: "category", label: "Categoria", value: discount.category_name ?? "Sin categoria" },
+    {
+      key: "method",
+      label: "Metodo",
+      value: `${getOperationalDiscountMethodLabel(discount.payment_method_code)} - ${getImpactTitle(
+        discount.affects_cash_drawer,
+      )}`,
+    },
+    { key: "operator", label: "Operador", value: discount.created_by.full_name },
+    {
+      key: "time",
+      label: "Hora",
+      value: formatLocalDateTime(discount.committed_at_utc, discount.branch.timezone),
+    },
+    {
+      key: "branch",
+      label: "Sucursal",
+      value: `${discount.branch.name} - ${discount.workstation.name}`,
+    },
+    ...(discount.notes ? [{ key: "notes", label: "Observacion", value: discount.notes }] : []),
+  ];
+
   return (
     <div className="grid gap-3">
       <div className="rounded-[var(--pos-radius-control)] border border-[var(--pos-shell-border)] bg-[var(--pos-shell-muted)] px-3 py-3">
@@ -467,7 +482,23 @@ function DiscountDetailSummary({
         </p>
       </div>
 
-      <div className="grid gap-2 text-sm text-slate-700">
+      <div className="overflow-hidden rounded-[var(--pos-radius-control)] border border-[var(--pos-shell-border)] bg-white text-sm">
+        {detailRows.map((row) => (
+          <div
+            className="grid grid-cols-[6.25rem_minmax(0,1fr)] gap-2 border-t border-[var(--pos-shell-border)] px-3 py-2 first:border-t-0"
+            key={row.key}
+          >
+            <span className="text-xs font-semibold uppercase tracking-[0.08em] text-slate-500">
+              {row.label}
+            </span>
+            <span className="truncate text-right font-semibold text-slate-950" title={row.value}>
+              {row.value}
+            </span>
+          </div>
+        ))}
+      </div>
+
+      <div className="hidden gap-2 text-sm text-slate-700">
         <div className="grid gap-1 rounded-[var(--pos-radius-control)] border border-[var(--pos-shell-border)] bg-white px-3 py-2.5">
           <span className="pos-label-text">Motivo o referencia</span>
           <p className="font-semibold text-slate-950">{discount.concept}</p>
@@ -517,7 +548,6 @@ function DiscountDetailSummary({
 }
 
 export function DiscountsRightPanel({
-  blockedMessages,
   blockedReason,
   categories,
   controls,
@@ -530,10 +560,9 @@ export function DiscountsRightPanel({
   onCancelCreate,
   onCommitCreate,
   onResultAction,
+  discountCount,
   discountDetail,
-  recentCreatedDiscountId,
 }: {
-  blockedMessages: string[];
   blockedReason: string | null;
   categories: OperationalDiscountCategoryView[];
   controls: DiscountControlsView | null;
@@ -546,16 +575,36 @@ export function DiscountsRightPanel({
   onCancelCreate: () => void;
   onCommitCreate: () => void;
   onResultAction: (actionKey: string) => void;
+  discountCount: number;
   discountDetail: OperationalDiscountDetailResponse | null;
-  recentCreatedDiscountId: string | null;
 }) {
   if (mode === "create") {
     const draftCategoryLabel = getCategoryLabel(draft.categoryCode, categories);
     const amountLabel = getDraftAmountLabel(draft.totalAmountText);
+    const draftRows = [
+      {
+        key: "subject",
+        label: "Persona",
+        value: draft.subjectName.trim().length > 0 ? draft.subjectName.trim() : "Pendiente",
+      },
+      {
+        key: "concept",
+        label: "Motivo",
+        value: draft.concept.trim().length > 0 ? draft.concept.trim() : "Pendiente",
+      },
+      { key: "category", label: "Categoria", value: draftCategoryLabel ?? "Pendiente" },
+      {
+        key: "method",
+        label: "Metodo",
+        value:
+          draft.paymentMethodCode.length > 0
+            ? getOperationalDiscountMethodLabel(draft.paymentMethodCode)
+            : "Pendiente",
+      },
+    ];
 
     return (
       <PosSummaryPanel
-        description="Resume el descuento antes de registrarlo."
         stateLabel="Captura activa"
         stateTone="draft"
         title="Nuevo descuento"
@@ -585,31 +634,20 @@ export function DiscountsRightPanel({
             </p>
           </div>
 
-          <div className="grid gap-2 text-sm text-slate-700">
-            <div className="rounded-[var(--pos-radius-control)] border border-[var(--pos-shell-border)] bg-white px-3 py-2.5">
-              <span className="pos-label-text">Persona o entidad</span>
-              <p className="font-semibold text-slate-950">
-                {draft.subjectName.trim().length > 0 ? draft.subjectName.trim() : "Pendiente"}
-              </p>
-            </div>
-            <div className="rounded-[var(--pos-radius-control)] border border-[var(--pos-shell-border)] bg-white px-3 py-2.5">
-              <span className="pos-label-text">Motivo o referencia</span>
-              <p className="font-semibold text-slate-950">
-                {draft.concept.trim().length > 0 ? draft.concept.trim() : "Pendiente"}
-              </p>
-            </div>
-            <div className="rounded-[var(--pos-radius-control)] border border-[var(--pos-shell-border)] bg-white px-3 py-2.5">
-              <span className="pos-label-text">Categoria</span>
-              <p className="font-semibold text-slate-950">{draftCategoryLabel ?? "Pendiente"}</p>
-            </div>
-            <div className="rounded-[var(--pos-radius-control)] border border-[var(--pos-shell-border)] bg-white px-3 py-2.5">
-              <span className="pos-label-text">Metodo</span>
-              <p className="font-semibold text-slate-950">
-                {draft.paymentMethodCode.length > 0
-                  ? getOperationalDiscountMethodLabel(draft.paymentMethodCode)
-                  : "Pendiente"}
-              </p>
-            </div>
+          <div className="overflow-hidden rounded-[var(--pos-radius-control)] border border-[var(--pos-shell-border)] bg-white text-sm">
+            {draftRows.map((row) => (
+              <div
+                className="grid grid-cols-[6rem_minmax(0,1fr)] gap-2 border-t border-[var(--pos-shell-border)] px-3 py-2 first:border-t-0"
+                key={row.key}
+              >
+                <span className="text-xs font-semibold uppercase tracking-[0.08em] text-slate-500">
+                  {row.label}
+                </span>
+                <span className="truncate text-right font-semibold text-slate-950" title={row.value}>
+                  {row.value}
+                </span>
+              </div>
+            ))}
           </div>
 
           {isCreateHighValue ? (
@@ -620,11 +658,9 @@ export function DiscountsRightPanel({
             </PosInlineValidationMessage>
           ) : null}
 
-          {blockedMessages.map((message) => (
-            <PosInlineValidationMessage key={message} tone="warning">
-              {message}
-            </PosInlineValidationMessage>
-          ))}
+          {blockedReason ? (
+            <PosInlineValidationMessage tone="warning">{blockedReason}</PosInlineValidationMessage>
+          ) : null}
         </ScrollPane>
       </PosSummaryPanel>
     );
@@ -649,35 +685,16 @@ export function DiscountsRightPanel({
   if (!discountDetail) {
     return (
       <PosSummaryPanel
-        description="El panel derecho muestra el resumen operativo y el resultado del registro."
-        stateLabel="Sin seleccion"
+        stateLabel="Consulta"
         stateTone="draft"
-        title="Selecciona un descuento"
+        title="Detalle del descuento"
       >
-        <PosEmptyState
-          description="Selecciona un descuento para revisar su contexto operativo o crea uno nuevo para registrar una salida auditada."
-          title="Sin descuento seleccionado"
-        />
+        <div className="rounded-xl border border-dashed border-[var(--pos-shell-border)] bg-white px-3 py-3 text-sm text-slate-600">
+          {discountCount > 0
+            ? "Selecciona un descuento para revisar su informacion."
+            : "Registra un descuento para comenzar."}
+        </div>
       </PosSummaryPanel>
-    );
-  }
-
-  if (discountDetail.id === recentCreatedDiscountId) {
-    const resultMessage = createOperationResultMessage({
-      description: `Motivo o referencia ${discountDetail.concept}. Usa el historial para seguir auditando el turno o registra un nuevo descuento.`,
-      nextActions: [createToastAction("viewHistory"), createToastAction("newOperation")],
-      operationType: "discount",
-      referenceId: discountDetail.folio,
-    });
-
-    return (
-      <div className="grid gap-3">
-        <PosOperationResultPanel message={resultMessage} onSelectAction={onResultAction} />
-        <PosAuditSummary
-          auditSummary={discountDetail.audit_summary}
-          timeZone={discountDetail.branch.timezone}
-        />
-      </div>
     );
   }
 
@@ -721,7 +738,6 @@ export function DiscountsScreen() {
   );
   const [createError, setCreateError] = useState<string | null>(null);
   const [isConfirmDialogOpen, setIsConfirmDialogOpen] = useState(false);
-  const [recentCreatedDiscountId, setRecentCreatedDiscountId] = useState<string | null>(null);
 
   const debouncedSearchText = useDebouncedValue(searchText, 220);
   const discountsListQuery = useDiscountsListQuery(
@@ -752,19 +768,23 @@ export function DiscountsScreen() {
     () => discountsResponse?.discounts ?? [],
     [discountsResponse?.discounts],
   );
+  const totalDiscountsAmount = useMemo(
+    () => discounts.reduce((sum, discount) => sum + Number(discount.total_amount), 0),
+    [discounts],
+  );
   const availableUsers = useMemo(
     () => discountsResponse?.available_users ?? [],
     [discountsResponse?.available_users],
   );
+  const hasActiveAdvancedFilters =
+    selectedCategory.length > 0 ||
+    selectedMethodFilter.length > 0 ||
+    selectedCreatedByUserId.length > 0;
+  const hasActiveListFilters = searchText.trim().length > 0 || hasActiveAdvancedFilters;
+  const shouldShowAdvancedFilters = discounts.length > 0 || hasActiveAdvancedFilters;
   const selectedDiscount = discountDetailQuery.data ?? null;
   const selectedMethod = getOperationalDiscountMethod(draftState.paymentMethodCode, methods);
   const affectsCash = doesOperationalDiscountAffectCashDrawer(draftState.paymentMethodCode, methods);
-  const createBlockedMessages = getOperationalDiscountBlockingMessages(
-    draftState,
-    methods,
-    categories,
-    discountControls,
-  );
   const createBlockedReason = getOperationalDiscountBlockedReason(
     draftState,
     methods,
@@ -865,7 +885,6 @@ export function DiscountsScreen() {
       setSelectedMethodFilter("");
       setSelectedCreatedByUserId("");
       setSelectedDiscountId(result.id);
-      setRecentCreatedDiscountId(result.id);
       setDraftState(createInitialOperationalDiscountDraftState());
       setCreateError(null);
       setIsConfirmDialogOpen(false);
@@ -1002,7 +1021,6 @@ export function DiscountsScreen() {
 
   useAppShellRightPanel(
     <DiscountsRightPanel
-      blockedMessages={createBlockedMessages}
       blockedReason={createBlockedReason}
       categories={categories}
       controls={discountControls}
@@ -1015,17 +1033,12 @@ export function DiscountsScreen() {
       onCancelCreate={handleCancelCreate}
       onCommitCreate={handleCommit}
       onResultAction={(actionKey) => {
-        if (actionKey === "viewHistory") {
-          setRecentCreatedDiscountId(null);
-          return;
-        }
-
         if (actionKey === "newOperation") {
           handleOpenCreate();
         }
       }}
+      discountCount={discounts.length}
       discountDetail={selectedDiscount}
-      recentCreatedDiscountId={recentCreatedDiscountId}
     />,
   );
 
@@ -1188,59 +1201,30 @@ export function DiscountsScreen() {
         header={
           <CompactPageHeader
             secondaryChips={
-              mode === "create" ? (
-                <ModuleStateChip tone={getCaptureStateTone(captureUiState)}>
-                  {getCaptureStateLabel(captureUiState)}
-                </ModuleStateChip>
-              ) : (
-                <ModuleStateChip>
-                  {searchText.trim().length > 0 ||
-                  selectedCategory.length > 0 ||
-                  selectedMethodFilter.length > 0 ||
-                  selectedCreatedByUserId.length > 0
-                    ? "Filtro activo"
-                    : getScopeContextLabel(selectedScope)}
-                </ModuleStateChip>
-              )
+              <div className="flex flex-wrap items-center gap-2">
+                {mode === "create" ? (
+                  <ModuleStateChip tone={getCaptureStateTone(captureUiState)}>
+                    {getCaptureStateLabel(captureUiState)}
+                  </ModuleStateChip>
+                ) : (
+                  <>
+                    <ModuleStateChip>
+                      {hasActiveListFilters ? "Filtro activo" : getScopeContextLabel(selectedScope)}
+                    </ModuleStateChip>
+                    <ModuleStateChip tone="muted">
+                      {discounts.length} descuentos - {formatCurrency(totalDiscountsAmount)}
+                    </ModuleStateChip>
+                  </>
+                )}
+              </div>
             }
             stateChip={
               <ModuleStateChip tone={mode === "create" ? "primary" : "muted"}>
-                {mode === "create"
-                  ? "Captura activa"
-                  : selectedDiscountId
-                    ? "Descuento en vista"
-                    : "Sin seleccion"}
+                {mode === "create" ? "Captura activa" : "Consulta"}
               </ModuleStateChip>
             }
-            title="Descuentos operativos"
-          >
-            <FlowGuide
-              activeStepKey={
-                mode === "create"
-                  ? getOperationalDiscountCreateStepKey(draftState, methods, categories)
-                  : selectedDiscountId === null
-                    ? "list"
-                    : "detail"
-              }
-              steps={
-                mode === "create"
-                  ? [...DISCOUNT_CREATE_GUIDE_STEPS]
-                  : [
-                      {
-                        key: "list",
-                        label: "Consulta",
-                        state: selectedDiscountId ? "completed" : "current",
-                      },
-                      {
-                        key: "detail",
-                        label: "Detalle",
-                        state: selectedDiscountId ? "current" : "upcoming",
-                      },
-                    ]
-              }
-              variant={mode === "create" ? "process" : "compact"}
-            />
-          </CompactPageHeader>
+            title={mode === "create" ? "Nuevo descuento" : "Descuentos operativos"}
+          />
         }
       >
         {mode === "create" ? (
@@ -1295,10 +1279,11 @@ export function DiscountsScreen() {
             }
           />
         ) : (
-          <div className="grid h-full min-h-0 gap-3">
+          <div className="grid h-full min-h-0 content-start gap-3">
             <PosFilterBar
               actions={
                 <PosButton
+                  className="h-10"
                   leadingIcon={<PlusIcon className="h-4 w-4" />}
                   onClick={handleOpenCreate}
                 >
@@ -1314,38 +1299,47 @@ export function DiscountsScreen() {
                 label: scope.label,
                 onSelect: () => setSelectedScope(scope.code),
               }))}
-              countLabel={<PosStatusBadge status="draft">{discounts.length} descuentos</PosStatusBadge>}
+              className="rounded-xl border border-[var(--pos-shell-border)] bg-white px-3 py-3 shadow-sm"
+              countLabel={
+                <PosStatusBadge status="draft">
+                  {discounts.length} descuentos - {formatCurrency(totalDiscountsAmount)}
+                </PosStatusBadge>
+              }
               searchInput={{
                 ariaLabel: "Buscar descuento por folio, persona o entidad, categoria o referencia",
                 hotkeyChords: ["Ctrl+F"],
                 inputRef: searchInputRef,
                 onChange: setSearchText,
-                placeholder: "Buscar por folio, persona o entidad, categoria o referencia",
+                placeholder: "Buscar descuento",
                 value: searchText,
               }}
-              selectFilters={[
-                {
-                  ariaLabel: "Filtrar descuentos por categoria",
-                  key: "category",
-                  onChange: setSelectedCategory,
-                  options: getCategoryFilterOptions(categories),
-                  value: selectedCategory,
-                },
-                {
-                  ariaLabel: "Filtrar descuentos por metodo",
-                  key: "method",
-                  onChange: setSelectedMethodFilter,
-                  options: getMethodFilterOptions(methods),
-                  value: selectedMethodFilter,
-                },
-                {
-                  ariaLabel: "Filtrar descuentos por operador",
-                  key: "user",
-                  onChange: setSelectedCreatedByUserId,
-                  options: getUserFilterOptions(availableUsers),
-                  value: selectedCreatedByUserId,
-                },
-              ]}
+              selectFilters={
+                shouldShowAdvancedFilters
+                  ? [
+                      {
+                        ariaLabel: "Filtrar descuentos por categoria",
+                        key: "category",
+                        onChange: setSelectedCategory,
+                        options: getCategoryFilterOptions(categories),
+                        value: selectedCategory,
+                      },
+                      {
+                        ariaLabel: "Filtrar descuentos por metodo",
+                        key: "method",
+                        onChange: setSelectedMethodFilter,
+                        options: getMethodFilterOptions(methods),
+                        value: selectedMethodFilter,
+                      },
+                      {
+                        ariaLabel: "Filtrar descuentos por operador",
+                        key: "user",
+                        onChange: setSelectedCreatedByUserId,
+                        options: getUserFilterOptions(availableUsers),
+                        value: selectedCreatedByUserId,
+                      },
+                    ]
+                  : []
+              }
               title="Descuentos registrados"
             />
 
@@ -1365,38 +1359,16 @@ export function DiscountsScreen() {
             ) : (
               <PosRecordTable
                 columns={listColumns}
-                emptyAction={
-                  <PosButton
-                    leadingIcon={<PlusIcon className="h-4 w-4" />}
-                    onClick={handleOpenCreate}
-                  >
-                    Nuevo descuento
-                  </PosButton>
-                }
                 emptyDescription={getEmptyListDescription(
                   getScopeContextLabel(selectedScope),
                   searchText,
                 )}
-                emptyTitle="Sin descuentos para esta vista"
+                emptyTitle={getEmptyListTitle(searchText, hasActiveAdvancedFilters)}
                 getKey={(discount) => discount.id}
-                getRowActions={(discount) => [
-                  {
-                    key: `${discount.id}-copy-folio`,
-                    label: "Copiar folio",
-                    onSelect: () => {
-                      void copyDocumentReferenceToClipboard(discount.folio)
-                        .then(() => showSuccess("Folio copiado."))
-                        .catch(() => showError("No se pudo copiar el folio."));
-                    },
-                  },
-                ]}
                 loading={discountsListQuery.isPending}
                 loadingTitle="Cargando descuentos"
                 onSelect={(discount) => {
                   setSelectedDiscountId(discount.id);
-                  setRecentCreatedDiscountId((current) =>
-                    current === discount.id ? current : null,
-                  );
                 }}
                 records={discounts}
                 selectedKey={selectedDiscountId}

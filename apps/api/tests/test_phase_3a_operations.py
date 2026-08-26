@@ -42,6 +42,18 @@ def _authorization_header(client: TestClient) -> dict[str, str]:
     return {"Authorization": f"Bearer {_login(client)}"}
 
 
+def _open_cash_session(client: TestClient, workstation_code: str = SEED_WORKSTATION_CODE) -> None:
+    response = client.post(
+        "/v1/cash-sessions/open",
+        headers=_authorization_header(client),
+        json={
+            "workstation_code": workstation_code,
+            "opening_amount": "150.00",
+        },
+    )
+    assert response.status_code == 201
+
+
 def _get_product_id(code: str) -> str:
     with SessionLocal() as session:
         product = session.execute(select(Product).where(Product.code == code)).scalar_one()
@@ -169,6 +181,8 @@ def test_counter_transfer_commit_writes_document_audit_and_outbox(client: TestCl
 def test_counter_transfer_detail_and_history_return_folio_and_filters(
     client: TestClient,
 ) -> None:
+    _open_cash_session(client)
+
     commit_response = client.post(
         "/v1/operations/counter-transfer/commit",
         headers=_authorization_header(client),
@@ -217,6 +231,7 @@ def test_counter_transfer_detail_and_history_return_folio_and_filters(
     assert history_payload["records"][0]["line_count"] == 1
     assert Decimal(str(history_payload["records"][0]["total_quantity"])) == Decimal("3.000")
     assert history_payload["available_scopes"] == [
+        {"code": "ALL", "label": "Todos"},
         {"code": "CURRENT_SHIFT", "label": "Turno actual"},
         {"code": "TODAY", "label": "Hoy"},
         {"code": "RECENT", "label": "Recientes"},
@@ -228,6 +243,23 @@ def test_counter_transfer_detail_and_history_return_folio_and_filters(
     assert history_payload["available_destination_buckets"] == [
         {"value": "COUNTER", "label": "COUNTER"}
     ]
+
+    all_history_response = client.get(
+        "/v1/operations/history",
+        params={
+            "workstation_code": SEED_WORKSTATION_CODE,
+            "document_type": "COUNTER_TRANSFER",
+            "scope": "ALL",
+            "created_by_user_id": detail_payload["created_by_user_id"],
+            "source_bucket_code": "BACKROOM",
+            "destination_bucket_code": "COUNTER",
+        },
+        headers=_authorization_header(client),
+    )
+    assert all_history_response.status_code == 200
+    all_history_payload = all_history_response.json()
+    assert all_history_payload["scope"] == "ALL"
+    assert any(record["id"] == document["id"] for record in all_history_payload["records"])
 
 
 def test_waste_commit_requires_exact_product_and_reason_and_writes_audit_and_outbox(
@@ -378,6 +410,8 @@ def test_high_impact_waste_requires_acknowledgement_and_emits_alert_outbox(
 
 
 def test_waste_history_returns_reason_and_product_filters(client: TestClient) -> None:
+    _open_cash_session(client)
+
     commit_response = client.post(
         "/v1/operations/waste/commit",
         headers=_authorization_header(client),
@@ -576,6 +610,8 @@ def test_transfer_dispatch_pending_detail_and_receive_work_end_to_end(client: Te
 
 
 def test_transfer_dispatch_history_returns_folio_status_and_filters(client: TestClient) -> None:
+    _open_cash_session(client)
+
     dispatch_response = client.post(
         "/v1/transfers/dispatch/commit",
         headers=_authorization_header(client),
@@ -616,6 +652,8 @@ def test_transfer_dispatch_history_returns_folio_status_and_filters(client: Test
 
 
 def test_transfer_inbound_history_returns_folio_status_and_filters(client: TestClient) -> None:
+    _open_cash_session(client, SEED_DESTINATION_WORKSTATION_CODE)
+
     dispatch_response = client.post(
         "/v1/transfers/dispatch/commit",
         headers=_authorization_header(client),
@@ -648,6 +686,7 @@ def test_transfer_inbound_history_returns_folio_status_and_filters(client: TestC
         },
     )
     assert receive_response.status_code == 200
+    receipt = receive_response.json()["receipt"]
     history_response = client.get(
         "/v1/transfers/inbound/history",
         params={
@@ -666,7 +705,7 @@ def test_transfer_inbound_history_returns_folio_status_and_filters(client: TestC
     assert payload["status"] == "RECEIVED"
     assert payload["available_source_branches"][0]["label"] == "Main Branch"
     assert payload["available_statuses"][0]["value"] == "RECEIVED"
-    assert payload["records"][0]["id"] == shipment["id"]
+    assert payload["records"][0]["id"] == receipt["id"]
     assert payload["records"][0]["folio"].startswith("REC-")
     assert payload["records"][0]["status"] == "RECEIVED"
     assert payload["records"][0]["source_branch_code"] == "MAIN"

@@ -6,14 +6,16 @@ import { useForm } from "react-hook-form";
 import { z } from "zod";
 
 import { PosInlineValidationMessage } from "../../components/pos-feedback";
-import { PosButton, PosFieldLabel, PosPanel, PosSectionTitle, PosStatusBadge } from "../../components/pos-foundations";
-import { posInputClass } from "../pos-theme/theme";
+import { PosButton, PosFieldLabel, PosPanel, PosSectionTitle } from "../../components/pos-foundations";
+import { ProgressStepper } from "../../components/pos-module-primitives";
+import { appEnv } from "../../env";
 import type { LoginRequest } from "../../lib/api-contracts";
 import { ApiError, toOperationalErrorMessage } from "../../lib/http";
 import { cn } from "../../lib/utils";
-import { FlowGuide } from "../../components/pos-module-primitives";
 import { useFocusFlow } from "../pos-shell/keyboard";
+import { posInputClass } from "../pos-theme/theme";
 import { loginOperator } from "./auth-api";
+import { buildBackofficeAdminUrl, shouldRouteToBackoffice } from "./auth-surfaces";
 import { usePosAuthStore } from "./auth-store";
 
 const loginSchema = z.object({
@@ -52,6 +54,13 @@ export function LoginForm() {
   const loginMutation = useMutation({
     mutationFn: (payload: LoginRequest) => loginOperator(payload),
     onSuccess: async (response) => {
+      if (shouldRouteToBackoffice(response.user)) {
+        window.location.assign(
+          buildBackofficeAdminUrl(appEnv.VITE_BACKOFFICE_BASE_URL, response.access_token),
+        );
+        return;
+      }
+
       setAccessToken(response.access_token);
       await navigate({ to: "/" });
     },
@@ -113,21 +122,17 @@ export function LoginForm() {
       <div className="w-full max-w-[39rem]">
         <PosPanel className="px-6 py-6 sm:px-7 sm:py-7">
           <PosSectionTitle
-            action={<PosStatusBadge status="draft">Paso 1 de 3</PosStatusBadge>}
             description="Inicia sesion para confirmar la estacion y abrir la caja."
             eyebrow="Identidad de cajero"
             title="Acceso del cajero"
           />
 
-          <div className="mt-4">
-            <FlowGuide
-              activeStepKey="identity"
-              steps={[
-                { key: "identity", label: "Cajero", state: "current" },
-                { key: "station", label: "Estacion", state: "upcoming" },
-                { key: "opening", label: "Apertura", state: "upcoming" },
-              ]}
-              variant="compact"
+          <div className="mt-3">
+            <ProgressStepper
+              currentLabel="Cajero"
+              currentStep={1}
+              stepLabels={["Cajero", "Estacion", "Apertura"]}
+              totalSteps={3}
             />
           </div>
 

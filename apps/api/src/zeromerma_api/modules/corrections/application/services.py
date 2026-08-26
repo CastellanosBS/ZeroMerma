@@ -85,6 +85,7 @@ from zeromerma_api.modules.operations.domain.constants import (
     OPERATION_DOCUMENT_TYPE_BRANCH_TRANSFER_SHIPMENT,
     OPERATION_DOCUMENT_TYPE_COUNTER_TRANSFER,
     OPERATION_DOCUMENT_TYPE_WASTE_RECORD,
+    OPERATION_HISTORY_SCOPE_ALL,
     OPERATION_HISTORY_SCOPE_CURRENT_SHIFT,
     OPERATION_HISTORY_SCOPE_RECENT,
     OPERATION_HISTORY_SCOPE_TODAY,
@@ -673,6 +674,7 @@ class CorrectionQueryService:
             target_document_type=validated_target_document_type,
             reason_code=normalized_reason_code,
             available_scopes=[
+                CorrectionHistoryScopeView(code=OPERATION_HISTORY_SCOPE_ALL, label="Todos"),
                 CorrectionHistoryScopeView(
                     code=OPERATION_HISTORY_SCOPE_CURRENT_SHIFT,
                     label="Turno actual",
@@ -1502,6 +1504,9 @@ def _apply_correction_history_scope_filters(
     context: WorkstationContext,
     current_shift_opened_at: datetime,
 ) -> Select[tuple[object, ...]]:
+    if normalized_scope == OPERATION_HISTORY_SCOPE_ALL:
+        return statement
+
     if normalized_scope == OPERATION_HISTORY_SCOPE_CURRENT_SHIFT:
         return statement.where(CorrectionDocument.created_at_utc >= current_shift_opened_at)
 

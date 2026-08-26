@@ -5,39 +5,28 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useAppShellRightPanel } from "../../components/app-shell-right-panel";
 import {
   CopyFolioAction,
-  DocumentActionsMenu,
   PrintAction,
 } from "../../components/document-actions";
 import { OperationalStatus } from "../../components/operational-status";
 import {
-  PosEmptyState,
   PosErrorState,
   PosInlineValidationMessage,
-  PosLoadingState,
 } from "../../components/pos-feedback";
-import { PosButton, PosPanel, PosStatusBadge } from "../../components/pos-foundations";
-import { PosScannerInput } from "../../components/pos-scanner-input";
+import { PosButton, PosStatusBadge } from "../../components/pos-foundations";
 import {
-  PosFilterBar,
   PosHistoryView,
-  type PosRecordAction,
+  PosRecordTable,
+  type PosRecordColumn,
   PosRecordDetailPanel,
-  PosRecordList,
 } from "../../components/pos-records";
-import {
-  DownloadIcon,
-  MoneyIcon,
-  OperatorIcon,
-  RotateCcwIcon,
-  StationIcon,
-  StoreIcon,
-} from "../../components/pos-icons";
+import { RotateCcwIcon } from "../../components/pos-icons";
 import {
   CentralWorkspaceSheet,
-  FlowGuide,
-  ModuleStateChip,
   CompactPageHeader,
-  ResponsivePaneLayout,
+  FilterButton,
+  KeyValueRow,
+  ModuleStateChip,
+  SearchField,
   ScrollPane,
 } from "../../components/pos-module-primitives";
 import { appEnv } from "../../env";
@@ -56,13 +45,10 @@ import { toOperationalErrorMessage } from "../../lib/http";
 import { isEditableTarget } from "../../lib/keyboard-shortcuts";
 import { openBrowserPrintWindow } from "../../lib/browser-print";
 import { matchesScannerValue, normalizeScannerText, parseTicketScannerValue } from "../../lib/scanner";
-import {
-  getCustomerCommunicationActionState,
-  getCustomerCommunicationReadinessNote,
-} from "../../lib/customer-communication";
 import { getDocumentActionAvailability } from "../../lib/document-actions";
 import { usePosAuthStore } from "../auth/auth-store";
 import { useCurrentCashSessionQuery } from "../cash-session-open/queries";
+import { posInputClass } from "../pos-theme/theme";
 import { useStatusMessageStore } from "../status-messages/store";
 import { writeTicketToPrintWindow } from "./print";
 import { useTicketDetailQuery, useTicketsBootstrapQuery, useTicketsListQuery } from "./queries";
@@ -124,7 +110,7 @@ function getPaymentMethodLabel(code: string): string {
 function getTicketStatusLabel(status: string): string {
   switch (status) {
     case "CONFIRMED":
-      return "Venta confirmada";
+      return "Confirmado";
     default:
       return status;
   }
@@ -184,6 +170,10 @@ function getPaymentSummaryLabel(
   }
 
   return payments.map((payment) => getPaymentMethodLabel(payment.payment_method_code)).join(" | ");
+}
+
+function formatTicketCountLabel(count: number): string {
+  return `${count} ${count === 1 ? "ticket" : "tickets"}`;
 }
 
 function getTicketConsoleState({
@@ -298,308 +288,6 @@ function getEmptyListDescription(scopeLabel: string, searchText: string): string
   return `${scopeLabel}. Aun no hay tickets emitidos para esta consulta.`;
 }
 
-function TicketMetricTile({
-  label,
-  tone = "muted",
-  value,
-}: {
-  label: string;
-  tone?: "financial" | "muted";
-  value: string;
-}) {
-  return (
-    <div
-      className="rounded-[var(--pos-radius-panel)] border border-[var(--pos-shell-border)] px-3 py-3"
-      data-tone={tone}
-    >
-      <p className="pos-label-text">{label}</p>
-      <p className="mt-1 text-lg font-semibold leading-tight text-slate-950 [font-variant-numeric:tabular-nums]">
-        {value}
-      </p>
-    </div>
-  );
-}
-
-export function TicketRecordCard({
-  isSelected,
-  ticket,
-  timeZone,
-}: {
-  isSelected: boolean;
-  ticket: TicketListItemView;
-  timeZone: string;
-}) {
-  return (
-    <div className="grid gap-2">
-      <div className="flex items-start justify-between gap-3">
-        <div className="min-w-0">
-          <div className="flex flex-wrap items-center gap-2">
-            <p className="truncate text-sm font-semibold text-slate-950">{ticket.folio}</p>
-            <PosStatusBadge status={isSelected ? "ready" : "draft"}>
-              {isSelected ? "Activo" : "Emitido"}
-            </PosStatusBadge>
-            {getTicketReturnStatusLabel(ticket.return_status) ? (
-              <PosStatusBadge status={getTicketReturnStatusTone(ticket.return_status)}>
-                {getTicketReturnStatusLabel(ticket.return_status)}
-              </PosStatusBadge>
-            ) : null}
-          </div>
-          <p className="mt-1 text-sm font-semibold text-slate-900">
-            {formatCompactLocalDateTime(ticket.confirmed_at, timeZone)}
-          </p>
-          <p className="mt-1 truncate text-xs text-slate-600">{ticket.operator_full_name}</p>
-        </div>
-        <div className="text-right">
-          <p className="text-sm font-semibold text-slate-950">{formatCurrency(ticket.total_amount)}</p>
-          <p
-            className="mt-1 max-w-[10rem] truncate text-xs text-slate-500"
-            title={getPaymentSummaryLabel(ticket.payment_summary)}
-          >
-            {getPaymentSummaryLabel(ticket.payment_summary)}
-          </p>
-        </div>
-      </div>
-
-      <div className="flex flex-wrap items-center gap-1.5 text-[12px] font-medium text-slate-500">
-        <span className="rounded-full bg-[var(--pos-shell-muted)] px-2 py-1">
-          {ticket.item_count} art.
-        </span>
-        <span className="rounded-full bg-[var(--pos-shell-muted)] px-2 py-1">
-          {formatQuantity(ticket.total_quantity)} uds
-        </span>
-        <span className="rounded-full bg-[var(--pos-shell-muted)] px-2 py-1">
-          Cambio {formatCurrency(ticket.change_amount)}
-        </span>
-        {ticket.return_count > 0 ? (
-          <span className="rounded-full bg-[var(--pos-shell-muted)] px-2 py-1">
-            Devuelto {formatCurrency(ticket.returned_amount)}
-          </span>
-        ) : null}
-      </div>
-    </div>
-  );
-}
-
-function TicketLinesTable({ ticket }: { ticket: TicketDetailResponse }) {
-  return (
-    <PosPanel className="flex min-h-0 flex-col overflow-hidden px-0 py-0">
-      <div className="flex items-center justify-between gap-3 border-b border-[var(--pos-shell-border)] px-3 py-2.5">
-        <p className="text-sm font-semibold text-slate-950">Lineas del ticket</p>
-        <PosStatusBadge status="draft">{ticket.lines.length}</PosStatusBadge>
-      </div>
-      <div className="grid shrink-0 grid-cols-[minmax(10rem,1fr)_5rem_6rem_6.5rem] gap-2 border-b border-[var(--pos-shell-border)] px-3 py-2 text-xs font-semibold uppercase tracking-[0.08em] text-slate-500">
-        <span>Articulo</span>
-        <span className="text-right">Cant.</span>
-        <span className="text-right">Precio</span>
-        <span className="text-right">Importe</span>
-      </div>
-      <ScrollPane className="min-h-0 flex-1 divide-y divide-[var(--pos-shell-border)]">
-        {ticket.lines.map((line) => (
-          <div
-            className="grid grid-cols-[minmax(10rem,1fr)_5rem_6rem_6.5rem] gap-2 px-3 py-2.5"
-            key={line.id}
-          >
-            <div className="min-w-0">
-              <p className="truncate text-sm font-semibold text-slate-950" title={line.name}>
-                {line.name}
-              </p>
-              <p className="mt-0.5 text-xs text-slate-500">Linea {line.sequence}</p>
-            </div>
-            <p className="text-right text-sm text-slate-600">{formatQuantity(line.quantity)}</p>
-            <p className="text-right text-sm text-slate-600">{formatCurrency(line.unit_price)}</p>
-            <p className="text-right text-sm font-semibold text-slate-950">
-              {formatCurrency(line.line_total_amount)}
-            </p>
-          </div>
-        ))}
-      </ScrollPane>
-    </PosPanel>
-  );
-}
-
-function TicketPaymentsTable({ ticket }: { ticket: TicketDetailResponse }) {
-  return (
-    <PosPanel className="overflow-hidden px-0 py-0">
-      <div className="flex items-center justify-between gap-3 border-b border-[var(--pos-shell-border)] px-3 py-2.5">
-        <p className="text-sm font-semibold text-slate-950">Pagos registrados</p>
-        <PosStatusBadge status="draft">{ticket.payments.length}</PosStatusBadge>
-      </div>
-      <div className="grid grid-cols-[minmax(6rem,1fr)_6rem_6rem_6rem_7rem] gap-2 border-b border-[var(--pos-shell-border)] px-3 py-2 text-xs font-semibold uppercase tracking-[0.08em] text-slate-500">
-        <span>Metodo</span>
-        <span className="text-right">Aplicado</span>
-        <span className="text-right">Recibido</span>
-        <span className="text-right">Cambio</span>
-        <span className="text-right">Hora</span>
-      </div>
-      <div className="divide-y divide-[var(--pos-shell-border)]">
-        {ticket.payments.map((payment) => (
-          <div
-            className="grid grid-cols-[minmax(6rem,1fr)_6rem_6rem_6rem_7rem] gap-2 px-3 py-2.5"
-            key={payment.id}
-          >
-            <p className="truncate text-sm font-medium text-slate-950">
-              {getPaymentMethodLabel(payment.payment_method_code)}
-            </p>
-            <p className="text-right text-sm font-medium text-slate-950">
-              {formatCurrency(payment.applied_amount)}
-            </p>
-            <p className="text-right text-sm text-slate-600">
-              {formatCurrency(payment.tendered_amount)}
-            </p>
-            <p className="text-right text-sm text-slate-600">
-              {formatCurrency(payment.change_amount)}
-            </p>
-            <p
-              className="text-right text-sm text-slate-500"
-              title={formatLocalDateTime(payment.received_at, ticket.branch.timezone)}
-            >
-              {formatCompactLocalDateTime(payment.received_at, ticket.branch.timezone)}
-            </p>
-          </div>
-        ))}
-      </div>
-    </PosPanel>
-  );
-}
-
-export function TicketDetailSurface({
-  detailError,
-  isLoadingDetail,
-  selectedTicket,
-}: {
-  detailError: unknown;
-  isLoadingDetail: boolean;
-  selectedTicket: TicketDetailResponse | null;
-}) {
-  return (
-    <PosRecordDetailPanel
-      description="Consulta lineas, pagos y contexto operativo del ticket emitido."
-      title="Detalle del ticket"
-    >
-      {isLoadingDetail ? (
-        <PosLoadingState
-          description="Consultando el ticket seleccionado."
-          title="Buscando ticket"
-        />
-      ) : detailError ? (
-        <PosErrorState
-          description={toOperationalErrorMessage(
-            detailError,
-            "No fue posible cargar el detalle del ticket seleccionado.",
-          )}
-          title="Detalle no disponible"
-        />
-      ) : !selectedTicket ? (
-        <PosEmptyState
-          description="Selecciona un ticket para revisar su detalle completo sin salir de esta vista."
-          title="Selecciona un ticket"
-        />
-      ) : (
-        <div className="grid h-full min-h-0 gap-3">
-          <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_auto]">
-            <div className="min-w-0">
-              <div className="flex flex-wrap items-center gap-2">
-                <p className="text-lg font-semibold text-slate-950">{selectedTicket.folio}</p>
-                <PosStatusBadge status={getTicketStatusTone(selectedTicket.status)}>
-                  {getTicketStatusLabel(selectedTicket.status)}
-                </PosStatusBadge>
-                {getTicketReturnStatusLabel(selectedTicket.return_status) ? (
-                  <PosStatusBadge status={getTicketReturnStatusTone(selectedTicket.return_status)}>
-                    {getTicketReturnStatusLabel(selectedTicket.return_status)}
-                  </PosStatusBadge>
-                ) : null}
-              </div>
-              <p className="mt-1 text-sm text-slate-600">
-                {formatLocalDateTime(selectedTicket.confirmed_at, selectedTicket.branch.timezone)}
-              </p>
-            </div>
-            <PosStatusBadge status="draft">Solo lectura</PosStatusBadge>
-          </div>
-
-          <div className="grid gap-2 md:grid-cols-4">
-            <TicketMetricTile label="Total" tone="financial" value={formatCurrency(selectedTicket.total_amount)} />
-            <TicketMetricTile label="Cambio" value={formatCurrency(selectedTicket.change_amount)} />
-            <TicketMetricTile label="Articulos" value={String(selectedTicket.item_count)} />
-            <TicketMetricTile
-              label="Unidades"
-              value={formatQuantity(selectedTicket.total_quantity)}
-            />
-          </div>
-
-          {selectedTicket.return_count > 0 ? (
-            <div className="grid gap-2 md:grid-cols-2">
-              <TicketMetricTile
-                label="Devoluciones"
-                value={String(selectedTicket.return_count)}
-              />
-              <TicketMetricTile
-                label="Monto devuelto"
-                tone="financial"
-                value={formatCurrency(selectedTicket.returned_amount)}
-              />
-            </div>
-          ) : null}
-
-          <div className="grid gap-2 md:grid-cols-4">
-            <PosPanel className="px-3 py-3">
-              <div className="flex items-start gap-2">
-                <OperatorIcon className="mt-0.5 h-4 w-4 text-slate-500" />
-                <div className="min-w-0">
-                  <p className="pos-label-text">Cajero</p>
-                  <p className="mt-1 truncate text-sm font-semibold text-slate-950" title={selectedTicket.operator.full_name}>
-                    {selectedTicket.operator.full_name}
-                  </p>
-                </div>
-              </div>
-            </PosPanel>
-            <PosPanel className="px-3 py-3">
-              <div className="flex items-start gap-2">
-                <StoreIcon className="mt-0.5 h-4 w-4 text-slate-500" />
-                <div className="min-w-0">
-                  <p className="pos-label-text">Sucursal</p>
-                  <p className="mt-1 truncate text-sm font-semibold text-slate-950" title={selectedTicket.branch.name}>
-                    {selectedTicket.branch.name}
-                  </p>
-                </div>
-              </div>
-            </PosPanel>
-            <PosPanel className="px-3 py-3">
-              <div className="flex items-start gap-2">
-                <StationIcon className="mt-0.5 h-4 w-4 text-slate-500" />
-                <div className="min-w-0">
-                  <p className="pos-label-text">Caja</p>
-                  <p className="mt-1 truncate text-sm font-semibold text-slate-950" title={selectedTicket.workstation.name}>
-                    {selectedTicket.workstation.name}
-                  </p>
-                </div>
-              </div>
-            </PosPanel>
-            <PosPanel className="px-3 py-3">
-              <div className="flex items-start gap-2">
-                <MoneyIcon className="mt-0.5 h-4 w-4 text-slate-500" />
-                <div className="min-w-0">
-                  <p className="pos-label-text">Metodo</p>
-                  <p
-                    className="mt-1 truncate text-sm font-semibold text-slate-950"
-                    title={getPaymentSummaryLabel(selectedTicket.payments)}
-                  >
-                    {getPaymentSummaryLabel(selectedTicket.payments)}
-                  </p>
-                </div>
-              </div>
-            </PosPanel>
-          </div>
-
-          <div className="grid min-h-0 gap-3 xl:grid-cols-[minmax(0,1fr)_minmax(20rem,24rem)]">
-            <TicketLinesTable ticket={selectedTicket} />
-            <TicketPaymentsTable ticket={selectedTicket} />
-          </div>
-        </div>
-      )}
-    </PosRecordDetailPanel>
-  );
-}
-
 export function TicketSummaryPanel({
   consoleState,
   detailError,
@@ -618,15 +306,6 @@ export function TicketSummaryPanel({
   selectedTicket: TicketDetailResponse | null;
 }) {
   const documentActionAvailability = getDocumentActionAvailability("saleTicket");
-  const sendTicketByEmailAction = getCustomerCommunicationActionState({
-    channel: "email",
-    intent: "saleTicket",
-  });
-  const sendTicketBySmsAction = getCustomerCommunicationActionState({
-    channel: "sms",
-    intent: "saleTicket",
-  });
-  const communicationNote = getCustomerCommunicationReadinessNote("saleTicket");
 
   return (
     <PosRecordDetailPanel
@@ -640,66 +319,41 @@ export function TicketSummaryPanel({
       footer={
         selectedTicket ? (
           <div className="grid gap-2">
-            <PosButton
-              disabled={!selectedTicket.has_returnable_quantity}
-              leadingIcon={<RotateCcwIcon className="h-4 w-4" />}
-              onClick={() => onStartReturn(selectedTicket.id)}
-              variant="secondary"
-            >
-              Iniciar devolucion
-            </PosButton>
-            <div className="flex flex-wrap items-center gap-2">
-              <PrintAction
-                disabled={
-                  isReprintPending ||
-                  !selectedTicket.can_reprint ||
-                  !documentActionAvailability.print.isAvailable
-                }
-                isPending={isReprintPending}
-                label={selectedTicket.can_reprint ? "Reimprimir" : documentActionAvailability.print.label}
-                onPrint={() => onReprint(selectedTicket.id)}
-                title={
-                  !selectedTicket.can_reprint
-                    ? "La reimpresion no esta disponible para este ticket."
-                    : documentActionAvailability.print.unavailableReason
-                }
-                variant="primary"
-              />
+            <PrintAction
+              disabled={
+                isReprintPending ||
+                !selectedTicket.can_reprint ||
+                !documentActionAvailability.print.isAvailable
+              }
+              isPending={isReprintPending}
+              label={selectedTicket.can_reprint ? "Reimprimir" : documentActionAvailability.print.label}
+              onPrint={() => onReprint(selectedTicket.id)}
+              title={
+                !selectedTicket.can_reprint
+                  ? "La reimpresion no esta disponible para este ticket."
+                  : documentActionAvailability.print.unavailableReason
+              }
+              variant="primary"
+            />
+            <div className="grid grid-cols-[1fr_1fr] gap-2">
               <CopyFolioAction referenceValue={selectedTicket.folio} />
-              <DocumentActionsMenu
-                actions={[
-                  {
-                    disabled: sendTicketByEmailAction.disabled,
-                    disabledReason: sendTicketByEmailAction.disabledReason,
-                    key: `ticket-email-${selectedTicket.id}`,
-                    label: sendTicketByEmailAction.label,
-                    onSelect: () => undefined,
-                  },
-                  {
-                    disabled: sendTicketBySmsAction.disabled,
-                    disabledReason: sendTicketBySmsAction.disabledReason,
-                    key: `ticket-sms-${selectedTicket.id}`,
-                    label: sendTicketBySmsAction.label,
-                    onSelect: () => undefined,
-                  },
-                  {
-                    disabled: !documentActionAvailability.exportPdf.isAvailable,
-                    disabledReason: documentActionAvailability.exportPdf.unavailableReason,
-                    key: `ticket-export-${selectedTicket.id}`,
-                    label: documentActionAvailability.exportPdf.label,
-                    leadingIcon: <DownloadIcon className="h-4 w-4" />,
-                    onSelect: () => undefined,
-                  },
-                ]}
-              />
+              {selectedTicket.has_returnable_quantity ? (
+                <PosButton
+                  leadingIcon={<RotateCcwIcon className="h-4 w-4" />}
+                  onClick={() => onStartReturn(selectedTicket.id)}
+                  variant="secondary"
+                >
+                  Iniciar devolucion
+                </PosButton>
+              ) : null}
             </div>
           </div>
         ) : undefined
       }
     >
       {isDetailPending ? (
-        <PosLoadingState
-          description="Cargando el ticket seleccionado para operar sobre el."
+        <OperationalStatus
+          description="Consultando el detalle del ticket."
           title="Ticket seleccionado"
         />
       ) : detailError ? (
@@ -711,12 +365,13 @@ export function TicketSummaryPanel({
           title="Ticket no disponible"
         />
       ) : !selectedTicket ? (
-        <PosEmptyState
-          description="Selecciona un ticket para reimprimirlo, copiar su folio o iniciar una devolucion."
-          title="Selecciona un ticket"
-        />
+        <div className="grid h-full place-items-center rounded-xl border border-dashed border-[var(--pos-shell-border)] bg-[var(--pos-shell-muted)] px-4 py-6 text-center">
+          <p className="max-w-xs text-sm leading-6 text-slate-600">
+            Selecciona un ticket para ver su detalle y acciones disponibles.
+          </p>
+        </div>
       ) : (
-        <div className="grid gap-3">
+        <div className="grid h-full min-h-0 grid-rows-[auto_auto_minmax(0,1fr)_auto] gap-3">
           <div className="grid gap-2">
             <div className="flex flex-wrap items-center gap-2">
               <p className="text-base font-semibold text-slate-950">{selectedTicket.folio}</p>
@@ -734,75 +389,75 @@ export function TicketSummaryPanel({
             </p>
           </div>
 
-          <div className="grid gap-2">
-            <TicketMetricTile label="Total" tone="financial" value={formatCurrency(selectedTicket.total_amount)} />
-            <TicketMetricTile label="Cambio" value={formatCurrency(selectedTicket.change_amount)} />
-            {selectedTicket.return_count > 0 ? (
-              <TicketMetricTile
-                label="Monto devuelto"
-                tone="financial"
-                value={formatCurrency(selectedTicket.returned_amount)}
-              />
+          <div className="grid gap-1 rounded-xl border border-[var(--pos-shell-border)] bg-[var(--pos-shell-muted)] px-3 py-2.5">
+            <KeyValueRow label="Total" value={formatCurrency(selectedTicket.total_amount)} />
+            {selectedTicket.change_amount !== "0.00" ? (
+              <KeyValueRow label="Cambio" value={formatCurrency(selectedTicket.change_amount)} />
             ) : null}
+            <KeyValueRow
+              label="Metodo"
+              title={getPaymentSummaryLabel(selectedTicket.payments)}
+              value={getPaymentSummaryLabel(selectedTicket.payments)}
+            />
+            <KeyValueRow label="Cajero" title={selectedTicket.operator.full_name} value={selectedTicket.operator.full_name} />
+            <KeyValueRow label="Sucursal" title={selectedTicket.branch.name} value={selectedTicket.branch.name} />
+            <KeyValueRow label="Caja" title={selectedTicket.workstation.name} value={selectedTicket.workstation.name} />
+            <KeyValueRow label="Estado" value={getTicketStatusLabel(selectedTicket.status)} />
           </div>
 
-          <PosPanel className="px-3 py-3">
-            <div className="grid gap-2 text-sm">
-              <div className="flex items-start gap-2">
-                <OperatorIcon className="mt-0.5 h-4 w-4 text-slate-500" />
-                <div className="min-w-0">
-                  <p className="pos-label-text">Cajero</p>
-                  <p className="mt-1 truncate font-semibold text-slate-950">
-                    {selectedTicket.operator.full_name}
-                  </p>
-                </div>
-              </div>
-              <div className="flex items-start gap-2">
-                <StoreIcon className="mt-0.5 h-4 w-4 text-slate-500" />
-                <div className="min-w-0">
-                  <p className="pos-label-text">Sucursal</p>
-                  <p className="mt-1 truncate font-semibold text-slate-950">
-                    {selectedTicket.branch.name}
-                  </p>
-                </div>
-              </div>
-              <div className="flex items-start gap-2">
-                <StationIcon className="mt-0.5 h-4 w-4 text-slate-500" />
-                <div className="min-w-0">
-                  <p className="pos-label-text">Caja</p>
-                  <p className="mt-1 truncate font-semibold text-slate-950">
-                    {selectedTicket.workstation.name}
-                  </p>
-                </div>
-              </div>
+          <div className="min-h-0 overflow-hidden rounded-xl border border-[var(--pos-shell-border)] bg-white">
+            <div className="grid grid-cols-[3.5rem_minmax(0,1fr)_4.75rem_5rem] gap-2 border-b border-[var(--pos-shell-border)] bg-[var(--pos-shell-muted)] px-2.5 py-2 text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-500">
+              <span className="text-right">Cant.</span>
+              <span>Producto</span>
+              <span className="text-right">P. unit.</span>
+              <span className="text-right">Importe</span>
             </div>
-          </PosPanel>
+            <ScrollPane className="max-h-[18rem] divide-y divide-[var(--pos-shell-border)]">
+              {selectedTicket.lines.map((line) => (
+                <div
+                  className="grid grid-cols-[3.5rem_minmax(0,1fr)_4.75rem_5rem] items-center gap-2 px-2.5 py-2"
+                  key={line.id}
+                >
+                  <span className="text-right text-sm font-semibold text-slate-700 [font-variant-numeric:tabular-nums]">
+                    {formatQuantity(line.quantity)}
+                  </span>
+                  <span className="truncate text-sm font-medium text-slate-950" title={line.name}>
+                    {line.name}
+                  </span>
+                  <span className="text-right text-sm text-slate-600 [font-variant-numeric:tabular-nums]">
+                    {formatCurrency(line.unit_price)}
+                  </span>
+                  <span className="text-right text-sm font-semibold text-slate-950 [font-variant-numeric:tabular-nums]">
+                    {formatCurrency(line.line_total_amount)}
+                  </span>
+                </div>
+              ))}
+            </ScrollPane>
+          </div>
 
-          <PosInlineValidationMessage tone="info">
-            Usa Devoluciones para ventas confirmadas.
-          </PosInlineValidationMessage>
-
-          <PosInlineValidationMessage tone="info">
-            {communicationNote}
-          </PosInlineValidationMessage>
-
-          {consoleState === "REPRINT_SUCCESS" ? (
-            <PosInlineValidationMessage tone="success">
-              Reimpresion enviada.
-            </PosInlineValidationMessage>
-          ) : null}
-
-          {consoleState === "REPRINT_ERROR" ? (
-            <PosInlineValidationMessage tone="error">
-              No se pudo reimprimir. Intenta de nuevo.
-            </PosInlineValidationMessage>
-          ) : null}
-
-          {!selectedTicket.can_reprint ? (
-            <PosInlineValidationMessage tone="warning">
-              La reimpresion no esta disponible para este ticket.
-            </PosInlineValidationMessage>
-          ) : null}
+          <div className="grid gap-1.5">
+            {selectedTicket.return_count > 0 ? (
+              <PosInlineValidationMessage tone="info">
+                Devoluciones registradas: {selectedTicket.return_count}. Monto devuelto{" "}
+                {formatCurrency(selectedTicket.returned_amount)}.
+              </PosInlineValidationMessage>
+            ) : null}
+            {!selectedTicket.has_returnable_quantity ? (
+              <PosInlineValidationMessage tone="info">
+                Este ticket no tiene productos disponibles para devolucion.
+              </PosInlineValidationMessage>
+            ) : null}
+            {consoleState === "REPRINT_ERROR" ? (
+              <PosInlineValidationMessage tone="error">
+                No se pudo reimprimir. Intenta de nuevo.
+              </PosInlineValidationMessage>
+            ) : null}
+            {!selectedTicket.can_reprint ? (
+              <PosInlineValidationMessage tone="warning">
+                La reimpresion no esta disponible para este ticket.
+              </PosInlineValidationMessage>
+            ) : null}
+          </div>
         </div>
       )}
     </PosRecordDetailPanel>
@@ -815,12 +470,10 @@ export function TicketsScreen() {
   const showError = useStatusMessageStore((state) => state.showError);
   const showSuccess = useStatusMessageStore((state) => state.showSuccess);
   const searchInputRef = useRef<HTMLInputElement>(null);
-  const scannerInputRef = useRef<HTMLInputElement>(null);
   const ticketsBootstrapQuery = useTicketsBootstrapQuery();
   const currentCashSessionQuery = useCurrentCashSessionQuery();
   const [selectedScope, setSelectedScope] = useState("CURRENT_SHIFT");
   const [searchText, setSearchText] = useState("");
-  const [scannerText, setScannerText] = useState("");
   const [pendingScannerFolio, setPendingScannerFolio] = useState<string | null>(null);
   const [selectedTicketId, setSelectedTicketId] = useState<string | null>(null);
   const [preferredTicketId, setPreferredTicketId] = useState<string | null>(null);
@@ -876,13 +529,6 @@ export function TicketsScreen() {
   useEffect(() => {
     const tickets = ticketsListQuery.data?.tickets ?? [];
 
-    if (tickets.length === 0) {
-      if (preferredTicketId === null) {
-        setSelectedTicketId(null);
-      }
-      return;
-    }
-
     if (preferredTicketId) {
       if (selectedTicketId !== preferredTicketId) {
         setSelectedTicketId(preferredTicketId);
@@ -890,11 +536,15 @@ export function TicketsScreen() {
       return;
     }
 
-    if (selectedTicketId && tickets.some((ticket) => ticket.id === selectedTicketId)) {
+    if (selectedTicketId === null) {
       return;
     }
 
-    setSelectedTicketId(tickets[0]?.id ?? null);
+    if (tickets.some((ticket) => ticket.id === selectedTicketId)) {
+      return;
+    }
+
+    setSelectedTicketId(null);
   }, [preferredTicketId, selectedTicketId, ticketsListQuery.data]);
 
   useEffect(() => {
@@ -968,18 +618,6 @@ export function TicketsScreen() {
     selectedTicket,
   });
 
-  const handleCopyFolio = useCallback((folio: string) => {
-    if (!navigator.clipboard) {
-      showError("No se pudo copiar el folio en este navegador.");
-      return;
-    }
-
-    void navigator.clipboard
-      .writeText(folio)
-      .then(() => showSuccess("Folio copiado."))
-      .catch(() => showError("No se pudo copiar el folio."));
-  }, [showError, showSuccess]);
-
   const handleReprintTicket = useCallback((ticketId: string) => {
     setSelectedTicketId(ticketId);
 
@@ -1012,28 +650,6 @@ export function TicketsScreen() {
       to: "/devoluciones",
     });
   }, [navigate]);
-
-  const ticketRowActions = useMemo(
-    () => (ticket: TicketListItemView): PosRecordAction[] => [
-      {
-        key: `copy-${ticket.id}`,
-        label: "Copiar folio",
-        onSelect: () => handleCopyFolio(ticket.folio),
-      },
-      {
-        key: `reprint-${ticket.id}`,
-        label: "Reimprimir",
-        onSelect: () => handleReprintTicket(ticket.id),
-      },
-      {
-        key: `return-${ticket.id}`,
-        label: "Iniciar devolucion",
-        disabled: !ticket.has_returnable_quantity,
-        onSelect: () => handleStartReturn(ticket.id),
-      },
-    ],
-    [handleCopyFolio, handleReprintTicket, handleStartReturn],
-  );
 
   const summaryPanel = useMemo(
     () => (
@@ -1112,16 +728,76 @@ export function TicketsScreen() {
 
   const availableScopes: TicketScopeView[] = ticketsBootstrapQuery.data.available_scopes;
   const tickets = ticketsListQuery.data?.tickets ?? [];
+  const ticketCountLabel = formatTicketCountLabel(tickets.length);
+  const ticketColumns: PosRecordColumn<TicketListItemView>[] = [
+    {
+      header: "Ticket",
+      key: "folio",
+      renderCell: (ticket) => (
+        <span className="font-semibold text-slate-950">{ticket.folio}</span>
+      ),
+      width: "18%",
+    },
+    {
+      header: "Fecha/hora",
+      key: "date",
+      renderCell: (ticket) =>
+        formatCompactLocalDateTime(ticket.confirmed_at, ticketsBootstrapQuery.data.branch.timezone),
+      width: "18%",
+    },
+    {
+      header: "Cajero",
+      key: "operator",
+      renderCell: (ticket) => (
+        <span className="block truncate" title={ticket.operator_full_name}>
+          {ticket.operator_full_name}
+        </span>
+      ),
+      width: "22%",
+    },
+    {
+      align: "right",
+      header: "Total",
+      key: "total",
+      renderCell: (ticket) => formatCurrency(ticket.total_amount),
+      width: "12%",
+    },
+    {
+      header: "Metodo de pago",
+      key: "payment",
+      renderCell: (ticket) => (
+        <span className="block truncate" title={getPaymentSummaryLabel(ticket.payment_summary)}>
+          {getPaymentSummaryLabel(ticket.payment_summary)}
+        </span>
+      ),
+      width: "18%",
+    },
+    {
+      align: "right",
+      header: "Estado",
+      key: "status",
+      renderCell: (ticket) => (
+        <div className="flex justify-end gap-1.5">
+          <PosStatusBadge status="draft">Emitido</PosStatusBadge>
+          {getTicketReturnStatusLabel(ticket.return_status) ? (
+            <PosStatusBadge status={getTicketReturnStatusTone(ticket.return_status)}>
+              {getTicketReturnStatusLabel(ticket.return_status)}
+            </PosStatusBadge>
+          ) : null}
+        </div>
+      ),
+      width: "12%",
+    },
+  ];
 
   function handleTicketScanSubmit() {
     const scannedValue =
-      parseTicketScannerValue(scannerText) ?? normalizeScannerText(scannerText);
+      parseTicketScannerValue(searchText) ?? normalizeScannerText(searchText);
 
     if (scannedValue.length === 0) {
       return;
     }
 
-    setScannerText("");
     setPendingScannerFolio(scannedValue);
     setSearchText(scannedValue);
   }
@@ -1139,103 +815,80 @@ export function TicketsScreen() {
             </ModuleStateChip>
           }
           title="Tickets"
-        >
-          <FlowGuide
-            activeStepKey={selectedTicket ? "detail" : "list"}
-            steps={[
-              { key: "list", label: "Consulta", state: selectedTicket ? "completed" : "current" },
-              { key: "detail", label: "Detalle", state: selectedTicket ? "current" : "upcoming" },
-              { key: "action", label: "Accion", state: selectedTicket ? "upcoming" : "blocked" },
-            ]}
-            variant="compact"
-          />
-        </CompactPageHeader>
+        />
       }
     >
-      <ResponsivePaneLayout
-        className="h-full gap-2.5"
-        compactMode="stack"
-        detail={
-          <TicketDetailSurface
-            detailError={ticketDetailQuery.error}
-            isLoadingDetail={selectedTicketId !== null && ticketDetailQuery.isPending}
-            selectedTicket={selectedTicket}
-          />
+      <PosHistoryView
+        className="h-full"
+        title="Tickets emitidos"
+        toolbar={
+          <div className="grid gap-2 xl:grid-cols-[minmax(18rem,28rem)_auto_minmax(0,1fr)_auto] xl:items-center">
+            <SearchField
+              ariaLabel="Buscar o escanear folio de ticket"
+              className="min-w-0"
+              inputClassName={`h-10 rounded-lg text-sm shadow-sm ${posInputClass}`}
+              inputRef={searchInputRef}
+              onChange={(value) => {
+                setPendingScannerFolio(null);
+                setSearchText(value);
+              }}
+              onKeyDown={(event) => {
+                if (event.key === "Enter" || event.key === "NumpadEnter") {
+                  event.preventDefault();
+                  handleTicketScanSubmit();
+                }
+              }}
+              placeholder="Buscar o escanear folio"
+              value={searchText}
+            />
+            <PosButton
+              disabled={searchText.trim().length === 0}
+              onClick={handleTicketScanSubmit}
+              type="button"
+              variant="neutral"
+            >
+              Buscar
+            </PosButton>
+            <div className="flex min-w-0 flex-wrap items-center gap-2">
+              {availableScopes.map((scope) => (
+                <FilterButton
+                  isActive={selectedScope === scope.code}
+                  key={scope.code}
+                  label={scope.label}
+                  onClick={() => setSelectedScope(scope.code)}
+                />
+              ))}
+            </div>
+            <PosStatusBadge className="justify-self-start whitespace-nowrap xl:justify-self-end" status="draft">
+              {ticketCountLabel}
+            </PosStatusBadge>
+          </div>
         }
-        detailClassName="min-h-0"
-        list={
-          <PosHistoryView
-            className="h-full"
-            description="Busca por folio, revisa el detalle y ejecuta acciones operativas sin salir del historial."
-            title="Tickets emitidos"
-            toolbar={
-              <div className="grid gap-3">
-                <PosScannerInput
-                  ariaLabel="Escanear folio de ticket"
-                  inputRef={scannerInputRef}
-                  modeLabel="Escaneo de ticket"
-                  onChange={setScannerText}
-                  onSubmit={handleTicketScanSubmit}
-                  placeholder="Escanear folio de ticket"
-                  submitLabel="Buscar folio"
-                  value={scannerText}
-                />
-                <PosFilterBar
-                  chipFilters={availableScopes.map((scope) => ({
-                    isActive: selectedScope === scope.code,
-                    key: scope.code,
-                    label: scope.label,
-                    onSelect: () => setSelectedScope(scope.code),
-                  }))}
-                  countLabel={<PosStatusBadge status="draft">{tickets.length} tickets</PosStatusBadge>}
-                  searchInput={{
-                    ariaLabel: "Buscar ticket por folio",
-                    hotkeyDescription: "Enfoca la busqueda de tickets.",
-                    inputRef: searchInputRef,
-                    onChange: (value) => {
-                      setPendingScannerFolio(null);
-                      setSearchText(value);
-                    },
-                    placeholder: "Buscar por folio",
-                    value: searchText,
-                  }}
-                />
-              </div>
-            }
-          >
-            {ticketsListQuery.error ? (
-              <PosErrorState
-                action={<PosButton onClick={() => ticketsListQuery.refetch()}>Reintentar</PosButton>}
-                description={toOperationalErrorMessage(
-                  ticketsListQuery.error,
-                  "No fue posible consultar los tickets del alcance actual.",
-                )}
-                title="La lista no esta disponible"
-              />
-            ) : (
-              <PosRecordList
-                emptyDescription={getEmptyListDescription(scopeLabel, searchText)}
-                emptyTitle="No hay tickets para mostrar"
-                getKey={(ticket) => ticket.id}
-                getRowActions={ticketRowActions}
-                loading={ticketsListQuery.isPending}
-                loadingTitle="Buscando tickets"
-                onSelect={(ticket) => setSelectedTicketId(ticket.id)}
-                records={tickets}
-                renderContent={(ticket, state) => (
-                  <TicketRecordCard
-                    isSelected={state.isSelected}
-                    ticket={ticket}
-                    timeZone={ticketsBootstrapQuery.data.branch.timezone}
-                  />
-                )}
-                selectedKey={selectedTicketId}
-              />
+      >
+        {ticketsListQuery.error ? (
+          <PosErrorState
+            action={<PosButton onClick={() => ticketsListQuery.refetch()}>Reintentar</PosButton>}
+            description={toOperationalErrorMessage(
+              ticketsListQuery.error,
+              "No fue posible consultar los tickets.",
             )}
-          </PosHistoryView>
-        }
-        listClassName="min-h-0"
-      />
+            title="La lista no esta disponible"
+          />
+        ) : (
+          <PosRecordTable
+            columns={ticketColumns}
+            emptyDescription={getEmptyListDescription(scopeLabel, searchText)}
+            emptyTitle="No hay tickets"
+            getKey={(ticket) => ticket.id}
+            loading={ticketsListQuery.isPending}
+            loadingTitle="Buscando tickets"
+            onSelect={(ticket) => setSelectedTicketId(ticket.id)}
+            records={tickets}
+            selectedKey={selectedTicketId}
+            tableAriaLabel="Tabla de tickets"
+          />
+        )}
+      </PosHistoryView>
     </CentralWorkspaceSheet>
   );
 }

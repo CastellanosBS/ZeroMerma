@@ -36,6 +36,7 @@ from zeromerma_api.modules.operations.domain.constants import (
     OPERATION_DOCUMENT_STATUS_RECEIVED_WITH_VARIANCE,
     OPERATION_DOCUMENT_TYPE_BRANCH_TRANSFER_RECEIPT,
     OPERATION_DOCUMENT_TYPE_BRANCH_TRANSFER_SHIPMENT,
+    OPERATION_HISTORY_SCOPE_ALL,
     OPERATION_HISTORY_SCOPE_CURRENT_SHIFT,
     OPERATION_HISTORY_SCOPE_RECENT,
     OPERATION_HISTORY_SCOPE_TODAY,
@@ -350,6 +351,7 @@ class TransferQueryService:
                 str(destination_branch_id) if destination_branch_id is not None else None
             ),
             available_scopes=[
+                OperationHistoryScopeView(code=OPERATION_HISTORY_SCOPE_ALL, label="Todos"),
                 OperationHistoryScopeView(
                     code=OPERATION_HISTORY_SCOPE_CURRENT_SHIFT,
                     label="Turno actual",
@@ -546,6 +548,7 @@ class TransferQueryService:
             source_branch_id=str(source_branch_id) if source_branch_id is not None else None,
             status=normalized_status,
             available_scopes=[
+                OperationHistoryScopeView(code=OPERATION_HISTORY_SCOPE_ALL, label="Todos"),
                 OperationHistoryScopeView(
                     code=OPERATION_HISTORY_SCOPE_CURRENT_SHIFT,
                     label="Turno actual",

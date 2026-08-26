@@ -59,6 +59,7 @@ from zeromerma_api.modules.operations.domain.constants import (
     OPERATION_DOCUMENT_STATUS_COMMITTED,
     OPERATION_DOCUMENT_TYPE_COUNTER_TRANSFER,
     OPERATION_DOCUMENT_TYPE_WASTE_RECORD,
+    OPERATION_HISTORY_SCOPE_ALL,
     OPERATION_HISTORY_SCOPE_CURRENT_SHIFT,
     OPERATION_HISTORY_SCOPE_RECENT,
     OPERATION_HISTORY_SCOPE_TODAY,
@@ -533,6 +534,7 @@ class OperationsQueryService:
             source_bucket_code=source_bucket_code,
             destination_bucket_code=destination_bucket_code,
             available_scopes=[
+                OperationHistoryScopeView(code=OPERATION_HISTORY_SCOPE_ALL, label="Todos"),
                 OperationHistoryScopeView(
                     code=OPERATION_HISTORY_SCOPE_CURRENT_SHIFT,
                     label="Turno actual",
@@ -1210,6 +1212,9 @@ def apply_operation_history_scope_filters(
     context: WorkstationContext,
     current_shift_opened_at: datetime | None,
 ) -> Select[tuple[object, ...]]:
+    if normalized_scope == OPERATION_HISTORY_SCOPE_ALL:
+        return statement
+
     if normalized_scope == OPERATION_HISTORY_SCOPE_CURRENT_SHIFT:
         assert current_shift_opened_at is not None
         return statement.where(OperationDocument.created_at_utc >= current_shift_opened_at)

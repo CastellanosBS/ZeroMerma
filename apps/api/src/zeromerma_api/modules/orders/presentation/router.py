@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import date
+from datetime import date, datetime
 from typing import Annotated
 from uuid import UUID
 
@@ -21,7 +21,15 @@ from zeromerma_api.modules.catalog.domain.exceptions import (
     ProductNotFoundError,
 )
 from zeromerma_api.modules.identity.application.schemas import AuthenticatedUser
+from zeromerma_api.modules.identity.application.services import user_can_access_surface
+from zeromerma_api.modules.identity.domain.constants import IDENTITY_SURFACE_BACKOFFICE
 from zeromerma_api.modules.identity.presentation.dependencies import get_current_user
+from zeromerma_api.modules.orders.application.admin_schemas import (
+    AdminOrderActionRequest,
+    AdminOrderDetailView,
+    AdminOrdersListResponse,
+)
+from zeromerma_api.modules.orders.application.admin_services import AdminOrdersService
 from zeromerma_api.modules.orders.application.schemas import (
     CancelCustomerOrderRequest,
     CreateCustomerOrderRequest,
@@ -45,6 +53,16 @@ from zeromerma_api.modules.orders.domain.exceptions import (
 )
 
 router = APIRouter(prefix="/v1/orders", tags=["orders"])
+admin_router = APIRouter(prefix="/v1/admin/orders", tags=["admin-orders"])
+
+
+def _require_backoffice_user(current_user: AuthenticatedUser) -> AuthenticatedUser:
+    if not user_can_access_surface(current_user, IDENTITY_SURFACE_BACKOFFICE):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Backoffice access is required.",
+        )
+    return current_user
 
 
 def _to_http_exception(error: Exception) -> HTTPException:
@@ -69,6 +87,113 @@ def _to_http_exception(error: Exception) -> HTTPException:
         return HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(error))
 
     return HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(error))
+
+
+@admin_router.get("", response_model=AdminOrdersListResponse)
+def list_admin_orders(
+    current_user: Annotated[AuthenticatedUser, Depends(get_current_user)],
+    session: Annotated[Session, Depends(get_session)],
+    branch_id: UUID | None = None,
+    cashier_id: UUID | None = None,
+    date_from: datetime | None = None,
+    date_to: datetime | None = None,
+    page: Annotated[int, Query(ge=1)] = 1,
+    page_size: Annotated[int, Query(alias="page_size", ge=1, le=100)] = 25,
+    payment_state: Annotated[str | None, Query(min_length=1)] = None,
+    search: Annotated[str | None, Query(min_length=1)] = None,
+    status_filter: Annotated[str | None, Query(alias="status", min_length=1)] = None,
+    workstation_id: UUID | None = None,
+) -> AdminOrdersListResponse:
+    _require_backoffice_user(current_user)
+    try:
+        return AdminOrdersService().list_orders(
+            session,
+            branch_id=branch_id,
+            cashier_id=cashier_id,
+            date_from=date_from,
+            date_to=date_to,
+            page=page,
+            page_size=page_size,
+            payment_state=payment_state,
+            search=search,
+            status_filter=status_filter,
+            workstation_id=workstation_id,
+        )
+    except OrderError as error:
+        raise _to_http_exception(error) from error
+
+
+@admin_router.get("/{order_id}", response_model=AdminOrderDetailView)
+def get_admin_order_detail(
+    order_id: UUID,
+    current_user: Annotated[AuthenticatedUser, Depends(get_current_user)],
+    session: Annotated[Session, Depends(get_session)],
+) -> AdminOrderDetailView:
+    _require_backoffice_user(current_user)
+    try:
+        return AdminOrdersService().get_order_detail(session, order_id=order_id)
+    except OrderError as error:
+        raise _to_http_exception(error) from error
+
+
+@admin_router.post("/{order_id}/mark-ready", response_model=AdminOrderDetailView)
+def mark_admin_order_ready(
+    order_id: UUID,
+    payload: AdminOrderActionRequest,
+    request: Request,
+    current_user: Annotated[AuthenticatedUser, Depends(get_current_user)],
+    session: Annotated[Session, Depends(get_session)],
+) -> AdminOrderDetailView:
+    _require_backoffice_user(current_user)
+    try:
+        return AdminOrdersService().mark_ready(
+            session,
+            actor_id=current_user.id,
+            order_id=order_id,
+            request_id=payload.idempotency_key or request.headers.get("X-Request-ID"),
+        )
+    except OrderError as error:
+        raise _to_http_exception(error) from error
+
+
+@admin_router.post("/{order_id}/deliver", response_model=AdminOrderDetailView)
+def deliver_admin_order(
+    order_id: UUID,
+    payload: AdminOrderActionRequest,
+    request: Request,
+    current_user: Annotated[AuthenticatedUser, Depends(get_current_user)],
+    session: Annotated[Session, Depends(get_session)],
+) -> AdminOrderDetailView:
+    _require_backoffice_user(current_user)
+    try:
+        return AdminOrdersService().deliver_order(
+            session,
+            actor_id=current_user.id,
+            order_id=order_id,
+            request_id=payload.idempotency_key or request.headers.get("X-Request-ID"),
+        )
+    except OrderError as error:
+        raise _to_http_exception(error) from error
+
+
+@admin_router.post("/{order_id}/cancel", response_model=AdminOrderDetailView)
+def cancel_admin_order(
+    order_id: UUID,
+    payload: AdminOrderActionRequest,
+    request: Request,
+    current_user: Annotated[AuthenticatedUser, Depends(get_current_user)],
+    session: Annotated[Session, Depends(get_session)],
+) -> AdminOrderDetailView:
+    _require_backoffice_user(current_user)
+    try:
+        return AdminOrdersService().cancel_order(
+            session,
+            actor_id=current_user.id,
+            order_id=order_id,
+            request_id=payload.idempotency_key or request.headers.get("X-Request-ID"),
+        )
+    except OrderError as error:
+        raise _to_http_exception(error) from error
 
 
 @router.get("/bootstrap", response_model=OrdersBootstrapResponse)
@@ -243,3 +368,4 @@ def cancel_order(
         )
     except (BranchAccessError, CatalogError, OrderError) as error:
         raise _to_http_exception(error) from error
+

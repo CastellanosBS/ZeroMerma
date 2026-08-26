@@ -464,11 +464,11 @@ vi.mock("./queries", () => ({
     return {
       data: {
         available_reasons: bootstrapResponse.return_reasons.map((reason) => ({
-          code: reason.code,
+          value: reason.code,
           label: reason.label,
         })),
         available_scopes: bootstrapResponse.available_scopes,
-        available_users: [{ code: "user-1", label: "Main Branch Cashier" }],
+        available_users: [{ value: "user-1", label: "Main Branch Cashier" }],
         created_by_user_id: createdByUserId || null,
         date_from: dateFrom || null,
         date_to: dateTo || null,
@@ -656,15 +656,15 @@ describe("ReturnsScreen", () => {
     mountedRoots.push(view.unmount);
     await flush();
 
-    const saleButtons = Array.from(
-      view.container.querySelectorAll(".pos-record-card__button"),
-    ) as HTMLButtonElement[];
+    const saleRows = Array.from(view.container.querySelectorAll<HTMLTableRowElement>("tbody tr"));
     act(() => {
-      saleButtons[0]?.click();
+      saleRows[0]?.click();
     });
     await flush();
 
-    const lineRow = view.container.querySelector("tbody tr") as HTMLTableRowElement;
+    const lineRow = Array.from(view.container.querySelectorAll<HTMLTableRowElement>("tbody tr")).find(
+      (row) => row.textContent?.includes("Bolillo"),
+    ) as HTMLTableRowElement;
     act(() => {
       lineRow.click();
     });
@@ -673,17 +673,13 @@ describe("ReturnsScreen", () => {
     const rightPanelHost = view.container.querySelector(
       '[data-testid="right-panel-host"]',
     ) as HTMLDivElement;
-    const dispositionSelect = rightPanelHost.querySelectorAll("select")[0] as HTMLSelectElement;
-    setSelectValue(dispositionSelect, "RESTOCK_COUNTER");
-    await flush();
-
     const commitButton = Array.from(rightPanelHost.querySelectorAll("button")).find((button) =>
       button.textContent?.includes("Confirmar devolucion"),
     ) as HTMLButtonElement;
 
     expect(commitButton.disabled).toBe(true);
     expect(view.container.textContent).toContain("Selecciona un motivo para continuar.");
-    expect(view.container.textContent).toContain("Selecciona el metodo de reembolso.");
+    expect(view.container.textContent).not.toContain("Selecciona el metodo de reembolso.");
   });
 
   it("commits a partial return and navigates to the original ticket", async () => {
@@ -693,15 +689,15 @@ describe("ReturnsScreen", () => {
     mountedRoots.push(view.unmount);
     await flush();
 
-    const saleButtons = Array.from(
-      view.container.querySelectorAll(".pos-record-card__button"),
-    ) as HTMLButtonElement[];
+    const saleRows = Array.from(view.container.querySelectorAll<HTMLTableRowElement>("tbody tr"));
     act(() => {
-      saleButtons[0]?.click();
+      saleRows[0]?.click();
     });
     await flush();
 
-    const lineRow = view.container.querySelector("tbody tr") as HTMLTableRowElement;
+    const lineRow = Array.from(view.container.querySelectorAll<HTMLTableRowElement>("tbody tr")).find(
+      (row) => row.textContent?.includes("Bolillo"),
+    ) as HTMLTableRowElement;
     act(() => {
       lineRow.click();
     });
@@ -710,7 +706,7 @@ describe("ReturnsScreen", () => {
     const rightPanelHost = view.container.querySelector(
       '[data-testid="right-panel-host"]',
     ) as HTMLDivElement;
-    const quantityInput = Array.from(rightPanelHost.querySelectorAll("input")).find(
+    const quantityInput = Array.from(view.container.querySelectorAll("input")).find(
       (input) => (input as HTMLInputElement).inputMode === "decimal",
     ) as HTMLInputElement;
     setInputValue(quantityInput, "1");
@@ -718,15 +714,10 @@ describe("ReturnsScreen", () => {
     const selects = Array.from(rightPanelHost.querySelectorAll("select")) as HTMLSelectElement[];
     const dispositionSelect = selects[0]!;
     const reasonSelect = selects[1]!;
+    const refundMethodSelect = selects[2]!;
     setSelectValue(dispositionSelect, "RESTOCK_COUNTER");
     setSelectValue(reasonSelect, "WRONG_ITEM");
-
-    const refundButton = Array.from(rightPanelHost.querySelectorAll("button")).find((button) =>
-      button.textContent?.includes("Efectivo"),
-    ) as HTMLButtonElement;
-    act(() => {
-      refundButton.click();
-    });
+    setSelectValue(refundMethodSelect, "CASH");
     await flush();
 
     const commitButton = Array.from(rightPanelHost.querySelectorAll("button")).find((button) =>
@@ -738,13 +729,6 @@ describe("ReturnsScreen", () => {
       commitButton.click();
     });
     await flush();
-
-    const confirmButton = Array.from(view.container.querySelectorAll("button")).find((button) =>
-      button.textContent?.trim() === "Confirmar devolucion",
-    ) as HTMLButtonElement;
-    act(() => {
-      confirmButton.click();
-    });
     await flush();
     await flush();
 
@@ -765,16 +749,8 @@ describe("ReturnsScreen", () => {
       }),
     );
     expect(view.container.textContent).toContain("RET-0001");
-    const sendEmailButton = Array.from(rightPanelHost.querySelectorAll("button")).find((button) =>
-      button.textContent?.includes("Enviar comprobante de devolucion por correo"),
-    ) as HTMLButtonElement | undefined;
-    const sendSmsButton = Array.from(rightPanelHost.querySelectorAll("button")).find((button) =>
-      button.textContent?.includes("Enviar comprobante de devolucion por SMS"),
-    ) as HTMLButtonElement | undefined;
-    expect(sendEmailButton).toBeDefined();
-    expect(sendSmsButton).toBeDefined();
-    expect(sendEmailButton?.disabled).toBe(true);
-    expect(sendSmsButton?.disabled).toBe(true);
+    expect(view.container.textContent).toContain("Historial de devoluciones");
+    expect(showSuccessMock).toHaveBeenCalledWith("Devolucion registrada. Folio RET-0001.");
 
     const viewTicketButton = Array.from(rightPanelHost.querySelectorAll("button")).find((button) =>
       button.textContent?.includes("Ver ticket"),

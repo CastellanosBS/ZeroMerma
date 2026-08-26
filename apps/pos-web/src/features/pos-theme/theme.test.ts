@@ -21,6 +21,7 @@ const bootstrap: PosBootstrapResponse = {
   },
   local_timestamp: "2026-04-09T10:00:00Z",
   user: {
+    default_surface: "POS",
     email: "cashier@zeromerma.local",
     full_name: "Main Branch Cashier",
     id: "user-1",

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from datetime import UTC, date, datetime, time
 from typing import Annotated
 from uuid import UUID
 
@@ -15,6 +16,11 @@ from zeromerma_api.modules.branches.domain.exceptions import (
     WorkstationNotFoundError,
 )
 from zeromerma_api.modules.catalog.domain.exceptions import CatalogError, ProductNotFoundError
+from zeromerma_api.modules.corrections.application.admin_schemas import (
+    AdminCorrectionDetailView,
+    AdminCorrectionsListResponse,
+)
+from zeromerma_api.modules.corrections.application.admin_services import AdminCorrectionsService
 from zeromerma_api.modules.corrections.application.schemas import (
     CorrectionBootstrapResponse,
     CorrectionCommitRequest,
@@ -37,10 +43,25 @@ from zeromerma_api.modules.corrections.domain.exceptions import (
     CorrectionValidationError,
 )
 from zeromerma_api.modules.identity.application.schemas import AuthenticatedUser
+from zeromerma_api.modules.identity.application.services import user_can_access_surface
+from zeromerma_api.modules.identity.domain.constants import IDENTITY_SURFACE_BACKOFFICE
 from zeromerma_api.modules.identity.presentation.dependencies import get_current_user
 from zeromerma_api.modules.operations.domain.exceptions import OperationError
 
 router = APIRouter(prefix="/v1/corrections", tags=["corrections"])
+admin_router = APIRouter(
+    prefix="/v1/admin/returns-corrections/corrections",
+    tags=["admin-returns-corrections"],
+)
+
+
+def _require_backoffice_user(current_user: AuthenticatedUser) -> AuthenticatedUser:
+    if not user_can_access_surface(current_user, IDENTITY_SURFACE_BACKOFFICE):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Backoffice access is required.",
+        )
+    return current_user
 
 
 def _to_http_exception(error: Exception) -> HTTPException:
@@ -82,6 +103,62 @@ def _to_http_exception(error: Exception) -> HTTPException:
         return HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(error))
 
     return HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(error))
+
+
+@admin_router.get("", response_model=AdminCorrectionsListResponse)
+def list_admin_corrections(
+    current_user: Annotated[AuthenticatedUser, Depends(get_current_user)],
+    session: Annotated[Session, Depends(get_session)],
+    branch_id: UUID | None = None,
+    operator_id: UUID | None = None,
+    correction_type: Annotated[str | None, Query(min_length=1)] = None,
+    target_document_type: Annotated[str | None, Query(min_length=1)] = None,
+    reason_code: Annotated[str | None, Query(min_length=1)] = None,
+    net_effect: Annotated[str | None, Query(min_length=1)] = None,
+    status_filter: Annotated[str | None, Query(alias="status", min_length=1)] = None,
+    search: Annotated[str | None, Query(min_length=1)] = None,
+    date_from: date | None = None,
+    date_to: date | None = None,
+    page: Annotated[int, Query(ge=1)] = 1,
+    page_size: Annotated[int, Query(alias="page_size", ge=1, le=100)] = 25,
+) -> AdminCorrectionsListResponse:
+    _require_backoffice_user(current_user)
+    try:
+        return AdminCorrectionsService().list_corrections(
+            session,
+            branch_id=branch_id,
+            correction_type=correction_type,
+            date_from=(
+                None if date_from is None else datetime.combine(date_from, time.min, tzinfo=UTC)
+            ),
+            date_to=None if date_to is None else datetime.combine(date_to, time.max, tzinfo=UTC),
+            net_effect=net_effect,
+            operator_id=operator_id,
+            page=page,
+            page_size=page_size,
+            reason_code=reason_code,
+            search=search,
+            status_filter=status_filter,
+            target_document_type=target_document_type,
+        )
+    except CorrectionError as error:
+        raise _to_http_exception(error) from error
+
+
+@admin_router.get("/{correction_id}", response_model=AdminCorrectionDetailView)
+def get_admin_correction_detail(
+    correction_id: UUID,
+    current_user: Annotated[AuthenticatedUser, Depends(get_current_user)],
+    session: Annotated[Session, Depends(get_session)],
+) -> AdminCorrectionDetailView:
+    _require_backoffice_user(current_user)
+    try:
+        return AdminCorrectionsService().get_correction_detail(
+            session,
+            correction_id=correction_id,
+        )
+    except CorrectionError as error:
+        raise _to_http_exception(error) from error
 
 
 @router.get("/bootstrap", response_model=CorrectionBootstrapResponse)
@@ -216,3 +293,4 @@ def commit_correction(
         )
     except (BranchAccessError, CatalogError, OperationError, CorrectionError) as error:
         raise _to_http_exception(error) from error
+

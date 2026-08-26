@@ -13,7 +13,6 @@ import {
 import { AppShellRightPanelContext } from "./app-shell-right-panel";
 import { AppShellSidebar } from "./app-shell-sidebar";
 import { InlineNotice, RightPanelBlock } from "./pos-module-primitives";
-import { PosStatusBadge } from "./pos-foundations";
 import { TrainingModeBanner } from "./training-mode-banner";
 import { Button } from "./ui/button";
 import { PosCheckoutPanel } from "../features/pos-terminal/pos-checkout-panel";
@@ -154,25 +153,29 @@ function ShellInfoPill({
   return (
     <div
       className={cn(
-        "flex min-w-0 items-center gap-2 rounded-[var(--pos-radius-control)] border px-3 py-2",
+        "flex h-14 min-w-[10.25rem] max-w-[16rem] items-center gap-2.5 rounded-[var(--pos-radius-control)] border px-3 shadow-[0_8px_20px_rgba(15,23,42,0.035)] transition-colors",
         tone === "warning"
-          ? "border-[var(--ui-color-warning-soft)] bg-[var(--ui-color-warning-soft)]"
-          : "border-[var(--pos-shell-border)] bg-white",
+          ? "border-[var(--ui-color-warning)]/25 bg-[var(--ui-color-warning-soft)]"
+          : "border-[var(--pos-shell-border)] bg-white/96",
       )}
     >
       <span
         className={cn(
-          "flex h-8 w-8 shrink-0 items-center justify-center rounded-xl",
+          "flex h-9 w-9 shrink-0 items-center justify-center rounded-[0.9rem] border",
           tone === "warning"
-            ? "bg-white text-[var(--ui-color-warning)]"
-            : "bg-[var(--pos-shell-muted)] text-[var(--pos-primary)]",
+            ? "border-[var(--ui-color-warning)]/20 bg-white text-[var(--ui-color-warning)]"
+            : "border-[var(--pos-shell-border)] bg-[var(--pos-primary-soft)] text-[var(--pos-primary)]",
         )}
       >
         {icon}
       </span>
-      <span className="min-w-0">
-        <span className="pos-label-text block">{label}</span>
-        <span className="block truncate text-sm font-semibold leading-5 text-slate-950">{value}</span>
+      <span className="grid min-w-0 gap-0.5">
+        <span className="truncate text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-500">
+          {label}
+        </span>
+        <span className="block truncate text-[13px] font-bold leading-5 text-slate-950" title={value}>
+          {value}
+        </span>
       </span>
     </div>
   );
@@ -655,9 +658,9 @@ function AppShellFrame({ bootstrap, cashSession, children, onSignOut }: AppShell
               <MenuIcon className="h-4 w-4" />
             </Button>
 
-            <div className="pos-shell-panel flex min-w-0 items-center gap-3 px-3 py-2">
+            <div className="pos-shell-panel flex min-w-0 items-center gap-3 px-3 py-2 shadow-[0_8px_22px_rgba(15,23,42,0.04)]">
               <div
-                className="flex h-10 w-10 items-center justify-center rounded-[var(--pos-radius-control)] text-sm font-semibold"
+                className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[var(--pos-radius-control)] text-sm font-semibold shadow-sm"
                 style={{
                   backgroundColor: "var(--pos-brand-mark-bg)",
                   color: "var(--pos-brand-mark-fg)",
@@ -665,17 +668,11 @@ function AppShellFrame({ bootstrap, cashSession, children, onSignOut }: AppShell
               >
                 {branchTheme.brandMark}
               </div>
-              <div className="min-w-0">
-                <div className="flex min-w-0 items-center gap-2">
-                  <p className="truncate text-base font-semibold text-slate-950">
-                    {bootstrap.branch.name}
-                  </p>
-                  <span className="pos-chip" data-tone="accent">
-                    {getBrandLabel(branchTheme.brandKey)}
-                  </span>
-                  <PosStatusBadge status="confirmed">{activeModule.label}</PosStatusBadge>
-                </div>
-                <p className="truncate text-xs text-slate-500">
+              <div className="grid min-w-0 gap-0.5">
+                <p className="truncate text-[17px] font-bold leading-5 text-slate-950" title={bootstrap.branch.name}>
+                  {bootstrap.branch.name}
+                </p>
+                <p className="truncate text-[12px] font-medium leading-4 text-slate-500" title={`${bootstrap.workstation.name} | ${bootstrap.workstation.code}`}>
                   {bootstrap.workstation.name} | {bootstrap.workstation.code}
                 </p>
               </div>
@@ -726,10 +723,12 @@ function AppShellFrame({ bootstrap, cashSession, children, onSignOut }: AppShell
             ) : null}
 
             <Button
-              aria-label="Acciones rapidas"
-              className={cn("h-10 px-3", posOutlineButtonClass)}
+              aria-label="Buscar acciones rapidas"
+              className={cn(
+                "h-11 w-11 rounded-[var(--pos-radius-control)] border border-[var(--pos-primary)]/35 bg-[var(--pos-primary-soft)] p-0 text-[var(--pos-primary)] shadow-sm transition hover:-translate-y-px hover:border-[var(--pos-primary)] hover:bg-white hover:text-[var(--pos-primary)] hover:shadow-md active:translate-y-0 focus-visible:ring-2 focus-visible:ring-[var(--pos-ring)] focus-visible:ring-offset-2 focus-visible:ring-offset-white",
+              )}
               onClick={() => setIsCommandPaletteOpen(true)}
-              title="Acciones rapidas"
+              title="Buscar acciones rapidas"
               type="button"
               variant="outline"
             >
@@ -738,7 +737,9 @@ function AppShellFrame({ bootstrap, cashSession, children, onSignOut }: AppShell
 
             <Button
               aria-label="Cerrar sesion"
-              className={cn("h-10 px-3", posOutlineButtonClass)}
+              className={cn(
+                "h-11 w-11 rounded-[var(--pos-radius-control)] border border-[var(--pos-shell-border)] bg-white p-0 text-slate-700 shadow-sm transition hover:-translate-y-px hover:border-rose-200 hover:bg-rose-50 hover:text-rose-700 hover:shadow-md active:translate-y-0 focus-visible:ring-2 focus-visible:ring-[var(--pos-ring)] focus-visible:ring-offset-2 focus-visible:ring-offset-white",
+              )}
               onClick={onSignOut}
               title="Cerrar sesion"
               type="button"

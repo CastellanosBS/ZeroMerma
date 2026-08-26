@@ -7,20 +7,27 @@ from sqlalchemy import engine_from_config, pool
 
 from zeromerma_api.core.config import get_settings
 from zeromerma_api.db.base import Base
+from zeromerma_api.db.wait import wait_for_database
 from zeromerma_api.modules.audit.infrastructure import models as audit_models
 from zeromerma_api.modules.branches.infrastructure import models as branch_models
 from zeromerma_api.modules.cash.infrastructure import models as cash_models
 from zeromerma_api.modules.cash_close.infrastructure import models as cash_close_models
 from zeromerma_api.modules.catalog.infrastructure import models as catalog_models
+from zeromerma_api.modules.configuration.infrastructure import models as configuration_models
 from zeromerma_api.modules.corrections.infrastructure import models as corrections_models
 from zeromerma_api.modules.discounts.infrastructure import models as discounts_models
 from zeromerma_api.modules.identity.infrastructure import models as identity_models
+from zeromerma_api.modules.inventory.infrastructure import models as inventory_models
 from zeromerma_api.modules.operations.infrastructure import models as operations_models
 from zeromerma_api.modules.orders.infrastructure import models as orders_models
-from zeromerma_api.modules.payments.infrastructure import models as payments_models
 from zeromerma_api.modules.outbox.infrastructure import models as outbox_models
+from zeromerma_api.modules.payments.infrastructure import models as payments_models
+from zeromerma_api.modules.production.infrastructure import models as production_models
+from zeromerma_api.modules.purchases.infrastructure import models as purchases_models
+from zeromerma_api.modules.quality.infrastructure import models as quality_models
 from zeromerma_api.modules.returns.infrastructure import models as returns_models
 from zeromerma_api.modules.sales.infrastructure import models as sales_models
+from zeromerma_api.modules.suppliers.infrastructure import models as suppliers_models
 
 config = context.config
 
@@ -35,15 +42,21 @@ _ = (
     catalog_models,
     cash_models,
     cash_close_models,
+    configuration_models,
     corrections_models,
     discounts_models,
     identity_models,
+    inventory_models,
     operations_models,
     orders_models,
     payments_models,
+    production_models,
+    purchases_models,
+    quality_models,
     outbox_models,
     returns_models,
     sales_models,
+    suppliers_models,
 )
 
 
@@ -63,6 +76,7 @@ def run_migrations_offline() -> None:
 
 def run_migrations_online() -> None:
     settings = get_settings()
+    wait_for_database(str(settings.database_url))
     config.set_main_option("sqlalchemy.url", str(settings.database_url))
 
     connectable = engine_from_config(

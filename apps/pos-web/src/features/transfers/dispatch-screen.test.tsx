@@ -352,6 +352,22 @@ function changeInput(element: HTMLInputElement | null, value: string) {
   });
 }
 
+function changeSelect(element: HTMLSelectElement | null, value: string) {
+  if (!element) {
+    throw new Error("Expected select element to exist.");
+  }
+
+  act(() => {
+    const valueSetter = Object.getOwnPropertyDescriptor(
+      HTMLSelectElement.prototype,
+      "value",
+    )?.set;
+    valueSetter?.call(element, value);
+    element.dispatchEvent(new Event("input", { bubbles: true }));
+    element.dispatchEvent(new Event("change", { bubbles: true }));
+  });
+}
+
 async function flush() {
   await act(async () => {
     await Promise.resolve();
@@ -399,9 +415,10 @@ function findButtonByText(container: ParentNode, text: string): HTMLButtonElemen
 }
 
 async function addShipmentLineUsingKeyboard(container: HTMLElement) {
-  const destinationButton = findButtonByText(container, "North Branch");
-  focus(destinationButton ?? null);
-  keydown(destinationButton, "Enter");
+  const destinationSelect = container.querySelector<HTMLSelectElement>(
+    "#transfer-destination-branch",
+  );
+  changeSelect(destinationSelect, "branch-2");
   await flush();
 
   const classButton = findButtonByText(container, "Pan dulce");
@@ -448,24 +465,26 @@ describe("TransferDispatchScreen", () => {
     await flush();
 
     const rightPanel = view.container.querySelector('[data-testid="right-panel-probe"]');
-    const registerButton = findButtonByText(rightPanel ?? document, "Registrar envio");
+    const registerButton = findButtonByText(rightPanel ?? document, "Confirmar envio");
 
     expect(registerButton?.disabled).toBe(true);
     expect(rightPanel?.textContent).toContain("Selecciona una sucursal destino.");
   });
 
-  it("supports keyboard destination selection and route update", async () => {
+  it("updates the compact destination selector and route", async () => {
     const view = renderUi();
     mountedRoots.push(view.unmount);
     await flush();
 
-    const destinationButton = findButtonByText(view.container, "North Branch");
-    focus(destinationButton ?? null);
-    keydown(destinationButton, "Enter");
+    const destinationSelect = view.container.querySelector<HTMLSelectElement>(
+      "#transfer-destination-branch",
+    );
+    changeSelect(destinationSelect, "branch-2");
     await flush();
 
+    expect(destinationSelect?.value).toBe("branch-2");
     expect(view.container.textContent).toContain("Main Branch -> North Branch");
-    expect(view.container.textContent).toContain("Seleccionada");
+    expect(view.container.textContent).toContain("Sucursal destino");
   });
 
   it("cancels the confirmation dialog without persisting", async () => {
@@ -474,7 +493,7 @@ describe("TransferDispatchScreen", () => {
     await addShipmentLineUsingKeyboard(view.container);
 
     const rightPanel = view.container.querySelector('[data-testid="right-panel-probe"]');
-    const registerButton = findButtonByText(rightPanel ?? document, "Registrar envio");
+    const registerButton = findButtonByText(rightPanel ?? document, "Confirmar envio");
     click(registerButton ?? null);
 
     expect(view.container.textContent).toContain("Confirmar envio a sucursal");
@@ -493,7 +512,20 @@ describe("TransferDispatchScreen", () => {
     await addShipmentLineUsingKeyboard(view.container);
 
     const rightPanel = view.container.querySelector('[data-testid="right-panel-probe"]');
-    const registerButton = findButtonByText(rightPanel ?? document, "Registrar envio");
+    const lineQuantityButton = rightPanel?.querySelector<HTMLButtonElement>(
+      'button[aria-label="Editar cantidad de Concha vainilla"]',
+    );
+    click(lineQuantityButton ?? null);
+    await flush();
+
+    const lineQuantityInput = rightPanel?.querySelector<HTMLInputElement>(
+      'input[aria-label="Cantidad de Concha vainilla"]',
+    );
+    changeInput(lineQuantityInput ?? null, "4");
+    keydown(lineQuantityInput ?? null, "Enter");
+    await flush();
+
+    const registerButton = findButtonByText(rightPanel ?? document, "Confirmar envio");
     focus(registerButton ?? null);
     click(registerButton ?? null);
     await flush();
@@ -505,20 +537,14 @@ describe("TransferDispatchScreen", () => {
 
     expect(commitTransferDispatch).toHaveBeenCalledWith("token", {
       destination_branch_id: "branch-2",
-      lines: [{ product_id: "product-1", quantity: "3" }],
+      lines: [{ product_id: "product-1", quantity: "4" }],
       notes: null,
       workstation_code: "POS-01",
     });
     expect(showSuccessMock).toHaveBeenCalledWith("Envio registrado. Folio ENV-000001.");
-    expect(rightPanel?.textContent).toContain("ENV-000001");
-    expect(rightPanel?.textContent).toContain("Ver historial");
-
-    const historyButton = findButtonByText(rightPanel ?? document, "Ver historial");
-    click(historyButton ?? null);
-    await flush();
-
     expect(view.container.textContent).toContain("Historial de envios");
     expect(view.container.textContent).toContain("ENV-000001");
     expect(rightPanel?.textContent).toContain("Envio seleccionado");
+    expect(rightPanel?.textContent).toContain("Volver a captura");
   });
 });

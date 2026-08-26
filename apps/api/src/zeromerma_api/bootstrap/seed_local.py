@@ -6,8 +6,10 @@ from decimal import Decimal
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from zeromerma_api.core.config import get_settings
 from zeromerma_api.db.session import SessionLocal
-from zeromerma_api.modules.branches.infrastructure.models import Branch, Workstation
+from zeromerma_api.db.wait import wait_for_database
+from zeromerma_api.modules.branches.infrastructure.models import Branch, Brand, Workstation
 from zeromerma_api.modules.catalog.domain.constants import (
     CATALOG_CAPTURE_MODE_CLASS_CAPTURE,
     CATALOG_CAPTURE_MODE_PRODUCT_DIRECT,
@@ -31,8 +33,23 @@ from zeromerma_api.modules.discounts.domain.constants import (
     DISCOUNT_CATEGORY_PAYROLL_ADVANCE_ADJUSTMENT,
 )
 from zeromerma_api.modules.discounts.infrastructure.models import OperationalDiscountCategory
+from zeromerma_api.modules.identity.application.permissions import PERMISSION_CATALOG
 from zeromerma_api.modules.identity.application.security import PasswordHasher
-from zeromerma_api.modules.identity.infrastructure.models import User, UserBranchAssignment
+from zeromerma_api.modules.identity.domain.constants import (
+    IDENTITY_ROLE_ADMIN,
+    IDENTITY_ROLE_BRANCH_MANAGER,
+    IDENTITY_ROLE_CASHIER,
+    IDENTITY_SURFACE_BACKOFFICE,
+    IDENTITY_SURFACE_POS,
+)
+from zeromerma_api.modules.identity.infrastructure.models import (
+    Permission,
+    Role,
+    RolePermission,
+    User,
+    UserBranchAssignment,
+    UserRoleAssignment,
+)
 from zeromerma_api.modules.operations.domain.constants import (
     WASTE_REASON_CONTAMINATED,
     WASTE_REASON_DAMAGED,
@@ -54,6 +71,10 @@ from zeromerma_api.modules.payments.infrastructure.models import OperationalPaym
 SEED_BRANCH_CODE = "MAIN"
 SEED_BRANCH_NAME = "Main Branch"
 SEED_BRANCH_TIMEZONE = "America/Hermosillo"
+SEED_BRAND_EL_MEJOR_PAN_CODE = "EL_MEJOR_PAN"
+SEED_BRAND_EL_MEJOR_PAN_NAME = "El Mejor Pan"
+SEED_BRAND_MERENNA_CODE = "MERENNA"
+SEED_BRAND_MERENNA_NAME = "Merenna"
 
 SEED_DESTINATION_BRANCH_CODE = "NORTE"
 SEED_DESTINATION_BRANCH_NAME = "North Branch"
@@ -76,6 +97,10 @@ SEED_USER_EMAIL = "cashier@zeromerma.local"
 SEED_USER_FULL_NAME = "Main Branch Cashier"
 SEED_USER_PASSWORD = "ChangeMe123!"
 
+SEED_ADMIN_EMAIL = "admin@zeromerma.local"
+SEED_ADMIN_FULL_NAME = "ZeroMerma Admin"
+SEED_ADMIN_PASSWORD = "AdminChangeMe123!"
+
 SEED_PRODUCT_CLASS_PAN_DULCE_CODE = "PAN-DULCE"
 SEED_PRODUCT_CLASS_BOLILLO_CODE = "BOLILLO"
 SEED_PRODUCT_CLASS_TELERA_CODE = "TELERA"
@@ -92,20 +117,41 @@ SEED_PRODUCT_CAFE_AMERICANO_CODE = "CAFE-AMERICANO"
 SEED_PRODUCT_PASTEL_CHOC_IND_CODE = "PASTEL-CHOC-IND"
 SEED_PRODUCT_REBANADA_TRES_LECHES_CODE = "REBANADA-TRES-LECHES"
 
+def _upsert_brand(
+    session: Session,
+    *,
+    code: str,
+    name: str,
+) -> Brand:
+    brand = session.execute(select(Brand).where(Brand.code == code)).scalar_one_or_none()
+    if brand is None:
+        brand = Brand(code=code, name=name, is_active=True)
+        session.add(brand)
+        session.flush()
+        return brand
+
+    brand.name = name
+    brand.is_active = True
+    session.flush()
+    return brand
+
+
 def _upsert_branch(
     session: Session,
     *,
+    brand_id: uuid.UUID,
     code: str,
     name: str,
     timezone: str,
 ) -> Branch:
     branch = session.execute(select(Branch).where(Branch.code == code)).scalar_one_or_none()
     if branch is None:
-        branch = Branch(code=code, name=name, timezone=timezone, is_active=True)
+        branch = Branch(brand_id=brand_id, code=code, name=name, timezone=timezone, is_active=True)
         session.add(branch)
         session.flush()
         return branch
 
+    branch.brand_id = brand_id
     branch.name = name
     branch.timezone = timezone
     branch.is_active = True
@@ -141,23 +187,38 @@ def _upsert_workstation(
     return workstation
 
 
-def _upsert_user(session: Session, *, password_hasher: PasswordHasher) -> User:
-    user = session.execute(select(User).where(User.email == SEED_USER_EMAIL)).scalar_one_or_none()
-    password_hash = password_hasher.hash_password(SEED_USER_PASSWORD)
+def _upsert_user(
+    session: Session,
+    *,
+    email: str,
+    full_name: str,
+    password: str,
+    default_surface: str,
+    allowed_surfaces: list[str] | None = None,
+    password_hasher: PasswordHasher,
+) -> User:
+    user = session.execute(select(User).where(User.email == email)).scalar_one_or_none()
+    password_hash = password_hasher.hash_password(password)
+    resolved_allowed_surfaces = allowed_surfaces or [default_surface]
     if user is None:
         user = User(
-            email=SEED_USER_EMAIL,
-            full_name=SEED_USER_FULL_NAME,
+            allowed_surfaces=resolved_allowed_surfaces,
+            email=email,
+            full_name=full_name,
             password_hash=password_hash,
+            default_surface=default_surface,
             is_active=True,
         )
         session.add(user)
         session.flush()
         return user
 
-    user.full_name = SEED_USER_FULL_NAME
+    user.full_name = full_name
     user.password_hash = password_hash
+    user.allowed_surfaces = resolved_allowed_surfaces
+    user.default_surface = default_surface
     user.is_active = True
+    user.is_locked = False
     session.flush()
     return user
 
@@ -167,6 +228,7 @@ def _upsert_assignment(
     *,
     user_id: uuid.UUID,
     branch_id: uuid.UUID,
+    is_default: bool = False,
 ) -> UserBranchAssignment:
     assignment = session.execute(
         select(UserBranchAssignment).where(
@@ -179,12 +241,101 @@ def _upsert_assignment(
             user_id=user_id,
             branch_id=branch_id,
             is_active=True,
+            is_default=is_default,
         )
         session.add(assignment)
         session.flush()
         return assignment
 
     assignment.is_active = True
+    assignment.is_default = is_default
+    session.flush()
+    return assignment
+
+
+def _seed_permissions(session: Session) -> dict[str, Permission]:
+    permissions: dict[str, Permission] = {}
+    for definition in PERMISSION_CATALOG:
+        permission = session.execute(
+            select(Permission).where(Permission.code == definition.code)
+        ).scalar_one_or_none()
+        if permission is None:
+            permission = Permission(code=definition.code)
+            session.add(permission)
+        permission.label = definition.label
+        permission.description = definition.description
+        permission.module = definition.module
+        permission.module_label = definition.module_label
+        permission.action = definition.action
+        permission.surfaces = list(definition.surfaces)
+        permission.is_sensitive = definition.is_sensitive
+        permission.is_active = True
+        session.flush()
+        permissions[definition.code] = permission
+    return permissions
+
+
+def _upsert_role(
+    session: Session,
+    *,
+    code: str,
+    name: str,
+    description: str,
+    surfaces: list[str],
+    permission_codes: list[str],
+    permissions: dict[str, Permission],
+    is_system: bool,
+) -> Role:
+    role = session.execute(select(Role).where(Role.code == code)).scalar_one_or_none()
+    if role is None:
+        role = Role(code=code)
+        session.add(role)
+    role.name = name
+    role.description = description
+    role.surfaces = surfaces
+    role.is_active = True
+    role.is_system = is_system
+    session.flush()
+
+    existing = session.execute(
+        select(RolePermission).where(RolePermission.role_id == role.id)
+    ).scalars().all()
+    for row in existing:
+        session.delete(row)
+    session.flush()
+    for permission_code in permission_codes:
+        session.add(
+            RolePermission(
+                role_id=role.id,
+                permission_id=permissions[permission_code].id,
+            )
+        )
+    session.flush()
+    return role
+
+
+def _upsert_user_role_assignment(
+    session: Session,
+    *,
+    user_id: uuid.UUID,
+    role_id: uuid.UUID,
+    assigned_by_user_id: uuid.UUID | None,
+) -> UserRoleAssignment:
+    assignment = session.execute(
+        select(UserRoleAssignment).where(
+            UserRoleAssignment.user_id == user_id,
+            UserRoleAssignment.role_id == role_id,
+        )
+    ).scalar_one_or_none()
+    if assignment is None:
+        assignment = UserRoleAssignment(
+            user_id=user_id,
+            role_id=role_id,
+            assigned_by_user_id=assigned_by_user_id,
+        )
+        session.add(assignment)
+    assignment.is_active = True
+    assignment.assigned_by_user_id = assigned_by_user_id
     session.flush()
     return assignment
 
@@ -192,6 +343,7 @@ def _upsert_assignment(
 def _upsert_product_class(
     session: Session,
     *,
+    brand_id: uuid.UUID,
     code: str,
     name: str,
     quick_name: str | None,
@@ -205,6 +357,7 @@ def _upsert_product_class(
     ).scalar_one_or_none()
     if product_class is None:
         product_class = ProductClass(
+            brand_id=brand_id,
             code=code,
             name=name,
             quick_name=quick_name,
@@ -218,6 +371,7 @@ def _upsert_product_class(
         )
         session.add(product_class)
 
+    product_class.brand_id = brand_id
     product_class.name = name
     product_class.quick_name = quick_name
     product_class.search_aliases = search_aliases
@@ -525,9 +679,10 @@ def _seed_discount_categories(session: Session) -> None:
     )
 
 
-def _seed_pos_catalog(session: Session) -> None:
+def _seed_pos_catalog(session: Session, *, brand_id: uuid.UUID) -> None:
     pan_dulce = _upsert_product_class(
         session,
+        brand_id=brand_id,
         code=SEED_PRODUCT_CLASS_PAN_DULCE_CODE,
         name="Pan dulce",
         quick_name="Dulce",
@@ -538,6 +693,7 @@ def _seed_pos_catalog(session: Session) -> None:
     )
     bolillo = _upsert_product_class(
         session,
+        brand_id=brand_id,
         code=SEED_PRODUCT_CLASS_BOLILLO_CODE,
         name="Bolillo",
         quick_name="Bolillo",
@@ -548,6 +704,7 @@ def _seed_pos_catalog(session: Session) -> None:
     )
     telera = _upsert_product_class(
         session,
+        brand_id=brand_id,
         code=SEED_PRODUCT_CLASS_TELERA_CODE,
         name="Telera",
         quick_name="Telera",
@@ -558,6 +715,7 @@ def _seed_pos_catalog(session: Session) -> None:
     )
     bebidas = _upsert_product_class(
         session,
+        brand_id=brand_id,
         code=SEED_PRODUCT_CLASS_BEBIDAS_CODE,
         name="Bebidas",
         quick_name="Bebidas",
@@ -568,6 +726,7 @@ def _seed_pos_catalog(session: Session) -> None:
     )
     pasteles = _upsert_product_class(
         session,
+        brand_id=brand_id,
         code=SEED_PRODUCT_CLASS_PASTELES_CODE,
         name="Pasteles",
         quick_name="Pasteles",
@@ -671,21 +830,34 @@ def _seed_pos_catalog(session: Session) -> None:
 
 def seed_local_data(session: Session) -> None:
     password_hasher = PasswordHasher()
+    el_mejor_pan_brand = _upsert_brand(
+        session,
+        code=SEED_BRAND_EL_MEJOR_PAN_CODE,
+        name=SEED_BRAND_EL_MEJOR_PAN_NAME,
+    )
+    merenna_brand = _upsert_brand(
+        session,
+        code=SEED_BRAND_MERENNA_CODE,
+        name=SEED_BRAND_MERENNA_NAME,
+    )
 
     main_branch = _upsert_branch(
         session,
+        brand_id=el_mejor_pan_brand.id,
         code=SEED_BRANCH_CODE,
         name=SEED_BRANCH_NAME,
         timezone=SEED_BRANCH_TIMEZONE,
     )
     north_branch = _upsert_branch(
         session,
+        brand_id=merenna_brand.id,
         code=SEED_DESTINATION_BRANCH_CODE,
         name=SEED_DESTINATION_BRANCH_NAME,
         timezone=SEED_DESTINATION_BRANCH_TIMEZONE,
     )
     south_branch = _upsert_branch(
         session,
+        brand_id=el_mejor_pan_brand.id,
         code=SEED_ALT_DESTINATION_BRANCH_CODE,
         name=SEED_ALT_DESTINATION_BRANCH_NAME,
         timezone=SEED_ALT_DESTINATION_BRANCH_TIMEZONE,
@@ -710,11 +882,83 @@ def seed_local_data(session: Session) -> None:
         name=SEED_ALT_DESTINATION_WORKSTATION_NAME,
     )
 
-    user = _upsert_user(session, password_hasher=password_hasher)
-    _upsert_assignment(session, user_id=user.id, branch_id=main_branch.id)
+    user = _upsert_user(
+        session,
+        email=SEED_USER_EMAIL,
+        full_name=SEED_USER_FULL_NAME,
+        password=SEED_USER_PASSWORD,
+        default_surface=IDENTITY_SURFACE_POS,
+        allowed_surfaces=[IDENTITY_SURFACE_POS],
+        password_hasher=password_hasher,
+    )
+    admin_user = _upsert_user(
+        session,
+        email=SEED_ADMIN_EMAIL,
+        full_name=SEED_ADMIN_FULL_NAME,
+        password=SEED_ADMIN_PASSWORD,
+        default_surface=IDENTITY_SURFACE_BACKOFFICE,
+        allowed_surfaces=[IDENTITY_SURFACE_BACKOFFICE],
+        password_hasher=password_hasher,
+    )
+    _upsert_assignment(session, user_id=user.id, branch_id=main_branch.id, is_default=True)
     _upsert_assignment(session, user_id=user.id, branch_id=north_branch.id)
     _upsert_assignment(session, user_id=user.id, branch_id=south_branch.id)
-    _seed_pos_catalog(session)
+    _upsert_assignment(session, user_id=admin_user.id, branch_id=main_branch.id, is_default=True)
+    _upsert_assignment(session, user_id=admin_user.id, branch_id=north_branch.id)
+    _upsert_assignment(session, user_id=admin_user.id, branch_id=south_branch.id)
+    permissions = _seed_permissions(session)
+    admin_role = _upsert_role(
+        session,
+        code=IDENTITY_ROLE_ADMIN,
+        name="Administrador",
+        description="Acceso administrativo completo a Backoffice.",
+        surfaces=[IDENTITY_SURFACE_BACKOFFICE],
+        permission_codes=list(permissions.keys()),
+        permissions=permissions,
+        is_system=True,
+    )
+    cashier_role = _upsert_role(
+        session,
+        code=IDENTITY_ROLE_CASHIER,
+        name="Cajero POS",
+        description="Operacion basica de punto de venta en sucursales asignadas.",
+        surfaces=[IDENTITY_SURFACE_POS],
+        permission_codes=["pos.operate"],
+        permissions=permissions,
+        is_system=True,
+    )
+    _upsert_role(
+        session,
+        code=IDENTITY_ROLE_BRANCH_MANAGER,
+        name="Encargado de sucursal",
+        description="Gestion operativa de sucursal con consulta financiera y calidad.",
+        surfaces=[IDENTITY_SURFACE_POS, IDENTITY_SURFACE_BACKOFFICE],
+        permission_codes=[
+            "pos.operate",
+            "sales_tickets.view",
+            "orders.manage",
+            "returns_corrections.manage",
+            "inventory.adjust",
+            "cash_finance.view",
+            "quality_hygiene.manage",
+            "reports.export",
+        ],
+        permissions=permissions,
+        is_system=True,
+    )
+    _upsert_user_role_assignment(
+        session,
+        user_id=user.id,
+        role_id=cashier_role.id,
+        assigned_by_user_id=admin_user.id,
+    )
+    _upsert_user_role_assignment(
+        session,
+        user_id=admin_user.id,
+        role_id=admin_role.id,
+        assigned_by_user_id=admin_user.id,
+    )
+    _seed_pos_catalog(session, brand_id=el_mejor_pan_brand.id)
     _seed_waste_reasons(session)
     _seed_correction_reasons(session)
     _seed_payment_categories(session)
@@ -722,16 +966,22 @@ def seed_local_data(session: Session) -> None:
 
 
 def main() -> int:
+    settings = get_settings()
+    wait_for_database(str(settings.database_url))
+
     with SessionLocal() as session:
         seed_local_data(session)
         session.commit()
 
     print(
         "Seeded branches "
-        f"{SEED_BRANCH_CODE}, {SEED_DESTINATION_BRANCH_CODE}, and {SEED_ALT_DESTINATION_BRANCH_CODE}, workstations "
-        f"{SEED_WORKSTATION_CODE}, {SEED_DESTINATION_WORKSTATION_CODE}, and {SEED_ALT_DESTINATION_WORKSTATION_CODE}."
+        f"{SEED_BRANCH_CODE}, {SEED_DESTINATION_BRANCH_CODE}, "
+        f"and {SEED_ALT_DESTINATION_BRANCH_CODE}, workstations "
+        f"{SEED_WORKSTATION_CODE}, {SEED_DESTINATION_WORKSTATION_CODE}, "
+        f"and {SEED_ALT_DESTINATION_WORKSTATION_CODE}."
     )
     print(f"Seeded cashier {SEED_USER_EMAIL} with password {SEED_USER_PASSWORD}.")
+    print(f"Seeded admin {SEED_ADMIN_EMAIL} with password {SEED_ADMIN_PASSWORD}.")
     print(
         "Seeded operational catalog products, waste reasons, correction reasons, "
         "payment categories, discount categories, and cash close payment-method defaults."

@@ -94,6 +94,7 @@ const bootstrapResponse = {
   discount_registration_allowed: true,
   local_timestamp: "2026-04-22T18:00:00Z",
   user: {
+    default_surface: "POS",
     email: "cashier@zeromerma.local",
     full_name: "Main Branch Cashier",
     id: "user-1",
@@ -505,13 +506,13 @@ afterEach(() => {
 });
 
 describe("DiscountsScreen", () => {
-  it("shows an explanatory empty state and opens create from the registered shortcut", async () => {
+  it("shows a compact empty state and opens create from the registered shortcut", async () => {
     seededDiscounts = [];
     const view = renderUi(<DiscountsScreen />);
     mountedRoots.push(view.unmount);
 
-    expect(view.container.textContent).toContain("Sin descuentos para esta vista");
-    expect(view.container.textContent).toContain("Los descuentos operativos registran cobros internos auditables");
+    expect(view.container.textContent).toContain("Sin descuentos registrados");
+    expect(view.container.textContent).toContain("Sin descuentos registrados en turno actual.");
 
     triggerShortcut("discounts-new");
     await flushPromises();
@@ -555,7 +556,7 @@ describe("DiscountsScreen", () => {
     dispatchElementKey(secondRow, "Enter");
     await flushPromises();
 
-    expect(view.container.textContent).toContain("Descuento en vista");
+    expect(secondRow.getAttribute("aria-selected")).toBe("true");
   });
 
   it("requires high-value acknowledgement before confirming and then creates the discount", async () => {
@@ -632,10 +633,6 @@ describe("DiscountsRightPanel", () => {
   it("shows validation blockers in create mode", () => {
     const view = renderUi(
       <DiscountsRightPanel
-        blockedMessages={[
-          "Captura la persona o entidad del descuento.",
-          "Selecciona la categoria del descuento.",
-        ]}
         blockedReason="Captura la persona o entidad del descuento."
         categories={[...bootstrapResponse.active_categories]}
         controls={bootstrapResponse.discount_controls}
@@ -649,17 +646,17 @@ describe("DiscountsRightPanel", () => {
         onCancelCreate={() => undefined}
         onCommitCreate={() => undefined}
         onResultAction={() => undefined}
-        recentCreatedDiscountId={null}
+        discountCount={0}
       />,
     );
     mountedRoots.push(view.unmount);
 
     expect(view.container.textContent).toContain("Nuevo descuento");
     expect(view.container.textContent).toContain("Captura la persona o entidad del descuento.");
-    expect(view.container.textContent).toContain("Selecciona la categoria del descuento.");
+    expect(view.container.textContent).toContain("Monto");
   });
 
-  it("shows success result with history action for a newly created discount", () => {
+  it("shows compact detail for a selected discount", () => {
     const detail = toDiscountDetail({
       ...baseDiscounts[0]!,
       concept: "Prestamo interno abril",
@@ -672,7 +669,6 @@ describe("DiscountsRightPanel", () => {
 
     const view = renderUi(
       <DiscountsRightPanel
-        blockedMessages={[]}
         blockedReason={null}
         categories={[...bootstrapResponse.active_categories]}
         controls={bootstrapResponse.discount_controls}
@@ -686,21 +682,20 @@ describe("DiscountsRightPanel", () => {
         onCancelCreate={() => undefined}
         onCommitCreate={() => undefined}
         onResultAction={onResultAction}
-        recentCreatedDiscountId="discount-new"
+        discountCount={1}
       />,
     );
     mountedRoots.push(view.unmount);
 
-    expect(view.container.textContent).toContain("Descuento registrado");
     expect(view.container.textContent).toContain("DES-NEW001");
-    expect(view.container.textContent).toContain("Ver historial");
+    expect(view.container.textContent).toContain("Sergio Castellanos");
 
     click(
       Array.from(view.container.querySelectorAll("button")).find((button) =>
-        button.textContent?.includes("Ver historial"),
+        button.textContent?.includes("Nuevo descuento"),
       ),
     );
 
-    expect(onResultAction).toHaveBeenCalledWith("viewHistory");
+    expect(onResultAction).toHaveBeenCalledWith("newOperation");
   });
 });

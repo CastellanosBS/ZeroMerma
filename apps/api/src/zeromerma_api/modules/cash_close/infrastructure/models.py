@@ -5,6 +5,7 @@ from datetime import UTC, datetime
 from decimal import Decimal
 
 from sqlalchemy import (
+    Boolean,
     CheckConstraint,
     DateTime,
     ForeignKey,
@@ -23,9 +24,12 @@ from zeromerma_api.modules.cash_close.domain.constants import (
     CASH_CLOSE_DISCREPANCY_REASON_COUNT_ERROR,
     CASH_CLOSE_DISCREPANCY_RESOLUTION_TYPE_CLOSE_COUNTER_ADJUSTMENT,
     CASH_CLOSE_ISSUE_LEVEL_BLOCKER,
+    CASH_CLOSE_MODE_WITH_COUNT,
     CASH_CLOSE_PAYMENT_METHOD_CASH,
     CASH_CLOSE_RECONCILIATION_STATUS_NOT_EVALUATED,
     CASH_CLOSE_STATUS_PREVIEW,
+    FINANCIAL_RECONCILIATION_SOURCE_CASH_CUT,
+    FINANCIAL_RECONCILIATION_STATUS_PENDING,
 )
 from zeromerma_api.modules.operations.domain.constants import (
     OPERATION_BUCKET_BACKROOM,
@@ -49,6 +53,10 @@ class CashSessionClose(Base):
         CheckConstraint(
             "status IN ('PREVIEW', 'READY', 'COMMITTED')",
             name="ck_cash_session_closes_status_valid",
+        ),
+        CheckConstraint(
+            "close_mode IN ('WITH_COUNT')",
+            name="ck_cash_session_closes_close_mode_valid",
         ),
         CheckConstraint(
             "reconciliation_status IN ('NOT_EVALUATED', 'PENDING', 'BLOCKED', 'READY')",
@@ -80,6 +88,10 @@ class CashSessionClose(Base):
     status: Mapped[str] = mapped_column(
         String(20), default=CASH_CLOSE_STATUS_PREVIEW, nullable=False
     )
+    close_mode: Mapped[str] = mapped_column(
+        String(32), default=CASH_CLOSE_MODE_WITH_COUNT, nullable=False
+    )
+    counter_empty_confirmed: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     opening_amount: Mapped[Decimal] = mapped_column(Numeric(12, 2), nullable=False)
     total_cash_in: Mapped[Decimal] = mapped_column(Numeric(12, 2), nullable=False)
     total_cash_out: Mapped[Decimal] = mapped_column(Numeric(12, 2), nullable=False)
@@ -346,6 +358,121 @@ class CashSessionCloseIssue(Base):
     message: Mapped[str] = mapped_column(Text, nullable=False)
 
 
+class FinancialReconciliation(Base):
+    __tablename__ = "financial_reconciliations"
+    __table_args__ = (
+        UniqueConstraint(
+            "source_type",
+            "source_document_id",
+            "payment_method_code",
+            name="uq_financial_reconciliations_source_method",
+        ),
+        CheckConstraint(
+            "source_type IN ("
+            "'CASH_CUT', "
+            "'PAYMENT_SETTLEMENT', "
+            "'DEPOSIT', "
+            "'RETURN_REFUND', "
+            "'OPERATIONAL_PAYMENT', "
+            "'CORRECTION'"
+            ")",
+            name="ck_financial_reconciliations_source_valid",
+        ),
+        CheckConstraint(
+            "status IN ('PENDING', 'IN_REVIEW', 'RECONCILED', 'VOIDED')",
+            name="ck_financial_reconciliations_status_valid",
+        ),
+        CheckConstraint(
+            "reason_code IS NULL OR reason_code IN ("
+            "'COUNTING_ERROR', "
+            "'CASH_MISSING', "
+            "'CASH_OVER', "
+            "'CARD_SETTLEMENT_DIFFERENCE', "
+            "'REFUND_RECORDED', "
+            "'OPERATIONAL_PAYMENT_MISSING', "
+            "'DEPOSIT_DIFFERENCE', "
+            "'DUPLICATE_TICKET', "
+            "'CORRECTION_APPLIED', "
+            "'OTHER'"
+            ")",
+            name="ck_financial_reconciliations_reason_valid",
+        ),
+        CheckConstraint(
+            "expected_amount >= 0",
+            name="ck_financial_reconciliations_expected_non_negative",
+        ),
+        CheckConstraint(
+            "actual_amount >= 0",
+            name="ck_financial_reconciliations_actual_non_negative",
+        ),
+        CheckConstraint(
+            "difference_amount <> 0",
+            name="ck_financial_reconciliations_difference_non_zero",
+        ),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    folio: Mapped[str] = mapped_column(String(40), unique=True, nullable=False)
+    source_type: Mapped[str] = mapped_column(
+        String(40),
+        default=FINANCIAL_RECONCILIATION_SOURCE_CASH_CUT,
+        nullable=False,
+    )
+    source_document_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), nullable=False)
+    source_reference: Mapped[str] = mapped_column(String(80), nullable=False)
+    source_occurred_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    branch_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("branches.id", ondelete="RESTRICT"),
+        nullable=False,
+    )
+    workstation_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("workstations.id", ondelete="RESTRICT"),
+        nullable=False,
+    )
+    operator_user_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("users.id", ondelete="SET NULL"),
+        nullable=True,
+    )
+    payment_method_code: Mapped[str] = mapped_column(String(40), nullable=False)
+    expected_amount: Mapped[Decimal] = mapped_column(Numeric(12, 2), nullable=False)
+    actual_amount: Mapped[Decimal] = mapped_column(Numeric(12, 2), nullable=False)
+    difference_amount: Mapped[Decimal] = mapped_column(Numeric(12, 2), nullable=False)
+    status: Mapped[str] = mapped_column(
+        String(20),
+        default=FINANCIAL_RECONCILIATION_STATUS_PENDING,
+        nullable=False,
+    )
+    reason_code: Mapped[str | None] = mapped_column(String(60), nullable=True)
+    notes: Mapped[str | None] = mapped_column(Text, nullable=True)
+    evidence_note: Mapped[str | None] = mapped_column(Text, nullable=True)
+    has_evidence: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    created_by_user_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("users.id", ondelete="RESTRICT"),
+        nullable=False,
+    )
+    resolved_by_user_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("users.id", ondelete="SET NULL"),
+        nullable=True,
+    )
+    resolved_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=utc_now,
+        nullable=False,
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=utc_now,
+        onupdate=utc_now,
+        nullable=False,
+    )
+
+
 class BranchCounterSnapshot(Base):
     __tablename__ = "branch_counter_snapshots"
     __table_args__ = (
@@ -426,6 +553,7 @@ _ = (
     CASH_CLOSE_DISCREPANCY_RESOLUTION_TYPE_CLOSE_COUNTER_ADJUSTMENT,
     CASH_CLOSE_ISSUE_LEVEL_BLOCKER,
     CASH_CLOSE_CLASS_RESOLUTION_STATUS_COUNT_REQUIRED,
+    CASH_CLOSE_MODE_WITH_COUNT,
     OPERATION_BUCKET_BACKROOM,
     OPERATION_BUCKET_COUNTER,
     OPERATION_BUCKET_IN_TRANSIT,
