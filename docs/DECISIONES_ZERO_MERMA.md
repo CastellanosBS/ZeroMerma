@@ -444,12 +444,203 @@ La relación actual `(user_id, role_id)` puede conservarse: una única asignaci�
 
 ## DEC-05 — Sesión
 
-- **Estado:** `PENDIENTE`
+- **Estado:** `APROBADA`
+- **Fecha:** 2026-08-27
 - **Propietario:** propietario de ZeroMerma
-- **Qué debe aprobarse:** cookie segura, intercambio de un solo uso u otro mecanismo; duración, refresh, revocación y terminal compartida.
-- **Tareas principales afectadas:** tarea de sesión correspondiente del Plan Maestro; `POS-BO-01`; tareas de seguridad relacionadas.
-- **Respuesta aprobada:** ninguna; el traspaso actual de bearer mediante URL no está autorizado para producción.
-- **Regla:** ninguna inferencia de `ZM-FIN-002` constituye la solución de sesión.
+- **Contenido aprobado:** sesiones opacas server-side independientes para POS y Backoffice; cookies seguras; protección CSRF; expiración, bloqueo y revocación; vínculo explícito con estación y caja; y migración sin convivencia permanente con bearer.
+- **Respuesta aprobada:** política normativa, modelo conceptual y estrategia de migración descritos en esta decisión.
+
+### Arquitectura de sesión
+
+1. POS y Backoffice utilizarán sesiones opacas persistidas server-side.
+2. POS y Backoffice tendrán audiencias y sesiones independientes.
+3. La credencial será un secreto aleatorio criptográficamente fuerte y opaco.
+4. El secreto crudo nunca se persistirá server-side; se almacenará únicamente un hash o HMAC adecuado para verificarlo.
+5. La credencial se transportará únicamente mediante cookie segura.
+6. No habrá bearer en URL, bearer persistido en `localStorage`, sesión compartida POS-Backoffice, SSO implícito ni canje automático POS-Backoffice.
+7. POS-Backoffice continuará requiriendo login Backoffice independiente.
+8. Los grants y scopes no se almacenarán como autoridad dentro de la cookie; se resolverán server-side conforme a DEC-03 y DEC-04.
+
+### Modelo canónico de sesión
+
+La entidad conceptual común será equivalente a:
+
+```text
+AuthSession
+  id
+  credential_hash
+  user_id
+  audience: POS | BACKOFFICE
+  status: ACTIVE | LOCKED | REVOKED | EXPIRED
+  created_at
+  last_activity_at
+  idle_expires_at
+  absolute_expires_at
+  revoked_at nullable
+  revocation_reason nullable
+  workstation_id nullable
+  cash_session_id nullable
+```
+
+Invariantes:
+
+- Para `POS`, `workstation_id` será obligatorio y `cash_session_id` será opcional para representar el vínculo con el turno cuando exista.
+- Para `BACKOFFICE`, `workstation_id` y `cash_session_id` serán nulos.
+- `AuthSession`, `CashSession` y `Workstation` son entidades distintas y no deberán fusionarse.
+- IP y user-agent serán datos opcionales cuya necesidad y retención dependerán de DEC-16.
+- Nunca se registrarán en auditoría el secreto de cookie, bearer heredado, token o secreto CSRF, contraseña ni material break-glass. El estado de sesión conservará únicamente verificadores no reversibles, como `credential_hash` y el verificador necesario para el token CSRF synchronizer; nunca los secretos crudos.
+
+### Cookies
+
+La cookie POS tendrá como nombre recomendado `__Host-zm-pos-session`, `Secure=true`, `HttpOnly=true`, `Path=/`, `Domain` omitido y duración absoluta máxima de 12 horas.
+
+La cookie Backoffice tendrá como nombre recomendado `__Host-zm-backoffice-session`, `Secure=true`, `HttpOnly=true`, `Path=/`, `Domain` omitido y duración absoluta máxima de 8 horas.
+
+El valor de `SameSite` dependerá de la topología:
+
+- despliegue same-site: `Lax` preferido;
+- despliegue cross-site: `None; Secure` sólo cuando sea técnicamente necesario.
+
+El valor final de `SameSite`, los orígenes productivos, TLS y reverse proxy dependen de DEC-17 y no alteran la política de negocio de DEC-05. La expiración del navegador nunca sustituirá la validación server-side. DEC-05 no aprueba un refresh token.
+
+### CSRF y CORS
+
+La autenticación mediante cookie requerirá protección CSRF en las mutaciones:
+
+1. token CSRF synchronizer ligado server-side a la sesión;
+2. conservación del token por el frontend únicamente en memoria;
+3. envío mediante `X-CSRF-Token` en mutaciones;
+4. validación backend del token y de `Origin`;
+5. uso de `Referer` sólo como fallback documentado;
+6. `SameSite` como defensa adicional, no como sustituto de CSRF;
+7. CORS con credenciales limitado a orígenes productivos explícitos;
+8. prohibición de `*` como origen credentialed productivo.
+
+La topología concreta se resolverá posteriormente conforme a DEC-17.
+
+### POS — idle y bloqueo
+
+- El timeout de inactividad POS será de 5 minutos.
+- La duración absoluta máxima POS será de 12 horas.
+- El servidor será la autoridad del timeout.
+- Polling, refetch automático, health checks y timers no contarán como actividad del operador.
+- La actividad podrá transmitirse mediante heartbeat limitado y ligado a eventos reales de teclado, touch o pointer.
+- Las mutaciones iniciadas por el usuario contarán como actividad.
+- La actividad nunca extenderá la duración absoluta.
+- Tras 5 minutos de inactividad, la sesión pasará de `ACTIVE` a `LOCKED`.
+- Mientras esté `LOCKED`, no se permitirán operaciones de negocio; sólo estado de sesión, reautenticación y logout.
+- El bloqueo no cerrará `CashSession` ni generará un cierre de turno.
+- Una reautenticación correcta conservará la misma `AuthSession`, la devolverá a `ACTIVE`, rotará el secreto de cookie y no reiniciará el límite absoluto.
+- Al alcanzar el máximo absoluto, `ACTIVE` o `LOCKED` pasará a `EXPIRED` y se exigirá un login completo.
+- El código de dominio recomendado será `SESSION_LOCKED`; HTTP `423` podrá representar una sesión POS bloqueada.
+
+### Unicidad POS
+
+Existirá como máximo una `AuthSession` POS `ACTIVE` o `LOCKED` por combinación usuario y workstation.
+
+- Un mismo usuario podrá autenticarse en estaciones diferentes mediante sesiones separadas y auditables.
+- Dos browsers del mismo usuario en la misma estación no mantendrán dos slots activos.
+- Una autenticación válida nueva reemplazará atómicamente la sesión anterior del mismo usuario y estación; la anterior quedará revocada con razón `REPLACED`.
+- Una estación inactiva no podrá crear ni desbloquear una sesión.
+- Autenticarse no concederá autoridad sobre una caja perteneciente a otro usuario.
+- La restricción vigente de `CashSession OPEN` por usuario no se modifica mediante DEC-05 y deberá reconciliarse con DEC-06.
+
+### Backoffice — sesiones múltiples
+
+- El timeout de inactividad Backoffice será de 15 minutos.
+- La duración absoluta máxima Backoffice será de 8 horas.
+- Se permitirán múltiples sesiones Backoffice simultáneas por usuario.
+- Cada sesión será visible al propio usuario, revocable individualmente e identificable mediante datos no secretos de creación, última actividad, expiración y estado.
+- Se requerirán operaciones conceptuales para listar sesiones propias, revocar una sesión propia, revocar todas excepto la actual y hacer logout de la sesión actual.
+- Administrar sesiones de otro usuario será autoridad derivada de `users.manage`, deberá respetar DEC-04 y no añadirá una capacidad nueva a DEC-03.
+
+### Revocación
+
+Una sesión afectada será inválida para cualquier request posterior al commit de su revocación.
+
+Se revocarán inmediatamente las sesiones afectadas por logout, bloqueo o desactivación del usuario, cambio de contraseña, cambio de privilegios o scope, cambio de `UserBranchAssignment`, activación o desactivación de rol o permiso y modificación de `allowed_surfaces`.
+
+Los cambios de autorización combinarán:
+
+1. resolución de grants y scopes en cada request conforme a DEC-03 y DEC-04;
+2. revocación de las sesiones de los usuarios afectados dentro de la misma transacción del cambio.
+
+Los grants efectivos no se cachearán en la cookie como autoridad. Las operaciones sensibles en curso deberán revalidar autoridad antes de commit cuando la tarea funcional correspondiente lo exija.
+
+### Cierre de caja y sesión POS
+
+Cuando `CashSession` pase de `OPEN` a `CLOSED`, se revocarán dentro de la misma unidad transaccional todas las `AuthSession` POS `ACTIVE` o `LOCKED` cuyo `cash_session_id` corresponda a la caja cerrada, con razón `CASH_SESSION_CLOSED`.
+
+Esto no significa revocar todas las sesiones del usuario, todas las sesiones de la estación ni únicamente la sesión del navegador que ejecutó el cierre. La definición de carreras entre venta, pago y cierre pertenece a DEC-06.
+
+### Cambio y recuperación de contraseña
+
+- El cambio propio de contraseña revocará todas las sesiones, incluida la actual.
+- Un reset administrativo revocará todas las sesiones.
+- Una recuperación futura utilizará una credencial independiente y de un solo uso.
+- Completar la recuperación revocará todas las sesiones.
+- DEC-05 no implica implementar en esta etapa una UI de cambio o recuperación.
+- Retención y comunicaciones de recuperación dependerán de DEC-16.
+
+### Auditoría
+
+Se registrarán conceptualmente los eventos `session.created`, `session.locked`, `session.unlocked`, `session.revoked`, `session.expired`, `session.logout`, `session.reauthentication_succeeded` y `session.reauthentication_failed`.
+
+Podrán incluir `session_id`, `user_id`, audiencia, `workstation_id`, `cash_session_id`, actor, reason code, `request_id` y timestamp. Nunca incluirán secretos. Auditoría y outbox de cambios de estado serán transaccionales cuando corresponda.
+
+### Migración desde bearer
+
+La transición conceptual será:
+
+1. crear persistencia de sesiones;
+2. implementar login, logout, consulta de sesión y reautenticación por audiencia;
+3. implementar cookies y CSRF;
+4. migrar POS;
+5. migrar Backoffice;
+6. introducir revocación transaccional;
+7. actualizar OpenAPI;
+8. regenerar el cliente TypeScript desde backend;
+9. retirar emisión y aceptación de bearer;
+10. eliminar de los clientes las claves heredadas `zeromerma-pos-auth` y `zeromerma-backoffice-auth`;
+11. no convertir automáticamente bearers heredados en sesiones;
+12. responder `401` a bearers heredados después del cutover.
+
+Si fuera imprescindible una convivencia temporal entre bearer y cookie, será acotada, bearer no se renovará, los clientes nuevos usarán sólo cookie, contará con telemetría sin secretos y se eliminará definitivamente. No se admite coexistencia permanente.
+
+### HTTP y contratos conceptuales
+
+- `401`: sesión ausente, inválida, revocada o expirada.
+- `403`: usuario autenticado sin capability o scope exigido por DEC-03 y DEC-04.
+- `423`: sesión POS bloqueada.
+- `409`: conflicto de estado o unicidad cuando corresponda.
+- Los errores no revelarán la existencia de usuarios por email.
+- DEC-05 registra las operaciones conceptuales necesarias, pero no fija rutas OpenAPI definitivas antes de su implementación.
+
+### Dependencias
+
+- DEC-03: capacidades y autorización deny-by-default.
+- DEC-04: scopes efectivos.
+- DEC-06: carreras de cierre y restricción de caja.
+- DEC-07: retries y resultados desconocidos.
+- DEC-15: pérdida de red y offline.
+- DEC-16: privacidad, retención, IP, user-agent y recuperación.
+- DEC-17: TLS, dominios, proxy, `SameSite` y alta disponibilidad.
+
+Estas decisiones no quedan resueltas por DEC-05.
+
+### Hallazgos técnicos asociados
+
+La evidencia estática registró bearer HMAC stateless con `sub` y `exp`, TTL común de 480 minutos, bearer en `localStorage` de POS y Backoffice, logout únicamente local, ausencia de idle, ausencia de una entidad Session persistente, ausencia de CSRF, CORS pendiente de endurecimiento productivo, ausencia de flujo de cambio de contraseña, `last_login_at` aparentemente actualizado mediante `flush` sin commit durable y cierre de caja sin revocación server-side.
+
+Estos hallazgos son deuda de implementación futura y no implican cambios de código autorizados por esta decisión.
+
+### Evidencia, tareas, consecuencias e historial
+
+- **Evidencia:** validación técnica de `ZM-FIN-003`; implementación actual de `TokenService`, `AuthService`, `get_current_user`, stores de autenticación POS y Backoffice, `CashSession`, `Workstation`, cierre de caja, auditoría, outbox, CORS y contratos vigentes.
+- **Tareas afectadas:** `ZM-FIN-003`, `ZM-FIN-008`, `ZM-FIN-015`, `ZM-FIN-016`, `ZM-FIN-017`, `ZM-FIN-018`, `ZM-FIN-019`, `ZM-FIN-020`, `ZM-FIN-021` y `ZM-FIN-022`; las tareas posteriores de cierre, idempotencia, infraestructura y seguridad deberán respetar DEC-05 conforme al Plan Maestro.
+- **Consecuencias:** migración coordinada de API, POS, Backoffice, OpenAPI y cliente generado; sesiones revocables; cookies seguras; CSRF; expiración por audiencia; vínculo de sesión POS con estación y caja; pruebas de concurrencia, revocación y aislamiento.
+- **Límite:** DEC-05 define la política y el modelo conceptual; no certifica que sesiones, cookies, CSRF, revocación, migraciones o contratos estén implementados o probados.
+- **Historial:** `PENDIENTE` desde 2026-08-26; `APROBADA` por el propietario el 2026-08-27.
 
 ## DEC-06 — Cierre
 
