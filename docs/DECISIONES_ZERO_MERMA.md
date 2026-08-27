@@ -2,7 +2,7 @@
 
 **Condición:** única fuente versionada para registrar `DEC-01`–`DEC-20` y sus futuras revisiones.
 **Propietario de las decisiones:** propietario de ZeroMerma.
-**Última actualización:** 2026-08-26.
+**Última actualización:** 2026-08-27.
 **Fuente normativa:** `PLAN_MAESTRO_FINALIZACION_ZERO_MERMA.md`, fecha de consolidación 2026-08-25, sección “Decisiones pendientes del propietario”, con contenido normativo suministrado por el propietario durante `ZM-FIN-002`.
 
 ## Reglas de gobierno
@@ -211,21 +211,236 @@ Las tareas `ZM-FIN-004`–`ZM-FIN-006` son precondiciones, no sustitutos de la v
 
 ## DEC-03 — RBAC
 
-- **Estado:** `PENDIENTE`
+- **Estado:** `APROBADA`
+- **Fecha:** 2026-08-27
 - **Propietario:** propietario de ZeroMerma
-- **Qué debe aprobarse:** catálogo de capacidades, superadministrador, separación de funciones y quién administra roles.
-- **Tareas principales afectadas:** `ZM-FIN-015`–`ZM-FIN-022`, según la distribución del Plan Maestro.
-- **Respuesta aprobada:** ninguna.
-- **Regla:** ninguna inferencia de `ZM-FIN-002` constituye decisión sobre RBAC.
+- **Contenido aprobado:** autorización backend deny-by-default, catálogo canónico de capacidades, Superadministrador explícito, separación de funciones y procedimiento excepcional con un único Superadministrador.
+- **Respuesta aprobada:** política normativa, catálogo de 55 capacidades y CLI local break-glass descritos en esta decisión.
+
+### Política normativa aprobada
+
+1. ZeroMerma utilizará autorización backend `deny-by-default`.
+2. Tener acceso a Backoffice no concede por sí mismo autoridad administrativa.
+3. Toda operación protegida deberá declarar una capacidad backend explícita.
+4. La UI sólo reflejará grants efectivos para UX; nunca será autoridad de seguridad.
+5. Existirá un rol explícito de Superadministrador.
+6. El Superadministrador no se inferirá por email, usuario seed, `allowed_surfaces` ni ausencia de scope.
+7. El rol canónico será explícitamente identificable como Superadministrador y tendrá `GLOBAL` explícito.
+8. No habrá wildcard implícito de capacidades: el Superadministrador sólo obtendrá capacidades explícitamente asignadas al rol.
+9. Una capacidad nueva no será concedida automáticamente al Superadministrador hasta incorporarla deliberadamente al rol.
+10. Habrá separación entre administración de usuarios, administración de roles/capacidades y asignación de roles/scopes.
+11. `users.manage` no permitirá conceder privilegios.
+12. `roles.manage` no permitirá autoelevación ni asignar unilateralmente Superadministrador.
+13. `role_assignments.manage` administrará asignaciones ordinarias, pero no eludirá las reglas especiales de Superadministrador.
+14. Ningún actor podrá autoasignarse privilegios superiores.
+15. No podrá eliminarse, bloquearse, desactivarse, degradarse, quitarse Backoffice ni reducirse a scope no global al último Superadministrador activo.
+16. Las comprobaciones del último Superadministrador deberán serializarse transaccionalmente para impedir que cambios concurrentes eliminen la última autoridad.
+17. Cuando existan al menos dos Superadministradores activos, todo cambio de privilegio de Superadministrador requerirá iniciador Superadministrador, aprobador Superadministrador distinto, aprobación durable, payload exacto aprobado, expiración, uso único, revalidación de ambos actores al ejecutar, auditoría y outbox.
+18. Cuando exista únicamente un Superadministrador activo, el procedimiento canónico excepcional será una **CLI local break-glass dedicada**.
+19. La CLI local break-glass:
+    - sólo podrá ejecutarse desde un host o control plane autorizado;
+    - requerirá material de recuperación independiente y de un solo uso;
+    - reutilizará el servicio de aplicación y sus invariantes;
+    - no ejecutará SQL manual como mecanismo normal;
+    - sólo podrá crear o promover al segundo Superadministrador;
+    - no podrá degradar, desactivar ni eliminar al último Superadministrador;
+    - serializará la operación;
+    - generará auditoría y outbox transaccionales;
+    - invalidará o rotará el material de recuperación utilizado.
+20. Un endpoint web break-glass no será el mecanismo canónico aprobado.
+21. SQL o migraciones manuales no serán el procedimiento operativo normal de recuperación; sólo podrán formar parte de disaster recovery extraordinario fuera de esta política.
+
+### Catálogo técnico canónico
+
+El catálogo canónico derivado de la política aprobada contiene exactamente estos 55 códigos únicos:
+
+```text
+pos.operate
+sales_tickets.view
+sales_tickets.reprint
+orders.view
+orders.manage
+orders.cancel
+returns_corrections.view
+returns_corrections.manage
+catalog.view
+catalog.manage
+catalog.availability.manage
+pricing.view
+pricing.manage
+recipes.view
+recipes.manage
+discounts.view
+discounts.manage
+inventory.view
+inventory.adjust
+branches.view
+branches.manage
+workstations.view
+workstations.manage
+transfers.view
+transfers.manage
+transfers.execute
+transfers.cancel
+production.view
+production.manage
+production.execute
+production.cancel
+waste.view
+waste.manage
+suppliers.view
+suppliers.manage
+purchases.view
+purchases.manage
+purchases.confirm
+purchases.receive
+purchases.cancel
+cash_finance.view
+cash_finance.manage
+quality_hygiene.view
+quality_hygiene.manage
+users.view
+users.manage
+roles.view
+roles.manage
+role_assignments.manage
+audit.view
+audit.export
+reports.view
+reports.export
+config.view
+config.manage
+```
+
+### Capacidades existentes a retirar después de migración
+
+Las siguientes capacidades quedan deprecadas conceptualmente una vez que todos sus consumidores hayan migrado. No deben eliminarse antes de completar esa migración:
+
+```text
+catalog_products.manage
+multibranch_operations.manage
+purchases_supply.manage
+```
+
+No se mantendrá una arquitectura paralela ni una capa permanente de aliases para estas capacidades.
+
+### Reglas de separación relevantes
+
+Las siguientes capacidades son autoridades diferentes y no se implican entre sí:
+
+```text
+users.view != users.manage
+roles.view != roles.manage
+roles.manage != role_assignments.manage
+inventory.view != inventory.adjust
+reports.view != reports.export
+audit.view != audit.export
+sales_tickets.view != sales_tickets.reprint
+```
+
+La misma regla de mínimo privilegio se aplicará a los splits restantes: lectura, mantenimiento ordinario, ejecución, aprobación, cancelación, reversa y exportación no se combinarán cuando hacerlo impida expresar la separación de funciones aprobada.
+
+### Evidencia, tareas, consecuencias e historial
+
+- **Evidencia:** validación técnica de `ZM-FIN-003`; catálogo vigente de 17 capacidades en `apps/api/src/zeromerma_api/modules/identity/application/permissions.py`; ausencia de enforcement backend por capacidad; modelos `Role`, `Permission`, `RolePermission`, `UserRoleAssignment` y `UserBranchAssignment`; guardas actuales basadas en superficie o `roles.manage`; ausencia de un mecanismo productivo break-glass.
+- **Tareas afectadas:** `ZM-FIN-003`, `ZM-FIN-008`, `ZM-FIN-015`, `ZM-FIN-016`, `ZM-FIN-017`, `ZM-FIN-018`, `ZM-FIN-019`, `ZM-FIN-020`, `ZM-FIN-021` y `ZM-FIN-022`.
+- **Consecuencias:** los routers deberán aplicar capacidades explícitas en backend; usuarios, roles y asignaciones tendrán autoridades separadas; Superadministrador, doble intervención y break-glass requerirán implementación, migraciones y pruebas específicas.
+- **Límite:** DEC-03 define la política normativa y el catálogo; no certifica que RBAC, Superadministrador o la CLI break-glass estén implementados, migrados o probados.
+- **Historial:** `PENDIENTE` desde 2026-08-26; `APROBADA` por el propietario el 2026-08-27, incluida la opción A de CLI local break-glass dedicada.
 
 ## DEC-04 — Scopes
 
-- **Estado:** `PENDIENTE`
+- **Estado:** `APROBADA`
+- **Fecha:** 2026-08-27
 - **Propietario:** propietario de ZeroMerma
-- **Qué debe aprobarse:** roles globales o scoped, múltiples sucursales y operaciones centralizadas permitidas.
-- **Tareas principales afectadas:** `ZM-FIN-015`–`ZM-FIN-022`, según la distribución del Plan Maestro.
-- **Respuesta aprobada:** ninguna.
-- **Regla:** ninguna inferencia de `ZM-FIN-002` constituye decisión sobre scopes.
+- **Contenido aprobado:** scopes explícitos `GLOBAL` y `BRANCH_SET`, resolución por capacidad, intersección con sucursales asignadas, reglas multisucursal y modelo técnico normalizado.
+- **Respuesta aprobada:** política normativa, modelo y algoritmo descritos en esta decisión.
+
+### Política normativa aprobada
+
+1. ZeroMerma soportará usuarios Backoffice con múltiples sucursales y operaciones administrativas centralizadas.
+2. Todo scope será explícito: `GLOBAL` o `BRANCH_SET`.
+3. Scope ausente o vacío nunca significará `GLOBAL`.
+4. Los grants se resolverán por capacidad.
+5. Varias asignaciones activas que concedan la misma capacidad podrán aportar scopes.
+6. Los scopes de esas asignaciones se unirán por capacidad.
+7. Para asignaciones `BRANCH_SET`, el scope autorizado se intersectará con las `UserBranchAssignment` activas del usuario.
+8. Una sucursal no activamente asignada al usuario no podrá utilizarse mediante `BRANCH_SET`, aunque aparezca en el scope del rol.
+9. `GLOBAL` explícito no será limitado por `UserBranchAssignment`.
+10. `GLOBAL` nunca se inferirá de ausencia de scope, pertenencia a Backoffice, rol seed, email ni múltiples sucursales.
+11. El Superadministrador tendrá `GLOBAL` explícito.
+12. Una operación origen-destino requerirá autoridad sobre ambos extremos, salvo `GLOBAL`.
+13. Los listados sin filtro de sucursal no ampliarán acceso: con `BRANCH_SET`, el backend inyectará el conjunto efectivo; con `GLOBAL`, podrá consultar globalmente conforme a la capacidad.
+14. Agregados, reportes y exportaciones sólo incluirán sucursales autorizadas.
+15. Una sucursal inactiva no permitirá operaciones económicas ordinarias.
+16. Ningún usuario o rol existente será convertido silenciosamente a `GLOBAL` durante una migración.
+
+### Modelo técnico canónico
+
+El modelo normalizado derivado de DEC-04 será:
+
+```text
+UserRoleAssignment
+  scope_type: GLOBAL | BRANCH_SET, obligatorio
+
+UserRoleAssignmentBranchScope
+  assignment_id FK
+  branch_id FK
+  UNIQUE(assignment_id, branch_id)
+```
+
+Invariantes:
+
+```text
+GLOBAL -> cero filas branch scope
+BRANCH_SET -> al menos una fila branch scope
+scope ausente -> inválido y DENY
+```
+
+La relación actual `(user_id, role_id)` puede conservarse: una única asignación usuario-rol contiene el conjunto completo de sucursales de esa asignación. La implementación deberá preservar integridad referencial mediante FKs y validación transaccional. JSON o ARRAY no será el modelo canónico de scope.
+
+### Algoritmo normativo
+
+```text
+1. usuario inexistente, inactivo o bloqueado -> DENY
+2. capacidad inexistente o inactiva -> DENY
+3. considerar sólo roles, asignaciones y permisos activos
+4. ausencia de grant -> DENY
+5. unir scopes de todas las asignaciones que conceden ESA capacidad
+6. GLOBAL explícito -> ALLOW_GLOBAL
+7. BRANCH_SET -> unión de scopes de rol
+8. intersectar BRANCH_SET con UserBranchAssignment activas
+9. scope efectivo vacío -> DENY
+10. colección sin filtro -> servidor limita al scope efectivo
+11. origen-destino -> ambos deben pertenecer al scope efectivo
+12. Superadministrador requiere GLOBAL explícito y RolePermission explícito
+```
+
+### Ejemplos normativos
+
+1. `sales_tickets.view` en Norte permite consultar Norte y niega Centro.
+2. `sales_tickets.view` en Norte y Centro junto con `inventory.adjust` sólo en Norte no comparte scopes entre capacidades: el ajuste en Centro se deniega.
+3. Una transferencia Norte-Sur requiere autoridad sobre Norte y Sur; disponer sólo de Norte produce `DENY`, mientras que `GLOBAL` explícito permite ambos extremos.
+4. Dos roles que conceden la misma capacidad en Norte y Centro producen la unión Norte más Centro antes de aplicar la frontera del usuario.
+5. Un rol que concede Norte y Centro, combinado con `UserBranchAssignment` activa sólo en Norte, produce scope efectivo Norte.
+6. Un Superadministrador con `GLOBAL` explícito obtiene `ALLOW_GLOBAL`, pero sólo para capacidades asignadas explícitamente mediante `RolePermission`.
+
+### Migración conceptual
+
+- El rol `admin` actual no se convertirá automáticamente en Superadministrador ni recibirá automáticamente `GLOBAL`.
+- `cashier` migrará a `BRANCH_SET` con sus sucursales activas.
+- `branch_manager` migrará a `BRANCH_SET` con sus sucursales activas.
+- Los roles personalizados se traducirán a las nuevas capacidades; una combinación ambigua quedará pendiente o inactiva hasta revisión.
+- La ausencia de una sucursal asignada no producirá `GLOBAL`.
+- La selección del primer Superadministrador y de los administradores que realmente requieran `GLOBAL` dependerá de la inspección de datos existentes en DEC-19.
+
+### Evidencia, tareas, consecuencias e historial
+
+- **Evidencia:** validación técnica de `ZM-FIN-003`; modelos actuales `User`, `UserBranchAssignment`, `Role`, `Permission`, `RolePermission` y `UserRoleAssignment`; contrato `AdminRoleScopeView` con soporte deshabilitado; ausencia actual de scope persistido.
+- **Tareas afectadas:** `ZM-FIN-003`, `ZM-FIN-008`, `ZM-FIN-015`, `ZM-FIN-016`, `ZM-FIN-017`, `ZM-FIN-018`, `ZM-FIN-019`, `ZM-FIN-020`, `ZM-FIN-021` y `ZM-FIN-022`.
+- **Consecuencias:** scopes normalizados y obligatorios, filtros backend por scope efectivo, autorización conjunta de origen y destino, migración sin globalización silenciosa y pruebas de aislamiento por sucursal.
+- **Límite:** DEC-04 define la semántica y el modelo canónico; no certifica que scopes, filtros o migraciones estén implementados o probados.
+- **Historial:** `PENDIENTE` desde 2026-08-26; `APROBADA` por el propietario el 2026-08-27.
 
 ## DEC-05 — Sesión
 
