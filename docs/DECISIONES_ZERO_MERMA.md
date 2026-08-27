@@ -653,12 +653,398 @@ Estos hallazgos son deuda de implementación futura y no implican cambios de có
 
 ## DEC-07 — Idempotencia
 
-- **Estado:** `PENDIENTE`
+- **Estado:** `APROBADA`
+- **Fecha:** 2026-08-27
 - **Propietario:** propietario de ZeroMerma
-- **Qué debe aprobarse:** generador, scope y retención de claves; respuesta ante la misma clave con payload distinto.
-- **Tareas principales afectadas:** tareas de idempotencia y operaciones económicas del Plan Maestro.
-- **Respuesta aprobada:** ninguna.
-- **Regla:** el bloqueo de doble clic observado no constituye una política de idempotencia aprobada.
+- **Contenido aprobado:** mecanismo transversal de idempotencia para comandos críticos, clave UUIDv7 globalmente única, fingerprint contextual versionado, replay sin repetición de efectos, atomicidad con negocio, auditoría y outbox, recuperación de errores y estado externo incierto, retención y condiciones de concurrencia y rendimiento.
+- **Respuesta aprobada:** política normativa, modelo conceptual, cobertura inicial y estrategia de migración descritos en esta decisión.
+
+### Política normativa aprobada
+
+1. ZeroMerma utilizará un mecanismo transversal y uniforme de idempotencia para comandos críticos.
+2. Ningún módulo definirá una semántica de idempotencia incompatible con este mecanismo canónico.
+3. La infraestructura será automática y no añadirá aprobaciones humanas ni pasos operativos adicionales.
+4. Cada nueva intención utilizará una `Idempotency-Key` UUIDv7.
+5. Todos los retries de la misma intención reutilizarán exactamente la misma key.
+6. Una intención nueva utilizará una key nueva.
+7. La key no sustituirá el ID de dominio del documento.
+8. La identidad idempotente tendrá unicidad global mediante `UNIQUE(idempotency_key)`.
+9. La misma key nunca podrá utilizarse para otra operación, actor o contexto.
+10. Una reutilización incompatible devolverá `409 IDEMPOTENCY_KEY_REUSED` sin efectos nuevos.
+
+### Replay
+
+La equivalencia de replay será:
+
+```text
+misma key
++ misma operación
++ mismo actor/contexto
++ mismo payload canónico
+= mismo resultado lógico
++ cero repetición de efectos
+```
+
+Una reutilización incompatible será:
+
+```text
+misma key
++ operación/contexto/payload diferente
+= 409
++ cero efectos nuevos
+```
+
+Un retry ya completado no volverá a ejecutar el servicio de dominio.
+
+### Fingerprint canónico
+
+El fingerprint será versionado e incluirá conceptualmente:
+
+```text
+fingerprint_version
+operation_code
+actor_user_id
+branch_id cuando aplique
+workstation_id cuando aplique
+cash_session_id cuando aplique
+payload canónico
+```
+
+La canonización deberá:
+
+- ordenar las claves JSON de manera estable;
+- normalizar UUID;
+- normalizar enums;
+- normalizar fechas UTC;
+- normalizar `Decimal` conforme a la escala contractual;
+- conservar el orden de arrays, salvo cuando el contrato declare una colección como conjunto;
+- aplicar defaults contractuales antes del hash;
+- distinguir `null` y ausencia, salvo equivalencia contractual explícita;
+- usar un hash criptográfico equivalente a SHA-256.
+
+No incluirá cookies, contraseñas, secretos, `X-Request-ID` ni la propia `Idempotency-Key`.
+
+### Modelo conceptual canónico
+
+La entidad transversal será equivalente a:
+
+```text
+IdempotencyRecord
+  id
+  idempotency_key
+  operation_code
+  fingerprint_version
+  request_fingerprint
+  actor_user_id
+  branch_id nullable
+  workstation_id nullable
+  cash_session_id nullable
+  status
+  resource_type nullable
+  resource_id nullable
+  response_status nullable
+  response_schema_version nullable
+  response_reference nullable
+  response_payload nullable
+  error_code nullable
+  first_request_id nullable
+  created_at
+  updated_at
+  completed_at nullable
+  response_expires_at nullable
+```
+
+Los estados canónicos serán:
+
+```text
+PROCESSING
+COMPLETED
+REJECTED
+UNKNOWN
+```
+
+- `PROCESSING`: comando admitido o en curso.
+- `COMPLETED`: resultado comprometido.
+- `REJECTED`: rechazo determinista admitido y terminal.
+- `UNKNOWN`: resultado externo incierto; no equivale a fallo.
+
+Los workflows externos podrán incorporar campos técnicos de lease y reconciliación derivados de una implementación posterior. No se registrará un `expires_at` que elimine la identidad idempotente y vuelva a permitir duplicación histórica.
+
+### Atomicidad
+
+Para comandos internos deberán quedar en una única unidad transaccional:
+
+```text
+IdempotencyRecord
+documento de negocio
+movimientos económicos
+movimientos físicos
+auditoría
+outbox
+resultado idempotente
+```
+
+`COMPLETED` nunca se confirmará en una transacción posterior e independiente al documento de negocio. Un crash antes del commit revertirá conjuntamente todos esos efectos. Las constraints de dominio actuales se conservarán como defensa adicional.
+
+### Errores
+
+#### Antes de admisión
+
+Los errores de schema o key inválida, `401`, `403` y demás validaciones previas no consumen la key.
+
+#### Después de admisión
+
+Un rechazo de negocio determinista podrá persistirse como `REJECTED`; un replay devolverá el mismo resultado lógico.
+
+#### Error transitorio antes de commit
+
+Un `500` inesperado, deadlock, serialization failure o timeout antes de commit provocará rollback completo y permitirá retry con la misma key.
+
+#### Commit exitoso y respuesta perdida
+
+El retry recuperará `COMPLETED` sin repetir efectos. Un comando compensatorio será una nueva intención y utilizará otra key.
+
+### Concurrencia
+
+- Dos requests con la misma key competirán únicamente por esa identidad.
+- Una request ejecutará los efectos; la otra esperará de forma acotada o recibirá un estado o conflicto temporal y después hará replay.
+- No habrá lock por `operation_code`.
+- Keys diferentes podrán procesarse concurrentemente.
+- Sucursales distintas no se serializarán por el mecanismo idempotente.
+- Operaciones no relacionadas tampoco se serializarán.
+- No se fija en esta decisión un timeout numérico de espera.
+
+Las condiciones normativas de rendimiento serán:
+
+```text
+no_global_serialization=true
+unrelated_commands_can_run_concurrently=true
+idempotency_lookup_indexed=true
+lock_scope_minimized=true
+external_dependency_in_sync_path=false
+human_approval_added=false
+```
+
+### Condición explícita de rendimiento
+
+DEC-07 fue aprobada por el propietario bajo la condición de que:
+
+> La idempotencia no debe entorpecer la operación, hacer lento materialmente el sistema ni ralentizar la toma de decisiones del operador.
+
+Como consecuencia:
+
+1. no habrá cola global;
+2. no habrá serialización global;
+3. no habrá aprobación humana;
+4. el lookup será indexado;
+5. el bloqueo se limitará al mínimo ámbito necesario;
+6. worker, outbox consumer, batch o servicio externo no serán requisito del fast-path síncrono para comandos internos;
+7. el procesamiento de outbox seguirá siendo asíncrono;
+8. los replays `COMPLETED` usarán fast-path;
+9. la implementación futura requerirá pruebas de concurrencia y regresión de rendimiento.
+
+Los SLA y umbrales numéricos de latencia dependerán de una línea base y métricas posteriores; no se inventan en DEC-07.
+
+### Fast path
+
+Para un record `COMPLETED` se deberá:
+
+1. autenticar la request actual;
+2. buscar por el índice único de `idempotency_key`;
+3. verificar operación, contexto y fingerprint;
+4. revalidar la autorización vigente conforme a DEC-03 y DEC-04;
+5. devolver el snapshot o la referencia persistida.
+
+No se volverán a ejecutar el servicio de dominio, pricing, cálculos físicos, adapters externos, worker ni outbox consumer. Conocer una key nunca concede acceso al recurso.
+
+### `X-Request-ID`
+
+```text
+X-Request-ID = identidad/correlación de una request HTTP
+Idempotency-Key = identidad durable de una intención de negocio
+```
+
+Un retry podrá utilizar un nuevo `X-Request-ID` con la misma `Idempotency-Key`. `X-Request-ID` no será sustituto de idempotencia. El campo actual de pedidos denominado `idempotency_key`, que sólo se usa como `request_id`, deberá migrarse posteriormente a la semántica canónica.
+
+### Estado externo incierto
+
+```text
+UNKNOWN != FAILED
+UNKNOWN != SAFE_TO_RETRY
+```
+
+Si una integración externa futura produce un resultado incierto, no se repetirá ciegamente el efecto; se conservará la identidad idempotente, se devolverá un estado o referencia de seguimiento, se reconciliará usando la misma identidad y se permitirá la transición posterior a un estado terminal. El proveedor, la autorización, la captura, la reversa y las reglas específicas pertenecen a DEC-14.
+
+### Crash recovery
+
+#### Comandos internos
+
+Un `PROCESSING` interno no quedará comprometido durablemente separado de sus efectos:
+
+- crash antes del commit: rollback y retry;
+- commit exitoso: `COMPLETED` recuperable.
+
+#### Operaciones externas o asíncronas
+
+Un `PROCESSING` o `UNKNOWN` durable podrá ser tomado por reconciliación mediante un lease técnico. La expiración de un lease no autoriza repetir ciegamente el efecto externo; sólo autoriza continuar la reconciliación.
+
+### Retención
+
+#### Identidad idempotente
+
+Se conservará información suficiente para impedir duplicaciones y verificar key, operación, contexto, fingerprint, status y referencia al recurso o resultado.
+
+#### Payload de respuesta
+
+Podrá purgarse antes cuando exista un snapshot compacto o una referencia estable suficiente.
+
+#### Payload original
+
+No será necesario conservarlo cuando el fingerprint y los metadatos canónicos sean suficientes.
+
+#### Auditoría
+
+Tendrá su propia política y no sustituirá al record idempotente.
+
+#### Retención legal
+
+Dependerá de DEC-16; DEC-07 no fija una duración legal definitiva.
+
+### Cobertura inicial obligatoria
+
+Como mínimo, requerirán idempotencia las mutaciones críticas equivalentes a:
+
+```text
+cash_session.open
+cash_session.close
+sale.confirm
+operational_payment.create
+
+order.create
+order.mark_ready
+order.deliver
+order.cancel
+pagos/reembolsos independientes de pedido si aparecen
+
+return.commit
+correction.commit
+waste.commit
+inventory.adjust
+
+counter_transfer.commit
+transfer.create
+transfer.update
+transfer.dispatch
+transfer.receive
+transfer.cancel
+
+purchase.create
+purchase.update
+purchase.confirm
+purchase.receive
+purchase.cancel
+direct purchase entry
+
+production.create
+production.update
+production.start
+production.complete
+production.cancel
+
+role.permissions.replace
+user_role.assign
+user_role.remove
+scope/branch assignment
+superadmin privilege changes
+break-glass execution
+```
+
+Las lecturas, búsquedas y previews sin efectos no requerirán `Idempotency-Key`. Una acción física como reimpresión podrá requerir una regla específica posterior conforme a DEC-15. La matriz exhaustiva definitiva pertenece a `ZM-FIN-008`.
+
+### Relación con DEC-05
+
+- `AuthSession` e `Idempotency-Key` son identidades distintas.
+- Expirar o revocar una sesión no altera una intención ya comprometida.
+- Tras un login nuevo, el mismo usuario podrá recuperar una intención propia si conserva autorización vigente.
+- Un actor diferente no podrá utilizar la key como credential.
+- Un usuario que perdió capability o scope no obtendrá el resultado mediante replay.
+- No será necesario que una cash session histórica continúe abierta para consultar un resultado ya comprometido y autorizado.
+- Una intención nueva resolverá nuevamente el contexto vigente.
+
+### Relación con DEC-06
+
+DEC-07 permitirá el retry del cierre, recuperar el mismo cierre tras una respuesta perdida, impedir doble efecto para la misma key y devolver el cierre existente mediante fast-path.
+
+DEC-07 no decide si gana una venta o el cierre, qué locks usa el cierre, qué ocurre con dos keys distintas de cierre ni cuándo rechazar operaciones tardías. Esas reglas pertenecen a DEC-06.
+
+### Migración conceptual
+
+1. Crear la infraestructura transversal `IdempotencyRecord`.
+2. Añadir `Idempotency-Key` requerida a los comandos `REQUIRED`.
+3. Validar UUIDv7 en backend.
+4. Conservar `X-Request-ID` separado.
+5. Generar UUIDv7 por intención en POS y Backoffice.
+6. Conservar la key en el estado cliente hasta obtener un resultado terminal.
+7. Introducir una unidad de trabajo idempotente transversal.
+8. Retirar commits internos incompatibles dentro de servicios críticos.
+9. Compartir la transacción con documento, ledgers, auditoría y outbox.
+10. Corregir `AdminOrderActionRequest.idempotency_key`.
+11. Actualizar OpenAPI desde backend.
+12. Regenerar el cliente TypeScript.
+13. Retirar helpers que aparenten idempotencia mediante request IDs o UUIDv4.
+14. Conservar constraints de negocio útiles.
+15. Añadir telemetría de hit, miss, replay, mismatch y contention sin payload sensible.
+16. No convertir históricos `X-Request-ID` en records idempotentes sin evidencia.
+
+Esta estrategia es conceptual; no implementa cambios en esta iteración.
+
+### Pruebas futuras obligatorias
+
+La implementación deberá cubrir como mínimo:
+
+- misma key con mismo payload;
+- misma key con payload diferente;
+- misma key con operación diferente;
+- misma key con contexto diferente;
+- concurrencia de N requests con la misma key;
+- concurrencia con keys diferentes;
+- sucursales independientes;
+- respuesta perdida;
+- crash antes y después de commit;
+- rechazo determinista;
+- retry tras deadlock o serialization failure;
+- auditoría exactamente una vez;
+- outbox exactamente una vez;
+- `UNKNOWN` externo sin duplicación;
+- autorización actual durante replay;
+- fast-path sin dominio, adapters ni workers;
+- replay tras purga del payload;
+- ausencia de serialización global;
+- benchmark y regresión de overhead.
+
+No se fijará un umbral numérico sin una línea base.
+
+### Dependencias
+
+- DEC-05: autenticación y autorización del replay.
+- DEC-06: cierre y carreras.
+- DEC-08–DEC-13: comandos económicos y físicos.
+- DEC-14: operaciones externas y `UNKNOWN`.
+- DEC-15: offline y hardware.
+- DEC-16: retención.
+- DEC-17: alta disponibilidad, recovery y leases.
+- DEC-19: datos existentes.
+
+Estas decisiones no se resuelven mediante DEC-07.
+
+### Evidencia, tareas, consecuencias e historial
+
+- **Evidencia:** validación técnica de `ZM-FIN-003`; ausencia actual de `Idempotency-Key` canónica y de modelo o tabla transversal; `X-Request-ID` usado sólo para trazabilidad; pseudo-`idempotency_key` de pedidos usado como `request_id`; guards frontend contra doble submit; constraints particulares de negocio; auditoría y outbox capaces de compartir sesión; commits actuales distribuidos entre servicios.
+- **Distinciones obligatorias:** trazabilidad no equivale a idempotencia; un guard de doble submit en UI no equivale a idempotencia; una constraint única de negocio no equivale a idempotencia transversal.
+- **Tareas afectadas:** `ZM-FIN-003`, `ZM-FIN-008` y las tareas posteriores del Plan Maestro que implementen idempotencia, operaciones económicas y físicas, cierre, pagos externos, offline, retención, continuidad y migración de datos.
+- **Consecuencias:** nueva persistencia transversal, unidad de trabajo compartida, cambios de contrato backend-first, regeneración del cliente TypeScript, adopción coordinada por POS y Backoffice y pruebas de atomicidad, concurrencia, recuperación y rendimiento.
+- **Límite:** DEC-07 define la política y el modelo conceptual; no certifica que la idempotencia, las migraciones, los contratos, los clientes o las pruebas estén implementados.
+- **Historial:** `PENDIENTE` desde 2026-08-26; `APROBADA` por el propietario el 2026-08-27.
 
 ## DEC-08 — Inventario
 
