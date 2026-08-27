@@ -21,18 +21,22 @@ export function isPosUser(user: AuthSurfaceUser) {
   );
 }
 
-export function readAccessTokenFromUrl(url: URL) {
-  const hashParams = new URLSearchParams(url.hash.startsWith("#") ? url.hash.slice(1) : url.hash);
-  return hashParams.get("access_token") ?? url.searchParams.get("access_token");
-}
-
-export function clearAccessTokenFromCurrentUrl() {
-  const url = new URL(window.location.href);
+export function getUrlWithoutDisallowedAccessToken(url: URL) {
+  const sanitizedUrl = new URL(url.toString());
   const hashParams = new URLSearchParams(url.hash.startsWith("#") ? url.hash.slice(1) : url.hash);
   hashParams.delete("access_token");
-  url.searchParams.delete("access_token");
-  url.hash = hashParams.toString();
-  window.history.replaceState(null, "", `${url.pathname}${url.search}${url.hash}`);
+  sanitizedUrl.searchParams.delete("access_token");
+  sanitizedUrl.hash = hashParams.toString();
+  return `${sanitizedUrl.pathname}${sanitizedUrl.search}${sanitizedUrl.hash}`;
+}
+
+export function clearDisallowedAccessTokenFromCurrentUrl() {
+  const url = new URL(window.location.href);
+  const sanitizedUrl = getUrlWithoutDisallowedAccessToken(url);
+  const currentUrl = `${url.pathname}${url.search}${url.hash}`;
+  if (sanitizedUrl !== currentUrl) {
+    window.history.replaceState(null, "", sanitizedUrl);
+  }
 }
 
 export function redirectToPos() {

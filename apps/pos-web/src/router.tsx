@@ -1,8 +1,7 @@
-import { createRootRoute, createRoute, createRouter } from "@tanstack/react-router";
+import { createRootRoute, createRoute, createRouter, Navigate } from "@tanstack/react-router";
 
 import { CashSessionOpenRoutePage } from "./routes/cash-session-open";
 import { CorrectionsRoutePage } from "./routes/corrections";
-import { DiscountsRoutePage } from "./routes/discounts";
 import { HealthDemoPage } from "./routes/health-demo";
 import { HomePage } from "./routes/home";
 import { LoginRoutePage } from "./routes/login";
@@ -17,6 +16,27 @@ import { SendToBranchRoutePage } from "./routes/send-to-branch";
 import { ShiftCloseRoutePage } from "./routes/shift-close";
 import { TicketsRoutePage } from "./routes/tickets";
 import { WasteRoutePage } from "./routes/waste";
+
+export function getPosReleaseRouteRedirect(pathname: string, isDevelopment: boolean) {
+  if (pathname === "/descuentos") {
+    return "/pos";
+  }
+
+  if (pathname === "/health" && !isDevelopment) {
+    return "/";
+  }
+
+  return null;
+}
+
+function DiscountsReleaseRoute() {
+  return <Navigate to={getPosReleaseRouteRedirect("/descuentos", import.meta.env.DEV) ?? "/pos"} />;
+}
+
+function HealthReleaseRoute() {
+  const redirect = getPosReleaseRouteRedirect("/health", import.meta.env.DEV);
+  return redirect ? <Navigate to={redirect} /> : <HealthDemoPage />;
+}
 
 const rootRoute = createRootRoute({
   component: RootLayout,
@@ -103,7 +123,7 @@ const paymentsRoute = createRoute({
 const discountsRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/descuentos",
-  component: DiscountsRoutePage,
+  component: DiscountsReleaseRoute,
 });
 
 const shiftCloseRoute = createRoute({
@@ -115,7 +135,7 @@ const shiftCloseRoute = createRoute({
 const healthRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/health",
-  component: HealthDemoPage,
+  component: HealthReleaseRoute,
 });
 
 const routeTree = rootRoute.addChildren([

@@ -1,38 +1,29 @@
 import { useQuery } from "@tanstack/react-query";
 import { Navigate } from "@tanstack/react-router";
-import { useEffect, useMemo } from "react";
+import { useEffect } from "react";
 
 import { AdminLayout } from "../admin/layout/AdminLayout";
 import { getCurrentBackofficeUser } from "../../lib/api";
 import {
-  clearAccessTokenFromCurrentUrl,
+  clearDisallowedAccessTokenFromCurrentUrl,
   isBackofficeUser,
-  readAccessTokenFromUrl,
   redirectToPos,
 } from "./auth-surfaces";
 import { useBackofficeAuthStore } from "./backoffice-auth-store";
 
 export function ProtectedAdminRoute() {
   const accessToken = useBackofficeAuthStore((state) => state.accessToken);
-  const setAccessToken = useBackofficeAuthStore((state) => state.setAccessToken);
   const clearSession = useBackofficeAuthStore((state) => state.clearSession);
-  const urlAccessToken = useMemo(() => readAccessTokenFromUrl(new URL(window.location.href)), []);
-  const effectiveAccessToken = accessToken ?? urlAccessToken;
   const currentUserQuery = useQuery({
-    enabled: Boolean(effectiveAccessToken),
-    queryFn: () => getCurrentBackofficeUser(effectiveAccessToken ?? ""),
-    queryKey: ["backoffice-auth", "surface", effectiveAccessToken],
+    enabled: Boolean(accessToken),
+    queryFn: () => getCurrentBackofficeUser(accessToken ?? ""),
+    queryKey: ["backoffice-auth", "surface", accessToken],
     retry: false,
   });
 
   useEffect(() => {
-    if (!urlAccessToken) {
-      return;
-    }
-
-    setAccessToken(urlAccessToken);
-    clearAccessTokenFromCurrentUrl();
-  }, [setAccessToken, urlAccessToken]);
+    clearDisallowedAccessTokenFromCurrentUrl();
+  }, []);
 
   useEffect(() => {
     if (currentUserQuery.isError) {
@@ -49,7 +40,7 @@ export function ProtectedAdminRoute() {
     redirectToPos();
   }, [clearSession, currentUserQuery.data]);
 
-  if (!effectiveAccessToken) {
+  if (!accessToken) {
     return <Navigate to="/login" />;
   }
 

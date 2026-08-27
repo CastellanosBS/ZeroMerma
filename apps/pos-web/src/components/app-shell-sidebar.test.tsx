@@ -42,6 +42,24 @@ afterEach(() => {
 });
 
 describe("AppShellSidebar", () => {
+  it("does not render the release-hidden operational discounts module", () => {
+    const view = renderUi(
+      <AppShellSidebar
+        activeModuleKey="pos"
+        collapsed={false}
+        hasCashSession={true}
+        isKeyboardNavigationEnabled={true}
+        modules={posModules}
+        onNavigate={() => undefined}
+        onNavigationModeChange={() => undefined}
+      />,
+    );
+    mountedRoots.push(view.unmount);
+
+    expect(view.container.textContent).not.toContain("Descuentos");
+    expect(view.container.querySelector('[title*="Ctrl+Alt+F"]')).toBeNull();
+  });
+
   it("marks the active module accessibly and preserves collapsed labels via aria", () => {
     const view = renderUi(
       <AppShellSidebar

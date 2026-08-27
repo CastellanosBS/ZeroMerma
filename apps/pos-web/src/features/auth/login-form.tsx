@@ -15,7 +15,7 @@ import { cn } from "../../lib/utils";
 import { useFocusFlow } from "../pos-shell/keyboard";
 import { posInputClass } from "../pos-theme/theme";
 import { loginOperator } from "./auth-api";
-import { buildBackofficeAdminUrl, shouldRouteToBackoffice } from "./auth-surfaces";
+import { buildBackofficeLoginUrl, shouldRouteToBackoffice } from "./auth-surfaces";
 import { usePosAuthStore } from "./auth-store";
 
 const loginSchema = z.object({
@@ -55,9 +55,7 @@ export function LoginForm() {
     mutationFn: (payload: LoginRequest) => loginOperator(payload),
     onSuccess: async (response) => {
       if (shouldRouteToBackoffice(response.user)) {
-        window.location.assign(
-          buildBackofficeAdminUrl(appEnv.VITE_BACKOFFICE_BASE_URL, response.access_token),
-        );
+        window.location.assign(buildBackofficeLoginUrl(appEnv.VITE_BACKOFFICE_BASE_URL));
         return;
       }
 

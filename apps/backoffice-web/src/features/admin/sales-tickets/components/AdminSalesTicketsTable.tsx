@@ -44,7 +44,6 @@ interface AdminSalesTicketsTableProps {
   isLoading?: boolean;
   onCopyFolio: (item: AdminSalesTicketListItem) => void;
   onPageChange: (page: number) => void;
-  onReprint: (item: AdminSalesTicketListItem) => void;
   onSelectTicket: (item: AdminSalesTicketListItem) => void;
   page: number;
   pageSize: number;
@@ -59,7 +58,6 @@ export function AdminSalesTicketsTable({
   isLoading = false,
   onCopyFolio,
   onPageChange,
-  onReprint,
   onSelectTicket,
   page,
   pageSize,
@@ -192,9 +190,10 @@ export function AdminSalesTicketsTable({
                     </button>
                     {backendContract.reprintEndpoint ? (
                       <button
-                        className="rounded-full border border-[var(--ui-color-border)] bg-white px-2.5 py-1 text-xs font-semibold text-slate-700 transition hover:border-[var(--ui-color-info)] hover:text-[var(--ui-color-info)] focus:outline-none focus:ring-4 focus:ring-[var(--ui-color-ring)]"
+                        className="cursor-not-allowed rounded-full border border-[var(--ui-color-border)] bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-400"
+                        disabled
+                        title="Reimpresion no disponible en Backoffice"
                         type="button"
-                        onClick={() => onReprint(item)}
                       >
                         Reimprimir
                       </button>

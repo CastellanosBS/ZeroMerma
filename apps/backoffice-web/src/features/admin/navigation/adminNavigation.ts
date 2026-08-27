@@ -1,4 +1,5 @@
 import { adminModules, adminSections, getAdminModulesBySection } from "../adminModules";
+import { isAdminModuleVisibleInCurrentRelease } from "../releaseVisibility";
 import type { AdminModuleKey, AdminSectionKey } from "../adminTypes";
 import type { AdminNavigationIconName } from "./AdminNavigationIcon";
 
@@ -31,19 +32,23 @@ const sectionIconByKey: Record<AdminSectionKey, AdminNavigationIconName> = {
   salesOrders: "receipt",
 };
 
-export const adminNavigationSections: AdminNavigationSection[] = adminSections.map((section) => ({
-  key: section.key,
-  title: section.title,
-  description: section.description,
-  icon: sectionIconByKey[section.key],
-  items: getAdminModulesBySection(section.key).map((module) => ({
-    key: module.key,
-    label: module.title,
-    path: module.path,
-    description: module.description,
-    status: module.status,
-  })),
-}));
+export const adminNavigationSections: AdminNavigationSection[] = adminSections
+  .map((section) => ({
+    key: section.key,
+    title: section.title,
+    description: section.description,
+    icon: sectionIconByKey[section.key],
+    items: getAdminModulesBySection(section.key)
+      .filter((module) => isAdminModuleVisibleInCurrentRelease(module.key))
+      .map((module) => ({
+        key: module.key,
+        label: module.title,
+        path: module.path,
+        description: module.description,
+        status: module.status,
+      })),
+  }))
+  .filter((section) => section.items.length > 0);
 
 export const adminNavigationItems = adminNavigationSections.flatMap((section) => section.items);
 

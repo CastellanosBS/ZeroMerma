@@ -7,7 +7,6 @@ import {
   InboxIcon,
   MoneyIcon,
   PencilSquareIcon,
-  PercentIcon,
   PrinterIcon,
   RotateCcwIcon,
   StoreIcon,
@@ -129,15 +128,6 @@ export const posModules: PosModuleDefinition[] = [
     icon: MoneyIcon,
     path: "/pagos",
     description: "Registro de egresos operativos del turno.",
-  },
-  {
-    key: "discounts",
-    label: "Descuentos",
-    navigationShortcut: "Ctrl+Alt+F",
-    shortLabel: "DS",
-    icon: PercentIcon,
-    path: "/descuentos",
-    description: "Registro de cargos internos y descuentos del turno.",
   },
   {
     key: "shiftClose",

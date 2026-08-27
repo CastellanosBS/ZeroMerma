@@ -45,7 +45,6 @@ interface AdminSalesTicketDetailPanelProps {
   errorMessage?: string | null;
   isLoading?: boolean;
   onCopyFolio: (folio: string) => void;
-  onReprint: (ticket: AdminSalesTicketListItem | AdminSalesTicketDetail) => void;
   selectedTicket: AdminSalesTicketListItem | null;
 }
 
@@ -54,7 +53,6 @@ export function AdminSalesTicketDetailPanel({
   errorMessage,
   isLoading = false,
   onCopyFolio,
-  onReprint,
   selectedTicket,
 }: AdminSalesTicketDetailPanelProps) {
   if (!selectedTicket) {
@@ -240,10 +238,10 @@ export function AdminSalesTicketDetailPanel({
           Copiar folio
         </button>
         <button
-          className="h-10 rounded-2xl bg-[var(--ui-color-primary)] px-3 text-sm font-semibold text-white transition hover:bg-[var(--ui-color-primary-strong)] focus:outline-none focus:ring-4 focus:ring-[var(--ui-color-ring)] disabled:cursor-not-allowed disabled:bg-slate-300"
-          disabled={!detail.printableTicket.canReprint}
+          className="h-10 cursor-not-allowed rounded-2xl bg-slate-300 px-3 text-sm font-semibold text-white"
+          disabled
+          title="Reimpresion no disponible en Backoffice"
           type="button"
-          onClick={() => onReprint(detail)}
         >
           Reimprimir
         </button>

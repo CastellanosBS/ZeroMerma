@@ -4,7 +4,14 @@ import type { PropsWithChildren } from "react";
 import { Button } from "../components/ui/button";
 import { useBackofficeShellStore } from "../stores/use-backoffice-shell-store";
 
-export function AppShell({ children }: PropsWithChildren) {
+interface AppShellProps extends PropsWithChildren {
+  showDevelopmentNavigation?: boolean;
+}
+
+export function AppShell({
+  children,
+  showDevelopmentNavigation = import.meta.env.DEV,
+}: AppShellProps) {
   const workspaceName = useBackofficeShellStore((state) => state.workspaceName);
 
   return (
@@ -21,12 +28,14 @@ export function AppShell({ children }: PropsWithChildren) {
             <Link className="rounded-xl px-3 py-2 text-sm font-medium hover:bg-slate-100" to="/">
               Operations
             </Link>
-            <Link
-              className="rounded-xl px-3 py-2 text-sm font-medium hover:bg-slate-100"
-              to="/health"
-            >
-              Health
-            </Link>
+            {showDevelopmentNavigation ? (
+              <Link
+                className="rounded-xl px-3 py-2 text-sm font-medium hover:bg-slate-100"
+                to="/health"
+              >
+                Health
+              </Link>
+            ) : null}
             <Button className="h-9 rounded-xl">Audit required</Button>
           </nav>
         </div>

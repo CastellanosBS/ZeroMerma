@@ -9,8 +9,11 @@ import {
 import { AppShell } from "./components/app-shell";
 import { AdminAuditPage } from "./features/admin/audit/pages/AdminAuditPage";
 import { adminModules } from "./features/admin/adminModules";
+import {
+  DEFAULT_ADMIN_RELEASE_PATH,
+  getAdminModuleReleaseRedirect,
+} from "./features/admin/releaseVisibility";
 import { AdminCleaningLogsPage } from "./features/admin/cleaning-logs/pages/AdminCleaningLogsPage";
-import { AdminDashboardPage } from "./features/admin/pages/AdminDashboardPage";
 import { AdminModulePage } from "./features/admin/pages/AdminModulePage";
 import { AdminBranchesPage } from "./features/admin/branches/pages/AdminBranchesPage";
 import { AdminCashCutsPage } from "./features/admin/cash-cuts/pages/AdminCashCutsPage";
@@ -48,24 +51,45 @@ const rootRoute = createRootRoute({
   component: Outlet,
 });
 
-const indexRoute = createRoute({
-  getParentRoute: () => rootRoute,
-  path: "/",
-  component: () => (
+export function getBackofficeDevelopmentRouteRedirect(
+  pathname: "/" | "/health",
+  isDevelopment: boolean,
+) {
+  return isDevelopment ? null : "/login" as const;
+}
+
+function DevelopmentHomeRoute() {
+  const redirect = getBackofficeDevelopmentRouteRedirect("/", import.meta.env.DEV);
+  return redirect ? (
+    <Navigate to={redirect} />
+  ) : (
     <AppShell>
       <HomePage />
     </AppShell>
-  ),
+  );
+}
+
+function DevelopmentHealthRoute() {
+  const redirect = getBackofficeDevelopmentRouteRedirect("/health", import.meta.env.DEV);
+  return redirect ? (
+    <Navigate to={redirect} />
+  ) : (
+    <AppShell>
+      <HealthDemoPage />
+    </AppShell>
+  );
+}
+
+const indexRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/",
+  component: DevelopmentHomeRoute,
 });
 
 const healthRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/health",
-  component: () => (
-    <AppShell>
-      <HealthDemoPage />
-    </AppShell>
-  ),
+  component: DevelopmentHealthRoute,
 });
 
 const loginRoute = createRoute({
@@ -83,15 +107,18 @@ const adminRoute = createRoute({
 const adminIndexRoute = createRoute({
   getParentRoute: () => adminRoute,
   path: "/",
-  component: AdminDashboardPage,
+  component: () => <Navigate to={DEFAULT_ADMIN_RELEASE_PATH as never} />,
 });
 
-const adminModuleRoutes = adminModules.map((module) =>
-  createRoute({
+const adminModuleRoutes = adminModules.map((module) => {
+  const releaseRedirect = getAdminModuleReleaseRedirect(module.key);
+  return createRoute({
     getParentRoute: () => adminRoute,
     path: module.routeSlug,
     component:
-      module.key === "cleaningLogs"
+      releaseRedirect
+        ? () => <Navigate to={releaseRedirect as never} />
+        : module.key === "cleaningLogs"
         ? AdminCleaningLogsPage
         : module.key === "sanitaryChecks"
           ? AdminSanitaryVerificationsPage
@@ -152,13 +179,13 @@ const adminModuleRoutes = adminModules.map((module) =>
                                                                 : () => (
                                                                     <AdminModulePage moduleKey={module.key} />
                                                                   ),
-  }),
-);
+  });
+});
 
 const legacyRolesRoute = createRoute({
   getParentRoute: () => adminRoute,
   path: "roles",
-  component: () => <Navigate to={"/admin/roles-permisos" as never} />,
+  component: () => <Navigate to={DEFAULT_ADMIN_RELEASE_PATH as never} />,
 });
 
 const legacyRegistersRoute = createRoute({

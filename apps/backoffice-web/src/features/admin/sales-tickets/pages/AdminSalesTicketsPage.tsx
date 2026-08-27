@@ -1,4 +1,4 @@
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import { useMemo, useState } from "react";
 
 import { toBackofficeErrorMessage } from "../../../../lib/api";
@@ -8,13 +8,11 @@ import {
   adminSalesTicketsBackendContract,
   fetchAdminSalesTicketDetail,
   fetchAdminSalesTickets,
-  reprintAdminSalesTicket,
 } from "../api";
 import { AdminSalesTicketDetailPanel } from "../components/AdminSalesTicketDetailPanel";
 import { AdminSalesTicketsFilters } from "../components/AdminSalesTicketsFilters";
 import { AdminSalesTicketsTable } from "../components/AdminSalesTicketsTable";
 import type {
-  AdminSalesTicketDetail,
   AdminSalesTicketFilterOptions,
   AdminSalesTicketListFilters,
   AdminSalesTicketListItem,
@@ -114,7 +112,6 @@ function AdminSalesTicketsMetricStrip({
 
 export function AdminSalesTicketsPage() {
   const accessToken = useBackofficeAuthStore((state) => state.accessToken);
-  const queryClient = useQueryClient();
   const [filters, setFilters] = useState<AdminSalesTicketListFilters>(initialFilters);
   const [selectedTicketId, setSelectedTicketId] = useState<string | null>(null);
   const [feedback, setFeedback] = useState<{ tone: "success" | "error"; message: string } | null>(null);
@@ -137,20 +134,6 @@ export function AdminSalesTicketsPage() {
     queryFn: () => fetchAdminSalesTicketDetail(accessToken ?? "", selectedTicketId ?? ""),
     queryKey: ["admin", "sales-tickets", "detail", selectedTicketId],
     retry: false,
-  });
-
-  const reprintMutation = useMutation({
-    mutationFn: (ticketId: string) => reprintAdminSalesTicket(accessToken ?? "", ticketId),
-    onError: (error) => {
-      setFeedback({
-        tone: "error",
-        message: toBackofficeErrorMessage(error, "No se pudo reimprimir el ticket. Intenta nuevamente."),
-      });
-    },
-    onSuccess: (detail) => {
-      setFeedback({ tone: "success", message: `Reimpresion registrada para ${detail.overview.folio}.` });
-      void queryClient.invalidateQueries({ queryKey: ["admin", "sales-tickets", "detail", detail.overview.id] });
-    },
   });
 
   const listErrorMessage = ticketsQuery.isError
@@ -186,15 +169,6 @@ export function AdminSalesTicketsPage() {
     const folio = typeof value === "string" ? value : value.folio;
     void navigator.clipboard?.writeText(folio);
     setFeedback({ tone: "success", message: `Folio ${folio} copiado.` });
-  }
-
-  function handleReprint(ticket: AdminSalesTicketListItem | AdminSalesTicketDetail) {
-    const ticketId = "overview" in ticket ? ticket.overview.id : ticket.id;
-    if (!ticketId || reprintMutation.isPending) {
-      return;
-    }
-    setFeedback(null);
-    reprintMutation.mutate(ticketId);
   }
 
   return (
@@ -241,7 +215,6 @@ export function AdminSalesTicketsPage() {
             total={ticketList.total}
             onCopyFolio={handleCopyFolio}
             onPageChange={handlePageChange}
-            onReprint={handleReprint}
             onSelectTicket={handleSelectTicket}
           />
 
@@ -251,7 +224,6 @@ export function AdminSalesTicketsPage() {
             isLoading={detailQuery.isLoading}
             selectedTicket={selectedTicket}
             onCopyFolio={handleCopyFolio}
-            onReprint={handleReprint}
           />
         </div>
       </div>

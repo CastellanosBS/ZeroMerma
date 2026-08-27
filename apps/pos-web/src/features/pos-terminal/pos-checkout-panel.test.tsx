@@ -266,12 +266,20 @@ describe("PosCheckoutPanel", () => {
       await new Promise((resolve) => window.setTimeout(resolve, 0));
     });
 
+    expect(view.container.textContent).toContain("Tarjeta (registro)");
+    expect(view.container.textContent).toContain("Mixto (registro)");
+
     dispatchKey(window, "*");
-    expect(view.container.textContent).toContain("Cobro con tarjeta");
+    expect(view.container.textContent).toContain("Registro de pago con tarjeta");
+    expect(view.container.textContent).toContain("Solo registra el medio de pago");
+    expect(view.container.textContent).toContain("no autoriza ni captura");
+    expect(view.container.textContent).toContain("DEC-14");
+    expect(view.container.textContent).not.toContain("Pago autorizado");
     expect(view.container.querySelector('input[aria-label="Dinero recibido"]')).toBeNull();
 
     dispatchKey(window, "/");
-    expect(view.container.textContent).toContain("Cobro efectivo");
+    expect(view.container.textContent).toContain("Cobro en efectivo");
+    expect(view.container.textContent).not.toContain("integracion externa pendiente");
     expect(view.container.querySelector('input[aria-label="Dinero recibido"]')).not.toBeNull();
   });
 
@@ -449,9 +457,12 @@ describe("PosCheckoutPanel", () => {
 
     act(() => {
       Array.from(view.container.querySelectorAll("button"))
-        .find((button) => button.textContent?.includes("Cobro mixto"))
+        .find((button) => button.textContent?.includes("Mixto (registro)"))
         ?.click();
     });
+
+    expect(view.container.textContent).toContain("Registro de pago mixto");
+    expect(view.container.textContent).toContain("Solo registra el medio de pago");
 
     const legInput = view.container.querySelector(
       'input[aria-label="Monto del tramo"]',

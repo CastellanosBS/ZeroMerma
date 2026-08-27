@@ -4,7 +4,11 @@ import type { FormEvent } from "react";
 import { useEffect, useRef, useState } from "react";
 
 import { loginBackofficeUser, toBackofficeErrorMessage } from "../../lib/api";
-import { isBackofficeUser, redirectToPos } from "./auth-surfaces";
+import {
+  clearDisallowedAccessTokenFromCurrentUrl,
+  isBackofficeUser,
+  redirectToPos,
+} from "./auth-surfaces";
 import { useBackofficeAuthStore } from "./backoffice-auth-store";
 
 export function BackofficeLoginPage() {
@@ -28,6 +32,10 @@ export function BackofficeLoginPage() {
       await navigate({ to: "/admin" });
     },
   });
+
+  useEffect(() => {
+    clearDisallowedAccessTokenFromCurrentUrl();
+  }, []);
 
   useEffect(() => {
     if (!accessToken) {

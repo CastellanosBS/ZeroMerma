@@ -7,8 +7,7 @@ export function shouldRouteToBackoffice(user: Pick<AuthenticatedUser, "default_s
   return user.default_surface === AUTH_SURFACE_BACKOFFICE;
 }
 
-export function buildBackofficeAdminUrl(backofficeBaseUrl: string, accessToken: string) {
-  const redirectUrl = new URL("/admin", backofficeBaseUrl);
-  redirectUrl.hash = new URLSearchParams({ access_token: accessToken }).toString();
+export function buildBackofficeLoginUrl(backofficeBaseUrl: string) {
+  const redirectUrl = new URL("/login", backofficeBaseUrl);
   return redirectUrl.toString();
 }

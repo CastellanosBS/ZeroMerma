@@ -267,6 +267,9 @@ function PaymentMethodButton({
   );
 }
 
+const EXTERNAL_PAYMENT_PENDING_NOTE =
+  "Solo registra el medio de pago. ZeroMerma no autoriza ni captura con terminal o proveedor; integracion externa pendiente de DEC-14.";
+
 function CheckoutMetricTile({
   icon,
   label,
@@ -1073,19 +1076,26 @@ export function PosCheckoutPanel({
                 <div className="min-w-0">
                   <p className="truncate whitespace-nowrap text-[15px] font-semibold leading-5 text-slate-950">
                     {saleFlow.state.paymentMethodCode === MIXED_PAYMENT_METHOD_CODE
-                      ? "Cobro mixto"
+                      ? "Registro de pago mixto"
                       : saleFlow.state.paymentMethodCode === CARD_PAYMENT_METHOD_CODE
-                        ? "Cobro con tarjeta"
-                        : "Cobro efectivo"}
+                        ? "Registro de pago con tarjeta"
+                        : "Cobro en efectivo"}
                   </p>
                 </div>
               </div>
               {saleFlow.state.paymentMethodCode === MIXED_PAYMENT_METHOD_CODE ? (
                 <span className="pos-chip" data-tone="primary">
-                  Efectivo + tarjeta
+                  Efectivo + tarjeta registrada
                 </span>
               ) : null}
             </div>
+
+            {saleFlow.state.paymentMethodCode === CARD_PAYMENT_METHOD_CODE ||
+            saleFlow.state.paymentMethodCode === MIXED_PAYMENT_METHOD_CODE ? (
+              <p className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-medium leading-4 text-amber-950">
+                {EXTERNAL_PAYMENT_PENDING_NOTE}
+              </p>
+            ) : null}
 
             <div className="grid grid-cols-3 gap-2">
               {paymentControls.map((paymentMethod) => (
@@ -1103,7 +1113,13 @@ export function PosCheckoutPanel({
                   isActive={paymentMethod.code === saleFlow.state.paymentMethodCode}
                   isDisabled={saleFlow.state.mode === SALE_FLOW_PROCESSING}
                   key={paymentMethod.code}
-                  label={paymentMethod.label}
+                  label={
+                    paymentMethod.code === CARD_PAYMENT_METHOD_CODE
+                      ? "Tarjeta (registro)"
+                      : paymentMethod.code === MIXED_PAYMENT_METHOD_CODE
+                        ? "Mixto (registro)"
+                        : paymentMethod.label
+                  }
                   onClick={switchPaymentMethod}
                 />
               ))}
