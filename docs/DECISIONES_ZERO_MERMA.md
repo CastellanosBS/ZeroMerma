@@ -3170,12 +3170,1035 @@ Estas dependencias no se resuelven mediante DEC-09.
 
 ## DEC-10 — Pedidos
 
-- **Estado:** `PENDIENTE`
+- **Estado:** `APROBADA`
+- **Fecha:** 2026-08-28
 - **Propietario:** propietario de ZeroMerma
-- **Qué debe aprobarse:** momento de reconocimiento financiero y físico, reserva, pago parcial, entrega y cancelación.
-- **Tareas principales afectadas:** tareas de pedidos, caja, inventario y conciliación del Plan Maestro.
-- **Respuesta aprobada:** ninguna.
-- **Regla:** el ciclo implementado no aprueba su semántica económica.
+- **Contenido aprobado:** naturaleza económica, anticipo mínimo, pagos, snapshot, producto exacto, ciclo, reservas, entrega, reconocimiento de ingreso, amendments, cancelación, expiración, sucursal, caja, locking, rendimiento, migración y pruebas futuras.
+- **Respuesta aprobada:** política normativa, modelos conceptuales, invariantes, dependencias y pruebas futuras descritos en esta decisión.
+
+### Naturaleza económica del pedido
+
+Un pedido confirmado representa inicialmente un compromiso comercial, no una venta entregada.
+
+La confirmación:
+
+- congela su snapshot comercial vigente;
+- registra los anticipos o pagos recibidos;
+- no reconoce todavía el ingreso total como venta entregada.
+
+El ingreso de la venta se reconocerá únicamente cuando el pedido alcance:
+
+```text
+DELIVERED
+```
+
+Los anticipos y liquidaciones recibidos antes de `DELIVERED`:
+
+- serán movimientos financieros reales;
+- pertenecerán a la caja y turno donde fueron cobrados;
+- participarán en el cierre de esa caja conforme a DEC-06;
+- permanecerán distinguibles del ingreso de una venta entregada.
+
+Regla normativa:
+
+```text
+cash_received_before_delivery
+!=
+sale_revenue_recognized
+```
+
+DEC-10 no define un libro contable general.
+
+### Anticipo obligatorio del 50 %
+
+La política será aplicada por backend:
+
+```text
+minimum_advance_percent = 50%
+```
+
+Para confirmar un pedido:
+
+```text
+minimum_advance =
+quantize(order_total_snapshot * 0.50, 0.01, ROUND_HALF_UP)
+```
+
+Esta regla reutiliza la escala y el redondeo monetario vigentes.
+
+Ejemplo normativo:
+
+```text
+order_total=33.33
+50%=16.665
+minimum_advance=16.67
+```
+
+Invariantes:
+
+```text
+net_paid >= minimum_advance
+net_paid <= order_total
+```
+
+El sistema:
+
+- calculará automáticamente el anticipo mínimo;
+- lo mostrará a la cajera;
+- impedirá en backend confirmar por debajo del mínimo;
+- no concederá una excepción discrecional a la cajera;
+- no permitirá que un pedido confirmado persista durablemente por debajo del 50 %;
+- no permitirá sobrepago.
+
+Un borrador puramente local de UI no constituirá un pedido confirmado.
+
+### Pagos posteriores
+
+Después del anticipo inicial podrán existir múltiples pagos adicionales.
+
+Regla permanente:
+
+```text
+0 <= net_paid <= order_total
+```
+
+Cada pago:
+
+- será causal e idempotente;
+- estará vinculado al pedido;
+- identificará la caja y turno donde se recibió;
+- podrá pertenecer a un turno distinto del anticipo inicial;
+- no reconocerá por sí solo ingreso de venta;
+- producirá el efecto financiero que DEC-06 incluirá en cash close.
+
+El reparto entre medios y el pago mixto pertenecen a DEC-11. Los pagos externos pertenecen a DEC-14.
+
+### Protección contra sobrepago
+
+`net_paid` deberá mantenerse mediante una proyección o materialización race-safe respaldada por el subledger financiero.
+
+Dos pagos concurrentes nunca podrán producir:
+
+```text
+net_paid > order_total
+```
+
+La validación se realizará bajo el lock del agregado del pedido.
+
+Ejemplo:
+
+```text
+total=1000
+paid=900
+
+T1 intenta +100
+T2 intenta +100
+
+T1 bloquea el pedido y confirma net_paid=1000
+T2 adquiere después el lock
+T2 recalcula y se rechaza
+```
+
+### Snapshot comercial
+
+Cada versión confirmada del pedido preservará como mínimo:
+
+```text
+product_id
+product name/description snapshot cuando corresponda
+quantity
+unit_price_snapshot
+line_total_snapshot
+discount/promotion snapshot cuando DEC-13 aplique
+order_total_snapshot
+minimum_advance_policy/version
+cancellation_policy/version
+fulfillment_branch_id
+effective timestamp/version
+```
+
+Cambios posteriores de catálogo, precio, promoción o política no recalcularán silenciosamente pedidos confirmados.
+
+DEC-13 determinará el cálculo inicial de precios, promociones y descuentos. DEC-10 congela el resultado aplicado.
+
+### Productos siempre exactos
+
+Todo pedido utilizará un producto exacto:
+
+```text
+CustomerOrderItem.product_id = obligatorio
+```
+
+Los pedidos no utilizarán `CLASS_CAPTURE`. Una clase será exclusivamente un mecanismo de navegación o presentación.
+
+Ejemplo:
+
+```text
+Conchas
+  -> Concha vainilla
+  -> Concha chocolate
+  -> Concha fresa
+```
+
+Antes de añadir una línea se seleccionará un producto o SKU concreto.
+
+No se persistirán como identidad física de una línea de pedido:
+
+```text
+product_class_id genérico
+cantidad CLASS_CAPTURE
+ClassInventoryObligation
+```
+
+`ClassInventoryObligation` de DEC-08 pertenece a ventas `CLASS_CAPTURE`, no a pedidos.
+
+### Máquina de estados
+
+Estados canónicos:
+
+```text
+PENDING
+READY
+DELIVERED
+CANCELED
+EXPIRED
+NO_SHOW
+```
+
+Transiciones permitidas:
+
+```text
+PENDING -> READY
+PENDING -> CANCELED
+PENDING -> EXPIRED
+PENDING -> NO_SHOW
+
+READY -> DELIVERED
+READY -> CANCELED
+READY -> EXPIRED
+READY -> NO_SHOW
+```
+
+Estados terminales:
+
+```text
+DELIVERED
+CANCELED
+EXPIRED
+NO_SHOW
+```
+
+Transiciones prohibidas:
+
+```text
+READY -> PENDING
+PENDING -> DELIVERED
+DELIVERED -> CANCELED
+DELIVERED -> READY
+```
+
+No habrá transiciones silenciosas causadas únicamente por el paso del tiempo. Después de `DELIVERED`, las devoluciones y correcciones pertenecen a DEC-09.
+
+### `READY` y reserva completa
+
+Conforme a DEC-08:
+
+```text
+READY -> reserve exact products
+```
+
+DEC-10 fija:
+
+```text
+full reservation or fail
+```
+
+No se soportarán inicialmente:
+
+```text
+partial reservation
+implicit backorder
+partial READY
+```
+
+Protocolo conceptual:
+
+```text
+lock order
+require PENDING
+lock balances/reservations
+validate complete availability
+create all reservations exactly once
+status=READY
+audit/outbox/idempotency
+commit
+```
+
+Si una sola línea carece de disponibilidad:
+
+```text
+ORDER_READY_STOCK_INSUFFICIENT
+```
+
+y el resultado será:
+
+```text
+pedido permanece PENDING
+reservas parciales comprometidas = 0
+```
+
+### `DELIVERED`
+
+Sólo podrá comprometerse cuando:
+
+```text
+status=READY
+net_paid=order_total
+reservations complete
+```
+
+El pedido podrá haberse pagado completamente antes o podrá cobrarse el saldo final en la misma unidad transaccional de entrega.
+
+Al comprometer `DELIVERED`:
+
+```text
+consume reservation exactly once
+recognize order_total_snapshot revenue exactly once
+mark DELIVERED
+audit
+outbox
+idempotency COMPLETED
+```
+
+Efecto físico conforme a DEC-08:
+
+```text
+quantity_on_hand -= reserved quantity
+quantity_reserved -= reserved quantity
+```
+
+### Sin entrega parcial
+
+La entrega parcial no estará soportada inicialmente:
+
+```text
+partial delivery unsupported
+```
+
+No existirán:
+
+```text
+PARTIALLY_DELIVERED
+partial reservation consumption
+partial revenue recognition by delivery
+```
+
+El pedido se entregará completo o permanecerá `READY`. Un flujo parcial futuro requerirá una decisión explícita.
+
+### Reconocimiento de ingreso
+
+El subledger del pedido distinguirá conceptos equivalentes a:
+
+```text
+ADVANCE_RECEIVED
+SETTLEMENT_RECEIVED
+REFUND
+REVENUE_RECOGNIZED
+```
+
+Regla:
+
+```text
+cash receipt at payment time
+revenue recognition at DELIVERED
+```
+
+Al entregar:
+
+```text
+recognized_revenue = order_total_snapshot
+exactly_once=true
+```
+
+No se creará una `Sale` ficticia ligada a una única `CashSession` para representar un pedido cuyos pagos puedan abarcar varios turnos.
+
+Una cancelación anterior a `DELIVERED` tendrá:
+
+```text
+sale revenue recognized = 0
+```
+
+Si una cancelación del cliente ocurre después de iniciar producción y se retiene el dinero:
+
+```text
+retained advance
+!=
+DELIVERED sale revenue
+```
+
+DEC-10 no reclasifica silenciosamente ese importe como una venta entregada. Su clasificación contable posterior deberá resolverse explícitamente si se requiere.
+
+### Modificaciones mientras `PENDING`
+
+Mientras el pedido esté `PENDING` podrá utilizarse una operación equivalente a:
+
+```text
+order.amend
+```
+
+La operación será auditada e idempotente y conservará historial mediante versiones o snapshots equivalentes.
+
+Después del amendment:
+
+```text
+net_paid >= 50% new_total
+net_paid <= new_total
+```
+
+Si el total aumenta y se obtiene:
+
+```text
+net_paid < 50% new_total
+```
+
+la nueva versión no podrá confirmarse sin completar simultáneamente el anticipo requerido o mediante una operación compuesta equivalente.
+
+Si el total disminuye y se obtiene:
+
+```text
+net_paid > new_total
+```
+
+la modificación se rechazará salvo que una operación financiera explícita y atómica resuelva el exceso. No se generarán refunds silenciosos.
+
+Después de `READY` quedarán bloqueados:
+
+```text
+product_id
+quantity
+price snapshot
+order total
+```
+
+Un cambio posterior requerirá cancelación y recreación o un futuro workflow explícito de amendment.
+
+### Cancelación solicitada por cliente antes de producción
+
+Cuando:
+
+```text
+cancellation_responsibility=CUSTOMER
+production_started=false
+```
+
+aplicará:
+
+```text
+refund = 100% net_paid
+recognized_sale_revenue = 0
+status = CANCELED
+```
+
+Si existen reservas se liberará la reserva restante exactamente una vez.
+
+No se retendrá automáticamente el 50 %. El anticipo obligatorio es un requisito de confirmación, no una penalización automática.
+
+### Cancelación solicitada por cliente después de iniciar producción
+
+Cuando:
+
+```text
+cancellation_responsibility=CUSTOMER
+production_started=true
+```
+
+aplicará por defecto:
+
+```text
+refund = 0
+status = CANCELED
+recognized_DELIVERED_sale_revenue = 0
+```
+
+No se inventarán porcentajes intermedios, penalizaciones adicionales ni refunds parciales automáticos.
+
+El dinero retenido permanecerá financieramente distinguible y auditable. DEC-12 proporcionará la evidencia autoritativa de `production_started`.
+
+### Cancelación atribuible a la panadería
+
+Cuando:
+
+```text
+cancellation_responsibility=MERCHANT
+```
+
+aplicará, independientemente del estado productivo:
+
+```text
+refund = 100% net_paid
+recognized_sale_revenue = 0
+status = CANCELED
+```
+
+La misma regla aplicará si `production_started=true` o si el producto ya fue producido.
+
+Se registrarán:
+
+```text
+responsibility
+reason
+actor
+timestamp
+production evidence cuando corresponda
+refund reference
+```
+
+DEC-10 no fija un catálogo exhaustivo de causas.
+
+### Política de cancelación congelada
+
+El pedido permitirá reconstruir que fue confirmado bajo una política equivalente a:
+
+```text
+minimum_advance_percent = 50%
+
+customer_cancel_before_production =
+FULL_REFUND
+
+customer_cancel_after_production_start =
+NO_REFUND
+
+merchant_attributable_cancel =
+FULL_REFUND
+```
+
+Cambiar la política global en el futuro no modificará pedidos históricos.
+
+### Señal autoritativa `production_started`
+
+DEC-10 exige una interfaz durable que permita determinar `production_started` para el pedido.
+
+Conceptualmente:
+
+```text
+get_order_production_boundary(order_id)
+- started
+- evidence_id
+- evidence_type
+- occurred_at
+```
+
+DEC-12 determinará qué evento productivo activa esta señal.
+
+No se inferirá:
+
+```text
+READY == production_started
+requested_for_at vencido == production_started
+UI state == production_started
+```
+
+### Liberación de reservas en cancelación
+
+#### `PENDING`
+
+Normalmente:
+
+```text
+reservation=0
+release=0
+```
+
+porque la reserva nace en `READY`.
+
+#### `READY`
+
+Al cancelar:
+
+```text
+release remaining reservation exactly once
+```
+
+Efecto:
+
+```text
+on_hand no cambia
+reserved disminuye
+available aumenta
+```
+
+#### `DELIVERED`
+
+No se cancela. Una devolución posterior utiliza DEC-09.
+
+### `EXPIRED` y `NO_SHOW`
+
+Serán transiciones terminales explícitas y auditables.
+
+No bastará:
+
+```text
+now > pickup_time
+```
+
+para modificar automáticamente el pedido.
+
+Cada transición identificará:
+
+```text
+reason
+actor o system actor autorizado
+policy snapshot
+transition timestamp
+production-state evidence
+financial resolution reference
+reservation release
+```
+
+DEC-10 no fija grace period, horas ni días. El tratamiento financiero utilizará la política snapshot aplicable y no reconocerá ingreso por el mero paso del tiempo.
+
+### Sucursal de fulfillment
+
+Cada pedido tendrá una única:
+
+```text
+fulfillment_branch_id
+```
+
+Será inmutable después de la confirmación.
+
+Dentro de esa sucursal ocurrirán ordinariamente:
+
+```text
+READY
+reservation
+production/fulfillment
+DELIVERED
+advance
+settlement
+refund
+```
+
+Los distintos pagos podrán pertenecer a diferentes `CashSession` o turnos de la misma sucursal.
+
+No se habilitarán:
+
+```text
+cross-branch fulfillment implícito
+cross-branch payment implícito
+```
+
+El acceso `GLOBAL` de DEC-04 no autoriza mover silenciosamente el fulfillment.
+
+### Pagos y caja
+
+Cada movimiento financiero del pedido identificará, según corresponda:
+
+```text
+order_id
+financial type
+amount
+fulfillment branch
+cash_session_id
+workstation
+actor
+timestamp
+idempotency reference
+```
+
+Un anticipo, liquidación o refund pertenecerá al turno donde físicamente se mueva el dinero y participará en el cierre de esa `CashSession` conforme a DEC-06.
+
+No todos los pagos del pedido deberán pertenecer al mismo turno.
+
+### Relación con DEC-06
+
+Todo `ADVANCE`, `SETTLEMENT` o `REFUND` que afecte caja deberá:
+
+- adquirir la frontera de `CashSession`;
+- validar el estado aplicable;
+- crear el movimiento financiero canónico;
+- participar en cash close;
+- quedar incluido en expected y blockers.
+
+No se reabrirán cajas cerradas.
+
+### Relación con DEC-07
+
+Como mínimo, operaciones equivalentes a las siguientes serán idempotentes:
+
+```text
+order.create
+order.advance
+order.amend
+order.mark_ready
+order.deliver
+order.cancel
+order.expire
+order.no_show
+order.refund
+```
+
+Un replay `COMPLETED` no duplicará:
+
+```text
+payment
+reservation
+reservation consumption
+revenue recognition
+refund
+audit
+outbox
+```
+
+### Relación con DEC-08
+
+Se preservarán estas reglas:
+
+```text
+READY -> full exact-product reservation
+CANCELED/EXPIRED -> release remaining reservation
+DELIVERED -> consume reservation exactly once
+```
+
+Los pedidos no usarán reservas de clase.
+
+La reserva no disminuirá `on_hand`. La entrega disminuirá `on_hand` y `reserved` exactamente una vez.
+
+### Relación con DEC-09
+
+Una vez que el pedido alcance `DELIVERED`, no se cancelará para corregir una entrega.
+
+Una devolución o corrección posterior utilizará DEC-09. No se editará el pedido histórico para simular una devolución.
+
+### Dependencias posteriores
+
+#### DEC-11
+
+- pago mixto;
+- cambio;
+- distribución de anticipos o saldos por medio;
+- refund por medio.
+
+#### DEC-12
+
+- workflow productivo;
+- señal autoritativa `production_started`.
+
+#### DEC-13
+
+- pricing;
+- promociones;
+- descuentos;
+- cálculo inicial del snapshot.
+
+#### DEC-14
+
+- pagos y refunds externos;
+- `PROCESSING`;
+- `UNKNOWN`;
+- reconciliación.
+
+#### DEC-19
+
+- pedidos y pagos históricos;
+- clasificación financiera;
+- reservas históricas inexistentes;
+- evidencia histórica de producción.
+
+Estas decisiones no se resuelven mediante DEC-10.
+
+### Modelo conceptual mínimo
+
+Sin imponer nombres físicos, el modelo deberá ser equivalente a:
+
+```text
+CustomerOrder
+  fulfillment_branch_id
+  status
+  current_version
+  total_snapshot
+  net_paid_amount
+  minimum_advance_policy/version
+  cancellation_policy/version
+  production evidence nullable
+  delivered/canceled terminal metadata
+```
+
+```text
+CustomerOrderVersion
+  order_id
+  version_number
+  commercial snapshot
+```
+
+```text
+CustomerOrderVersionItem
+  product_id
+  quantity
+  unit_price_snapshot
+  line_total_snapshot
+```
+
+```text
+CustomerOrderFinancialEntry
+  type
+  amount
+  cash context
+  causal/idempotency reference
+```
+
+La implementación evolucionará `CustomerOrderPayment` hacia el subledger canónico y no mantendrá dos libros financieros permanentes en paralelo.
+
+### Locking y concurrencia
+
+Orden conceptual:
+
+```text
+1. IdempotencyRecord
+2. CustomerOrder/current version
+3. CashSession cuando aplique
+4. InventoryBalance/Reservation según DEC-08
+5. otros recursos
+6. efectos/audit/outbox
+7. commit
+```
+
+Para creación:
+
+```text
+IdempotencyRecord
+-> CashSession
+-> insertar agregado
+```
+
+Resultados normativos:
+
+```text
+no_global_order_lock=true
+different_orders_can_progress_concurrently=true
+different_branches_can_progress_concurrently=true
+overpayment_race_safe=true
+state_transition_race_safe=true
+reservation_race_safe=true
+```
+
+### Rendimiento
+
+La dirección técnica será:
+
+- `net_paid_amount` materializado o una proyección equivalente para lectura rápida;
+- subledger causal como respaldo;
+- índices por pedido, status, sucursal y pagos;
+- ausencia de full payment scans innecesarios;
+- ausencia de full inventory ledger scans;
+- ausencia de locks globales;
+- ausencia de integraciones externas bajo locks de inventario.
+
+DEC-10 no fija un SLA numérico sin baseline.
+
+### Errores conceptuales
+
+Códigos estables equivalentes:
+
+```text
+ORDER_ADVANCE_MINIMUM_REQUIRED
+ORDER_OVERPAYMENT_NOT_ALLOWED
+ORDER_INVALID_TRANSITION
+ORDER_READY_STOCK_INSUFFICIENT
+ORDER_PARTIAL_RESERVATION_NOT_ALLOWED
+ORDER_NOT_FULLY_PAID
+ORDER_PARTIAL_DELIVERY_NOT_SUPPORTED
+ORDER_ITEMS_LOCKED_AFTER_READY
+ORDER_PRODUCTION_STATE_REQUIRED
+ORDER_ALREADY_DELIVERED
+ORDER_CANCELLATION_NOT_ALLOWED
+ORDER_BRANCH_MISMATCH
+```
+
+Semántica general recomendada:
+
+```text
+409 = conflicto con estado, recurso o concurrencia
+422 = payload o regla semántica de entrada inválida
+403 = autorización o scope cuando corresponda
+```
+
+### Auditoría y outbox
+
+Eventos conceptuales equivalentes:
+
+```text
+order.created
+order.payment_received
+order.amended
+order.ready
+order.delivered
+order.canceled
+order.expired
+order.no_show
+order.refunded
+order.revenue_recognized
+```
+
+Cada evento auditará como mínimo, cuando corresponda:
+
+```text
+order_id
+version
+actor
+fulfillment_branch_id
+cash_session_id
+old/new status
+total
+minimum advance
+net_paid
+payment/refund
+production evidence
+cancellation responsibility
+reason
+inventory reservation reference
+request_id
+idempotency reference no secreta
+timestamp
+```
+
+Un replay no duplicará eventos.
+
+### Migración conceptual
+
+La implementación posterior deberá:
+
+1. ampliar la máquina de estados con `EXPIRED` y `NO_SHOW`;
+2. implementar en backend el mínimo del 50 %;
+3. persistir snapshots y versiones de políticas;
+4. conservar `product_id` exacto;
+5. evolucionar `CustomerOrderPayment` al subledger financiero canónico;
+6. materializar `net_paid`;
+7. proteger el sobrepago concurrente;
+8. integrar reservas completas en `READY`;
+9. consumir reservas en `DELIVERED`;
+10. crear reconocimiento de ingreso exactly-once;
+11. añadir responsabilidad y evidencia de cancelación;
+12. integrar la señal `production_started` de DEC-12;
+13. crear refunds causales;
+14. introducir historial de amendments;
+15. incorporar comandos `EXPIRED` y `NO_SHOW`;
+16. integrar DEC-07;
+17. añadir locking del agregado y recursos;
+18. completar auditoría y outbox;
+19. actualizar OpenAPI backend-first;
+20. regenerar el cliente TypeScript;
+21. actualizar POS y Backoffice;
+22. reconciliar históricos mediante DEC-19.
+
+No se inventarán pagos, reservas, estados productivos ni responsabilidades históricas.
+
+### Pruebas futuras obligatorias
+
+#### Creación
+
+- exactamente 50 %;
+- más de 50 %;
+- menos de 50 % rechazado;
+- redondeo;
+- sobrepago;
+- replay;
+- `CashMovement` y cash close.
+
+#### Productos
+
+- producto exacto;
+- clase sólo como navegación;
+- línea genérica rechazada.
+
+#### Pagos
+
+- múltiples anticipos;
+- pago final;
+- diferentes turnos;
+- sobrepago concurrente.
+
+#### `READY`
+
+- reserva completa;
+- stock insuficiente;
+- cero reserva parcial;
+- concurrencia;
+- replay.
+
+#### `DELIVERED`
+
+- pedido completamente pagado;
+- saldo pendiente rechazado;
+- consumo exactly-once;
+- revenue exactly-once;
+- entrega parcial rechazada.
+
+#### Cancelación
+
+- cliente antes de producción: refund 100 %;
+- cliente después de producción: refund 0;
+- panadería antes de producción: refund 100 %;
+- panadería después de producción: refund 100 %;
+- liberación de reserva en `READY`;
+- `PENDING` sin reserva;
+- `DELIVERED` no cancelable.
+
+#### Amendments
+
+- aumento del total;
+- incumplimiento posterior del 50 %;
+- disminución que causaría sobrepago;
+- amendment después de `READY` rechazado.
+
+#### `EXPIRED` y `NO_SHOW`
+
+- transición explícita;
+- ausencia de transición automática sólo por reloj;
+- resolución financiera;
+- release de reserva.
+
+#### Atomicidad y concurrencia
+
+- payment vs payment;
+- `READY` vs cancelación;
+- delivery vs cancelación;
+- reserva vs venta competidora;
+- crash;
+- respuesta perdida;
+- payment, refund, reservation, revenue, audit y outbox exactly-once.
+
+### Evidencia técnica asociada
+
+En el código vigente:
+
+- los estados de pedido son sólo `PENDING`, `READY`, `DELIVERED` y `CANCELED`;
+- `CustomerOrderItem.product_id` ya es obligatorio;
+- se conservan precios y totales, pero no versiones completas de políticas;
+- se permiten anticipos inferiores al 50 %;
+- no existe un comando general de pagos posteriores;
+- `CustomerOrderPayment` contiene `ADVANCE`, `SETTLEMENT` y `REFUND`;
+- esos pagos no crean el `CashMovement` canónico consumido por cash close;
+- no existe protección transversal race-safe contra sobrepago;
+- `READY` no reserva inventario;
+- `DELIVERED` no consume reservas;
+- no existe reconocimiento de ingreso de pedido;
+- la cancelación usa una regla temporal que deberá sustituirse por la frontera productiva;
+- no existe una señal autoritativa `production_started`;
+- no existen amendments versionados;
+- no existen `EXPIRED` ni `NO_SHOW`;
+- no existe idempotencia transversal conforme a DEC-07;
+- no existe locking adecuado del agregado.
+
+Estos hechos no equivalen a implementación de DEC-10.
+
+### Consecuencias, límite e historial
+
+- **Tareas afectadas:** `ZM-FIN-003`, `ZM-FIN-008` y las tareas posteriores del Plan Maestro que implementen pedidos, caja, inventario, producción, contratos, clientes, reportes y migración de datos.
+- **Consecuencias:** subledger financiero de pedidos, snapshots versionados, enforcement backend del 50 %, reserva completa, reconocimiento de ingreso al entregar, cancelación gobernada por evidencia productiva, locking, idempotencia, auditoría, outbox y pruebas de concurrencia y rendimiento.
+- **Dependencias:** DEC-06 para caja y cierre; DEC-07 para idempotencia; DEC-08 para reservas e inventario; DEC-09 para devoluciones posteriores; DEC-11 para medios mixtos; DEC-12 para producción; DEC-13 para pricing; DEC-14 para pagos externos; DEC-19 para históricos.
+- **Límite:** DEC-10 define la política y el modelo conceptual; no certifica que pedidos, pagos, reservas, reconocimiento de ingreso, cancelaciones, expiración, locking, idempotencia, migraciones, contratos, clientes o pruebas estén implementados.
+- **Historial:** `PENDIENTE` desde 2026-08-26; `APROBADA` por el propietario el 2026-08-28.
 
 ## DEC-11 — Pago mixto
 
