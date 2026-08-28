@@ -1506,12 +1506,694 @@ Estas decisiones no se resuelven mediante DEC-07.
 
 ## DEC-08 — Inventario
 
-- **Estado:** `PENDIENTE`
+- **Estado:** `APROBADA`
+- **Fecha:** 2026-08-27
 - **Propietario:** propietario de ZeroMerma
-- **Qué debe aprobarse:** momento de afectación de PRODUCT_DIRECT y CLASS_CAPTURE, reservas, UOM y política de stock negativo.
-- **Tareas principales afectadas:** tareas de ledger de inventario, ventas, pedidos, transferencias, producción, devoluciones y merma.
-- **Respuesta aprobada:** ninguna.
-- **Regla:** la persistencia actual no constituye aprobación de sus invariantes.
+- **Contenido aprobado:** ledger causal e inmutable, balance materializado con existencia y reservas, afectación física de `PRODUCT_DIRECT`, obligaciones y atribuciones de `CLASS_CAPTURE`, reservas, transferencias, producción, compras, UOM, stock negativo, reversas, locking, rendimiento y migración conceptual.
+- **Respuesta aprobada:** política normativa, modelos conceptuales, invariantes, dependencias y pruebas futuras descritos en esta decisión.
+
+### Ledger causal
+
+1. Todo cambio de existencias tendrá un movimiento causal de inventario.
+2. Ningún saldo podrá modificarse silenciosamente sin un movimiento que explique el efecto.
+3. Cada movimiento identificará como mínimo:
+   - producto;
+   - sucursal;
+   - ubicación;
+   - cantidad;
+   - UOM;
+   - documento origen;
+   - línea origen cuando aplique;
+   - tipo o efecto causal;
+   - actor y contexto;
+   - timestamp.
+4. Los movimientos serán inmutables.
+5. Las correcciones y reversas físicas utilizarán nuevos movimientos compensatorios.
+6. No se borrarán ni editarán movimientos históricos para cuadrar saldos.
+
+### Modelo canónico de balances
+
+El balance materializado persistirá:
+
+```text
+quantity_on_hand
+quantity_reserved
+
+available =
+quantity_on_hand - quantity_reserved
+```
+
+La semántica será:
+
+```text
+on_hand:
+existencia física
+
+reserved:
+existencia comprometida pero todavía no consumida
+
+available:
+existencia realmente disponible para nuevas operaciones
+```
+
+Reglas:
+
+- se persistirán `on_hand` y `reserved`;
+- `available` se derivará;
+- no se persistirá una tercera fuente redundante que pueda generar drift;
+- la lectura operacional se realizará desde el balance materializado;
+- el ledger inmutable será la fuente de causalidad y reconciliación;
+- no se escaneará todo el ledger en cada venta.
+
+Resultados normativos:
+
+```text
+operational_reads_use_balance=true
+ledger_remains_source_of_causality=true
+no_full_ledger_scan_per_sale=true
+```
+
+### Modelo conceptual de movimiento
+
+La entidad será equivalente a:
+
+```text
+InventoryMovement
+  id
+  branch_id
+  product_id
+  location_code
+  movement_type
+  quantity_base
+  base_uom
+  source_quantity
+  source_uom
+  conversion_factor
+  source_document_type
+  source_document_id
+  source_line_id nullable
+  causal_operation_code
+  causal_effect_code
+  idempotency_record_id
+  reversal_of_movement_id nullable
+  actor_user_id
+  occurred_at
+```
+
+La forma física exacta podrá adaptarse durante la implementación, pero deberá preservar estas invariantes. La protección contra efectos duplicados tendrá una constraint causal equivalente a:
+
+```text
+UNIQUE(idempotency_record_id, causal_effect_code)
+```
+
+Se admitirá una estructura técnicamente equivalente si garantiza exactamente un delta por efecto causal. La clave causal y la `Idempotency-Key` de DEC-07 serán defensas complementarias.
+
+### `PRODUCT_DIRECT`
+
+1. Una venta `PRODUCT_DIRECT` descontará físicamente inventario al confirmar la venta.
+2. Para la operación POS vigente, la ubicación canónica será `COUNTER`, salvo que una operación futura declare explícitamente otra ubicación.
+3. Antes de confirmar el movimiento se validará disponibilidad bajo locking.
+4. El movimiento quedará vinculado a la línea de venta.
+5. El decremento ocurrirá exactamente una vez.
+6. Venta, balance, movimiento, auditoría, outbox e idempotencia compartirán la misma unidad transaccional.
+7. Un replay `COMPLETED` no volverá a descontar inventario.
+
+### `CLASS_CAPTURE`
+
+Al confirmar una venta `CLASS_CAPTURE`:
+
+- no se inventará un SKU concreto;
+- no se descontará genéricamente una pieza física;
+- se creará una obligación física pendiente por línea de venta, clase y cantidad.
+
+El modelo conceptual será equivalente a:
+
+```text
+ClassInventoryObligation
+  id
+  sale_id
+  sale_line_id UNIQUE
+  branch_id
+  product_class_id
+  quantity_required
+  quantity_attributed
+  status
+```
+
+y las atribuciones serán equivalentes a:
+
+```text
+ClassInventoryAttribution
+  obligation_id
+  product_id
+  quantity
+  efecto causal/idempotente
+```
+
+Invariantes:
+
+```text
+quantity_required > 0
+0 <= quantity_attributed <= quantity_required
+
+pending =
+quantity_required - quantity_attributed
+
+FULFILLED iff pending = 0
+```
+
+Reglas:
+
+1. Cada producto atribuido deberá pertenecer a la clase correspondiente.
+2. No podrá atribuirse más cantidad que la pendiente.
+3. Cada atribución generará el movimiento físico exacto del SKU concreto.
+4. Cada atribución y su movimiento físico se confirmarán exactamente una vez.
+5. No podrá existir:
+   - doble descuento;
+   - sobre-atribución;
+   - obligación completada sin movimientos correspondientes;
+   - movimiento sin atribución causal.
+6. La suma de atribuciones deberá coincidir con la obligación para considerarla cumplida.
+7. Obligación, atribución, balance, movimiento, auditoría, outbox e idempotencia deberán ser consistentes.
+8. Conforme a DEC-06, una inconsistencia física obligatoria no resuelta al commit del cierre será blocker.
+
+Ejemplo normativo:
+
+```text
+Venta:
+5 unidades de clase Conchas
+
+Obligación:
+Conchas pending=5
+
+Reconciliación:
+3 Concha vainilla
+2 Concha chocolate
+
+Movimientos:
+Concha vainilla COUNTER -3
+Concha chocolate COUNTER -2
+
+Resultado:
+pending=0
+```
+
+No existirá ningún descuento adicional de cinco unidades genéricas.
+
+### Reservas
+
+Existirá un modelo causal de reserva separado del saldo materializado, conceptualmente equivalente a:
+
+```text
+InventoryReservation
+  id
+  branch_id
+  product_id
+  location_code
+  source_document_type
+  source_document_id
+  source_line_id
+  quantity_base
+  consumed_quantity
+  released_quantity
+  status
+  idempotency_record_id
+```
+
+Los estados serán equivalentes a:
+
+```text
+ACTIVE
+PARTIALLY_CONSUMED
+CONSUMED
+RELEASED
+```
+
+Efectos:
+
+```text
+RESERVE:
+  on_hand no cambia
+  reserved aumenta
+  available disminuye
+
+RELEASE:
+  on_hand no cambia
+  reserved disminuye
+  available aumenta
+
+CONSUME:
+  on_hand disminuye
+  reserved disminuye
+```
+
+Invariantes:
+
+```text
+reserved >= 0
+consumed + released <= reserved_original
+```
+
+Una reserva no podrá liberarse ni consumirse dos veces. El balance materializará `quantity_reserved`; la entidad de reserva preservará la causalidad.
+
+### Pedidos
+
+La política de inventario aprobada será:
+
+```text
+READY -> reserva producto exacto
+CANCELED/EXPIRED -> libera reserva
+DELIVERED -> consume reserva
+```
+
+Reglas:
+
+- `READY` requerirá disponibilidad suficiente para la reserva aprobada;
+- no se reservará y descontará `on_hand` simultáneamente por la misma cantidad;
+- la entrega consumirá exactamente la reserva correspondiente;
+- la cancelación o expiración liberará exactamente la reserva restante;
+- delivery y cancelación concurrentes se serializarán para que sólo una transición terminal comprometa efectos.
+
+Los siguientes detalles pertenecen a DEC-10 y no se resuelven en DEC-08:
+
+- reserva parcial o backorder;
+- expiración comercial;
+- pedidos `CLASS_CAPTURE`;
+- sustituciones;
+- cambios de producto después de reservar.
+
+### Transferencias
+
+#### Dispatch
+
+```text
+source on_hand -= quantity
+IN_TRANSIT += quantity
+```
+
+#### Receive
+
+```text
+IN_TRANSIT -= received_quantity
+destination on_hand += received_quantity
+```
+
+Reglas:
+
+1. La diferencia entre enviado y recibido no desaparecerá.
+2. Una recepción parcial dejará explícitamente el remanente en tránsito hasta su resolución.
+3. Pérdida, daño o merma en tránsito requerirá un movimiento causal posterior.
+4. Cancelar antes del dispatch no generará efecto físico.
+5. Cancelar después del dispatch no podrá limitarse a cambiar un status; requerirá retorno o disposición causal.
+6. La recepción será idempotente.
+7. El scope de origen y destino obedecerá DEC-04.
+8. Todos los balances relacionados se bloquearán en orden canónico.
+9. POS y Backoffice deberán converger posteriormente en una única semántica física.
+
+La implementación vigente de transferencia administrativa puede eliminar una diferencia de tránsito sin un movimiento causal explícito; este comportamiento deberá corregirse durante la implementación de DEC-08.
+
+### Producción
+
+DEC-08 fija los requisitos físicos generales:
+
+```text
+DRAFT -> sin efecto físico
+
+START ->
+reserva de insumos
+o movimiento a WIP
+según DEC-12
+
+COMPLETE ->
+consumo real
++ retornos/sobrantes
++ merma
++ output real
+
+CANCEL antes de uso ->
+liberar
+
+CANCEL después de uso ->
+disposición causal explícita
+```
+
+Reglas:
+
+- iniciar producción impedirá que los mismos insumos queden simultáneamente disponibles para otras operaciones;
+- completar producción registrará todos los efectos físicos relevantes;
+- cancelar después del uso físico no restaurará automáticamente los insumos como si nunca se hubieran utilizado.
+
+DEC-12 resolverá la elección definitiva entre reserva y WIP, el momento de consumo irreversible, el output parcial, el rendimiento y el consumo real frente al planificado.
+
+### Compras
+
+```text
+create -> no stock
+confirm -> no stock
+receive -> on_hand aumenta
+```
+
+Una entrada directa sólo aumentará inventario cuando represente una recepción física confirmada. Cada recepción incluirá:
+
+- documento y línea de recepción;
+- UOM y factor utilizados;
+- cantidad base;
+- movimiento causal;
+- incremento de balance;
+- auditoría;
+- outbox;
+- idempotencia.
+
+Crear o aprobar una compra no aumentará existencias físicas por sí solo.
+
+### Devoluciones
+
+DEC-08 define que el ledger será capaz de representar los efectos físicos que DEC-09 apruebe posteriormente. Como mínimo podrá expresar:
+
+```text
+RESTOCK_COUNTER
+-> movimiento IN COUNTER
+
+RESTOCK_BACKROOM
+-> movimiento IN BACKROOM
+
+SEND_TO_WASTE
+-> movimiento causal hacia WASTE/no vendible
+
+QUARANTINE futuro
+-> ubicación no vendible
+
+NO_STOCK
+-> sin movimiento sólo cuando el elemento no sea inventariable
+```
+
+DEC-09 decidirá cuándo podrá utilizarse cada disposición; DEC-08 no las aprueba como política final de devolución.
+
+### Merma
+
+La semántica física futura será única:
+
+```text
+documento de merma confirmado
+=> efecto físico causal exactamente una vez
+=> salida de ubicación vendible
+=> entrada a WASTE o disposición terminal según DEC-09
+```
+
+POS y Backoffice no conservarán comportamientos físicos diferentes para la misma operación.
+
+El código vigente presenta esta divergencia:
+
+```text
+POS waste:
+  documento sí
+  movimiento no
+
+Admin waste:
+  documento sí
+  movimiento/balance sí
+```
+
+Esta divergencia deberá eliminarse posteriormente.
+
+### UOM y conversiones
+
+1. Cada producto tendrá una UOM base canónica.
+2. Los movimientos físicos se expresarán finalmente en esa UOM base.
+3. Cuando la operación use otra UOM se conservará este snapshot:
+
+```text
+source_quantity
+source_uom
+conversion_factor
+base_quantity
+base_uom
+```
+
+4. `conversion_factor` será positivo cuando exista conversión.
+5. El cálculo utilizará `Decimal/Numeric`, nunca float.
+6. Cambiar después el factor del producto o proveedor no alterará movimientos históricos.
+7. Una conversión inversa para presentación no reescribirá el ledger.
+8. La precisión y cuantización seguirán la convención contractual vigente y se documentarán durante la implementación.
+9. Los datos y UOM históricos ambiguos dependerán de DEC-19.
+
+### Stock negativo
+
+#### Operaciones ordinarias
+
+Las operaciones ordinarias no podrán producir stock negativo. Antes de comprometer una operación se deberá:
+
+```text
+lock saldo/reserva
+require available >= required
+```
+
+La falta de disponibilidad producirá un rechazo sin efectos.
+
+#### Ajuste excepcional
+
+Un ajuste o conciliación excepcional podrá producir saldo negativo únicamente con:
+
+```text
+inventory.adjust
+intención explícita de permitir negativo
+reason obligatorio
+audit
+outbox
+idempotency
+```
+
+No se requiere una capacidad adicional a `inventory.adjust` para establecer DEC-08. El saldo negativo nunca será silencioso, nunca será consecuencia normal de venta, pedido, transferencia o producción y permanecerá visible y auditable.
+
+### Correcciones y reversas
+
+```text
+movimiento original:
+  inmutable
+
+movimiento de reversa:
+  nuevo movimiento
+  efecto opuesto
+  referencia al original
+```
+
+Reglas:
+
+- no se borrará el original;
+- no se editará su cantidad histórica;
+- será obligatoria una relación `reversal_of_movement_id` o equivalente;
+- existirá un documento causal nuevo;
+- se registrarán razón y actor;
+- la reversa tendrá idempotencia propia;
+- se impedirá la doble reversa del mismo efecto bajo el mismo documento causal;
+- la cadena causal deberá ser reconstruible.
+
+Corregir datos maestros no constituirá automáticamente un movimiento físico.
+
+### Locking y concurrencia
+
+Los principios técnicos serán:
+
+```text
+no_global_inventory_lock=true
+different_products_can_progress_concurrently=true
+different_branches_can_progress_concurrently=true
+causal_duplicates_prevented=true
+```
+
+El orden canónico conceptual será:
+
+```text
+1. IdempotencyRecord
+2. documento/estado de negocio
+3. CashSession cuando DEC-06 aplique
+4. InventoryBalance ordenados determinísticamente
+5. Reservation/Obligation correspondientes
+6. efectos
+7. commit
+```
+
+Los balances se ordenarán mediante una clave determinista equivalente a:
+
+```text
+branch_id
+product_id
+location_code
+```
+
+Las transferencias bloquearán origen, tránsito y destino siguiendo el mismo orden canónico, no "origen primero". Producción ordenará conjuntamente insumos y outputs. No existirá un lock global de inventario.
+
+### Causalidad y DEC-07
+
+En las mutaciones críticas compartirán unidad transaccional:
+
+```text
+IdempotencyRecord
+business document
+InventoryReservation cuando aplique
+ClassInventoryObligation/Attribution cuando aplique
+InventoryMovement
+InventoryBalance
+audit
+outbox
+```
+
+Reglas:
+
+- un rollback revertirá todo;
+- `COMPLETED` se confirmará con los efectos;
+- un replay no generará movimientos adicionales;
+- la constraint causal evitará duplicaciones;
+- `Idempotency-Key` no será sustituida por la clave causal;
+- autorización y scopes se revalidarán conforme a DEC-03 y DEC-04.
+
+### Rendimiento
+
+```text
+ledger inmutable = fuente de causalidad
+InventoryBalance = proyección operacional materializada
+```
+
+No se reconstruirá todo el ledger para cada lectura del POS. Los procesos de reconciliación podrán verificar o reconstruir balances fuera del camino síncrono. DEC-08 no fija un SLA sin baseline.
+
+### Migración conceptual
+
+1. Añadir `quantity_reserved` con valor inicial cero sin reinterpretar históricos.
+2. Crear persistencia causal de reservas.
+3. Crear obligaciones y atribuciones `CLASS_CAPTURE`.
+4. Ampliar el ledger con causalidad, snapshot UOM, línea origen, idempotencia y reversas.
+5. Crear constraints e índices causales.
+6. Introducir locking ordenado.
+7. Migrar los flujos existentes que ya escriben ledger.
+8. Corregir las transferencias parciales.
+9. Migrar las ventas `PRODUCT_DIRECT`.
+10. Migrar la reconciliación `CLASS_CAPTURE`.
+11. Migrar pedidos.
+12. Unificar los flujos POS y Backoffice de transferencias y merma.
+13. Integrar devoluciones y correcciones.
+14. Aplicar conversiones UOM.
+15. Integrar DEC-07, auditoría y outbox.
+16. Actualizar OpenAPI desde backend.
+17. Regenerar el cliente TypeScript.
+18. Actualizar POS y Backoffice.
+19. Reconciliar el balance materializado contra el ledger.
+
+No se inventarán movimientos históricos para explicar saldos actuales. Todo backfill incierto, UOM histórico, saldo negativo existente y documento ambiguo dependerá de DEC-19.
+
+### Pruebas futuras obligatorias
+
+#### `PRODUCT_DIRECT`
+
+- decremento exactamente una vez;
+- stock insuficiente;
+- replay;
+- concurrencia.
+
+#### `CLASS_CAPTURE`
+
+- obligación creada;
+- atribución parcial;
+- atribución completa;
+- sobre-atribución rechazada;
+- replay;
+- cierre con obligación pendiente;
+- cero descuento al confirmar;
+- un solo descuento al atribuir.
+
+#### Reservas
+
+- reserve;
+- release;
+- consume;
+- doble release;
+- doble consume;
+- delivery frente a cancel.
+
+#### Transferencias
+
+- dispatch;
+- receive;
+- recepción parcial;
+- recepción duplicada;
+- diferencia explícita;
+- merma en tránsito;
+- concurrencia.
+
+#### Producción
+
+- start;
+- complete;
+- cancel antes y después de uso;
+- merma;
+- retorno;
+- output.
+
+#### Compras
+
+- create sin stock;
+- confirm sin stock;
+- receive con stock;
+- direct entry;
+- conversión UOM;
+- replay.
+
+#### Reversas
+
+- movimiento compensatorio;
+- doble reversa rechazada;
+- causalidad reconstruible.
+
+#### Stock negativo
+
+- operación ordinaria rechazada;
+- ajuste excepcional autorizado;
+- ajuste negativo sin razón o permiso rechazado.
+
+#### Rendimiento
+
+- ausencia de lock global;
+- productos diferentes concurrentes;
+- sucursales diferentes concurrentes;
+- lectura operacional sin full ledger scan.
+
+### Dependencias
+
+- DEC-04: scope de sucursal.
+- DEC-06: cierre y reconciliación física obligatoria.
+- DEC-07: idempotencia exactamente una vez.
+- DEC-09: devoluciones, merma y disposiciones.
+- DEC-10: ciclo de pedidos y reservas comerciales.
+- DEC-12: producción, WIP y consumo.
+- DEC-19: datos históricos y backfill.
+
+Estas decisiones posteriores no se resuelven mediante DEC-08.
+
+### Evidencia técnica asociada
+
+La validación estática de `ZM-FIN-003` comprobó:
+
+- `InventoryBalance` actual sólo contiene `quantity_on_hand`;
+- no existen reservas;
+- `PRODUCT_DIRECT` no descuenta inventario;
+- `CLASS_CAPTURE` actual no genera movimientos físicos por producto;
+- los pedidos no reservan ni consumen stock;
+- las transferencias POS no actualizan el ledger;
+- las transferencias administrativas sí lo hacen parcialmente;
+- las compras reciben a `BACKROOM`, pero no aplican consistentemente un snapshot de conversión;
+- producción sólo afecta inventario al completar;
+- merma POS y administrativa divergen;
+- las devoluciones almacenan disposición sin efecto físico;
+- los ajustes permiten negativos;
+- no existe una constraint causal única ni idempotencia transversal implementada.
+
+Estos hechos describen el código vigente y no equivalen a implementación de DEC-08.
+
+### Consecuencias, límite e historial
+
+- **Tareas afectadas:** `ZM-FIN-003`, `ZM-FIN-008` y las tareas posteriores del Plan Maestro que implementen inventario, ventas, pedidos, transferencias, producción, compras, devoluciones, merma, contratos y migración de datos.
+- **Consecuencias:** nuevo modelo de reservas y obligaciones, ampliación del ledger, locking ordenado, integración con DEC-07, contratos backend-first, regeneración del cliente TypeScript, adopción coordinada por POS y Backoffice y pruebas de causalidad, atomicidad, concurrencia y rendimiento.
+- **Límite:** DEC-08 define la política y el modelo conceptual; no certifica que ledger, reservas, obligaciones, movimientos, locking, migraciones, contratos, clientes o pruebas estén implementados.
+- **Historial:** `PENDIENTE` desde 2026-08-26; `APROBADA` por el propietario el 2026-08-27.
 
 ## DEC-09 — Devolución y merma
 
