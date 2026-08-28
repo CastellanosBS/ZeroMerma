@@ -2197,12 +2197,976 @@ Estos hechos describen el código vigente y no equivalen a implementación de DE
 
 ## DEC-09 — Devolución y merma
 
-- **Estado:** `PENDIENTE`
+- **Estado:** `APROBADA`
+- **Fecha:** 2026-08-27
 - **Propietario:** propietario de ZeroMerma
-- **Qué debe aprobarse:** restock, cuarentena, waste o no-stock; SEND_TO_WASTE y reglas de reversa.
-- **Tareas principales afectadas:** tareas de devoluciones, correcciones, merma e inventario del Plan Maestro.
-- **Respuesta aprobada:** ninguna.
-- **Regla:** ninguna clasificación estática sustituye esta decisión funcional.
+- **Contenido aprobado:** causalidad, inmutabilidad, disposiciones físicas, cuarentena, split disposition, conservación del derecho de devolución, locking, devoluciones `CLASS_CAPTURE`, merma, compensaciones, sucursal, rendimiento, migración y pruebas futuras.
+- **Respuesta aprobada:** política normativa, modelos conceptuales, invariantes, dependencias y pruebas futuras descritos en esta decisión.
+
+### Principio general
+
+Toda devolución y toda merma comprometida será:
+
+```text
+causal
+inmutable
+auditable
+idempotente
+compatible con DEC-06, DEC-07 y DEC-08
+```
+
+La realidad financiera, documental y física permanecerá relacionada causalmente, pero no se considerará automáticamente equivalente.
+
+### Disposiciones aprobadas
+
+Las disposiciones canónicas serán:
+
+```text
+RESTOCK_COUNTER
+RESTOCK_BACKROOM
+QUARANTINE
+SEND_TO_WASTE
+NO_STOCK
+```
+
+#### `RESTOCK_COUNTER`
+
+Sólo podrá utilizarse cuando el producto:
+
+- sea inventariable;
+- esté identificado físicamente;
+- esté íntegro;
+- sea apto para venta directa.
+
+Su efecto será:
+
+```text
+producto retornado
+-> InventoryMovement IN
+-> COUNTER
+```
+
+#### `RESTOCK_BACKROOM`
+
+Sólo podrá utilizarse cuando el producto:
+
+- sea inventariable;
+- sea físicamente recuperable;
+- pueda mantenerse como existencia;
+- no necesite volver inmediatamente a mostrador.
+
+Su efecto será:
+
+```text
+producto retornado
+-> InventoryMovement IN
+-> BACKROOM
+```
+
+#### `QUARANTINE`
+
+Será la disposición segura por defecto cuando exista duda material sobre:
+
+- calidad;
+- integridad;
+- daño;
+- condición sanitaria;
+- aptitud para venta o producción.
+
+Sus invariantes serán:
+
+```text
+tracked_physical_quantity=true
+sellable=false
+reservable=false
+production_eligible=false
+automatic_release=false
+```
+
+Una operación posterior explícita y autorizada podrá mover el producto desde `QUARANTINE` hacia:
+
+```text
+COUNTER
+BACKROOM
+WASTE
+```
+
+No existirá liberación automática.
+
+#### `SEND_TO_WASTE`
+
+Representará producto devuelto que:
+
+```text
+no es vendible
+se considera descartado
+queda destinado a merma
+```
+
+La devolución materializará el efecto físico correspondiente exactamente una vez.
+
+#### `NO_STOCK`
+
+Sólo será válido cuando el producto identificado realmente no esté sujeto a control de inventario. Requerirá:
+
+```text
+product_id concreto
+Product.is_inventory_tracked=false
+reason obligatorio
+audit
+```
+
+Se rechazará para productos inventariables y no podrá utilizarse para ocultar una inconsistencia de inventario.
+
+### Compatibilidad de `QUARANTINE` con DEC-08
+
+DEC-08 permanece sin cambios:
+
+```text
+arithmetic_available =
+on_hand - reserved
+```
+
+Para `QUARANTINE` se aplicará adicionalmente elegibilidad operacional por ubicación:
+
+```text
+QUARANTINE.is_sellable=false
+QUARANTINE.is_reservable=false
+QUARANTINE.is_production_eligible=false
+
+effective_available_for_operation=0
+```
+
+Esto no redefine el balance aritmético de DEC-08. `QUARANTINE` conserva existencia física trazada, pero no es fuente elegible para venta, reserva ni producción.
+
+Como regla general:
+
+```text
+QUARANTINE.quantity_reserved=0
+```
+
+Una reserva existente deberá resolverse explícitamente antes de mover el producto a cuarentena.
+
+### Modelo canónico de devolución
+
+La estructura conceptual recomendada será:
+
+```text
+SaleReturn
+  original_sale_id
+  branch_id
+  financial/cash context
+  reason
+  actor
+  committed_at
+```
+
+```text
+SaleReturnLine
+  sale_return_id
+  original_sale_line_id
+  quantity
+  refund snapshot
+  UOM snapshot
+```
+
+```text
+ReturnDispositionAllocation
+  return_line_id
+  product_id
+  quantity_base
+  source_quantity
+  source_uom
+  conversion_factor
+  disposition
+  target_location nullable
+  causal_effect_code
+  idempotency_record_id
+```
+
+La forma física exacta podrá variar durante la implementación, pero deberá preservar esta separación:
+
+```text
+línea económica de devolución
+!=
+una única disposición física obligatoria
+```
+
+Este modelo permitirá split disposition sin duplicar el refund.
+
+### Split disposition
+
+Una misma cantidad devuelta podrá distribuirse entre varias disposiciones.
+
+Ejemplo:
+
+```text
+SaleReturnLine:
+  quantity=4
+
+Allocation A:
+  product X
+  quantity=2
+  RESTOCK_BACKROOM
+
+Allocation B:
+  product X
+  quantity=1
+  QUARANTINE
+
+Allocation C:
+  product X
+  quantity=1
+  SEND_TO_WASTE
+```
+
+Invariantes:
+
+```text
+return_line.quantity > 0
+allocation.quantity > 0
+
+sum(allocation.quantity)
+=
+return_line.quantity
+```
+
+Cada allocation tendrá un efecto causal independiente y exactamente una vez. Dividir la realidad física no duplicará el refund.
+
+### Conservación del derecho de devolución
+
+Por cada línea original:
+
+```text
+net_committed_returns
+<=
+original_sold_quantity
+```
+
+Conceptualmente:
+
+```text
+net_committed_returns =
+committed_return_quantity
+-
+explicit_entitlement_restoring_compensations
+```
+
+Reglas:
+
+- toda validación será transaccional;
+- la línea original o una proyección de entitlement se bloqueará;
+- la cantidad retornable se recalculará bajo lock;
+- dos devoluciones concurrentes no podrán devolver la misma unidad.
+
+No restaurarán automáticamente el derecho de devolución:
+
+```text
+reversa puramente financiera
+InventoryMovement reversal aislada
+cambio administrativo de status
+corrección de datos maestros
+```
+
+Sólo una compensación causal explícita que restaure ese derecho podrá disminuir `net_committed_returns`.
+
+### Locking y concurrencia
+
+El orden conceptual será equivalente a:
+
+```text
+1. IdempotencyRecord
+2. Sale/SaleLine o entitlement correspondiente
+3. CashSession cuando exista efecto financiero de caja
+4. InventoryBalance ordenados según DEC-08
+5. ClassInventoryObligation/Attribution cuando aplique
+6. efectos
+7. commit único
+```
+
+Los balances se ordenarán determinísticamente mediante una clave equivalente a:
+
+```text
+branch_id
+product_id
+location_code
+```
+
+Resultados normativos:
+
+```text
+no_global_return_lock=true
+return_quantity_race_safe=true
+different_sales_can_progress_concurrently=true
+different_branches_can_progress_concurrently=true
+```
+
+Ante dos devoluciones concurrentes por la última unidad retornable:
+
+```text
+una completa
+la otra recalcula
+la otra falla con RETURN_QUANTITY_EXCEEDED
+```
+
+No será válida una comprobación optimista en memoria sin protección transaccional sobre la cantidad retornable.
+
+### `RESTOCK`
+
+Para `RESTOCK_COUNTER` y `RESTOCK_BACKROOM`, cada allocation producirá:
+
+```text
+InventoryMovement IN
++
+quantity_on_hand += quantity
+```
+
+en la ubicación correspondiente.
+
+El efecto:
+
+- tendrá causalidad;
+- conservará UOM snapshot;
+- quedará relacionado con devolución, línea y allocation;
+- será idempotente;
+- sucederá exactamente una vez;
+- compartirá unidad transaccional con los efectos internos correspondientes.
+
+No se creará un decremento ficticio anterior sólo para justificar el restock.
+
+### `QUARANTINE`
+
+`QUARANTINE` será una ubicación física explícita no elegible.
+
+Una liberación posterior requerirá:
+
+```text
+QUARANTINE OUT
++
+COUNTER | BACKROOM | WASTE IN
+```
+
+mediante una nueva operación autorizada, causal, auditada e idempotente. La disposición histórica original no se modificará.
+
+### `SEND_TO_WASTE` desde devolución
+
+La representación preferida será una entrada física directa desde el cliente o contexto externo a `WASTE`:
+
+```text
+cliente/exterior
+-> InventoryMovement IN WASTE
+```
+
+Esto producirá:
+
+```text
+returned_physical_item=true
+sellable_stock_increment=0
+waste_quantity_increment=true
+```
+
+No se creará un ingreso artificial a `COUNTER` o `BACKROOM` para retirarlo inmediatamente.
+
+Si el material permanece físicamente bajo custodia:
+
+```text
+WASTE = ubicación física no vendible
+```
+
+La eliminación terminal posterior podrá registrarse mediante:
+
+```text
+InventoryMovement OUT WASTE
+```
+
+Si devolución y eliminación física terminal ocurren materialmente en el mismo acto, podrán expresarse como efectos causales pareados del mismo documento sin pasar por una ubicación vendible.
+
+### `SEND_TO_WASTE` y transacción de devolución
+
+Cuando todos los efectos sean internos y terminales:
+
+```text
+return
+refund interno
+allocation SEND_TO_WASTE
+InventoryMovement
+balance
+audit
+outbox
+IdempotencyRecord
+```
+
+compartirán una unidad transaccional. No se requerirá una segunda tarea manual de merma para materializar el mismo retorno físico.
+
+Esto no implica una transacción distribuida con un proveedor de pagos externo. Los refunds externos permanecen como dependencia de DEC-14.
+
+### `CLASS_CAPTURE`
+
+Para devolver físicamente una unidad originada en `CLASS_CAPTURE` será obligatorio identificar un:
+
+```text
+product_id concreto
+```
+
+No existirá:
+
+```text
+restock de clase genérica
+waste de clase genérica
+quarantine de clase genérica
+```
+
+#### Venta totalmente atribuida
+
+El SKU:
+
+- deberá pertenecer a la clase;
+- deberá estar respaldado por atribuciones causales de la venta;
+- no podrá devolverse por encima de la cantidad atribuida neta de retornos previos.
+
+#### Venta pendiente o parcialmente atribuida
+
+La devolución podrá, dentro de la misma transacción:
+
+```text
+atribuir SKU a la obligación original
++
+crear movimiento causal de la venta
++
+crear allocation de devolución
++
+crear efecto físico de la disposición
+```
+
+Son dos hechos distintos:
+
+```text
+atribución original:
+explica qué salió en la venta
+
+devolución:
+explica qué regresó y cuál fue su disposición
+```
+
+No se considerará doble movimiento si ambos hechos están causalmente identificados.
+
+Ejemplo:
+
+```text
+atribución original:
+COUNTER -1
+
+devolución RESTOCK_COUNTER:
+COUNTER +1
+```
+
+El neto físico será cero, pero conservará causalidad completa. Si no puede demostrarse un SKU válido sin violar DEC-08, no se inventará.
+
+### `NO_STOCK`
+
+`NO_STOCK` sólo podrá utilizarse cuando:
+
+```text
+Product.is_inventory_tracked=false
+```
+
+y exista:
+
+```text
+reason
+actor
+audit/outbox
+```
+
+No generará `InventoryMovement`. Para un producto inventariable se rechazará mediante un error estable equivalente a:
+
+```text
+RETURN_NO_STOCK_NOT_ALLOWED
+```
+
+### Inmutabilidad
+
+Una devolución comprometida será inmutable. Una merma comprometida será inmutable.
+
+No se permitirá:
+
+```text
+editar cantidad histórica
+cambiar disposición histórica
+borrar devolución
+borrar merma
+borrar movimiento para cuadrar
+```
+
+Toda corrección utilizará:
+
+```text
+nuevo documento compensatorio
+referencia causal al original
+reason
+actor
+audit
+outbox
+idempotency
+```
+
+### Modelo de reversas y compensaciones
+
+Se distinguirán conceptualmente:
+
+```text
+ReturnCompensation
+FinancialRefundCompensation
+InventoryMovement reversal
+WasteDisposition correction
+```
+
+Los nombres físicos podrán variar durante la implementación.
+
+#### Return compensation
+
+Corregirá causalmente el documento de devolución. Sólo restaurará el derecho de devolución si declara y sustenta explícitamente ese efecto.
+
+#### Financial refund compensation
+
+Corregirá dinero. Por sí sola:
+
+```text
+no restaura inventario
+no restaura entitlement
+```
+
+#### Inventory movement reversal
+
+Creará un nuevo movimiento físico opuesto. No alterará automáticamente el refund ni el documento.
+
+#### Waste disposition correction
+
+Si el producto todavía existe físicamente y puede recuperarse, será una nueva disposición autorizada desde `WASTE`.
+
+### Reversa de `WASTE`
+
+Una reversa financiera o documental no producirá automáticamente:
+
+```text
+WASTE -> COUNTER
+WASTE -> BACKROOM
+```
+
+La realidad física sólo cambiará mediante una disposición posterior explícita.
+
+Regla:
+
+```text
+refund reversed
+!=
+inventory automatically sellable
+```
+
+### Merma canónica
+
+POS y Backoffice podrán mantener UIs distintas, pero convergerán a la misma semántica de dominio:
+
+```text
+same_domain_effect=true
+same_inventory_causality=true
+```
+
+El protocolo conceptual `commit_waste(...)` requerirá:
+
+- producto concreto;
+- cantidad;
+- ubicación origen;
+- reason;
+- capability;
+- scope de sucursal;
+- disponibilidad;
+- locking DEC-08;
+- documento;
+- movimiento causal;
+- balance;
+- audit;
+- outbox;
+- idempotencia;
+- commit único.
+
+### Representación de `WASTE`
+
+`WASTE` podrá funcionar como ubicación física no vendible mientras el material permanezca bajo custodia.
+
+Una merma desde una ubicación vendible podrá representarse como:
+
+```text
+source location OUT
++
+WASTE IN
+```
+
+Cuando el descarte físico terminal ocurra inmediatamente y la arquitectura lo represente expresamente, podrá existir una disposición terminal equivalente, preservando siempre la causalidad.
+
+POS y Backoffice no conservarán consecuencias físicas distintas.
+
+### Capabilities y alto impacto
+
+Se utilizarán las capabilities ya aprobadas:
+
+```text
+returns_corrections.manage
+waste.manage
+```
+
+DEC-09 no amplía el catálogo de DEC-03.
+
+Política:
+
+- capability correspondiente;
+- reason;
+- audit;
+- no existirá un segundo aprobador universal;
+- un segundo aprobador sólo se exigirá cuando exista una regla o umbral futuro explícitamente aprobado.
+
+DEC-09 no fija importes, porcentajes, cantidades ni umbrales nuevos.
+
+### Sucursal
+
+La política ordinaria será:
+
+```text
+return.branch_id == original_sale.branch_id
+```
+
+Una devolución cross-branch no estará habilitada ordinariamente. Hasta que exista un flujo explícito:
+
+```text
+ordinary_cross_branch_return=false
+```
+
+El futuro flujo deberá definir:
+
+- sucursal receptora física;
+- ledger;
+- compensación financiera;
+- caja;
+- scopes de ambos extremos;
+- auditoría.
+
+El error conceptual estable será:
+
+```text
+RETURN_CROSS_BRANCH_NOT_ALLOWED
+```
+
+La política se aplicará en backend conforme a DEC-04.
+
+### Relación con DEC-06
+
+Si la devolución produce un refund interno asociado a una caja:
+
+- adquirirá la frontera de `CashSession`;
+- validará `OPEN`;
+- registrará el `CashMovement` dentro de esa unidad transaccional;
+- no podrá quedar fuera del cierre.
+
+Si la caja histórica está cerrada:
+
+```text
+no reopen
+no edit original close
+```
+
+El desembolso pertenecerá a una caja abierta autorizada o a un documento financiero compensatorio adecuado. La recepción física del producto no reabrirá la caja histórica.
+
+### Relación con DEC-07
+
+Como mínimo requerirán idempotencia códigos equivalentes a:
+
+```text
+return.commit
+waste.commit
+return.compensate
+waste.compensate
+quarantine.release
+```
+
+Un replay `COMPLETED` garantizará:
+
+```text
+duplicate refund=0
+duplicate InventoryMovement=0
+duplicate waste effect=0
+duplicate audit business effect=0
+duplicate outbox business effect=0
+```
+
+La causal unique del ledger complementará DEC-07 y no sustituirá la `Idempotency-Key`.
+
+### Relación con DEC-08
+
+DEC-09 preserva:
+
+```text
+movimientos inmutables
+UOM snapshot
+balances materializados
+causal uniqueness
+reversas compensatorias
+locking ordenado
+stock negativo ordinario prohibido
+exactly once
+```
+
+DEC-09 utiliza el modelo de inventario de DEC-08 y no crea un segundo ledger.
+
+### Dependencias posteriores
+
+#### DEC-11
+
+Permanecen pendientes:
+
+- devolución de pago mixto;
+- reparto del refund entre medios;
+- límites y redondeos por medio.
+
+#### DEC-14
+
+Permanecen pendientes:
+
+- refund externo;
+- `PROCESSING`;
+- `UNKNOWN`;
+- conciliación con procesador o adquirente.
+
+#### DEC-19
+
+Permanecen pendientes:
+
+- datos históricos;
+- movimientos históricos inexistentes;
+- disposiciones antiguas sin efecto físico;
+- reconciliación y backfill.
+
+Un proveedor externo no participará en una transacción SQL distribuida.
+
+### Errores conceptuales estables
+
+Se definirán errores equivalentes a:
+
+```text
+RETURN_QUANTITY_EXCEEDED
+RETURN_DISPOSITION_REQUIRED
+RETURN_DISPOSITION_SUM_MISMATCH
+RETURN_PRODUCT_REQUIRED
+RETURN_PRODUCT_CLASS_MISMATCH
+RETURN_NO_STOCK_NOT_ALLOWED
+RETURN_CROSS_BRANCH_NOT_ALLOWED
+RETURN_ALREADY_COMPENSATED
+WASTE_INSUFFICIENT_STOCK
+WASTE_ALREADY_COMPENSATED
+QUARANTINE_NOT_SELLABLE
+```
+
+Semántica general:
+
+```text
+409:
+conflictos con estado actual/recurso/concurrencia
+
+422:
+input o disposición semánticamente inválidos
+```
+
+DEC-09 no implementa estos contratos.
+
+### Auditoría y outbox
+
+Los eventos conceptuales serán equivalentes a:
+
+```text
+return.committed
+return.disposition_recorded
+return.compensated
+waste.committed
+waste.compensated
+quarantine.released
+```
+
+No será obligatorio utilizar exactamente esos nombres si la convención de implementación justifica otros.
+
+Los datos auditables mínimos serán:
+
+```text
+actor
+branch_id
+sale_id
+sale_line_id
+return_id
+allocation_id
+product_id
+quantity
+UOM
+disposition
+source_location
+target_location
+reason
+financial_effect/reference
+request_id
+idempotency reference no secreta
+timestamp
+```
+
+Un replay no generará un nuevo efecto de negocio.
+
+### Rendimiento y concurrencia
+
+Resultados normativos:
+
+```text
+no_global_return_lock=true
+no_global_waste_lock=true
+full_inventory_ledger_scan_per_return=false
+full_return_history_scan=false
+different_sales_can_progress_concurrently=true
+different_branches_can_progress_concurrently=true
+```
+
+Las consultas de cantidades retornables y compensaciones utilizarán índices adecuados. DEC-09 no fija un SLA sin baseline.
+
+### Migración conceptual
+
+1. Añadir `QUARANTINE`.
+2. Añadir `NO_STOCK`.
+3. Añadir elegibilidad de `QUARANTINE`.
+4. Separar `SaleReturnLine` de las allocations físicas.
+5. Migrar cada línea histórica actual a una allocation única usando exclusivamente su disposición existente demostrable.
+6. No inventar split histórico.
+7. Crear locking transaccional de entitlement.
+8. Crear efectos físicos para devoluciones nuevas.
+9. No inventar movimientos de inventario históricos ambiguos.
+10. Integrar `CLASS_CAPTURE` con DEC-08.
+11. Crear documentos compensatorios.
+12. Integrar DEC-07.
+13. Aplicar la frontera DEC-06 para refunds internos.
+14. Unificar la semántica de merma POS y Backoffice.
+15. Representar `WASTE` causalmente.
+16. Aplicar capabilities y scopes DEC-03/04.
+17. Actualizar OpenAPI backend-first.
+18. Regenerar el cliente TypeScript.
+19. Actualizar POS y Backoffice.
+20. Reconciliar históricos mediante DEC-19.
+
+### Evidencia técnica asociada
+
+La validación estática de `ZM-FIN-003` comprobó:
+
+- `SaleReturnLine` actual contiene una sola disposición;
+- split disposition no existe;
+- no existe `QUARANTINE`;
+- no existe `NO_STOCK`;
+- la cantidad retornada se valida actualmente sin locking transaccional suficiente;
+- `RESTOCK_COUNTER` y `RESTOCK_BACKROOM` no generan un ledger real;
+- `SEND_TO_WASTE` sólo registra disposición y no materializa inventario;
+- `CLASS_CAPTURE` exige SKU concreto, pero todavía no integra las obligaciones de DEC-08;
+- los refunds crean `CashMovement`, pero todavía no adquieren la frontera DEC-06;
+- la merma POS no actualiza inventario;
+- la merma Backoffice sí decrementa parcialmente el origen;
+- no existe una reversa canónica;
+- no existe idempotencia DEC-07 transversal;
+- cross-branch ordinario ya está rechazado por la lógica actual, aunque faltan los guards definitivos de DEC-04.
+
+Estos hechos describen el código vigente y no equivalen a implementación de DEC-09.
+
+### Pruebas futuras obligatorias
+
+#### Cantidades
+
+- devolución parcial;
+- devolución total;
+- sobredevolución;
+- dos devoluciones concurrentes;
+- replay.
+
+#### Disposiciones
+
+- counter;
+- backroom;
+- quarantine;
+- waste;
+- no-stock válido;
+- no-stock inválido;
+- split.
+
+#### `CLASS_CAPTURE`
+
+- totalmente reconciliado;
+- pendiente;
+- SKU inválido;
+- atribución y devolución en una transacción;
+- cero doble efecto.
+
+#### `QUARANTINE`
+
+- existencia física rastreada;
+- no vendible;
+- no reservable;
+- no utilizable en producción;
+- liberación explícita.
+
+#### Merma
+
+- POS;
+- Backoffice;
+- misma causalidad;
+- exactly once;
+- stock insuficiente.
+
+#### Reversas
+
+- compensación documental;
+- compensación financiera;
+- movimiento físico compensatorio;
+- ausencia de auto-restock desde `WASTE`;
+- doble compensación rechazada.
+
+#### Sucursal
+
+- misma sucursal;
+- cross-branch rechazado.
+
+#### Atomicidad e idempotencia
+
+- crash antes de commit;
+- respuesta perdida;
+- refund exactly once;
+- inventory exactly once;
+- audit exactly once;
+- outbox exactly once.
+
+#### Concurrencia y rendimiento
+
+- diferentes ventas en paralelo;
+- diferentes productos;
+- diferentes sucursales;
+- ausencia de locks globales;
+- ausencia de full scans.
+
+### Dependencias
+
+- DEC-04: scopes y sucursal.
+- DEC-06: `CashSession` y cierre.
+- DEC-07: idempotencia.
+- DEC-08: ledger, balances, UOM y locking.
+- DEC-11: mixed-payment refund.
+- DEC-14: refund externo, `PROCESSING` y `UNKNOWN`.
+- DEC-19: históricos y backfill.
+
+Estas dependencias no se resuelven mediante DEC-09.
+
+### Consecuencias, límite e historial
+
+- **Tareas afectadas:** `ZM-FIN-003`, `ZM-FIN-008` y las tareas posteriores del Plan Maestro que implementen devoluciones, correcciones, merma, inventario, caja, contratos y migración de datos.
+- **Consecuencias:** allocations físicas separadas, nueva ubicación `QUARANTINE`, locking de entitlement, integración con DEC-06/07/08, merma canónica, compensaciones, contratos backend-first, regeneración de cliente y pruebas de causalidad, atomicidad, concurrencia y rendimiento.
+- **Límite:** DEC-09 define la política y el modelo conceptual; no certifica que devoluciones, merma, cuarentena, allocations, movimientos, locking, idempotencia, migraciones, contratos, clientes o pruebas estén implementados.
+- **Historial:** `PENDIENTE` desde 2026-08-26; `APROBADA` por el propietario el 2026-08-27.
 
 ## DEC-10 — Pedidos
 
