@@ -4202,12 +4202,921 @@ Estos hechos no equivalen a implementación de DEC-10.
 
 ## DEC-11 — Pago mixto
 
-- **Estado:** `PENDIENTE`
+- **Estado:** `APROBADA`
+- **Fecha:** 2026-08-28
 - **Propietario:** propietario de ZeroMerma
-- **Qué debe aprobarse:** definición métrica y conteo o conciliación por medio.
-- **Tareas principales afectadas:** tareas de pagos, pedidos, reportes, caja y cierre del Plan Maestro.
-- **Respuesta aprobada:** ninguna.
-- **Regla:** los renglones de pago actuales no constituyen una definición aprobada.
+- **Contenido aprobado:** clasificación derivada `MIXED`, composición financiera por legs reales, cambio sólo en efectivo, refunds `CASH_FIRST`, capacidad de caja, liquidación parcial, moneda única, idempotencia, locking, reportes y migración.
+- **Respuesta aprobada:** política normativa, modelos conceptuales, invariantes, dependencias y pruebas futuras descritos en esta decisión.
+
+### `MIXED` es una clasificación derivada
+
+`MIXED` será una clasificación derivada de la composición real de una transacción. No será un medio financiero persistido.
+
+Ejemplo normativo:
+
+```text
+Payment:
+  CASH applied=400
+  CARD applied=600
+
+classification=MIXED
+```
+
+La fuente financiera real será:
+
+```text
+CASH=400
+CARD=600
+```
+
+No se persistirá ni contabilizará:
+
+```text
+MIXED=1000
+```
+
+La derivación será equivalente a:
+
+```text
+methods =
+  distinct method_code
+  de legs aplicados > 0
+
+0 methods -> NONE
+1 method  -> ese método
+>=2       -> MIXED
+```
+
+Dos o más legs del mismo método no producirán clasificación `MIXED`. La regla será general para dos o más métodos distintos, aunque la UI exponga inicialmente sólo los métodos habilitados.
+
+Se distinguirá entre:
+
+```text
+classification de una transacción
+```
+
+y:
+
+```text
+composición histórica total de un pedido
+```
+
+La composición histórica total será una dimensión analítica derivada, no un medio de pago.
+
+### Conservación del importe del cobro
+
+Para un cobro completo deberá cumplirse:
+
+```text
+sum(PaymentLeg.applied_amount)
+=
+Payment.amount_due
+```
+
+No se permitirá:
+
+```text
+sum(applied) < amount_due
+sum(applied) > amount_due
+```
+
+Cuando corresponda, se distinguirán conceptualmente:
+
+```text
+tendered_amount
+applied_amount
+change_amount
+```
+
+El importe presentado por el cliente no sustituirá al importe efectivamente aplicado al documento.
+
+### Cambio exclusivamente en efectivo
+
+Sólo `CASH` podrá generar cambio.
+
+Ejemplo normativo:
+
+```text
+amount_due=100
+
+CARD:
+  applied=60
+
+CASH:
+  applied=40
+  tendered=50
+  change=10
+```
+
+La composición financiera será:
+
+```text
+CARD=60
+CASH=40
+```
+
+El efecto neto de caja será:
+
+```text
+CashMovement IN 40
+```
+
+Reglas:
+
+- para `CASH`, `tendered >= applied`;
+- para `CASH`, `change = tendered - applied`;
+- para un medio no `CASH`, `change = 0`;
+- un medio no efectivo nunca generará cambio en efectivo;
+- el efecto financiero `CASH` se producirá una única vez por `applied_amount` neto.
+
+La representación canónica conservará `tendered`, `applied` y `change` en el leg. No se creará una segunda salida de caja por el cambio que duplique el efecto económico ya expresado por el importe neto aplicado.
+
+### Modelo conceptual de `Payment`
+
+Se utilizará un modelo conceptual equivalente a:
+
+```text
+Payment
+  id
+  source_document_type
+  source_document_id
+  operation_code
+  amount_due
+  amount_settled
+  currency_code
+  status
+  idempotency_record_id
+  created_at
+  completed_at nullable
+```
+
+```text
+PaymentLeg
+  id
+  payment_id
+  sequence
+  method_code
+  applied_amount
+  tendered_amount nullable
+  change_amount
+  currency_code
+  status
+  cash_session_id nullable
+  original_tender_reference nullable
+  external_operation_reference nullable
+  causal_effect_code
+  created_at
+  completed_at nullable
+```
+
+Invariantes conceptuales:
+
+```text
+method_code != MIXED
+applied_amount > 0
+change_amount >= 0
+leg.currency == payment.currency
+```
+
+Para `CASH`:
+
+```text
+cash_session_id requerido
+tendered_amount requerido
+tendered = applied + change
+```
+
+Para un método no `CASH`:
+
+```text
+change=0
+```
+
+Los nombres físicos podrán adaptarse durante implementación, pero no podrán alterar estas invariantes.
+
+### Origen causal obligatorio del refund
+
+Todo refund deberá tener un origen causal válido.
+
+Para devoluciones de ventas:
+
+```text
+SaleReturn validada conforme DEC-09
+-> Refund
+```
+
+Será suficiente cualquiera de estas evidencias cuando permita localizar y validar inequívocamente la operación:
+
+- ticket físico válido;
+- venta o ticket localizado en el sistema.
+
+No será obligatorio presentar papel cuando la venta pueda localizarse y validarse electrónicamente. No se permitirá un refund `CASH` arbitrario sin una venta, devolución o documento causal válido.
+
+Para pedidos, DEC-10 determinará el derecho y el importe reembolsable; DEC-11 materializará la composición financiera.
+
+### Refund no limitado al medio original
+
+La composición real de un refund no quedará limitada por la composición del pago original.
+
+Ejemplo normativo:
+
+```text
+venta original:
+CASH=40
+CARD=60
+
+refund válido=80
+cash_capacity>=80
+```
+
+Resultado permitido:
+
+```text
+refund:
+CASH=80
+```
+
+El refund podrá entregar 80 en efectivo aunque originalmente sólo hubieran entrado 40 en `CASH`.
+
+Siempre se preservarán:
+
+```text
+original payment composition
+actual refund composition
+causal relationship
+```
+
+No se exigirá revertir `CARD` únicamente porque la venta original utilizó `CARD`.
+
+### Prioridad `CASH_FIRST`
+
+La política ordinaria será:
+
+```text
+refund_priority = CASH_FIRST
+```
+
+El algoritmo conceptual será:
+
+```text
+cash_capacity =
+  capacidad autoritativa de la CashSession abierta
+
+cash_refund =
+  min(refund_due, cash_capacity)
+
+remaining =
+  refund_due - cash_refund
+```
+
+DEC-11 no introducirá:
+
+- reparto proporcional;
+- prioridad proporcional basada en los medios originales;
+- fondo mínimo arbitrario;
+- `safety reserve` no aprobado.
+
+La política no exige que un refund sea proporcional a la composición original.
+
+Ejemplo de reparto no normativo y no obligatorio:
+
+```text
+original:
+40 CASH
+60 CARD
+
+refund=50
+
+20 CASH
+30 CARD
+```
+
+La política aprobada será:
+
+```text
+CASH first
+then remaining eligible non-cash
+```
+
+### Capacidad autoritativa de efectivo
+
+La capacidad de backend será equivalente a:
+
+```text
+expected_cash =
+    opening_amount
+  + committed CASH inflows
+  - committed CASH outflows
+
+cash_capacity = max(expected_cash, 0)
+```
+
+Incluirá, cuando los conceptos correspondientes estén implementados:
+
+- apertura;
+- ventas `CASH` netas del cambio;
+- anticipos de pedidos;
+- liquidaciones;
+- refunds anteriores;
+- pagos operativos;
+- depósitos y retiros;
+- los demás `CashMovement` confirmados.
+
+Regla obligatoria:
+
+```text
+ordinary refund
+must not produce
+authoritative expected_cash < 0
+```
+
+No se fijará un fondo mínimo adicional. El sistema puede desconocer las denominaciones físicas exactas durante el turno; esa limitación no cambia la capacidad contable autoritativa.
+
+Una discrepancia física se resolverá operativamente y mediante cierre o conciliación conforme a DEC-06. No se inventará capacidad de efectivo para ocultarla.
+
+### Efectivo insuficiente y liquidación parcial
+
+Si:
+
+```text
+refund_due > cash_capacity
+```
+
+se aplicará:
+
+```text
+CASH = cash_capacity
+remaining = refund_due - cash_capacity
+```
+
+Ejemplo:
+
+```text
+refund_due=500
+cash_capacity=300
+
+CASH completed=300
+remaining=200
+```
+
+El remanente se intentará únicamente mediante medios no efectivos originales elegibles. Nunca se permitirá:
+
+```text
+cash refund > cash_capacity
+expected_cash < 0
+```
+
+Caso obligatorio para una venta pagada sólo en efectivo:
+
+```text
+original payment=CASH
+refund_due=100
+cash_capacity=40
+```
+
+Resultado:
+
+```text
+settled=40
+pending=60
+status=PARTIALLY_SETTLED
+```
+
+o una representación técnicamente equivalente.
+
+No se permitirá:
+
+```text
+cash=-60
+invented CARD
+refund fully settled
+```
+
+El derecho financiero pendiente permanecerá explícito hasta su resolución.
+
+### Remanente no efectivo
+
+Después de agotar la capacidad `CASH`:
+
+- sólo podrán utilizarse métodos no efectivos originales elegibles;
+- se conservarán las referencias de las operaciones originales;
+- no se superará lo causalmente reembolsable por cada operación externa;
+- no se inventará un método nuevo.
+
+La prioridad exacta entre varios procesadores externos pertenece a DEC-14.
+
+Si un remanente externo queda `PENDING`, `PROCESSING` o `UNKNOWN`, conforme al modelo externo definitivo:
+
+- no se considerará liquidado;
+- no se sustituirá silenciosamente por más `CASH` cuando no exista capacidad;
+- no se repetirá ciegamente;
+- conservará su identidad externa;
+- el refund agregado no se considerará completamente resuelto.
+
+DEC-14 definirá autorización, refund, void, reconciliación y estados externos.
+
+### Modelo conceptual de `Refund`
+
+Se utilizará un agregado equivalente a:
+
+```text
+Refund
+  id
+  source_return_id/source_document
+  amount_due
+  amount_settled
+  amount_pending
+  status
+  idempotency_record_id
+```
+
+y legs equivalentes a:
+
+```text
+RefundLeg
+  id
+  refund_id
+  method_code
+  amount
+  original_tender_reference nullable
+  cash_session_id nullable
+  external_operation_reference nullable
+  status
+  causal_effect_code
+```
+
+El modelo deberá representar, por ejemplo:
+
+```text
+refund due=500
+
+CASH=300 COMPLETED
+CARD=200 PROCESSING
+```
+
+sin duplicar la devolución física o documental.
+
+Los estados conceptuales deberán distinguir como mínimo:
+
+```text
+PENDING
+PARTIALLY_SETTLED
+PROCESSING
+UNKNOWN
+COMPLETED
+REJECTED
+```
+
+Invariante terminal:
+
+```text
+refund COMPLETED
+iff
+amount_settled == amount_due
+and
+no required leg remains non-terminal
+```
+
+Cuando exista remanente:
+
+```text
+amount_settled + amount_pending
+=
+amount_due
+```
+
+El fallo o la incertidumbre de un leg externo no eliminará silenciosamente la obligación financiera.
+
+### Redondeo y moneda
+
+Todos los importes utilizarán:
+
+```text
+Decimal/Numeric
+scale=0.01
+ROUND_HALF_UP
+```
+
+No se requiere una regla de centavo residual proporcional porque DEC-11 no impone reparto proporcional.
+
+Cuando el refund esté completamente resuelto:
+
+```text
+sum(refund legs)
+=
+refund_due
+```
+
+Cada documento tendrá una sola moneda y deberá cumplirse:
+
+```text
+all legs currency == document currency
+```
+
+DEC-11 no soportará:
+
+```text
+mixed-currency payment
+FX conversion inside payment
+FX gain/loss
+```
+
+Un soporte multi-divisa futuro requerirá una decisión explícita.
+
+### Caja y cierre
+
+Cada leg `CASH`:
+
+- pertenecerá a una `CashSession`;
+- adquirirá la frontera transaccional de DEC-06;
+- producirá el `CashMovement` causal correspondiente;
+- participará en `expected_cash` y en el cierre.
+
+Cada leg no efectivo participará en su conciliación real.
+
+Ejemplo:
+
+```text
+payment:
+CASH +400
+CARD +600
+
+refund:
+CASH -100
+```
+
+Resultado:
+
+```text
+cash net effect=+300
+card component=+600
+```
+
+No se reducirá `CARD` porque el refund real haya sido `CASH`.
+
+`MIXED` se retirará conceptualmente como método de conteo o ledger financiero. Un refund `PENDING`, `PROCESSING` o `UNKNOWN` que todavía pueda alterar el turno podrá bloquear el cierre conforme a DEC-06. Una caja cerrada no se reabrirá para ejecutar un refund posterior.
+
+### Reportes sin doble conteo
+
+Los contratos analíticos separarán:
+
+```text
+transaction_classification
+actual_method
+```
+
+Deberá ser posible reportar:
+
+```text
+mixed_transaction_count
+cash_collected
+card_collected
+cash_refunded
+card_refunded
+```
+
+Los importes se agregarán desde los legs reales. `MIXED` servirá únicamente como dimensión de clasificación.
+
+Nunca se sumarán simultáneamente:
+
+```text
+MIXED total
++
+CASH legs
++
+CARD legs
+```
+
+como volumen financiero.
+
+### Aplicación a pedidos conforme a DEC-10
+
+El mismo modelo de payment legs aplicará a:
+
+```text
+minimum 50% advance
+additional advance
+settlement
+refund
+```
+
+Ejemplo:
+
+```text
+order total=1000
+minimum advance=500
+
+CASH applied=200
+CARD applied=300
+
+net_paid=500
+classification=MIXED
+```
+
+El mínimo del 50 % se evaluará sobre:
+
+```text
+sum(applied amounts)
+```
+
+No se evaluará sobre el efectivo presentado antes de calcular cambio.
+
+Cada transacción financiera del pedido conservará su propia composición. DEC-10 seguirá determinando `amount_due`, anticipo mínimo, saldo y derecho de refund por cancelación; DEC-11 sólo materializará los medios.
+
+### Idempotencia del agregado y sus legs
+
+Conforme a DEC-07 existirá una intención agregada para operaciones equivalentes a:
+
+```text
+sale.payment
+order.advance
+order.settlement
+return.refund
+```
+
+y causalidad exactamente una vez por leg.
+
+Defensas conceptuales:
+
+```text
+IdempotencyRecord UNIQUE(idempotency_key)
+
+PaymentLeg UNIQUE(payment_id, causal_effect_code)
+
+RefundLeg UNIQUE(refund_id, causal_effect_code)
+
+CashMovement UNIQUE(source/effect causal identity)
+```
+
+Un replay no podrá producir:
+
+```text
+duplicate CASH leg
+duplicate CARD leg
+duplicate change
+duplicate CashMovement
+duplicate refund leg
+duplicate audit/outbox effect
+```
+
+Un retry de un refund parcialmente liquidado:
+
+- recuperará el mismo agregado;
+- no volverá a ejecutar el leg `CASH` ya liquidado;
+- no generará otro `CashMovement`;
+- no creará otra identidad externa;
+- devolverá el estado agregado vigente.
+
+`X-Request-ID` continuará siendo únicamente trazabilidad.
+
+### Relación con decisiones aprobadas y posteriores
+
+- **DEC-06:** preserva `CashSession` abierta para legs `CASH`, la frontera transaccional, `expected_cash` y los blockers financieros. No se reabrirán cajas cerradas.
+- **DEC-07:** `Payment`, `Refund` y sus legs serán exactly-once; DEC-11 no reinterpreta la política transversal de idempotencia.
+- **DEC-09:** determina validez, cantidad retornable, disposición física e inmutabilidad de la devolución. DEC-11 determina únicamente la composición financiera del refund.
+- **DEC-10:** determina `amount_due`, anticipo mínimo, saldo y derecho de refund por cancelación. DEC-11 materializa los medios sin alterar esa política.
+- **DEC-14:** definirá autorización, capture, refund, void, `PROCESSING`, `UNKNOWN`, reconciliación y asignación entre procesadores externos.
+
+Cambiar el medio financiero de un refund no cambiará la realidad física de la devolución.
+
+DEC-11 fija respecto de operaciones externas:
+
+```text
+no blind retry
+no fake terminal success
+no silent CASH beyond capacity
+```
+
+### Locking y concurrencia
+
+El orden conceptual será:
+
+```text
+1. IdempotencyRecord
+2. business document / Refund / CustomerOrder
+3. CashSession cuando CASH aplique
+4. metadata/intent externo cuando corresponda
+5. legs / CashMovement / efectos
+6. audit/outbox
+7. commit
+```
+
+No habrá lock global de pagos.
+
+Resultados normativos:
+
+```text
+no_global_payment_lock=true
+different_cash_sessions_can_progress_concurrently=true
+cash_refund_capacity_race_safe=true
+refund_amount_race_safe=true
+```
+
+Caso obligatorio de concurrencia:
+
+```text
+cash_capacity=100
+
+refund A=80
+refund B=80
+```
+
+Los dos refunds sólo podrán liquidar conjuntamente 100 en efectivo. La capacidad se comprobará bajo la frontera de la `CashSession`, de modo que ninguna carrera produzca `expected_cash` negativo.
+
+### Rendimiento
+
+La implementación deberá mantener:
+
+- proyección o materialización rápida del efectivo esperado;
+- ledger causal como respaldo;
+- índices por payment, refund, método, estado y documento origen;
+- fast-path de replay;
+- ausencia de escaneo completo del historial de pagos por operación;
+- ausencia de escaneo completo innecesario del historial de refunds;
+- ausencia de lock global;
+- ausencia de llamadas externas bajo locks largos;
+- reportes desde legs o proyecciones indexadas.
+
+No se fijará un SLA sin una línea base medible.
+
+### Errores conceptuales
+
+Se registran códigos estables equivalentes a:
+
+```text
+PAYMENT_TENDER_SUM_MISMATCH
+PAYMENT_CHANGE_ONLY_CASH
+PAYMENT_OVERPAYMENT_NOT_ALLOWED
+PAYMENT_MIXED_CURRENCY_NOT_ALLOWED
+
+REFUND_SOURCE_REQUIRED
+REFUND_AMOUNT_INVALID
+REFUND_CASH_CAPACITY_INSUFFICIENT
+REFUND_PARTIALLY_SETTLED
+REFUND_EXTERNAL_PENDING
+REFUND_ALREADY_SETTLED
+```
+
+`REFUND_CASH_CAPACITY_INSUFFICIENT` no implicará normalmente el rechazo total de un refund ordinario `CASH_FIRST`; activará liquidación parcial y conservación explícita del remanente pendiente.
+
+Los contratos HTTP definitivos se establecerán backend-first durante la implementación.
+
+### Auditoría y outbox
+
+Se contemplan eventos conceptuales equivalentes a:
+
+```text
+payment.committed
+payment.leg.committed
+refund.committed
+refund.partially_settled
+refund.leg.settled
+refund.pending
+refund.external_processing
+refund.external_unknown
+```
+
+La evidencia auditable incluirá, según corresponda:
+
+```text
+source document
+payment/refund id
+original payment composition
+actual refund composition
+method
+applied
+tendered
+change
+cash_session
+external reference no secreta
+actor
+request_id
+idempotency reference no secreta
+timestamp
+```
+
+No se registrarán secretos. Un replay no duplicará eventos de negocio.
+
+### Migración conceptual
+
+La estrategia será:
+
+1. Inventariar dónde `MIXED` está persistido actualmente.
+2. Crear aggregates y legs canónicos de pago.
+3. Crear `Refund` y `RefundLeg`.
+4. Migrar `SalePayment` a legs.
+5. Migrar pagos de pedidos.
+6. Migrar devoluciones actuales.
+7. Eliminar `MIXED` como método financiero para operaciones nuevas.
+8. Conservar `MIXED` sólo como clasificación derivada.
+9. Separar `tendered`, `applied` y `change`.
+10. Añadir causalidad e idempotencia a `CashMovement`.
+11. Implementar `CASH_FIRST`.
+12. Implementar refund parcial y pendiente.
+13. Introducir una proyección autoritativa de capacidad de caja.
+14. Adaptar cash close.
+15. Adaptar reportes.
+16. Adaptar ventas.
+17. Adaptar pedidos.
+18. Adaptar devoluciones.
+19. Coordinar estados externos con DEC-14.
+20. Actualizar OpenAPI backend-first.
+21. Regenerar el cliente TypeScript.
+22. Actualizar POS y Backoffice.
+23. Retirar las estructuras financieras anteriores después del cutover.
+24. Tratar históricos ambiguos conforme a DEC-19.
+
+No se inferirán composiciones históricas `MIXED` sin evidencia.
+
+### Pruebas futuras obligatorias
+
+La implementación deberá cubrir como mínimo:
+
+#### Payment
+
+- `CASH`;
+- `CARD`;
+- `CASH` más `CARD`;
+- tres o más métodos;
+- dos legs del mismo método;
+- suma aplicada distinta del due;
+- sobrepago;
+- cambio `CASH`;
+- cambio en método no efectivo rechazado;
+- moneda diferente rechazada;
+- replay.
+
+#### Cash close y reportes
+
+- split real por legs;
+- clasificación derivada;
+- ausencia de doble conteo;
+- efectivo neto después del cambio.
+
+#### Pedidos
+
+- anticipo mixto del 50 %;
+- anticipos posteriores;
+- settlement;
+- rechazo de sobrepago;
+- cambio `CASH`.
+
+#### Refund
+
+- venta `CARD` con refund total `CASH`;
+- refund `CASH` superior al `CASH` original;
+- prioridad `CASH_FIRST`;
+- capacidad insuficiente con remanente externo;
+- venta sólo `CASH` con capacidad insuficiente y estado parcial o pendiente;
+- dos refunds concurrentes por capacidad;
+- ticket electrónico válido sin papel;
+- fuente inválida;
+- retry exactly-once.
+
+#### Operación externa
+
+- `PROCESSING`;
+- `UNKNOWN`;
+- ausencia de blind retry;
+- misma identidad durante reconciliación.
+
+#### Moneda
+
+- una sola moneda aceptada;
+- mixed currency rechazada.
+
+Estas pruebas no se ejecutan ni implementan mediante esta decisión documental.
+
+### Evidencia técnica asociada
+
+En el código vigente:
+
+- las ventas ya persisten legs reales y rechazan `MIXED` como leg;
+- otros modelos todavía permiten `MIXED`;
+- las ventas validan la suma exacta;
+- existen `tendered` y `change`;
+- el movimiento de caja actual usa el `applied CASH` neto;
+- el pago mixto POS está fijado a `CASH` y `CARD`;
+- POS impide actualmente algunos escenarios de cambio mixto;
+- los pedidos permiten `CASH`, `CARD` y `MIXED`, y no crean el `CashMovement` canónico;
+- los refunds de venta son sólo `CASH`;
+- los refunds de pedido replican la composición original;
+- no existe enforcement de capacidad de caja;
+- no existe refund parcial o pendiente;
+- no existen estados externos;
+- algunas rutas de reporte todavía tratan `MIXED` como bucket directo;
+- no existe idempotencia transversal conforme a DEC-07;
+- no existe locking adecuado.
+
+Estos hechos describen la implementación vigente y no equivalen a implementación de DEC-11.
+
+### Consecuencias, límite e historial
+
+- **Tareas afectadas:** `ZM-FIN-003`, `ZM-FIN-008` y las tareas posteriores del Plan Maestro que implementen pagos, pedidos, devoluciones, caja, reportes, contratos, clientes, migración de datos y medios externos.
+- **Consecuencias:** aggregates y legs canónicos, `MIXED` derivado, cambio sólo `CASH`, capacidad autoritativa de caja, refunds `CASH_FIRST`, remanentes explícitos, reportes por legs, locking, idempotencia, auditoría y outbox.
+- **Dependencias:** DEC-06 para `CashSession`, cash close y blockers; DEC-07 para idempotencia; DEC-09 para validez y causalidad de devolución; DEC-10 para pedidos y refund entitlement; DEC-14 para medios externos y reconciliación; DEC-19 para históricos ambiguos.
+- **Límite:** DEC-11 define la política normativa y los modelos conceptuales; no certifica que pagos, refunds, capacidad de caja, estados externos, locking, idempotencia, migraciones, contratos, POS, Backoffice, reportes o pruebas estén implementados.
+- **Historial:** `PENDIENTE` desde 2026-08-26; `APROBADA` por el propietario el 2026-08-28.
 
 ## DEC-12 — Producción
 
