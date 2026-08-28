@@ -644,12 +644,470 @@ Estos hallazgos son deuda de implementación futura y no implican cambios de có
 
 ## DEC-06 — Cierre
 
-- **Estado:** `PENDIENTE`
+- **Estado:** `APROBADA`
+- **Fecha:** 2026-08-27
 - **Propietario:** propietario de ZeroMerma
-- **Qué debe aprobarse:** qué comando gana ante venta o pago concurrente, si se permite cierre sin conteo y cómo se tratan pendientes.
-- **Tareas principales afectadas:** tareas de caja, concurrencia y cierre del Plan Maestro.
-- **Respuesta aprobada:** ninguna.
-- **Regla:** la existencia de `CashCloseScreen` no aprueba la semántica de cierre.
+- **Contenido aprobado:** ciclo terminal de cierre, fase transaccional `CLOSING`, frontera por `CashSession`, conteo obligatorio, tratamiento de diferencias, blockers financieros, warnings no financieros, idempotencia, recuperación y correcciones compensatorias.
+- **Respuesta aprobada:** política normativa, protocolos de concurrencia y cierre, errores conceptuales y estrategia de migración descritos en esta decisión.
+
+### Ciclo de cierre
+
+1. El ciclo normativo será `OPEN -> CLOSING -> CLOSED`.
+2. `CLOSED` será terminal.
+3. No existirá reapertura de un turno cerrado.
+4. Una corrección posterior utilizará documentos o movimientos compensatorios auditables.
+5. El cierre original no se editará, borrará ni reabrirá para corregirlo.
+
+### Semántica técnica de `CLOSING`
+
+`CLOSING` será una fase transaccional y no requerirá necesariamente un estado persistido mediante un commit intermedio. El modelo aprobado es:
+
+```text
+CashSession durable antes de la operación: OPEN
+
+transacción de cierre:
+  adquirir lock exclusivo de CashSession
+  fase normativa CLOSING
+  recalcular/validar cierre
+  marcar CLOSED
+  commit único
+```
+
+Consecuencias:
+
+- no se requiere persistir durablemente `CLOSING`;
+- no se requiere ampliar el enum de base de datos sólo para representar esa fase;
+- no habrá commit intermedio `OPEN -> CLOSING`;
+- un crash antes del commit deja durablemente `OPEN`;
+- ese rollback no constituye una reapertura;
+- no puede quedar un `CLOSING` durable huérfano;
+- toda operación concurrente sujeta al cierre compartirá la misma frontera de locking.
+
+`CLOSING` no se confundirá con `PENDING_CLOSE` administrativo ni con estados derivados de UI.
+
+### Frontera de caja
+
+El mecanismo técnico canónico derivado será:
+
+```text
+SELECT ... FOR UPDATE
+sobre la CashSession concreta
+```
+
+Reglas:
+
+1. No habrá lock global de cajas.
+2. Turnos diferentes podrán progresar concurrentemente.
+3. Toda operación económica que afecte un turno adquirirá la misma frontera.
+4. El cierre y las operaciones consultarán la `CashSession` por identidad y después validarán su estado.
+5. No será válido comprobar `OPEN`, liberar esa conclusión y confirmar efectos posteriormente sin conservar la frontera.
+
+Resultados normativos:
+
+```text
+no_global_cash_lock=true
+different_cash_sessions_can_progress_concurrently=true
+close_lock_scoped_to_cash_session=true
+```
+
+### Carrera entre operación económica y cierre
+
+#### La operación obtiene la frontera primero
+
+```text
+T1 operación adquiere CashSession OPEN
+T2 cierre espera
+T1 compromete su efecto
+T2 adquiere la frontera
+T2 recalcula el cierre incluyendo T1
+```
+
+El efecto de T1 quedará incluido en el cierre.
+
+#### El cierre obtiene la frontera primero
+
+```text
+T1 cierre adquiere CashSession OPEN
+T1 entra en fase transaccional CLOSING
+T2 operación espera o recibe conflicto temporal
+T1 marca CLOSED y commit
+T2 adquiere o consulta después
+T2 observa CLOSED
+```
+
+T2 será rechazada sin efectos. Nunca podrá existir un cierre confirmado acompañado de una venta o pago tardío del mismo turno fuera del corte.
+
+### Operaciones sujetas a la frontera
+
+Compartirán esta frontera todas las operaciones que puedan cambiar los importes o la composición financiera del turno, como mínimo:
+
+```text
+venta
+pago operativo
+devolución/reembolso
+corrección con efecto financiero
+anticipo de pedido
+liquidación de pedido
+reembolso de pedido
+otros efectos financieros futuros del turno
+```
+
+La matriz exhaustiva pertenece a `ZM-FIN-008`. DEC-10, DEC-11 y DEC-14 concretarán semánticas posteriores, pero ninguna podrá dejar un efecto financiero admitido fuera del cierre de su turno.
+
+### Conteo obligatorio
+
+1. Todo cierre requiere conteo explícito.
+2. Debe existir explícitamente el conteo `CASH`.
+3. La ausencia de la fila `CASH` será inválida con código `CASH_COUNT_REQUIRED`.
+4. Un conteo explícito `CASH counted_amount=0.00` será válido.
+5. Una fila `CARD` o de cualquier otro medio no sustituye el conteo de efectivo.
+6. No se permitirá omitir el conteo mediante una excepción ambigua de “mostrador vacío”.
+
+### Diferencia de caja
+
+Se conservará la convención vigente:
+
+```text
+difference_amount = counted_amount - expected_amount
+
+> 0 = sobrante
+< 0 = faltante
+= 0 = cuadrado
+```
+
+Cuando la diferencia sea distinta de cero se persistirán como mínimo:
+
+```text
+expected_amount
+counted_amount
+difference_amount
+difference_reason
+actor
+timestamp
+audit
+```
+
+Reglas:
+
+- la diferencia no impedirá por sí sola cerrar;
+- la razón será obligatoria cuando `difference != 0`;
+- no se alterará `expected_amount` para forzar cuadratura;
+- no se creará automáticamente un movimiento ficticio para compensarla;
+- no se ocultará la diferencia;
+- quedará como información financiera auditable del cierre.
+
+DEC-06 no fija un umbral monetario arbitrario. Un futuro umbral de alto impacto podrá activar capability o aprobación adicional conforme a DEC-03, sin cambiar la regla de que el cierre final registre explícitamente la diferencia.
+
+### Blockers financieros
+
+Bloqueará el cierre toda operación financiera admitida pero no terminal que todavía pueda alterar el turno. Esto incluye conceptualmente:
+
+```text
+pago pendiente
+anticipo pendiente
+liquidación pendiente
+reembolso pendiente
+operación externa PROCESSING
+operación externa UNKNOWN
+otro efecto financiero admitido no resuelto
+```
+
+Reglas:
+
+```text
+UNKNOWN != FAILED
+UNKNOWN != safe_to_close
+```
+
+El efecto deberá resolverse o reconciliarse antes del cierre. DEC-07 gobierna idempotencia y recuperación; DEC-14 concretará pagos externos.
+
+### Warnings no financieros
+
+Un documento pendiente que no pueda modificar el efectivo o los medios de pago del turno podrá generar un warning sin bloquear. Una transferencia física en tránsito es un ejemplo cuando no afecta el ledger financiero del turno.
+
+Los warnings operativamente relevantes quedarán visibles y auditables. No se convertirá automáticamente toda deuda física en blocker de caja.
+
+### Pedidos
+
+1. La mera existencia de un pedido abierto no bloqueará el cierre.
+2. Sí bloqueará un efecto financiero de pedido perteneciente al turno que haya sido admitido y permanezca pendiente o no resuelto.
+3. Todo anticipo, liquidación o reembolso asociado al turno quedará representado en el ledger financiero canónico consumido por cash close.
+4. Ningún pago de pedido podrá quedar fuera del expected o de la reconciliación del turno que lo recibió.
+
+La regla de interfaz será:
+
+```text
+todo efecto financiero de pedido
+admitido y asociado a un turno
+debe quedar atómicamente representado
+en el ledger canónico consumido por cash close
+```
+
+DEC-10 decidirá cuándo nace exactamente cada efecto económico del pedido.
+
+### `CLASS_CAPTURE` y reconciliación física
+
+- Una reconciliación física pendiente que pueda completarse correctamente como parte del cierre no será por sí sola motivo para mantener el turno abierto indefinidamente.
+- Si al momento del commit permanece una inconsistencia física obligatoria no resuelta, será blocker.
+- DEC-08 definirá el ledger y el inventario físico definitivos.
+
+DEC-06 no resuelve la semántica completa de inventario.
+
+### Idempotencia del cierre
+
+Conforme a DEC-07:
+
+```text
+operation_code=cash_session.close
+Idempotency-Key obligatoria
+```
+
+#### Misma key
+
+```text
+misma key + mismo fingerprint + COMPLETED
+=> replay del mismo cierre
+=> cero efectos nuevos
+```
+
+Dos requests simultáneas con la misma key producirán un único efecto.
+
+#### Dos keys diferentes para la misma `CashSession`
+
+Serán dos intenciones distintas, pero sólo una podrá comprometer el cierre. La segunda quedará terminalmente:
+
+```text
+REJECTED
+error_code=CASH_CLOSE_ALREADY_EXISTS
+HTTP=409
+```
+
+La segunda intención no creará un segundo cierre, una segunda auditoría del efecto, un segundo outbox del efecto ni una segunda revocación.
+
+### Recuperación
+
+Si un cierre es interrumpido se cumplirán:
+
+```text
+no_auto_reopen=true
+no_second_close=true
+same_key_recovery=true
+```
+
+- crash antes del lock: retry normal;
+- crash con lock y antes del commit: rollback; durablemente continúa `OPEN`;
+- crash después de los cálculos pero antes del commit: rollback conjunto;
+- commit exitoso con respuesta perdida: replay `COMPLETED` con la misma key.
+
+No existirá `timeout -> CLOSING -> OPEN`, porque no habrá un `CLOSING` durable comprometido. Tampoco se creará un nuevo cierre como mecanismo de recuperación.
+
+### Relación con DEC-05
+
+Dentro de la misma transacción que comprometa `CashSession -> CLOSED` se revocarán:
+
+```text
+todas las AuthSession POS ACTIVE o LOCKED
+ligadas mediante cash_session_id
+al turno cerrado
+```
+
+La razón será `CASH_SESSION_CLOSED`. Esto no significa revocar todas las sesiones del usuario, todas las sesiones de la estación ni únicamente el navegador que ejecutó el cierre.
+
+Una sesión `LOCKED` por idle no cerrará la caja. Una sesión expirada no podrá ejecutar una mutación de cierre.
+
+### Correcciones posteriores
+
+`CLOSED` será inmutable. Una corrección posterior deberá:
+
+- referenciar el cierre o documento original;
+- utilizar un documento o movimiento compensatorio;
+- mantener relación causal;
+- registrar actor, razón y fecha;
+- producir auditoría y outbox;
+- no cambiar `expected`, `counted` ni `difference` originales;
+- no reabrir el cierre.
+
+La forma exacta del documento compensatorio queda para implementación posterior.
+
+### Contratos y errores conceptuales
+
+Los códigos estables serán:
+
+```text
+CASH_SESSION_CLOSING
+CASH_SESSION_CLOSED
+CASH_COUNT_REQUIRED
+CASH_PENDING_FINANCIAL_OPERATION
+CASH_CLOSE_ALREADY_EXISTS
+CASH_CLOSE_DIFFERENCE_REASON_REQUIRED
+```
+
+Semántica HTTP recomendada:
+
+```text
+409:
+  conflictos de estado, frontera, cierre existente o pendiente financiero
+
+422:
+  conteo requerido
+  razón de diferencia requerida
+```
+
+`CASH_SESSION_CLOSING` sólo aplicará cuando la implementación utilice espera acotada, `NOWAIT` o equivalente y pueda detectar temporalmente la frontera ocupada. Los errores serán estructurados para consumo del frontend.
+
+### Auditoría y outbox
+
+Los eventos conceptuales serán:
+
+```text
+cash_close.committed
+cash_close.rejected
+cash_close.difference_recorded
+```
+
+`cash_close.started` no será obligatorio como evento durable cuando `CLOSING` sea sólo transaccional.
+
+Un cierre confirmado auditará como mínimo:
+
+```text
+actor
+cash_session_id
+close_id
+expected
+counted
+difference
+difference_reason
+warnings o blockers relevantes
+request_id
+referencia idempotente no secreta
+timestamp
+```
+
+Un replay no generará un segundo evento de negocio. `cash_close.difference_recorded` aparecerá exactamente una vez cuando corresponda. Cierre, auditoría, outbox, revocaciones de DEC-05 e idempotencia de DEC-07 compartirán la unidad transaccional cuando corresponda.
+
+### Rendimiento y UX
+
+```text
+different_cash_sessions_concurrent=true
+close_lock_scoped_to_cash_session=true
+preview_does_not_establish_close_boundary=true
+final_commit_revalidates=true
+```
+
+- El usuario podrá obtener un preview antes del lock final.
+- El preview no reservará el derecho a cerrar.
+- La interacción de conteo del usuario no mantendrá bloqueada la fila.
+- La transacción final recalculará expected, blockers y datos críticos tras adquirir la frontera.
+- No se realizarán llamadas externas bajo el lock.
+- Worker y outbox consumer no formarán parte del commit síncrono.
+- Cajas distintas progresarán en paralelo.
+
+DEC-06 no fija un SLA numérico sin una línea base.
+
+### Migración conceptual
+
+1. Mantener durablemente `CashSession.status` con `OPEN/CLOSED` inicialmente.
+2. Modelar `CLOSING` como fase transaccional.
+3. Introducir un helper o unidad de trabajo canónica de `CashSession FOR UPDATE`.
+4. Migrar las operaciones financieras del turno a esa frontera.
+5. Recalcular el cierre final bajo lock.
+6. Exigir conteo `CASH` explícito.
+7. Añadir una razón inequívoca de diferencia.
+8. Añadir detección canónica de pendientes financieros.
+9. Integrar DEC-07.
+10. Integrar la revocación de DEC-05.
+11. Conservar `UNIQUE(cash_session_id)` del cierre.
+12. Añadir errores de dominio estables.
+13. Actualizar OpenAPI desde backend.
+14. Regenerar el cliente TypeScript.
+15. Actualizar POS.
+16. Preservar cierres históricos sin inventar razones ni reinterpretar datos existentes.
+
+Esta decisión no implementa ninguno de estos cambios.
+
+### Pruebas futuras obligatorias
+
+#### Concurrencia
+
+- venta obtiene el lock primero;
+- cierre obtiene el lock primero;
+- pago contra cierre en ambos órdenes;
+- efectos financieros de pedido contra cierre;
+- misma key de cierre simultánea;
+- dos keys distintas;
+- cierres de cajas diferentes en paralelo.
+
+#### Conteo
+
+- `CASH` ausente;
+- `CASH=0`;
+- conteo exacto;
+- diferencia positiva;
+- diferencia negativa;
+- diferencia sin razón;
+- `CARD` sin `CASH`;
+- filas inválidas o duplicadas.
+
+#### Blockers y warnings
+
+- pendiente financiero;
+- `PROCESSING`;
+- `UNKNOWN`;
+- pedido abierto sin pendiente financiero;
+- transferencia en tránsito;
+- reconciliación física resuelta y no resuelta.
+
+#### Recuperación
+
+- crash antes del lock;
+- crash con lock;
+- crash antes del commit;
+- respuesta perdida;
+- replay.
+
+#### Integración
+
+- revocación exacta de `AuthSession`;
+- audit exactly once;
+- outbox exactly once;
+- idempotency exactly once;
+- `CLOSED` no reabrible;
+- corrección posterior sin modificación del cierre original.
+
+### Dependencias
+
+- DEC-05: revocación de sesiones POS.
+- DEC-07: retry, replay e idempotencia.
+- DEC-08: reconciliación física e inventario.
+- DEC-10: timing económico de pedidos.
+- DEC-11: clasificación y reconciliación de medios.
+- DEC-14: estados externos `PROCESSING` y `UNKNOWN`.
+- DEC-19: históricos y datos existentes.
+
+Estas decisiones no quedan resueltas por DEC-06.
+
+### Evidencia técnica asociada
+
+La validación estática de `ZM-FIN-003` comprobó:
+
+- `CashSession` actual sólo admite `OPEN/CLOSED`;
+- ausencia de row lock transversal;
+- venta, pagos y devoluciones sin una frontera común;
+- cierre actual con expected calculado antes del lock;
+- conteo `CASH` actualmente no exigido inequívocamente;
+- diferencia actual calculada como `counted - expected`;
+- `CustomerOrderPayment` vinculado a `cash_session_id` pero fuera del ledger consumido por cierre;
+- `UNIQUE(cash_session_id)` existente para el cierre;
+- auditoría y outbox actuales añadidos a la misma sesión SQLAlchemy;
+- ausencia de pruebas concurrentes entre operación y cierre.
+
+Estos hechos describen el código vigente y no equivalen a implementación de DEC-06.
+
+### Consecuencias, límite e historial
+
+- **Consecuencias:** frontera transaccional común para cierre y operaciones económicas, integración con DEC-05 y DEC-07, ledger financiero completo, contratos estables y pruebas concurrentes.
+- **Límite:** DEC-06 define la política y el modelo técnico; no certifica que locking, conteo, blockers, idempotencia, revocación, contratos o pruebas estén implementados.
+- **Historial:** `PENDIENTE` desde 2026-08-26; `APROBADA` por el propietario el 2026-08-27.
 
 ## DEC-07 — Idempotencia
 
