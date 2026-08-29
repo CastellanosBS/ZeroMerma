@@ -6234,12 +6234,709 @@ Estos hechos describen la implementación vigente y no equivalen a implementaci�
 
 ## DEC-13 — Pricing y descuentos
 
-- **Estado:** `PENDIENTE`
+- **Estado:** `APROBADA`
+- **Fecha:** 2026-08-28
 - **Propietario:** propietario de ZeroMerma
-- **Qué debe aprobarse:** vigencia, prioridad, acumulación, límites, redondeo y autorización de excepciones.
-- **Tareas principales afectadas:** tareas de pricing y descuentos del Plan Maestro; `POS-OPDISC-01`.
-- **Respuesta aprobada:** ninguna.
-- **Regla:** la administración de reglas o el nombre actual de descuentos operativos no aprueban su semántica.
+- **Contenido aprobado:** autoridad del backend, precios versionados, scope global con sustitución por sucursal, motor declarativo limitado 13-B, stacking exclusivamente explícito, prioridad, exclusiones, caps, redondeo, snapshot, cotización, ventas, pedidos, amendments, devoluciones, seguridad, idempotencia, rendimiento, migración y pruebas futuras.
+- **Respuesta aprobada:** decisiones 1B, 2A, 3B, 4A, 5C y 6A, junto con las invariantes, modelos conceptuales y dependencias descritos en esta decisión.
+
+### Separación conceptual
+
+ZeroMerma distinguirá expresamente:
+
+```text
+base price
+commercial discount/promotion
+manual price or discount exception
+operational deduction/charge
+payment method
+refund
+cost
+```
+
+Invariantes:
+
+```text
+CommercialDiscount != OperationalDiscount
+payment method != pricing rule
+refund != new pricing calculation
+cost != sale price
+price/cost change != inventory movement
+```
+
+`CommercialDiscount` será una regla comercial que modifica el importe de una venta o pedido. `OperationalDiscount` continuará siendo una deducción o cargo interno y no participará en el precio comercial, subtotal, descuento ni total de ventas o pedidos.
+
+`POS-OPDISC-01` permanecerá oculto conforme a DEC-02 hasta que nombres, contratos, navegación y presentación no puedan confundirse con promociones comerciales.
+
+### Autoridad del backend
+
+El backend será la única autoridad sobre:
+
+- precio base;
+- reglas candidatas;
+- descuentos aplicados;
+- importes bruto, descuento y neto;
+- total de venta o pedido;
+- identidad o fingerprint de cotización;
+- snapshot confirmado.
+
+El frontend podrá presentar una cotización y enviar su identidad, pero no podrá imponer precio, descuento o total. Toda venta, pedido y amendment terminará en una decisión de pricing validada por backend.
+
+### Propietario del precio base
+
+La resolución canónica será:
+
+```text
+PRODUCT_DIRECT
+-> versión de precio del Product exacto
+
+CLASS_CAPTURE
+-> versión de precio de ProductClass
+```
+
+No habrá fallback silencioso entre producto y clase.
+
+Si no existe un precio válido:
+
+```text
+PRICE_NOT_AVAILABLE
+```
+
+la operación no podrá confirmarse. Un producto o clase inactivo, no vendible o sin precio aplicable tampoco podrá confirmarse.
+
+### Scope del precio base
+
+La política aprobada será:
+
+```text
+global base price
++
+optional branch override
+```
+
+Reglas:
+
+1. Existirá un precio global por defecto.
+2. Una sucursal podrá definir una versión que sustituya el precio global.
+3. POS y pedidos de una misma sucursal utilizarán el mismo precio base.
+4. No habrá precios base distintos por canal dentro de la misma sucursal.
+5. Las promociones sí podrán declarar elegibilidad por canal.
+6. Un override de sucursal no afectará otras sucursales.
+7. Los scopes obedecerán DEC-04.
+8. La administración obedecerá las capacidades de DEC-03.
+9. La ausencia de scope no significará `GLOBAL`.
+
+Orden de resolución:
+
+```text
+branch override válido
+-> global válido
+-> PRICE_NOT_AVAILABLE
+```
+
+Dos versiones igualmente aplicables para la misma identidad, scope y momento constituirán una configuración inválida.
+
+### Precios versionados y vigencia
+
+Los precios serán inmutables y versionados. Cada versión conservará como mínimo:
+
+- producto o clase;
+- importe;
+- moneda;
+- scope;
+- sucursal cuando aplique;
+- `valid_from`;
+- `valid_to` nullable;
+- estado;
+- número o identidad de versión;
+- actor;
+- razón o referencia del cambio;
+- timestamps.
+
+La vigencia será un intervalo semiabierto:
+
+```text
+[valid_from, valid_to)
+```
+
+La fecha inicial será inclusiva y la final exclusiva. Las reglas configuradas con horario local usarán la timezone versionada de la sucursal y persistirán los instantes UTC utilizados.
+
+No se permitirán solapamientos para la misma identidad, scope, sucursal y rango efectivo. Cambiar un precio creará una nueva versión y nunca editará documentos históricos.
+
+### Precio base cero y gratuidad
+
+La política será:
+
+```text
+active and sellable base price > 0
+```
+
+No se permitirá precio base cero para un producto o clase activo y vendible. Precio cero no podrá utilizarse para ocultar una configuración faltante.
+
+La gratuidad se representará mediante una promoción explícita y versionada del 100 %, conservando:
+
+- precio bruto;
+- regla y versión aplicadas;
+- causa;
+- importe descontado;
+- total neto;
+- auditoría.
+
+### Motor de promociones 13-B
+
+Se aprueba un motor declarativo limitado. No se aprueba una DSL, código promocional arbitrario ni ejecución general de expresiones.
+
+Las reglas podrán expresar estructuradamente:
+
+- producto, clase, marca u otro target soportado;
+- scope global o por sucursal;
+- canal;
+- rango de vigencia;
+- porcentaje o importe fijo;
+- nivel de aplicación;
+- prioridad;
+- grupo de exclusión;
+- compatibilidad explícita;
+- cantidad mínima;
+- subtotal mínimo;
+- límite o cap;
+- precio neto mínimo;
+- estado;
+- versión.
+
+Las capacidades físicas concretas podrán incorporarse progresivamente, pero no podrán contradecir esta semántica.
+
+### Stacking, prioridad y exclusiones
+
+La política será:
+
+```text
+no implicit stacking
+```
+
+Dos reglas sólo se acumularán cuando el modelo declare explícitamente su compatibilidad. La coincidencia entre scopes `GLOBAL`, `PRODUCT`, `CLASS`, `BRAND`, `BRANCH` o `CHANNEL` no implicará stacking.
+
+Los grupos de exclusión representarán reglas incompatibles.
+
+Convención normativa:
+
+```text
+lower numeric priority
+=
+higher precedence
+```
+
+Dentro de un mismo grupo:
+
+- ganará la regla elegible con mayor precedencia;
+- un empate de prioridad será una configuración inválida;
+- no habrá desempate por UUID, fecha de creación, orden SQL o posición accidental;
+- una configuración ambigua no podrá activarse.
+
+### Orden matemático
+
+El orden aprobado será:
+
+```text
+1. descuentos porcentuales de línea
+2. descuentos fijos de línea
+3. descuentos porcentuales de documento
+4. descuentos fijos de documento
+```
+
+Cada descuento fijo declarará explícitamente uno de estos niveles:
+
+```text
+PER_UNIT
+PER_LINE
+DOCUMENT
+```
+
+El nivel no se inferirá silenciosamente. El orden matemático formará parte de la versión de la política de pricing y redondeo.
+
+### Caps, floor y reglas inválidas
+
+1. Un descuento no podrá exceder su base elegible.
+2. El neto nunca podrá ser negativo.
+3. No habrá clamp silencioso de una regla inválida.
+4. Una regla inválida será rechazada o no podrá activarse.
+5. Una promoción explícita del 100 % podrá producir neto cero.
+6. Los caps por regla, línea o documento serán explícitos y versionados.
+7. Un precio neto mínimo será explícito y versionado cuando exista.
+8. DEC-13 no fija un cap o floor monetario global arbitrario.
+
+### Redondeo y asignación de descuentos
+
+La política será:
+
+```text
+Decimal/Numeric
+monetary scale = 0.01
+ROUND_HALF_UP
+float prohibited
+```
+
+Cálculo conceptual:
+
+```text
+gross_line =
+Q(base_unit_price * quantity)
+
+line_percentage_discounts
+-> line_fixed_discounts
+
+net_line_before_document =
+gross_line - line_discount
+
+gross_document =
+sum(gross_line)
+
+document_percentage_discounts
+-> document_fixed_discounts
+
+net_document =
+sum(net_line_before_document)
+- document_discount
+```
+
+Los descuentos de documento se asignarán a líneas para soportar devoluciones, tickets y reportes. La distribución será determinista mediante:
+
+- proporción sobre el neto elegible después de descuentos de línea;
+- método de mayores restos;
+- desempate estable por secuencia de línea;
+- persistencia del ajuste residual.
+
+DEC-13 no introduce impuestos de venta que no estén definidos por decisiones o contratos vigentes.
+
+### Snapshot de pricing
+
+Cada decisión confirmada conservará una estructura equivalente a:
+
+```text
+PricingDecision
+  pricing_version
+  currency
+  resolved_at
+  branch_id
+  channel
+  quote_id/fingerprint
+
+  base_price_source
+  base_price_reference/version
+  base_unit_price
+
+  candidate_discount_rule_versions
+  applied_discount_rule_versions
+  excluded_rule_reasons
+
+  gross_line_amount
+  line_discount_amount
+  document_discount_allocation
+  net_line_amount
+
+  gross_document_amount
+  total_discount_amount
+  net_document_amount
+
+  rounding_policy_version
+```
+
+El snapshot permitirá reconstruir:
+
+- precio base y versión;
+- reglas candidatas;
+- reglas aplicadas;
+- reglas excluidas y su razón;
+- orden matemático;
+- redondeo;
+- importes bruto, descuento y neto.
+
+La implementación podrá utilizar una entidad común y referencias para evitar duplicación innecesaria, sin crear una fuente paralela de verdad.
+
+### Excepciones manuales
+
+La política vigente será:
+
+```text
+manual price override in POS = prohibited
+manual discount override in POS = prohibited
+```
+
+La cajera no podrá introducir arbitrariamente un precio, porcentaje, descuento fijo, gratuidad ni excepción ad hoc. Toda reducción procederá de una regla comercial configurada, versionada, vigente, autorizada y auditable.
+
+`discounts.manage` administrará reglas y no concederá autoridad para alterar una venta concreta. Una futura política de overrides requerirá aprobación explícita nueva y una capacidad operativa separada.
+
+### Cotización obsoleta
+
+La cotización backend devolverá una identidad o fingerprint estable.
+
+Al confirmar:
+
+1. el backend resolverá nuevamente o validará la versión de pricing;
+2. comparará el fingerprint presentado;
+3. si cambió el precio o alguna regla, no cobrará silenciosamente;
+4. responderá con un conflicto equivalente a:
+
+```text
+PRICE_QUOTE_STALE
+HTTP 409
+```
+
+5. el frontend mostrará el nuevo total;
+6. la cajera deberá aceptarlo nuevamente.
+
+No se aprueba una ventana temporal de precio congelado. La interacción del carrito no mantendrá un lock global ni locks de base de datos abiertos.
+
+### Ventas
+
+La venta utilizará el motor canónico para:
+
+- resolver precio base;
+- evaluar reglas;
+- calcular bruto, descuento y neto;
+- validar pagos;
+- persistir snapshot;
+- generar ticket;
+- producir auditoría y outbox;
+- completar la idempotencia de DEC-07.
+
+Persistirá como mínimo:
+
+- subtotal bruto;
+- descuento total;
+- total neto;
+- importes por línea;
+- asignación de descuentos documentales;
+- referencias y versiones aplicadas;
+- `pricing_decision_id` o fingerprint equivalente.
+
+El frontend no enviará un total autoritativo.
+
+### Pedidos y anticipo
+
+Se preservan las reglas de DEC-10:
+
+- producto exacto;
+- snapshot versionado;
+- anticipo obligatorio del 50 %;
+- amendments sólo antes de `PRODUCTION_COMMITTED`;
+- históricos inmutables.
+
+El anticipo mínimo se calculará sobre:
+
+```text
+net order_total_snapshot
+```
+
+después de aplicar pricing y promociones. Una versión confirmada conservará precios, reglas e importes aunque las reglas expiren posteriormente.
+
+### Repricing completo de amendments
+
+La política será:
+
+```text
+order.amend
+-> reprice entire new version
+using current valid prices and promotions
+```
+
+Reglas:
+
+1. La versión anterior permanecerá inmutable.
+2. Todas las líneas de la nueva versión se resolverán nuevamente.
+3. No se conservarán silenciosamente precios antiguos de líneas no modificadas.
+4. Se creará un snapshot completo nuevo.
+5. Se recalculará el total neto.
+6. Se recalculará el anticipo mínimo del 50 %.
+7. Si `net_paid` queda por debajo del mínimo, deberá completarse atómicamente o se rechazará el amendment.
+8. Si `net_paid` excede el nuevo total, no se generará un refund silencioso; se requerirá una operación financiera explícita y atómica.
+9. Después de `PRODUCTION_COMMITTED`, el amendment continuará prohibido.
+
+### Devoluciones y refunds
+
+Se preservan DEC-09 y DEC-11. La base económica del refund será:
+
+```text
+original allocated net line amount
+```
+
+No se utilizarán el precio vigente, la promoción vigente, el catálogo actual ni el costo actual.
+
+Por línea se conservará:
+
+- cantidad original;
+- bruto original;
+- descuento de línea;
+- asignación de descuento documental;
+- neto retornable;
+- cantidad retornada acumulada;
+- valor retornado acumulado;
+- residual de redondeo.
+
+En una devolución parcial:
+
+- el neto se distribuirá proporcionalmente;
+- se aplicará la misma política de centavos;
+- la última devolución elegible recibirá el remanente exacto;
+- múltiples devoluciones nunca superarán la cantidad ni el valor neto original.
+
+La liquidación real del refund continuará gobernada por DEC-11.
+
+### Tickets y reportes
+
+Los tickets mostrarán de manera reconstruible:
+
+- precio bruto;
+- promociones aplicadas;
+- descuento;
+- total neto;
+- desglose pertinente por línea y documento.
+
+No informarán descuento cero cuando haya existido uno.
+
+Los reportes distinguirán:
+
+- venta bruta;
+- descuentos comerciales;
+- venta neta;
+- devoluciones;
+- margen o costo cuando esté definido.
+
+`OperationalDiscount` no participará en estas métricas comerciales.
+
+### Scope y seguridad
+
+Capacidades aplicables:
+
+```text
+pricing.view
+pricing.manage
+discounts.view
+discounts.manage
+```
+
+Reglas:
+
+- autorización backend deny-by-default;
+- scopes conforme a DEC-04;
+- una regla de sucursal no afectará otra;
+- administración global requerirá `GLOBAL` explícito;
+- consultar no concederá modificar;
+- administrar precios no concederá administrar promociones;
+- no existirá autoridad de override manual;
+- activaciones, desactivaciones, conflictos y cambios sensibles serán auditables.
+
+### Idempotencia, locking y rendimiento
+
+DEC-07 se aplicará a las operaciones críticas. Un replay no duplicará:
+
+- decisión de pricing;
+- descuento;
+- venta;
+- pedido;
+- amendment;
+- ticket;
+- auditoría;
+- outbox.
+
+No habrá lock global de pricing. Los conflictos de solapamiento se serializarán únicamente por la identidad relevante del precio o regla.
+
+La implementación utilizará índices por:
+
+- estado;
+- moneda;
+- scope;
+- sucursal;
+- canal;
+- target;
+- prioridad;
+- grupo;
+- rango efectivo;
+- versión.
+
+La caché será una optimización y nunca autoridad. No se escanearán históricos para calcular una venta, no se recalcularán documentos confirmados y el checkout no dependerá de Backoffice o worker. DEC-13 no fija un SLA sin baseline.
+
+### Errores conceptuales
+
+Se registran códigos estables equivalentes a:
+
+```text
+PRICE_NOT_AVAILABLE
+PRICE_ZERO_NOT_ALLOWED
+PRICE_SCOPE_CONFLICT
+PRICE_VERSION_OVERLAP
+PRICE_QUOTE_STALE
+
+DISCOUNT_RULE_CONFIGURATION_INVALID
+DISCOUNT_PRIORITY_CONFLICT
+DISCOUNT_STACKING_NOT_ALLOWED
+DISCOUNT_EXCLUSION_CONFLICT
+DISCOUNT_EXCEEDS_ELIGIBLE_BASE
+DISCOUNT_NET_NEGATIVE
+DISCOUNT_MANUAL_OVERRIDE_NOT_ALLOWED
+
+ORDER_REPRICING_REQUIRED
+ORDER_REPRICING_OVERPAYMENT
+```
+
+La forma HTTP definitiva se concretará durante implementación; `PRICE_QUOTE_STALE` corresponderá a un conflicto `409`.
+
+### Auditoría y outbox
+
+Se auditarán como mínimo:
+
+- actor;
+- sucursal y scope;
+- canal;
+- producto o clase;
+- versión de precio;
+- regla y versión;
+- vigencia;
+- prioridad;
+- compatibilidad;
+- grupo de exclusión;
+- importe anterior y nuevo;
+- candidatas;
+- reglas aplicadas;
+- exclusiones y razón;
+- bruto;
+- descuento;
+- neto;
+- rounding policy;
+- fingerprint;
+- request ID;
+- referencia idempotente no secreta;
+- timestamps.
+
+Un replay no generará eventos de negocio duplicados.
+
+### Migración conceptual
+
+1. Crear precios inmutables y versionados.
+2. Añadir scope global y por sucursal.
+3. Añadir vigencia `[from,to)`.
+4. Convertir precios actuales en versiones iniciales sólo cuando sea demostrable.
+5. Versionar reglas comerciales.
+6. Añadir canal, grupos, compatibilidad, prioridad, nivel y caps.
+7. Validar configuraciones y solapamientos.
+8. Implementar el motor único del backend.
+9. Añadir cotización y fingerprint.
+10. Persistir `PricingDecision`.
+11. Integrar ventas.
+12. Integrar pedidos.
+13. Integrar amendments con repricing completo.
+14. Integrar devoluciones desde el snapshot original.
+15. Adaptar tickets.
+16. Adaptar reportes.
+17. Aplicar DEC-03, DEC-04 y DEC-07.
+18. Actualizar OpenAPI backend-first.
+19. Regenerar cliente TypeScript.
+20. Actualizar POS.
+21. Actualizar Backoffice.
+22. Mantener `POS-OPDISC-01` oculto.
+23. Retirar estructuras mutables o paralelas después del cutover.
+24. Tratar históricos ambiguos mediante DEC-19.
+
+No se inventarán promociones o descuentos históricos.
+
+### Pruebas futuras obligatorias
+
+#### Precio
+
+- producto y clase;
+- global y override de sucursal;
+- ausencia y cero;
+- producto o clase inactivo;
+- vigencia y timezone;
+- solapamiento;
+- rango `[from,to)`.
+
+#### Promociones
+
+- producto, clase, marca y global;
+- sucursal y canal;
+- porcentaje;
+- fijo `PER_UNIT`, `PER_LINE` y `DOCUMENT`;
+- prioridad y empate;
+- exclusión;
+- stacking permitido y prohibido;
+- regla futura y expirada;
+- cap y floor;
+- descuento superior a la base;
+- gratuidad mediante 100 %;
+- configuración inválida.
+
+#### Redondeo
+
+- línea y documento;
+- método de mayores restos;
+- residual;
+- cantidades decimales;
+- ausencia de float.
+
+#### Ventas
+
+- autoridad backend;
+- quote vigente y stale;
+- reconfirmación;
+- replay;
+- snapshot;
+- ticket;
+- auditoría y outbox.
+
+#### Pedidos
+
+- anticipo del 50 % sobre neto;
+- repricing completo;
+- promociones modificadas;
+- anticipo insuficiente tras amendment;
+- sobrepago;
+- amendment posterior a `PRODUCTION_COMMITTED` rechazado.
+
+#### Devoluciones
+
+- refund desde neto original;
+- devolución parcial y múltiples devoluciones;
+- descuento documental;
+- último centavo;
+- límite de valor.
+
+#### Seguridad y separación
+
+- `view` y `manage`;
+- branch scope y `GLOBAL`;
+- deny-by-default;
+- override manual rechazado;
+- `CommercialDiscount` sí afecta pricing;
+- `OperationalDiscount` no afecta pricing;
+- costo no cambia precio automáticamente;
+- cambiar precio no mueve inventario.
+
+### Evidencia técnica vigente
+
+La inspección técnica asociada constató:
+
+- el precio vigente es mutable en `Product` y `ProductClass`;
+- no existen versiones ni vigencia de precios;
+- los descuentos comerciales tienen CRUD y preview;
+- `priority` no tiene semántica de checkout;
+- ventas y pedidos no consumen `CommercialDiscount`;
+- tickets registran descuento cero;
+- devoluciones usan `unit_price` original sin allocations completas;
+- POS y backend pueden divergir si cambia el precio;
+- `OperationalDiscount` está separado en efecto, pero su nombre es ambiguo;
+- la autorización actual se limita principalmente a la superficie;
+- no existe idempotencia transversal ni snapshot completo.
+
+Estos hechos describen el código vigente y no equivalen a implementación de DEC-13.
+
+### Consecuencias, dependencias, límite e historial
+
+- **Tareas afectadas:** `ZM-FIN-003`, `ZM-FIN-008`, `ZM-FIN-071`, `ZM-FIN-072`, `POS-OPDISC-01` y las tareas posteriores que implementen ventas, pedidos, devoluciones, tickets, reportes, contratos, clientes y migración de datos.
+- **Consecuencias:** motor único de pricing en backend; precios y promociones versionados; scope global/sucursal; promociones por canal; snapshot reconstruible; cotizaciones con fingerprint; repricing completo de amendments; refunds desde el neto original; reportes bruto/descuento/neto; seguridad, idempotencia, auditoría y outbox.
+- **Dependencias:** DEC-02 para mantener oculto `POS-OPDISC-01`; DEC-03 para capacidades; DEC-04 para scope; DEC-07 para idempotencia; DEC-09 para devoluciones; DEC-10 para pedidos y amendments; DEC-11 para liquidación de refunds; DEC-19 para históricos ambiguos.
+- **Límite:** DEC-13 define política normativa y modelos conceptuales. No certifica implementación de pricing, promociones, snapshots, cotizaciones, ventas, pedidos, devoluciones, tickets, reportes, migraciones, contratos, clientes, seguridad ni pruebas.
+- **Historial:** `PENDIENTE` desde 2026-08-26; `APROBADA` por el propietario el 2026-08-28 mediante decisiones 1B, 2A, 3B, 4A, 5C y 6A; se aprueba el motor 13-B con stacking exclusivamente explícito y se prohíben los overrides manuales en POS.
 
 ## DEC-14 — Pagos externos
 
