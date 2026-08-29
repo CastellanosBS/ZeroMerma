@@ -7794,12 +7794,856 @@ Estos hechos describen el código vigente; no constituyen implementación de DEC
 
 ## DEC-15 — Hardware y offline
 
-- **Estado:** `PENDIENTE`
+- **Estado:** `APROBADA`
+- **Fecha:** 2026-08-29
 - **Propietario:** propietario de ZeroMerma
-- **Qué debe aprobarse:** matriz de dispositivos, bridge o agente local, alcance offline/reconnect y contingencia.
+- **Qué se aprueba:** bridge local provider-agnostic, matriz certificada, hardware mínimo del piloto, operación transaccional online-only, recuperación de resultados y contingencia manual externa controlada.
 - **Tareas principales afectadas:** tareas de POS, impresión, scanner, cajón, terminal, conectividad y continuidad de tienda.
-- **Respuesta aprobada:** ninguna.
-- **Regla:** browser print y keyboard wedge no constituyen aprobación de la matriz de hardware.
+- **Respuesta aprobada:** decisiones `1B`, `2A`, `3B`, `4B`, `5A`, `6A` y `7B`, con las dependencias y límites que se detallan a continuación.
+- **Regla:** una falla de hardware o conectividad no altera la autoridad del backend ni el resultado económico o de inventario ya confirmado.
+
+### Principios normativos
+
+```text
+business commit
+!=
+device side effect
+```
+
+```text
+sale confirmed
+!=
+ticket printed
+```
+
+```text
+cash payment confirmed
+!=
+drawer opened
+```
+
+```text
+browser print
+!=
+certified printer integration
+```
+
+```text
+keyboard input
+!=
+certified scanner integration
+```
+
+```text
+cached read
+!=
+offline transactional authority
+```
+
+```text
+network error
+!=
+business rejection
+```
+
+```text
+request not sent
+!=
+request sent with unknown result
+!=
+server commit confirmed
+```
+
+```text
+local device availability
+!=
+backend business authority
+```
+
+```text
+manual contingency outside ZeroMerma
+!=
+offline transaction confirmed by ZeroMerma
+```
+
+Una falla de hardware posterior al commit no revierte, repite ni altera silenciosamente el resultado económico o de inventario.
+
+### Arquitectura aprobada: bridge local provider-agnostic
+
+La estrategia aprobada es:
+
+```text
+POS web
+  -> LocalHardwareAgent / LocalHardwareBridge
+  -> device adapter
+  -> printer / drawer / terminal / diagnostic capability
+```
+
+El POS continúa siendo una aplicación web. No se aprueba convertirlo en una aplicación desktop completa como requisito inicial.
+
+El bridge será estrecho y provider-agnostic:
+
+- no contendrá reglas de venta, pricing, caja o inventario;
+- no decidirá si una venta quedó confirmada;
+- no determinará estados financieros de BBVA;
+- no sustituirá la autoridad del backend;
+- expondrá únicamente capacidades locales estructuradas;
+- utilizará adapters por protocolo o dispositivo;
+- conservará identidad, versión, health y binding de workstation;
+- permitirá incorporar nuevos dispositivos sin reescribir el dominio.
+
+Modelo conceptual equivalente, sin imponer nombres físicos:
+
+```text
+LocalHardwareAgent
+  identity
+  workstation_binding
+  version
+  capabilities
+  health
+  paired_at
+  last_seen_at
+```
+
+Capacidades iniciales potenciales:
+
+```text
+print
+open_drawer
+terminal_transport
+device_health
+```
+
+El scanner keyboard wedge no necesita pasar obligatoriamente por el bridge.
+
+### Seguridad del bridge
+
+Requisitos mínimos:
+
+- ejecución con mínimo privilegio;
+- comunicación mediante loopback protegido, IPC local o equivalente;
+- pairing o autenticación con la workstation;
+- allowlist de la aplicación u origen autorizado;
+- prohibición de aceptar comandos de cualquier sitio web;
+- mensajes estructurados, no comandos arbitrarios;
+- correlation e identidad causal;
+- protección contra repetición;
+- timeouts;
+- logs sanitizados;
+- secretos fuera del frontend;
+- separación sandbox/producción;
+- paquete e instalaciones verificables;
+- actualizaciones firmadas;
+- compatibilidad de versiones;
+- rollback controlado;
+- diagnóstico sanitizado.
+
+Una prueba de dispositivo nunca crea una venta, pago, refund, movimiento de caja o movimiento de inventario.
+
+### Política de soporte: matriz certificada
+
+La política aprobada es:
+
+```text
+supported
+iff
+explicitly tested and versioned in the certified matrix
+```
+
+ZeroMerma no declara soporte abierto para cualquier dispositivo que parezca compatible con el sistema operativo, el navegador o un protocolo genérico.
+
+La matriz conservará como mínimo:
+
+```text
+device_type
+required_or_optional
+manufacturer_model_or_protocol
+connection
+operating_system
+browser_or_runtime
+driver_version
+adapter_version
+workstation_binding
+fallback
+failure_impact
+tested_status
+support_status
+validated_at
+```
+
+Los modelos, versiones y familia concreta de sistema operativo y navegador se seleccionarán durante inventario físico, implementación y piloto. DEC-15 no inventa marcas o versiones aún no probadas.
+
+Una combinación fuera de la matriz podrá clasificarse como `UNSUPPORTED`, `EXPERIMENTAL`, `PENDING_VALIDATION` o equivalente, pero nunca se presentará como soportada.
+
+### Hardware obligatorio y opcional del piloto
+
+Será obligatorio en una caja POS:
+
+- workstation compatible;
+- navegador o runtime certificado;
+- pantalla o monitor;
+- impresora de tickets certificada.
+
+La pantalla táctil no será obligatoria si teclado y mouse permiten operar correctamente la experiencia POS.
+
+Serán opcionales:
+
+- scanner;
+- cajón de efectivo;
+- display de cliente;
+- otros periféricos no esenciales.
+
+La ausencia de scanner o cajón no impedirá utilizar el POS cuando exista un procedimiento operativo alternativo válido.
+
+La terminal BBVA será obligatoria únicamente en las workstations donde se habilite `PROVIDER_INTEGRATED`. Una caja que opere sólo con otros medios permitidos no requerirá terminal BBVA.
+
+La exigencia documental, fiscal o de comprobantes continúa sujeta a DEC-16. Una incompatibilidad deberá reportarse explícitamente.
+
+### Impresión y ticket
+
+La secuencia normativa es:
+
+```text
+business commit
+  -> immutable document/ticket available
+  -> print request with causal identity
+  -> bridge/adapter execution
+  -> independent local outcome
+```
+
+Reglas:
+
+1. La impresión ocurre después del commit del negocio.
+2. Un fallo de impresión no revierte la venta, pedido, devolución o cierre.
+3. Un retry de impresión no repite la operación económica.
+4. La reimpresión usa el mismo snapshot histórico e inicia un nuevo intento físico.
+5. Los intentos y reimpresiones serán auditables cuando corresponda.
+6. Una impresora sin papel u offline produce un problema operacional.
+7. El sistema no afirmará `PRINTED` sin evidencia del adapter.
+8. El diálogo del navegador no acredita impresión física.
+9. Caracteres, corte de papel y comandos específicos pertenecen al adapter certificado.
+10. El comprobante ZeroMerma y el comprobante BBVA permanecen conceptualmente separados, salvo que capacidades verificadas y DEC-16 aprueben una composición diferente.
+
+`window.print()` podrá mantenerse temporalmente como fallback no certificado o de compatibilidad, pero no será evidencia de impresión exitosa ni el camino soportado principal del piloto.
+
+### Reimpresión
+
+La reimpresión:
+
+- no modifica el documento original;
+- no recalcula precios, promociones o importes;
+- no vuelve a ejecutar la venta;
+- crea un nuevo intento físico;
+- conserva actor, motivo y timestamp cuando la política lo requiera;
+- no abre el cajón;
+- no inicia un nuevo pago;
+- no cambia la conciliación.
+
+La autorización y retención de tickets o datos personales dependen de DEC-16.
+
+### Política del cajón de efectivo
+
+La política aprobada es:
+
+```text
+automatic causal opening for confirmed CASH effects
++
+controlled supervised manual opening
+```
+
+La apertura automática:
+
+- ocurre sólo después de un efecto `CASH` confirmado que requiera acceso físico;
+- se ejecuta como máximo una vez por efecto causal autorizado;
+- no ocurre por una venta únicamente `CARD`;
+- no ocurre por una reimpresión;
+- no vuelve a ocurrir por replay de la venta;
+- en una operación `MIXED`, corresponde al leg `CASH`, no a la clasificación `MIXED`;
+- no se repite ciegamente ante timeout del dispositivo.
+
+Pueden ser operaciones causales una venta con efectivo, refund en efectivo, pago operativo con entrada o salida física y otros movimientos `CASH` autorizados.
+
+El fallo del cajón no revierte ni duplica el efecto financiero confirmado.
+
+La apertura manual exige:
+
+- autoridad backend explícita;
+- scope de sucursal;
+- razón obligatoria;
+- actor;
+- workstation;
+- timestamp;
+- auditoría;
+- comando causal estructurado.
+
+No se concede por pertenecer simplemente a Backoffice ni por tener un rol denominado supervisor.
+
+La implementación deberá mapear la apertura manual a una capability explícita de DEC-03. Si el catálogo vigente no contiene una capability adecuada, se requerirá una extensión controlada antes de habilitarla. No se reutilizará silenciosamente una capability existente ni se inventa ahora su nombre.
+
+Hasta que esa autoridad esté versionada e implementada, la apertura manual desde ZeroMerma permanecerá deshabilitada.
+
+### Scanner
+
+La política inicial es:
+
+```text
+scanner optional
+keyboard_wedge baseline
+```
+
+Reglas:
+
+- el POS seguirá siendo operable táctilmente, con teclado o búsqueda;
+- un scanner no será autoridad de negocio;
+- una doble lectura no podrá confirmar dos efectos financieros;
+- el foco será controlado;
+- la lectura durante modales o acciones incompatibles se ignorará o manejará explícitamente;
+- un código inexistente no se sustituirá silenciosamente por otro producto;
+- la operación manual seguirá disponible;
+- soporte HID/API directo requerirá adapter y matriz certificada.
+
+Que un dispositivo se comporte como teclado no equivale a scanner certificado.
+
+### Terminal BBVA dedicada por workstation
+
+La topología inicial aprobada es:
+
+```text
+one dedicated BBVA terminal per integrated workstation
+```
+
+Está sujeta a validación técnica real con BBVA Total POS.
+
+Cada binding conservará:
+
+- terminal;
+- workstation;
+- sucursal;
+- cuenta o afiliación de proveedor cuando corresponda;
+- vigencia;
+- configuración o versión;
+- estado activo;
+- última validación;
+- health;
+- actor del cambio.
+
+Reglas:
+
+- no habrá selección silenciosa de otra terminal;
+- una terminal inactiva o asociada a otra sucursal no podrá utilizarse;
+- sustituir una terminal no reescribirá históricos;
+- la operación externa conservará snapshot de terminal y workstation;
+- el bridge podrá transportar comandos sólo si el protocolo real de BBVA lo requiere;
+- el bridge no decidirá `CAPTURED`, `DECLINED` o `UNKNOWN`;
+- los estados económicos continúan gobernados por DEC-14.
+
+Si BBVA demuestra que esta topología no es técnicamente soportada, deberá reportarse la contradicción y revisarse explícitamente. No se cambiará silenciosamente a terminal compartida.
+
+### Binding y configuración de dispositivos
+
+Modelo conceptual:
+
+```text
+Branch
+  -> Workstation
+  -> DeviceBinding
+  -> Device
+  -> Capability
+  -> AdapterConfigurationVersion
+```
+
+Cada binding indicará:
+
+- tipo de dispositivo;
+- identidad;
+- conexión;
+- scope de sucursal;
+- workstation;
+- exclusividad o compartición;
+- adapter;
+- versión;
+- estado activo;
+- health;
+- fecha de vigencia;
+- fallback;
+- última prueba;
+- actor del cambio.
+
+Un dispositivo compartido futuro utilizará lease o serialización por dispositivo, nunca un lock global.
+
+### Diagnóstico
+
+La herramienta futura comprobará separadamente:
+
+- API;
+- sesión;
+- sucursal;
+- workstation;
+- bridge;
+- versión y compatibilidad;
+- impresora;
+- cajón;
+- scanner;
+- terminal;
+- último error;
+- configuración;
+- health;
+- logs sanitizados.
+
+```text
+non_destructive_health_check
+!=
+physical_action
+!=
+financial_operation
+```
+
+Probar el cajón no lo abrirá sin una acción autorizada. Probar la terminal no ejecutará un cobro real implícito.
+
+### Política offline aprobada
+
+La política es:
+
+```text
+transactional_mode = ONLINE_ONLY
+```
+
+Sin conexión no se confirmarán dentro de ZeroMerma:
+
+- ventas;
+- pagos `CASH`;
+- pagos externos;
+- pedidos;
+- anticipos;
+- devoluciones;
+- refunds;
+- merma;
+- transferencias;
+- producción;
+- ajustes de inventario;
+- apertura o cierre de caja;
+- administración Backoffice.
+
+No se implementará inicialmente:
+
+- una cola de mutaciones offline;
+- ventas locales pendientes de sincronización;
+- ledgers locales;
+- pricing local autoritativo;
+- stock local autoritativo;
+- autenticación offline;
+- una réplica transaccional completa.
+
+No existe aprobación electrónica offline implícita.
+
+### Lecturas cacheadas opcionales
+
+Podrán implementarse posteriormente lecturas cacheadas limitadas, como catálogo básico no sensible, información informativa de productos, Production Board y otros snapshots expresamente aprobados.
+
+Toda lectura cacheada mostrará origen, versión, `last_synced_at`, estado stale y ausencia de autoridad transaccional.
+
+Reglas:
+
+- precio cacheado no autoriza checkout;
+- promoción cacheada no autoriza descuento;
+- stock cacheado no autoriza venta;
+- Production Board cacheado es informativo;
+- pedidos, tickets, clientes y datos personales no se cachean por defecto;
+- cifrado, retención y limpieza dependen de DEC-16.
+
+La caché no sustituye PostgreSQL ni al backend como autoridad.
+
+### Sesión y autorización online
+
+Se preservan DEC-03, DEC-04 y DEC-05:
+
+- no existe autenticación offline implícita;
+- no se utiliza usuario genérico;
+- no existe operación anónima;
+- no se infiere `GLOBAL`;
+- una sesión expirada, bloqueada o revocada no autoriza mutaciones;
+- datos cacheados no conservan autoridad indefinida;
+- el bearer actual persistido en `localStorage` no se utiliza como mecanismo offline.
+
+El bearer persistido actual es una brecha de implementación frente a DEC-05, no una capacidad aprobada por DEC-15.
+
+Un lease offline o una credencial de contingencia requerirían una nueva decisión explícita y no quedan aprobados.
+
+### Reconexión y resultados inciertos
+
+La experiencia distinguirá conceptualmente:
+
+```text
+NOT_SENT
+SENDING
+PENDING_RESULT
+CONFIRMED
+REJECTED
+```
+
+Los nombres físicos podrán variar.
+
+- Antes de enviar, la intención permanece `NOT_SENT` y puede enviarse con su misma `Idempotency-Key`.
+- Durante el envío o después de enviar sin respuesta, permanece `PENDING_RESULT`; no se genera una key nueva y el POS consulta al backend con la identidad existente.
+- Después del commit, la consulta recupera `CONFIRMED` y no repite el efecto.
+- Un rechazo de negocio se distingue de un error de red.
+- Refresh, crash, dos pestañas o reconexión convergen a la misma intención conforme DEC-07.
+
+```text
+network error
+!=
+business rejection
+```
+
+### Cola offline
+
+Con la política online-only:
+
+```text
+offline_mutation_queue = disabled
+```
+
+No se almacenarán mutaciones económicas pendientes en IndexedDB, `localStorage` u otra cola local.
+
+Una futura política offline limitada requeriría una nueva revisión y, como mínimo, allowlist explícita de comandos, UUIDv7/`Idempotency-Key` durable, cifrado, usuario, sucursal, workstation, scope, contrato versionado, orden causal, coordinación entre pestañas, recuperación tras reboot, límites de almacenamiento, resolución de conflictos, logout, revocación y limpieza segura.
+
+Nada de ello queda aprobado ahora.
+
+### Contingencia manual externa
+
+La política aprobada es:
+
+```text
+controlled manual contingency outside ZeroMerma
+```
+
+No constituye una transacción offline confirmada por ZeroMerma.
+
+La contingencia podrá utilizarse únicamente cuando ZeroMerma o la conectividad impidan operar y exista un procedimiento aprobado con supervisor, folio controlado, hora, sucursal, operador, productos, cantidades, importes, medios, evidencia del cobro, captura posterior y conciliación.
+
+La posterior incorporación deberá:
+
+- usar una identidad idempotente;
+- preservar `occurred_at` y `recorded_at`;
+- identificar el origen como contingencia;
+- detectar duplicados;
+- revalidar inconsistencias;
+- no inventar estados BBVA;
+- no inventar stock o pricing histórico;
+- no sobrescribir datos conflictivos silenciosamente.
+
+La contingencia manual permanecerá deshabilitada hasta que:
+
+- DEC-16 determine requisitos legales, documentales, fiscales, de privacidad y retención aplicables;
+- DEC-17 determine continuidad, recuperación e infraestructura;
+- DEC-20 valide el procedimiento en el piloto.
+
+Mientras esas condiciones no estén resueltas, la política efectiva ante indisponibilidad es suspender la operación transaccional.
+
+La contingencia aprobada no autoriza incumplir requisitos externos.
+
+### Efectos locales durante desconexión
+
+Una vez confirmado un documento en backend, sus efectos físicos locales pendientes podrán continuar o recuperarse mediante su identidad causal, por ejemplo imprimir un ticket confirmado, reintentar una impresión fallida o consultar el resultado del print job.
+
+Esto no autoriza nuevas mutaciones económicas offline. Un documento no confirmado no podrá imprimirse como venta pagada.
+
+### Instalación y actualización
+
+La arquitectura permitirá:
+
+- instalación verificable;
+- pairing por workstation;
+- configuración versionada;
+- compatibilidad POS/bridge/adapter;
+- actualización firmada;
+- rollout controlado;
+- rollback;
+- diagnóstico de versión;
+- bloqueo únicamente de la capacidad incompatible;
+- no actualizar durante una operación local activa;
+- coexistencia temporal de versiones sólo dentro de una matriz compatible.
+
+Sistema operativo, distribución productiva, observabilidad y canal de actualización dependen parcialmente de DEC-17. La validación por sucursal y rollout dependen de DEC-20.
+
+### Experiencia POS
+
+La UX deberá:
+
+- mostrar estado de red y periféricos;
+- diferenciar no enviado, pendiente, rechazado y confirmado;
+- presentar errores accionables;
+- evitar doble toque y duplicación;
+- recuperar operaciones tras refresh;
+- marcar datos stale;
+- permitir reimpresión desde documento inmutable;
+- distinguir capacidad degradada de fallo de negocio;
+- no bloquear el flujo por un dispositivo opcional;
+- no cambiar el resultado financiero por una falla física;
+- mantener `Tarjeta (registro)` separada de BBVA integrado.
+
+### Responsabilidades
+
+La cajera podrá ver estados, cambiar papel, reintentar una impresión, utilizar teclado o búsqueda cuando el scanner falle, reportar una falla e iniciar contingencia únicamente conforme al procedimiento autorizado. No podrá inventar un resultado financiero, abrir el cajón arbitrariamente, modificar bindings, instalar adapters o ignorar una sesión inválida.
+
+El supervisor podrá autorizar procedimientos permitidos, gestionar contingencia cuando esté habilitada, solicitar apertura manual del cajón sólo con autoridad explícita y coordinar conciliación y soporte.
+
+Soporte resolverá bridge, pairing, adapters, drivers, versiones, impresora, scanner, terminal, conectividad técnica, actualización y rollback. Soporte no fabricará ventas, pagos o estados financieros.
+
+El administrador gestionará configuración y matriz, bindings, rollout, discrepancias relevantes, autorizaciones RBAC y casos que excedan la sucursal.
+
+### Rendimiento y concurrencia
+
+```text
+no_global_hardware_lock=true
+business_fast_path_not_blocked_by_optional_device=true
+hardware_failure_does_not_duplicate_business_effect=true
+```
+
+Además:
+
+- impresión y cajón ocurren fuera del commit;
+- health polling será acotado;
+- un dispositivo compartido futuro se serializará por dispositivo;
+- la caché será sólo read-only;
+- reconexión consultará identidades pendientes;
+- el bridge no escaneará todo el historial;
+- una actualización no ocurrirá dentro del camino de venta;
+- workstations y sucursales independientes progresarán concurrentemente.
+
+DEC-15 no fija SLA sin hardware objetivo y baseline.
+
+### Errores conceptuales
+
+Se registrarán códigos equivalentes a:
+
+```text
+HARDWARE_AGENT_UNAVAILABLE
+HARDWARE_AGENT_VERSION_INCOMPATIBLE
+HARDWARE_AGENT_PAIRING_INVALID
+
+PRINTER_UNAVAILABLE
+PRINTER_OUT_OF_PAPER
+PRINT_RESULT_UNKNOWN
+PRINT_JOB_ALREADY_COMPLETED
+
+CASH_DRAWER_UNAVAILABLE
+CASH_DRAWER_MANUAL_OPEN_FORBIDDEN
+CASH_DRAWER_RESULT_UNKNOWN
+
+SCANNER_INPUT_INVALID
+DEVICE_BINDING_INVALID
+DEVICE_NOT_CERTIFIED
+
+NETWORK_OFFLINE_TRANSACTION_FORBIDDEN
+NETWORK_RESULT_PENDING
+OFFLINE_MUTATION_NOT_SUPPORTED
+
+MANUAL_CONTINGENCY_NOT_ENABLED
+MANUAL_CONTINGENCY_EVIDENCE_REQUIRED
+MANUAL_CONTINGENCY_RECONCILIATION_REQUIRED
+```
+
+Los contratos HTTP o IPC definitivos se concretarán durante implementación.
+
+### Auditoría y observabilidad
+
+Se auditarán cuando corresponda:
+
+- binding y cambios de configuración;
+- pairing;
+- versión;
+- instalación o actualización;
+- health;
+- print request/result;
+- reimpresión;
+- cajón automático/manual;
+- motivo y actor;
+- terminal y workstation;
+- contingencia;
+- reconexión;
+- discrepancia;
+- request ID;
+- idempotency/correlation;
+- `occurred_at`;
+- `recorded_at`.
+
+No se registrarán secretos, datos de tarjeta ni payloads sensibles.
+
+### Relaciones con decisiones aprobadas
+
+- **DEC-02:** una pantalla, botón o texto no acredita soporte físico inexistente.
+- **DEC-03 y DEC-04:** capacidades explícitas, mínimo privilegio, scope backend y deny-by-default gobiernan bridge, bindings y aperturas manuales.
+- **DEC-05:** sesiones online server-side; no autenticación offline implícita ni secretos en almacenamiento inseguro.
+- **DEC-06:** fallo físico no revierte una operación confirmada; resultados financieros inciertos bloquean cierre cuando corresponda.
+- **DEC-07:** mutaciones críticas y recuperación usan identidad idempotente durable; no blind retry.
+- **DEC-08:** caché local no autoriza stock ni movimientos; backend y locking conservan autoridad.
+- **DEC-10 y DEC-13:** pricing, cotización, stock, pedidos y anticipos se resuelven online por backend.
+- **DEC-12:** producción no depende de sensores obligatorios y las observaciones no mutan directamente el dominio.
+- **DEC-14:** BBVA permanece provider-agnostic; DEC-15 sólo define transporte, binding, health y contingencia local.
+
+### Dependencias posteriores
+
+- **DEC-16:** datos personales cacheados, cifrado, retención local, tickets, comprobantes, documentos de contingencia y obligaciones legales, fiscales o de privacidad. DEC-15 no resuelve DEC-16.
+- **DEC-17:** topología productiva, disponibilidad, recuperación, distribución, observabilidad, actualización, continuidad y disaster recovery. DEC-15 no fija RPO/RTO ni infraestructura final.
+- **DEC-19:** backfill de contingencia, históricos ambiguos, evidencia incompleta y migración de configuraciones.
+- **DEC-20:** hardware concreto del piloto, versiones certificadas, validación física, procedimiento de contingencia, rollout y métricas de soporte.
+
+DEC-16, DEC-17, DEC-19 y DEC-20 permanecen `PENDIENTE`.
+
+### Dependencias de implementación
+
+Permanecen pendientes:
+
+- inventario físico de dispositivos;
+- modelos concretos;
+- familia OS/browser;
+- bridge e instalador;
+- drivers y adapters;
+- pairing;
+- matriz versionada;
+- print jobs;
+- cajón;
+- terminal BBVA;
+- health y diagnóstico;
+- actualización;
+- pruebas físicas;
+- documentación operativa.
+
+DEC-15 no certifica ningún dispositivo por el solo hecho de aprobar la arquitectura.
+
+### Migración conceptual
+
+1. Inventariar dispositivos y plataformas reales.
+2. Versionar la matriz certificada.
+3. Crear abstracción provider-agnostic de dispositivos.
+4. Implementar el bridge local.
+5. Crear pairing y binding por sucursal/workstation.
+6. Implementar print jobs y reimpresión.
+7. Implementar cajón causal.
+8. Mantener keyboard wedge e integrar scanners certificados.
+9. Integrar transporte local BBVA sólo si el contrato real lo exige.
+10. Añadir health y diagnóstico.
+11. Añadir recuperación de resultados.
+12. Mantener mutaciones offline deshabilitadas.
+13. Añadir caché read-only sólo donde se apruebe.
+14. Corregir sesión POS conforme a DEC-05.
+15. Integrar DEC-07.
+16. Añadir auditoría y observabilidad.
+17. Crear instalación, actualización y rollback.
+18. Actualizar OpenAPI backend-first cuando aplique.
+19. Regenerar el cliente.
+20. Actualizar POS.
+21. Documentar contingencia.
+22. Validar hardware objetivo.
+23. Coordinar DEC-16, DEC-17, DEC-19 y DEC-20.
+
+No se inventará soporte, integración o certificación histórica.
+
+### Pruebas futuras obligatorias
+
+Sin ejecutar ahora, se deberán cubrir:
+
+#### Impresión
+
+- impresora ausente;
+- sin papel;
+- offline;
+- resultado desconocido;
+- reimpresión;
+- duplicación;
+- crash después del commit;
+- documento histórico.
+
+#### Cajón
+
+- operación `CASH`;
+- operación `CARD`;
+- operación `MIXED`;
+- replay;
+- fallo;
+- apertura manual autorizada y denegada;
+- intento desde origen no autorizado.
+
+#### Scanner
+
+- lectura correcta;
+- producto inexistente;
+- doble lectura;
+- foco;
+- modal de pago;
+- fallback teclado;
+- scanner no certificado.
+
+#### Bridge
+
+- ausente;
+- pairing inválido;
+- origen no permitido;
+- versión incompatible;
+- adapter faltante;
+- actualización interrumpida;
+- rollback;
+- logs sanitizados.
+
+#### Red y recuperación
+
+- desconexión antes de enviar, durante envío y después del commit;
+- respuesta perdida;
+- refresh;
+- dos pestañas;
+- dos workstations;
+- sesión expirada;
+- usuario bloqueado;
+- scope revocado.
+
+#### Offline
+
+- mutación rechazada;
+- caché stale;
+- precio y stock cacheados sin autoridad;
+- Production Board cacheado;
+- ausencia de cola local.
+
+#### BBVA
+
+- terminal dedicada correcta;
+- terminal inactiva;
+- binding equivocado;
+- bridge caído;
+- sin aprobación offline;
+- `UNKNOWN` gobernado por DEC-14.
+
+#### Contingencia
+
+- no habilitada;
+- autorizada;
+- folio duplicado;
+- evidencia incompleta;
+- captura posterior;
+- conflicto;
+- conciliación;
+- requisitos DEC-16/17 pendientes.
+
+#### Rendimiento
+
+- sucursales y workstations independientes;
+- ausencia de lock global;
+- dispositivo opcional fuera del fast path;
+- health polling acotado.
+
+### Historial y límite
+
+- DEC-15 permaneció `PENDIENTE` desde 2026-08-26.
+- Fue aprobada por el propietario el 2026-08-29.
+- Las decisiones aprobadas fueron `1B`, `2A`, `3B`, `4B`, `5A`, `6A` y `7B`.
+- El bridge es provider-agnostic.
+- El soporte se limita a una matriz certificada.
+- La operación transaccional es online-only.
+- La contingencia manual es externa y condicionada.
+- No se aprobó una cola offline ni una aplicación desktop completa.
+
+DEC-15 define política, arquitectura e invariantes. No certifica que el bridge exista, una impresora esté integrada, el cajón funcione, un scanner esté soportado, BBVA esté conectado, exista operación offline, exista contingencia habilitada o el hardware del piloto haya sido validado.
 
 ## DEC-16 — Requisitos externos
 
