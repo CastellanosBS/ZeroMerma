@@ -6940,12 +6940,857 @@ Estos hechos describen el código vigente y no equivalen a implementación de DE
 
 ## DEC-14 — Pagos externos
 
-- **Estado:** `PENDIENTE`
+- **Estado:** `APROBADA`
+- **Fecha:** 2026-08-29
 - **Propietario:** propietario de ZeroMerma
-- **Qué debe aprobarse:** proveedor o terminal, fallback manual, reversas, estados pendientes y responsabilidades.
-- **Tareas principales afectadas:** tareas de pagos, devoluciones, conciliación y hardware del Plan Maestro.
-- **Respuesta aprobada:** ninguna.
-- **Regla:** registrar un medio CARD no constituye una integración aprobada.
+- **Contenido aprobado:** frontera provider-agnostic, primera integración prevista con BBVA Total POS, operación externa durable, finalización por evidencia equivalente a `CAPTURED`, incertidumbre `UNKNOWN`, resolución automática prioritaria, registro contable separado, fallback manual controlado, conciliación, seguridad, responsabilidades, idempotencia, migración y dependencias de implementación.
+- **Respuesta aprobada:** decisiones 1B, 2B, 3B y 4B, junto con las invariantes, modelos conceptuales y límites descritos en esta decisión.
+
+### Alcance aprobado
+
+ZeroMerma evolucionará desde el registro contable actual del medio `CARD` hacia una integración real de pagos externos mediante una frontera provider-agnostic.
+
+La primera integración prevista será:
+
+```text
+BBVA Total POS
+```
+
+El dominio financiero no dependerá directamente de BBVA. La composición conceptual será equivalente a:
+
+```text
+Sale / Order / Refund
+        ↓
+Payment domain
+        ↓
+ExternalPaymentProvider
+        ↓
+BBVA adapter
+        ↓
+BBVA Total POS
+```
+
+Agregar otro proveedor posteriormente no obligará a reescribir ventas, pedidos, devoluciones, caja o conciliación.
+
+La selección de BBVA como primera integración prevista no certifica ni presupone todavía:
+
+- protocolo concreto;
+- SDK;
+- middleware local;
+- modelo exacto de terminal;
+- compatibilidad con navegador o workstation;
+- certificaciones;
+- sandbox;
+- condiciones comerciales;
+- capacidades exactas de void, refund, callback, webhook o polling.
+
+Estas dependencias deberán verificarse antes de implementar y antes del cutover.
+
+### Separación conceptual
+
+ZeroMerma distinguirá expresamente:
+
+```text
+CARD accounting leg
+!=
+provider authorization
+
+authorization
+!=
+capture
+!=
+settlement
+
+refund
+!=
+void
+!=
+technical reversal
+!=
+chargeback
+
+provider fee
+!=
+sale revenue
+
+payment method
+!=
+external provider operation
+```
+
+El modelo distinguirá conceptualmente:
+
+- `Payment`;
+- `PaymentLeg`;
+- intención de pago externo;
+- operación del proveedor;
+- autorización;
+- captura;
+- settlement;
+- void;
+- refund;
+- reversa técnica;
+- disputa o chargeback;
+- conciliación;
+- fee del proveedor.
+
+Registrar un medio `CARD` no constituye por sí mismo autorización, captura ni integración aprobada.
+
+### Modos de ejecución
+
+Cada operación conservará una procedencia equivalente a:
+
+```text
+ACCOUNTING_ONLY
+PROVIDER_INTEGRATED
+MANUAL_FALLBACK
+```
+
+Los nombres físicos podrán variar, pero las tres semánticas permanecerán separadas.
+
+#### `ACCOUNTING_ONLY`
+
+Representa un cobro realizado fuera de ZeroMerma. ZeroMerma registra el hecho contable, pero no afirma haber obtenido automáticamente autorización o captura del proveedor.
+
+La interfaz y los comprobantes deberán dejar inequívoco que se trata de registro externo y no de un pago iniciado o confirmado por ZeroMerma.
+
+#### `PROVIDER_INTEGRATED`
+
+ZeroMerma inicia y sigue una operación mediante el adapter correspondiente. El éxito exige evidencia autoritativa del proveedor y no puede provenir de una afirmación del cliente o del operador.
+
+#### `MANUAL_FALLBACK`
+
+Es una vía excepcional para resolver una operación integrada incierta cuando existe evidencia verificable suficiente. No es una confirmación automática y no permite fabricar una autorización o captura.
+
+### Vinculación automática de la operación externa
+
+Antes de contactar a BBVA o a cualquier proveedor, ZeroMerma persistirá y vinculará la intención externa con:
+
+- venta o pedido;
+- `Payment`;
+- `PaymentLeg`;
+- sucursal;
+- workstation;
+- terminal;
+- importe;
+- moneda;
+- `IdempotencyRecord`;
+- identidad utilizada ante el proveedor.
+
+La relación conceptual será equivalente a:
+
+```text
+Sale / Order / Refund
+          ↓
+       Payment
+          ↓
+      PaymentLeg
+          ↓
+ExternalPaymentOperation
+          ↓
+       provider
+```
+
+Cuando una respuesta se pierda, la misma operación continuará vinculada automáticamente con la misma venta, pedido, aggregate y leg:
+
+```text
+PROCESSING
+   ↓
+UNKNOWN
+```
+
+La cajera no creará el estado `UNKNOWN`, no reconstruirá manualmente la relación y no seleccionará a posteriori una venta a la cual asociar un cobro incierto.
+
+### Modelo conceptual de operación externa
+
+La implementación conservará invariantes equivalentes a:
+
+```text
+ExternalPaymentOperation
+  id
+  payment_leg_id/refund_leg_id
+  operation_type
+  execution_mode
+  provider_code
+  merchant_account_reference
+  terminal_reference
+  workstation_id
+  branch_id
+
+  local_idempotency_record_id
+  provider_idempotency_key
+  provider_operation_id nullable
+
+  requested_amount
+  currency
+  local_status
+
+  provider_status nullable
+  provider_response_code nullable
+  failure_category nullable
+
+  requested_at
+  last_attempt_at nullable
+  authorized_at nullable
+  captured_at nullable
+  completed_at nullable
+
+  reconciliation_status
+  last_reconciled_at nullable
+```
+
+La forma física exacta podrá variar, pero deberá preservar identidad causal, procedencia, scope, estado local, evidencia externa y conciliación.
+
+Constraints conceptuales mínimos:
+
+```text
+exactly one of payment_leg_id/refund_leg_id
+requested_amount > 0
+operation currency == leg currency
+unique local causal effect
+unique provider idempotency identity per provider account
+unique non-null provider operation identity per provider account
+unique callback/webhook event identity
+```
+
+Los intentos, respuestas, callbacks y cambios relevantes conservarán historia append-only o una estructura técnicamente equivalente.
+
+### Evidencia mínima para completar
+
+Política aprobada:
+
+```text
+PENDING / PROCESSING / UNKNOWN
+!=
+completed payment
+```
+
+Un leg integrado sólo se proyectará como completado cuando exista evidencia concluyente del proveedor equivalente a:
+
+```text
+CAPTURED
+```
+
+`AUTHORIZED` por sí solo no será suficiente cuando el proveedor distinga autorización de captura.
+
+`SETTLED` pertenece a conciliación bancaria posterior y no será requisito ordinario para finalizar la venta.
+
+Si BBVA Total POS expone una operación de venta aprobada sin separar literalmente autorización y captura, el adapter mapeará la evidencia autoritativa de BBVA a la semántica canónica equivalente a `CAPTURED` únicamente cuando demuestre que el cobro quedó efectivamente realizado.
+
+Los nombres específicos del proveedor no se convertirán en estados del dominio.
+
+### Máquina de estados e incertidumbre
+
+La operación externa distinguirá como mínimo estados equivalentes a:
+
+```text
+CREATED
+PROCESSING
+DECLINED
+UNKNOWN
+FAILED
+SUCCEEDED/CAPTURED
+```
+
+Cuando aplique, distinguirá además:
+
+```text
+AUTHORIZED
+VOIDED
+PARTIALLY_REFUNDED
+REFUNDED
+```
+
+La conciliación conservará una dimensión separada equivalente a:
+
+```text
+PENDING
+MATCHED
+DISCREPANCY
+RESOLVED
+```
+
+Reglas:
+
+- `DECLINED` es un resultado conocido;
+- `FAILED` sólo significa que existe evidencia suficiente de que no ocurrió el efecto financiero;
+- un timeout con posible efecto externo produce `UNKNOWN`;
+- `UNKNOWN` podrá resolverse posteriormente usando la misma identidad;
+- callbacks, webhooks, consultas o respuestas tardías sólo podrán aplicar transiciones válidas y monotónicas;
+- una transición tardía no reescribirá la secuencia histórica;
+- una corrección utilizará un nuevo evento causal o efecto compensatorio cuando corresponda.
+
+### Rechazo conocido
+
+Ante un rechazo concluyente del proveedor:
+
+```text
+status = DECLINED
+leg_completed = false
+```
+
+ZeroMerma:
+
+- no considerará pagada la venta por ese importe;
+- permitirá otro intento o método conforme a las reglas ordinarias;
+- conservará el intento rechazado para auditoría y diagnóstico.
+
+Un rechazo conocido no equivale a `UNKNOWN`.
+
+### Resultado `UNKNOWN`
+
+Caso canónico:
+
+```text
+T1 ZeroMerma persiste la operación y su identidad
+T2 ZeroMerma envía el cobro a BBVA
+T3 BBVA puede haber procesado el cobro
+T4 la respuesta se pierde
+
+resultado = UNKNOWN
+```
+
+Mientras la operación permanezca `UNKNOWN`:
+
+- no se cobrará nuevamente a ciegas el mismo efecto;
+- no se creará una intención nueva para el mismo efecto causal abierto;
+- se conservará la identidad local y del proveedor;
+- la venta conservará el vínculo con el leg incierto;
+- ZeroMerma intentará consultar automáticamente al proveedor;
+- se podrán usar polling, callback, webhook o reconciliación conforme a las capacidades reales de BBVA;
+- el cierre se comportará conforme a DEC-06.
+
+Invariante:
+
+```text
+UNKNOWN
+!=
+DECLINED
+!=
+permission to retry
+```
+
+DEC-14 no fija duraciones arbitrarias para resolver incertidumbre.
+
+### Resolución automática primero
+
+La política ordinaria será:
+
+```text
+automatic resolution first
+```
+
+Secuencia conceptual:
+
+```text
+UNKNOWN
+  ↓
+consulta/callback/reconciliación automática
+  ↓
+CAPTURED
+o
+DECLINED/FAILED conocido
+```
+
+La intervención humana será excepcional y sólo procederá cuando el sistema no pueda producir automáticamente evidencia concluyente.
+
+### Fallback manual controlado
+
+La resolución manual de una operación integrada exigirá:
+
+- capability operativa separada;
+- supervisor de la sucursal;
+- mismo scope de sucursal;
+- importe y moneda;
+- terminal;
+- referencia disponible;
+- evidencia verificable del proveedor;
+- motivo obligatorio;
+- actor;
+- timestamps;
+- auditoría;
+- outbox;
+- estado explícitamente manual;
+- conciliación obligatoria.
+
+El supervisor:
+
+- no crea una autorización;
+- no puede marcar `CAPTURED` sólo por declaración de la cajera;
+- no elimina ni sustituye la historia de `UNKNOWN`;
+- sólo resuelve con evidencia verificable conforme al contrato real del proveedor.
+
+Si no existe evidencia suficiente, la operación permanece incierta.
+
+### Dependencia RBAC del fallback manual
+
+La política aprobada de `MANUAL_FALLBACK` exige una autoridad operativa específica y separada.
+
+El catálogo canónico vigente de DEC-03 contiene 55 capabilities únicas, pero todavía no incluye una capability dedicada a resolver manualmente pagos externos `UNKNOWN`.
+
+Por tanto:
+
+1. `cash_finance.manage` no implica autoridad para resolver `UNKNOWN -> CAPTURED` ni para ejecutar `MANUAL_FALLBACK`.
+2. `config.manage`, `roles.manage`, la pertenencia a Backoffice, el rol de supervisor o cualquier otra capability existente tampoco implican por sí solos esa autoridad.
+3. Antes de habilitar `MANUAL_FALLBACK` deberá incorporarse deliberadamente una capability explícita al catálogo RBAC mediante la revisión y el versionado correspondientes de DEC-03.
+4. El código o nombre concreto de esa futura capability será una decisión técnica de implementación y no se inventa en DEC-14.
+5. Su asignación deberá cumplir DEC-03 y DEC-04:
+   - deny-by-default;
+   - scope explícito;
+   - no autoelevación;
+   - no concesión automática al Superadministrador;
+   - mínimo privilegio.
+6. Hasta que esa extensión RBAC esté versionada e implementada, `MANUAL_FALLBACK` permanecerá deshabilitado.
+7. Esta regla no modifica DEC-03 ni cambia el conteo canónico vigente de 55 capabilities.
+
+La extensión del catálogo, sus asignaciones y la aplicación efectiva de scopes dependerán de las tareas RBAC y scopes `ZM-FIN-015`–`ZM-FIN-022`.
+
+### Responsabilidades
+
+#### Cajera
+
+Puede:
+
+- iniciar el cobro normal;
+- ver sus estados;
+- aportar comprobante o información;
+- identificar la terminal utilizada;
+- solicitar ayuda.
+
+No puede resolver arbitrariamente `UNKNOWN -> CAPTURED`.
+
+#### Supervisor de sucursal
+
+Puede resolver excepcionalmente una operación de su sucursal únicamente mediante el fallback aprobado, con capability, scope y evidencia suficientes.
+
+#### Soporte
+
+Atiende conectividad, errores del adapter, consultas fallidas, webhook, polling y problemas técnicos de terminal o integración. Soporte no fabrica resultados económicos.
+
+#### Administrador
+
+Atiende duplicados, discrepancias materiales, capturas huérfanas, disputas, chargebacks, compensaciones y casos que exceden la autoridad del supervisor.
+
+### Idempotencia
+
+Conforme a DEC-07 existirá correlación entre:
+
+```text
+business Idempotency-Key
+provider idempotency identity
+provider operation identity
+callback/webhook event identity
+```
+
+Garantías:
+
+- como máximo un cargo por intención;
+- como máximo un refund por intención;
+- el replay local devuelve el resultado existente;
+- una respuesta tardía no crea otra operación;
+- un callback o webhook repetido no genera efectos nuevos;
+- polling y callback pueden competir sin duplicar la transición;
+- una key nueva no permite esquivar un `UNKNOWN` causal todavía abierto;
+- `X-Request-ID` permanece sólo como trazabilidad.
+
+La clave del proveedor, la identidad de su operación y la identidad del evento externo complementan, pero no sustituyen, la `Idempotency-Key` de negocio.
+
+### Frontera transaccional
+
+La integración utilizará un patrón equivalente a:
+
+```text
+TX1:
+  IdempotencyRecord
+  payment/refund aggregate
+  leg
+  external operation
+  audit/outbox
+  commit
+
+external provider call:
+  fuera de locks largos
+
+TX2:
+  lock de operación/agregado necesario
+  validar transición
+  persistir resultado y efectos
+  audit/outbox
+  commit
+```
+
+No habrá:
+
+- transacción distribuida ficticia;
+- llamada a BBVA bajo un lock largo de caja, pedido o inventario;
+- lock global de pagos;
+- éxito local antes de evidencia suficiente.
+
+Las operaciones independientes de distintas sucursales, workstations y legs podrán avanzar concurrentemente.
+
+### Terminal, workstation y sucursal
+
+La política provider-agnostic exigirá:
+
+- terminal activa;
+- terminal asociada o validada para la sucursal correcta;
+- snapshot de terminal, workstation y sucursal en la operación;
+- ninguna selección silenciosa de una terminal equivocada;
+- históricos inmutables aunque una terminal sea sustituida;
+- correlación inequívoca entre callback y operación.
+
+La topología concreta:
+
+```text
+terminal dedicada
+vs
+terminal compartida
+```
+
+y el mecanismo físico de comunicación se resolverán mediante DEC-15 y la validación técnica real de BBVA.
+
+### Void, refund y reversa técnica
+
+Invariante:
+
+```text
+void != refund != technical reversal
+```
+
+- `void` sólo se utilizará cuando BBVA o el proveedor lo soporte para una operación todavía elegible;
+- `refund` será una nueva operación causal contra una captura válida;
+- `technical reversal` será una compensación por inconsistencia o duplicado conforme a las capacidades del proveedor.
+
+Se preservan DEC-09, DEC-10 y DEC-11:
+
+- prioridad CASH-first;
+- refunds parciales;
+- límite acumulado;
+- no exceder el derecho económico causal;
+- no duplicar la devolución física;
+- un refund posterior al cierre no reabre una caja histórica.
+
+Un refund `UNKNOWN` tampoco podrá repetirse a ciegas.
+
+### Conciliación y settlement
+
+`CAPTURED` será la frontera operativa del pago integrado.
+
+`SETTLED` será una dimensión posterior de conciliación bancaria.
+
+La conciliación deberá detectar como mínimo:
+
+- operación local coincidente;
+- operación local sin evidencia externa;
+- operación externa sin documento local;
+- importe distinto;
+- moneda distinta;
+- duplicado;
+- refund faltante;
+- fee;
+- chargeback;
+- operación no encontrada.
+
+Los estados `UNKNOWN` que puedan modificar el resultado financiero de un turno bloquearán el cierre conforme a DEC-06.
+
+Una captura todavía no liquidada bancariamente no bloqueará por sí sola la venta o el cierre ordinario.
+
+No se reabrirá una caja cerrada.
+
+La resolución manual de una operación externa siempre dejará conciliación obligatoria.
+
+### Fees
+
+Invariante:
+
+```text
+provider fee
+!=
+customer sale total
+```
+
+La comisión de BBVA o de otro proveedor:
+
+- no modificará silenciosamente el pricing de DEC-13;
+- no reducirá el revenue comercial registrado;
+- se representará separadamente;
+- podrá formar parte de conciliación y reportes financieros.
+
+DEC-14 no aprueba recargos al cliente.
+
+### Seguridad
+
+Requisitos mínimos:
+
+- nunca almacenar PAN completo;
+- nunca almacenar CVV;
+- nunca almacenar track data;
+- usar únicamente tokens o referencias opacas cuando corresponda;
+- mantener secretos fuera del repositorio;
+- separar sandbox y producción;
+- usar TLS;
+- validar firmas de callbacks o webhooks cuando el proveedor los soporte;
+- proteger contra replay de eventos externos;
+- permitir rotación de credenciales;
+- minimizar payloads;
+- redactar datos antes de logs, auditoría y outbox.
+
+DEC-14 no declara cumplimiento PCI, certificación de BBVA ni certificación de hardware sin evidencia.
+
+### Offline y relación con DEC-15
+
+DEC-14 no autoriza pagos electrónicos offline implícitos.
+
+```text
+no evidence
+!=
+approval
+```
+
+Cuando ZeroMerma carezca de comunicación suficiente para conocer el resultado, la operación permanecerá pendiente o incierta según la evidencia disponible.
+
+La estrategia de hardware, terminal offline, continuidad, workstation, middleware local y terminal compartida o dedicada se decidirá mediante DEC-15 y la verificación de la integración BBVA.
+
+### POS
+
+La experiencia futura distinguirá claramente:
+
+- esperando terminal;
+- aprobado;
+- rechazado;
+- resultado pendiente;
+- requiere conciliación;
+- operación contable externa;
+- fallback manual;
+- refund pendiente.
+
+Reglas:
+
+- el doble submit estará bloqueado;
+- la identidad sobrevivirá reload o crash;
+- `UNKNOWN` impedirá un nuevo cobro ciego;
+- `DECLINED` permitirá cambiar de método;
+- no se imprimirá una venta como pagada antes de evidencia suficiente;
+- `Tarjeta (registro)` nunca aparentará ser un pago integrado.
+
+### Backoffice
+
+La superficie administrativa futura permitirá:
+
+- localizar una operación por venta, pedido o referencia;
+- ver su timeline;
+- comparar estado local y del proveedor;
+- identificar sucursal, workstation y terminal;
+- consultar discrepancias;
+- reconciliar;
+- tramitar comandos permitidos;
+- conservar evidencia e historial;
+- aplicar scopes y capabilities.
+
+El estado no se editará arbitrariamente para ocultar una discrepancia.
+
+### Auditoría, outbox y observabilidad
+
+Se registrarán eventos conceptuales equivalentes para:
+
+- operación solicitada;
+- processing;
+- captured;
+- declined;
+- unknown;
+- void;
+- refund;
+- refund unknown;
+- reconciliación;
+- discrepancia.
+
+La auditoría conservará, sin secretos ni datos de tarjeta:
+
+- actor;
+- sucursal;
+- workstation;
+- terminal;
+- proveedor;
+- importe;
+- moneda;
+- referencia externa no secreta;
+- estado anterior y nuevo;
+- motivo o failure category;
+- request ID;
+- referencia idempotente;
+- `occurred_at`;
+- `recorded_at`.
+
+El replay no duplicará eventos de negocio, auditoría ni outbox.
+
+### Errores conceptuales
+
+La implementación expondrá errores equivalentes a:
+
+```text
+EXTERNAL_PAYMENT_DECLINED
+EXTERNAL_PAYMENT_UNKNOWN
+EXTERNAL_PAYMENT_ALREADY_PENDING
+EXTERNAL_PAYMENT_PROVIDER_UNAVAILABLE
+EXTERNAL_PAYMENT_TERMINAL_INVALID
+EXTERNAL_PAYMENT_EVIDENCE_REQUIRED
+EXTERNAL_PAYMENT_MANUAL_RESOLUTION_FORBIDDEN
+
+EXTERNAL_REFUND_UNKNOWN
+EXTERNAL_REFUND_EXCEEDS_ELIGIBLE_AMOUNT
+
+EXTERNAL_RECONCILIATION_DISCREPANCY
+```
+
+DEC-14 no fija todavía el contrato HTTP definitivo.
+
+### Rendimiento y concurrencia
+
+La implementación deberá preservar:
+
+```text
+no_global_payment_lock = true
+external_calls_under_long_locks = false
+different_branches_can_progress_concurrently = true
+different_terminals_can_progress_concurrently = true
+causal_duplicates_prevented = true
+```
+
+Las lecturas operativas utilizarán aggregates y estados materializados e indexados. No se escaneará todo el historial de proveedor para cada operación y el replay tendrá un fast-path idempotente.
+
+### Migración conceptual
+
+La transición seguirá una secuencia equivalente a:
+
+1. Separar `CARD` contable de pago integrado.
+2. Crear operación externa durable.
+3. Integrar DEC-07.
+4. Crear frontera provider-agnostic.
+5. Implementar adapter BBVA después de validar el protocolo real.
+6. Añadir máquina de estados.
+7. Añadir recuperación de `UNKNOWN`.
+8. Añadir callback, webhook o polling conforme a BBVA.
+9. Añadir conciliación.
+10. Integrar ventas.
+11. Integrar pedidos.
+12. Integrar refunds.
+13. Integrar blockers de cierre.
+14. Actualizar reportes.
+15. Aplicar seguridad, secrets y redacción.
+16. Actualizar OpenAPI backend-first.
+17. Regenerar cliente TypeScript.
+18. Actualizar POS.
+19. Actualizar Backoffice.
+20. Retirar caminos ambiguos después del cutover.
+21. Tratar históricos mediante DEC-19.
+
+No se inventarán autorizaciones, capturas, voids, refunds ni settlements históricos.
+
+### Pruebas futuras obligatorias
+
+La implementación deberá cubrir como mínimo:
+
+- captura confirmada;
+- rechazo;
+- timeout demostrado antes del proveedor;
+- timeout con posible efecto externo;
+- replay con la misma key;
+- key nueva contra un efecto `UNKNOWN` abierto;
+- callback o webhook duplicado;
+- polling y callback concurrentes;
+- éxito tardío después de `UNKNOWN`;
+- crash y restart;
+- venta con `CASH + CARD`;
+- CASH completado y CARD pendiente;
+- void cuando sea elegible;
+- refund total, parcial y múltiple;
+- CASH-first con remanente externo;
+- refund `UNKNOWN`;
+- límite acumulado de refund;
+- terminal inactiva o equivocada;
+- operación externa sin documento local;
+- documento local sin captura externa;
+- cierre bloqueado por incertidumbre relevante;
+- fee y net settlement separados;
+- chargeback;
+- fallback manual con y sin evidencia;
+- scopes de sucursal;
+- redacción de datos sensibles;
+- sandbox frente a producción;
+- ausencia de llamadas externas bajo locks largos.
+
+### Relaciones con decisiones aprobadas
+
+- **DEC-02:** `CARD` contable no aparentará integración real.
+- **DEC-05:** credenciales de usuario y del proveedor permanecen separadas; no se registran secretos.
+- **DEC-06:** efectos `UNKNOWN` financieramente relevantes bloquean cierre y no se reabren cajas cerradas.
+- **DEC-07:** intención, llamadas, callbacks y replay serán idempotentes.
+- **DEC-09:** devolución física y refund financiero permanecen separados.
+- **DEC-10:** la operación externa materializa el derecho económico del pedido, no lo redefine.
+- **DEC-11:** se preservan legs reales, CASH-first, refunds pendientes y ausencia de liquidación ficticia.
+- **DEC-13:** pricing determina el importe debido; proveedor y fees no lo recalculan.
+
+### Dependencia explícita de DEC-16
+
+DEC-16 gobernará los requisitos externos aplicables que DEC-14 no puede aprobar por sí sola, incluidos, según correspondan al proveedor, jurisdicción y operación real:
+
+- obligaciones de seguridad y compliance de pagos;
+- alcance PCI y responsabilidades asociadas;
+- retención de referencias o datos relacionados con pagos;
+- privacidad;
+- contenido documental o comprobantes cuando aplique;
+- otros requisitos legales o regulatorios externos.
+
+Reglas:
+
+1. DEC-14 no declara cumplimiento PCI.
+2. DEC-14 no decide ni presupone el alcance PCI definitivo.
+3. DEC-14 no sustituye ni resuelve DEC-16; DEC-16 permanece `PENDIENTE`.
+4. Seleccionar BBVA no constituye validación legal, contractual, regulatoria ni de compliance.
+5. Antes del cutover productivo del pago integrado deberán estar aprobados, implementados y verificados los requisitos de DEC-16 que resulten aplicables.
+6. Una incompatibilidad futura entre requisitos de BBVA, DEC-16 y DEC-14 se reportará explícitamente y no se resolverá reinterpretando silenciosamente DEC-14.
+
+### Dependencias explícitas de BBVA
+
+Permanecen pendientes de implementación o verificación:
+
+- protocolo y contrato técnico real de BBVA Total POS;
+- modelo físico de terminal;
+- SDK o middleware, si existe;
+- sandbox;
+- credenciales;
+- certificación;
+- capacidades de void y refund;
+- mecanismo de consulta, callback, webhook o polling;
+- disponibilidad;
+- restricciones comerciales;
+- seguridad exigida por BBVA.
+
+Si evidencia futura de BBVA contradice DEC-14, la política no se modificará ni reinterpretará silenciosamente: la contradicción se reportará y resolverá explícitamente.
+
+### Evidencia técnica asociada
+
+El código vigente al aprobar DEC-14 presenta estas brechas:
+
+- ventas persisten `CARD` como leg contable y confirman localmente sin proveedor;
+- pedidos registran pagos y refunds sin ciclo externo;
+- refunds de ventas externos permanecen deshabilitados;
+- no existen operaciones externas, estados de proveedor, terminal binding ni identidad externa;
+- no existe idempotencia DEC-07 transversal;
+- la conciliación administrativa sólo opera realmente sobre cortes de efectivo;
+- el worker no procesa callbacks, polling ni reconciliación externa;
+- POS muestra correctamente `Tarjeta (registro)` como registro contable;
+- OpenAPI no expresa todavía operaciones externas ni sus estados.
+
+Estos hechos describen el código vigente; no constituyen implementación de DEC-14.
+
+### Historial y límite
+
+- **Historial:** DEC-14 permaneció `PENDIENTE` desde 2026-08-26 y fue `APROBADA` por el propietario el 2026-08-29 mediante decisiones 1B, 2B, 3B y 4B.
+- **Primera integración prevista:** BBVA Total POS mediante un adapter y dominio provider-agnostic.
+- **Resolución de incertidumbre:** automática primero; intervención humana sólo como excepción controlada y con evidencia verificable.
+- **Vinculación:** ZeroMerma crea y vincula automáticamente la operación externa antes de contactar al proveedor; la cajera no crea el `UNKNOWN`.
+- **Límite:** DEC-14 define política e invariantes. No certifica que BBVA esté integrado, contratado, probado o disponible en producción y no implementa pagos, terminales, migraciones, contratos, clientes ni preparación productiva.
 
 ## DEC-15 — Hardware y offline
 
