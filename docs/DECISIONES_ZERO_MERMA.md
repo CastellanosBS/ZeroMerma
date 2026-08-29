@@ -5358,12 +5358,879 @@ Estos hechos describen la implementación vigente y no equivalen a implementaci�
 
 ## DEC-12 — Producción
 
-- **Estado:** `PENDIENTE`
+- **Estado:** `APROBADA`
+- **Fecha:** 2026-08-28
 - **Propietario:** propietario de ZeroMerma
-- **Qué debe aprobarse:** semántica de cancelación, consumo, output, merma, rendimiento y receta versionada.
-- **Tareas principales afectadas:** tareas de producción, recetas, costos e inventario del Plan Maestro.
-- **Respuesta aprobada:** ninguna.
-- **Regla:** ninguna inferencia de `ZM-FIN-002` constituye decisión de producción.
+- **Respuesta aprobada:** producción operativa de baja interacción, independiente de sensores, separada entre plan y corrida, con conciliación final mínima, reservas causales, WIP opcional, recetas versionadas, efectos físicos explícitos, asignaciones de output y una capa append-only de observaciones preparada para Living Lab.
+- **Regla:** la realidad productiva canónica sólo nace de fuentes operativas autorizadas o de una conciliación/promoción explícita; una inferencia, observación o señal experimental no muta por sí sola el dominio.
+
+### Principio operativo de baja interacción
+
+1. Los panaderos no realizarán captura digital rutinaria.
+2. Su interfaz ordinaria será un monitor de producción principalmente de sólo lectura.
+3. No deberán llenar formularios, navegar pantallas ni registrar manualmente cada etapa.
+4. ZeroMerma deberá funcionar completamente sin sensores, cámaras, básculas conectadas, RFID, NFC, voz ni hardware especializado.
+5. No se pedirá al personal un dato que ZeroMerma pueda obtener de sus propios módulos o inferir razonablemente.
+6. Cuando un dato físico real no pueda obtenerse de una fuente canónica, se resolverá mediante una conciliación final breve, precargada y realizada por un usuario autorizado, no necesariamente el panadero.
+7. La captura humana normal será por excepción.
+8. Un dato inferido no se presentará como realidad física confirmada.
+9. La futura instrumentación no será requisito para operar el módulo.
+
+Queda establecido:
+
+```text
+sensor_independent_core=true
+routine_baker_data_entry=false
+exception_based_capture=true
+```
+
+### Separación entre plan y corrida
+
+El modelo conceptual mínimo será equivalente a:
+
+```text
+ProductionPlan
+  DRAFT
+  RELEASED
+  CANCELLED
+
+ProductionRun
+  OPEN
+  PENDING_RECONCILIATION
+  COMPLETED
+  CANCELLED
+```
+
+La forma física podrá variar durante la implementación si conserva las invariantes siguientes.
+
+#### `ProductionPlan DRAFT`
+
+- Es editable.
+- No tiene efectos físicos.
+- No está publicado como plan operativo definitivo.
+
+#### `ProductionPlan RELEASED`
+
+- Congela el snapshot de receta, cantidades, demanda y destinos.
+- Es visible en el Production Board.
+- Puede crear reservas de insumos.
+- No afirma que la producción física comenzó.
+
+#### `ProductionRun OPEN`
+
+- Representa una corrida disponible para ejecución física.
+- No implica `production_started`.
+- No implica consumo, WIP ni output.
+
+#### `PENDING_RECONCILIATION`
+
+- La ejecución física pudo ocurrir.
+- Falta confirmar o explicar output, consumo, retorno, merma o diferencias.
+- Ningún valor inferido pendiente se considera realidad física canónica.
+
+#### `COMPLETED`
+
+- La conciliación final quedó confirmada.
+- Movimientos físicos, reservas, output, retorno y merma son consistentes.
+- Auditoría, outbox e idempotencia quedaron confirmados.
+
+#### `CANCELLED`
+
+- Es terminal.
+- Si existieron efectos físicos, deben quedar reconciliados antes de confirmar la cancelación.
+
+`IN_PROGRESS` no será una transición obligatoria del core. Podrá existir como observación, milestone opcional, dato manual confirmado o dato instrumental futuro, pero no se inventará cuando no exista evidencia.
+
+### Planificación y Production Board
+
+El Production Board será una superficie principalmente de sólo lectura para el personal de producción. Mostrará, como mínimo:
+
+- productos;
+- cantidades;
+- prioridad;
+- hora objetivo;
+- pedidos relacionados claramente diferenciados;
+- cantidades destinadas a pedidos;
+- cantidades destinadas a stock;
+- receta o versión aplicable cuando corresponda;
+- faltantes o bloqueos;
+- estado del plan.
+
+No exigirá formularios rutinarios al panadero.
+
+La planificación reutilizará la información ya existente en pedidos, ventas, inventario, recetas, sucursales, compras, horarios, transferencias y los demás módulos aplicables. No se volverá a pedir manualmente un dato ya disponible en ZeroMerma.
+
+### Conciliación final mínima
+
+Existirá una superficie separada equivalente a `Production Reconciliation / Supervisor`, utilizada por un usuario autorizado y precargada con:
+
+- plan liberado;
+- receta y versión;
+- inputs teóricos;
+- cantidades planeadas;
+- demanda de pedidos;
+- cantidad para stock;
+- reservas;
+- observaciones disponibles;
+- output esperado;
+- eventos automáticos disponibles.
+
+El caso normal será:
+
+```text
+Confirmar sin diferencias
+```
+
+Esta acción deberá requerir una sola interacción.
+
+La captura excepcional permitirá:
+
+- corregir output real;
+- corregir consumo;
+- registrar retorno;
+- registrar merma;
+- registrar incidencia;
+- registrar reproceso;
+- explicar diferencias.
+
+Una confirmación manual sin diferencias se clasificará como:
+
+```text
+source_kind=MANUAL
+evidence_quality=CONFIRMED
+```
+
+No como:
+
+```text
+source_kind=SENSOR
+evidence_quality=MEASURED
+```
+
+Si no existe fuente canónica ni conciliación:
+
+```text
+status=PENDING_RECONCILIATION
+```
+
+y los valores inferidos permanecerán no canónicos.
+
+### Reserva de insumos al liberar
+
+Al liberar un plan podrá crearse una reserva causal conforme a DEC-08:
+
+```text
+on_hand no cambia
+reserved aumenta
+available disminuye
+```
+
+La reserva deberá:
+
+- corresponder al plan y sus líneas;
+- ser idempotente;
+- evitar doble disponibilidad;
+- conservar producto, cantidad, ubicación, UOM y causalidad;
+- liberarse, consumirse o reconciliarse exactamente una vez.
+
+La mera publicación del plan no significa consumo físico.
+
+### WIP opcional según evidencia
+
+`WIP` no será obligatorio para operar la Capa 1.
+
+Sólo una fuente operativa canónica podrá mover material:
+
+```text
+BACKROOM -> WIP
+```
+
+No podrán producir ese movimiento por sí solos:
+
+- la llegada de una hora;
+- la publicación del plan;
+- una inferencia;
+- una observación experimental;
+- una señal no validada.
+
+Si no existe evento canónico de emisión a WIP, la conciliación final podrá registrar atómicamente consumo real, retorno, merma, liberación de reserva no utilizada y output.
+
+Si en el futuro existe instrumentación validada, podrá registrarse WIP antes de la conciliación.
+
+Ambos modos utilizarán el mismo dominio, ledger, reservas, idempotencia, auditoría y modelo de conciliación. No se crearán dos arquitecturas paralelas.
+
+### Receta versionada e inmutable
+
+Cada plan y corrida referenciará una versión concreta de receta y conservará un snapshot equivalente a:
+
+- receta y versión;
+- ingredientes;
+- cantidades;
+- UOM;
+- conversiones;
+- output esperado;
+- rendimiento esperado;
+- datos de costo relevantes;
+- timestamp de vigencia.
+
+Reglas:
+
+1. Una versión utilizada por un plan liberado o corrida no se editará.
+2. Cambiar ingredientes, cantidades, UOM o rendimiento crea una nueva versión.
+3. Desactivar una receta no modifica históricos.
+4. Las cantidades planeadas quedan congeladas al liberar.
+5. Los consumos y outputs reales no reescriben automáticamente la receta.
+6. La receta representa expectativa; la conciliación representa realidad.
+
+```text
+recipe_expectation != production_actuals
+```
+
+### Consumo, retorno, merma y output
+
+La conciliación deberá poder explicar:
+
+```text
+material emitido o reservado
+=
+consumo real
++ retorno
++ merma
++ remanente explícito autorizado
+```
+
+Reglas:
+
+- el consumo teórico de receta no se considera consumo real sin confirmación;
+- no se inventará consumo para cuadrar;
+- no se ocultará merma dentro del consumo;
+- el retorno será explícito;
+- el remanente será explícito y justificado;
+- el output real puede diferir del output planeado;
+- no se creará output ficticio;
+- UOM y causalidad serán obligatorias;
+- los movimientos históricos serán inmutables;
+- las correcciones usarán movimientos compensatorios;
+- auditoría y outbox serán transaccionales;
+- DEC-07 garantizará exactly-once.
+
+### Merma explícita
+
+Toda merma productiva canónica conservará como mínimo:
+
+- plan/corrida;
+- producto o insumo;
+- cantidad;
+- UOM;
+- ubicación o contexto;
+- razón;
+- actor o fuente;
+- `occurred_at`;
+- `recorded_at`;
+- referencia causal;
+- referencia idempotente;
+- movimiento hacia `WASTE` o disposición válida conforme a DEC-08/09.
+
+No se usará una simple diferencia de rendimiento como sustituto de una merma canónica.
+
+### Rendimiento
+
+El rendimiento será una métrica derivada de datos canónicos. Como mínimo podrá comparar:
+
+```text
+output real / output esperado
+```
+
+y conservará:
+
+- output esperado;
+- output real;
+- diferencia;
+- porcentaje;
+- receta/version;
+- corrida;
+- periodo.
+
+El rendimiento será analítico; no modificará automáticamente la receta ni los movimientos, no inventará merma y no cambiará futuras producciones sin una decisión explícita.
+
+### Output parcial
+
+La arquitectura soportará output parcial cuando exista evidencia canónica, pero no será obligatorio capturarlo por tanda en la Capa 1.
+
+Reglas:
+
+- cada output parcial tendrá identidad causal única;
+- será idempotente;
+- afectará inventario exactamente una vez;
+- conservará producto, cantidad, UOM, ubicación y timestamp;
+- la conciliación final sumará outputs parciales;
+- el cierre sólo registrará el delta no registrado previamente;
+- se rechazará sobreconteo o duplicación.
+
+La Capa 1 podrá operar únicamente con output final. Una futura Capa 2 podrá aportar outputs parciales medidos o promovidos.
+
+### Corridas con varios pedidos y stock
+
+El propietario aprobó expresamente:
+
+> Una misma corrida de producción puede abastecer simultáneamente varios pedidos y producción para stock, siempre que existan asignaciones explícitas de cantidades por destino y no exista doble asignación.
+
+Existirá una estructura equivalente a:
+
+```text
+ProductionDemandAllocation
+  production_plan_id
+  production_run_id nullable
+  order_item_id nullable
+  destination: ORDER | STOCK
+  planned_quantity
+  fulfilled_quantity
+  causal identity
+```
+
+Reglas:
+
+1. Cada asignación indicará un destino explícito.
+2. Una asignación `ORDER` referenciará una línea de pedido concreta.
+3. Una asignación `STOCK` identificará producto, sucursal y ubicación destino.
+4. La suma planificada de asignaciones no excederá el output planeado.
+5. La suma cumplida no excederá el output real conciliado.
+6. No habrá doble asignación del mismo output.
+7. Un output podrá distribuirse entre varios pedidos y stock.
+8. Las cantidades no asignadas deberán quedar explícitamente como stock, remanente o diferencia pendiente; nunca desaparecerán.
+9. Las asignaciones conservarán trazabilidad, auditoría e idempotencia.
+10. La corrida no se dividirá artificialmente por pedido si una producción por lote satisface varios destinos.
+
+Ejemplo normativo:
+
+```text
+Corrida:
+40 conchas
+
+Asignaciones:
+Pedido A = 10
+Pedido B = 5
+Stock = 25
+
+Total asignado = 40
+```
+
+No se exige identificar individualmente cada pieza. DEC-12 no fija una regla contable detallada de reparto de costos entre pedidos; la implementación conservará cantidades y causalidad suficientes para derivaciones posteriores.
+
+### Cancelación
+
+#### Plan `DRAFT`
+
+- Puede cancelarse sin efectos físicos.
+- No existen reservas liberadas ni consumos inventados.
+
+#### Plan `RELEASED` sin efectos físicos confirmados
+
+- No se asumirá automáticamente que nada ocurrió.
+- Se requerirá confirmación autorizada de “sin efectos”.
+- Hasta entonces permanecerá `PENDING_RECONCILIATION`.
+- Las reservas se liberarán únicamente al confirmar.
+
+#### Con efectos físicos canónicos
+
+La cancelación no será un rollback ficticio. Deberá explicar consumo, retorno, merma, output ya producido, WIP si existió, reserva restante y disposición final.
+
+No se restaurarán automáticamente insumos como si la producción no hubiese ocurrido. `CANCELLED` será terminal.
+
+### Capa 2 — Living Lab futura
+
+ZeroMerma quedará preparada para fuentes futuras como:
+
+- sensores;
+- básculas conectadas;
+- hornos y equipos;
+- RFID/NFC;
+- lectores;
+- visión por computadora;
+- variables ambientales;
+- modelos de inferencia;
+- telemetría;
+- fuentes experimentales futuras.
+
+Estas fuentes:
+
+- no serán requisito del core;
+- no participarán obligatoriamente en el fast-path;
+- no escribirán directamente inventario o estados productivos;
+- no modificarán pedidos ni refunds;
+- ingresarán inicialmente como observaciones;
+- podrán almacenar datos brutos fuera del OLTP;
+- conservarán referencias verificables y lineage.
+
+DEC-12 no selecciona proveedor ni hardware.
+
+### Separación entre datos canónicos y experimentales
+
+```text
+dato operativo canónico
+!=
+dato observado, inferido o experimental
+```
+
+Una observación experimental no podrá por sí sola:
+
+- mover inventario;
+- crear WIP;
+- registrar consumo;
+- registrar output;
+- registrar merma;
+- completar una corrida;
+- cancelar una corrida;
+- modificar pedidos;
+- afectar la frontera `PRODUCTION_COMMITTED`;
+- afectar refunds.
+
+La única ruta permitida será equivalente a:
+
+```text
+ProductionObservation
+  -> validación/promoción explícita
+  -> comando de dominio
+  -> evento operativo canónico
+```
+
+### Modelo de observaciones
+
+Se utilizará un modelo append-only equivalente a:
+
+```text
+ProductionObservation
+  id
+  production_plan_id
+  production_run_id
+  production_stage_id nullable
+  observation_type
+
+  source_kind
+  source_id nullable
+  source_event_id nullable
+
+  occurred_at
+  recorded_at
+
+  evidence_status
+  evidence_quality
+  confidence nullable
+
+  schema_version
+  instrumentation_version nullable
+  model_version nullable
+
+  payload/reference
+  correlation_id nullable
+  causation_id nullable
+  promoted_event_id nullable
+  supersedes_observation_id nullable
+```
+
+Tipos de origen mínimos:
+
+```text
+MANUAL
+ZEROMERMA
+INFERRED
+SENSOR
+EQUIPMENT
+COMPUTER_VISION
+EXPERIMENTAL
+```
+
+Estados de evidencia mínimos:
+
+```text
+EXPERIMENTAL
+VALIDATED
+REJECTED
+PROMOTED
+```
+
+Calidades mínimas:
+
+```text
+MEASURED
+CONFIRMED
+DERIVED
+ESTIMATED
+CORRECTED
+```
+
+Reglas:
+
+- `confidence` será nullable y, cuando exista, estará entre 0 y 1;
+- el tipo de fuente no equivale a autoridad;
+- la calidad no convierte automáticamente un dato en canónico;
+- las correcciones usarán supersession, no edición destructiva;
+- una observación rechazada permanecerá registrada;
+- cambiar un modelo no reescribirá decisiones históricas;
+- la retención y privacidad dependerán de DEC-16;
+- la telemetría masiva podrá almacenarse fuera del OLTP mediante referencias verificables.
+
+### Promoción explícita
+
+Existirá un contrato conceptual equivalente a:
+
+```text
+promote_observation(
+  observation_id,
+  validation_rule_version,
+  actor_or_process
+)
+  -> domain command
+  -> canonical event
+```
+
+Invariantes:
+
+- una observación no muta directamente el dominio;
+- la regla de validación es versionada;
+- el actor o proceso debe estar autorizado;
+- la promoción es idempotente;
+- existe auditoría y outbox;
+- se conserva lineage;
+- `promoted_event_id` enlaza el resultado;
+- una observación rechazada no desaparece;
+- no se aprueba promoción automática general.
+
+Una promoción automática futura requerirá política explícita y evidencia suficiente.
+
+### Identidad, timestamps y lineage
+
+Se utilizarán identificadores estables, preferentemente UUIDv7 cuando sea compatible con las decisiones vigentes, para plan, corrida, etapa, evento, observación, fuente e instrumento.
+
+Se distinguirá:
+
+```text
+occurred_at
+= momento del hecho u observación
+
+recorded_at
+= momento de recepción o persistencia
+```
+
+Se conservarán cuando corresponda:
+
+- `correlation_id`;
+- `causation_id`;
+- `source_event_id`;
+- `schema_version`;
+- `instrumentation_version`;
+- `model_version`;
+- referencia/hash del dato bruto.
+
+Cadena conceptual:
+
+```text
+production_plan_id
+  -> production_run_id
+  -> production_stage_id
+  -> canonical_event_id / observation_id
+  -> source_id
+  -> occurred_at / recorded_at
+```
+
+### Eventos canónicos
+
+Se contemplan eventos conceptuales equivalentes a:
+
+```text
+production.plan_created
+production.plan_released
+production.reconciliation_requested
+production.reconciled
+production.input_consumed
+production.input_returned
+production.output_recorded
+production.waste_recorded
+production.completed
+production.cancelled
+```
+
+Los nombres físicos podrán ajustarse. Una observación describe evidencia; un evento canónico registra un cambio de dominio autorizado. No son intercambiables.
+
+### Idempotencia, locking y atomicidad
+
+Como mínimo deberán ser idempotentes:
+
+- liberación del plan;
+- conciliación;
+- cancelación;
+- registro de output;
+- registro de merma;
+- promoción de observaciones.
+
+Orden conceptual de locking:
+
+```text
+1. IdempotencyRecord
+2. ProductionPlan/ProductionRun
+3. reservas
+4. InventoryBalance ordenados por branch/product/location
+5. movimientos, asignaciones y eventos
+6. auditoría/outbox
+7. commit
+```
+
+Reglas:
+
+- no habrá lock global de producción;
+- corridas distintas podrán avanzar concurrentemente;
+- productos y sucursales independientes no se serializarán;
+- una conciliación no duplicará reservas, movimientos, output, merma, auditoría ni outbox;
+- corrida, reservas, balances, movimientos, asignaciones, auditoría, outbox e idempotencia compartirán la unidad transaccional correspondiente.
+
+### Rendimiento
+
+La dirección técnica será:
+
+- Production Board desde proyecciones indexadas;
+- conciliación precargada;
+- ausencia de escaneo completo del ledger por pantalla;
+- ausencia de lock global;
+- ausencia de dependencia de sensores;
+- telemetría masiva fuera del fast-path;
+- eventos y observaciones indexados por corrida, tiempo, fuente y estado;
+- datos brutos de alta frecuencia fuera del OLTP cuando sea necesario;
+- replay mediante fast-path.
+
+DEC-12 no fija SLA sin una línea base.
+
+### Errores conceptuales
+
+Se registran códigos estables equivalentes a:
+
+```text
+PRODUCTION_PLAN_NOT_RELEASED
+PRODUCTION_PLAN_ALREADY_RELEASED
+PRODUCTION_RECONCILIATION_REQUIRED
+PRODUCTION_RECONCILIATION_MISMATCH
+PRODUCTION_INPUTS_UNEXPLAINED
+PRODUCTION_OUTPUT_OVER_RECORDED
+PRODUCTION_ALLOCATION_MISMATCH
+PRODUCTION_CANCELLATION_REQUIRES_RECONCILIATION
+PRODUCTION_RECIPE_VERSION_IMMUTABLE
+PRODUCTION_OBSERVATION_NOT_PROMOTABLE
+PRODUCTION_OBSERVATION_ALREADY_PROMOTED
+```
+
+No se implementan mediante esta decisión documental.
+
+### Auditoría y outbox
+
+Se auditarán como mínimo:
+
+- plan y versión;
+- corrida;
+- receta/version;
+- cantidades planeadas;
+- demanda de pedidos y stock;
+- reservas;
+- consumos;
+- retornos;
+- merma;
+- outputs;
+- asignaciones;
+- diferencias;
+- razones;
+- usuario o fuente;
+- `occurred_at`;
+- `recorded_at`;
+- `request_id`;
+- referencia idempotente;
+- lineage de observación/promoción cuando corresponda.
+
+Un replay no generará eventos de negocio duplicados.
+
+### Relación con DEC-10
+
+Se preserva:
+
+```text
+PRODUCTION_COMMITTED
+= frontera comercial de cancelación
+```
+
+El inicio físico, plan liberado, corrida, observación, inferencia, sensor, conciliación, output o merma no modificarán retroactivamente esa frontera.
+
+`production_started` podrá existir como dato operativo o analítico, pero no como autoridad financiera ordinaria.
+
+### Relaciones con DEC-07 y DEC-08
+
+DEC-07 gobierna operaciones exactly-once, replay sin duplicar efectos y causalidad por evento/movimiento.
+
+DEC-08 gobierna ledger causal, reserva al liberar, WIP sólo con evidencia, consumo/output/merma coherentes, movimientos compensatorios, prohibición de stock negativo ordinario y locking ordenado.
+
+DEC-12 no reinterpreta esas decisiones.
+
+### Dependencias posteriores
+
+```text
+DEC-15 -> hardware, gateways, conectividad y offline opcionales
+DEC-16 -> privacidad, cámaras, audio, datos personales y retención
+DEC-17 -> continuidad, almacenamiento externo, recovery e ingesta
+DEC-18 -> métricas, confianza, calidad y alertas
+DEC-19 -> migración e históricos sin inventar producción real
+DEC-20 -> piloto operacional y Living Lab
+```
+
+Estas decisiones no se resuelven dentro de DEC-12.
+
+### Ajustes puntuales a tareas posteriores
+
+Sin crear un roadmap paralelo:
+
+- `ZM-FIN-008`: comandos, capabilities, scopes, idempotencia y lineage de producción;
+- `ZM-FIN-054`: plan/corrida, reservas, WIP opcional, ledger y conciliación;
+- `ZM-FIN-069`: recetas inmutables y snapshots versionados;
+- `ZM-FIN-070`: Production Board y Reconciliation/Supervisor.
+
+### Migración conceptual
+
+1. Separar plan y corrida.
+2. Crear estados de liberación y conciliación.
+3. Fortalecer versión y snapshot de receta.
+4. Añadir reservas al liberar.
+5. Incorporar WIP opcional.
+6. Crear conciliación final.
+7. Sustituir consumo teórico registrado como real.
+8. Crear movimientos causales de consumo, retorno, merma y output.
+9. Añadir asignaciones a pedidos y stock.
+10. Permitir output parcial opcional.
+11. Corregir cancelación.
+12. Añadir idempotencia y locking.
+13. Añadir eventos canónicos.
+14. Crear un módulo append-only de observaciones.
+15. Crear la frontera de promoción explícita.
+16. Añadir IDs, timestamps y lineage.
+17. Separar Production Board de Reconciliation.
+18. Actualizar OpenAPI backend-first.
+19. Regenerar el cliente TypeScript.
+20. Adaptar Backoffice.
+21. Tratar históricos mediante DEC-19.
+
+No se inventarán consumos, outputs, inicios, mermas o asignaciones históricas.
+
+### Pruebas futuras obligatorias
+
+#### Plan y reservas
+
+- crear y liberar;
+- release idempotente;
+- reserva completa;
+- stock insuficiente;
+- cancelación `DRAFT`;
+- cancelación `RELEASED` sin efectos;
+- concurrencia.
+
+#### Conciliación
+
+- confirmar sin diferencias;
+- consumo real distinto;
+- retorno;
+- merma;
+- output distinto;
+- material no explicado;
+- `PENDING_RECONCILIATION`;
+- replay exactly-once.
+
+#### Receta
+
+- versión congelada;
+- edición histórica rechazada;
+- nueva versión;
+- UOM y snapshot.
+
+#### Asignaciones
+
+- varios pedidos;
+- pedido más stock;
+- suma exacta;
+- doble asignación rechazada;
+- output insuficiente;
+- remanente explícito.
+
+#### Output parcial
+
+- uno o varios outputs;
+- replay;
+- conciliación final del delta;
+- sobreconteo rechazado.
+
+#### Cancelación
+
+- sin efectos;
+- con efectos;
+- WIP;
+- output previo;
+- merma;
+- reconciliación obligatoria.
+
+#### Observaciones
+
+- manual;
+- inferida;
+- sensor;
+- equipo;
+- visión;
+- confidence;
+- deduplicación por `source_event_id`;
+- supersession;
+- rechazo;
+- promoción;
+- doble promoción;
+- lineage.
+
+#### Autoridad
+
+- observación no mueve inventario;
+- observación no completa corrida;
+- sensor no altera pedidos;
+- inferencia no cambia refund;
+- sólo un comando promovido genera evento canónico.
+
+#### Rendimiento y concurrencia
+
+- corridas independientes;
+- sucursales independientes;
+- ausencia de lock global;
+- Production Board sin full ledger scan;
+- telemetría fuera del fast-path.
+
+Estas pruebas no se ejecutan ni implementan mediante esta decisión documental.
+
+### Evidencia técnica asociada
+
+En el código vigente:
+
+- `ProductionBatch` mezcla plan y ejecución;
+- los estados actuales exigen `IN_PROGRESS`;
+- el servicio `start` registra un inicio administrativo no necesariamente físico;
+- `complete` usa consumo teórico como real;
+- no existen reservas ni WIP;
+- la merma se oculta en varianza;
+- la cancelación sólo cambia estado;
+- receta/versionado no es plenamente inmutable;
+- la UI actual es interactiva;
+- no existe conciliación integral;
+- no existen asignaciones de pedidos/stock;
+- no existe módulo de observaciones;
+- los timestamps no distinguen `occurred_at` y `recorded_at`;
+- no existe lineage científico;
+- idempotencia y locking son incompletos.
+
+Estos hechos describen la implementación vigente y no equivalen a implementación de DEC-12.
+
+### Consecuencias, límite e historial
+
+- **Tareas afectadas:** `ZM-FIN-003`, `ZM-FIN-008`, `ZM-FIN-054`, `ZM-FIN-069`, `ZM-FIN-070` y las tareas posteriores del Plan Maestro que implementen producción, recetas, inventario, pedidos, observaciones, hardware, contratos, clientes o migración de datos.
+- **Consecuencias:** separación plan/corrida, reservas, conciliación final, WIP opcional, recetas inmutables, movimientos causales, asignaciones explícitas, Production Board, superficie de supervisor, observaciones append-only, promoción explícita, lineage, locking, idempotencia, auditoría y outbox.
+- **Dependencias:** DEC-07 para idempotencia; DEC-08 para inventario; DEC-10 para la frontera comercial `PRODUCTION_COMMITTED`; DEC-15 a DEC-20 para hardware/offline, privacidad, continuidad, calidad de datos, históricos y piloto.
+- **Límite:** DEC-12 define política normativa y modelos conceptuales; no certifica que producción, reservas, WIP, conciliación, observaciones, sensores, locking, idempotencia, migraciones, contratos, Backoffice o pruebas estén implementados.
+- **Historial:** `PENDIENTE` desde 2026-08-26; `APROBADA` por el propietario el 2026-08-28. La aprobación incluye operación de baja interacción, extensión Living Lab desacoplada y corridas capaces de abastecer varios pedidos y stock mediante asignaciones explícitas sin doble asignación.
 
 ## DEC-13 — Pricing y descuentos
 
