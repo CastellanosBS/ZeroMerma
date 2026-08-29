@@ -3173,8 +3173,42 @@ Estas dependencias no se resuelven mediante DEC-09.
 - **Estado:** `APROBADA`
 - **Fecha:** 2026-08-28
 - **Propietario:** propietario de ZeroMerma
-- **Contenido aprobado:** naturaleza económica, anticipo mínimo, pagos, snapshot, producto exacto, ciclo, reservas, entrega, reconocimiento de ingreso, amendments, cancelación, expiración, sucursal, caja, locking, rendimiento, migración y pruebas futuras.
+- **Contenido aprobado:** naturaleza económica, anticipo mínimo, pagos, snapshot, producto exacto, ciclo, reservas, entrega, reconocimiento de ingreso, amendments, frontera comercial `PRODUCTION_COMMITTED`, cancelación, expiración, sucursal, caja, locking, rendimiento, migración y pruebas futuras.
 - **Respuesta aprobada:** política normativa, modelos conceptuales, invariantes, dependencias y pruebas futuras descritos en esta decisión.
+
+### Revisión vigente — 2026-08-28
+
+#### Sustitución de la frontera de cancelación
+
+La versión inicial de DEC-10, aprobada el 2026-08-28, utilizó `production_started` como frontera ordinaria para determinar el refund de una cancelación atribuible al cliente.
+
+Evidencia operativa posterior suministrada por el propietario estableció que:
+
+- los panaderos no realizan captura digital rutinaria;
+- producción opera principalmente mediante un monitor de sólo lectura;
+- ZeroMerma debe funcionar completamente sin sensores ni instrumentación avanzada;
+- no existe una señal confiable y obligatoria de inicio físico de producción.
+
+Exigir `production_started` como autoridad financiera obligaría a introducir captura rutinaria o instrumentación que la operación aprobada no garantiza. Por ello, queda sustituida exclusivamente esa frontera por el milestone comercial y de planificación:
+
+```text
+PRODUCTION_COMMITTED
+```
+
+Desde esta revisión, las cláusulas vigentes de DEC-10 son las que utilizan `PRODUCTION_COMMITTED`. Las referencias históricas a `production_started` documentan la versión inicial, pero no constituyen política vigente.
+
+Las demás reglas de DEC-10 permanecen aprobadas y sin cambio, incluyendo anticipo mínimo, producto exacto, ciclo del pedido, reserva completa, entrega, reconocimiento de ingreso, sucursal, caja, idempotencia y relaciones con DEC-06 a DEC-11.
+
+La dimensión comercial queda conceptualmente:
+
+```text
+PENDING + NOT_COMMITTED
+PENDING + PRODUCTION_COMMITTED
+READY
+DELIVERED
+```
+
+`PRODUCTION_COMMITTED` será un milestone comercial irreversible y no necesita ser un estado principal de `CustomerOrder`.
 
 ### Naturaleza económica del pedido
 
@@ -3313,6 +3347,9 @@ discount/promotion snapshot cuando DEC-13 aplique
 order_total_snapshot
 minimum_advance_policy/version
 cancellation_policy/version
+production_commit_policy/version
+production_commit_at UTC
+branch timezone/offset snapshot usado para el cálculo
 fulfillment_branch_id
 effective timestamp/version
 ```
@@ -3406,6 +3443,16 @@ Conforme a DEC-08:
 ```text
 READY -> reserve exact products
 ```
+
+La separación vigente será:
+
+```text
+PRODUCTION_COMMITTED = frontera comercial y de planificación
+READY                 = producto preparado y reserva completa para entrega
+DELIVERED             = entrega y reconocimiento de ingreso
+```
+
+`READY` no sustituye, crea ni modifica retroactivamente el commitment. Una transición a `READY` anterior a `production_commit_at` no podrá cerrar silenciosamente la ventana de cancelación y deberá rechazarse o diferirse según la implementación posterior.
 
 DEC-10 fija:
 
@@ -3528,7 +3575,7 @@ Una cancelación anterior a `DELIVERED` tendrá:
 sale revenue recognized = 0
 ```
 
-Si una cancelación del cliente ocurre después de iniciar producción y se retiene el dinero:
+Si una cancelación del cliente ocurre después de `PRODUCTION_COMMITTED` y se retiene el dinero:
 
 ```text
 retained advance
@@ -3547,6 +3594,16 @@ order.amend
 ```
 
 La operación será auditada e idempotente y conservará historial mediante versiones o snapshots equivalentes.
+
+Sólo podrá confirmarse mientras `PRODUCTION_COMMITTED` todavía no sea efectivo. La transacción deberá bloquear el pedido, validar la versión vigente y conservar el orden histórico completo.
+
+Cada nueva versión confirmada anterior al commitment:
+
+- recalculará prospectivamente `production_commit_at` mediante la política aplicable;
+- mostrará el nuevo cutoff antes de su confirmación;
+- conservará el cutoff y snapshot de la versión anterior;
+- generará una nueva identidad estable de commitment;
+- no podrá establecer un cutoff retrospectivo anterior al momento de confirmación del amendment.
 
 Después del amendment:
 
@@ -3571,7 +3628,15 @@ net_paid > new_total
 
 la modificación se rechazará salvo que una operación financiera explícita y atómica resuelva el exceso. No se generarán refunds silenciosos.
 
-Después de `READY` quedarán bloqueados:
+Después de que `PRODUCTION_COMMITTED` sea efectivo, `order.amend` será rechazado con un código equivalente a:
+
+```text
+ORDER_AMENDMENT_AFTER_PRODUCTION_COMMITMENT
+```
+
+No se permitirá borrar el milestone, modificar su `effective_at`, desplazar el cutoff para recuperar un derecho perdido ni reactivar una versión anterior.
+
+Después de `READY` continuarán bloqueados:
 
 ```text
 product_id
@@ -3582,20 +3647,48 @@ order total
 
 Un cambio posterior requerirá cancelación y recreación o un futuro workflow explícito de amendment.
 
-### Cancelación solicitada por cliente antes de producción
+### Semántica vigente de `PRODUCTION_COMMITTED`
+
+`PRODUCTION_COMMITTED` significa:
+
+- el pedido quedó formalmente comprometido al plan productivo;
+- terminó la ventana ordinaria de cancelación con reembolso para el cliente;
+- la panadería puede haber comprometido capacidad productiva planificada.
+
+No significa:
+
+- inicio físico real;
+- captura del panadero;
+- movimiento de inventario;
+- WIP;
+- consumo de insumos;
+- output o merma;
+- producto terminado;
+- `READY`.
+
+Invariantes:
+
+```text
+PRODUCTION_COMMITTED != production_started
+PRODUCTION_COMMITTED != READY
+PRODUCTION_COMMITTED != WIP
+PRODUCTION_COMMITTED != inventory movement
+```
+
+### Cancelación solicitada por cliente antes del commitment
 
 Cuando:
 
 ```text
 cancellation_responsibility=CUSTOMER
-production_started=false
+PRODUCTION_COMMITTED todavía no es efectivo
 ```
 
 aplicará:
 
 ```text
 refund = 100% net_paid
-recognized_sale_revenue = 0
+recognized_delivered_sale_revenue = 0
 status = CANCELED
 ```
 
@@ -3603,13 +3696,13 @@ Si existen reservas se liberará la reserva restante exactamente una vez.
 
 No se retendrá automáticamente el 50 %. El anticipo obligatorio es un requisito de confirmación, no una penalización automática.
 
-### Cancelación solicitada por cliente después de iniciar producción
+### Cancelación solicitada por cliente después del commitment
 
 Cuando:
 
 ```text
 cancellation_responsibility=CUSTOMER
-production_started=true
+PRODUCTION_COMMITTED ya es efectivo
 ```
 
 aplicará por defecto:
@@ -3617,12 +3710,12 @@ aplicará por defecto:
 ```text
 refund = 0
 status = CANCELED
-recognized_DELIVERED_sale_revenue = 0
+recognized_delivered_sale_revenue = 0
 ```
 
 No se inventarán porcentajes intermedios, penalizaciones adicionales ni refunds parciales automáticos.
 
-El dinero retenido permanecerá financieramente distinguible y auditable. DEC-12 proporcionará la evidencia autoritativa de `production_started`.
+El dinero retenido permanecerá financieramente distinguible y auditable y no se convertirá silenciosamente en ingreso de una venta `DELIVERED`.
 
 ### Cancelación atribuible a la panadería
 
@@ -3632,15 +3725,15 @@ Cuando:
 cancellation_responsibility=MERCHANT
 ```
 
-aplicará, independientemente del estado productivo:
+aplicará:
 
 ```text
 refund = 100% net_paid
-recognized_sale_revenue = 0
+recognized_delivered_sale_revenue = 0
 status = CANCELED
 ```
 
-La misma regla aplicará si `production_started=true` o si el producto ya fue producido.
+La misma regla aplicará independientemente de `PRODUCTION_COMMITTED`, inicio físico, producción parcial o producto terminado.
 
 Se registrarán:
 
@@ -3648,55 +3741,126 @@ Se registrarán:
 responsibility
 reason
 actor
-timestamp
-production evidence cuando corresponda
+decision_at
+commitment evidence cuando corresponda
 refund reference
 ```
 
 DEC-10 no fija un catálogo exhaustivo de causas.
 
-### Política de cancelación congelada
+Un pedido `DELIVERED` no se cancela. Una devolución o corrección posterior utiliza DEC-09.
 
-El pedido permitirá reconstruir que fue confirmado bajo una política equivalente a:
+### Política de cancelación y planificación congelada
+
+Cada versión confirmada del pedido permitirá reconstruir una política equivalente a:
 
 ```text
 minimum_advance_percent = 50%
 
-customer_cancel_before_production =
+customer_cancel_before_production_commitment =
 FULL_REFUND
 
-customer_cancel_after_production_start =
+customer_cancel_after_production_commitment =
 NO_REFUND
 
 merchant_attributable_cancel =
 FULL_REFUND
 ```
 
-Cambiar la política global en el futuro no modificará pedidos históricos.
-
-### Señal autoritativa `production_started`
-
-DEC-10 exige una interfaz durable que permita determinar `production_started` para el pedido.
-
-Conceptualmente:
+Cada versión conservará obligatoriamente un valor equivalente a:
 
 ```text
-get_order_production_boundary(order_id)
-- started
-- evidence_id
-- evidence_type
-- occurred_at
+production_commit_at
 ```
 
-DEC-12 determinará qué evento productivo activa esta señal.
+Será inmutable dentro de la versión, visible antes de confirmar el pedido o amendment, almacenado como instante UTC, calculado mediante una política configurada y versionada e independiente de sensores, scheduler o actividad del panadero.
 
-No se inferirá:
+El snapshot conservará como mínimo:
 
 ```text
-READY == production_started
-requested_for_at vencido == production_started
-UI state == production_started
+policy_id/version
+fulfillment_branch_id
+branch_timezone
+timezone offset aplicado
+requested_for_at
+inputs relevantes de producto/tipo de pedido
+cutoff local calculado
+production_commit_at UTC
+calculation version
+confirmed_at
 ```
+
+DEC-10 no aprueba un lead time numérico. Si no existe una política aplicable válida, el pedido no podrá confirmarse inventando un cutoff. Cambios posteriores de configuración, política o timezone no modificarán pedidos históricos.
+
+### Evento durable `order.production_committed`
+
+El commitment se materializará exactamente una vez mediante un evento o milestone durable equivalente a:
+
+```text
+order.production_committed
+  order_id
+  order_version
+  fulfillment_branch_id
+  production_commit_at
+  effective_at
+  recorded_at
+  policy_id/version
+  system_actor autorizado
+  idempotency reference no secreta
+  causal_effect_code
+```
+
+La persistencia deberá imponer una constraint causal equivalente a:
+
+```text
+UNIQUE(order_id, order_version, causal_effect_code)
+```
+
+o una estructura técnicamente equivalente que garantice un único milestone por versión.
+
+Semántica:
+
+```text
+effective_at = momento contractual en que cerró la ventana
+recorded_at  = momento en que ZeroMerma persistió el milestone
+```
+
+La autoridad comercial es `effective_at`, no la puntualidad del scheduler.
+
+### Scheduler y materialización oportunista
+
+El milestone podrá materializarse mediante scheduler o worker, comando interno o materialización oportunista dentro de cancelación, `READY` u otra operación relevante.
+
+Si una cancelación llega después de `production_commit_at` y el milestone todavía no fue persistido, la misma transacción deberá materializarlo primero con `effective_at=production_commit_at` y resolver después el refund.
+
+Invariantes:
+
+```text
+scheduler atrasado != ventana extendida
+recorded_at tardío != effective_at tardío
+```
+
+Una caída temporal del scheduler no extenderá el derecho del cliente.
+
+### Concurrencia y frontera exacta
+
+Cancelación y commitment utilizarán el mismo lock de la fila `CustomerOrder`.
+
+La comparación normativa será:
+
+```text
+decision_at < production_commit_at
+=> antes de la frontera
+
+decision_at >= production_commit_at
+=> después de la frontera
+```
+
+`decision_at` procederá del reloj autoritativo de la base de datos después de adquirir el lock, no del cliente ni de una hora congelada antes de esperar.
+
+El protocolo deberá cubrir cancelación confirmada antes, commitment confirmado primero, solicitudes concurrentes alrededor del cutoff, scheduler atrasado, retry idempotente, timezone de sucursal con persistencia UTC y un milestone ya materializado que nunca se revierte por cambios de reloj.
+
+No habrá lock global de pedidos.
 
 ### Liberación de reservas en cancelación
 
@@ -3750,12 +3914,12 @@ reason
 actor o system actor autorizado
 policy snapshot
 transition timestamp
-production-state evidence
+PRODUCTION_COMMITTED evidence
 financial resolution reference
 reservation release
 ```
 
-DEC-10 no fija grace period, horas ni días. El tratamiento financiero utilizará la política snapshot aplicable y no reconocerá ingreso por el mero paso del tiempo.
+DEC-10 no fija grace period, horas ni días. El tratamiento financiero utilizará `PRODUCTION_COMMITTED` y la política snapshot aplicable, y no reconocerá ingreso ni ejecutará una transición por el mero paso del tiempo sin evento o comando durable.
 
 ### Sucursal de fulfillment
 
@@ -3830,6 +3994,7 @@ Como mínimo, operaciones equivalentes a las siguientes serán idempotentes:
 order.create
 order.advance
 order.amend
+order.production_commit
 order.mark_ready
 order.deliver
 order.cancel
@@ -3881,8 +4046,18 @@ Una devolución o corrección posterior utilizará DEC-09. No se editará el ped
 
 #### DEC-12
 
-- workflow productivo;
-- señal autoritativa `production_started`.
+- producción planeada;
+- reconstrucción o conciliación;
+- inicio físico observado;
+- eventos manuales, inferencias, sensores, telemetría y Living Lab.
+
+`production_started` podrá existir como dato operativo o experimental de DEC-12, pero no será la frontera comercial de cancelación de DEC-10.
+
+```text
+dato experimental
+!=
+autoridad financiera
+```
 
 #### DEC-13
 
@@ -3920,7 +4095,11 @@ CustomerOrder
   net_paid_amount
   minimum_advance_policy/version
   cancellation_policy/version
-  production evidence nullable
+  production_commit_at
+  production_commit_policy_version
+  production_commit_timezone
+  production_commit_intent_id
+  production_commitment_recorded_at nullable
   delivered/canceled terminal metadata
 ```
 
@@ -3929,7 +4108,18 @@ CustomerOrderVersion
   order_id
   version_number
   commercial snapshot
+  production_commit_at
+  policy/calculation snapshot
+  timezone/offset snapshot
 ```
+
+Evento durable equivalente:
+
+```text
+order.production_committed
+```
+
+La forma física podrá variar si conserva las mismas invariantes, la identidad causal y la separación entre `effective_at` y `recorded_at`.
 
 ```text
 CustomerOrderVersionItem
@@ -3980,7 +4170,10 @@ different_branches_can_progress_concurrently=true
 overpayment_race_safe=true
 state_transition_race_safe=true
 reservation_race_safe=true
+production_commitment_race_safe=true
 ```
+
+Cancelación, amendment, commitment y `READY` compartirán el lock de la fila `CustomerOrder`. El scheduler y la materialización oportunista reutilizarán la misma identidad estable del commitment.
 
 ### Rendimiento
 
@@ -4009,7 +4202,12 @@ ORDER_PARTIAL_RESERVATION_NOT_ALLOWED
 ORDER_NOT_FULLY_PAID
 ORDER_PARTIAL_DELIVERY_NOT_SUPPORTED
 ORDER_ITEMS_LOCKED_AFTER_READY
-ORDER_PRODUCTION_STATE_REQUIRED
+ORDER_PRODUCTION_ALREADY_COMMITTED
+ORDER_CANCELLATION_WINDOW_CLOSED
+ORDER_PRODUCTION_COMMITMENT_CONFLICT
+ORDER_PRODUCTION_COMMIT_AT_INVALID
+ORDER_AMENDMENT_AFTER_PRODUCTION_COMMITMENT
+ORDER_PRODUCTION_COMMITMENT_ALREADY_RECORDED
 ORDER_ALREADY_DELIVERED
 ORDER_CANCELLATION_NOT_ALLOWED
 ORDER_BRANCH_MISMATCH
@@ -4031,6 +4229,7 @@ Eventos conceptuales equivalentes:
 order.created
 order.payment_received
 order.amended
+order.production_committed
 order.ready
 order.delivered
 order.canceled
@@ -4053,7 +4252,9 @@ total
 minimum advance
 net_paid
 payment/refund
-production evidence
+production_commit_at
+commitment effective_at/recorded_at
+commitment policy/version
 cancellation responsibility
 reason
 inventory reservation reference
@@ -4062,7 +4263,16 @@ idempotency reference no secreta
 timestamp
 ```
 
-Un replay no duplicará eventos.
+Como mínimo serán idempotentes:
+
+```text
+order.production_commit
+order.cancel
+order.amend
+order.mark_ready
+```
+
+Milestone, marker del pedido, cancelación/refund cuando aplique, release de reserva, auditoría, outbox e idempotencia compartirán la transacción correspondiente. Un replay no duplicará milestone, refund, release, auditoría ni outbox.
 
 ### Migración conceptual
 
@@ -4078,20 +4288,26 @@ La implementación posterior deberá:
 8. integrar reservas completas en `READY`;
 9. consumir reservas en `DELIVERED`;
 10. crear reconocimiento de ingreso exactly-once;
-11. añadir responsabilidad y evidencia de cancelación;
-12. integrar la señal `production_started` de DEC-12;
-13. crear refunds causales;
-14. introducir historial de amendments;
-15. incorporar comandos `EXPIRED` y `NO_SHOW`;
-16. integrar DEC-07;
-17. añadir locking del agregado y recursos;
-18. completar auditoría y outbox;
-19. actualizar OpenAPI backend-first;
-20. regenerar el cliente TypeScript;
-21. actualizar POS y Backoffice;
-22. reconciliar históricos mediante DEC-19.
+11. sustituir normativamente `production_started` por `PRODUCTION_COMMITTED`;
+12. añadir `production_commit_at` y su policy snapshot;
+13. añadir la identidad estable y el marker durable del commitment;
+14. añadir el evento `order.production_committed`;
+15. implementar scheduler/worker y fallback de materialización oportunista;
+16. añadir locking del agregado para cancelación, commitment, amendment y `READY`;
+17. añadir `cancellation_responsibility` y aplicar las reglas CUSTOMER/MERCHANT;
+18. eliminar la regla temporal vigente de un día antes de `requested_for_at`;
+19. introducir historial versionado de amendments y cutoff;
+20. crear refunds causales;
+21. incorporar comandos `EXPIRED` y `NO_SHOW`;
+22. integrar DEC-07;
+23. completar auditoría, outbox e idempotencia causal;
+24. exponer cutoff y commitment en los contratos;
+25. actualizar OpenAPI backend-first;
+26. regenerar el cliente TypeScript;
+27. actualizar POS y Backoffice;
+28. reconciliar históricos mediante DEC-19.
 
-No se inventarán pagos, reservas, estados productivos ni responsabilidades históricas.
+No se inventarán pagos, reservas, estados productivos, responsabilidades ni `production_started` históricos.
 
 ### Pruebas futuras obligatorias
 
@@ -4124,7 +4340,9 @@ No se inventarán pagos, reservas, estados productivos ni responsabilidades hist
 - stock insuficiente;
 - cero reserva parcial;
 - concurrencia;
-- replay.
+- replay;
+- transición anterior al cutoff rechazada o diferida;
+- transición posterior al commitment sin modificar retrospectivamente la frontera.
 
 #### `DELIVERED`
 
@@ -4136,10 +4354,16 @@ No se inventarán pagos, reservas, estados productivos ni responsabilidades hist
 
 #### Cancelación
 
-- cliente antes de producción: refund 100 %;
-- cliente después de producción: refund 0;
-- panadería antes de producción: refund 100 %;
-- panadería después de producción: refund 100 %;
+- cliente antes de `production_commit_at`: refund 100 %;
+- cliente exactamente en `production_commit_at`: refund 0;
+- cliente después de `production_commit_at`: refund 0;
+- responsabilidad `MERCHANT`: refund 100 % antes o después del commitment;
+- scheduler puntual;
+- scheduler retrasado sin extensión de ventana;
+- materialización oportunista;
+- cancelación frente a commitment concurrentes;
+- timezone y DST;
+- cambio posterior de timezone sin alterar históricos;
 - liberación de reserva en `READY`;
 - `PENDING` sin reserva;
 - `DELIVERED` no cancelable.
@@ -4149,7 +4373,19 @@ No se inventarán pagos, reservas, estados productivos ni responsabilidades hist
 - aumento del total;
 - incumplimiento posterior del 50 %;
 - disminución que causaría sobrepago;
+- amendment anterior al commitment con cutoff versionado;
+- cutoff retroactivo rechazado;
+- amendment posterior a `PRODUCTION_COMMITTED` rechazado;
 - amendment después de `READY` rechazado.
+
+#### `PRODUCTION_COMMITTED`
+
+- evento durable exactamente una vez;
+- `effective_at` y `recorded_at` distintos cuando el scheduler se retrase;
+- mismo resultado con scheduler, comando interno o materialización oportunista;
+- retry exactly-once;
+- milestone, auditoría y outbox exactly-once;
+- ausencia de lock global.
 
 #### `EXPIRED` y `NO_SHOW`
 
@@ -4183,8 +4419,10 @@ En el código vigente:
 - `READY` no reserva inventario;
 - `DELIVERED` no consume reservas;
 - no existe reconocimiento de ingreso de pedido;
-- la cancelación usa una regla temporal que deberá sustituirse por la frontera productiva;
-- no existe una señal autoritativa `production_started`;
+- la cancelación usa actualmente `requested_for_at - 1 día` como regla temporal;
+- no existen `production_commit_at`, policy snapshot ni milestone durable;
+- no existe scheduler de pedidos; el worker actual sólo consulta el outbox;
+- `ProductionBatch.started_at` no está ligado al pedido y requiere una acción Backoffice no garantizada;
 - no existen amendments versionados;
 - no existen `EXPIRED` ni `NO_SHOW`;
 - no existe idempotencia transversal conforme a DEC-07;
@@ -4195,10 +4433,10 @@ Estos hechos no equivalen a implementación de DEC-10.
 ### Consecuencias, límite e historial
 
 - **Tareas afectadas:** `ZM-FIN-003`, `ZM-FIN-008` y las tareas posteriores del Plan Maestro que implementen pedidos, caja, inventario, producción, contratos, clientes, reportes y migración de datos.
-- **Consecuencias:** subledger financiero de pedidos, snapshots versionados, enforcement backend del 50 %, reserva completa, reconocimiento de ingreso al entregar, cancelación gobernada por evidencia productiva, locking, idempotencia, auditoría, outbox y pruebas de concurrencia y rendimiento.
-- **Dependencias:** DEC-06 para caja y cierre; DEC-07 para idempotencia; DEC-08 para reservas e inventario; DEC-09 para devoluciones posteriores; DEC-11 para medios mixtos; DEC-12 para producción; DEC-13 para pricing; DEC-14 para pagos externos; DEC-19 para históricos.
+- **Consecuencias:** subledger financiero de pedidos, snapshots versionados, enforcement backend del 50 %, reserva completa, reconocimiento de ingreso al entregar, cutoff `production_commit_at`, milestone `PRODUCTION_COMMITTED`, cancelación CUSTOMER/MERCHANT, locking por pedido, idempotencia, auditoría, outbox y pruebas de concurrencia y rendimiento.
+- **Dependencias:** DEC-06 para caja y cierre; DEC-07 para idempotencia; DEC-08 para reservas e inventario; DEC-09 para devoluciones posteriores; DEC-11 para medios mixtos; DEC-12 para datos productivos sin autoridad sobre el refund; DEC-13 para pricing; DEC-14 para pagos externos; DEC-19 para históricos.
 - **Límite:** DEC-10 define la política y el modelo conceptual; no certifica que pedidos, pagos, reservas, reconocimiento de ingreso, cancelaciones, expiración, locking, idempotencia, migraciones, contratos, clientes o pruebas estén implementados.
-- **Historial:** `PENDIENTE` desde 2026-08-26; `APROBADA` por el propietario el 2026-08-28.
+- **Historial:** `PENDIENTE` desde 2026-08-26; versión inicial `APROBADA` por el propietario el 2026-08-28 con `production_started` como frontera; evidencia operativa posterior del mismo día demostró que esa señal no podía garantizarse sin captura rutinaria o sensores; revisión vigente del 2026-08-28 sustituye exclusivamente esa frontera por `PRODUCTION_COMMITTED`; las demás reglas aprobadas permanecen sin cambio.
 
 ## DEC-11 — Pago mixto
 
