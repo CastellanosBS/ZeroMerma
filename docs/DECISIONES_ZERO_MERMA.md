@@ -8647,12 +8647,554 @@ DEC-15 define política, arquitectura e invariantes. No certifica que el bridge 
 
 ## DEC-16 — Requisitos externos
 
-- **Estado:** `PENDIENTE`
+- **Estado:** `APROBADA`
+- **Fecha:** 2026-08-29
 - **Propietario:** propietario de ZeroMerma
-- **Qué debe aprobarse:** jurisdicción, ticket, privacidad, retención, exportación, comunicaciones y consentimiento.
+- **Qué decide:** requisitos externos para la operación inicial en Sonora, México; frontera entre ticket operativo, CFDI y comprobante del proveedor; privacidad; retención por categoría; exportación; comunicaciones; consentimiento; datos de personal; y gates fiscales, BBVA/PCI, continuidad y piloto.
 - **Tareas principales afectadas:** tareas fiscales, legales, de documentos, comunicaciones, privacidad y reportes del Plan Maestro.
-- **Respuesta aprobada:** ninguna.
-- **Regla:** ninguna recomendación técnica sustituye aprobación legal o del propietario.
+- **Respuesta aprobada:** política descrita en esta decisión.
+- **Regla:** DEC-16 aprueba la línea base de gobernanza y los controles exigibles a ZeroMerma. No sustituye asesoría fiscal, legal o de compliance, no certifica una implementación y no autoriza un cutover productivo sin evidencia de los gates aplicables.
+
+### Contexto aprobado
+
+La política parte del siguiente contexto comercial resuelto por el propietario:
+
+- jurisdicción inicial: Sonora, México;
+- operación en panaderías propias y en panaderías de terceros;
+- clientes iniciales consumidores;
+- canales presencial y delivery;
+- ticket operativo de ZeroMerma separado de la facturación fiscal;
+- PII de cliente por operación, sin un `Customer` global inicial;
+- clientes `BRANCH_LOCAL` por defecto;
+- comunicaciones exclusivamente transaccionales durante el lanzamiento;
+- retención 16-B, diferenciada por categoría;
+- exportación inicial limitada a reportes operativos autorizados;
+- datos de empleados limitados a lo necesario para operar y a métricas agregadas o disociadas;
+- sin perfilado individual de desempeño ni instrumentación identificable en el alcance inicial.
+
+```text
+owner_policy_approved=true
+pending_owner_questions=0
+pending_external_validation_questions=0
+DEC16_EXTERNAL_POLICY_BASELINE_DEFINED=true
+```
+
+Los requisitos documentados se sustentan en fuentes oficiales vigentes a la fecha de aprobación y deben revalidarse si cambian antes del cutover productivo.
+
+### Fuentes externas normativas
+
+Se registran como fuentes de la política, sin afirmar que DEC-16 sustituya asesoría, validación o certificación especializada:
+
+- Ley Federal de Protección al Consumidor, texto vigente y última reforma DOF 12-12-2025, especialmente artículos 7 Bis, 12, 16, 17, 18 y 18 Bis;
+- Ley Federal de Protección de Datos Personales en Posesión de los Particulares, texto vigente y última reforma DOF 14-11-2025, especialmente artículos 5, 7, 9–20 y 21–36;
+- Reglamento de la Ley Federal de Protección de Datos Personales en Posesión de los Particulares listado como vigente por la Cámara de Diputados, especialmente artículos 49–52 sobre la persona encargada y su relación contractual con la responsable;
+- Código Fiscal de la Federación, texto vigente y última reforma DOF 09-04-2026, incluidos los artículos 29, 29-A y 30 y el decreto de reforma al artículo 141 publicado en esa fecha;
+- Resolución Miscelánea Fiscal 2026 y sus modificaciones vigentes, especialmente la regla 2.7.1.21 sobre operaciones con el público en general;
+- documentación oficial del SAT sobre CFDI 4.0 y sus requisitos vigentes;
+- documentación pública de BBVA México sobre Total POS;
+- documentación vigente del PCI Security Standards Council sobre terminales, dispositivos PTS, soluciones PCI-listed P2PE y elegibilidad de SAQ P2PE.
+
+Las fuentes deberán revalidarse frente a la entidad contribuyente, el proveedor, el adquirente, el canal y la operación reales. Una terminal PTS aprobada no demuestra por sí sola que la solución completa sea una solución PCI-listed P2PE ni reduce automáticamente el alcance PCI.
+
+### Frontera documental
+
+```text
+operational_sale_ticket
+!=
+CFDI
+!=
+provider_payment_receipt
+```
+
+ZeroMerma emitirá un comprobante operativo para las ventas al consumidor. El ticket conservará como mínimo:
+
+- identificador interno;
+- número o folio estable de operación;
+- identidad fiscal configurada del vendedor;
+- RFC y régimen configurados;
+- sucursal o lugar;
+- fecha y hora;
+- productos o servicios;
+- cantidades;
+- precios;
+- descuentos;
+- total a pagar;
+- medios de pago;
+- referencias operativas necesarias.
+
+El importe mostrado al consumidor será el total exigible conforme a DEC-13 y a las obligaciones externas aplicables. El ticket operativo nunca se presentará como CFDI ni como comprobante emitido por BBVA u otro proveedor.
+
+### Frontera fiscal especializada
+
+La arquitectura aprobada será equivalente a:
+
+```text
+ZeroMerma economic document
+        -> FiscalAdapter
+        -> CFDI provider/PAC or authorized fiscal mechanism
+```
+
+No se aprueba construir un PAC ni un motor fiscal autónomo.
+
+Para operaciones con público en general, ZeroMerma deberá poder:
+
+- preservar el número de folio o de operación del comprobante;
+- relacionarlo con el proceso fiscal correspondiente;
+- soportar un CFDI global diario, semanal o mensual según la configuración válida para la entidad contribuyente y la regla vigente;
+- conservar el desglose y los datos necesarios para el tratamiento fiscal de impuestos;
+- generar o transmitir la información requerida por un `FiscalAdapter` sin reescribir el ledger económico.
+
+No se hardcodeará una periodicidad única para todos los contribuyentes. Cuando un cliente solicite CFDI individual, la integración fiscal manejará los datos exigidos por CFDI 4.0 vigentes en ese momento.
+
+Devoluciones, descuentos, cancelaciones, anticipos, pagos y refunds deberán vincularse con el tratamiento fiscal aplicable mediante eventos y documentos compensatorios cuando corresponda. La integración fiscal nunca alterará silenciosamente ventas, pedidos, pricing, pagos o inventario históricos.
+
+```text
+FISCAL_INVOICING_IMPLEMENTED=false
+FISCAL_ADAPTER_IMPLEMENTATION_PENDING=true
+```
+
+### Clasificación fiscal versionada
+
+```text
+all_bakery_products_same_tax=false
+```
+
+La política fiscal deberá ser versionada y resolverse, como mínimo, por:
+
+- entidad contribuyente;
+- sucursal cuando corresponda;
+- producto, SKU o categoría fiscal;
+- vigencia;
+- IVA aplicable;
+- IEPS aplicable;
+- exenciones, estímulos u otras reglas aplicables;
+- fuente y versión de la regla fiscal.
+
+El snapshot fiscal de una venta confirmada es inmutable y no se recalcula retroactivamente. La clasificación concreta de cada SKU es una dependencia de implementación y parametrización fiscal; DEC-16 no asigna silenciosamente una tasa o clasificación a todos los productos de panadería.
+
+### Retención por categoría — política 16-B
+
+```text
+category_based_retention=true
+indefinite_retention_by_default=false
+```
+
+Reglas:
+
+1. La documentación contable y fiscal se conservará durante el periodo legal aplicable. Como baseline general del artículo 30 del CFF se registran cinco años desde el punto de cómputo correspondiente, sin excluir excepciones, suspensiones, legal holds o plazos mayores aplicables.
+2. Ledgers, eventos causales y snapshots económicos no se reescriben para aparentar la eliminación de PII.
+3. La PII separable se minimiza y no se duplica sin necesidad.
+4. Al terminar la finalidad y la conservación válida se aplicará, según corresponda, `block -> suppress/anonymize/delete`.
+5. Una obligación fiscal, contractual o legal, la defensa de derechos o un legal hold puede impedir temporalmente la cancelación o supresión.
+6. No existe un plazo único para todas las categorías.
+7. `ZM-FIN-007` convertirá esta política en una matriz `obligación -> categoría -> plazo -> control -> evidencia`.
+
+```text
+economic_history_must_be_preserved=true
+no_indefinite_PII_default=true
+```
+
+### Modelo inicial de cliente
+
+```text
+persistent_customer_profile=false
+customer_PII_per_operation=true
+customer_scope=BRANCH_LOCAL_DEFAULT
+```
+
+No se creará un `Customer` global por defecto. Sólo se conservará PII necesaria para:
+
+- pedido;
+- delivery;
+- comunicación transaccional;
+- factura solicitada;
+- otra finalidad expresamente aprobada y documentada.
+
+Los datos obtenidos por una sucursal no serán reutilizados para búsqueda global, marketing, perfilado o analítica identificable sin finalidad y autoridad explícitas. Un futuro perfil persistente requerirá una nueva decisión de producto y privacidad.
+
+### Responsable y persona encargada
+
+- La entidad jurídica que determina la finalidad y los medios esenciales del tratamiento actúa como Responsable.
+- En panaderías propias de la misma entidad, ZeroMerma funciona como sistema interno de la Responsable.
+- Cuando una panadería tercera determine la finalidad de sus datos, la entidad que presta ZeroMerma actúa como Encargada para el tratamiento ejecutado bajo sus instrucciones.
+- Si una entidad que presta ZeroMerma determina una finalidad independiente para PII, deberá evaluarse separadamente como Responsable de esa finalidad.
+
+Para panaderías de terceros deberá existir contrato, DPA u otro instrumento jurídico aplicable que cubra al menos:
+
+- instrucciones;
+- alcance y finalidades;
+- confidencialidad;
+- medidas de seguridad;
+- incidentes;
+- subencargados;
+- transferencias;
+- asistencia para derechos ARCO;
+- retorno, supresión y terminación;
+- conservación fiscal, contractual o legal.
+
+Se prohíbe por defecto el uso secundario identificable cross-tenant. La analítica transversal utilizará datos disociados o agregados salvo una nueva política aprobada.
+
+### Aviso de privacidad versionado
+
+Cada Responsable deberá disponer de un aviso aplicable y versionado. ZeroMerma deberá conservar o referenciar como mínimo:
+
+- `responsible_identity`;
+- `version`;
+- `valid_from`;
+- categorías de datos;
+- finalidades;
+- mecanismos para limitar uso o divulgación;
+- mecanismo ARCO;
+- método para comunicar cambios del aviso.
+
+Cuando los datos se recaben electrónicamente podrá presentarse la modalidad correspondiente con acceso al aviso integral según el marco vigente. DEC-16 no redacta ni aprueba el texto jurídico final de ningún aviso.
+
+### Workflow ARCO
+
+Cada Responsable designará una persona o departamento de privacidad. ZeroMerma deberá poder registrar:
+
+- titular o representante verificado;
+- Responsable aplicable;
+- solicitud y derecho ejercido;
+- alcance;
+- `received_at`;
+- referencia a evidencia de identidad;
+- decisión;
+- `decision_at`;
+- ejecución;
+- `execution_at`;
+- razón de negativa o atención parcial;
+- legal hold;
+- auditoría.
+
+Política temporal normativa:
+
+```text
+decision_deadline=20 days
+execution_after_approval=15 days
+single_justified_extension_supported=true
+```
+
+El cómputo y las excepciones se implementarán conforme al texto vigente y al procedimiento aplicable. Atender ARCO no implica hard-delete de ledgers ni snapshots económicos.
+
+La cancelación seguirá un modelo equivalente a:
+
+```text
+block
+-> suppress/anonymize when legally possible
+```
+
+Podrá limitarse cuando exista obligación contractual, fiscal o legal válida o resulte necesaria para la defensa de derechos.
+
+### Comunicaciones
+
+```text
+transactional_communications=true
+marketing_communications=false
+```
+
+Durante el lanzamiento sólo se permiten comunicaciones directamente relacionadas con:
+
+- pedido;
+- delivery;
+- pedido listo;
+- comprobante o recibo;
+- incidencia de la operación.
+
+Estas finalidades deberán aparecer en el aviso aplicable. Los datos obtenidos para la operación no se reutilizarán para publicidad.
+
+Una futura activación de marketing requerirá:
+
+- nueva decisión;
+- finalidad separada;
+- consentimiento u opt-in cuando corresponda;
+- oposición u opt-out aplicable;
+- versión y evidencia;
+- controles derivados de las reglas de consumidores y privacidad vigentes.
+
+### Consentimiento y evidencia
+
+No se creará un `accepted=true` ficticio para tratamientos necesarios para cumplir la relación jurídica. El modelo deberá distinguir:
+
+```text
+notice_presented
+consent_required
+consent_not_required_due_to_valid_exception
+consent_granted
+consent_withdrawn
+```
+
+Cuando una finalidad requiera consentimiento se conservarán la evidencia, la versión, el canal, el momento y cualquier retiro. Los datos sensibles y la instrumentación futura no quedan habilitados implícitamente.
+
+### Exportación
+
+```text
+personal_self_service_export=false
+operational_reports=true
+```
+
+Toda exportación operativa deberá:
+
+- requerir capability explícita;
+- aplicar scope backend;
+- minimizar PII;
+- redactar cuando corresponda;
+- auditar actor, filtros, finalidad y timestamp;
+- no inferir acceso `GLOBAL`.
+
+El ejercicio administrado de acceso ARCO podrá producir una exportación específica aunque no exista self-service. Los archivos descargados dejan de estar bajo control directo del servidor, por lo que deberán contener sólo lo necesario.
+
+### Auditoría, outbox y logs
+
+```text
+auditability + data_minimization
+```
+
+Reglas:
+
+- preferir IDs y snapshots mínimos;
+- no duplicar PII innecesaria en metadata o payloads;
+- no almacenar secretos ni bearer tokens;
+- no almacenar PAN completo, CVV/CVC, track data, PIN o PIN block;
+- aplicar redacción estructurada antes de logs, auditoría y outbox;
+- proteger acceso mediante RBAC y scope;
+- aplicar retención por categoría;
+- preservar causalidad económica e idempotencia.
+
+### Navegador y caché local
+
+El bearer actual persistido en `localStorage` es una brecha de implementación frente a DEC-05. No queda aprobado como política de privacidad o seguridad.
+
+```text
+sensitive_browser_cache_default=false
+```
+
+Una futura caché local de PII requerirá finalidad, minimización, cifrado, retención, limpieza y threat model explícitos. No podrá convertirse en autoridad transaccional.
+
+### Datos de empleados
+
+Los datos de personal constituyen una categoría separada de los datos de clientes.
+
+```text
+individual_performance_profiling=false
+identifiable_worker_sensor_monitoring=false
+```
+
+Durante el lanzamiento se permiten únicamente:
+
+- identidad necesaria;
+- autorización;
+- turnos;
+- acciones auditables;
+- información operativa necesaria;
+- métricas agregadas o disociadas.
+
+Una futura activación de cámaras, computer vision, audio, RFID o sensores identificables exigirá una revisión nueva antes de producción.
+
+### Living Lab
+
+Se preserva DEC-12:
+
+```text
+experimental_observation
+!=
+automatic_productive_authority
+```
+
+Los datos experimentales deberán contar con política específica de finalidad, sujetos, acceso, retención, seguridad, disociación y evidencia o consentimiento cuando corresponda. DEC-16 no habilita instrumentación productiva.
+
+### BBVA, datos de tarjeta y frontera PCI
+
+ZeroMerma no deberá recibir, almacenar o registrar en navegador, backend, bridge, logs, auditoría u outbox:
+
+- PAN completo;
+- CVV/CVC;
+- track data;
+- PIN o PIN block;
+- datos equivalentes de autenticación sensible.
+
+Browser, backend y bridge sólo manejarán:
+
+- importe;
+- moneda;
+- identidad de negocio o pago;
+- identidad de terminal;
+- referencia opaca del proveedor;
+- status y metadata de resultado sanitizados.
+
+```text
+PCI_SCOPE_CURRENTLY_DETERMINABLE=false
+```
+
+La documentación pública disponible de BBVA Total POS describe integración con el punto de venta, terminales y conciliación, pero no acredita por sí sola el flujo definitivo de datos, el protocolo de ZeroMerma ni una solución PCI-listed P2PE para su configuración concreta.
+
+La aprobación PTS de una terminal no constituye por sí sola una solución P2PE validada ni demuestra reducción del alcance PCI.
+
+### Gate BBVA/PCI
+
+Antes del cutover productivo se exigirá evidencia escrita de BBVA, adquirente y/o asesor competente sobre:
+
+- arquitectura y flujo de datos;
+- terminal y firmware exactos;
+- protocolo, SDK o middleware;
+- campos enviados y recibidos;
+- responsabilidades PCI;
+- validación o SAQ aplicable;
+- solución PCI-listed P2PE cuando se afirme P2PE;
+- callbacks, consultas y reconciliación;
+- void y refund;
+- comprobantes del proveedor;
+- logging y redacción;
+- certificación y alta comercial.
+
+```text
+BBVA_PCI_CUTOVER_VALIDATION_PENDING=true
+BBVA_INTEGRATED_PAYMENT_PRODUCTION_CUTOVER=false
+```
+
+El segundo valor permanecerá falso hasta satisfacer el gate.
+
+Si una futura integración exige PAN, CVV o track data en navegador, backend o bridge:
+
+```text
+STOP
+REPORT_CONTRADICTION
+REDESIGN_OR_CHANGE_INTEGRATION
+```
+
+No se ampliará silenciosamente el alcance PCI.
+
+### Contingencia manual
+
+Se preserva DEC-15:
+
+```text
+manual_contingency_outside_zeromerma=true
+```
+
+Cuando se habilite, cada documento utilizará un folio controlado por sucursal y conservará como mínimo:
+
+- entidad y sucursal;
+- folio;
+- `occurred_at`;
+- operador;
+- supervisor;
+- artículos;
+- cantidades;
+- importes;
+- medio de pago;
+- evidencia;
+- referencia externa permitida.
+
+Nunca incluirá PAN, CVV o track data.
+
+Al recuperar el sistema:
+
+```text
+contingency_folio
+-> idempotent capture
+-> preserve occurred_at
+-> recorded_at
+-> reconciliation
+-> fiscal linkage
+```
+
+La recaptura no inventará pricing, stock ni estado BBVA; detectará duplicados y conservará conflictos sin sobrescribirlos. Cuando corresponda se relacionará con el CFDI global o individual aplicable.
+
+DEC-17 y DEC-20 todavía deberán validar el procedimiento operativo antes de habilitarlo.
+
+### Backups
+
+La PII dentro de un backup conserva su clasificación. Se exigirán:
+
+- mínimo acceso;
+- cifrado;
+- retención alineada con la categoría y la recuperación;
+- procedimiento de expiración o borrado lógico;
+- prohibición de usar backups como archivo indefinido de PII.
+
+Infraestructura, región, proveedor, RPO/RTO, restore y evidencia operativa dependen de DEC-17.
+
+### Evidencia técnica actual
+
+DEC-16 no afirma que sus controles ya estén implementados. Al aprobarse se conserva como evidencia que:
+
+- `FISCAL_INVOICING_IMPLEMENTED=false`;
+- no existe un `Customer` global;
+- la PII del cliente está embebida en pedidos;
+- el ticket actual es operativo y no fiscal;
+- el bearer actual persiste en `localStorage`;
+- no existe workflow ARCO;
+- no existe `ConsentRecord`;
+- no existe aviso de privacidad versionado;
+- no existe retención general implementada;
+- auditoría y outbox pueden duplicar PII;
+- exports administrativos no equivalen a portabilidad;
+- no se encontró PAN completo, CVV/CVC o track data en el repositorio actual;
+- BBVA no está implementado;
+- backups y restore no son verificables en código.
+
+### Dependencias y gates
+
+- **DEC-17:** plataforma, backups, continuidad, restore, región/proveedor y observabilidad.
+- **DEC-19:** datos históricos, PII existente, bearer actual, registros ambiguos, migración y anonimización.
+- **DEC-20:** piloto, hardware, contingencia, procedimiento físico y validación BBVA.
+- **ZM-FIN-007:** convertir esta política y sus fuentes vigentes en la matriz `obligación -> módulo -> control -> evidencia`.
+
+```text
+BBVA_PCI_CUTOVER_VALIDATION_PENDING=true
+FISCAL_ADAPTER_IMPLEMENTATION_PENDING=true
+DEC17_CONTINUITY_VALIDATION_PENDING=true
+DEC20_PILOT_VALIDATION_PENDING=true
+```
+
+Estos gates no son preguntas pendientes y no convierten DEC-16 en una declaración de cumplimiento. `ZM-FIN-007` no está terminada.
+
+### Pruebas futuras obligatorias
+
+Sin ejecutarlas en esta iteración, se deberá cubrir:
+
+- ticket operativo y folio estable;
+- mapping ticket–CFDI;
+- clasificación fiscal versionada;
+- CFDI global e individual;
+- identidad fiscal por entidad y sucursal;
+- jobs de retención;
+- legal hold;
+- anonimización y supresión;
+- workflow ARCO;
+- scopes cross-branch;
+- límites Responsable/Encargado y DPA;
+- versión de aviso de privacidad;
+- comunicaciones transaccionales;
+- marketing deshabilitado;
+- autorización y auditoría de exportación;
+- minimización en audit/outbox/logs;
+- eliminación del bearer de `localStorage`;
+- ausencia de PAN/CVV/track;
+- gate BBVA/PCI;
+- folio, recaptura y conciliación de contingencia;
+- perfilado individual deshabilitado;
+- instrumentación identificable deshabilitada.
+
+### Relaciones con decisiones aprobadas
+
+- **DEC-03/04:** capabilities y scopes explícitos, deny-by-default y ausencia de acceso `GLOBAL` implícito.
+- **DEC-05:** sesiones server-side y prohibición de secretos en URL o almacenamiento inseguro.
+- **DEC-07:** idempotencia, auditoría y outbox causal.
+- **DEC-09/10/11/13:** snapshots económicos inmutables y correcciones compensatorias.
+- **DEC-12:** observaciones experimentales separadas de autoridad productiva.
+- **DEC-14:** referencias opacas, separación de comprobante del proveedor y gate BBVA/PCI.
+- **DEC-15:** caché sensible deshabilitada por defecto, contingencia externa y dependencia de continuidad.
+
+### Historial y límite
+
+- DEC-16 permaneció `PENDIENTE` desde 2026-08-26.
+- La inspección técnica final delimitó 10 preguntas del propietario y 11 áreas de validación externa.
+- El propietario resolvió el contexto comercial y aprobó esta política para Sonora, México el 2026-08-29.
+- Las fuentes oficiales vigentes se incorporaron como línea base normativa y deberán revalidarse ante cambios.
+- DEC-16 aprueba gobernanza, no implementación ni cumplimiento certificado.
+- DEC-17–DEC-20 permanecen `PENDIENTE` y sin respuesta aprobada.
 
 ## DEC-17 — Continuidad
 
