@@ -9198,21 +9198,1874 @@ Sin ejecutarlas en esta iteración, se deberá cubrir:
 
 ## DEC-17 — Continuidad
 
-- **Estado:** `PENDIENTE`
+- **Estado:** `APROBADA`
+- **Fecha:** 2026-09-01
 - **Propietario:** propietario de ZeroMerma
-- **Qué debe aprobarse:** plataforma, dominios, RPO/RTO, retención de backup y criterios de DR.
-- **Tareas principales afectadas:** tareas de infraestructura, despliegue, backup, restore, observabilidad y recuperación.
-- **Respuesta aprobada:** ninguna.
-- **Regla:** el entorno local no constituye una plataforma productiva aprobada.
+- **Qué se aprueba:** arquitectura productiva inicial local-first, continuidad por LAN sin browser offline, RPO nodo local cero/casi cero, RPO pérdida de sitio <=5 minutos, RTO primario <=1 hora, RTO pérdida de sitio <=8 horas, segundo mini-PC standby controlado, cloud complementario y evolución híbrida futura.
+- **Tareas principales afectadas:** ZM-FIN-107, ZM-FIN-108, ZM-FIN-109, ZM-FIN-110, ZM-FIN-111, ZM-FIN-112, ZM-FIN-113 y ZM-FIN-114.
+- **Respuesta aprobada:** servidor local autoritativo en El Mejor Pan; POS→LAN→backend local sin Internet pero sin mutaciones offline del browser; RPO nodo cero/casi cero; RPO sitio <=5 minutos; RTO primario <=1 hora; RTO sitio <=8 horas; segundo mini-PC standby controlado sin promoción ciega/split-brain; cloud complementario y diseño híbrido futuro.
+- **Regla:** la instalación local de El Mejor Pan sí podrá constituir la plataforma productiva inicial cuando sus controles, recuperación y evidencia satisfagan esta decisión y los gates aplicables.
+
+### Decisión canónica
+
+La arquitectura productiva inicial aprobada es LOCAL-FIRST. La primera instalación productiva de ZeroMerma operará físicamente dentro de El Mejor Pan y el servidor local será inicialmente la autoridad operacional de esa sucursal.
+
+Se registra:
+
+- `initial_production_architecture=LOCAL_FIRST`
+- `initial_authoritative_server=EL_MEJOR_PAN_LOCAL`
+- `cloud_required_for_initial_operation=false`
+- `cloud_ready_design=true`
+- `DEC17_LOCAL_FIRST=true`
+- `DEC17_STORE_OPERATES_WITHOUT_INTERNET=true`
+
+El servidor local deberá alojar, directamente o mediante contenedores o servicios reproducibles:
+
+- API;
+- PostgreSQL;
+- worker;
+- servicios necesarios de ZeroMerma.
+
+POS y Backoffice se conectarán al backend mediante la LAN de El Mejor Pan. No se exige una plataforma cloud para aprobar el primer Production Ready o Pilot Ready de El Mejor Pan.
+
+Esta aprobación no declara que el servidor local actual, Docker Compose ni cualquier equipo existente ya sean productivos. La condición productiva dependerá de implementar y demostrar los controles aprobados.
+
+### Independencia de Internet
+
+ZeroMerma deberá continuar realizando la operación básica de El Mejor Pan cuando Internet esté caído, siempre que:
+
+- el servidor local funcione;
+- PostgreSQL funcione;
+- la LAN funcione.
+
+Como mínimo deberán continuar localmente:
+
+- autenticación y sesión compatibles con operación sin Internet;
+- POS;
+- apertura y cierre de caja;
+- ventas;
+- inventario;
+- producción;
+- merma;
+- Backoffice local;
+- auditoría;
+- worker para efectos internos que no requieran un tercero externo.
+
+Las capacidades que dependan genuinamente de Internet o de terceros podrán entrar en modo degradado, pendiente o reconciliable. Su indisponibilidad no deberá convertir una transacción local durable en una operación silenciosamente perdida.
+
+La distinción canónica es:
+
+- `internet_offline != local_backend_offline`
+- `store_operates_without_internet=true`
+- `LAN_and_local_server_required=true`
+- `internet_is_not_required_for_core_store_transactions=true`
+- `POS_offline_from_local_server=false`
+- `DEC17_ONLINE_MEANS_LAN_BACKEND_ALLOWED=true`
+- `DEC17_BROWSER_OFFLINE_MUTATIONS=false`
+- `DEC17_LOCAL_MUTATION_QUEUE=false`
+
+DEC-17 no introduce un POS offline respecto al servidor local. Si la LAN, el backend local o PostgreSQL no están disponibles, la operación transaccional dependiente de ellos se suspende hasta recuperación o hasta que una contingencia futura expresamente aprobada disponga otra cosa.
+
+### RTO del servidor local
+
+Para la pérdida completa del servidor local principal se aprueba:
+
+- `primary_local_server_failure_RTO <= 1 hour`
+- `DEC17_PRIMARY_SERVER_RTO_1H=true`
+
+El objetivo exige una ruta operativa ensayada que restablezca ZeroMerma en un equipo sustituto dentro de una hora. Pueden existir objetivos más cortos para reinicios de procesos o servicios, pero no sustituyen ni contradicen este RTO rector.
+
+Ante pérdida física completa del sitio se aprueba como objetivo de diseño:
+
+- `site_disaster_RTO <= 8 hours`
+- `DEC17_SITE_DISASTER_RTO_8H=true`
+
+Este objetivo exige reconstrucción controlada desde la copia off-site o el objetivo DR complementario y reconciliación posterior. No convierte una región cloud activa en requisito del lanzamiento inicial y todavía debe demostrarse mediante simulacro.
+
+### RPO del servidor local
+
+Ante fallo del nodo principal con promoción o recuperación en el segundo mini-PC se aprueba:
+
+- `local_node_failure_RPO=ZERO_OR_PRACTICALLY_ZERO`
+- `DEC17_LOCAL_NODE_RPO_ZERO_OR_NEAR_ZERO=true`
+
+No se acepta silenciosamente una pérdida de hasta cinco minutos al promover el segundo nodo. Las operaciones económicas confirmadas deberán permanecer durables y cualquier gap observado deberá detectarse, detener la promoción ciega y reconciliarse.
+
+Ante pérdida física completa del sitio se aprueba:
+
+- `catastrophic_local_server_RPO <= 5 minutes`
+- `site_disaster_RPO <= 5 minutes`
+- `DEC17_SITE_DISASTER_RPO_5M=true`
+
+Las transacciones normales deberán persistirse durablemente. El RPO de cinco minutos no autoriza pérdida ordinaria ni silenciosa de operaciones confirmadas: define el máximo aceptable únicamente ante pérdida física completa del sitio que obligue a reconstruir desde una copia off-site.
+
+Los mecanismos necesarios para demostrar ambos objetivos deberán resolverse durante diseño e implementación. DEC-17 no presume que un backup, una réplica o PITR satisfacen un RPO sin medición.
+
+### Segundo servidor de recuperación
+
+Existirá un segundo mini-PC dedicado de respaldo, físicamente disponible en El Mejor Pan, con el objetivo de asumir el rol de servidor cuando falle el principal.
+
+Se registra:
+
+- `dedicated_local_recovery_node=true`
+- `recovery_node_type=SECOND_MINI_PC`
+- `recovery_node_location=EL_MEJOR_PAN`
+- `recovery_target_RTO<=1h`
+- `DEC17_SECOND_MINIPC=true`
+- `DEC17_SECOND_MINIPC_CONTROLLED_STANDBY=true`
+- `DEC17_AUTOMATIC_BLIND_FAILOVER=false`
+- `split_brain_permitted=false`
+
+El segundo mini-PC deberá estar preconfigurado o contar con automatización suficiente para permitir el RTO aprobado. Será un standby controlado: ninguna promoción automática ciega podrá crear dos autoridades, aceptar divergencia silenciosa o producir split-brain. DEC-17 no decide todavía si el mecanismo será hot standby, warm standby, restore automatizado, réplica PostgreSQL o imagen/contenedores más restore. La implementación seleccionará la alternativa que pueda probar RPO, RTO, integridad y operabilidad con complejidad sostenible.
+
+### Rol inicial de cloud
+
+Cloud no se descarta; su rol inicial es complementario.
+
+Se registra:
+
+- `cloud_role_initial=COMPLEMENTARY`
+- `cloud_transaction_authority_initial=false`
+- `offsite_backup_expected=true`
+- `cloud_provider_selected=false`
+- `DEC17_CLOUD_PRIMARY_FOR_PILOT=false`
+- `DEC17_CLOUD_COMPLEMENTARY=true`
+- `DEC17_CLOUD_OFFSITE_BACKUP=true`
+- `DEC17_CLOUD_OBSERVABILITY_COMPLEMENT=true`
+- `DEC17_CLOUD_DR_TARGET=true`
+- `DEC17_FUTURE_HYBRID=true`
+
+Los usos iniciales previstos son:
+
+- backup cifrado off-site;
+- copia externa de información crítica;
+- posible observabilidad remota;
+- recuperación ante desastre del local cuando se implemente;
+- servicios externos que lo requieran.
+
+Cloud no será inicialmente la autoridad transaccional necesaria para vender en El Mejor Pan. La selección del proveedor queda diferida y no bloqueará el piloto inicial salvo por las funciones estrictamente necesarias para demostrar el RPO y el backup externo aprobados.
+
+Ninguna capacidad cloud se considerará disponible sin evidencia. Una selección futura de proveedor no podrá cambiar silenciosamente las decisiones de continuidad, seguridad, privacidad o autoridad transaccional de esta DEC.
+
+### Evolución arquitectónica
+
+La progresión aprobada no convierte las etapas futuras en requisitos del piloto actual.
+
+#### Etapa 1 — El Mejor Pan
+
+- arquitectura local-first;
+- servidor local autoritativo;
+- operación básica sin dependencia de Internet;
+- segundo mini-PC de recuperación;
+- RPO y RTO locales demostrables.
+
+#### Etapa 2 — Piloto estabilizado
+
+- backups externos cifrados;
+- restore probado;
+- observabilidad;
+- actualización controlada;
+- servidor secundario probado.
+
+#### Etapa 3 — Segunda sucursal o Merenna
+
+- servidor o edge local por establecimiento;
+- sincronización y consolidación central donde aporte valor;
+- una caída de Internet no impide la venta local.
+
+#### Etapa 4 — Varias sucursales
+
+Cloud podrá actuar como control plane y plataforma de datos para:
+
+- administración central;
+- consolidación;
+- reporting;
+- configuración;
+- analítica;
+- posteriormente IA.
+
+Las sucursales conservarán capacidad operacional local.
+
+#### Etapa 5 — Evolución posterior
+
+Se evaluarán cloud authority, híbrido avanzado, HA central u otros cambios según datos, riesgos y escala reales. Ninguna de esas alternativas queda aprobada como requisito actual.
+
+Se registra:
+
+- `architecture_evolution=LOCAL_FIRST_TO_HYBRID`
+- `future_cloud_control_plane=true`
+- `premature_distributed_architecture=false`
+
+### Principios de continuidad preservados
+
+Se mantienen las siguientes distinciones:
+
+- `high_availability != backup`
+- `backup != restore_proof`
+- `restore != disaster_recovery`
+- `rollback != database_downgrade`
+- `RPO != RTO`
+- `service_redundancy != data_redundancy`
+- `application_rollback != logical_data_recovery`
+- `backup_retention != business_record_retention`
+- `internet_offline != local_backend_offline`
+
+La retención fiscal definida en DEC-16 no obliga a conservar imágenes completas de PostgreSQL durante cinco años. Un backup sólo será útil si existe evidencia de restore. El backup operacional y el archivo fiscal o de negocio de largo plazo son responsabilidades distintas.
+
+### Entornos, secretos y promoción
+
+La implementación deberá separar `local`, `test`, `staging` y `production`. Como mínimo deberá preservar:
+
+- bases de datos separadas;
+- secrets separados;
+- credenciales de proveedores separadas;
+- BBVA sandbox separado de producción;
+- almacenamiento y observabilidad identificables por entorno;
+- backups productivos separados;
+- controles de promoción;
+- datos productivos fuera de test por defecto.
+
+Una copia excepcional de datos productivos requerirá autorización, minimización y anonimización cuando corresponda.
+
+La instalación local-first no autoriza compartir secrets, datos, credenciales ni estado entre ambientes.
+
+### Red local y exposición
+
+El modelo productivo local deberá prever:
+
+- POS y Backoffice conectados al backend por la LAN controlada;
+- API mediante un ingress o reverse proxy controlado, incluso cuando sea local;
+- PostgreSQL sin exposición pública;
+- worker sin entrada pública;
+- endpoints administrativos y de diagnóstico restringidos;
+- TLS y validación de origen conforme al modelo de amenaza y a DEC-05;
+- health/liveness separados de readiness;
+- readiness que verifique PostgreSQL y el estado mínimo necesario para recibir tráfico;
+- egress identificable para funciones que dependan de Internet;
+- interfaces de desarrollo deshabilitadas por defecto en producción.
+
+La resolución concreta de hostnames, certificados y direccionamiento LAN queda para implementación. No se exige un dominio cloud público para que POS y Backoffice operen localmente.
+
+### Durabilidad y recuperación
+
+Las operaciones confirmadas deberán usar commits durables y conservar identidades idempotentes. El diseño de continuidad deberá cubrir:
+
+- fallo de proceso;
+- fallo de API;
+- fallo de worker;
+- fallo de PostgreSQL;
+- fallo de almacenamiento;
+- pérdida del servidor principal;
+- despliegue defectuoso;
+- configuración o secret defectuoso;
+- corrupción lógica;
+- pérdida física del local cuando la capacidad externa correspondiente se implemente.
+
+Un reinicio automático no sustituye un restore. Una réplica no sustituye un backup. El segundo mini-PC no se considerará una ruta de recuperación válida hasta que la conmutación o reconstrucción haya sido ensayada y medida.
+
+### Backups y copia off-site
+
+La estrategia deberá incluir:
+
+- backups operativos cifrados;
+- copia off-site esperada;
+- acceso separado y mínimo;
+- automatización y monitoreo;
+- checks de integridad;
+- protección razonable frente a borrado malicioso;
+- versión de PostgreSQL y revisión de schema identificables;
+- restore aislado;
+- retención compatible con DEC-16;
+- expiración de PII;
+- recuperación controlada de configuración y secrets.
+
+La frecuencia, tecnología y topología de backup o réplica deberán satisfacer y demostrar `catastrophic_local_server_RPO <= 5 minutes`. DEC-17 no inventa una retención concreta ni aprueba backups completos indefinidos.
+
+Los documentos que requieran conservación prolongada deberán preservarse mediante archivo selectivo adecuado, no mediante imágenes completas indefinidas de la base de datos.
+
+### Aceptación de restore y failover local
+
+Un restore o failover al segundo mini-PC sólo se considerará válido cuando demuestre:
+
+- equipo sustituto disponible;
+- infraestructura y configuración reproducibles;
+- secrets recuperables;
+- PostgreSQL compatible;
+- revisión Alembic identificada;
+- base de datos recuperada dentro del RPO;
+- API, worker, POS y Backoffice arrancan;
+- readiness válida;
+- audit y outbox íntegros;
+- caja reconciliada;
+- inventario reconciliado;
+- producción y merma reconciliadas;
+- pedidos, pagos y refunds reconciliados;
+- proveedores externos en modo seguro;
+- ausencia de doble entrega;
+- smoke crítico;
+- RPO observado medido;
+- RTO observado medido;
+- gaps documentados.
+
+Se registra `backup_success != restore_success`. La mera disponibilidad física del segundo mini-PC no prueba recuperación.
+
+### Roll-forward y rollback
+
+La política aprobada preserva:
+
+- `prefer_roll_forward_when_data_or_schema_changed=true`
+- `generic_alembic_downgrade_is_safe=false`
+
+La implementación deberá usar artefactos reproducibles e inmutables donde aplique, configuración versionada y migraciones expand/contract. El rollback de aplicación sólo será válido cuando el schema siga siendo compatible. Ante cambios de datos o schema se preferirá roll-forward correctivo.
+
+La corrupción lógica se resolverá mediante restore a un punto válido y reconciliación. No se asumirá un downgrade genérico de PostgreSQL o Alembic como mecanismo seguro.
+
+### PII en backups
+
+Se preserva DEC-16:
+
+- PII en backup continúa siendo PII;
+- cifrado;
+- acceso mínimo;
+- expiración;
+- restore controlado;
+- ausencia de archivo indefinido.
+
+Una supresión válida en el sistema activo deberá contar con un mecanismo durable que evite que un restore antiguo reintroduzca indefinidamente PII ya suprimida. Podrá utilizarse un registro o tombstone durable, o un mecanismo equivalente, sin modificar inseguramente backups inmutables.
+
+### Worker y outbox
+
+Se preserva la invariante:
+
+- `delivery=at_least_once`
+- `business_effect=exactly_once_by_identity`
+
+La continuidad futura exigirá claim o lease durable, attempts, backoff, estados, escalamiento o dead-letter, reanudación tras crash, deduplicación, pausa segura durante restore, reconciliación del backlog y prohibición de marcar procesado antes del efecto.
+
+Cuando Internet esté caído, el worker continuará los efectos internos locales. Los efectos que requieran terceros deberán quedar pendientes, degradados o reconciliables sin perder identidad ni duplicar el efecto de negocio.
+
+El worker vigente no cumple todavía esta política.
+
+### BBVA y terceros durante contingencia
+
+Se preservan DEC-14 y DEC-16. Si BBVA o Internet no están disponibles:
+
+- las operaciones que dependan del proveedor entran en un estado seguro, explícito y reconciliable;
+- `UNKNOWN` conserva identidad;
+- una operación existente en BBVA pero ausente localmente exige consulta y reconciliación;
+- no se repite un cargo;
+- no se duplica un refund;
+- callbacks tardíos se deduplican;
+- ausencia local no se interpreta como rechazo ni autorización.
+
+La operación local básica que no requiera al tercero deberá continuar. DEC-17 no autoriza simular aprobaciones externas durante una caída de Internet.
+
+`BBVA_INTEGRATED_PAYMENT_PRODUCTION_CUTOVER=false` hasta satisfacer el gate de DEC-16.
+
+### Logs, observabilidad y salud
+
+La instalación local deberá producir logs, métricas y trazas útiles para operación, recuperación y auditoría. La observabilidad remota podrá ser complementaria, pero la pérdida de Internet no deberá impedir que la evidencia local crítica se registre.
+
+Deberán distinguirse:
+
+- health de proceso;
+- liveness;
+- readiness;
+- salud de PostgreSQL;
+- estado del worker y outbox;
+- edad y resultado del último backup;
+- capacidad y estado del almacenamiento;
+- disponibilidad del nodo de recuperación;
+- mediciones observadas de RPO y RTO.
+
+La ausencia de conectividad con una plataforma remota no deberá convertir automáticamente al backend local sano en no-ready.
+
+### Autoridad operativa
+
+Se preservan `incident_commander_model=true` y `DEC17_INCIDENT_COMMANDER=true`. Un Incident Commander técnico designado podrá ejecutar runbooks preaprobados y no destructivos dentro de su autoridad, incluyendo restart, replacement, failover local, rollback compatible, rotación o recuperación técnica y restore de ensayo aislado.
+
+Cualquier acción que pueda reemplazar la DB productiva, descartar datos posteriores, efectuar un restore con cutover, promover el segundo nodo sobre datos potencialmente divergentes o realizar otra operación irreversible equivalente requiere dos aprobaciones independientes:
+
+1. aprobación técnica;
+2. aprobación de negocio o administración.
+
+La misma persona no puede satisfacer ambas aprobaciones y toda aprobación deberá quedar auditada.
+
+Se registra `DEC17_DESTRUCTIVE_RESTORE_DUAL_APPROVAL=true`.
+
+### Runbooks mínimos
+
+DEC-17 exige runbooks adaptados a la instalación local para:
+
+- service outage;
+- fallo del servidor principal;
+- promoción o reconstrucción en el segundo mini-PC;
+- fallo de PostgreSQL;
+- restore;
+- bad deploy;
+- bad config;
+- failed o partial migration;
+- worker pause/replay;
+- outbox backlog;
+- secret compromise;
+- LAN failure;
+- Internet failure;
+- backup failure;
+- corrupt backup;
+- pérdida física del local;
+- BBVA `UNKNOWN`;
+- reconciliación posterior al restore.
+
+Cada runbook deberá incluir autoridad, precondiciones, acciones controladas, evidencia, rollback o roll-forward, escalamiento, criterio de salida y medición observada cuando aplique.
+
+### Dependencias posteriores por horizonte
+
+Las tareas ZM-FIN-107–ZM-FIN-114 permanecen vigentes y ninguna queda marcada como implementada. Sus entregables deberán distinguir tres horizontes.
+
+#### A — Infraestructura local productiva inicial
+
+- **ZM-FIN-107:** infraestructura reproducible del servidor local, red LAN, ingress local, TLS o confianza de red controlada y resolución local.
+- **ZM-FIN-108:** PostgreSQL local, durabilidad, SSL, pooling, orquestación de migraciones y mecanismo de datos para recuperación.
+- **ZM-FIN-109:** logging local, métricas, tracing, liveness/readiness y alertas operables.
+- **ZM-FIN-110:** artefactos reproducibles o inmutables, promoción, migraciones, smoke y roll-forward.
+- **ZM-FIN-111:** gestión, separación, rotación y recuperación de secrets.
+- **ZM-FIN-112:** RPO nodo cero/casi cero, RPO sitio <=5 minutos, RTO primario <=1 hora, RTO sitio <=8 horas, backups, restore y drills medidos.
+- **ZM-FIN-113:** promoción controlada o reconstrucción en el segundo mini-PC sin split-brain, recuperación de sitio y reconciliación.
+- **ZM-FIN-114:** hosting local de POS y Backoffice, cache de assets y estrategia de actualización.
+
+#### B — Backup externo y DR
+
+- copia off-site cifrada;
+- recuperación de configuración y secrets;
+- restore desde una copia externa;
+- observabilidad remota opcional;
+- recuperación ante pérdida física del local;
+- reconciliación posterior.
+
+Sólo las funciones externas estrictamente necesarias para demostrar el RPO y el backup off-site aprobados podrán bloquear Pilot Ready.
+
+#### C — Arquitectura cloud o híbrida futura
+
+- selección completa de proveedor cloud;
+- control plane central;
+- consolidación multi-sucursal;
+- hosting central futuro;
+- DR regional;
+- DNS cutover regional;
+- analítica central;
+- evolución posterior de autoridad transaccional.
+
+Los entregables de C no bloquearán artificialmente el Pilot Ready de El Mejor Pan. Cualquier cambio futuro de autoridad requerirá una nueva decisión explícita.
+
+### Evidencia técnica actual y brechas
+
+Se preservan como hechos:
+
+- no existe infraestructura productiva local versionada y aprobada;
+- Docker Compose actual es local, pero no prueba Production Ready;
+- la configuración del servidor principal y del segundo mini-PC no está demostrada;
+- la operación completa sin Internet no está demostrada;
+- los backups siguen siendo documentales;
+- el RPO de cinco minutos no está demostrado;
+- el RTO de una hora no está demostrado;
+- restore y failover local no están ensayados;
+- no existe copia off-site productiva demostrada;
+- no existe staging productivo;
+- CI no despliega;
+- health actual no constituye readiness completa;
+- worker y outbox no tienen entrega durable completa;
+- bearer continúa en localStorage;
+- no hay proveedor cloud seleccionado.
+
+DEC-17 no convierte ninguna de estas brechas en implementación.
+
+### Trazabilidad de la corrección
+
+El 2026-09-01 se documentó inicialmente una interpretación managed-cloud de DEC-17.
+
+Antes de aprobar definitivamente DEC-17, el propietario aclaró que la decisión canónica es LOCAL-FIRST, con:
+
+- operación LAN sin Internet;
+- RPO del nodo local cero o casi cero;
+- RPO de pérdida completa del sitio <= 5 minutos;
+- RTO del servidor primario <= 1 hora;
+- RTO de pérdida completa del sitio <= 8 horas;
+- segundo mini-PC standby controlado sin split-brain;
+- cloud complementario;
+- evolución futura hacia arquitectura híbrida.
+
+La interpretación managed-cloud como plataforma productiva inicial queda revocada. Permanece visible mediante el diff o historial Git, pero no es la política vigente. Esta corrección no representa implementación.
+
+### Historial y límite
+
+- DEC-17 permaneció `PENDIENTE` hasta 2026-09-01.
+- La interpretación managed-cloud inicial del 2026-09-01 fue corregida antes de la aprobación definitiva.
+- DEC-17 queda `APROBADA` con arquitectura LOCAL-FIRST.
+- DEC-18 se resuelve en su propia sección; DEC-19–DEC-20 permanecen `PENDIENTE` y sin respuesta aprobada.
+- ZM-FIN-003 continúa abierta.
+- No se avanza a DEC-19 ni a ZM-FIN-004.
 
 ## DEC-18 — Métricas y alertas
 
-- **Estado:** `PENDIENTE`
+- **Estado:** `APROBADA`
+- **Fecha:** 2026-09-01
 - **Propietario:** propietario de ZeroMerma
-- **Qué debe aprobarse:** definiciones KPI, severidades, owners y condiciones accionables.
-- **Tareas principales afectadas:** tareas de dashboard, reportes, alertas, worker y observabilidad.
-- **Respuesta aprobada:** ninguna.
-- **Regla:** métricas estáticas o metadata de reportes no constituyen KPI aprobados.
+- **Contenido aprobado:** DEC-18.1–DEC-18.10 y catálogo KPI exhaustivo v1: canales y escalamiento de alertas, sensibilidad conservadora, instrumentación amplia, definiciones/owners/validez de KPI, granularidad, capa analítica derivada, outbox transaccional, retención por capas, evolución futura hacia lakehouse e identidad causal de eventos.
+- **Preguntas pendientes del propietario:** ninguna.
+- **Tareas principales afectadas:** tareas de contratos, ledgers, inventario, producción, pricing, auditoría, outbox, worker, dashboard, reportes, observabilidad, infraestructura, backup, data quality y analítica futura.
+- **Respuesta aprobada:** instrumentación amplia, catálogo KPI exhaustivo/versionado y dashboard selectivo con alerting conservador; dashboard interno; Telegram sólo para alertas críticas; ACK y escalamiento por severidad; hechos granulares; PostgreSQL operacional autoritativo; analytics event/fact layer reconstruible; outbox at-least-once con consumidores idempotentes; retención HOT/WARM/COLD; lakehouse futuro no bloqueante; identidad de eventos versionada y causal.
+- **Regla:** una decisión documental define qué construir, pero no certifica implementación, datos, dashboards, alertas, worker, infraestructura analítica, cumplimiento de gates ni preparación productiva.
+
+Se registra:
+
+- `DEC18_APPROVED_SUBDECISIONS=DEC-18.1..DEC-18.10 + KPI_CATALOG_V1`
+- `owner_policy_approved=true`
+- `pending_owner_questions=0`
+- `DEC18_PENDING_OWNER_DECISION_KPI_CATALOG=false`
+- `DEC18_PENDING_OWNER_DECISION_APPEND_ONLY=false`
+- `KPI_CATALOG_SCOPE=EXHAUSTIVE`
+- `KPI_CATALOG_VERSIONED=true`
+- `KPI_CATALOG_VERSION=KPI-1.0.0`
+- `KPI_CATALOG_COUNT=373`
+
+El requisito original de DEC-18 era literalmente **“Definiciones KPI, severidades, owners y condiciones accionables.”** El catálogo exhaustivo resuelve definiciones y owners; CRITICAL-A/B/C resuelven severidades; HIGH SIGNAL / LOW NOISE y el contrato condición-owner-acción-ACK-escalamiento-resolución resuelven condiciones accionables. No existe otro requisito original material pendiente. La aprobación sigue siendo normativa y no se reinterpreta como implementación.
+
+### DEC-18.1 — Canales de alerta
+
+ZeroMerma tendrá un dashboard interno como fuente completa de alertas. El dashboard deberá conservar:
+
+- condición detectada;
+- severidad;
+- historial;
+- estado;
+- owner;
+- acción requerida;
+- reconocimiento o ACK;
+- escalamiento;
+- resolución;
+- evidencia y timestamps relevantes.
+
+El canal externo inicial aprobado es Telegram y se utilizará inicialmente sólo para alertas críticas. WhatsApp queda como opción futura potencial y no forma parte del camino crítico inicial.
+
+Se registra:
+
+- `alert_dashboard=true`
+- `critical_external_channel=TELEGRAM`
+- `whatsapp_future_option=true`
+- `external_notification_failure_must_not_block_operations=true`
+
+Si Internet no está disponible:
+
+- ZeroMerma continuará operando localmente conforme a DEC-17;
+- la alerta se persistirá localmente;
+- conservará identidad y estado;
+- se reintentará posteriormente;
+- no se perderá;
+- un fallo de Telegram no revertirá ni bloqueará una operación local válida.
+
+El dashboard local será la fuente completa; Telegram será una salida crítica complementaria, no la fuente de verdad de la alerta.
+
+### DEC-18.2 — Reconocimiento y escalamiento
+
+Las alertas críticas requieren ACK. El destinatario primario es el propietario de ZeroMerma. Cuando no exista reconocimiento, el escalamiento dependerá de la severidad.
+
+#### CRITICAL-A
+
+Impacto:
+
+- operación detenida;
+- riesgo inmediato de dinero;
+- riesgo inmediato de pérdida o corrupción de datos;
+- servidor, API o DB indisponible durante operación;
+- POS incapaz de vender;
+- inconsistencia crítica de caja o inventario;
+- incidente equivalente.
+
+Escalamiento:
+
+- notificación inmediata al propietario;
+- sin ACK en 5 minutos, escalar al responsable operativo secundario, inicialmente esposa o administración.
+
+#### CRITICAL-B
+
+Impacto:
+
+- operación degradada pero viable;
+- worker u outbox detenido;
+- backlog anormal;
+- reconciliación problemática;
+- errores repetitivos relevantes;
+- periférico esencial degradado con workaround.
+
+Escalamiento:
+
+- notificación inmediata al propietario;
+- sin ACK en 15 minutos, escalar al responsable secundario.
+
+#### CRITICAL-C
+
+Impacto:
+
+- resiliencia comprometida sin impacto operacional inmediato;
+- backup fallido;
+- backup off-site atrasado;
+- restore drill fallido;
+- capacidad o disco cerca de un umbral crítico validado.
+
+Escalamiento:
+
+- notificación al propietario;
+- sin ACK en 60 minutos durante horario operativo, escalar al responsable secundario.
+
+Fuera del horario operativo no se despertará ni escalará automáticamente salvo que esperar hasta la siguiente ventana incremente materialmente el riesgo.
+
+La política deberá poder configurarse posteriormente sin perder historial. Los tiempos de 5, 15 y 60 minutos son decisiones expresas de escalamiento; DEC-18 no inventa otros thresholds técnicos.
+
+### DEC-18.3 — Sensibilidad inicial
+
+La sensibilidad inicial aprobada es CONSERVADORA, bajo el principio HIGH SIGNAL / LOW NOISE.
+
+Durante el lanzamiento y las primeras semanas sólo deberán alertarse:
+
+- fallas claras;
+- estados peligrosos;
+- desviaciones operativas accionables;
+- amenazas a dinero;
+- amenazas a datos;
+- amenazas de seguridad;
+- pérdida de disponibilidad;
+- degradación de recuperación;
+- inconsistencias de inventario;
+- inconsistencias de caja.
+
+No deberán generar alertas inicialmente:
+
+- pequeñas fluctuaciones;
+- tendencias débiles;
+- anomalías no calibradas;
+- métricas decorativas;
+- datos sin owner ni acción operativa.
+
+Después de acumular entre dos y cuatro semanas de datos operativos reales podrá evaluarse sensibilidad INTERMEDIA. Los thresholds futuros deberán calibrarse con evidencia real y quedar versionados. No se aprueba ahora ningún umbral adicional.
+
+Se registra:
+
+- `initial_alert_sensitivity=CONSERVATIVE`
+- `alerting_principle=HIGH_SIGNAL_LOW_NOISE`
+- `future_thresholds_require_operational_evidence=true`
+
+### Métricas frente a alertas
+
+La distinción canónica es:
+
+- `INSTRUMENTATION=BROAD`
+- `ALERTING=CONSERVATIVE`
+
+Muchas métricas no implican muchas notificaciones. Un dato puede almacenarse, analizarse o aparecer en dashboard sin generar una alerta.
+
+Una alerta deberá tener:
+
+- condición;
+- severidad;
+- owner;
+- acción;
+- ACK cuando aplique;
+- escalamiento;
+- resolución.
+
+El flujo conceptual aprobado es:
+
+- datos amplios;
+- métricas derivadas;
+- KPI relevantes;
+- pocas alertas accionables.
+
+### DEC-18.4 — Instrumentación amplia
+
+ZeroMerma deberá diseñarse para capturar todas las métricas operativas, económicas, técnicas y analíticas que sean razonablemente útiles.
+
+Esto no significa mostrar todos los KPI simultáneamente, alertar por todo ni recolectar PII sin necesidad. La telemetría no se utilizará para vigilancia innecesaria de empleados.
+
+#### Ventas
+
+La instrumentación deberá permitir derivar, cuando aplique:
+
+- unidades;
+- ingresos;
+- ticket;
+- productos;
+- categorías;
+- hora y fecha;
+- sucursal;
+- estación;
+- canal;
+- medio de pago;
+- devoluciones;
+- cancelaciones;
+- descuentos;
+- variaciones.
+
+#### Caja y finanzas
+
+- aperturas;
+- cierres;
+- movimientos;
+- efectivo esperado;
+- efectivo real;
+- diferencias;
+- pagos;
+- refunds;
+- conciliación;
+- excepciones.
+
+#### Inventario
+
+- existencias;
+- entradas;
+- salidas;
+- movimientos;
+- reservas;
+- transferencias;
+- consumo;
+- rotación;
+- cobertura;
+- agotados;
+- discrepancias;
+- ajustes;
+- envejecimiento cuando aplique.
+
+#### Producción
+
+- lotes;
+- producto;
+- cantidades planeadas;
+- cantidades producidas;
+- tiempos;
+- rendimiento;
+- consumo teórico;
+- consumo real;
+- variaciones;
+- productividad;
+- reproceso;
+- scrap.
+
+#### Merma
+
+- producto;
+- lote;
+- cantidad;
+- costo;
+- causa;
+- etapa;
+- hora;
+- sucursal;
+- contexto;
+- usuario o actor;
+- proporción respecto de producción;
+- proporción respecto de venta;
+- tendencias.
+
+#### Costos y rentabilidad
+
+- costo unitario;
+- costos de receta;
+- variaciones;
+- margen;
+- contribution margin;
+- costo de merma;
+- rentabilidad cuando existan datos confiables.
+
+#### Demanda
+
+- ventas por franja;
+- día;
+- semana;
+- temporada;
+- producto;
+- agotados;
+- disponibilidad;
+- producción frente a demanda;
+- posteriormente forecast y error de forecast.
+
+#### Operación
+
+- tiempos;
+- incidencias;
+- correcciones;
+- excepciones;
+- disponibilidad;
+- duración de procesos;
+- frecuencia de problemas.
+
+#### UX y uso
+
+- flujos;
+- errores;
+- tiempos;
+- acciones repetidas;
+- fricción;
+- utilización funcional.
+
+La observación de UX deberá respetar minimización y finalidad; no justificará perfilado innecesario del personal.
+
+#### Plataforma
+
+- uptime;
+- latency;
+- throughput;
+- error rate;
+- CPU;
+- RAM;
+- disco;
+- conexiones DB;
+- slow queries;
+- locks;
+- deadlocks;
+- health;
+- readiness.
+
+#### Worker y outbox
+
+- backlog;
+- `oldest_event_age`;
+- attempts;
+- retries;
+- processing latency;
+- failures;
+- DLQ;
+- throughput;
+- stuck events.
+
+#### Data quality
+
+- integridad;
+- reconciliación;
+- duplicados;
+- gaps;
+- freshness;
+- orphans;
+- inconsistencias.
+
+#### Seguridad
+
+- login failures;
+- RBAC denies;
+- operaciones sensibles;
+- session anomalies;
+- cambios de permisos;
+- eventos de auditoría.
+
+#### Resiliencia
+
+- backups;
+- último backup válido;
+- backup age;
+- estado off-site;
+- resultados de restore;
+- RPO observado;
+- RTO observado;
+- DR drills.
+
+#### Hardware y red
+
+Cuando sea técnicamente observable:
+
+- workstation;
+- impresora;
+- scanner;
+- cajón;
+- LAN;
+- periféricos.
+
+#### Analítica e IA futura
+
+La instrumentación deberá preparar hechos útiles para:
+
+- predicción de merma;
+- demanda;
+- optimización de producción;
+- consistencia;
+- forecasting;
+- anomaly detection;
+- experimentación;
+- ML.
+
+Esta preparación no aprueba modelos, decisiones automatizadas ni un sistema de IA productivo.
+
+### DEC-18.5 — Máxima granularidad razonable
+
+Se conservarán hechos y eventos con la máxima granularidad razonable. Los hechos originales no se sustituirán prematuramente por agregados.
+
+El principio aprobado es:
+
+- raw o business facts;
+- metrics;
+- KPI;
+- models.
+
+Cuando aplique se conservarán:
+
+- timestamp;
+- branch;
+- workstation;
+- actor;
+- producto;
+- lote;
+- cantidad;
+- importe;
+- unidad;
+- causa;
+- operación origen;
+- correlation;
+- estado;
+- versión.
+
+Los agregados diarios, semanales y mensuales deberán poder recalcularse. La granularidad no autoriza recolectar PII innecesaria y deberá respetar minimización, privacidad, expiración y DEC-16.
+
+Se registra:
+
+- `maximum_reasonable_fact_granularity=true`
+- `raw_facts_not_replaced_by_aggregates=true`
+- `derived_aggregates_rebuildable=true`
+
+### DEC-18.6 — Capa analítica explícita
+
+La arquitectura conceptual inicial aprobada es:
+
+1. operación;
+2. PostgreSQL transaccional autoritativo;
+3. outbox y domain events;
+4. analytics event o fact layer;
+5. agregaciones;
+6. KPI y dashboards;
+7. futuro warehouse, lakehouse, ML o IA.
+
+PostgreSQL transaccional seguirá siendo fuente de verdad para:
+
+- ventas;
+- caja;
+- pagos;
+- inventario;
+- producción;
+- merma;
+- demás estado operacional.
+
+La capa analítica:
+
+- no manda sobre la operación;
+- no modifica directamente el estado transaccional;
+- puede reconstruirse;
+- conserva referencias hacia los hechos canónicos;
+- admite proyecciones idempotentes.
+
+No se construirá todavía un data warehouse externo completo.
+
+Se registra:
+
+- `transactional_postgresql_is_operational_authority=true`
+- `analytics_event_fact_layer=true`
+- `analytics_layer_authoritative_for_operations=false`
+- `analytics_layer_rebuildable=true`
+- `external_data_warehouse_required_for_pilot=false`
+
+### DEC-18.7 — Outbox transaccional
+
+La operación de negocio y la creación del evento outbox deberán confirmarse dentro de la misma transacción PostgreSQL.
+
+Invariante:
+
+Si una operación de negocio quedó confirmada, deberá existir evidencia durable que permita reconstruir su efecto analítico.
+
+La frontera transaccional conceptual es:
+
+1. begin;
+2. business mutation;
+3. canonical ledger, inventory u otro estado operacional;
+4. audit;
+5. outbox event;
+6. commit.
+
+Después del commit:
+
+1. el worker obtiene un claim durable;
+2. procesa el evento;
+3. materializa analytics event o projection;
+4. reconoce el procesamiento sólo después del efecto;
+5. reintenta con la misma identidad cuando sea necesario.
+
+Se registra:
+
+- `business_transaction_and_outbox_atomic=true`
+- `analytics_processing_async=true`
+- `delivery=at_least_once`
+- `consumer_idempotency_required=true`
+- `derived_metrics_rebuildable=true`
+- `unprocessed_events_recoverable=true`
+- `business_effect=exactly_once_by_identity`
+
+Una caída del worker no deberá:
+
+- perder eventos;
+- revertir ventas confirmadas;
+- duplicar métricas al reintentar;
+- marcar procesado antes de materializar el efecto.
+
+La identidad del evento, del consumidor y de la proyección deberá hacer observable y reconciliable cada reintento.
+
+### DEC-18.8 — Retención histórica por capas
+
+Los hechos empresariales relevantes se conservarán mientras tengan valor operativo, analítico, económico, científico o legal.
+
+PostgreSQL operacional no se convertirá obligatoriamente en un archivo histórico infinito.
+
+La arquitectura conceptual es:
+
+- HOT / OPERATIONAL: PostgreSQL;
+- WARM / ANALYTICAL: hechos y proyecciones analíticas;
+- COLD / HISTORICAL: object storage o lakehouse futuro.
+
+Reglas:
+
+- no borrar granularidad valiosa sólo para reducir tamaño de DB;
+- mover histórico cuando sea apropiado;
+- preservar IDs y relaciones;
+- respetar PII y expiraciones;
+- distinguir backup de archivo analítico;
+- conservar posibilidad de análisis longitudinal multianual;
+- mantener exportabilidad y schema versionado.
+
+DEC-18 no fija tiempos exactos arbitrarios para HOT, WARM o COLD. La política concreta deberá armonizar valor empresarial, DEC-16, capacidad local-first, costos, restore y tecnología seleccionada.
+
+Se registra:
+
+- `layered_historical_retention=true`
+- `operational_postgresql_not_infinite_archive=true`
+- `backup_not_analytics_archive=true`
+- `multiyear_longitudinal_analysis_preserved=true`
+
+### DEC-18.9 — Evolución futura hacia lakehouse
+
+ZeroMerma se diseñará desde v1 para poder evolucionar posteriormente hacia una arquitectura lakehouse.
+
+El lakehouse no se implementa ahora. Hadoop, Spark, Kafka, Snowflake, BigQuery, ClickHouse, Databricks u otra plataforma no se introducen como dependencias arbitrarias del piloto.
+
+La progresión conceptual es:
+
+1. OLTP;
+2. domain y outbox events;
+3. analytics fact layer;
+4. historical export;
+5. object storage;
+6. lakehouse;
+7. BI, ciencia, ML o IA.
+
+El lakehouse futuro será memoria analítica de largo plazo. Nunca será la fuente autoritativa de venta, caja, inventario ni producción.
+
+Su activación requerirá un gate futuro, sin ID inventado en DEC-18, sustentado por evidencia como:
+
+- volumen suficiente;
+- múltiples sucursales;
+- análisis longitudinal relevante;
+- datasets científicos;
+- ML;
+- datos no relacionales;
+- presión analítica sobre OLTP.
+
+Se registra:
+
+- `lakehouse_future_evolution=true`
+- `lakehouse_implemented_now=false`
+- `lakehouse_is_operational_authority=false`
+- `lakehouse_pilot_blocker=false`
+- `lakehouse_activation_requires_future_evidence_gate=true`
+
+### DEC-18.10 — Identidad y trazabilidad de eventos
+
+Se aprueba un contrato transversal de identidad de eventos. Todo evento relevante deberá soportar, cuando aplique:
+
+- `event_id`;
+- `event_type`;
+- `schema_version`;
+- `correlation_id`;
+- `causation_id`;
+- `entity_type`;
+- `entity_id`;
+- `branch_id`;
+- `workstation_id`;
+- `actor_id`;
+- `actor_type`;
+- `occurred_at`;
+- `recorded_at`;
+- payload versionado.
+
+Las relaciones causales importantes no se reconstruirán después por coincidencia de timestamps o nombres. Deberán quedar identificadas explícitamente.
+
+El contrato deberá permitir reconstruir cadenas como:
+
+1. producción;
+2. inventario;
+3. venta;
+4. pago;
+5. devolución;
+6. merma;
+7. conciliación.
+
+`event_id` identifica un evento; `correlation_id` agrupa un flujo; `causation_id` identifica el evento que causó al actual; `entity_type` y `entity_id` identifican el agregado o entidad afectada.
+
+El contrato y el payload deberán versionarse sin romper consumidores históricos.
+
+Se registra:
+
+- `event_identity_contract_required=true`
+- `causal_links_explicit=true`
+- `timestamp_matching_not_causal_authority=true`
+- `historical_consumers_require_schema_compatibility=true`
+
+### DEC-18.11 — Límite append-only no asumido
+
+No se aprueba una política transversal adicional de eventos históricos append-only con correcciones, reversas o compensaciones.
+
+Las decisiones anteriores que ya exigen snapshots inmutables, ledgers, auditoría o compensaciones en dominios concretos continúan vigentes. Esas reglas no se generalizan automáticamente a todo evento histórico.
+
+Se registra:
+
+- `DEC18_APPEND_ONLY_NOT_ASSUMED=true`
+- `DEC18_PENDING_OWNER_DECISION_APPEND_ONLY=false`
+- `cross_domain_append_only_policy_approved_by_DEC18=false`
+- `append_only_not_inferred_from_event_identity=true`
+
+Esta política transversal no formaba parte del requisito original de cierre, no es una pregunta pendiente de DEC-18 y no impide su aprobación. Las decisiones anteriores que ya ordenan ledgers, auditoría, snapshots inmutables o compensaciones en dominios concretos conservan su autoridad.
+
+### Catálogo KPI exhaustivo y versionado
+
+Se registra:
+
+- `KPI_CATALOG_SCOPE=EXHAUSTIVE`;
+- `KPI_CATALOG_VERSIONED=true`;
+- `KPI_CATALOG_VERSION=KPI-1.0.0`;
+- `KPI_CATALOG_COUNT=373`;
+- `INSTRUMENTATION=BROAD`;
+- `DASHBOARD=SELECTIVE`;
+- `ALERTING=CONSERVATIVE`;
+- `metric_exists_does_not_imply_alert_required=true`.
+
+Cada KPI queda definido por la composición obligatoria de su fila individual y su contrato familiar. La fila declara `kpi_id`, `name`, `definition`, `formula`, `unit` y validez específica. El contrato familiar declara `canonical_source`, `dimensions`, `owner`, `cadence`, `validity_conditions`, `data_quality_requirements` y `version`. Una implementación o exportación deberá materializar juntos los doce campos; la herencia no permite omitirlos.
+
+Se registra `KPI_FORMULA_REQUIRED=true`, `KPI_CANONICAL_SOURCE_REQUIRED=true`, `KPI_OWNER_REQUIRED=true`, `KPI_DIMENSIONS_REQUIRED=true`, `KPI_CADENCE_REQUIRED=true` y `KPI_VALIDITY_RULE_REQUIRED=true`.
+
+Primitivas de fórmula: `S(x)` suma cantidades con UOM compatible o importes Decimal/Numeric; `C(x)` cuenta hechos; `C_DISTINCT(id)` cuenta identidades canónicas. Toda división requiere denominador válido. Dinero usa Decimal/Numeric, nunca float. `occurred_at` es tiempo de negocio; `recorded_at` es persistencia/lineage.
+
+Estados: `VALID`, `PROVISIONAL`, `STALE`, `UNAVAILABLE`, `INVALID_DATA` y `RECONCILIATION_REQUIRED`. Se preserva: `no_data != zero`, `stale != current`, `estimated != measured`, `gross != net`, `count != amount` y `business_time != ingestion_time`.
+
+Dimensiones aplicables: branch, workstation, cash_session, channel, product, product_class, category, order, production_run, lot, payment_method, provider, actor, date, hour y weekday. Una vista GLOBAL requiere DEC-04 explícita; no se mezclarán sucursales para ocultar anomalías.
+
+| Familia | canonical_source | dimensions | owner | cadence | validity_conditions | data_quality_requirements | version |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| SAL | venta/línea reconocida + ledger financiero + descuentos/refunds | branch, workstation, cash_session, channel, product, product_class, category, payment_method, date, hour, weekday | propietario / administración | por evento cuando exista; agregación on-demand y por periodo de negocio versionado | completo, vigente, aplicable y reconciliado; en otro caso estado explícito | gross, discount, net y refund reconciliados según DEC-10/11/13 | KPI-1.0.0 |
+| ORD | pedido/versiones/amendments + pagos + entrega/cancelación | branch, workstation, channel, order, product, actor, date, hour, weekday | operación / administración | por evento cuando exista; agregación on-demand y por periodo de negocio versionado | completo, vigente, aplicable y reconciliado; en otro caso estado explícito | estados, versión e hitos completos | KPI-1.0.0 |
+| PRI | price quote + price list/version + regla/promoción aplicada | branch, workstation, channel, product, product_class, category, order, actor, date, hour, weekday | administración comercial | por evento cuando exista; agregación on-demand y por periodo de negocio versionado | completo, vigente, aplicable y reconciliado; en otro caso estado explícito | quote, prioridad, regla y versión trazables según DEC-13 | KPI-1.0.0 |
+| CASH | cash_session + ledger financiero + conteo/cierre | branch, workstation, cash_session, payment_method, actor, date, hour, weekday | administración de caja | por evento cuando exista; agregación on-demand y por periodo de negocio versionado | completo, vigente, aplicable y reconciliado; en otro caso estado explícito | sesión/ledger/conteo reconciliados; nunca promediar entre sucursales | KPI-1.0.0 |
+| PAY | payment attempt/provider result/callback + ledger/reconciliación | branch, workstation, cash_session, channel, order, payment_method, provider, actor, date, hour, weekday | administración / conciliación | por evento cuando exista; agregación on-demand y por periodo de negocio versionado | completo, vigente, aplicable y reconciliado; en otro caso estado explícito | DEC-14 implementada; UNKNOWN, DECLINED y CAPTURED diferenciados | KPI-1.0.0 |
+| RET | devolución + disposición física + refund + ledger | branch, workstation, cash_session, channel, product, category, order, payment_method, actor, date, hour, weekday | operación / administración | por evento cuando exista; agregación on-demand y por periodo de negocio versionado | completo, vigente, aplicable y reconciliado; en otro caso estado explícito | venta origen, cantidad, disposición y refund reconciliados | KPI-1.0.0 |
+| INV | ledger de inventario + reservas + conteos + transferencias | branch, workstation, product, product_class, category, production_run, lot, actor, date, hour, weekday | operación de inventario | por evento cuando exista; agregación on-demand y por periodo de negocio versionado | completo, vigente, aplicable y reconciliado; en otro caso estado explícito | UOM compatible; causa, reserva y balance reconstruibles | KPI-1.0.0 |
+| PUR | PO/version + recepción + costo/proveedor | branch, product, category, lot, provider, actor, date, weekday | compras / administración | por evento cuando exista; agregación on-demand y por periodo de negocio versionado | completo, vigente, aplicable y reconciliado; en otro caso estado explícito | PO, recepción, cantidad, precio y proveedor reconciliados | KPI-1.0.0 |
+| PROD | plan/run + receta versionada + ledger de materiales/output + reconciliación | branch, workstation, product, product_class, category, production_run, lot, actor, date, hour, weekday | operación de producción | por evento cuando exista; agregación on-demand y por periodo de negocio versionado | completo, vigente, aplicable y reconciliado; en otro caso estado explícito | receta=expectativa; reconciliación=realidad | KPI-1.0.0 |
+| WST | movimiento de merma + causa/etapa/lote + costo válido | branch, workstation, product, product_class, category, production_run, lot, actor, date, hour, weekday | operación / propietario | por evento cuando exista; agregación on-demand y por periodo de negocio versionado | completo, vigente, aplicable y reconciliado; en otro caso estado explícito | UOM compatible; causa/etapa/cantidad completas; costo no supuesto | KPI-1.0.0 |
+| COST | ledger financiero + costo reconciliado/versionado + ventas/refunds | branch, channel, product, product_class, category, production_run, lot, date, weekday | administración financiera / propietario | por evento cuando exista; agregación on-demand y por periodo de negocio versionado | completo, vigente, aplicable y reconciliado; en otro caso estado explícito | costo válido y reconciliado; costo ausente implica UNAVAILABLE | KPI-1.0.0 |
+| DEM | ventas + disponibilidad/agotado + producción/pedido reconciliados | branch, channel, product, product_class, category, date, hour, weekday | propietario / planeación | por evento cuando exista; agregación on-demand y por periodo de negocio versionado | completo, vigente, aplicable y reconciliado; en otro caso estado explícito | periodos comparables; forecast exige historia/modelo válidos | KPI-1.0.0 |
+| OPS | trazas de flujos + errores de dominio + eventos UX minimizados | branch, workstation, cash_session, channel, order, actor_type, date, hour, weekday | operación / producto | por evento cuando exista; agregación on-demand y por periodo de negocio versionado | completo, vigente, aplicable y reconciliado; en otro caso estado explícito | correlation_id completo; sin vigilancia individual ni PII innecesaria | KPI-1.0.0 |
+| ASY | outbox + claim/lease + attempts + handlers + DLQ/proyecciones | branch, event_type, consumer, projection, date, hour | soporte / SRE | por evento cuando exista; agregación on-demand y por periodo de negocio versionado | completo, vigente, aplicable y reconciliado; en otro caso estado explícito | event_id, attempt, lease, estado y tiempos completos; replay deduplicado | KPI-1.0.0 |
+| ALT | alerta persistida + ACK/escalamiento/resolución + delivery | branch, severity, alert_type, owner, channel, date, hour, weekday | Incident Commander / owner de alerta | por evento cuando exista; agregación on-demand y por periodo de negocio versionado | completo, vigente, aplicable y reconciliado; en otro caso estado explícito | condición, severidad, owner, acción, causalidad, ACK y resolución | KPI-1.0.0 |
+| SRE | telemetría local API/DB/hosts/procesos/readiness | branch, workstation_or_host, service, endpoint_or_operation, date, hour | soporte / SRE | por evento cuando exista; agregación on-demand y por periodo de negocio versionado | completo, vigente, aplicable y reconciliado; en otro caso estado explícito | ventana/población explícitas; business errors separados de 5xx | KPI-1.0.0 |
+| DQ | controles de reconciliación/contrato/lineage/rebuild | branch, domain, entity_type, projection, date | data steward / administración | por evento cuando exista; agregación on-demand y por periodo de negocio versionado | completo, vigente, aplicable y reconciliado; en otro caso estado explícito | regla versionada, población y evidencia reproducibles | KPI-1.0.0 |
+| SEC | auth/session/RBAC/scope/audit + controles/scans | branch, workstation, actor_type, capability, date, hour | seguridad / administración | por evento cuando exista; agregación on-demand y por periodo de negocio versionado | completo, vigente, aplicable y reconciliado; en otro caso estado explícito | evento auditable y minimizado; no KPI de productividad individual | KPI-1.0.0 |
+| RES | backup/replication/standby/restore/failover/DR drill | branch, primary_host, standby_host, backup_set, drill, date | Incident Commander técnico + administración | por evento cuando exista; agregación on-demand y por periodo de negocio versionado | completo, vigente, aplicable y reconciliado; en otro caso estado explícito | evidencia observada; RPO/RTO medidos; restore demostrado | KPI-1.0.0 |
+| HW | bridge/agent/device/network probes + resultados | branch, workstation, device_type, device_id, operation, date, hour | soporte operativo | por evento cuando exista; agregación on-demand y por periodo de negocio versionado | completo, vigente, aplicable y reconciliado; en otro caso estado explícito | identidad de estación/dispositivo y resultado completos | KPI-1.0.0 |
+| PRV | ARCO/privacidad/retención/export/compliance + auditoría | branch, control, processor_or_provider, data_category, date | responsable de privacidad / administración | por evento cuando exista; agregación on-demand y por periodo de negocio versionado | completo, vigente, aplicable y reconciliado; en otro caso estado explícito | indicadores de control, no certificaciones; conforme DEC-16 | KPI-1.0.0 |
+| DAT | event envelope + fact layer + export histórico + lineage/rebuild | branch, event_type, schema_version, entity_type, projection, date, hour | arquitectura de datos / soporte | por evento cuando exista; agregación on-demand y por periodo de negocio versionado | completo, vigente, aplicable y reconciliado; en otro caso estado explícito | envelope/schema/lineage completos y reconciliados contra OLTP | KPI-1.0.0 |
+| AI | datasets/model runs/experimentos futuros gobernados | branch, product, category, model_version, dataset_version, horizon, date | propietario + responsable futuro de datos/modelo | por evento cuando exista; agregación on-demand y por periodo de negocio versionado | completo, vigente, aplicable y reconciliado; en otro caso estado explícito | FUTURE/UNAVAILABLE hasta dataset, modelo, evaluación y gobierno aprobados | KPI-1.0.0 |
+
+
+#### Familia SAL — Ventas
+
+| kpi_id | name | definition | formula | unit | validity_conditions específicas |
+| --- | --- | --- | --- | --- | --- |
+| `SAL-001` | ventas brutas reconocidas | Indicador canónico de ventas brutas reconocidas, delimitado por el contrato SAL. | `S(gross_amount reconocido)` | currency Decimal/Numeric | hereda contrato; no_data/stale/estimated/unreconciled nunca se convierten en VALID |
+| `SAL-002` | descuentos comerciales | Indicador canónico de descuentos comerciales, delimitado por el contrato SAL. | `S(commercial_discount_amount)` | currency Decimal/Numeric | hereda contrato; no_data/stale/estimated/unreconciled nunca se convierten en VALID |
+| `SAL-003` | ventas netas reconocidas | Indicador canónico de ventas netas reconocidas, delimitado por el contrato SAL. | `S(net_recognized_sale_amount)` | currency Decimal/Numeric | hereda contrato; no_data/stale/estimated/unreconciled nunca se convierten en VALID |
+| `SAL-004` | refunds completados | Indicador canónico de refunds completados, delimitado por el contrato SAL. | `S(completed_refund_amount)` | currency Decimal/Numeric | hereda contrato; no_data/stale/estimated/unreconciled nunca se convierten en VALID |
+| `SAL-005` | ingreso neto posterior a refunds, preservando componentes | Indicador canónico de ingreso neto posterior a refunds, preservando componentes, delimitado por el contrato SAL. | `SAL-003 - SAL-004; preservar ambos componentes` | currency Decimal/Numeric | hereda contrato; no_data/stale/estimated/unreconciled nunca se convierten en VALID |
+| `SAL-006` | número de transacciones reconocidas | Indicador canónico de número de transacciones reconocidas, delimitado por el contrato SAL. | `C_DISTINCT(sale_id reconocida)` | count/state/unidad del hecho | hereda contrato; no_data/stale/estimated/unreconciled nunca se convierten en VALID |
+| `SAL-007` | unidades vendidas | Indicador canónico de unidades vendidas, delimitado por el contrato SAL. | `S(sold_quantity en UOM comparable)` | quantity+UOM | hereda contrato; no_data/stale/estimated/unreconciled nunca se convierten en VALID |
+| `SAL-008` | ticket promedio | Indicador canónico de ticket promedio, delimitado por el contrato SAL. | `SAL-003 / SAL-006` | count/state/unidad del hecho | hereda contrato; no_data/stale/estimated/unreconciled nunca se convierten en VALID |
+| `SAL-009` | unidades por ticket | Indicador canónico de unidades por ticket, delimitado por el contrato SAL. | `SAL-007 / SAL-006` | quantity+UOM | hereda contrato; no_data/stale/estimated/unreconciled nunca se convierten en VALID |
+| `SAL-010` | precio neto medio por unidad | Indicador canónico de precio neto medio por unidad, delimitado por el contrato SAL. | `SAL-003 / SAL-007` | count/state/unidad del hecho | hereda contrato; no_data/stale/estimated/unreconciled nunca se convierten en VALID |
+| `SAL-011` | tasa de cancelación de venta | Indicador canónico de tasa de cancelación de venta, delimitado por el contrato SAL. | `C(canceladas) / C(ventas elegibles)` | ratio/% | hereda contrato; no_data/stale/estimated/unreconciled nunca se convierten en VALID |
+| `SAL-012` | mix por canal | Indicador canónico de mix por canal, delimitado por el contrato SAL. | `S(net_amount por channel) / SAL-003` | ratio/% | hereda contrato; no_data/stale/estimated/unreconciled nunca se convierten en VALID |
+| `SAL-013` | mix por medio real de pago | Indicador canónico de mix por medio real de pago, delimitado por el contrato SAL. | `S(settled_amount por medio real) / S(settled_amount)` | ratio/% | hereda contrato; no_data/stale/estimated/unreconciled nunca se convierten en VALID |
+| `SAL-014` | mix por producto | Indicador canónico de mix por producto, delimitado por el contrato SAL. | `S(net_amount por product) / SAL-003` | ratio/% | hereda contrato; no_data/stale/estimated/unreconciled nunca se convierten en VALID |
+| `SAL-015` | mix por categoría | Indicador canónico de mix por categoría, delimitado por el contrato SAL. | `S(net_amount por category) / SAL-003` | ratio/% | hereda contrato; no_data/stale/estimated/unreconciled nunca se convierten en VALID |
+| `SAL-016` | ventas por franja horaria | Indicador canónico de ventas por franja horaria, delimitado por el contrato SAL. | `S(net_amount) agrupado por business hour` | currency Decimal/Numeric | hereda contrato; no_data/stale/estimated/unreconciled nunca se convierten en VALID |
+| `SAL-017` | ventas por día de semana | Indicador canónico de ventas por día de semana, delimitado por el contrato SAL. | `S(net_amount) agrupado por business weekday` | currency Decimal/Numeric | hereda contrato; no_data/stale/estimated/unreconciled nunca se convierten en VALID |
+| `SAL-018` | variación contra periodo comparable | Indicador canónico de variación contra periodo comparable, delimitado por el contrato SAL. | `(actual - comparable) / ABS(comparable), si comparable != 0` | count/state/unidad del hecho | hereda contrato; no_data/stale/estimated/unreconciled nunca se convierten en VALID |
+| `SAL-019` | concentración de productos principales | Indicador canónico de concentración de productos principales, delimitado por el contrato SAL. | `S(net_amount de productos principales) / SAL-003` | count/state/unidad del hecho | hereda contrato; no_data/stale/estimated/unreconciled nunca se convierten en VALID |
+| `SAL-020` | gratuidad comercial por promociones explícitas | Indicador canónico de gratuidad comercial por promociones explícitas, delimitado por el contrato SAL. | `S(discount_amount de promoción explícita 100%)` | count/state/unidad del hecho | hereda contrato; no_data/stale/estimated/unreconciled nunca se convierten en VALID |
+
+#### Familia ORD — Pedidos/delivery
+
+| kpi_id | name | definition | formula | unit | validity_conditions específicas |
+| --- | --- | --- | --- | --- | --- |
+| `ORD-001` | pedidos creados | Indicador canónico de pedidos creados, delimitado por el contrato ORD. | `C_DISTINCT(identidad canónica que satisface definición)` | count/state/unidad del hecho | hereda contrato; no_data/stale/estimated/unreconciled nunca se convierten en VALID |
+| `ORD-002` | pedidos confirmados | Indicador canónico de pedidos confirmados, delimitado por el contrato ORD. | `C_DISTINCT(identidad canónica que satisface definición)` | count/state/unidad del hecho | hereda contrato; no_data/stale/estimated/unreconciled nunca se convierten en VALID |
+| `ORD-003` | pedidos entregados | Indicador canónico de pedidos entregados, delimitado por el contrato ORD. | `C_DISTINCT(identidad canónica que satisface definición)` | count/state/unidad del hecho | hereda contrato; no_data/stale/estimated/unreconciled nunca se convierten en VALID |
+| `ORD-004` | valor neto de pedidos | Indicador canónico de valor neto de pedidos, delimitado por el contrato ORD. | `S(order_net_amount confirmado)` | currency Decimal/Numeric | hereda contrato; no_data/stale/estimated/unreconciled nunca se convierten en VALID |
+| `ORD-005` | ticket promedio de pedido | Indicador canónico de ticket promedio de pedido, delimitado por el contrato ORD. | `ORD-004 / ORD-002` | count/state/unidad del hecho | hereda contrato; no_data/stale/estimated/unreconciled nunca se convierten en VALID |
+| `ORD-006` | saldo pendiente de pedidos | Indicador canónico de saldo pendiente de pedidos, delimitado por el contrato ORD. | `S(MAX(order_net_amount - settled_amount,0))` | currency Decimal/Numeric | hereda contrato; no_data/stale/estimated/unreconciled nunca se convierten en VALID |
+| `ORD-007` | cobertura de anticipo | Indicador canónico de cobertura de anticipo, delimitado por el contrato ORD. | `S(advance_amount) / S(required_advance_amount)` | ratio/% | hereda contrato; no_data/stale/estimated/unreconciled nunca se convierten en VALID |
+| `ORD-008` | bloqueos por anticipo insuficiente | Indicador canónico de bloqueos por anticipo insuficiente, delimitado por el contrato ORD. | `C_DISTINCT(identidad canónica que satisface definición)` | count/state/unidad del hecho | hereda contrato; no_data/stale/estimated/unreconciled nunca se convierten en VALID |
+| `ORD-009` | lead time | Indicador canónico de lead time, delimitado por el contrato ORD. | `AVG(delivered_at - confirmed_at)` | duration | hereda contrato; no_data/stale/estimated/unreconciled nunca se convierten en VALID |
+| `ORD-010` | entrega a tiempo | Indicador canónico de entrega a tiempo, delimitado por el contrato ORD. | `C(on_time) / C(entregas elegibles)` | duration | hereda contrato; no_data/stale/estimated/unreconciled nunca se convierten en VALID |
+| `ORD-011` | backlog por estado | Indicador canónico de backlog por estado, delimitado por el contrato ORD. | `C_DISTINCT(identidad canónica que satisface definición)` | count/state/unidad del hecho | hereda contrato; no_data/stale/estimated/unreconciled nunca se convierten en VALID |
+| `ORD-012` | aging de pedidos | Indicador canónico de aging de pedidos, delimitado por el contrato ORD. | `NOW_business - last_state_occurred_at` | duration | hereda contrato; no_data/stale/estimated/unreconciled nunca se convierten en VALID |
+| `ORD-013` | amendments por pedido | Indicador canónico de amendments por pedido, delimitado por el contrato ORD. | `C_DISTINCT(identidad canónica que satisface definición)` | count/state/unidad del hecho | hereda contrato; no_data/stale/estimated/unreconciled nunca se convierten en VALID |
+| `ORD-014` | delta económico de amendment | Indicador canónico de delta económico de amendment, delimitado por el contrato ORD. | `S(amended_total - previous_total)` | count/state/unidad del hecho | hereda contrato; no_data/stale/estimated/unreconciled nunca se convierten en VALID |
+| `ORD-015` | cancelación cliente pre-PRODUCTION_COMMITTED | Indicador canónico de cancelación cliente pre-PRODUCTION_COMMITTED, delimitado por el contrato ORD. | `C_DISTINCT(identidad canónica que satisface definición)` | count/state/unidad del hecho | hereda contrato; no_data/stale/estimated/unreconciled nunca se convierten en VALID |
+| `ORD-016` | cancelación cliente post-PRODUCTION_COMMITTED | Indicador canónico de cancelación cliente post-PRODUCTION_COMMITTED, delimitado por el contrato ORD. | `C_DISTINCT(identidad canónica que satisface definición)` | count/state/unidad del hecho | hereda contrato; no_data/stale/estimated/unreconciled nunca se convierten en VALID |
+| `ORD-017` | cancelación atribuible al comercio | Indicador canónico de cancelación atribuible al comercio, delimitado por el contrato ORD. | `C_DISTINCT(identidad canónica que satisface definición)` | count/state/unidad del hecho | hereda contrato; no_data/stale/estimated/unreconciled nunca se convierten en VALID |
+| `ORD-018` | expired/no-show | Indicador canónico de expired/no-show, delimitado por el contrato ORD. | `C_DISTINCT(identidad canónica que satisface definición)` | count/state/unidad del hecho | hereda contrato; no_data/stale/estimated/unreconciled nunca se convierten en VALID |
+| `ORD-019` | cumplimiento de cantidad | Indicador canónico de cumplimiento de cantidad, delimitado por el contrato ORD. | `S(delivered_quantity) / S(committed_quantity)` | ratio/% | hereda contrato; no_data/stale/estimated/unreconciled nunca se convierten en VALID |
+| `ORD-020` | amendments que producirían sobrepago | Indicador canónico de amendments que producirían sobrepago, delimitado por el contrato ORD. | `C(amendments donde settled_amount > amended_total)` | count/state/unidad del hecho | hereda contrato; no_data/stale/estimated/unreconciled nunca se convierten en VALID |
+
+#### Familia PRI — Pricing/promociones
+
+| kpi_id | name | definition | formula | unit | validity_conditions específicas |
+| --- | --- | --- | --- | --- | --- |
+| `PRI-001` | cobertura de precio válido | Indicador canónico de cobertura de precio válido, delimitado por el contrato PRI. | `C(ítems con precio vigente resoluble) / C(ítems elegibles)` | ratio/% | hereda contrato; no_data/stale/estimated/unreconciled nunca se convierten en VALID |
+| `PRI-002` | productos sin precio | Indicador canónico de productos sin precio, delimitado por el contrato PRI. | `C_DISTINCT(identidad canónica que satisface definición)` | count/state/unidad del hecho | hereda contrato; no_data/stale/estimated/unreconciled nunca se convierten en VALID |
+| `PRI-003` | conflictos de versiones | Indicador canónico de conflictos de versiones, delimitado por el contrato PRI. | `C_DISTINCT(identidad canónica que satisface definición)` | count/state/unidad del hecho | hereda contrato; no_data/stale/estimated/unreconciled nunca se convierten en VALID |
+| `PRI-004` | uso de branch override | Indicador canónico de uso de branch override, delimitado por el contrato PRI. | `C_DISTINCT(identidad canónica que satisface definición)` | count/state/unidad del hecho | hereda contrato; no_data/stale/estimated/unreconciled nunca se convierten en VALID |
+| `PRI-005` | descuento total | Indicador canónico de descuento total, delimitado por el contrato PRI. | `S(applied_discount_amount)` | currency Decimal/Numeric | hereda contrato; no_data/stale/estimated/unreconciled nunca se convierten en VALID |
+| `PRI-006` | tasa de descuento | Indicador canónico de tasa de descuento, delimitado por el contrato PRI. | `PRI-005 / S(pre_discount_amount)` | ratio/% | hereda contrato; no_data/stale/estimated/unreconciled nunca se convierten en VALID |
+| `PRI-007` | transacciones con promoción | Indicador canónico de transacciones con promoción, delimitado por el contrato PRI. | `C(transacciones con promoción) / C(elegibles)` | count/state/unidad del hecho | hereda contrato; no_data/stale/estimated/unreconciled nunca se convierten en VALID |
+| `PRI-008` | redención por regla/version | Indicador canónico de redención por regla/version, delimitado por el contrato PRI. | `C(redemptions por rule_id+version)` | count/state/unidad del hecho | hereda contrato; no_data/stale/estimated/unreconciled nunca se convierten en VALID |
+| `PRI-009` | descuento promedio en operación descontada | Indicador canónico de descuento promedio en operación descontada, delimitado por el contrato PRI. | `S(discount_amount) / C(operaciones descontadas)` | currency Decimal/Numeric | hereda contrato; no_data/stale/estimated/unreconciled nunca se convierten en VALID |
+| `PRI-010` | stacking explícito utilizado | Indicador canónico de stacking explícito utilizado, delimitado por el contrato PRI. | `C_DISTINCT(identidad canónica que satisface definición)` | count/state/unidad del hecho | hereda contrato; no_data/stale/estimated/unreconciled nunca se convierten en VALID |
+| `PRI-011` | conflictos de prioridad | Indicador canónico de conflictos de prioridad, delimitado por el contrato PRI. | `C_DISTINCT(identidad canónica que satisface definición)` | count/state/unidad del hecho | hereda contrato; no_data/stale/estimated/unreconciled nunca se convierten en VALID |
+| `PRI-012` | reglas inválidas bloqueadas | Indicador canónico de reglas inválidas bloqueadas, delimitado por el contrato PRI. | `C_DISTINCT(identidad canónica que satisface definición)` | count/state/unidad del hecho | hereda contrato; no_data/stale/estimated/unreconciled nunca se convierten en VALID |
+| `PRI-013` | PRICE_QUOTE_STALE | Indicador canónico de PRICE_QUOTE_STALE, delimitado por el contrato PRI. | `S(amount Decimal/Numeric elegible)` | currency Decimal/Numeric | hereda contrato; no_data/stale/estimated/unreconciled nunca se convierten en VALID |
+| `PRI-014` | reconfirmaciones por cambio | Indicador canónico de reconfirmaciones por cambio, delimitado por el contrato PRI. | `C_DISTINCT(identidad canónica que satisface definición)` | count/state/unidad del hecho | hereda contrato; no_data/stale/estimated/unreconciled nunca se convierten en VALID |
+| `PRI-015` | promociones de gratuidad 100% | Indicador canónico de promociones de gratuidad 100%, delimitado por el contrato PRI. | `medida qualifying válida/población elegible` | ratio/% | hereda contrato; no_data/stale/estimated/unreconciled nunca se convierten en VALID |
+
+#### Familia CASH — Caja
+
+| kpi_id | name | definition | formula | unit | validity_conditions específicas |
+| --- | --- | --- | --- | --- | --- |
+| `CASH-001` | efectivo esperado | Indicador canónico de efectivo esperado, delimitado por el contrato CASH. | `opening_cash + S(CASH inflows) - S(CASH outflows)` | currency Decimal/Numeric | hereda contrato; no_data/stale/estimated/unreconciled nunca se convierten en VALID |
+| `CASH-002` | efectivo contado | Indicador canónico de efectivo contado, delimitado por el contrato CASH. | `S(counted_cash)` | currency Decimal/Numeric | hereda contrato; no_data/stale/estimated/unreconciled nunca se convierten en VALID |
+| `CASH-003` | diferencia counted-expected | Indicador canónico de diferencia counted-expected, delimitado por el contrato CASH. | `CASH-002 - CASH-001` | count/state/unidad del hecho | hereda contrato; no_data/stale/estimated/unreconciled nunca se convierten en VALID |
+| `CASH-004` | diferencia absoluta | Indicador canónico de diferencia absoluta, delimitado por el contrato CASH. | `ABS(CASH-003)` | count/state/unidad del hecho | hereda contrato; no_data/stale/estimated/unreconciled nunca se convierten en VALID |
+| `CASH-005` | tasa de diferencia cuando sea válida | Indicador canónico de tasa de diferencia cuando sea válida, delimitado por el contrato CASH. | `CASH-004 / ABS(CASH-001), si != 0` | ratio/% | hereda contrato; no_data/stale/estimated/unreconciled nunca se convierten en VALID |
+| `CASH-006` | cierres realizados | Indicador canónico de cierres realizados, delimitado por el contrato CASH. | `C_DISTINCT(identidad canónica que satisface definición)` | count/state/unidad del hecho | hereda contrato; no_data/stale/estimated/unreconciled nunca se convierten en VALID |
+| `CASH-007` | cierres con diferencia | Indicador canónico de cierres con diferencia, delimitado por el contrato CASH. | `observado-esperado/comparable; preservar componentes` | count/state/unidad del hecho | hereda contrato; no_data/stale/estimated/unreconciled nunca se convierten en VALID |
+| `CASH-008` | cierres bloqueados | Indicador canónico de cierres bloqueados, delimitado por el contrato CASH. | `C_DISTINCT(identidad canónica que satisface definición)` | count/state/unidad del hecho | hereda contrato; no_data/stale/estimated/unreconciled nunca se convierten en VALID |
+| `CASH-009` | tiempo de cierre | Indicador canónico de tiempo de cierre, delimitado por el contrato CASH. | `AGG(timestamp_fin-timestamp_inicio) con business time` | duration | hereda contrato; no_data/stale/estimated/unreconciled nunca se convierten en VALID |
+| `CASH-010` | sesiones abiertas | Indicador canónico de sesiones abiertas, delimitado por el contrato CASH. | `C_DISTINCT(identidad canónica que satisface definición)` | count/state/unidad del hecho | hereda contrato; no_data/stale/estimated/unreconciled nunca se convierten en VALID |
+| `CASH-011` | aging de sesiones abiertas | Indicador canónico de aging de sesiones abiertas, delimitado por el contrato CASH. | `AGG(timestamp_fin-timestamp_inicio) con business time` | duration | hereda contrato; no_data/stale/estimated/unreconciled nunca se convierten en VALID |
+| `CASH-012` | entradas CASH | Indicador canónico de entradas CASH, delimitado por el contrato CASH. | `S(CASH inflows)` | count/state/unidad del hecho | hereda contrato; no_data/stale/estimated/unreconciled nunca se convierten en VALID |
+| `CASH-013` | salidas CASH | Indicador canónico de salidas CASH, delimitado por el contrato CASH. | `S(CASH outflows)` | count/state/unidad del hecho | hereda contrato; no_data/stale/estimated/unreconciled nunca se convierten en VALID |
+| `CASH-014` | movimientos manuales/extraordinarios | Indicador canónico de movimientos manuales/extraordinarios, delimitado por el contrato CASH. | `C_DISTINCT(identidad canónica que satisface definición)` | count/state/unidad del hecho | hereda contrato; no_data/stale/estimated/unreconciled nunca se convierten en VALID |
+| `CASH-015` | capacidad de refund CASH | Indicador canónico de capacidad de refund CASH, delimitado por el contrato CASH. | `S(amount Decimal/Numeric elegible)` | currency Decimal/Numeric | hereda contrato; no_data/stale/estimated/unreconciled nunca se convierten en VALID |
+| `CASH-016` | faltantes | Indicador canónico de faltantes, delimitado por el contrato CASH. | `S(ABS(MIN(CASH-003,0)))` | count/state/unidad del hecho | hereda contrato; no_data/stale/estimated/unreconciled nunca se convierten en VALID |
+| `CASH-017` | sobrantes | Indicador canónico de sobrantes, delimitado por el contrato CASH. | `S(MAX(CASH-003,0))` | count/state/unidad del hecho | hereda contrato; no_data/stale/estimated/unreconciled nunca se convierten en VALID |
+| `CASH-018` | replays idempotentes de cierre | Indicador canónico de replays idempotentes de cierre, delimitado por el contrato CASH. | `C_DISTINCT(identidad canónica que satisface definición)` | count/state/unidad del hecho | hereda contrato; no_data/stale/estimated/unreconciled nunca se convierten en VALID |
+
+#### Familia PAY — Pagos externos
+
+| kpi_id | name | definition | formula | unit | validity_conditions específicas |
+| --- | --- | --- | --- | --- | --- |
+| `PAY-001` | volumen externo | Indicador canónico de volumen externo, delimitado por el contrato PAY. | `S(external_completed_amount)` | currency Decimal/Numeric | VALID sólo con DEC-14 implementada y reconciliada; antes UNAVAILABLE |
+| `PAY-002` | capturas completadas | Indicador canónico de capturas completadas, delimitado por el contrato PAY. | `C_DISTINCT(identidad canónica que satisface definición)` | count/state/unidad del hecho | VALID sólo con DEC-14 implementada y reconciliada; antes UNAVAILABLE |
+| `PAY-003` | capture rate | Indicador canónico de capture rate, delimitado por el contrato PAY. | `C(capturas completadas)/C(intentos elegibles)` | ratio/% | VALID sólo con DEC-14 implementada y reconciliada; antes UNAVAILABLE |
+| `PAY-004` | decline rate | Indicador canónico de decline rate, delimitado por el contrato PAY. | `C(declines)/C(intentos elegibles)` | ratio/% | VALID sólo con DEC-14 implementada y reconciliada; antes UNAVAILABLE |
+| `PAY-005` | UNKNOWN rate | Indicador canónico de UNKNOWN rate, delimitado por el contrato PAY. | `C(UNKNOWN)/C(intentos elegibles)` | ratio/% | VALID sólo con DEC-14 implementada y reconciliada; antes UNAVAILABLE |
+| `PAY-006` | tiempo de resolución UNKNOWN | Indicador canónico de tiempo de resolución UNKNOWN, delimitado por el contrato PAY. | `AVG(resolved_at-unknown_at)` | duration | VALID sólo con DEC-14 implementada y reconciliada; antes UNAVAILABLE |
+| `PAY-007` | UNKNOWN count/amount abiertos | Indicador canónico de UNKNOWN count/amount abiertos, delimitado por el contrato PAY. | `C(UNKNOWN abiertos) y S(amount abierto), sin mezclar count/amount` | count/state/unidad del hecho | VALID sólo con DEC-14 implementada y reconciliada; antes UNAVAILABLE |
+| `PAY-008` | blind retries bloqueados | Indicador canónico de blind retries bloqueados, delimitado por el contrato PAY. | `C_DISTINCT(identidad canónica que satisface definición)` | count/state/unidad del hecho | VALID sólo con DEC-14 implementada y reconciliada; antes UNAVAILABLE |
+| `PAY-009` | MANUAL_FALLBACK count | Indicador canónico de MANUAL_FALLBACK count, delimitado por el contrato PAY. | `C_DISTINCT(identidad canónica que satisface definición)` | count/state/unidad del hecho | VALID sólo con DEC-14 implementada y reconciliada; antes UNAVAILABLE |
+| `PAY-010` | discrepancias de conciliación | Indicador canónico de discrepancias de conciliación, delimitado por el contrato PAY. | `observado-esperado/comparable; preservar componentes` | count/state/unidad del hecho | VALID sólo con DEC-14 implementada y reconciliada; antes UNAVAILABLE |
+| `PAY-011` | valor de discrepancias | Indicador canónico de valor de discrepancias, delimitado por el contrato PAY. | `S(ABS(provider_amount-local_amount))` | currency Decimal/Numeric | VALID sólo con DEC-14 implementada y reconciliada; antes UNAVAILABLE |
+| `PAY-012` | provider fees | Indicador canónico de provider fees, delimitado por el contrato PAY. | `S(provider_fee_amount)` | currency Decimal/Numeric | VALID sólo con DEC-14 implementada y reconciliada; antes UNAVAILABLE |
+| `PAY-013` | provider fee rate | Indicador canónico de provider fee rate, delimitado por el contrato PAY. | `PAY-012/PAY-001` | ratio/% | VALID sólo con DEC-14 implementada y reconciliada; antes UNAVAILABLE |
+| `PAY-014` | refunds externos completados | Indicador canónico de refunds externos completados, delimitado por el contrato PAY. | `S(amount Decimal/Numeric elegible)` | currency Decimal/Numeric | VALID sólo con DEC-14 implementada y reconciliada; antes UNAVAILABLE |
+| `PAY-015` | refunds externos UNKNOWN | Indicador canónico de refunds externos UNKNOWN, delimitado por el contrato PAY. | `S(amount Decimal/Numeric elegible)` | currency Decimal/Numeric | VALID sólo con DEC-14 implementada y reconciliada; antes UNAVAILABLE |
+| `PAY-016` | tiempo de refund | Indicador canónico de tiempo de refund, delimitado por el contrato PAY. | `AVG(refund_completed_at-refund_requested_at)` | duration | VALID sólo con DEC-14 implementada y reconciliada; antes UNAVAILABLE |
+| `PAY-017` | chargebacks/disputas | Indicador canónico de chargebacks/disputas, delimitado por el contrato PAY. | `C_DISTINCT(identidad canónica que satisface definición)` | count/state/unidad del hecho | VALID sólo con DEC-14 implementada y reconciliada; antes UNAVAILABLE |
+| `PAY-018` | capturas huérfanas | Indicador canónico de capturas huérfanas, delimitado por el contrato PAY. | `C_DISTINCT(identidad canónica que satisface definición)` | count/state/unidad del hecho | VALID sólo con DEC-14 implementada y reconciliada; antes UNAVAILABLE |
+
+#### Familia RET — Devoluciones
+
+| kpi_id | name | definition | formula | unit | validity_conditions específicas |
+| --- | --- | --- | --- | --- | --- |
+| `RET-001` | tasa de transacciones con devolución | Indicador canónico de tasa de transacciones con devolución, delimitado por el contrato RET. | `medida qualifying válida/población elegible` | ratio/% | hereda contrato; no_data/stale/estimated/unreconciled nunca se convierten en VALID |
+| `RET-002` | tasa de unidades devueltas | Indicador canónico de tasa de unidades devueltas, delimitado por el contrato RET. | `medida qualifying válida/población elegible` | ratio/% | hereda contrato; no_data/stale/estimated/unreconciled nunca se convierten en VALID |
+| `RET-003` | valor neto devuelto | Indicador canónico de valor neto devuelto, delimitado por el contrato RET. | `S(amount Decimal/Numeric elegible)` | currency Decimal/Numeric | hereda contrato; no_data/stale/estimated/unreconciled nunca se convierten en VALID |
+| `RET-004` | refund / ventas | Indicador canónico de refund / ventas, delimitado por el contrato RET. | `S(amount Decimal/Numeric elegible)` | currency Decimal/Numeric | hereda contrato; no_data/stale/estimated/unreconciled nunca se convierten en VALID |
+| `RET-005` | devoluciones parciales | Indicador canónico de devoluciones parciales, delimitado por el contrato RET. | `C_DISTINCT(identidad canónica que satisface definición)` | count/state/unidad del hecho | hereda contrato; no_data/stale/estimated/unreconciled nunca se convierten en VALID |
+| `RET-006` | restock rate | Indicador canónico de restock rate, delimitado por el contrato RET. | `medida qualifying válida/población elegible` | ratio/% | hereda contrato; no_data/stale/estimated/unreconciled nunca se convierten en VALID |
+| `RET-007` | quarantine rate | Indicador canónico de quarantine rate, delimitado por el contrato RET. | `medida qualifying válida/población elegible` | ratio/% | hereda contrato; no_data/stale/estimated/unreconciled nunca se convierten en VALID |
+| `RET-008` | return-to-waste rate | Indicador canónico de return-to-waste rate, delimitado por el contrato RET. | `medida qualifying válida/población elegible` | ratio/% | hereda contrato; no_data/stale/estimated/unreconciled nunca se convierten en VALID |
+| `RET-009` | NO_STOCK disposition rate | Indicador canónico de NO_STOCK disposition rate, delimitado por el contrato RET. | `medida qualifying válida/población elegible` | ratio/% | hereda contrato; no_data/stale/estimated/unreconciled nunca se convierten en VALID |
+| `RET-010` | tiempo de resolución | Indicador canónico de tiempo de resolución, delimitado por el contrato RET. | `AGG(timestamp_fin-timestamp_inicio) con business time` | duration | hereda contrato; no_data/stale/estimated/unreconciled nunca se convierten en VALID |
+| `RET-011` | refund pendiente | Indicador canónico de refund pendiente, delimitado por el contrato RET. | `S(amount Decimal/Numeric elegible)` | currency Decimal/Numeric | hereda contrato; no_data/stale/estimated/unreconciled nunca se convierten en VALID |
+| `RET-012` | sobre-refunds bloqueados | Indicador canónico de sobre-refunds bloqueados, delimitado por el contrato RET. | `S(amount Decimal/Numeric elegible)` | currency Decimal/Numeric | hereda contrato; no_data/stale/estimated/unreconciled nunca se convierten en VALID |
+
+#### Familia INV — Inventario
+
+| kpi_id | name | definition | formula | unit | validity_conditions específicas |
+| --- | --- | --- | --- | --- | --- |
+| `INV-001` | on hand | Indicador canónico de on hand, delimitado por el contrato INV. | `S(quantity en UOM compatible)` | quantity+UOM | hereda contrato; no_data/stale/estimated/unreconciled nunca se convierten en VALID |
+| `INV-002` | reservado | Indicador canónico de reservado, delimitado por el contrato INV. | `S(quantity en UOM compatible)` | quantity+UOM | hereda contrato; no_data/stale/estimated/unreconciled nunca se convierten en VALID |
+| `INV-003` | disponible | Indicador canónico de disponible, delimitado por el contrato INV. | `INV-001 - INV-002` | quantity+UOM | hereda contrato; no_data/stale/estimated/unreconciled nunca se convierten en VALID |
+| `INV-004` | valor inventario cuando costo válido | Indicador canónico de valor inventario cuando costo válido, delimitado por el contrato INV. | `S(on_hand_quantity * reconciled_unit_cost)` | currency Decimal/Numeric | hereda contrato; no_data/stale/estimated/unreconciled nunca se convierten en VALID |
+| `INV-005` | agotados | Indicador canónico de agotados, delimitado por el contrato INV. | `C_DISTINCT(identidad canónica que satisface definición)` | count/state/unidad del hecho | hereda contrato; no_data/stale/estimated/unreconciled nunca se convierten en VALID |
+| `INV-006` | tasa de agotados | Indicador canónico de tasa de agotados, delimitado por el contrato INV. | `medida qualifying válida/población elegible` | ratio/% | hereda contrato; no_data/stale/estimated/unreconciled nunca se convierten en VALID |
+| `INV-007` | stock negativo ordinario bloqueado | Indicador canónico de stock negativo ordinario bloqueado, delimitado por el contrato INV. | `S(quantity en UOM compatible)` | quantity+UOM | hereda contrato; no_data/stale/estimated/unreconciled nunca se convierten en VALID |
+| `INV-008` | ajustes | Indicador canónico de ajustes, delimitado por el contrato INV. | `C_DISTINCT(identidad canónica que satisface definición)` | count/state/unidad del hecho | hereda contrato; no_data/stale/estimated/unreconciled nunca se convierten en VALID |
+| `INV-009` | valor ajustes | Indicador canónico de valor ajustes, delimitado por el contrato INV. | `S(amount Decimal/Numeric elegible)` | currency Decimal/Numeric | hereda contrato; no_data/stale/estimated/unreconciled nunca se convierten en VALID |
+| `INV-010` | ajustes negativos excepcionales | Indicador canónico de ajustes negativos excepcionales, delimitado por el contrato INV. | `C_DISTINCT(identidad canónica que satisface definición)` | count/state/unidad del hecho | hereda contrato; no_data/stale/estimated/unreconciled nunca se convierten en VALID |
+| `INV-011` | reservation fill rate | Indicador canónico de reservation fill rate, delimitado por el contrato INV. | `S(reserved_filled)/S(reserved_required)` | ratio/% | hereda contrato; no_data/stale/estimated/unreconciled nunca se convierten en VALID |
+| `INV-012` | reservas liberadas | Indicador canónico de reservas liberadas, delimitado por el contrato INV. | `C_DISTINCT(identidad canónica que satisface definición)` | count/state/unidad del hecho | hereda contrato; no_data/stale/estimated/unreconciled nunca se convierten en VALID |
+| `INV-013` | aging reservas | Indicador canónico de aging reservas, delimitado por el contrato INV. | `AGG(timestamp_fin-timestamp_inicio) con business time` | duration | hereda contrato; no_data/stale/estimated/unreconciled nunca se convierten en VALID |
+| `INV-014` | transferencias despachadas | Indicador canónico de transferencias despachadas, delimitado por el contrato INV. | `C_DISTINCT(identidad canónica que satisface definición)` | count/state/unidad del hecho | hereda contrato; no_data/stale/estimated/unreconciled nunca se convierten en VALID |
+| `INV-015` | transferencias recibidas | Indicador canónico de transferencias recibidas, delimitado por el contrato INV. | `C_DISTINCT(identidad canónica que satisface definición)` | count/state/unidad del hecho | hereda contrato; no_data/stale/estimated/unreconciled nunca se convierten en VALID |
+| `INV-016` | discrepancia de transferencias | Indicador canónico de discrepancia de transferencias, delimitado por el contrato INV. | `observado-esperado/comparable; preservar componentes` | count/state/unidad del hecho | hereda contrato; no_data/stale/estimated/unreconciled nunca se convierten en VALID |
+| `INV-017` | tiempo de transferencia | Indicador canónico de tiempo de transferencia, delimitado por el contrato INV. | `AVG(received_at-dispatched_at)` | duration | hereda contrato; no_data/stale/estimated/unreconciled nunca se convierten en VALID |
+| `INV-018` | rotación cuando datos válidos | Indicador canónico de rotación cuando datos válidos, delimitado por el contrato INV. | `sold_or_consumed_quantity / AVG(inventory_quantity)` | count/state/unidad del hecho | hereda contrato; no_data/stale/estimated/unreconciled nunca se convierten en VALID |
+| `INV-019` | cobertura | Indicador canónico de cobertura, delimitado por el contrato INV. | `available_quantity / observed_demand_rate` | ratio/% | hereda contrato; no_data/stale/estimated/unreconciled nunca se convierten en VALID |
+| `INV-020` | inventario envejecido | Indicador canónico de inventario envejecido, delimitado por el contrato INV. | `C_DISTINCT(identidad canónica que satisface definición)` | count/state/unidad del hecho | hereda contrato; no_data/stale/estimated/unreconciled nunca se convierten en VALID |
+| `INV-021` | exactitud de conteo | Indicador canónico de exactitud de conteo, delimitado por el contrato INV. | `1 - S(ABS(counted-expected))/S(ABS(expected))` | ratio/% | hereda contrato; no_data/stale/estimated/unreconciled nunca se convierten en VALID |
+| `INV-022` | discrepancias de conteo | Indicador canónico de discrepancias de conteo, delimitado por el contrato INV. | `observado-esperado/comparable; preservar componentes` | count/state/unidad del hecho | hereda contrato; no_data/stale/estimated/unreconciled nunca se convierten en VALID |
+
+#### Familia PUR — Compras/proveedores
+
+| kpi_id | name | definition | formula | unit | validity_conditions específicas |
+| --- | --- | --- | --- | --- | --- |
+| `PUR-001` | valor comprado | Indicador canónico de valor comprado, delimitado por el contrato PUR. | `S(amount Decimal/Numeric elegible)` | currency Decimal/Numeric | hereda contrato; no_data/stale/estimated/unreconciled nunca se convierten en VALID |
+| `PUR-002` | cantidad recibida | Indicador canónico de cantidad recibida, delimitado por el contrato PUR. | `S(quantity en UOM compatible)` | quantity+UOM | hereda contrato; no_data/stale/estimated/unreconciled nunca se convierten en VALID |
+| `PUR-003` | órdenes abiertas | Indicador canónico de órdenes abiertas, delimitado por el contrato PUR. | `C_DISTINCT(identidad canónica que satisface definición)` | count/state/unidad del hecho | hereda contrato; no_data/stale/estimated/unreconciled nunca se convierten en VALID |
+| `PUR-004` | aging PO | Indicador canónico de aging PO, delimitado por el contrato PUR. | `AGG(timestamp_fin-timestamp_inicio) con business time` | duration | hereda contrato; no_data/stale/estimated/unreconciled nunca se convierten en VALID |
+| `PUR-005` | lead time proveedor | Indicador canónico de lead time proveedor, delimitado por el contrato PUR. | `AGG(timestamp_fin-timestamp_inicio) con business time` | duration | hereda contrato; no_data/stale/estimated/unreconciled nunca se convierten en VALID |
+| `PUR-006` | entrega a tiempo | Indicador canónico de entrega a tiempo, delimitado por el contrato PUR. | `AGG(timestamp_fin-timestamp_inicio) con business time` | duration | hereda contrato; no_data/stale/estimated/unreconciled nunca se convierten en VALID |
+| `PUR-007` | fill rate | Indicador canónico de fill rate, delimitado por el contrato PUR. | `medida qualifying válida/población elegible` | ratio/% | hereda contrato; no_data/stale/estimated/unreconciled nunca se convierten en VALID |
+| `PUR-008` | discrepancia recepción | Indicador canónico de discrepancia recepción, delimitado por el contrato PUR. | `observado-esperado/comparable; preservar componentes` | count/state/unidad del hecho | hereda contrato; no_data/stale/estimated/unreconciled nunca se convierten en VALID |
+| `PUR-009` | variación precio compra | Indicador canónico de variación precio compra, delimitado por el contrato PUR. | `observado-esperado/comparable; preservar componentes` | count/state/unidad del hecho | hereda contrato; no_data/stale/estimated/unreconciled nunca se convierten en VALID |
+| `PUR-010` | incidencias/defectos | Indicador canónico de incidencias/defectos, delimitado por el contrato PUR. | `C_DISTINCT(identidad canónica que satisface definición)` | count/state/unidad del hecho | hereda contrato; no_data/stale/estimated/unreconciled nunca se convierten en VALID |
+| `PUR-011` | compras por proveedor | Indicador canónico de compras por proveedor, delimitado por el contrato PUR. | `C_DISTINCT(identidad canónica que satisface definición)` | count/state/unidad del hecho | hereda contrato; no_data/stale/estimated/unreconciled nunca se convierten en VALID |
+| `PUR-012` | concentración proveedor | Indicador canónico de concentración proveedor, delimitado por el contrato PUR. | `C_DISTINCT(identidad canónica que satisface definición)` | count/state/unidad del hecho | hereda contrato; no_data/stale/estimated/unreconciled nunca se convierten en VALID |
+
+#### Familia PROD — Producción
+
+| kpi_id | name | definition | formula | unit | validity_conditions específicas |
+| --- | --- | --- | --- | --- | --- |
+| `PROD-001` | cantidad planeada | Indicador canónico de cantidad planeada, delimitado por el contrato PROD. | `S(quantity en UOM compatible)` | quantity+UOM | hereda contrato; no_data/stale/estimated/unreconciled nunca se convierten en VALID |
+| `PROD-002` | output bueno real | Indicador canónico de output bueno real, delimitado por el contrato PROD. | `S(quantity en UOM compatible)` | quantity+UOM | hereda contrato; no_data/stale/estimated/unreconciled nunca se convierten en VALID |
+| `PROD-003` | cumplimiento plan | Indicador canónico de cumplimiento plan, delimitado por el contrato PROD. | `PROD-002/PROD-001` | ratio/% | hereda contrato; no_data/stale/estimated/unreconciled nunca se convierten en VALID |
+| `PROD-004` | yield físico | Indicador canónico de yield físico, delimitado por el contrato PROD. | `S(good_output)/S(actual_input comparable)` | count/state/unidad del hecho | hereda contrato; no_data/stale/estimated/unreconciled nunca se convierten en VALID |
+| `PROD-005` | variación output | Indicador canónico de variación output, delimitado por el contrato PROD. | `PROD-002-PROD-001` | quantity+UOM | hereda contrato; no_data/stale/estimated/unreconciled nunca se convierten en VALID |
+| `PROD-006` | consumo teórico | Indicador canónico de consumo teórico, delimitado por el contrato PROD. | `S(quantity en UOM compatible)` | quantity+UOM | hereda contrato; no_data/stale/estimated/unreconciled nunca se convierten en VALID |
+| `PROD-007` | consumo real | Indicador canónico de consumo real, delimitado por el contrato PROD. | `S(quantity en UOM compatible)` | quantity+UOM | hereda contrato; no_data/stale/estimated/unreconciled nunca se convierten en VALID |
+| `PROD-008` | variación consumo | Indicador canónico de variación consumo, delimitado por el contrato PROD. | `PROD-007-PROD-006` | quantity+UOM | hereda contrato; no_data/stale/estimated/unreconciled nunca se convierten en VALID |
+| `PROD-009` | duración run | Indicador canónico de duración run, delimitado por el contrato PROD. | `completed_at-started_at` | duration | hereda contrato; no_data/stale/estimated/unreconciled nunca se convierten en VALID |
+| `PROD-010` | tiempo reconciliación | Indicador canónico de tiempo reconciliación, delimitado por el contrato PROD. | `reconciled_at-completed_at` | duration | hereda contrato; no_data/stale/estimated/unreconciled nunca se convierten en VALID |
+| `PROD-011` | reprocess | Indicador canónico de reprocess, delimitado por el contrato PROD. | `C_DISTINCT(identidad canónica que satisface definición)` | count/state/unidad del hecho | hereda contrato; no_data/stale/estimated/unreconciled nunca se convierten en VALID |
+| `PROD-012` | runs cancelados | Indicador canónico de runs cancelados, delimitado por el contrato PROD. | `C_DISTINCT(identidad canónica que satisface definición)` | count/state/unidad del hecho | hereda contrato; no_data/stale/estimated/unreconciled nunca se convierten en VALID |
+| `PROD-013` | pendientes reconciliación | Indicador canónico de pendientes reconciliación, delimitado por el contrato PROD. | `C_DISTINCT(identidad canónica que satisface definición)` | count/state/unidad del hecho | hereda contrato; no_data/stale/estimated/unreconciled nunca se convierten en VALID |
+| `PROD-014` | output asignado a pedidos | Indicador canónico de output asignado a pedidos, delimitado por el contrato PROD. | `S(quantity en UOM compatible)` | quantity+UOM | hereda contrato; no_data/stale/estimated/unreconciled nunca se convierten en VALID |
+| `PROD-015` | output asignado a stock | Indicador canónico de output asignado a stock, delimitado por el contrato PROD. | `S(quantity en UOM compatible)` | quantity+UOM | hereda contrato; no_data/stale/estimated/unreconciled nunca se convierten en VALID |
+| `PROD-016` | cobertura de demanda | Indicador canónico de cobertura de demanda, delimitado por el contrato PROD. | `S(output asignable)/S(demanda comprometida)` | ratio/% | hereda contrato; no_data/stale/estimated/unreconciled nunca se convierten en VALID |
+| `PROD-017` | material retornado | Indicador canónico de material retornado, delimitado por el contrato PROD. | `C_DISTINCT(identidad canónica que satisface definición)` | count/state/unidad del hecho | hereda contrato; no_data/stale/estimated/unreconciled nunca se convierten en VALID |
+| `PROD-018` | WIP sólo con evidencia canónica | Indicador canónico de WIP sólo con evidencia canónica, delimitado por el contrato PROD. | `S(quantity en UOM compatible)` | quantity+UOM | hereda contrato; no_data/stale/estimated/unreconciled nunca se convierten en VALID |
+| `PROD-019` | desviación receta | Indicador canónico de desviación receta, delimitado por el contrato PROD. | `S(ABS(actual_consumption-recipe_expected))` | count/state/unidad del hecho | hereda contrato; no_data/stale/estimated/unreconciled nunca se convierten en VALID |
+| `PROD-020` | utilización de capacidad cuando exista modelo válido | Indicador canónico de utilización de capacidad cuando exista modelo válido, delimitado por el contrato PROD. | `medida qualifying válida/población elegible` | ratio/% | hereda contrato; no_data/stale/estimated/unreconciled nunca se convierten en VALID |
+
+#### Familia WST — Merma
+
+| kpi_id | name | definition | formula | unit | validity_conditions específicas |
+| --- | --- | --- | --- | --- | --- |
+| `WST-001` | cantidad total | Indicador canónico de cantidad total, delimitado por el contrato WST. | `S(quantity en UOM compatible)` | quantity+UOM | hereda contrato; no_data/stale/estimated/unreconciled nunca se convierten en VALID |
+| `WST-002` | costo total | Indicador canónico de costo total, delimitado por el contrato WST. | `S(amount Decimal/Numeric elegible)` | currency Decimal/Numeric | hereda contrato; no_data/stale/estimated/unreconciled nunca se convierten en VALID |
+| `WST-003` | merma/producción comparable | Indicador canónico de merma/producción comparable, delimitado por el contrato WST. | `S(waste_quantity)/S(comparable_production_quantity)` | count/state/unidad del hecho | hereda contrato; no_data/stale/estimated/unreconciled nunca se convierten en VALID |
+| `WST-004` | merma/ventas comparable | Indicador canónico de merma/ventas comparable, delimitado por el contrato WST. | `S(waste_quantity)/S(comparable_sold_quantity)` | currency Decimal/Numeric | hereda contrato; no_data/stale/estimated/unreconciled nunca se convierten en VALID |
+| `WST-005` | costo merma/ventas | Indicador canónico de costo merma/ventas, delimitado por el contrato WST. | `S(valid_waste_cost)/SAL-003` | currency Decimal/Numeric | hereda contrato; no_data/stale/estimated/unreconciled nunca se convierten en VALID |
+| `WST-006` | por producto | Indicador canónico de por producto, delimitado por el contrato WST. | `C_DISTINCT(identidad canónica que satisface definición)` | count/state/unidad del hecho | hereda contrato; no_data/stale/estimated/unreconciled nunca se convierten en VALID |
+| `WST-007` | por causa | Indicador canónico de por causa, delimitado por el contrato WST. | `C_DISTINCT(identidad canónica que satisface definición)` | count/state/unidad del hecho | hereda contrato; no_data/stale/estimated/unreconciled nunca se convierten en VALID |
+| `WST-008` | por etapa | Indicador canónico de por etapa, delimitado por el contrato WST. | `C_DISTINCT(identidad canónica que satisface definición)` | count/state/unidad del hecho | hereda contrato; no_data/stale/estimated/unreconciled nunca se convierten en VALID |
+| `WST-009` | por lote | Indicador canónico de por lote, delimitado por el contrato WST. | `C_DISTINCT(identidad canónica que satisface definición)` | count/state/unidad del hecho | hereda contrato; no_data/stale/estimated/unreconciled nunca se convierten en VALID |
+| `WST-010` | sin causa clasificada | Indicador canónico de sin causa clasificada, delimitado por el contrato WST. | `C(mermas sin causa válida)/C(mermas)` | count/state/unidad del hecho | hereda contrato; no_data/stale/estimated/unreconciled nunca se convierten en VALID |
+| `WST-011` | quarantine qty/value | Indicador canónico de quarantine qty/value, delimitado por el contrato WST. | `C_DISTINCT(identidad canónica que satisface definición)` | count/state/unidad del hecho | hereda contrato; no_data/stale/estimated/unreconciled nunca se convierten en VALID |
+| `WST-012` | quarantine aging | Indicador canónico de quarantine aging, delimitado por el contrato WST. | `AGG(timestamp_fin-timestamp_inicio) con business time` | duration | hereda contrato; no_data/stale/estimated/unreconciled nunca se convierten en VALID |
+| `WST-013` | tendencia | Indicador canónico de tendencia, delimitado por el contrato WST. | `serie versionada actual vs periodo comparable` | count/state/unidad del hecho | hereda contrato; no_data/stale/estimated/unreconciled nunca se convierten en VALID |
+| `WST-014` | correcciones/compensaciones existentes de dominios ya aprobados | Indicador canónico de correcciones/compensaciones existentes de dominios ya aprobados, delimitado por el contrato WST. | `C_DISTINCT(identidad canónica que satisface definición)` | count/state/unidad del hecho | hereda contrato; no_data/stale/estimated/unreconciled nunca se convierten en VALID |
+
+#### Familia COST — Costos/rentabilidad
+
+| kpi_id | name | definition | formula | unit | validity_conditions específicas |
+| --- | --- | --- | --- | --- | --- |
+| `COST-001` | COGS | Indicador canónico de COGS, delimitado por el contrato COST. | `S(reconciled_COGS)` | count/state/unidad del hecho | VALID sólo con costo reconciliado; costo ausente => UNAVAILABLE |
+| `COST-002` | utilidad bruta | Indicador canónico de utilidad bruta, delimitado por el contrato COST. | `SAL-003-COST-001` | count/state/unidad del hecho | VALID sólo con costo reconciliado; costo ausente => UNAVAILABLE |
+| `COST-003` | margen bruto % | Indicador canónico de margen bruto %, delimitado por el contrato COST. | `COST-002/SAL-003` | ratio/% | VALID sólo con costo reconciliado; costo ausente => UNAVAILABLE |
+| `COST-004` | contribution margin | Indicador canónico de contribution margin, delimitado por el contrato COST. | `SAL-003-S(variable_costs_reconciled)` | count/state/unidad del hecho | VALID sólo con costo reconciliado; costo ausente => UNAVAILABLE |
+| `COST-005` | contribution margin % | Indicador canónico de contribution margin %, delimitado por el contrato COST. | `COST-004/SAL-003` | ratio/% | VALID sólo con costo reconciliado; costo ausente => UNAVAILABLE |
+| `COST-006` | costo unitario | Indicador canónico de costo unitario, delimitado por el contrato COST. | `S(reconciled_cost)/S(good_quantity)` | currency Decimal/Numeric | VALID sólo con costo reconciliado; costo ausente => UNAVAILABLE |
+| `COST-007` | costo estándar receta | Indicador canónico de costo estándar receta, delimitado por el contrato COST. | `S(recipe_expected_quantity*valid_component_cost)` | currency Decimal/Numeric | VALID sólo con costo reconciliado; costo ausente => UNAVAILABLE |
+| `COST-008` | variación real vs estándar | Indicador canónico de variación real vs estándar, delimitado por el contrato COST. | `actual_reconciled_cost-standard_recipe_cost` | count/state/unidad del hecho | VALID sólo con costo reconciliado; costo ausente => UNAVAILABLE |
+| `COST-009` | impacto económico merma | Indicador canónico de impacto económico merma, delimitado por el contrato COST. | `S(valid_waste_cost)` | count/state/unidad del hecho | VALID sólo con costo reconciliado; costo ausente => UNAVAILABLE |
+| `COST-010` | impacto económico refunds | Indicador canónico de impacto económico refunds, delimitado por el contrato COST. | `S(refund_amount+nonrecoverable_return_cost)` | currency Decimal/Numeric | VALID sólo con costo reconciliado; costo ausente => UNAVAILABLE |
+| `COST-011` | margen producto | Indicador canónico de margen producto, delimitado por el contrato COST. | `S(amount Decimal/Numeric elegible)` | currency Decimal/Numeric | VALID sólo con costo reconciliado; costo ausente => UNAVAILABLE |
+| `COST-012` | margen categoría | Indicador canónico de margen categoría, delimitado por el contrato COST. | `S(amount Decimal/Numeric elegible)` | currency Decimal/Numeric | VALID sólo con costo reconciliado; costo ausente => UNAVAILABLE |
+| `COST-013` | margen sucursal | Indicador canónico de margen sucursal, delimitado por el contrato COST. | `S(amount Decimal/Numeric elegible)` | currency Decimal/Numeric | VALID sólo con costo reconciliado; costo ausente => UNAVAILABLE |
+| `COST-014` | rentabilidad por canal | Indicador canónico de rentabilidad por canal, delimitado por el contrato COST. | `S(amount Decimal/Numeric elegible)` | currency Decimal/Numeric | VALID sólo con costo reconciliado; costo ausente => UNAVAILABLE |
+
+#### Familia DEM — Demanda
+
+| kpi_id | name | definition | formula | unit | validity_conditions específicas |
+| --- | --- | --- | --- | --- | --- |
+| `DEM-001` | velocidad de venta | Indicador canónico de velocidad de venta, delimitado por el contrato DEM. | `C_DISTINCT(identidad canónica que satisface definición)` | count/state/unidad del hecho | hereda contrato; no_data/stale/estimated/unreconciled nunca se convierten en VALID |
+| `DEM-002` | demanda por franja | Indicador canónico de demanda por franja, delimitado por el contrato DEM. | `C_DISTINCT(identidad canónica que satisface definición)` | count/state/unidad del hecho | hereda contrato; no_data/stale/estimated/unreconciled nunca se convierten en VALID |
+| `DEM-003` | demanda por weekday | Indicador canónico de demanda por weekday, delimitado por el contrato DEM. | `C_DISTINCT(identidad canónica que satisface definición)` | count/state/unidad del hecho | hereda contrato; no_data/stale/estimated/unreconciled nunca se convierten en VALID |
+| `DEM-004` | estacionalidad observada | Indicador canónico de estacionalidad observada, delimitado por el contrato DEM. | `serie versionada actual vs periodo comparable` | count/state/unidad del hecho | hereda contrato; no_data/stale/estimated/unreconciled nunca se convierten en VALID |
+| `DEM-005` | disponibilidad producto | Indicador canónico de disponibilidad producto, delimitado por el contrato DEM. | `medida qualifying válida/población elegible` | ratio/% | hereda contrato; no_data/stale/estimated/unreconciled nunca se convierten en VALID |
+| `DEM-006` | tasa/tiempo de agotado | Indicador canónico de tasa/tiempo de agotado, delimitado por el contrato DEM. | `medida qualifying válida/población elegible` | duration | hereda contrato; no_data/stale/estimated/unreconciled nunca se convierten en VALID |
+| `DEM-007` | sell-through | Indicador canónico de sell-through, delimitado por el contrato DEM. | `S(sold_quantity)/S(available_or_produced_quantity)` | count/state/unidad del hecho | hereda contrato; no_data/stale/estimated/unreconciled nunca se convierten en VALID |
+| `DEM-008` | gap producción-demanda | Indicador canónico de gap producción-demanda, delimitado por el contrato DEM. | `S(production_quantity)-S(observed_demand_quantity)` | count/state/unidad del hecho | hereda contrato; no_data/stale/estimated/unreconciled nunca se convierten en VALID |
+| `DEM-009` | variabilidad | Indicador canónico de variabilidad, delimitado por el contrato DEM. | `C_DISTINCT(identidad canónica que satisface definición)` | count/state/unidad del hecho | hereda contrato; no_data/stale/estimated/unreconciled nunca se convierten en VALID |
+| `DEM-010` | cobertura temporal | Indicador canónico de cobertura temporal, delimitado por el contrato DEM. | `medida qualifying válida/población elegible` | ratio/% | hereda contrato; no_data/stale/estimated/unreconciled nunca se convierten en VALID |
+| `DEM-F01` | forecast WAPE | Indicador canónico de forecast WAPE, delimitado por el contrato DEM. | `S(ABS(actual-forecast))/S(ABS(actual))` | count/state/unidad del hecho | FUTURE/UNAVAILABLE; no bloquea piloto ni producción v1 |
+| `DEM-F02` | forecast bias | Indicador canónico de forecast bias, delimitado por el contrato DEM. | `S(forecast-actual)/S(ABS(actual))` | count/state/unidad del hecho | FUTURE/UNAVAILABLE; no bloquea piloto ni producción v1 |
+| `DEM-F03` | forecast MAE | Indicador canónico de forecast MAE, delimitado por el contrato DEM. | `AVG(ABS(actual-forecast))` | count/state/unidad del hecho | FUTURE/UNAVAILABLE; no bloquea piloto ni producción v1 |
+| `DEM-F04` | forecast coverage | Indicador canónico de forecast coverage, delimitado por el contrato DEM. | `C(predicciones comparables)/C(predicciones esperadas)` | ratio/% | FUTURE/UNAVAILABLE; no bloquea piloto ni producción v1 |
+| `DEM-F05` | forecast error por horizonte | Indicador canónico de forecast error por horizonte, delimitado por el contrato DEM. | `error_metric por forecast_horizon` | count/state/unidad del hecho | FUTURE/UNAVAILABLE; no bloquea piloto ni producción v1 |
+
+#### Familia OPS — Operación/UX
+
+| kpi_id | name | definition | formula | unit | validity_conditions específicas |
+| --- | --- | --- | --- | --- | --- |
+| `OPS-001` | duración checkout | Indicador canónico de duración checkout, delimitado por el contrato OPS. | `AGG(timestamp_fin-timestamp_inicio) con business time` | duration | hereda contrato; no_data/stale/estimated/unreconciled nunca se convierten en VALID |
+| `OPS-002` | duración venta completa | Indicador canónico de duración venta completa, delimitado por el contrato OPS. | `AGG(timestamp_fin-timestamp_inicio) con business time` | duration | hereda contrato; no_data/stale/estimated/unreconciled nunca se convierten en VALID |
+| `OPS-003` | captura pedido | Indicador canónico de captura pedido, delimitado por el contrato OPS. | `C_DISTINCT(identidad canónica que satisface definición)` | count/state/unidad del hecho | hereda contrato; no_data/stale/estimated/unreconciled nunca se convierten en VALID |
+| `OPS-004` | devolución | Indicador canónico de devolución, delimitado por el contrato OPS. | `C_DISTINCT(identidad canónica que satisface definición)` | count/state/unidad del hecho | hereda contrato; no_data/stale/estimated/unreconciled nunca se convierten en VALID |
+| `OPS-005` | error rate por flujo | Indicador canónico de error rate por flujo, delimitado por el contrato OPS. | `medida qualifying válida/población elegible` | ratio/% | hereda contrato; no_data/stale/estimated/unreconciled nunca se convierten en VALID |
+| `OPS-006` | reintentos | Indicador canónico de reintentos, delimitado por el contrato OPS. | `C_DISTINCT(identidad canónica que satisface definición)` | count/state/unidad del hecho | hereda contrato; no_data/stale/estimated/unreconciled nunca se convierten en VALID |
+| `OPS-007` | duplicados bloqueados | Indicador canónico de duplicados bloqueados, delimitado por el contrato OPS. | `C_DISTINCT(identidad canónica que satisface definición)` | count/state/unidad del hecho | hereda contrato; no_data/stale/estimated/unreconciled nunca se convierten en VALID |
+| `OPS-008` | reimpresiones | Indicador canónico de reimpresiones, delimitado por el contrato OPS. | `C_DISTINCT(identidad canónica que satisface definición)` | count/state/unidad del hecho | hereda contrato; no_data/stale/estimated/unreconciled nunca se convierten en VALID |
+| `OPS-009` | uso scanner | Indicador canónico de uso scanner, delimitado por el contrato OPS. | `C_DISTINCT(identidad canónica que satisface definición)` | count/state/unidad del hecho | hereda contrato; no_data/stale/estimated/unreconciled nunca se convierten en VALID |
+| `OPS-010` | búsqueda/captura manual | Indicador canónico de búsqueda/captura manual, delimitado por el contrato OPS. | `C_DISTINCT(identidad canónica que satisface definición)` | count/state/unidad del hecho | hereda contrato; no_data/stale/estimated/unreconciled nunca se convierten en VALID |
+| `OPS-011` | fallos de periférico | Indicador canónico de fallos de periférico, delimitado por el contrato OPS. | `C_DISTINCT(identidad canónica que satisface definición)` | count/state/unidad del hecho | hereda contrato; no_data/stale/estimated/unreconciled nunca se convierten en VALID |
+| `OPS-012` | recuperación refresh/crash | Indicador canónico de recuperación refresh/crash, delimitado por el contrato OPS. | `C_DISTINCT(identidad canónica que satisface definición)` | count/state/unidad del hecho | hereda contrato; no_data/stale/estimated/unreconciled nunca se convierten en VALID |
+| `OPS-013` | cotizaciones stale | Indicador canónico de cotizaciones stale, delimitado por el contrato OPS. | `C_DISTINCT(identidad canónica que satisface definición)` | count/state/unidad del hecho | hereda contrato; no_data/stale/estimated/unreconciled nunca se convierten en VALID |
+| `OPS-014` | mutaciones rechazadas por backend no disponible | Indicador canónico de mutaciones rechazadas por backend no disponible, delimitado por el contrato OPS. | `S(quantity en UOM compatible)` | quantity+UOM | hereda contrato; no_data/stale/estimated/unreconciled nunca se convierten en VALID |
+
+#### Familia ASY — Worker/outbox
+
+| kpi_id | name | definition | formula | unit | validity_conditions específicas |
+| --- | --- | --- | --- | --- | --- |
+| `ASY-001` | backlog | Indicador canónico de backlog, delimitado por el contrato ASY. | `C(outbox pendiente/procesando)` | count/state/unidad del hecho | hereda contrato; no_data/stale/estimated/unreconciled nunca se convierten en VALID |
+| `ASY-002` | oldest_event_age | Indicador canónico de oldest_event_age, delimitado por el contrato ASY. | `NOW_recorded-MIN(recorded_at pendiente)` | count/state/unidad del hecho | hereda contrato; no_data/stale/estimated/unreconciled nunca se convierten en VALID |
+| `ASY-003` | throughput | Indicador canónico de throughput, delimitado por el contrato ASY. | `C(acknowledged)/ventana` | count/state/unidad del hecho | hereda contrato; no_data/stale/estimated/unreconciled nunca se convierten en VALID |
+| `ASY-004` | processing latency | Indicador canónico de processing latency, delimitado por el contrato ASY. | `AVG(acknowledged_at-recorded_at)` | duration | hereda contrato; no_data/stale/estimated/unreconciled nunca se convierten en VALID |
+| `ASY-005` | retry rate | Indicador canónico de retry rate, delimitado por el contrato ASY. | `C(retry attempts)/C(attempts)` | ratio/% | hereda contrato; no_data/stale/estimated/unreconciled nunca se convierten en VALID |
+| `ASY-006` | failure rate | Indicador canónico de failure rate, delimitado por el contrato ASY. | `C(failed attempts)/C(attempts)` | ratio/% | hereda contrato; no_data/stale/estimated/unreconciled nunca se convierten en VALID |
+| `ASY-007` | DLQ | Indicador canónico de DLQ, delimitado por el contrato ASY. | `C_DISTINCT(identidad canónica que satisface definición)` | count/state/unidad del hecho | hereda contrato; no_data/stale/estimated/unreconciled nunca se convierten en VALID |
+| `ASY-008` | stuck events | Indicador canónico de stuck events, delimitado por el contrato ASY. | `C_DISTINCT(identidad canónica que satisface definición)` | count/state/unidad del hecho | hereda contrato; no_data/stale/estimated/unreconciled nunca se convierten en VALID |
+| `ASY-009` | attempts/event | Indicador canónico de attempts/event, delimitado por el contrato ASY. | `AVG(attempt_count por event_id)` | count/state/unidad del hecho | hereda contrato; no_data/stale/estimated/unreconciled nunca se convierten en VALID |
+| `ASY-010` | duplicate deliveries deduplicated | Indicador canónico de duplicate deliveries deduplicated, delimitado por el contrato ASY. | `C(deliveries repetidas neutralizadas)` | count/state/unidad del hecho | hereda contrato; no_data/stale/estimated/unreconciled nunca se convierten en VALID |
+| `ASY-011` | consumer lag | Indicador canónico de consumer lag, delimitado por el contrato ASY. | `NOW_recorded-last_acknowledged_recorded_at` | duration | hereda contrato; no_data/stale/estimated/unreconciled nunca se convierten en VALID |
+| `ASY-012` | projection freshness | Indicador canónico de projection freshness, delimitado por el contrato ASY. | `NOW_business-MAX(projected_occurred_at)` | duration | hereda contrato; no_data/stale/estimated/unreconciled nunca se convierten en VALID |
+| `ASY-013` | replay success | Indicador canónico de replay success, delimitado por el contrato ASY. | `C(replays verificados)/C(replays ejecutados)` | ratio/% | hereda contrato; no_data/stale/estimated/unreconciled nunca se convierten en VALID |
+| `ASY-014` | rebuild determinism | Indicador canónico de rebuild determinism, delimitado por el contrato ASY. | `HASH(rebuild_1 normalizado)==HASH(rebuild_2 normalizado)` | count/state/unidad del hecho | hereda contrato; no_data/stale/estimated/unreconciled nunca se convierten en VALID |
+
+#### Familia ALT — Alertas/incidentes
+
+| kpi_id | name | definition | formula | unit | validity_conditions específicas |
+| --- | --- | --- | --- | --- | --- |
+| `ALT-001` | alertas activas | Indicador canónico de alertas activas, delimitado por el contrato ALT. | `C_DISTINCT(identidad canónica que satisface definición)` | count/state/unidad del hecho | hereda contrato; no_data/stale/estimated/unreconciled nunca se convierten en VALID |
+| `ALT-002` | CRITICAL-A activas | Indicador canónico de CRITICAL-A activas, delimitado por el contrato ALT. | `C_DISTINCT(identidad canónica que satisface definición)` | count/state/unidad del hecho | hereda contrato; no_data/stale/estimated/unreconciled nunca se convierten en VALID |
+| `ALT-003` | CRITICAL-B | Indicador canónico de CRITICAL-B, delimitado por el contrato ALT. | `C_DISTINCT(identidad canónica que satisface definición)` | count/state/unidad del hecho | hereda contrato; no_data/stale/estimated/unreconciled nunca se convierten en VALID |
+| `ALT-004` | CRITICAL-C | Indicador canónico de CRITICAL-C, delimitado por el contrato ALT. | `C_DISTINCT(identidad canónica que satisface definición)` | count/state/unidad del hecho | hereda contrato; no_data/stale/estimated/unreconciled nunca se convierten en VALID |
+| `ALT-005` | time-to-ACK | Indicador canónico de time-to-ACK, delimitado por el contrato ALT. | `AVG(acknowledged_at-opened_at)` | count/state/unidad del hecho | hereda contrato; no_data/stale/estimated/unreconciled nunca se convierten en VALID |
+| `ALT-006` | ACK dentro de política | Indicador canónico de ACK dentro de política, delimitado por el contrato ALT. | `C(ACK dentro de A=5m/B=15m/C=60m aplicable)/C(elegibles)` | count/state/unidad del hecho | hereda contrato; no_data/stale/estimated/unreconciled nunca se convierten en VALID |
+| `ALT-007` | escalation rate | Indicador canónico de escalation rate, delimitado por el contrato ALT. | `C(escaladas)/C(críticas elegibles)` | ratio/% | hereda contrato; no_data/stale/estimated/unreconciled nunca se convierten en VALID |
+| `ALT-008` | time-to-resolution | Indicador canónico de time-to-resolution, delimitado por el contrato ALT. | `AVG(resolved_at-opened_at)` | count/state/unidad del hecho | hereda contrato; no_data/stale/estimated/unreconciled nunca se convierten en VALID |
+| `ALT-009` | aging abiertas | Indicador canónico de aging abiertas, delimitado por el contrato ALT. | `NOW_business-opened_at` | duration | hereda contrato; no_data/stale/estimated/unreconciled nunca se convierten en VALID |
+| `ALT-010` | recurrence | Indicador canónico de recurrence, delimitado por el contrato ALT. | `C_DISTINCT(identidad canónica que satisface definición)` | count/state/unidad del hecho | hereda contrato; no_data/stale/estimated/unreconciled nunca se convierten en VALID |
+| `ALT-011` | deduplicación | Indicador canónico de deduplicación, delimitado por el contrato ALT. | `C_DISTINCT(identidad canónica que satisface definición)` | count/state/unidad del hecho | hereda contrato; no_data/stale/estimated/unreconciled nunca se convierten en VALID |
+| `ALT-012` | Telegram delivery success | Indicador canónico de Telegram delivery success, delimitado por el contrato ALT. | `C(Telegram confirmadas)/C(Telegram intentadas)` | ratio/% | hereda contrato; no_data/stale/estimated/unreconciled nunca se convierten en VALID |
+| `ALT-013` | Telegram pending backlog | Indicador canónico de Telegram pending backlog, delimitado por el contrato ALT. | `C_DISTINCT(identidad canónica que satisface definición)` | count/state/unidad del hecho | hereda contrato; no_data/stale/estimated/unreconciled nunca se convierten en VALID |
+| `ALT-014` | escalamiento secundario | Indicador canónico de escalamiento secundario, delimitado por el contrato ALT. | `C_DISTINCT(identidad canónica que satisface definición)` | count/state/unidad del hecho | hereda contrato; no_data/stale/estimated/unreconciled nunca se convierten en VALID |
+| `ALT-015` | alertas sin acción definida | Indicador canónico de alertas sin acción definida, delimitado por el contrato ALT. | `C(alertas sin action_contract)` | count/state/unidad del hecho | hereda contrato; no_data/stale/estimated/unreconciled nunca se convierten en VALID |
+
+#### Familia SRE — Plataforma/SRE
+
+| kpi_id | name | definition | formula | unit | validity_conditions específicas |
+| --- | --- | --- | --- | --- | --- |
+| `SRE-001` | disponibilidad API | Indicador canónico de disponibilidad API, delimitado por el contrato SRE. | `tiempo API ready/ventana` | ratio/% | hereda contrato; no_data/stale/estimated/unreconciled nunca se convierten en VALID |
+| `SRE-002` | disponibilidad DB | Indicador canónico de disponibilidad DB, delimitado por el contrato SRE. | `tiempo DB disponible/ventana` | ratio/% | hereda contrato; no_data/stale/estimated/unreconciled nunca se convierten en VALID |
+| `SRE-003` | disponibilidad backend local de tienda | Indicador canónico de disponibilidad backend local de tienda, delimitado por el contrato SRE. | `tiempo backend local ready/ventana` | ratio/% | hereda contrato; no_data/stale/estimated/unreconciled nunca se convierten en VALID |
+| `SRE-004` | API latency p50 | Indicador canónico de API latency p50, delimitado por el contrato SRE. | `PERCENTILE_CONT(0.50,api_latency)` | duration | hereda contrato; no_data/stale/estimated/unreconciled nunca se convierten en VALID |
+| `SRE-005` | p95 | Indicador canónico de p95, delimitado por el contrato SRE. | `PERCENTILE_CONT(0.95,api_latency)` | duration | hereda contrato; no_data/stale/estimated/unreconciled nunca se convierten en VALID |
+| `SRE-006` | p99 | Indicador canónico de p99, delimitado por el contrato SRE. | `PERCENTILE_CONT(0.99,api_latency)` | duration | hereda contrato; no_data/stale/estimated/unreconciled nunca se convierten en VALID |
+| `SRE-007` | throughput | Indicador canónico de throughput, delimitado por el contrato SRE. | `C(requests)/ventana` | count/state/unidad del hecho | hereda contrato; no_data/stale/estimated/unreconciled nunca se convierten en VALID |
+| `SRE-008` | 5xx rate | Indicador canónico de 5xx rate, delimitado por el contrato SRE. | `C(5xx)/C(requests)` | ratio/% | hereda contrato; no_data/stale/estimated/unreconciled nunca se convierten en VALID |
+| `SRE-009` | business-error rate separado | Indicador canónico de business-error rate separado, delimitado por el contrato SRE. | `C(business_errors)/C(business_operations)` | ratio/% | hereda contrato; no_data/stale/estimated/unreconciled nunca se convierten en VALID |
+| `SRE-010` | DB connection utilization | Indicador canónico de DB connection utilization, delimitado por el contrato SRE. | `active_connections/configured_capacity` | count/state/unidad del hecho | hereda contrato; no_data/stale/estimated/unreconciled nunca se convierten en VALID |
+| `SRE-011` | slow queries | Indicador canónico de slow queries, delimitado por el contrato SRE. | `C_DISTINCT(identidad canónica que satisface definición)` | count/state/unidad del hecho | hereda contrato; no_data/stale/estimated/unreconciled nunca se convierten en VALID |
+| `SRE-012` | lock wait | Indicador canónico de lock wait, delimitado por el contrato SRE. | `C_DISTINCT(identidad canónica que satisface definición)` | count/state/unidad del hecho | hereda contrato; no_data/stale/estimated/unreconciled nunca se convierten en VALID |
+| `SRE-013` | deadlocks | Indicador canónico de deadlocks, delimitado por el contrato SRE. | `C_DISTINCT(identidad canónica que satisface definición)` | count/state/unidad del hecho | hereda contrato; no_data/stale/estimated/unreconciled nunca se convierten en VALID |
+| `SRE-014` | CPU | Indicador canónico de CPU, delimitado por el contrato SRE. | `C_DISTINCT(identidad canónica que satisface definición)` | count/state/unidad del hecho | hereda contrato; no_data/stale/estimated/unreconciled nunca se convierten en VALID |
+| `SRE-015` | RAM | Indicador canónico de RAM, delimitado por el contrato SRE. | `C_DISTINCT(identidad canónica que satisface definición)` | count/state/unidad del hecho | hereda contrato; no_data/stale/estimated/unreconciled nunca se convierten en VALID |
+| `SRE-016` | disk | Indicador canónico de disk, delimitado por el contrato SRE. | `C_DISTINCT(identidad canónica que satisface definición)` | count/state/unidad del hecho | hereda contrato; no_data/stale/estimated/unreconciled nunca se convierten en VALID |
+| `SRE-017` | disk growth | Indicador canónico de disk growth, delimitado por el contrato SRE. | `C_DISTINCT(identidad canónica que satisface definición)` | count/state/unidad del hecho | hereda contrato; no_data/stale/estimated/unreconciled nunca se convierten en VALID |
+| `SRE-018` | readiness failures | Indicador canónico de readiness failures, delimitado por el contrato SRE. | `C_DISTINCT(identidad canónica que satisface definición)` | count/state/unidad del hecho | hereda contrato; no_data/stale/estimated/unreconciled nunca se convierten en VALID |
+| `SRE-019` | process restarts | Indicador canónico de process restarts, delimitado por el contrato SRE. | `C_DISTINCT(identidad canónica que satisface definición)` | count/state/unidad del hecho | hereda contrato; no_data/stale/estimated/unreconciled nunca se convierten en VALID |
+| `SRE-020` | local server uptime | Indicador canónico de local server uptime, delimitado por el contrato SRE. | `C_DISTINCT(identidad canónica que satisface definición)` | duration | hereda contrato; no_data/stale/estimated/unreconciled nunca se convierten en VALID |
+
+#### Familia DQ — Calidad de datos
+
+| kpi_id | name | definition | formula | unit | validity_conditions específicas |
+| --- | --- | --- | --- | --- | --- |
+| `DQ-001` | discrepancias reconciliación | Indicador canónico de discrepancias reconciliación, delimitado por el contrato DQ. | `observado-esperado/comparable; preservar componentes` | count/state/unidad del hecho | hereda contrato; no_data/stale/estimated/unreconciled nunca se convierten en VALID |
+| `DQ-002` | valor discrepancias | Indicador canónico de valor discrepancias, delimitado por el contrato DQ. | `observado-esperado/comparable; preservar componentes` | currency Decimal/Numeric | hereda contrato; no_data/stale/estimated/unreconciled nunca se convierten en VALID |
+| `DQ-003` | duplicados causales | Indicador canónico de duplicados causales, delimitado por el contrato DQ. | `C_DISTINCT(identidad canónica que satisface definición)` | count/state/unidad del hecho | hereda contrato; no_data/stale/estimated/unreconciled nunca se convierten en VALID |
+| `DQ-004` | orphans | Indicador canónico de orphans, delimitado por el contrato DQ. | `C_DISTINCT(identidad canónica que satisface definición)` | count/state/unidad del hecho | hereda contrato; no_data/stale/estimated/unreconciled nunca se convierten en VALID |
+| `DQ-005` | completeness | Indicador canónico de completeness, delimitado por el contrato DQ. | `C(requeridos presentes)/C(requeridos)` | ratio/% | hereda contrato; no_data/stale/estimated/unreconciled nunca se convierten en VALID |
+| `DQ-006` | freshness | Indicador canónico de freshness, delimitado por el contrato DQ. | `AGG(timestamp_fin-timestamp_inicio) con business time` | duration | hereda contrato; no_data/stale/estimated/unreconciled nunca se convierten en VALID |
+| `DQ-007` | event envelope completeness | Indicador canónico de event envelope completeness, delimitado por el contrato DQ. | `C(envelopes completos)/C(eventos relevantes)` | ratio/% | hereda contrato; no_data/stale/estimated/unreconciled nunca se convierten en VALID |
+| `DQ-008` | correlation coverage | Indicador canónico de correlation coverage, delimitado por el contrato DQ. | `C(correlation completo)/C(requeridos)` | ratio/% | hereda contrato; no_data/stale/estimated/unreconciled nunca se convierten en VALID |
+| `DQ-009` | causation coverage | Indicador canónico de causation coverage, delimitado por el contrato DQ. | `C(causation completo)/C(requeridos)` | ratio/% | hereda contrato; no_data/stale/estimated/unreconciled nunca se convierten en VALID |
+| `DQ-010` | lineage coverage | Indicador canónico de lineage coverage, delimitado por el contrato DQ. | `C(lineage completo)/C(hechos relevantes)` | duration | hereda contrato; no_data/stale/estimated/unreconciled nunca se convierten en VALID |
+| `DQ-011` | projection reconciliation variance | Indicador canónico de projection reconciliation variance, delimitado por el contrato DQ. | `projection_value-authoritative_OLTP_value` | count/state/unidad del hecho | hereda contrato; no_data/stale/estimated/unreconciled nunca se convierten en VALID |
+| `DQ-012` | rebuild variance | Indicador canónico de rebuild variance, delimitado por el contrato DQ. | `rebuild_value-authoritative_expected_value` | count/state/unidad del hecho | hereda contrato; no_data/stale/estimated/unreconciled nunca se convierten en VALID |
+| `DQ-013` | stale projections | Indicador canónico de stale projections, delimitado por el contrato DQ. | `C_DISTINCT(identidad canónica que satisface definición)` | count/state/unidad del hecho | hereda contrato; no_data/stale/estimated/unreconciled nunca se convierten en VALID |
+| `DQ-014` | unresolved quality incidents | Indicador canónico de unresolved quality incidents, delimitado por el contrato DQ. | `C_DISTINCT(identidad canónica que satisface definición)` | count/state/unidad del hecho | hereda contrato; no_data/stale/estimated/unreconciled nunca se convierten en VALID |
+| `DQ-015` | cross-branch leakage findings | Indicador canónico de cross-branch leakage findings, delimitado por el contrato DQ. | `AGG(timestamp_fin-timestamp_inicio) con business time` | duration | hereda contrato; no_data/stale/estimated/unreconciled nunca se convierten en VALID |
+
+#### Familia SEC — Seguridad
+
+| kpi_id | name | definition | formula | unit | validity_conditions específicas |
+| --- | --- | --- | --- | --- | --- |
+| `SEC-001` | login failures | Indicador canónico de login failures, delimitado por el contrato SEC. | `C_DISTINCT(identidad canónica que satisface definición)` | count/state/unidad del hecho | hereda contrato; no_data/stale/estimated/unreconciled nunca se convierten en VALID |
+| `SEC-002` | lockouts | Indicador canónico de lockouts, delimitado por el contrato SEC. | `C_DISTINCT(identidad canónica que satisface definición)` | count/state/unidad del hecho | hereda contrato; no_data/stale/estimated/unreconciled nunca se convierten en VALID |
+| `SEC-003` | authorization denies | Indicador canónico de authorization denies, delimitado por el contrato SEC. | `C_DISTINCT(identidad canónica que satisface definición)` | count/state/unidad del hecho | hereda contrato; no_data/stale/estimated/unreconciled nunca se convierten en VALID |
+| `SEC-004` | scope denies | Indicador canónico de scope denies, delimitado por el contrato SEC. | `C_DISTINCT(identidad canónica que satisface definición)` | count/state/unidad del hecho | hereda contrato; no_data/stale/estimated/unreconciled nunca se convierten en VALID |
+| `SEC-005` | privilege changes | Indicador canónico de privilege changes, delimitado por el contrato SEC. | `C_DISTINCT(identidad canónica que satisface definición)` | count/state/unidad del hecho | hereda contrato; no_data/stale/estimated/unreconciled nunca se convierten en VALID |
+| `SEC-006` | session revocations | Indicador canónico de session revocations, delimitado por el contrato SEC. | `C_DISTINCT(identidad canónica que satisface definición)` | count/state/unidad del hecho | hereda contrato; no_data/stale/estimated/unreconciled nunca se convierten en VALID |
+| `SEC-007` | session anomalies | Indicador canónico de session anomalies, delimitado por el contrato SEC. | `C_DISTINCT(identidad canónica que satisface definición)` | count/state/unidad del hecho | hereda contrato; no_data/stale/estimated/unreconciled nunca se convierten en VALID |
+| `SEC-008` | CSRF/Origin rejects | Indicador canónico de CSRF/Origin rejects, delimitado por el contrato SEC. | `C_DISTINCT(identidad canónica que satisface definición)` | count/state/unidad del hecho | hereda contrato; no_data/stale/estimated/unreconciled nunca se convierten en VALID |
+| `SEC-009` | sensitive operations | Indicador canónico de sensitive operations, delimitado por el contrato SEC. | `C_DISTINCT(identidad canónica que satisface definición)` | count/state/unidad del hecho | hereda contrato; no_data/stale/estimated/unreconciled nunca se convierten en VALID |
+| `SEC-010` | sensitive operation missing required reason | Indicador canónico de sensitive operation missing required reason, delimitado por el contrato SEC. | `C_DISTINCT(identidad canónica que satisface definición)` | count/state/unidad del hecho | hereda contrato; no_data/stale/estimated/unreconciled nunca se convierten en VALID |
+| `SEC-011` | PII/secrets in logs findings | Indicador canónico de PII/secrets in logs findings, delimitado por el contrato SEC. | `C_DISTINCT(identidad canónica que satisface definición)` | count/state/unidad del hecho | hereda contrato; no_data/stale/estimated/unreconciled nunca se convierten en VALID |
+| `SEC-012` | insecure browser token/storage findings | Indicador canónico de insecure browser token/storage findings, delimitado por el contrato SEC. | `AGG(timestamp_fin-timestamp_inicio) con business time` | duration | hereda contrato; no_data/stale/estimated/unreconciled nunca se convierten en VALID |
+| `SEC-013` | active superadmins | Indicador canónico de active superadmins, delimitado por el contrato SEC. | `C_DISTINCT(identidad canónica que satisface definición)` | count/state/unidad del hecho | hereda contrato; no_data/stale/estimated/unreconciled nunca se convierten en VALID |
+| `SEC-014` | break-glass uses | Indicador canónico de break-glass uses, delimitado por el contrato SEC. | `C_DISTINCT(identidad canónica que satisface definición)` | count/state/unidad del hecho | hereda contrato; no_data/stale/estimated/unreconciled nunca se convierten en VALID |
+| `SEC-015` | superadmin changes under dual control | Indicador canónico de superadmin changes under dual control, delimitado por el contrato SEC. | `C_DISTINCT(identidad canónica que satisface definición)` | count/state/unidad del hecho | hereda contrato; no_data/stale/estimated/unreconciled nunca se convierten en VALID |
+
+#### Familia RES — Resiliencia LOCAL_FIRST
+
+| kpi_id | name | definition | formula | unit | validity_conditions específicas |
+| --- | --- | --- | --- | --- | --- |
+| `RES-001` | backup success | Indicador canónico de backup success, delimitado por el contrato RES. | `medida qualifying válida/población elegible` | ratio/% | VALID sólo con evidencia observada |
+| `RES-002` | age last valid backup | Indicador canónico de age last valid backup, delimitado por el contrato RES. | `NOW_recorded-last_valid_backup_completed_at` | duration | VALID sólo con evidencia observada |
+| `RES-003` | off-site replication lag | Indicador canónico de off-site replication lag, delimitado por el contrato RES. | `primary_durable_position_time-offsite_durable_position_time` | duration | VALID sólo con evidencia observada |
+| `RES-004` | standby replication lag | Indicador canónico de standby replication lag, delimitado por el contrato RES. | `primary_commit_position_time-standby_replay_position_time` | duration | VALID sólo con evidencia observada |
+| `RES-005` | standby health | Indicador canónico de standby health, delimitado por el contrato RES. | `C_DISTINCT(identidad canónica que satisface definición)` | count/state/unidad del hecho | VALID sólo con evidencia observada |
+| `RES-006` | restore drill pass | Indicador canónico de restore drill pass, delimitado por el contrato RES. | `C_DISTINCT(identidad canónica que satisface definición)` | count/state/unidad del hecho | VALID sólo con evidencia observada |
+| `RES-007` | restore duration | Indicador canónico de restore duration, delimitado por el contrato RES. | `restore_ready_at-restore_started_at` | count/state/unidad del hecho | VALID sólo con evidencia observada |
+| `RES-008` | observed RPO | Indicador canónico de observed RPO, delimitado por el contrato RES. | `last_confirmed_occurred_at-last_recovered_occurred_at` | count/state/unidad del hecho | VALID sólo con evidencia observada |
+| `RES-009` | observed RTO | Indicador canónico de observed RTO, delimitado por el contrato RES. | `service_recovered_at-incident_started_at` | count/state/unidad del hecho | VALID sólo con evidencia observada |
+| `RES-010` | local failover success | Indicador canónico de local failover success, delimitado por el contrato RES. | `medida qualifying válida/población elegible` | ratio/% | VALID sólo con evidencia observada |
+| `RES-011` | DR drill success | Indicador canónico de DR drill success, delimitado por el contrato RES. | `medida qualifying válida/población elegible` | ratio/% | VALID sólo con evidencia observada |
+| `RES-012` | backup integrity failures | Indicador canónico de backup integrity failures, delimitado por el contrato RES. | `C_DISTINCT(identidad canónica que satisface definición)` | count/state/unidad del hecho | VALID sólo con evidencia observada |
+| `RES-013` | backup monitoring gaps | Indicador canónico de backup monitoring gaps, delimitado por el contrato RES. | `observado-esperado/comparable; preservar componentes` | count/state/unidad del hecho | VALID sólo con evidencia observada |
+| `RES-014` | recovery reconciliation gaps | Indicador canónico de recovery reconciliation gaps, delimitado por el contrato RES. | `observado-esperado/comparable; preservar componentes` | count/state/unidad del hecho | VALID sólo con evidencia observada |
+| `RES-015` | site-disaster readiness basado en evidencia | Indicador canónico de site-disaster readiness basado en evidencia, delimitado por el contrato RES. | `C_DISTINCT(identidad canónica que satisface definición)` | count/state/unidad del hecho | VALID sólo con evidencia observada |
+
+#### Familia HW — Hardware/red
+
+| kpi_id | name | definition | formula | unit | validity_conditions específicas |
+| --- | --- | --- | --- | --- | --- |
+| `HW-001` | bridge availability | Indicador canónico de bridge availability, delimitado por el contrato HW. | `C_DISTINCT(identidad canónica que satisface definición)` | count/state/unidad del hecho | hereda contrato; no_data/stale/estimated/unreconciled nunca se convierten en VALID |
+| `HW-002` | agent version compliance | Indicador canónico de agent version compliance, delimitado por el contrato HW. | `C_DISTINCT(identidad canónica que satisface definición)` | count/state/unidad del hecho | hereda contrato; no_data/stale/estimated/unreconciled nunca se convierten en VALID |
+| `HW-003` | device binding health | Indicador canónico de device binding health, delimitado por el contrato HW. | `C_DISTINCT(identidad canónica que satisface definición)` | count/state/unidad del hecho | hereda contrato; no_data/stale/estimated/unreconciled nunca se convierten en VALID |
+| `HW-004` | printer availability | Indicador canónico de printer availability, delimitado por el contrato HW. | `C_DISTINCT(identidad canónica que satisface definición)` | count/state/unidad del hecho | hereda contrato; no_data/stale/estimated/unreconciled nunca se convierten en VALID |
+| `HW-005` | print success | Indicador canónico de print success, delimitado por el contrato HW. | `medida qualifying válida/población elegible` | ratio/% | hereda contrato; no_data/stale/estimated/unreconciled nunca se convierten en VALID |
+| `HW-006` | print unknown/failure | Indicador canónico de print unknown/failure, delimitado por el contrato HW. | `C_DISTINCT(identidad canónica que satisface definición)` | count/state/unidad del hecho | hereda contrato; no_data/stale/estimated/unreconciled nunca se convierten en VALID |
+| `HW-007` | reprint rate | Indicador canónico de reprint rate, delimitado por el contrato HW. | `medida qualifying válida/población elegible` | ratio/% | hereda contrato; no_data/stale/estimated/unreconciled nunca se convierten en VALID |
+| `HW-008` | drawer success | Indicador canónico de drawer success, delimitado por el contrato HW. | `medida qualifying válida/población elegible` | ratio/% | hereda contrato; no_data/stale/estimated/unreconciled nunca se convierten en VALID |
+| `HW-009` | drawer failure | Indicador canónico de drawer failure, delimitado por el contrato HW. | `C_DISTINCT(identidad canónica que satisface definición)` | count/state/unidad del hecho | hereda contrato; no_data/stale/estimated/unreconciled nunca se convierten en VALID |
+| `HW-010` | scanner valid read | Indicador canónico de scanner valid read, delimitado por el contrato HW. | `C_DISTINCT(identidad canónica que satisface definición)` | count/state/unidad del hecho | hereda contrato; no_data/stale/estimated/unreconciled nunca se convierten en VALID |
+| `HW-011` | scanner duplicate reads | Indicador canónico de scanner duplicate reads, delimitado por el contrato HW. | `C_DISTINCT(identidad canónica que satisface definición)` | count/state/unidad del hecho | hereda contrato; no_data/stale/estimated/unreconciled nunca se convierten en VALID |
+| `HW-012` | BBVA terminal health | Indicador canónico de BBVA terminal health, delimitado por el contrato HW. | `C_DISTINCT(identidad canónica que satisface definición)` | count/state/unidad del hecho | hereda contrato; no_data/stale/estimated/unreconciled nunca se convierten en VALID |
+| `HW-013` | LAN availability | Indicador canónico de LAN availability, delimitado por el contrato HW. | `tiempo LAN usable/ventana` | count/state/unidad del hecho | hereda contrato; no_data/stale/estimated/unreconciled nunca se convierten en VALID |
+| `HW-014` | LAN latency | Indicador canónico de LAN latency, delimitado por el contrato HW. | `latencia estación-backend local` | duration | hereda contrato; no_data/stale/estimated/unreconciled nunca se convierten en VALID |
+| `HW-015` | Internet availability | Indicador canónico de Internet availability, delimitado por el contrato HW. | `tiempo Internet disponible/ventana` | count/state/unidad del hecho | hereda contrato; no_data/stale/estimated/unreconciled nunca se convierten en VALID |
+| `HW-016` | Internet outage duration | Indicador canónico de Internet outage duration, delimitado por el contrato HW. | `internet_restored_at-internet_lost_at` | duration | hereda contrato; no_data/stale/estimated/unreconciled nunca se convierten en VALID |
+
+#### Familia PRV — Privacidad/compliance
+
+| kpi_id | name | definition | formula | unit | validity_conditions específicas |
+| --- | --- | --- | --- | --- | --- |
+| `PRV-001` | ARCO requests | Indicador canónico de ARCO requests, delimitado por el contrato PRV. | `C_DISTINCT(identidad canónica que satisface definición)` | count/state/unidad del hecho | indicador de control; no certificación |
+| `PRV-002` | ARCO decisions on time | Indicador canónico de ARCO decisions on time, delimitado por el contrato PRV. | `C_DISTINCT(identidad canónica que satisface definición)` | count/state/unidad del hecho | indicador de control; no certificación |
+| `PRV-003` | ARCO executions on time | Indicador canónico de ARCO executions on time, delimitado por el contrato PRV. | `C_DISTINCT(identidad canónica que satisface definición)` | count/state/unidad del hecho | indicador de control; no certificación |
+| `PRV-004` | privacy notice version coverage | Indicador canónico de privacy notice version coverage, delimitado por el contrato PRV. | `medida qualifying válida/población elegible` | ratio/% | indicador de control; no certificación |
+| `PRV-005` | third-party DPA coverage | Indicador canónico de third-party DPA coverage, delimitado por el contrato PRV. | `medida qualifying válida/población elegible` | ratio/% | indicador de control; no certificación |
+| `PRV-006` | retention jobs success | Indicador canónico de retention jobs success, delimitado por el contrato PRV. | `medida qualifying válida/población elegible` | ratio/% | indicador de control; no certificación |
+| `PRV-007` | anonymization/suppression success | Indicador canónico de anonymization/suppression success, delimitado por el contrato PRV. | `medida qualifying válida/población elegible` | ratio/% | indicador de control; no certificación |
+| `PRV-008` | audited export coverage | Indicador canónico de audited export coverage, delimitado por el contrato PRV. | `medida qualifying válida/población elegible` | ratio/% | indicador de control; no certificación |
+| `PRV-009` | PII exposure incidents | Indicador canónico de PII exposure incidents, delimitado por el contrato PRV. | `C_DISTINCT(identidad canónica que satisface definición)` | count/state/unidad del hecho | indicador de control; no certificación |
+| `PRV-010` | PII-in-logs findings | Indicador canónico de PII-in-logs findings, delimitado por el contrato PRV. | `C_DISTINCT(identidad canónica que satisface definición)` | count/state/unidad del hecho | indicador de control; no certificación |
+| `PRV-011` | sensitive browser storage violations | Indicador canónico de sensitive browser storage violations, delimitado por el contrato PRV. | `AGG(timestamp_fin-timestamp_inicio) con business time` | duration | indicador de control; no certificación |
+| `PRV-012` | BBVA/PCI production gate status | Indicador canónico de BBVA/PCI production gate status, delimitado por el contrato PRV. | `C_DISTINCT(identidad canónica que satisface definición)` | count/state/unidad del hecho | indicador de control; no certificación |
+| `PRV-013` | FiscalAdapter readiness | Indicador canónico de FiscalAdapter readiness, delimitado por el contrato PRV. | `C_DISTINCT(identidad canónica que satisface definición)` | count/state/unidad del hecho | indicador de control; no certificación |
+| `PRV-014` | contingency reconciliation completion | Indicador canónico de contingency reconciliation completion, delimitado por el contrato PRV. | `C_DISTINCT(identidad canónica que satisface definición)` | count/state/unidad del hecho | indicador de control; no certificación |
+
+#### Familia DAT — Analytics/eventos
+
+| kpi_id | name | definition | formula | unit | validity_conditions específicas |
+| --- | --- | --- | --- | --- | --- |
+| `DAT-001` | event emission completeness | Indicador canónico de event emission completeness, delimitado por el contrato DAT. | `C(operaciones con evento durable)/C(operaciones confirmadas)` | ratio/% | hereda contrato; no_data/stale/estimated/unreconciled nunca se convierten en VALID |
+| `DAT-002` | schema-version compliance | Indicador canónico de schema-version compliance, delimitado por el contrato DAT. | `C(schema compliant)/C(eventos)` | count/state/unidad del hecho | hereda contrato; no_data/stale/estimated/unreconciled nunca se convierten en VALID |
+| `DAT-003` | correlation completeness | Indicador canónico de correlation completeness, delimitado por el contrato DAT. | `C(correlation completo)/C(requeridos)` | ratio/% | hereda contrato; no_data/stale/estimated/unreconciled nunca se convierten en VALID |
+| `DAT-004` | causation completeness | Indicador canónico de causation completeness, delimitado por el contrato DAT. | `C(causation completo)/C(requeridos)` | ratio/% | hereda contrato; no_data/stale/estimated/unreconciled nunca se convierten en VALID |
+| `DAT-005` | fact-layer freshness | Indicador canónico de fact-layer freshness, delimitado por el contrato DAT. | `NOW_business-MAX(materialized_occurred_at)` | duration | hereda contrato; no_data/stale/estimated/unreconciled nunca se convierten en VALID |
+| `DAT-006` | fact-layer completeness | Indicador canónico de fact-layer completeness, delimitado por el contrato DAT. | `C(hechos esperados reconciliados)/C(hechos esperados)` | ratio/% | hereda contrato; no_data/stale/estimated/unreconciled nunca se convierten en VALID |
+| `DAT-007` | projection determinism | Indicador canónico de projection determinism, delimitado por el contrato DAT. | `HASH(rebuild)==HASH(expected_projection)` | count/state/unidad del hecho | hereda contrato; no_data/stale/estimated/unreconciled nunca se convierten en VALID |
+| `DAT-008` | historical export completeness | Indicador canónico de historical export completeness, delimitado por el contrato DAT. | `C(hechos exportados con lineage)/C(elegibles)` | ratio/% | hereda contrato; no_data/stale/estimated/unreconciled nunca se convierten en VALID |
+| `DAT-009` | historical export lag | Indicador canónico de historical export lag, delimitado por el contrato DAT. | `NOW_business-MAX(exported_occurred_at)` | duration | hereda contrato; no_data/stale/estimated/unreconciled nunca se convierten en VALID |
+| `DAT-010` | lineage traceability | Indicador canónico de lineage traceability, delimitado por el contrato DAT. | `C(trazables end-to-end)/C(relevantes)` | duration | hereda contrato; no_data/stale/estimated/unreconciled nunca se convierten en VALID |
+| `DAT-011` | analytical query latency | Indicador canónico de analytical query latency, delimitado por el contrato DAT. | `AGG(timestamp_fin-timestamp_inicio) con business time` | duration | hereda contrato; no_data/stale/estimated/unreconciled nunca se convierten en VALID |
+| `DAT-012` | analytical pressure on OLTP | Indicador canónico de analytical pressure on OLTP, delimitado por el contrato DAT. | `C_DISTINCT(identidad canónica que satisface definición)` | count/state/unidad del hecho | hereda contrato; no_data/stale/estimated/unreconciled nunca se convierten en VALID |
+| `DAT-013` | data-contract breakages | Indicador canónico de data-contract breakages, delimitado por el contrato DAT. | `C_DISTINCT(identidad canónica que satisface definición)` | count/state/unidad del hecho | hereda contrato; no_data/stale/estimated/unreconciled nunca se convierten en VALID |
+| `DAT-014` | schema-version adoption | Indicador canónico de schema-version adoption, delimitado por el contrato DAT. | `C_DISTINCT(identidad canónica que satisface definición)` | count/state/unidad del hecho | hereda contrato; no_data/stale/estimated/unreconciled nunca se convierten en VALID |
+| `DAT-015` | replay/rebuild success | Indicador canónico de replay/rebuild success, delimitado por el contrato DAT. | `C(replays/rebuilds verificados)/C(ejecutados)` | ratio/% | hereda contrato; no_data/stale/estimated/unreconciled nunca se convierten en VALID |
+
+#### Familia AI — IA/ciencia futura
+
+| kpi_id | name | definition | formula | unit | validity_conditions específicas |
+| --- | --- | --- | --- | --- | --- |
+| `AI-001` | forecast WAPE | Indicador canónico de forecast WAPE, delimitado por el contrato AI. | `C_DISTINCT(identidad canónica que satisface definición)` | count/state/unidad del hecho | FUTURE/UNAVAILABLE; no bloquea piloto ni producción v1 |
+| `AI-002` | forecast bias | Indicador canónico de forecast bias, delimitado por el contrato AI. | `observado-esperado/comparable; preservar componentes` | count/state/unidad del hecho | FUTURE/UNAVAILABLE; no bloquea piloto ni producción v1 |
+| `AI-003` | waste prediction MAE | Indicador canónico de waste prediction MAE, delimitado por el contrato AI. | `C_DISTINCT(identidad canónica que satisface definición)` | count/state/unidad del hecho | FUTURE/UNAVAILABLE; no bloquea piloto ni producción v1 |
+| `AI-004` | waste precision | Indicador canónico de waste precision, delimitado por el contrato AI. | `medida qualifying válida/población elegible` | ratio/% | FUTURE/UNAVAILABLE; no bloquea piloto ni producción v1 |
+| `AI-005` | waste recall | Indicador canónico de waste recall, delimitado por el contrato AI. | `medida qualifying válida/población elegible` | ratio/% | FUTURE/UNAVAILABLE; no bloquea piloto ni producción v1 |
+| `AI-006` | stockout precision | Indicador canónico de stockout precision, delimitado por el contrato AI. | `medida qualifying válida/población elegible` | ratio/% | FUTURE/UNAVAILABLE; no bloquea piloto ni producción v1 |
+| `AI-007` | stockout recall | Indicador canónico de stockout recall, delimitado por el contrato AI. | `medida qualifying válida/población elegible` | ratio/% | FUTURE/UNAVAILABLE; no bloquea piloto ni producción v1 |
+| `AI-008` | production recommendation error | Indicador canónico de production recommendation error, delimitado por el contrato AI. | `observado-esperado/comparable; preservar componentes` | count/state/unidad del hecho | FUTURE/UNAVAILABLE; no bloquea piloto ni producción v1 |
+| `AI-009` | anomaly precision | Indicador canónico de anomaly precision, delimitado por el contrato AI. | `medida qualifying válida/población elegible` | ratio/% | FUTURE/UNAVAILABLE; no bloquea piloto ni producción v1 |
+| `AI-010` | anomaly false-positive rate | Indicador canónico de anomaly false-positive rate, delimitado por el contrato AI. | `medida qualifying válida/población elegible` | ratio/% | FUTURE/UNAVAILABLE; no bloquea piloto ni producción v1 |
+| `AI-011` | model coverage | Indicador canónico de model coverage, delimitado por el contrato AI. | `medida qualifying válida/población elegible` | ratio/% | FUTURE/UNAVAILABLE; no bloquea piloto ni producción v1 |
+| `AI-012` | model freshness | Indicador canónico de model freshness, delimitado por el contrato AI. | `AGG(timestamp_fin-timestamp_inicio) con business time` | duration | FUTURE/UNAVAILABLE; no bloquea piloto ni producción v1 |
+| `AI-013` | data drift | Indicador canónico de data drift, delimitado por el contrato AI. | `C_DISTINCT(identidad canónica que satisface definición)` | count/state/unidad del hecho | FUTURE/UNAVAILABLE; no bloquea piloto ni producción v1 |
+| `AI-014` | feature freshness | Indicador canónico de feature freshness, delimitado por el contrato AI. | `AGG(timestamp_fin-timestamp_inicio) con business time` | duration | FUTURE/UNAVAILABLE; no bloquea piloto ni producción v1 |
+| `AI-015` | experiment sample coverage | Indicador canónico de experiment sample coverage, delimitado por el contrato AI. | `medida qualifying válida/población elegible` | ratio/% | FUTURE/UNAVAILABLE; no bloquea piloto ni producción v1 |
+| `AI-016` | experiment outcome completeness | Indicador canónico de experiment outcome completeness, delimitado por el contrato AI. | `medida qualifying válida/población elegible` | ratio/% | FUTURE/UNAVAILABLE; no bloquea piloto ni producción v1 |
+| `AI-017` | model business impact | Indicador canónico de model business impact, delimitado por el contrato AI. | `C_DISTINCT(identidad canónica que satisface definición)` | count/state/unidad del hecho | FUTURE/UNAVAILABLE; no bloquea piloto ni producción v1 |
+| `AI-018` | model override rate | Indicador canónico de model override rate, delimitado por el contrato AI. | `medida qualifying válida/población elegible` | ratio/% | FUTURE/UNAVAILABLE; no bloquea piloto ni producción v1 |
+| `AI-019` | human correction rate | Indicador canónico de human correction rate, delimitado por el contrato AI. | `medida qualifying válida/población elegible` | ratio/% | FUTURE/UNAVAILABLE; no bloquea piloto ni producción v1 |
+| `AI-020` | lakehouse readiness | Indicador canónico de lakehouse readiness, delimitado por el contrato AI. | `C_DISTINCT(identidad canónica que satisface definición)` | count/state/unidad del hecho | FUTURE/UNAVAILABLE; no bloquea piloto ni producción v1 |
+
+
+### Dashboard selectivo y versionado
+
+El catálogo es único y exhaustivo, pero las vistas son selectivas: propietario (ventas, caja, rentabilidad válida, merma, inventario, producción, pedidos, alertas y resiliencia); operación (venta actual, stock, pedidos, producción, merma, dispositivos e incidencias); administración (caja, pagos, conciliación, fiscal, privacidad y reportes); soporte/SRE (plataforma, worker/outbox, data quality, backups, DR, hardware y seguridad).
+
+Se registra `new_metric_does_not_require_new_DEC=true` y `change_to_KPI_semantics_requires_versioned_KPI_dictionary_change=true`. No se cambiará silenciosamente fórmula, población, fuente, unidad, dimensiones, owner, validez ni significado de un KPI.
+
+Los KPI DEM-F y AI son contractuales pero FUTURE/UNAVAILABLE hasta contar con historia, modelo, validación y gobierno. `AI_NOT_PILOT_BLOCKER=true` y `AI_NOT_PRODUCTION_V1_BLOCKER=true`. Ningún modelo podrá mutar automáticamente ventas, inventario, pricing, producción o pagos sin nueva decisión.
+
+### Relación con DEC-17 LOCAL_FIRST
+
+DEC-17 permanece canónica e intacta.
+
+La instrumentación, alertas y capa analítica inicial deberán operar conforme a LOCAL_FIRST:
+
+- el PostgreSQL local conserva autoridad operacional;
+- los eventos y alertas se persisten localmente;
+- una caída de Internet no detiene la operación básica;
+- Telegram se reintenta posteriormente;
+- observabilidad remota es complementaria;
+- cloud no es autoridad transaccional inicial;
+- la capa analítica no introduce dependencia de Internet para vender;
+- lakehouse y control plane futuro no bloquean el piloto inicial.
+
+No reaparece managed-cloud como requisito del Pilot Ready de El Mejor Pan.
+
+### Privacidad, seguridad y finalidad
+
+DEC-18 preserva DEC-03, DEC-04, DEC-05 y DEC-16:
+
+- mínimo privilegio para dashboard, ACK, resolución y configuración;
+- scopes explícitos;
+- auditoría de cambios sensibles;
+- minimización de PII;
+- retención y expiración por categoría;
+- protección de datos de empleados;
+- prohibición de telemetría de vigilancia innecesaria;
+- secretos de Telegram fuera de código y logs;
+- payloads analíticos sin secretos ni datos completos de tarjeta;
+- exportación y procesamiento compatibles con las obligaciones aplicables.
+
+La granularidad se limita por finalidad y privacidad; no autoriza captura indiscriminada.
+
+### Source of truth
+
+Se mantiene la dirección normativa:
+
+1. plan y documentos de decisión;
+2. implementación;
+3. datos operacionales.
+
+La aprobación de DEC-18 define qué construir. No declara que dashboards, alertas, telemetría, contratos, worker, proyecciones, almacenamiento histórico, lakehouse ni ML estén implementados.
+
+PostgreSQL operacional permanece como fuente de verdad transaccional. Las proyecciones analíticas son derivadas y reconstruibles.
+
+### Impacto verificable sobre tareas ZM-FIN
+
+`docs/PLAN_MAESTRO_FINALIZACION_ZERO_MERMA.md` es el único Plan Maestro canónico y contiene 126 IDs únicos, ZM-FIN-001–ZM-FIN-126. DEC-18 se sincroniza sin renumerar, eliminar ni marcar tareas como implementadas:
+
+| Tarea o rango | Consecuencia normativa de DEC-18 |
+| --- | --- |
+| ZM-FIN-003, 007–009 | Registrar el cierre, privacidad/retención, matriz de hechos/eventos y contratos versionados |
+| ZM-FIN-015–022, 027 | Capabilities/scopes para dashboard, ACK, resolución, exportación y secreto Telegram |
+| ZM-FIN-028–040 | Idempotencia, correlation/causation y atomicidad business mutation + canonical state/ledger + audit + outbox |
+| ZM-FIN-041–055 | Fuentes canónicas y hechos granulares reconciliables para dinero, caja, inventario, producción, merma y costo |
+| ZM-FIN-066, 068–086 | LOCAL_FIRST; hechos de dominio/UI; pricing; dashboard selectivo; reportes y auditoría |
+| ZM-FIN-087–093 | Claim durable, at-least-once, consumidores idempotentes, alertas, Telegram, event/fact layer y rebuild |
+| ZM-FIN-094–105 | Pruebas de fórmulas KPI, lineage, data quality, privacidad y documentación |
+| ZM-FIN-107–116 | Infra LOCAL_FIRST, standby, observabilidad, backup/restore, archivo separado y operación de alertas |
+| ZM-FIN-117–126 | Staging/piloto/reconciliación y gates; lakehouse/IA explícitamente no bloqueantes |
+
+Se registra:
+
+- `versioned_126_task_catalog_present=true`
+- `PLAN_MASTER_CANONICAL_IN_REPO=true`
+- `TASK_COUNT=126`
+- `known_task_ids_preserved=true`
+- `missing_task_ids=0`
+- `no_task_marked_implemented_by_sync=true`
+
+### Gates y dependencias
+
+DEC-18 no marca ningún gate como cumplido.
+
+Consecuencias de gates:
+
+- Async Ready exige backlog convergente, replay idempotente, proyecciones sin pérdida/duplicación y señales visibles de degradación;
+- QA Ready exige pruebas de fórmulas KPI críticas, data quality, correlation/causation y rebuilds deterministas;
+- Production Ready exige observabilidad LOCAL_FIRST, backups/restore, dashboard de alertas y Telegram crítico probado cuando exista Internet; perder Telegram no bloquea la tienda;
+- Pilot Ready exige vistas KPI selectivas útiles, sensibilidad conservadora e inicio de calibración con datos reales;
+- General Production exige evidencia del piloto, no lakehouse;
+- la capa analítica nunca se convierte en autoridad operacional;
+- los gates BBVA/PCI, privacidad, backup, restore y continuidad conservan sus propias autoridades y estados;
+- ninguna aprobación documental satisface un gate de implementación.
+
+Se registra `NOT_G8_BLOCKER=true` y `NOT_G9_V1_BLOCKER=true` para lakehouse.
+
+Dependencias conceptuales:
+
+- contratos transaccionales y ledgers preceden a hechos analíticos confiables;
+- outbox transaccional precede al procesamiento analítico;
+- identidad y schema versionado preceden a consumidores históricos;
+- worker durable e idempotente precede a proyecciones confiables;
+- privacidad y retención condicionan exportación histórica;
+- data quality y reconciliación condicionan KPI válidos;
+- datos reales de dos a cuatro semanas preceden a una posible sensibilidad intermedia;
+- suficiente escala y evidencia preceden a lakehouse.
+
+### Evidencia técnica actual
+
+La inspección vigente demuestra:
+
+- el dashboard Backoffice actual contiene módulos simulados o desconectados;
+- no existe un motor productivo de alertas;
+- no existe integración Telegram;
+- el worker actual lee eventos, pero no tiene handlers ni finalización durable completa;
+- outbox actual no demuestra claim, attempts, backoff, DLQ ni consumidores analíticos idempotentes;
+- no existe analytics event/fact layer;
+- el catálogo KPI está aprobado documentalmente, pero no existe todavía como implementación ejecutable ni con datos productivos;
+- reportes actuales no constituyen la instrumentación aprobada;
+- no existe almacenamiento histórico por capas;
+- no existe warehouse ni lakehouse;
+- health actual no constituye readiness completa;
+- observabilidad productiva no está implementada;
+- el Plan Maestro canónico está presente, pero sus tareas no quedan implementadas por esta sincronización.
+
+Estas brechas describen el estado actual y no invalidan la política aprobada. Tampoco quedan resueltas por documentarla.
+
+### Contradicciones resueltas
+
+DEC-18 resuelve las siguientes ambigüedades documentales:
+
+- métricas amplias no significan alertas numerosas;
+- metadata estática de reportes no sustituye el catálogo KPI aprobado y versionado;
+- Telegram no sustituye el dashboard local;
+- un fallo de Internet o Telegram no detiene la operación local;
+- PostgreSQL operacional, no la capa analítica, conserva autoridad;
+- at-least-once exige consumidores idempotentes;
+- backup no es archivo analítico;
+- granularidad no autoriza PII innecesaria;
+- lakehouse futuro no es dependencia del piloto;
+- identidad causal no implica una política transversal append-only aprobada por DEC-18;
+- instrumentación amplia y catálogo exhaustivo no significan dashboard saturado ni alertas numerosas.
+
+### Consecuencias, historial y límite
+
+Controles normativos verificables de DEC-18:
+
+- `DEC18_METRICS_BROAD=true`
+- `DEC18_KPI_CATALOG_EXHAUSTIVE=true`
+- `DEC18_KPI_CATALOG_VERSIONED=true`
+- `DEC18_DASHBOARD_SELECTIVE=true`
+- `DEC18_ALERTING_CONSERVATIVE=true`
+- `DEC18_TELEGRAM_CRITICAL=true`
+- `DEC18_WHATSAPP_FUTURE=true`
+- `DEC18_EXTERNAL_NOTIFICATION_NONBLOCKING=true`
+- `DEC18_CRITICAL_A_ACK_5M=true`
+- `DEC18_CRITICAL_B_ACK_15M=true`
+- `DEC18_CRITICAL_C_ACK_60M=true`
+- `DEC18_GRANULAR_FACTS=true`
+- `DEC18_ANALYTICS_EVENT_LAYER=true`
+- `DEC18_TRANSACTIONAL_OUTBOX=true`
+- `DEC18_AT_LEAST_ONCE=true`
+- `DEC18_IDEMPOTENT_CONSUMERS=true`
+- `DEC18_DERIVED_METRICS_REBUILDABLE=true`
+- `DEC18_LAYERED_RETENTION=true`
+- `DEC18_BACKUP_NOT_ANALYTICAL_ARCHIVE=true`
+- `DEC18_LAKEHOUSE_FUTURE=true`
+- `DEC18_LAKEHOUSE_NOT_PILOT_BLOCKER=true`
+- `DEC18_LAKEHOUSE_NOT_PRODUCTION_V1_BLOCKER=true`
+- `DEC18_EVENT_ID=true`
+- `DEC18_CORRELATION_ID=true`
+- `DEC18_CAUSATION_ID=true`
+- `DEC18_SCHEMA_VERSION=true`
+- `DEC18_CAUSALITY_EXPLICIT=true`
+- `DEC18_APPEND_ONLY_NOT_ASSUMED=true`
+- `DEC18_NO_ARBITRARY_THRESHOLDS=true`
+- `DEC18_NO_EMPLOYEE_SURVEILLANCE=true`
+- `DEC18_OLTP_REMAINS_AUTHORITY=true`
+- `DEC18_ANALYTICS_DERIVED=true`
+
+- DEC-18 permaneció `PENDIENTE` desde 2026-08-26.
+- El propietario aprobó DEC-18.1–DEC-18.10 y el catálogo KPI exhaustivo v1 el 2026-09-01.
+- El requisito original queda completamente satisfecho y DEC-18 queda `APROBADA`.
+- `pending_owner_questions=0`; append-only no se presume y no es una pregunta de cierre.
+- No se aprobó ninguna tecnología, proveedor cloud, warehouse o lakehouse concreto.
+- No se inventaron thresholds fuera de los tiempos de escalamiento expresamente aprobados.
+- Ninguna tarea ni gate queda implementado o cumplido.
+- DEC-17 LOCAL_FIRST permanece canónica y se precisa sin reinterpretarla.
+- DEC-19–DEC-20 permanecen `PENDIENTE` y sin respuesta aprobada.
+- ZM-FIN-003 continúa abierta.
+- No se avanza a DEC-19 ni a ZM-FIN-004.
 
 ## DEC-19 — Datos existentes
 
