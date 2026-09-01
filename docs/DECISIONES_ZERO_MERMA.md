@@ -8489,7 +8489,7 @@ No se registrarán secretos, datos de tarjeta ni payloads sensibles.
 - **DEC-19:** backfill de contingencia, históricos ambiguos, evidencia incompleta y migración de configuraciones.
 - **DEC-20:** hardware concreto del piloto, versiones certificadas, validación física, procedimiento de contingencia, rollout y métricas de soporte.
 
-DEC-16, DEC-17, DEC-19 y DEC-20 permanecen `PENDIENTE`.
+Al cierre documental de DEC-15, DEC-16, DEC-17, DEC-19 y DEC-20 permanecían `PENDIENTE`.
 
 ### Dependencias de implementación
 
@@ -9701,9 +9701,9 @@ La interpretación managed-cloud como plataforma productiva inicial queda revoca
 - DEC-17 permaneció `PENDIENTE` hasta 2026-09-01.
 - La interpretación managed-cloud inicial del 2026-09-01 fue corregida antes de la aprobación definitiva.
 - DEC-17 queda `APROBADA` con arquitectura LOCAL-FIRST.
-- DEC-18 se resuelve en su propia sección; DEC-19–DEC-20 permanecen `PENDIENTE` y sin respuesta aprobada.
+- Al cierre documental de DEC-17, DEC-18 se resolvía en su propia sección y DEC-19–DEC-20 permanecían `PENDIENTE` y sin respuesta aprobada.
 - ZM-FIN-003 continúa abierta.
-- No se avanza a DEC-19 ni a ZM-FIN-004.
+- La iteración de DEC-17 no avanzó a DEC-19 ni a ZM-FIN-004.
 
 ## DEC-18 — Métricas y alertas
 
@@ -11063,18 +11063,349 @@ Controles normativos verificables de DEC-18:
 - No se inventaron thresholds fuera de los tiempos de escalamiento expresamente aprobados.
 - Ninguna tarea ni gate queda implementado o cumplido.
 - DEC-17 LOCAL_FIRST permanece canónica y se precisa sin reinterpretarla.
-- DEC-19–DEC-20 permanecen `PENDIENTE` y sin respuesta aprobada.
+- Al cierre documental de DEC-18, DEC-19–DEC-20 permanecían `PENDIENTE` y sin respuesta aprobada.
 - ZM-FIN-003 continúa abierta.
-- No se avanza a DEC-19 ni a ZM-FIN-004.
+- La iteración de DEC-18 no avanzó a DEC-19 ni a ZM-FIN-004.
 
 ## DEC-19 — Datos existentes
 
-- **Estado:** `PENDIENTE`
+- **Estado:** `APROBADA`
+- **Fecha:** 2026-09-01
 - **Propietario:** propietario de ZeroMerma
-- **Qué debe aprobarse:** qué bases y datos deben migrarse, backfillearse y reconciliarse.
-- **Tareas principales afectadas:** tareas de migraciones, backfills, reconciliación, inventario, caja y despliegue.
-- **Respuesta aprobada:** ninguna.
-- **Regla:** la línea base preservada no aprueba la calidad ni migración de datos existentes.
+- **Contenido aprobado:** clasificación por el propietario de las fuentes locales conocidas como desarrollo/demo/test; inexistencia declarada de fuentes legacy externas a migrar; inicio limpio de historia operacional productiva; política híbrida y selectiva por dominio ante una fuente real futura; autoridades por dominio; opening state auditable; tratamiento de operaciones abiertas; Superadministrador inicial explícito; prohibición de heredar Superadministrador o `GLOBAL`; exclusión de datos demo/test de la historia productiva.
+- **Preguntas pendientes del propietario:** ninguna.
+- **Tareas principales afectadas:** `ZM-FIN-003`–`006`, `ZM-FIN-015`–`022`, `ZM-FIN-041`–`055`, `ZM-FIN-071`–`072`, `ZM-FIN-087`–`093`, `ZM-FIN-098`–`099`, `ZM-FIN-108`, `ZM-FIN-117`, `ZM-FIN-119`, `ZM-FIN-121`–`123` y cualquier tarea posterior que cargue, migre, reconstruya, reconcilie o corte datos.
+- **Respuesta aprobada:** los dos volúmenes locales conocidos son no productivos por declaración del propietario; no existe fuente legacy externa actual; producción comienza con historia operacional limpia, master data aprobada y opening state explícito; cualquier fuente real futura se trata selectivamente por dominio sin canonicalización histórica obligatoria; sólo el Superadministrador inicial designado tendrá `GLOBAL` al inicio.
+- **Regla:** DEC-19 define política de clasificación, migración, opening state y reconciliación. No certifica implementación, calidad de filas, revisión de esquema, migraciones, borrados, seeds, controles de DB de pruebas, cutover ni cumplimiento de gates.
+
+Se registra:
+
+- `owner_policy_approved=true`
+- `pending_owner_questions=0`
+- `production_operational_history_start=CLEAN`
+- `migration_policy=HYBRID_SELECTIVE_BY_DOMAIN`
+- `full_historical_canonicalization_required=false`
+- `DEC19_READY_TO_RECORD=true`
+
+### Evidencia técnica y clasificación declarada
+
+La inspección técnica read-only previa encontró dos volúmenes Docker asociados a ZeroMerma:
+
+| `source_id` | Volumen | Evidencia técnica disponible | Clasificación aprobada por el propietario |
+|---|---|---|---|
+| `PG-ZM-CURRENT` | `zeromerma_zeromerma_postgres_data` | volumen asociado al contenedor PostgreSQL local detenido; filas y revisión de schema no inspeccionadas | `DEVELOPMENT_DEMO_TEST` |
+| `PG-ZM-LEGACY` | `zeromerma_pgdata` | volumen etiquetado para el proyecto, sin contenedor activo; filas y revisión de schema no inspeccionadas | `DEVELOPMENT_DEMO_TEST` |
+
+La clasificación no productiva es una declaración expresa aprobada por el propietario. No se presenta como conclusión obtenida de row counts, contenido, revisión Alembic ni semántica interna de esas bases.
+
+Se registra:
+
+- `PG-ZM-CURRENT=DEVELOPMENT_DEMO_TEST`
+- `PG-ZM-LEGACY=DEVELOPMENT_DEMO_TEST`
+- `local_volumes_owner_classification=NON_PRODUCTION`
+- `real_operational_data_in_known_local_volumes=false`
+- `local_database_rows_inspected=false`
+- `local_database_schema_revisions_verified=false`
+
+No se inventan row counts, rangos temporales, sucursales, usuarios, revisiones de schema ni resultados de reconciliación.
+
+### Fuentes externas
+
+La inspección del repositorio no encontró una fuente concreta procedente de otro POS, otra PostgreSQL, Excel/CSV, ERP, sistema contable, proveedor fiscal, BBVA, inventarios manuales, recetas externas o listas de precios externas. Posteriormente, el propietario confirmó:
+
+`external_legacy_sources_to_migrate=NONE`
+
+Por tanto:
+
+- `external_operational_migration_sources=false`
+- DEC-19 no planifica una migración histórica desde una fuente legacy externa actualmente existente;
+- la ausencia actual de legacy no prohíbe importaciones futuras expresamente autorizadas;
+- una fuente nueva no podrá incorporarse silenciosamente al cutover.
+
+### Inicio limpio de historia operacional
+
+Los dos volúmenes conocidos son no productivos según el propietario, no existe fuente legacy externa actual y los seeds/fixtures identificados pertenecen a desarrollo, demo, training o test. El lanzamiento productivo no convertirá ninguno de esos datasets en historia empresarial.
+
+Se registra:
+
+- `production_operational_history_start=CLEAN`
+- `development_demo_history_not_canonical=true`
+- `seed_data_not_business_history=true`
+- `test_data_not_business_history=true`
+- `legacy_financial_history_to_migrate=false`
+- `legacy_inventory_history_to_migrate=false`
+
+No se crearán ventas, pagos, caja, inventario, producción, pedidos, devoluciones, merma, audit ni outbox históricos productivos a partir de seeds, fixtures o datos demo/test.
+
+### Política híbrida y selectiva por dominio
+
+Aunque el estado actual conduce a un clean operational start, cualquier fuente legacy legítima descubierta antes del cutover deberá clasificarse por dominio mediante exactamente uno de los tratamientos siguientes:
+
+- `PRESERVE_AS_IS`
+- `MIGRATE`
+- `BACKFILL`
+- `REBUILD_PROJECTION`
+- `OPENING_ADJUSTMENT`
+- `ARCHIVE_READ_ONLY`
+- `DISCARD_TEST_ONLY`
+- `MANUAL_RECONCILIATION`
+- `UNKNOWN`
+
+Se aprueba:
+
+- `migration_policy=HYBRID_SELECTIVE_BY_DOMAIN`
+- `full_historical_canonicalization_required=false`
+- no existe obligación de transformar toda historia previa en los nuevos ledgers;
+- un backfill sólo se ejecutará con causalidad y semántica suficientes;
+- una proyección reconstruible no sustituye evidencia operacional original;
+- datos ambiguos permanecen en reconciliación manual o archivo read-only según su naturaleza.
+
+### Fuente autoritativa por dominio
+
+#### Dinero, caja y pagos
+
+La autoridad primaria es `closed_and_reconcilable_economic_evidence`.
+
+Dos números incompatibles no se resolverán escogiendo silenciosamente uno. Cuando la evidencia no sea suficiente, el tratamiento será `MANUAL_RECONCILIATION`.
+
+#### Inventario
+
+Para el estado de cutover, la autoridad será:
+
+`validated_physical_count + reliable_causal_history_when_available`
+
+Cuando la historia no explique de forma fiable el saldo, el conteo físico validado define el estado real de apertura. No se usarán balances demo/test ni se inventarán movimientos históricos.
+
+#### Catálogo, recetas y precios
+
+La autoridad será `business_current_configuration_explicitly_approved`.
+
+Un seed, precio demo, commercial discount demo, receta demo o catálogo de training no se convierte automáticamente en master data productiva.
+
+#### Identidad
+
+La autoridad será `explicitly_validated_active_accounts`.
+
+Ningún usuario o rol heredado se promueve por nombre, email, pertenencia a Backoffice, seed, ausencia de scope o semántica implícita.
+
+Se registra:
+
+- `unresolved_source_conflict=MANUAL_RECONCILIATION`
+- `money_authority=closed_and_reconcilable_economic_evidence`
+- `inventory_authority=validated_physical_count_plus_reliable_causal_history`
+- `master_data_authority=business_current_configuration_explicitly_approved`
+- `identity_authority=explicitly_validated_active_accounts`
+
+### Opening state productivo
+
+Cualquier estado inicial productivo relevante tendrá una foto de cutover fechada, identificada, validada, scoped y auditable. Cuando apliquen, se incluirán:
+
+- caja;
+- inventario;
+- pedidos abiertos;
+- anticipos;
+- saldos económicos;
+- transferencias;
+- producción abierta.
+
+Si el estado físico o económico real es conocido pero falta historia causal suficiente, se utilizará `OPENING_ADJUSTMENT` o un mecanismo canónico equivalente explícitamente identificado.
+
+Todo opening state preservará, cuando aplique:
+
+- `occurred_at` o `cutover_at`;
+- `recorded_at`;
+- branch y scope;
+- actor;
+- reason;
+- source evidence;
+- audit;
+- outbox cuando la implementación futura lo requiera;
+- idempotency.
+
+Se registra:
+
+- `opening_state_requires_evidence=true`
+- `fictitious_historical_transactions_forbidden=true`
+- `opening_state_auditable=true`
+- `opening_state_idempotent=true`
+
+Nunca se fabricarán ventas, pagos, movimientos de inventario, producción u otras transacciones históricas para explicar un saldo de apertura.
+
+### Operaciones abiertas durante cutover
+
+La política aprobada es:
+
+1. cerrar y reconciliar antes del cutover siempre que sea operacionalmente viable;
+2. migrar una operación abierta sólo cuando pueda conservar identidad, causalidad, estado, importes o cantidades, scope y auditabilidad;
+3. enviar una operación ambigua a `MANUAL_RECONCILIATION` sin transformación automática.
+
+La política aplica, cuando existan, a:
+
+- `CashSession` en `OPEN` o `CLOSING`;
+- `CustomerOrder` abierto y anticipos;
+- `Payment` o `Refund` en `UNKNOWN` o `PENDING`;
+- transferencia `IN_TRANSIT`;
+- reserva;
+- `ProductionRun` abierto;
+- outbox pendiente.
+
+No se aprueba una regla universal de cierre forzado.
+
+Se registra:
+
+- `open_operations_close_and_reconcile_when_viable=true`
+- `open_operation_migration_requires_complete_causality=true`
+- `ambiguous_open_operation=MANUAL_RECONCILIATION`
+- `force_close_all_open_operations=false`
+
+### Fuente real futura no inventariada
+
+Si antes de producción aparece evidencia de una fuente real no inventariada:
+
+- `STOP_MIGRATION_ASSUMPTION=true`;
+- se reabrirá su clasificación técnica antes de borrarla, importarla, canonicalizarla o convertirla en opening state;
+- se preservará la evidencia hasta disponer de autoridad y tratamiento aprobados;
+- no se incorporará silenciosamente al cutover.
+
+### Datos de desarrollo, demo, training y test
+
+Los datasets demostrablemente no productivos podrán clasificarse como `DISCARD_TEST_ONLY`. Esta decisión no autoriza en esta iteración borrar volúmenes, resetear DB, truncar, ejecutar `reset-db`, eliminar fixtures ni eliminar seeds.
+
+La eliminación física sólo podrá ejecutarse en una tarea posterior con aislamiento, targets verificados, autoridad y pruebas suficientes.
+
+`seed_local.py` mezcla objetos bootstrap, desarrollo y demo. Debe separarse posteriormente.
+
+Se preservan estos principios:
+
+- seed no es autoridad productiva;
+- training seed no es dato real;
+- tests nunca apuntan a una DB operacional, staging real o producción;
+- scripts destructivos fallan de forma segura fuera de test/dev;
+- `owner_classified_test_data != safe_test_database_controls_implemented`.
+
+Esto afecta a `ZM-FIN-004`, `ZM-FIN-005` y `ZM-FIN-006`, sin marcarlas implementadas.
+
+### Superadministrador inicial y `GLOBAL`
+
+El propietario aprueba:
+
+- `initial_superadmin=ZEROMERMA_OWNER`
+- `initial_superadmin_role=explicit_superadmin`
+- `initial_superadmin_scope=GLOBAL`
+- `initial_superadmin_count=1`
+- `initial_global_superadmin_only=true`
+
+La designación no usa ni requiere un nombre personal y no certifica que el usuario o rol estén implementados. Se materializará posteriormente dentro de las tareas RBAC, seed seguro y cutover.
+
+Se preservan DEC-03/04:
+
+- `seed_admin_auto_superadmin=false`
+- `seed_admin_auto_global=false`
+- `legacy_admin_auto_superadmin=false`
+- `legacy_admin_auto_global=false`
+
+Al inicio, sólo el Superadministrador explícitamente designado por el propietario tendrá `GLOBAL`. Los demás roles y usuarios tendrán capabilities explícitas y scopes explícitos, normalmente `BRANCH_SET` cuando corresponda. Una asignación `GLOBAL` adicional requerirá una acción administrativa explícita bajo DEC-03/04, sin necesidad de una nueva DEC para cada asignación futura válida.
+
+### Finanzas, inventario, pricing, pedidos y producción
+
+#### Finanzas
+
+No se ejecutará backfill financiero desde volúmenes demo/test. La operación productiva real comenzará sobre el ledger canónico implementado mediante `ZM-FIN-041`–`047`.
+
+`ZM-FIN-047` permanece necesaria para diagnóstico read-only, fuentes reales futuras, staging, reconciliación, opening-state transformation e idempotencia. La inexistencia actual de legacy real no elimina la capacidad.
+
+#### Inventario
+
+El inventario inicial productivo se derivará de conteo físico validado y opening state aprobado. Los balances demo/test nunca serán autoridad productiva.
+
+`ZM-FIN-055` permanece necesaria para rebuild con causalidad fiable, opening balance, reconciliación y datasets representativos. No se inventarán movimientos históricos.
+
+#### Pricing
+
+Precios, commercial discounts y configuraciones seed/demo no se migrarán automáticamente. Los precios productivos iniciales serán `business_approved_current_configuration` y se materializarán conforme a DEC-13 y `ZM-FIN-071`–`072`.
+
+#### Pedidos y producción
+
+La historia demo/test de `CustomerOrder`, `ProductionBatch` o ejecución de recetas no se convierte en historia productiva. Master data legítimo se aprobará y cargará como configuración vigente, no como transacción histórica.
+
+### Audit, outbox y analytics
+
+Audit y outbox demo/test no se convertirán en historia productiva. No se fabricarán historical events.
+
+Se mantiene la distinción:
+
+`historical_event != backfilled_analytical_fact != migration_record != opening_adjustment`
+
+Analytics futuros partirán de:
+
+- operación productiva real desde cutover;
+- opening facts explícitamente identificados;
+- backfilled analytical facts sólo cuando exista una fuente real legítima y causalidad suficiente.
+
+### PII e identidad estable
+
+Los volúmenes de desarrollo/demo pueden contener PII ficticia o incidental. DEC-19 no autoriza reutilizarla en producción.
+
+Se registra:
+
+- `development_PII_not_migrated_by_default=true`
+- datos personales productivos sólo proceden de operación real, configuración empresarial válida o migración futura expresamente autorizada bajo DEC-16;
+- `stable_identity_when_safe=true`;
+- si cambia una identidad, se preservará un mapping durable y auditable `source_id -> target_id`;
+- no se perderá causalidad histórica.
+
+### Dependencias, gates y límite
+
+DEC-19 ajusta criterios futuros de `ZM-FIN-003`–`006`, `ZM-FIN-015`–`022`, `ZM-FIN-041`–`055`, `ZM-FIN-071`–`072`, `ZM-FIN-087`–`093`, `ZM-FIN-098`–`099`, `ZM-FIN-108`, `ZM-FIN-117`, `ZM-FIN-119` y `ZM-FIN-121`–`123`.
+
+No marca ninguna tarea implementada ni ningún gate cumplido. La evidencia futura afecta a G0 Baseline Ready, G3 Data Integrity Ready, G5 QA Ready, G6 Staging Ready, G7 Production Ready, G8 Pilot Ready y G9 General Production.
+
+Se registra:
+
+- `clean_start_policy_approved != migration_implemented`
+- `owner_classified_test_data != safe_test_database_controls_implemented`
+- `GATES_NOT_FAKE_COMPLETED=true`
+- `CODE_CHANGED=false`
+- `DATABASE_WRITES=0`
+- `DOCKER_MUTATIONS=0`
+
+### Controles normativos verificables de DEC-19
+
+- `DEC19_OWNER_CORRECT=true`
+- `DEC19_DATE_2026_09_01=true`
+- `DEC19_PENDING_OWNER_QUESTIONS_0=true`
+- `DEC19_LOCAL_VOLUMES_OWNER_CLASSIFIED_NON_PRODUCTION=true`
+- `DEC19_EXTERNAL_LEGACY_SOURCES_NONE=true`
+- `DEC19_CLEAN_OPERATIONAL_START=true`
+- `DEC19_HYBRID_SELECTIVE_POLICY=true`
+- `DEC19_FULL_HISTORICAL_CANONICALIZATION_NOT_REQUIRED=true`
+- `DEC19_MONEY_AUTHORITY_DEFINED=true`
+- `DEC19_INVENTORY_AUTHORITY_DEFINED=true`
+- `DEC19_MASTER_DATA_AUTHORITY_DEFINED=true`
+- `DEC19_UNRESOLVED_CONFLICT_MANUAL=true`
+- `DEC19_OPENING_STATE_AUDITABLE=true`
+- `DEC19_FICTITIOUS_HISTORY_FORBIDDEN=true`
+- `DEC19_OPEN_OPERATIONS_POLICY=true`
+- `DEC19_OWNER_INITIAL_SUPERADMIN=true`
+- `DEC19_INITIAL_GLOBAL_SUPERADMIN_ONLY=true`
+- `DEC19_SEED_ADMIN_NOT_SUPERADMIN=true`
+- `DEC19_SEED_ADMIN_NOT_GLOBAL=true`
+- `DEC19_DEMO_FINANCIAL_HISTORY_NOT_MIGRATED=true`
+- `DEC19_DEMO_INVENTORY_NOT_OPENING_BALANCE=true`
+- `DEC19_DEMO_AUDIT_OUTBOX_NOT_PRODUCTION_HISTORY=true`
+- `DEC19_PII_DEMO_NOT_MIGRATED=true`
+- `DEC19_STABLE_IDENTITY_POLICY=true`
+- `DEC19_PLAN_ALIGNMENT=true`
+
+### Historial
+
+- DEC-19 permaneció `PENDIENTE` desde 2026-08-26 hasta 2026-09-01.
+- La inspección técnica read-only identificó dos volúmenes locales, seeds compartidos y ausencia de fuentes legacy concretas en el repositorio, sin inspeccionar filas ni ejecutar DB.
+- El propietario clasificó ambos volúmenes como desarrollo/demo/test, confirmó que no existe fuente legacy externa a migrar y aprobó clean operational start, política híbrida/selectiva, opening state, autoridades por dominio, operaciones abiertas y Superadministrador inicial.
+- `pending_owner_questions=0`.
+- DEC-20 permanece `PENDIENTE` y sin respuesta aprobada.
+- ZM-FIN-003 continúa abierta.
+- No se avanza a DEC-20 ni a ZM-FIN-004.
 
 ## DEC-20 — Piloto y rollout
 
