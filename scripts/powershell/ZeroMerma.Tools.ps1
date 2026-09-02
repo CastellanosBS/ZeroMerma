@@ -29,25 +29,14 @@ function Resolve-ZeroMermaUvPath {
   throw @"
 uv CLI was not found.
 
-Install uv globally on Windows, then open a new PowerShell terminal:
-  winget install --id Astral-sh.UV
-
-Alternative official installer:
-  powershell -ExecutionPolicy Bypass -c "irm https://astral.sh/uv/install.ps1 | iex"
+Install the canonical uv version declared by tool.uv.required-version in pyproject.toml.
+Use the versioned official installer command documented in README.md, then open a new PowerShell terminal.
 
 Do not run ZeroMerma scripts from a random external virtual environment. These scripts resolve the uv CLI directly and manage the repository .venv themselves.
 "@
 }
 
 function Resolve-ZeroMermaPnpmCommand {
-  $pnpm = Get-Command pnpm -CommandType Application -ErrorAction SilentlyContinue | Select-Object -First 1
-  if ($pnpm) {
-    return [pscustomobject]@{
-      Path = $pnpm.Source
-      Arguments = @()
-    }
-  }
-
   $corepack = Get-Command corepack -CommandType Application -ErrorAction SilentlyContinue | Select-Object -First 1
   if ($corepack) {
     return [pscustomobject]@{
@@ -56,7 +45,10 @@ function Resolve-ZeroMermaPnpmCommand {
     }
   }
 
-  throw "pnpm was not found. Install Node.js 22 with Corepack enabled, then run: corepack prepare pnpm@9.15.4 --activate"
+  $packageJsonPath = Join-Path $script:ZeroMermaRepoRoot "package.json"
+  $packageManager = (Get-Content -Raw -LiteralPath $packageJsonPath | ConvertFrom-Json).packageManager
+  $pnpmSpec = ([string]$packageManager).Split("+")[0]
+  throw "Corepack was not found. Install Node.js 22.x, then run: corepack enable; corepack prepare $pnpmSpec --activate"
 }
 
 function Resolve-ZeroMermaDockerPath {

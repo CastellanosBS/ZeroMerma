@@ -15,6 +15,7 @@
     "test:operational-regression": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/dev/run-operational-regression.ps1",
     "test": "corepack pnpm -r --if-present test",
     "test:e2e": "corepack pnpm -r --if-present test:e2e",
+    "toolchain:check": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/dev/check-toolchain.ps1",
     "typecheck": "corepack pnpm -r --if-present typecheck"
   },
   "devDependencies": {

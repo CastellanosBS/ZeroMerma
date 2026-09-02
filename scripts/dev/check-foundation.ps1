@@ -5,6 +5,7 @@ $ToolsScript = Join-Path $PSScriptRoot "..\powershell\ZeroMerma.Tools.ps1"
 . $ToolsScript
 
 $Root = Get-ZeroMermaRepoRoot
+$ToolchainScript = Join-Path $PSScriptRoot "check-toolchain.ps1"
 
 function Test-ZeroMermaHttpServer {
   param(
@@ -50,13 +51,15 @@ function Test-ZeroMermaHttpServer {
 
 Push-Location $Root
 try {
+  & $ToolchainScript
+
   Write-Host "Resolving required tools..."
   $UvPath = Resolve-ZeroMermaUvPath
   $Pnpm = Resolve-ZeroMermaPnpmCommand
   $null = Resolve-ZeroMermaDockerPath
 
   Write-Host "Bootstrapping Python workspace with uv..."
-  Invoke-ZeroMermaUv sync --all-packages --dev
+  Invoke-ZeroMermaUv sync --all-packages --dev --frozen
 
   Write-Host "Installing Node workspace dependencies..."
   Invoke-ZeroMermaPnpm install --frozen-lockfile

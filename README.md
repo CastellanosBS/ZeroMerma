@@ -26,10 +26,11 @@ Canonical greenfield monorepo for a multi-branch bakery operations platform.
 
 ## Prerequisites
 
-- Python `3.12`
-- `uv` installed globally and available as `uv` in PowerShell
-- Node.js `22`
-- `pnpm` `9.15.4`
+- Python `3.12.x` (canonical runtime line in `.python-version`)
+- `uv` `0.11.4` (exact version enforced by `pyproject.toml`)
+- Node.js `22.x` (canonical runtime line in `.node-version`)
+- Corepack from the canonical Node.js distribution, explicitly enabled
+- `pnpm` `10.33.0` (exact version and integrity in root `packageManager`)
 - Docker with Docker Compose
 - Windows PowerShell for local scripts
 
@@ -37,26 +38,31 @@ Do not work from a random external Python virtual environment. ZeroMerma scripts
 
 ## Windows Setup
 
-Install `uv` globally:
+Install the exact canonical `uv` release with the versioned official installer:
 
 ```powershell
-winget install --id Astral-sh.UV
+powershell -ExecutionPolicy Bypass -c "irm https://astral.sh/uv/0.11.4/install.ps1 | iex"
 ```
 
-If `winget` is unavailable, use the official installer:
+Open a new PowerShell terminal, install the canonical Python line if needed, enable Corepack, and prepare the pnpm version declared by `packageManager`:
 
 ```powershell
-powershell -ExecutionPolicy Bypass -c "irm https://astral.sh/uv/install.ps1 | iex"
-```
-
-Open a new PowerShell terminal and verify the required tools:
-
-```powershell
-uv --version
-node --version
+uv python install 3.12
 corepack enable
-corepack prepare pnpm@9.15.4 --activate
-pnpm --version
+$packageManager = (Get-Content -Raw package.json | ConvertFrom-Json).packageManager
+$pnpmSpec = ([string]$packageManager).Split("+")[0]
+corepack prepare $pnpmSpec --activate
+```
+
+The preflight is offline after those tools are prepared: it reads the versioned policy, resolves an already installed Python without downloading it, and rejects an incompatible runtime before installation.
+
+```powershell
+.\scripts\dev\check-toolchain.ps1
+uv --version
+uv python find --no-python-downloads 3.12
+node --version
+corepack --version
+corepack pnpm --version
 docker --version
 docker compose version
 ```
@@ -66,9 +72,11 @@ docker compose version
 Run from the repository root:
 
 ```powershell
-uv sync --all-packages --dev
-pnpm install
-pnpm contracts:generate
+.\scripts\dev\check-toolchain.ps1
+uv sync --all-packages --dev --frozen
+corepack pnpm install --frozen-lockfile
+uv run python -m compileall -q apps/api/src apps/worker/src
+corepack pnpm typecheck
 ```
 
 POS web workstation configuration:
@@ -82,7 +90,7 @@ The canonical local workstation is `POS-01`.
 Install the Chromium browser for Playwright e2e smoke tests when needed:
 
 ```powershell
-pnpm --filter @zeromerma/pos-web exec playwright install chromium
+corepack pnpm --filter @zeromerma/pos-web exec playwright install chromium
 ```
 
 ## Start Locally
@@ -93,7 +101,7 @@ Start PostgreSQL, run migrations, and open separate terminals for the API, worke
 .\scripts\dev\start-local.ps1
 ```
 
-The script runs `uv sync --all-packages --dev`, installs Node dependencies with `pnpm install --frozen-lockfile`, regenerates API contracts, starts PostgreSQL, applies Alembic migrations, and launches the four local processes.
+The script runs the toolchain preflight, executes `uv sync --all-packages --dev --frozen`, installs Node dependencies with `corepack pnpm install --frozen-lockfile`, regenerates API contracts, starts PostgreSQL, applies Alembic migrations, and launches the four local processes.
 It also seeds the local cashier, branches, workstations, operational catalog products, waste reasons, correction reasons, and the cash close denomination catalog.
 
 Local URLs:
@@ -122,8 +130,8 @@ uv run --project apps/api alembic -c apps/api/alembic.ini upgrade head
 uv run --project apps/api python scripts/bootstrap/seed-local-data.py
 uv run --project apps/api uvicorn zeromerma_api.main:create_app --factory --app-dir apps/api/src --reload --host 0.0.0.0 --port 8000
 uv run --project apps/worker python -m zeromerma_worker
-pnpm --filter @zeromerma/pos-web dev
-pnpm --filter @zeromerma/backoffice-web dev
+corepack pnpm --filter @zeromerma/pos-web dev
+corepack pnpm --filter @zeromerma/backoffice-web dev
 ```
 
 ## Local Seed Data
@@ -177,7 +185,7 @@ Operational seed products now exist under every movable class used by the POS sh
 Backend OpenAPI is the source of truth. Regenerate TypeScript contracts with:
 
 ```powershell
-pnpm contracts:generate
+corepack pnpm contracts:generate
 ```
 
 This writes:
@@ -205,10 +213,10 @@ uv run ruff check apps/api/src apps/api/tests apps/worker/src apps/worker/tests
 uv run mypy apps/api/src apps/worker/src
 uv run pytest
 uv run --project apps/worker python -m zeromerma_worker --once --skip-db-check
-pnpm contracts:generate
-pnpm lint
-pnpm test
-pnpm build
+corepack pnpm contracts:generate
+corepack pnpm lint
+corepack pnpm test
+corepack pnpm build
 docker compose -f infra\docker\docker-compose.yml config
 uv run --project apps/api alembic -c apps/api/alembic.ini upgrade head
 uv run --project apps/worker python -m zeromerma_worker --once
@@ -383,7 +391,7 @@ Manual POS validation for the Phase 2 corrective patch:
 Optional Playwright e2e smoke tests:
 
 ```powershell
-pnpm test:e2e
+corepack pnpm test:e2e
 ```
 
 ## Database Reset

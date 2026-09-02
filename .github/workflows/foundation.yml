@@ -17,26 +17,35 @@ jobs:
       - name: Setup Python
         uses: actions/setup-python@v5
         with:
-          python-version: "3.12"
+          python-version-file: ".python-version"
 
       - name: Setup uv
         uses: astral-sh/setup-uv@v4
+        with:
+          version: "0.11.4"
 
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
-          node-version: "22"
+          node-version-file: ".node-version"
 
-      - name: Setup pnpm
-        uses: pnpm/action-setup@v4
-        with:
-          version: 9.15.4
+      - name: Prepare Corepack and pnpm
+        shell: pwsh
+        run: |
+          corepack enable
+          $packageManager = (Get-Content -Raw package.json | ConvertFrom-Json).packageManager
+          $pnpmSpec = ([string]$packageManager).Split("+")[0]
+          corepack prepare $pnpmSpec --activate
+
+      - name: Validate canonical toolchain
+        shell: pwsh
+        run: .\scripts\dev\check-toolchain.ps1
 
       - name: Install Python dependencies
-        run: uv sync --all-packages --dev
+        run: uv sync --all-packages --dev --frozen
 
       - name: Install Node dependencies
-        run: pnpm install --frozen-lockfile
+        run: corepack pnpm install --frozen-lockfile
 
       - name: Run foundation validation
         run: .\scripts\dev\check-foundation.ps1
