@@ -197,21 +197,59 @@ Do not handwrite shared domain types between Python and TypeScript.
 
 ## Validation
 
-Run the foundation checks without requiring a running database:
+Destructive API tests never use the application `DATABASE_URL` or the local Compose database.
+Run them through the isolated harness:
+
+```powershell
+.\scripts\dev\run-api-tests.ps1
+```
+
+Each invocation generates a unique run ID, database name, container name, test-only credential,
+and loopback port. PostgreSQL 16 stores its data in container `tmpfs`; the harness removes the
+container in `finally`, including when pytest fails. Concurrent harness invocations therefore use
+different databases and cannot truncate one another.
+
+The protected fixture requires all four dedicated values below. The harness owns them; do not put
+fixed values in `.env`:
+
+- `ZEROMERMA_TEST_ENVIRONMENT=test`
+- `ZEROMERMA_TEST_DATABASE_URL` pointing to the generated loopback database
+- `ZEROMERMA_TEST_RUN_ID` matching the database and application name
+- `ZEROMERMA_TEST_DESTRUCTIVE_CONFIRMATION` bound to that run ID
+
+Unknown environments, remote hosts, ordinary database names, shared users, missing confirmation,
+or mismatched identities abort before engine creation. After connecting, a read-only identity query
+must confirm the real database, user, application name, and PostgreSQL 16 before Alembic or
+`TRUNCATE` can run. Error messages redact credentials.
+
+Run the guard unit suite without Docker or database access:
+
+```powershell
+uv run --frozen pytest apps/api/unit_tests/test_database_safety.py
+```
+
+Calling `uv run pytest apps/api/tests` directly without the dedicated generated configuration is
+intentionally unsupported and fails closed before connecting. CI uses the same ephemeral harness on
+a Linux job and receives no operational or production database secret.
+
+Run all foundation checks locally:
 
 ```powershell
 .\scripts\dev\check-foundation.ps1
 ```
 
-This script starts PostgreSQL, waits for readiness, applies migrations, verifies the API health endpoint, verifies worker bootability, and verifies both web apps through lint/test/build and bounded Vite boot checks.
-It also seeds the local operational and correction data before running the backend test suite.
+This script uses the local development PostgreSQL only for local API/worker boot checks. Backend
+pytest always runs through a separate ephemeral PostgreSQL container. CI calls the same script with
+`-CiIsolated`, which skips the local development database and runs only the ephemeral test harness.
+Both modes also verify the web apps through lint/test/build and bounded Vite boot checks.
 
 Individual commands:
 
 ```powershell
 uv run ruff check apps/api/src apps/api/tests apps/worker/src apps/worker/tests
 uv run mypy apps/api/src apps/worker/src
-uv run pytest
+uv run --frozen pytest apps/api/unit_tests/test_database_safety.py
+.\scripts\dev\run-api-tests.ps1
 uv run --project apps/worker python -m zeromerma_worker --once --skip-db-check
 corepack pnpm contracts:generate
 corepack pnpm lint

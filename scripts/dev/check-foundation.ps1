@@ -1,4 +1,6 @@
-param()
+param(
+  [switch]$CiIsolated
+)
 
 $ErrorActionPreference = "Stop"
 $ToolsScript = Join-Path $PSScriptRoot "..\powershell\ZeroMerma.Tools.ps1"
@@ -6,6 +8,7 @@ $ToolsScript = Join-Path $PSScriptRoot "..\powershell\ZeroMerma.Tools.ps1"
 
 $Root = Get-ZeroMermaRepoRoot
 $ToolchainScript = Join-Path $PSScriptRoot "check-toolchain.ps1"
+$ApiTestScript = Join-Path $PSScriptRoot "run-api-tests.ps1"
 
 function Test-ZeroMermaHttpServer {
   param(
@@ -64,21 +67,24 @@ try {
   Write-Host "Installing Node workspace dependencies..."
   Invoke-ZeroMermaPnpm install --frozen-lockfile
 
-  Write-Host "Validating Docker Compose configuration..."
-  Invoke-ZeroMermaDockerCompose config
-  Start-ZeroMermaPostgres
-  Wait-ZeroMermaPostgres
+  if (-not $CiIsolated) {
+    Write-Host "Validating Docker Compose configuration..."
+    Invoke-ZeroMermaDockerCompose config
+    Start-ZeroMermaPostgres
+    Wait-ZeroMermaPostgres
 
-  Write-Host "Applying database migrations..."
-  Invoke-ZeroMermaApiMigrations
+    Write-Host "Applying database migrations to the local development database..."
+    Invoke-ZeroMermaApiMigrations
 
-  Write-Host "Seeding local development data..."
-  Invoke-ZeroMermaApiSeedLocalData
+    Write-Host "Seeding local development data..."
+    Invoke-ZeroMermaApiSeedLocalData
+  }
 
   Write-Host "Running Python validation..."
-  Invoke-ZeroMermaUv run ruff check apps/api/src apps/api/tests apps/worker/src apps/worker/tests
+  Invoke-ZeroMermaUv run ruff check apps/api/src apps/api/tests apps/api/unit_tests apps/worker/src apps/worker/tests
   Invoke-ZeroMermaUv run mypy apps/api/src apps/worker/src
-  Invoke-ZeroMermaUv run pytest
+  Invoke-ZeroMermaUv run --frozen pytest apps/api/unit_tests/test_database_safety.py
+  & $ApiTestScript
 
   Write-Host "Verifying worker bootability without database access..."
   Invoke-ZeroMermaUv run --project apps/worker python -m zeromerma_worker --once --skip-db-check
@@ -91,18 +97,20 @@ try {
   Invoke-ZeroMermaPnpm test
   Invoke-ZeroMermaPnpm build
 
-  Write-Host "Verifying worker bootability against PostgreSQL..."
-  Invoke-ZeroMermaUv run --project apps/worker python -m zeromerma_worker --once
+  if (-not $CiIsolated) {
+    Write-Host "Verifying worker bootability against PostgreSQL..."
+    Invoke-ZeroMermaUv run --project apps/worker python -m zeromerma_worker --once
 
-  Test-ZeroMermaHttpServer `
-    -Name "API health endpoint" `
-    -Url "http://127.0.0.1:18000/health" `
-    -ScriptBlock {
-      param($RootPath, $UvExecutable)
-      Set-Location -LiteralPath $RootPath
-      & $UvExecutable run --project apps/api uvicorn zeromerma_api.main:create_app --factory --app-dir apps/api/src --host 127.0.0.1 --port 18000
-    } `
-    -ArgumentList @($Root, $UvPath)
+    Test-ZeroMermaHttpServer `
+      -Name "API health endpoint" `
+      -Url "http://127.0.0.1:18000/health" `
+      -ScriptBlock {
+        param($RootPath, $UvExecutable)
+        Set-Location -LiteralPath $RootPath
+        & $UvExecutable run --project apps/api uvicorn zeromerma_api.main:create_app --factory --app-dir apps/api/src --host 127.0.0.1 --port 18000
+      } `
+      -ArgumentList @($Root, $UvPath)
+  }
 
   Test-ZeroMermaHttpServer `
     -Name "POS web app" `

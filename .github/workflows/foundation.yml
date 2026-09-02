@@ -8,7 +8,8 @@ on:
 
 jobs:
   lint-test-build:
-    runs-on: windows-latest
+    # Linux Docker is required for the isolated postgres:16-alpine test harness.
+    runs-on: ubuntu-latest
 
     steps:
       - name: Checkout
@@ -39,7 +40,7 @@ jobs:
 
       - name: Validate canonical toolchain
         shell: pwsh
-        run: .\scripts\dev\check-toolchain.ps1
+        run: ./scripts/dev/check-toolchain.ps1
 
       - name: Install Python dependencies
         run: uv sync --all-packages --dev --frozen
@@ -48,4 +49,5 @@ jobs:
         run: corepack pnpm install --frozen-lockfile
 
       - name: Run foundation validation
-        run: .\scripts\dev\check-foundation.ps1
+        shell: pwsh
+        run: ./scripts/dev/check-foundation.ps1 -CiIsolated

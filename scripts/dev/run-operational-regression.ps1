@@ -18,6 +18,7 @@ $ErrorActionPreference = "Stop"
 
 $repoRoot = Get-ZeroMermaRepoRoot
 $posWebRoot = Join-Path $repoRoot "apps\pos-web"
+$apiTestScript = Join-Path $PSScriptRoot "run-api-tests.ps1"
 
 $playwrightSpecs = @(
   "e2e/pos-entry.spec.ts",
@@ -101,12 +102,6 @@ finally {
 }
 
 if (-not $SkipBackend) {
-  Push-Location $repoRoot
-  try {
-    Write-Host "Running backend operational persistence regression tests..."
-    Invoke-ZeroMermaUv run pytest @backendRegressionTests -q
-  }
-  finally {
-    Pop-Location
-  }
+  Write-Host "Running backend operational persistence regression tests in isolated PostgreSQL..."
+  & $apiTestScript -TestTarget $backendRegressionTests
 }
