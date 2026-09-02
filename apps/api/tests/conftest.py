@@ -127,9 +127,11 @@ RESTART IDENTITY CASCADE
 def migrated_database() -> None:
     with TEST_ENGINE.connect() as connection:
         assert_authorized_destructive_connection(connection, TEST_DATABASE_CONFIG)
-
-    alembic_config = Config(str(REPO_ROOT / "apps" / "api" / "alembic.ini"))
-    command.upgrade(alembic_config, "head")
+        connection.commit()
+        alembic_config = Config(str(REPO_ROOT / "apps" / "api" / "alembic.ini"))
+        alembic_config.attributes["connection"] = connection
+        alembic_config.attributes["destructive_test_database_config"] = TEST_DATABASE_CONFIG
+        command.upgrade(alembic_config, "head")
 
 
 @pytest.fixture(scope="session", autouse=True)

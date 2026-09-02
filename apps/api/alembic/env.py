@@ -1,9 +1,11 @@
 from __future__ import annotations
 
+import os
 from logging.config import fileConfig
 
 from alembic import context
 from sqlalchemy import engine_from_config, pool
+from sqlalchemy.engine import Connection
 
 from zeromerma_api.core.config import get_settings
 from zeromerma_api.db.base import Base
@@ -28,6 +30,14 @@ from zeromerma_api.modules.quality.infrastructure import models as quality_model
 from zeromerma_api.modules.returns.infrastructure import models as returns_models
 from zeromerma_api.modules.sales.infrastructure import models as sales_models
 from zeromerma_api.modules.suppliers.infrastructure import models as suppliers_models
+from zeromerma_api.testing.database_safety import (
+    TEST_CONFIRMATION_VARIABLE,
+    TEST_DATABASE_URL_VARIABLE,
+    TEST_ENVIRONMENT_VARIABLE,
+    TEST_RUN_ID_VARIABLE,
+    DestructiveTestDatabaseConfig,
+    assert_authorized_destructive_connection,
+)
 
 config = context.config
 
@@ -35,6 +45,13 @@ if config.config_file_name is not None:
     fileConfig(config.config_file_name)
 
 target_metadata = Base.metadata
+
+TEST_GUARD_VARIABLES = (
+    TEST_ENVIRONMENT_VARIABLE,
+    TEST_DATABASE_URL_VARIABLE,
+    TEST_RUN_ID_VARIABLE,
+    TEST_CONFIRMATION_VARIABLE,
+)
 
 _ = (
     audit_models,
@@ -68,6 +85,26 @@ def run_migrations_offline() -> None:
         literal_binds=True,
         dialect_opts={"paramstyle": "named"},
         compare_type=True,
+        compare_server_default=True,
+    )
+
+    with context.begin_transaction():
+        context.run_migrations()
+
+
+def _run_migrations_with_connection(connection: Connection) -> None:
+    test_database_config = config.attributes.get("destructive_test_database_config")
+    if test_database_config is not None:
+        if not isinstance(test_database_config, DestructiveTestDatabaseConfig):
+            raise RuntimeError("Invalid destructive test database configuration.")
+        assert_authorized_destructive_connection(connection, test_database_config)
+        connection.commit()
+
+    context.configure(
+        connection=connection,
+        target_metadata=target_metadata,
+        compare_type=True,
+        compare_server_default=True,
     )
 
     with context.begin_transaction():
@@ -75,6 +112,20 @@ def run_migrations_offline() -> None:
 
 
 def run_migrations_online() -> None:
+    supplied_connection = config.attributes.get("connection")
+    if supplied_connection is not None:
+        if config.attributes.get("destructive_test_database_config") is None:
+            raise RuntimeError(
+                "Injected Alembic connections require the ZeroMerma destructive-test guard."
+            )
+        _run_migrations_with_connection(supplied_connection)
+        return
+
+    if any(name in os.environ for name in TEST_GUARD_VARIABLES):
+        raise RuntimeError(
+            "Destructive test migrations must use the guarded injected-connection path."
+        )
+
     settings = get_settings()
     wait_for_database(str(settings.database_url))
     config.set_main_option("sqlalchemy.url", str(settings.database_url))
@@ -86,10 +137,7 @@ def run_migrations_online() -> None:
     )
 
     with connectable.connect() as connection:
-        context.configure(connection=connection, target_metadata=target_metadata, compare_type=True)
-
-        with context.begin_transaction():
-            context.run_migrations()
+        _run_migrations_with_connection(connection)
 
 
 if context.is_offline_mode():

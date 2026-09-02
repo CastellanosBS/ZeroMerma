@@ -232,6 +232,20 @@ Calling `uv run pytest apps/api/tests` directly without the dedicated generated 
 intentionally unsupported and fails closed before connecting. CI uses the same ephemeral harness on
 a Linux job and receives no operational or production database secret.
 
+Validate the canonical Alembic chain through the same protected harness:
+
+```powershell
+# Fresh database, schema drift, constraints/indexes, and seed compatibility.
+.\scripts\dev\run-migration-validation.ps1 -Mode Fast
+
+# All 39 checkpoints plus data preservation, interruption, and dump/restore.
+.\scripts\dev\run-migration-validation.ps1 -Mode Full
+```
+
+The complete migration policy, checkpoint inventory, lock-risk classification, and required
+roll-forward evidence are documented in
+[`docs/operations/database-migrations.md`](docs/operations/database-migrations.md).
+
 Run all foundation checks locally:
 
 ```powershell

@@ -33,7 +33,8 @@ $testEnvironmentNames = @(
   "ZEROMERMA_TEST_ENVIRONMENT",
   "ZEROMERMA_TEST_DATABASE_URL",
   "ZEROMERMA_TEST_RUN_ID",
-  "ZEROMERMA_TEST_DESTRUCTIVE_CONFIRMATION"
+  "ZEROMERMA_TEST_DESTRUCTIVE_CONFIRMATION",
+  "ZEROMERMA_TEST_CONTAINER_NAME"
 )
 $previousEnvironment = @{}
 $containerCreated = $false
@@ -107,6 +108,11 @@ try {
   [Environment]::SetEnvironmentVariable("ZEROMERMA_TEST_ENVIRONMENT", "test", "Process")
   [Environment]::SetEnvironmentVariable("ZEROMERMA_TEST_DATABASE_URL", $databaseUrl, "Process")
   [Environment]::SetEnvironmentVariable("ZEROMERMA_TEST_RUN_ID", $RunId, "Process")
+  [Environment]::SetEnvironmentVariable(
+    "ZEROMERMA_TEST_CONTAINER_NAME",
+    $containerName,
+    "Process"
+  )
   [Environment]::SetEnvironmentVariable(
     "ZEROMERMA_TEST_DESTRUCTIVE_CONFIRMATION",
     $confirmation,

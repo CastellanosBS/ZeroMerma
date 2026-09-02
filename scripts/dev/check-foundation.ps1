@@ -9,6 +9,7 @@ $ToolsScript = Join-Path $PSScriptRoot "..\powershell\ZeroMerma.Tools.ps1"
 $Root = Get-ZeroMermaRepoRoot
 $ToolchainScript = Join-Path $PSScriptRoot "check-toolchain.ps1"
 $ApiTestScript = Join-Path $PSScriptRoot "run-api-tests.ps1"
+$MigrationValidationScript = Join-Path $PSScriptRoot "run-migration-validation.ps1"
 
 function Test-ZeroMermaHttpServer {
   param(
@@ -85,6 +86,7 @@ try {
   Invoke-ZeroMermaUv run mypy apps/api/src apps/worker/src
   Invoke-ZeroMermaUv run --frozen pytest apps/api/unit_tests/test_database_safety.py
   & $ApiTestScript
+  & $MigrationValidationScript -Mode Fast
 
   Write-Host "Verifying worker bootability without database access..."
   Invoke-ZeroMermaUv run --project apps/worker python -m zeromerma_worker --once --skip-db-check
