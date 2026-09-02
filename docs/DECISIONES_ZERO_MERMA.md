@@ -2,7 +2,7 @@
 
 **Condición:** única fuente versionada para registrar `DEC-01`–`DEC-20` y sus futuras revisiones.
 **Propietario de las decisiones:** propietario de ZeroMerma.
-**Última actualización:** 2026-08-27.
+**Última actualización:** 2026-09-01.
 **Fuente normativa:** `PLAN_MAESTRO_FINALIZACION_ZERO_MERMA.md`, fecha de consolidación 2026-08-25, sección “Decisiones pendientes del propietario”, con contenido normativo suministrado por el propietario durante `ZM-FIN-002`.
 
 ## Reglas de gobierno
@@ -9194,7 +9194,7 @@ Sin ejecutarlas en esta iteración, se deberá cubrir:
 - El propietario resolvió el contexto comercial y aprobó esta política para Sonora, México el 2026-08-29.
 - Las fuentes oficiales vigentes se incorporaron como línea base normativa y deberán revalidarse ante cambios.
 - DEC-16 aprueba gobernanza, no implementación ni cumplimiento certificado.
-- DEC-17–DEC-20 permanecen `PENDIENTE` y sin respuesta aprobada.
+- Al cierre documental de DEC-16, DEC-17–DEC-20 permanecían `PENDIENTE` y sin respuesta aprobada.
 
 ## DEC-17 — Continuidad
 
@@ -11403,15 +11403,348 @@ Se registra:
 - La inspección técnica read-only identificó dos volúmenes locales, seeds compartidos y ausencia de fuentes legacy concretas en el repositorio, sin inspeccionar filas ni ejecutar DB.
 - El propietario clasificó ambos volúmenes como desarrollo/demo/test, confirmó que no existe fuente legacy externa a migrar y aprobó clean operational start, política híbrida/selectiva, opening state, autoridades por dominio, operaciones abiertas y Superadministrador inicial.
 - `pending_owner_questions=0`.
-- DEC-20 permanece `PENDIENTE` y sin respuesta aprobada.
+- Al cierre documental de DEC-19, DEC-20 permanecía `PENDIENTE` y sin respuesta aprobada.
 - ZM-FIN-003 continúa abierta.
-- No se avanza a DEC-20 ni a ZM-FIN-004.
+- La iteración de DEC-19 no avanzó a DEC-20 ni a ZM-FIN-004.
 
 ## DEC-20 — Piloto y rollout
 
-- **Estado:** `PENDIENTE`
+- **Estado:** `APROBADA`
+- **Fecha:** 2026-09-01
 - **Propietario:** propietario de ZeroMerma
-- **Qué debe aprobarse:** sitio piloto, cadencias representativas, criterios de stop y estrategia de expansión.
-- **Tareas principales afectadas:** tareas de piloto, estabilización y producción general del Plan Maestro.
-- **Respuesta aprobada:** ninguna.
-- **Regla:** ninguna capacidad visible pendiente de validación está autorizada para piloto o producción por esta decisión.
+- **Contenido aprobado:** Sucursal Matriz como único sitio piloto inicial; duración híbrida con mínimo de dos ciclos semanales operativos completos y cobertura obligatoria de cadencias; stop basado en impacto; autoridades de pausa, reanudación y expansión; contingencia inicialmente stop-only; rollout de una sucursal por oleada; línea de release controlada; BBVA obligatorio para la aceptación final integral después de satisfacer sus gates; frontera fiscal derivada de DEC-16 y ZM-FIN-007.
+- **Preguntas pendientes del propietario:** ninguna.
+- **Tareas principales afectadas:** `ZM-FIN-003`, `ZM-FIN-007`, `ZM-FIN-046`, `ZM-FIN-059`, `ZM-FIN-065`, `ZM-FIN-105`–`126` y cualquier tarea que produzca evidencia para Production Ready, Pilot Ready o General Production.
+- **Respuesta aprobada:** `20-SITE-A`, `20-DUR-C`, `20-STOP-B`, `20-ROL-B` y `20-REL-C`; piloto en Sucursal Matriz, una sucursal, dos ciclos semanales completos como mínimo no calendario, extensión automática por evidencia faltante, stop por impacto, reanudación crítica y expansión con doble autoridad, contingencia inicial stop-only, BBVA integrado obligatorio en el piloto final una vez satisfechos sus gates y fiscalidad gobernada por DEC-16/ZM-FIN-007.
+- **Regla:** DEC-20 cierra la política documental de piloto y rollout. No implementa tareas, no satisface gates, no despliega, no habilita contingencia ni BBVA y no inicia ZM-FIN-004.
+
+Se registra:
+
+- `owner_policy_approved=true`
+- `pending_owner_questions=0`
+- `DEC20_READY_TO_RECORD=true`
+- `actual_pilot_site=Sucursal Matriz`
+- `pilot_branch_count=1`
+- `pilot_duration_policy=HYBRID`
+- `pilot_stop_policy=IMPACT_BASED`
+- `pilot_initial_outage_policy=STOP_ONLY`
+- `rollout_strategy=ONE_BRANCH_PER_WAVE`
+- `release_policy=CONTROLLED_RELEASE_LINE`
+
+### Sitio piloto y alcance inicial
+
+El sitio piloto real aprobado es **Sucursal Matriz**.
+
+Se aprueba:
+
+- `PILOT_SITE_NAME=Matriz`
+- `actual_pilot_site=Sucursal Matriz`
+- `20-SITE-A`
+- `pilot_branch_count=1`
+- sólo Sucursal Matriz entra en el piloto inicial;
+- múltiples sucursales simultáneas y rollout completo sin piloto quedan rechazados.
+
+La identidad productiva de Sucursal Matriz deberá crearse o identificarse explícitamente durante preparación y cutover. No existe mapping implícito con el seed de desarrollo:
+
+- `pilot_site_seed_mapping_implicit=false`
+- `seed_MAIN_is_not_implicitly_Matriz=true`
+- `MAIN`, `NORTE` y `SUR` continúan siendo entidades demo/test conforme DEC-19.
+
+El sitio deberá acreditar panadería real, operación representativa, supervisión empresarial, usuarios reales, LAN y energía adecuadas, mini-PC principal, segundo mini-PC standby, estaciones e impresora certificadas, Internet complementario, soporte rápido, rollback controlado, conteo físico/opening state y capacidad de reconciliar caja e inventario.
+
+### Duración híbrida y cadencias
+
+Se aprueba `20-DUR-C`:
+
+```text
+minimum_operational_cycles
++ mandatory_representative_cycle_coverage
++ automatic_extension_if_evidence_missing
+```
+
+El mínimo es `TWO_COMPLETE_WEEKLY_OPERATIONAL_CYCLES`: dos ciclos semanales completos conforme al calendario operativo real de Sucursal Matriz. No equivale automáticamente a catorce días calendario y no basta por sí solo para cerrar el piloto.
+
+El piloto se extiende automáticamente, sin máximo predeterminado, cuando:
+
+- falta una cadencia live obligatoria;
+- existe reconciliación pendiente;
+- permanece un incidente material abierto;
+- un hotfix invalida evidencia relevante;
+- no se satisface estabilización;
+- la evidencia es insuficiente.
+
+Cadencias live obligatorias cuando apliquen a Sucursal Matriz:
+
+- **por turno:** autenticación, apertura, venta, pagos, cierre y reconciliación de caja;
+- **diarias:** producción, inventario, merma, pedidos, outbox/worker, alertas, backup y reconciliación económica/física;
+- **por ciclo semanal operativo:** compras, recepción, reposición, transferencias, reportes, revisión de discrepancias y cambios naturales de usuarios o turnos.
+
+Fallos peligrosos o destructivos —pérdida de nodo, split-brain, restore destructivo, corrupción, ataques, failover, provider outage y recuperación— se prueban en staging o drill, no provocándolos en el sitio real. Un proceso poco frecuente podrá usar evidencia previa únicamente si es vigente, trazable, semánticamente equivalente para la misma versión y aceptada en el go/no-go.
+
+### Política STOP basada en impacto
+
+Se aprueba `20-STOP-B`. Stop se decide por impacto sobre dinero, integridad, inventario, seguridad, aislamiento, disponibilidad crítica o recuperación.
+
+#### `STOP_IMMEDIATE`
+
+Incluye como mínimo:
+
+- doble cargo o doble refund;
+- pérdida de una operación económica confirmada;
+- caja irreconciliable;
+- corrupción de datos o inventario sistémico;
+- efecto físico duplicado o pérdida de causalidad crítica;
+- acceso cross-branch o escalación de privilegios;
+- exposición material de PII o secretos;
+- split-brain;
+- POS incapaz de vender de forma fiable;
+- cierre incapaz de completarse correctamente;
+- backend autoritativo inestable sin contingencia validada;
+- BBVA inseguro, duplicado o `UNKNOWN` no reconciliable cuando esté habilitado.
+
+#### `CONTINUE_WITH_DEGRADED_MODE`
+
+Sólo procede con workaround previamente considerado seguro, owner, evidencia, reconciliación cuando corresponda y criterio de salida. Ejemplos conceptuales:
+
+- impresora no disponible con procedimiento aprobado;
+- scanner no disponible con entrada manual segura;
+- Internet o Telegram no disponibles mientras LAN y backend local están sanos;
+- worker degradado si outbox es durable, backlog está controlado y la integridad no está comprometida.
+
+#### `TRACK_AND_FIX`
+
+Aplica a cosmética, reporting no autoritativo, defectos menores y fricción no crítica, siempre con owner, registro y criterio o plazo de corrección.
+
+### Alert severity y defect severity
+
+No existe mapping 1:1 universal entre:
+
+- alertas DEC-18: `CRITICAL-A`, `CRITICAL-B`, `CRITICAL-C`;
+- defectos: `CRITICAL`, `HIGH`, `MEDIUM`, `LOW`.
+
+Se aprueba:
+
+- alerta `CRITICAL-A`: `presumption_of_immediate_stop=true`, salvo falso positivo demostrado o condición contenida de forma segura;
+- defecto `CRITICAL`: `immediate_stop=true`;
+- defecto `HIGH`: `always_blocks_expansion=true` y además detiene operación si afecta dinero, integridad, seguridad, aislamiento o disponibilidad crítica, o carece de workaround seguro;
+- defecto `MEDIUM`: sólo permite continuidad con workaround seguro, owner, evidencia, reconciliación intacta y sin deuda de seguridad o integridad;
+- defecto `LOW`: no bloquea por sí solo.
+
+Las taxonomías existentes permanecen separadas.
+
+### Autoridad operativa
+
+Se aprueba:
+
+- `any_operator_can_request_protective_pause=true`;
+- supervisor del sitio e Incident Commander técnico pueden ejecutar `STOP` cuando la situación lo exige;
+- solicitar de buena fe una pausa protectora no genera penalización operacional;
+- `resume_requires_dual_authority=true` después de un stop crítico;
+- reanudación requiere aprobación técnica y de propietario/administración;
+- expansión requiere `technical_approval + owner_or_administration_approval`.
+
+Antes de reanudar deberán existir causa contenida, revisión de integridad, reconciliación aplicable, smoke y aceptación del riesgo residual.
+
+Un workaround que pueda afectar dinero, datos, seguridad, autorización, inventario o reconciliación requiere doble control técnico y administrativo. Un workaround operacional no crítico puede seguir su runbook.
+
+Todo hotfix requiere aprobación técnica, versión, artefacto inmutable nuevo, pruebas dirigidas, gates relevantes, smoke y registro. No se editará directamente la instalación piloto.
+
+### Contingencia inicial
+
+Se aprueba:
+
+- `pilot_initial_outage_policy=STOP_ONLY`
+- mientras la contingencia manual no esté formalmente habilitada, `backend_authoritative_outage -> transactional_operation_suspended`.
+
+La contingencia sólo podrá habilitarse después de validar runbook, folio e identidad, entrenamiento, ownership, evidencia, reconciliación, idempotencia de recaptura, relación fiscal y drill satisfactorio. Se preservan DEC-15/16/17 y no se introduce browser offline.
+
+### Rollout por oleadas
+
+Se aprueba `20-ROL-B`: una sucursal por oleada inicialmente.
+
+```text
+prepare
+-> cutover
+-> reconcile
+-> stabilize
+-> approve next branch
+```
+
+No hay big bang. Un incidente material detiene la sucursal afectada cuando corresponda, pausa nuevas oleadas y obliga a determinar alcance. Sucursales operativas sólo continúan con aislamiento demostrado, defecto no aplicable y continuidad segura; no se ejecuta rollback global sin evidencia.
+
+Antes de la siguiente sucursal se exigen cero blockers, reconciliación aprobada, incidentes revisados, backup/off-site válido, hardware y LAN estables, soporte suficiente, ausencia de workaround inseguro, release aprobado, evidencia firmada y doble aprobación técnica/administrativa.
+
+### Release y hotfix
+
+Se aprueba `20-REL-C`:
+
+```text
+pilot_approved_release
++ revalidated_hotfixes
+```
+
+Cada sitio conserva una versión identificable y `free_per_branch_version_drift=false`.
+
+Un hotfix repite la evidencia afectada según riesgo. Cambios en dinero, inventario, schema, autorización, sesiones, outbox, worker, hardware, pagos o recovery repiten pruebas y cadencias relacionadas. Un cambio cosmético no reinicia automáticamente todo el piloto; la evaluación queda documentada.
+
+### BBVA en el piloto final
+
+Se aprueba:
+
+- `BBVA_REQUIRED_IN_FINAL_ACCEPTANCE_PILOT=true`
+- la aceptación final integral debe ejercer BBVA integrado cuando forma parte del alcance aprobado final;
+- BBVA no puede habilitarse en Sucursal Matriz sin implementar DEC-14 y satisfacer el gate BBVA/PCI de DEC-16.
+
+Antes de habilitarlo se demostrarán adapter/provider boundary, terminal correcta, binding workstation-terminal, ausencia de datos sensibles en componentes prohibidos, idempotencia, recuperación de `UNKNOWN`, callbacks o polling, conciliación, refunds/reversas aplicables, observabilidad, separación sandbox/production y cutover aprobado.
+
+Si BBVA no está listo:
+
+```text
+FINAL_PILOT_START=POSTPONED
+```
+
+DEC-20 no autoriza ni declara implementado BBVA.
+
+### Frontera fiscal
+
+DEC-16 y ZM-FIN-007 continúan siendo autoridad. Se registra:
+
+- `fiscal_pilot_boundary=DERIVED_FROM_DEC16_AND_ZM_FIN_007`;
+- antes de G7/G8 debe existir una matriz validada `obligation -> module -> control -> evidence` para la entidad real de Sucursal Matriz;
+- cualquier requisito fiscal clasificado como blocker debe satisfacerse antes del cutover;
+- DEC-20 no relaja CFDI, FiscalAdapter, ticket operativo, privacidad ni retención.
+
+### Clean operational start
+
+Se preserva DEC-19:
+
+- `pilot_uses_clean_operational_start=true`;
+- master data empresarial aprobada;
+- Superadministrador explícito;
+- usuarios, roles y scopes reales;
+- conteo físico y opening state;
+- caja inicial cuando corresponda;
+- operaciones abiertas tratadas conforme DEC-19.
+
+Queda prohibido usar seed demo, `MAIN`/`NORTE`/`SUR`, balances, ventas o historia financiera demo como historia empresarial.
+
+### Reconciliación del piloto
+
+Cada cierre reconcilia:
+
+```text
+expected cash
+vs
+counted cash
+vs
+cash ledger
+```
+
+Diariamente se reconcilian, cuando apliquen, ventas, orders, payments, `PaymentLeg`, refunds, caja, inventario, producción, merma, outbox y analytics projections.
+
+Se ejecuta reconciliación adicional después de incidente material, hotfix relevante, restore, failover, contingencia o migración/cutover correctivo. Antes de expansión debe existir reconciliación integral firmada. Un dashboard visualmente correcto no equivale a reconciliación.
+
+### Go/no-go y estabilización
+
+El piloto no empieza hasta que:
+
+- `G7 Production Ready=true`;
+- `G8 Pilot Ready=true`;
+- Sucursal Matriz, hardware, LAN, energía, principal y standby estén preparados;
+- backup/off-site y recovery tengan evidencia;
+- opening state esté reconciliado;
+- usuarios/scopes, capacitación, runbooks, soporte y rollback estén listos;
+- monitoring, alert dashboard y Telegram cuando haya Internet estén listos;
+- release manifest y checklist firmado existan.
+
+El piloto no sustituye QA ni Production Ready.
+
+La expansión requiere:
+
+- cero defectos `CRITICAL` abiertos;
+- cero `HIGH` blockers abiertos;
+- cero alertas `CRITICAL-A` activas sin resolución;
+- dinero e inventario reconciliados;
+- outbox convergente;
+- backup funcional y alerting operable;
+- usuarios y soporte efectivos;
+- dos ciclos semanales operativos completos y cadencias obligatorias observadas;
+- ausencia de workaround inseguro o paso manual oculto crítico.
+
+Un defecto `MEDIUM` sólo puede permanecer con workaround seguro y owner. Un defecto `LOW` o cosmético no bloquea por sí solo.
+
+### KPI, evidencia, capacitación y soporte
+
+El piloto usa un subconjunto operacional de DEC-18, sin mostrar ni exigir simultáneamente los 373 KPI: ventas/revenue, caja, pagos/refunds, discrepancias de inventario, merma, pedidos, backlog y edad del outbox, data quality, uptime/readiness, backup/off-site, RPO/RTO observado cuando aplique y ACK/resolución de alertas. No se inventan thresholds.
+
+La evidencia conservará commit, release SHA/digest, schema revision, configuración, identidad del sitio, inventario de hardware, opening state, usuarios/roles entrenados, smoke, cierres, reconciliaciones, incidentes, alertas, backups, hotfixes, decisiones stop/resume, go/no-go y aprobaciones de rollout, sin PII innecesaria.
+
+Cada rol aplicable demostrará en entorno seguro login, apertura, venta, pago, pedidos, devolución, cierre, reporte de incidente, contingencia cuando esté habilitada y funciones de supervisor/admin. La aceptación será `observed_and_signed_checklist`, sin porcentaje arbitrario.
+
+Debe existir soporte durante cutover, horario operativo del piloto e incident response. Mantenimiento disruptivo planificado se realizará fuera del horario operativo conforme DEC-17, sin inventar horarios de Sucursal Matriz.
+
+### Aislamiento multi-sucursal
+
+Cada sucursal conserva branch, opening state, hardware, contexto DB conforme a la arquitectura implementada, backup, release, configuración y evidencia identificables. Scopes y datos no se cruzan. LOCAL_FIRST continúa canónica y no se presume un control plane cloud no implementado.
+
+### Dependencias, gates y cierre documental
+
+DEC-20 ajusta evidencia futura de ZM-FIN-007, 046, 059, 065, 105–126, G7 Production Ready, G8 Pilot Ready y G9 General Production.
+
+G8 deberá acreditar Sucursal Matriz, una sucursal, hardware/LAN/standby, clean opening state, capacitación, soporte, rollback, Production Ready, gate BBVA cuando corresponda al piloto final y gates fiscales aplicables.
+
+G9 deberá acreditar dos ciclos semanales completos, cadencias representativas, reconciliación, cero critical/high blocker, rollout aprobado, una sucursal por oleada inicialmente y línea de release controlada.
+
+DEC-20 no marca G8 ni G9 cumplidos y no declara ninguna tarea implementada.
+
+Las veinte decisiones bloqueantes tienen propietario, estado aprobado, regla inequívoca, ejemplos y tareas afectadas. No existe una convención explícita de estado en las tareas del Plan Maestro; por tanto, no se agrega una nueva. Se registra:
+
+- `ZM_FIN_003_ACCEPTANCE_CRITERIA_SATISFIED=true`
+- `ZM_FIN_003_READY_TO_CLOSE=true`
+- `ZM_FIN_004_NOT_ADVANCED=true`
+
+### Controles normativos verificables de DEC-20
+
+- `DEC20_OWNER_CORRECT=true`
+- `DEC20_DATE_2026_09_01=true`
+- `DEC20_PENDING_OWNER_QUESTIONS_0=true`
+- `DEC20_PILOT_SITE_MATRIZ=true`
+- `DEC20_SEED_MAIN_NOT_IMPLICIT_MATRIZ=true`
+- `DEC20_SITE_A=true`
+- `DEC20_DURATION_C=true`
+- `DEC20_TWO_WEEKLY_OPERATIONAL_CYCLES=true`
+- `DEC20_MANDATORY_CYCLE_COVERAGE=true`
+- `DEC20_AUTO_EXTENSION=true`
+- `DEC20_STOP_B=true`
+- `DEC20_STOP_IMPACT_BASED=true`
+- `DEC20_ALERT_DEFECT_SEVERITIES_SEPARATE=true`
+- `DEC20_ANY_OPERATOR_CAN_REQUEST_PAUSE=true`
+- `DEC20_IC_OR_SUPERVISOR_CAN_STOP=true`
+- `DEC20_CRITICAL_RESUME_DUAL_APPROVAL=true`
+- `DEC20_EXPANSION_DUAL_APPROVAL=true`
+- `DEC20_INITIAL_CONTINGENCY_STOP_ONLY=true`
+- `DEC20_MANUAL_CONTINGENCY_REQUIRES_VALIDATION=true`
+- `DEC20_ROLLOUT_B=true`
+- `DEC20_ONE_BRANCH_PER_WAVE=true`
+- `DEC20_RELEASE_C=true`
+- `DEC20_NO_FREE_BRANCH_VERSION_DRIFT=true`
+- `DEC20_BBVA_REQUIRED_FINAL_PILOT=true`
+- `DEC20_BBVA_GATE_REQUIRED=true`
+- `DEC20_FINAL_PILOT_POSTPONED_IF_BBVA_NOT_READY=true`
+- `DEC20_FISCAL_DERIVED_DEC16_ZM_FIN_007=true`
+- `DEC20_RECONCILIATION_EACH_CLOSE=true`
+- `DEC20_RECONCILIATION_DAILY=true`
+- `DEC20_RECONCILIATION_BEFORE_EXPANSION=true`
+- `DEC20_G7_BEFORE_PILOT=true`
+- `DEC20_G8_BEFORE_PILOT=true`
+- `DEC20_G8_NOT_FAKE_COMPLETED=true`
+- `DEC20_G9_NOT_FAKE_COMPLETED=true`
+
+### Historial y límites
+
+- DEC-20 permaneció `PENDIENTE` desde 2026-08-26 hasta 2026-09-01.
+- El propietario aprobó Sucursal Matriz, SITE-A, DUR-C, STOP-B, ROL-B y REL-C, junto con autoridades, contingencia inicial stop-only y fronteras BBVA/fiscales.
+- `pending_owner_questions=0`.
+- DEC-20 cierra las decisiones bloqueantes de ZM-FIN-003 documentalmente.
+- ZM-FIN-003 queda lista para cierre conforme a sus criterios, sin declarar implementación.
+- No se avanza a ZM-FIN-004.

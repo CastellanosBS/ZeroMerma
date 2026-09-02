@@ -92,7 +92,7 @@ La auditoría activa eleva algunos riesgos estáticos a defectos reproducidos y 
 - Refactors sólo incrementales, precedidos por caracterización y justificados por seguridad, consistencia o mantenibilidad necesaria.
 ## 5. Registro de decisiones del propietario
 
-Este es el único Plan Maestro canónico versionado del repositorio. Conserva 126 tareas, ZM-FIN-001–ZM-FIN-126. DEC-01–DEC-19 están `APROBADA`; DEC-20 permanece `PENDIENTE`. Aprobar una DEC modifica criterios futuros, no marca implementación ni satisface gates.
+Este es el único Plan Maestro canónico versionado del repositorio. Conserva 126 tareas, ZM-FIN-001–ZM-FIN-126. DEC-01–DEC-20 están `APROBADA`; no quedan decisiones pendientes. Aprobar una DEC modifica criterios futuros, no marca implementación ni satisface gates.
 
 Se registra `PLAN_MASTER_CANONICAL_IN_REPO=true`, `PLAN_MASTER_SINGLE=true`, `TASK_COUNT_126=true`, `TASK_IDS_001_126_COMPLETE=true`, `NO_TASK_MARKED_IMPLEMENTED_BY_SYNC=true` y `GATES_NOT_FAKE_COMPLETED=true`.
 
@@ -117,7 +117,7 @@ Se registra `PLAN_MASTER_CANONICAL_IN_REPO=true`, `PLAN_MASTER_SINGLE=true`, `TA
 | DEC-17 | Continuidad — APROBADA | LOCAL_FIRST: backend/PostgreSQL local autoritativo por LAN; operación sin Internet pero no browser offline; segundo mini-PC standby controlado; RPO local cero/casi cero, RPO de sitio <=5m, RTO primario <=1h y RTO de sitio <=8h; cloud complementario. |
 | DEC-18 | Métricas y alertas — APROBADA | Instrumentación amplia; catálogo KPI exhaustivo/versionado; dashboard selectivo; alerting conservador; Telegram crítico; outbox/fact layer; HOT/WARM/COLD; lakehouse/IA futuros no bloqueantes. Append-only transversal no se presume. |
 | DEC-19 | Datos existentes — APROBADA | Volúmenes locales conocidos clasificados por el propietario como desarrollo/demo/test; ninguna fuente legacy externa actual; clean operational start; política híbrida/selectiva por dominio; opening state auditable; operaciones abiertas reconciliadas o migradas sólo con causalidad suficiente; Superadministrador inicial explícito y único `GLOBAL` inicial. |
-| DEC-20 | Piloto y rollout | Sitio piloto, cadencias representativas, criterios de stop y estrategia de expansión. |
+| DEC-20 | Piloto y rollout — APROBADA | Sucursal Matriz como único sitio piloto inicial; duración híbrida con dos ciclos semanales completos y cobertura obligatoria; stop por impacto; autoridad dual para reanudación crítica y expansión; contingencia inicial stop-only; rollout de una sucursal por oleada; línea de release controlada; BBVA obligatorio en la aceptación final después de gates; fiscalidad derivada de DEC-16/ZM-FIN-007. |
 
 ## 6. Gates obligatorios
 | Gate | Debe ser verdadero | Evidencia mínima |
@@ -129,9 +129,9 @@ Se registra `PLAN_MASTER_CANONICAL_IN_REPO=true`, `PLAN_MASTER_SINGLE=true`, `TA
 | **G4 — Security Ready** | RBAC/scopes deny-by-default, sesión/revocación, hardening, secrets, threat model y scans no tienen hallazgos críticos/altos abiertos sin aceptación explícita. | Matriz 401/403/2xx, pruebas cross-branch, scans/SBOM, evidencia de configuración fail-closed. |
 | **G5 — QA Ready** | Suites unitarias, integración, E2E, recuperación, rendimiento y hardware/a11y cubren los riesgos aprobados; fórmulas KPI críticas, data quality, correlation/causation, opening state y rebuilds deterministas están probados; seeds/demo no contaminan una DB real y no hay flakiness no controlada ni defectos críticos/altos abiertos. | Resultados CI, pruebas de aislamiento DB, KPI/lineage/rebuild/opening state, rechazo de datos ambiguos, reportes no funcionales, artefactos Playwright y triage firmado. |
 | **G6 — Staging Ready** | Staging equivalente a producción se aprovisiona desde cero y ejecuta el release candidate con migración, probes, worker, smoke y datos UAT explícitamente no productivos; ensaya clean start, opening state y reconciliación. | Manifiesto desplegado, digests, schema revision, clasificación del dataset, opening-state dry run, smoke, reconciliación y drift detection. |
-| **G7 — Production Ready** | La topología LOCAL_FIRST, artefactos, red/TLS local, PostgreSQL autoritativo, standby controlado, observabilidad, secretos, backup off-site/restore, rollback/DR y runbooks están probados; clean operational start, master data aprobada y mecanismo de opening state están listos; dashboard de alertas y Telegram crítico se prueban con Internet, y perder Telegram no bloquea la tienda. | Restore/failover drills con RPO/RTO observado, operación local sin Internet, paquete de carga/opening state idempotente, Superadministrador inicial explícito, alert dashboard, prueba Telegram y cola pendiente/retry, release pipeline, SLO/runbooks y aprobación formal. |
-| **G8 — Pilot Ready** | Sitio, mini-PC principal/standby, LAN, backup off-site, datos, usuarios, capacitación, soporte, rollback y cutover están completos; UAT y Production Ready aprobados; la historia productiva comienza limpia con configuración empresarial aprobada, conteo físico/opening state y operaciones abiertas tratadas conforme DEC-19; vistas KPI selectivas útiles operan con sensibilidad conservadora. Lakehouse, IA y WhatsApp no son requisitos. | Site survey, evidencia firmada de master data, Superadministrador inicial, conteo/opening state, tratamiento de operaciones abiertas, reconciliación inicial, smoke sin Internet, dashboards selectivos, inicio documentado de calibración con datos reales y acta go/no-go. |
-| **G9 — General Production** | El piloto cubrió cadencias representativas, no tiene incidentes críticos/altos abiertos, reconcilia dinero/inventario/outbox/proyecciones y demuestra que opening state y mappings permanecen explicables; el soporte opera el producto. No exige lakehouse para v1. | Acta de estabilización, incidentes/postmortems, reconciliaciones longitudinales desde cutover, evidencia KPI válida y plan de rollout/handover. |
+| **G7 — Production Ready** | La topología LOCAL_FIRST, artefactos, red/TLS local, PostgreSQL autoritativo, standby controlado, observabilidad, secretos, backup off-site/restore, rollback/DR y runbooks están probados; clean operational start, master data aprobada y mecanismo de opening state están listos; la matriz fiscal de la entidad real está validada; dashboard de alertas y Telegram crítico se prueban con Internet, y perder Telegram no bloquea la tienda. | Restore/failover drills con RPO/RTO observado, operación local sin Internet, paquete de carga/opening state idempotente, Superadministrador inicial explícito, matriz `obligation -> module -> control -> evidence`, alert dashboard, prueba Telegram y cola pendiente/retry, release pipeline, SLO/runbooks y aprobación formal. |
+| **G8 — Pilot Ready** | G7 Production Ready está aprobado; Sucursal Matriz es el único sitio inicial y acredita mini-PC principal/standby, LAN, energía, backup off-site, clean opening state, usuarios/scopes, capacitación observada, soporte, stop-only inicial, rollback y cutover; BBVA sólo se habilita después de todos sus gates y es obligatorio para la aceptación final integral; requisitos fiscales aplicables están satisfechos. | Site survey de Sucursal Matriz, evidencia firmada de master data, Superadministrador inicial, conteo/opening state, hardware y versiones, capacitación, runbooks, dual authority, tratamiento de operaciones abiertas, gate BBVA/PCI cuando corresponda, reconciliación inicial, smoke sin Internet, dashboards selectivos y acta go/no-go. |
+| **G9 — General Production** | El piloto en Sucursal Matriz cubrió como mínimo dos ciclos semanales operativos completos y todas las cadencias obligatorias; no tiene defectos `CRITICAL`, blockers `HIGH` ni alertas `CRITICAL-A` sin resolver; reconcilia dinero/inventario/outbox/proyecciones; soporte y ownership operan el producto; rollout de una sucursal por oleada y línea de release controlada están aprobados. No exige lakehouse para v1. | Acta de estabilización, cobertura de ciclos, incidentes/postmortems, reconciliaciones longitudinales desde cutover, evidencia KPI válida, aprobaciones técnica/administrativa, release line y plan de rollout/handover por sucursal. |
 
 ### 6.1 Sincronización canónica DEC-17/DEC-18
 
@@ -229,6 +229,51 @@ DEC-19 modifica la evidencia futura de G0, G3, G5, G6, G7, G8 y G9 conforme a su
 
 Se registra `DEC19_PLAN_ALIGNMENT=true`, `DEC19_CLEAN_OPERATIONAL_START=true`, `DEC19_HYBRID_SELECTIVE_POLICY=true`, `DEC19_OPENING_STATE_AUDITABLE=true`, `DEC19_INITIAL_GLOBAL_SUPERADMIN_ONLY=true`, `NO_TASK_MARKED_IMPLEMENTED_BY_DEC19=true` y `GATES_NOT_FAKE_COMPLETED=true`.
 
+### 6.3 Sincronización canónica DEC-20
+
+DEC-20 cierra documentalmente las decisiones bloqueantes de ZM-FIN-003 y añade requisitos futuros a piloto, estabilización y rollout. No implementa tareas, no satisface gates y no inicia ZM-FIN-004.
+
+Invariantes aprobados:
+
+- `actual_pilot_site=Sucursal Matriz`, `pilot_branch_count=1`, `20-SITE-A`;
+- Sucursal Matriz no se infiere del seed `MAIN` y debe tener identidad productiva explícita;
+- `20-DUR-C`, mínimo `TWO_COMPLETE_WEEKLY_OPERATIONAL_CYCLES`, cobertura obligatoria y extensión automática por evidencia faltante;
+- `20-STOP-B`, con stop por impacto y alert severity separada de defect severity;
+- cualquier operador puede solicitar pausa; supervisor o Incident Commander pueden ejecutar stop; reanudación crítica y expansión requieren autoridad técnica y administrativa;
+- `pilot_initial_outage_policy=STOP_ONLY` hasta validar formalmente la contingencia manual;
+- `20-ROL-B`, inicialmente una sucursal por oleada, con pausa del rollout ante incidente material;
+- `20-REL-C`, línea del release aprobado más hotfixes revalidados y sin drift libre por sucursal;
+- BBVA integrado es obligatorio para la aceptación final integral después de satisfacer DEC-14 y el gate BBVA/PCI de DEC-16; si no está listo, el piloto final se pospone;
+- fiscalidad deriva de DEC-16/ZM-FIN-007 y exige matriz validada para la entidad real;
+- clean start, opening state y exclusión de seeds/demo permanecen regidos por DEC-19;
+- reconciliación ocurre en cada cierre, diariamente, después de eventos extraordinarios y antes de expansión.
+
+#### Alineación por tarea existente
+
+| Tareas | Criterio DEC-20 obligatorio |
+|---|---|
+| `ZM-FIN-003` | DEC-01–20 tienen propietario, estado aprobado y reglas trazables; sus criterios documentales están satisfechos y queda lista para cierre sin iniciar ZM-FIN-004. |
+| `ZM-FIN-007` | Matriz fiscal validada para la entidad real de Sucursal Matriz antes de G7/G8; los blockers aplicables se satisfacen antes del cutover. |
+| `ZM-FIN-046`, `065` | BBVA/provider boundary, hardware, PCI, idempotencia, `UNKNOWN`, conciliación y reversas deben pasar sus gates antes del piloto final integral. |
+| `ZM-FIN-059`, `105` | Ticket operativo, frontera fiscal, manuales, capacitación observada, stop, contingencia y soporte deben reflejar DEC-20. |
+| `ZM-FIN-106`–`116` | Artefactos, LOCAL_FIRST, PostgreSQL, observabilidad, CI/CD, secretos, backup/restore, rollback/DR, hosting, instalación y SLO/runbooks producen evidencia para G7/G8; no se prueban destructivamente en el sitio real. |
+| `ZM-FIN-117` | Staging/drill cubre fallos peligrosos, misma versión/semántica, BBVA/fiscal cuando apliquen y evidencia reusable aprobable. |
+| `ZM-FIN-118` | Dataset y UAT representan Sucursal Matriz sin usar seed demo como identidad productiva y cubren cadencias, stop y reconciliación. |
+| `ZM-FIN-119` | Ensayo integral cubre ciclos, autoridades, stop/resume, contingencia, BBVA gated, fiscalidad y reconciliaciones extraordinarias. |
+| `ZM-FIN-120` | Production Ready precede Pilot Ready; valida sitio, duración, stop, gates BBVA/fiscales, dual authority y evidencia sin permitir que piloto sustituya QA. |
+| `ZM-FIN-121` | Preparar exclusivamente Sucursal Matriz, una branch, sin mapping implícito con `MAIN`; hardware/LAN/standby/opening state/scopes/backup/soporte. |
+| `ZM-FIN-122` | Capacitación observada y firmada, cutover firmado, stop-only inicial, rollback, reanudación crítica dual y BBVA sólo con gates completos. |
+| `ZM-FIN-123` | Reconciliar cada cierre, diariamente y después de incidente/hotfix/restore/failover/contingencia/correctivo; preservar alertas e incidentes. |
+| `ZM-FIN-124` | Dos ciclos semanales completos, cobertura obligatoria, extensión automática, taxonomía stop, cero blockers y doble aprobación de expansión. |
+| `ZM-FIN-125` | Una sucursal por oleada, línea de release controlada, pausa ante incidente material, aislamiento y aprobación antes de avanzar. |
+| `ZM-FIN-126` | Handover, capacidad de soporte, reconciliación, versiones, runbooks, ownership y evidencia por sucursal. |
+
+#### Gates y cierre
+
+G8 y G9 incorporan DEC-20 conforme a sus filas canónicas. Ninguno queda cumplido por esta sincronización documental.
+
+El Plan Maestro no contiene una convención explícita de estado de tarea; no se inventa un campo. Se registra `ZM_FIN_003_ACCEPTANCE_CRITERIA_SATISFIED=true`, `ZM_FIN_003_READY_TO_CLOSE=true`, `ZM_FIN_004_NOT_ADVANCED=true`, `ZM_FIN_117_126_ALIGNED_DEC20=true`, `ZM_FIN_121_MATRIZ=true`, `ZM_FIN_124_TWO_CYCLES=true`, `ZM_FIN_125_ONE_BRANCH_WAVE=true`, `NO_TASK_IMPLEMENTED_BY_DEC20_DOC_CHANGE=true` y `GATES_NOT_FAKE_COMPLETED=true`.
+
 ## 7. Orden exacto y razón de la secuencia
 
 1. **Preservar antes de cambiar.** Sin commit canónico y pruebas seguras, cualquier resultado puede corresponder a otro producto o destruir datos.
@@ -322,11 +367,11 @@ Se registra `DEC19_PLAN_ALIGNMENT=true`, `DEC19_CLEAN_OPERATIONAL_START=true`, `
 
 ### Fase 10 — Staging, piloto, estabilización y producción general
 
-**Objetivo:** Validar el sistema completo en staging, una panadería piloto y después expandirlo de forma controlada.<br>
+**Objetivo:** Validar el sistema completo en staging, pilotearlo en Sucursal Matriz (SITE-A) y después expandirlo de forma controlada.<br>
 **Épicas:** Staging; UAT; gates; sitio piloto; cutover; reconciliación; estabilización; rollout; handover.<br>
 **Tareas:** ZM-FIN-117 a ZM-FIN-126.<br>
-**Validación de fase:** UAT integral; gate review; sitio/hardware/datos; dashboards KPI selectivos; alerting conservador; calibración con datos reales; reconciliación del piloto; ausencia de bloqueos; rollout por sucursal.<br>
-**Gate de avance:** General Production: piloto estabilizado, procesos representativos observados, reconciliaciones limpias y ownership transferido; lakehouse/IA no son requisitos de v1.
+**Validación de fase:** UAT integral; gate review; Sucursal Matriz/hardware/datos; dashboards KPI selectivos; alerting conservador; dos ciclos operativos semanales completos con cobertura obligatoria; reconciliación al cierre, diaria, extraordinaria y previa a expansión; política STOP-B; cero bloqueos; rollout de una sucursal por ola con línea de release controlada.<br>
+**Gate de avance:** General Production: piloto en Sucursal Matriz estabilizado durante dos ciclos operativos semanales completos, cobertura obligatoria observada, reconciliaciones limpias, cero defectos `CRITICAL`, blockers `HIGH` o alertas `CRITICAL-A` activas sin resolver y doble aprobación para expandir; lakehouse/IA no son requisitos de v1.
 
 ## 9. Plan maestro ejecutable y prompts de Codex
 
@@ -513,27 +558,27 @@ Al terminar, reporta: resumen técnico; archivos modificados; migraciones; cambi
 ### ZM-FIN-003 — Cerrar y registrar invariantes de negocio pendientes
 
 **Épica:** Decisiones de dominio
-**Alineación canónica DEC-17/DEC-18 — criterio adicional obligatorio:** DEC-17 LOCAL_FIRST y DEC-18 KPI están aprobadas documentalmente; append-only transversal no se presume, DEC-19/20 siguen pendientes y la tarea no queda implementada.
+**Alineación canónica DEC-17–DEC-20 — criterio adicional obligatorio:** las veinte decisiones están aprobadas documentalmente; LOCAL_FIRST, KPI, clean start y piloto/rollout quedan trazados; append-only transversal no se presume y ninguna aprobación equivale a implementación.
 
 | Campo | Especificación |
 |---|---|
 | **1. ID único** | ZM-FIN-003 |
 | **2. Nombre de la tarea** | Cerrar y registrar invariantes de negocio pendientes |
 | **3. Objetivo** | Convertir las reglas ambiguas que afectan dinero, inventario, producción y operación multi-sucursal en decisiones aprobadas y comprobables. |
-| **4. Problema que resuelve** | DEC-01–DEC-19 ya están aprobadas y trazadas; DEC-20 continúa pendiente, por lo que ZM-FIN-003 no puede cerrarse todavía ni permitir supuestos silenciosos sobre piloto y rollout. |
+| **4. Problema que resuelve** | DEC-01–DEC-20 están aprobadas y trazadas; el cierre documental debe reconocer que ya no quedan decisiones bloqueantes sin convertir esa aprobación en implementación ni iniciar ZM-FIN-004. |
 | **5. Hallazgo relacionado** | ZMA-WASTE-001; ZMA-FIN-001; ZMA-REP-001; ZMA-PROD-001; ZMA-CAT-001; reglas indefinidas de la auditoría activa. |
 | **6. Módulos afectados** | Ventas, pedidos, caja, inventario, producción, descuentos, identidad, multi-sucursal, hardware y continuidad. |
 | **7. Archivos/áreas a inspeccionar** | Documento de decisiones vigente; modelos y enums de dominio; servicios de venta/cierre/inventario/producción; contratos de UI. |
 | **8. Dependencias previas** | ZM-FIN-001 y participación del propietario. |
-| **9. Cambios a implementar** | Preservar DEC-01–DEC-19; preparar alternativas técnicas para DEC-20; obtener decisión del propietario; registrar reglas, ejemplos, excepciones y pruebas que las harán obligatorias sin declarar implementación. |
+| **9. Cambios a implementar** | Preservar DEC-01–DEC-20, verificar propietario/estado/regla/ejemplos/tareas afectadas y registrar que los criterios documentales están satisfechos; cerrar exclusivamente el trabajo de gobierno, sin implementar tareas posteriores. |
 | **10. Restricciones arquitectónicas** | Conservar el monolito modular, FastAPI/SQLAlchemy/PostgreSQL, POS y Backoffice separados, OpenAPI como contrato fuente, tipos Decimal/Numeric, auditoría y outbox transaccionales. No introducir microservicios, repositorios paralelos, tipos de dominio manuales en frontend ni una reescritura amplia. |
 | **11. Decisiones a conservar** | Compatibilidad con la arquitectura vigente, la experiencia táctil del POS, el cliente generado y la trazabilidad por usuario, sucursal, caja, estación y turno. |
 | **12. Riesgos** | Tomar decisiones técnicas que en realidad corresponden al negocio; aprobar reglas incompatibles entre caja e inventario. |
 | **13. Posibles regresiones** | Cambiar una regla ya utilizada por datos existentes sin plan de migración o compensación. |
 | **14. Pruebas requeridas** | Revisión de escenarios límite por dominio; ejemplos numéricos de caja/inventario; consistencia entre decisiones relacionadas. |
-| **15. Criterios de aceptación** | DEC-01–DEC-20 tienen propietario, estado aprobado, regla inequívoca, ejemplos y tareas afectadas; mientras DEC-20 permanezca pendiente, ZM-FIN-003 continúa abierta y no se avanza a implementación. |
+| **15. Criterios de aceptación** | DEC-01–DEC-20 tienen propietario, estado aprobado, regla inequívoca, ejemplos y tareas afectadas; no quedan supuestos silenciosos P0/P1; `ZM_FIN_003_ACCEPTANCE_CRITERIA_SATISFIED=true` y `ZM_FIN_003_READY_TO_CLOSE=true`, sin iniciar ZM-FIN-004. |
 | **16. Definition of Done específica** | Cada decisión bloqueante tiene propietario, estado aprobado, regla inequívoca, ejemplos y tareas afectadas; no quedan supuestos silenciosos en P0/P1. Los cambios aplicables, pruebas y documentación quedan integrados; no existen cambios accidentales y la evidencia solicitada está adjunta. |
-| **17. Evidencia de terminación** | Documento único de decisiones actualizado y aprobado, con IDs estables y trazabilidad a tareas. |
+| **17. Evidencia de terminación** | Documento único con 20 decisiones aprobadas, IDs estables, trazabilidad a tareas, Plan Maestro alineado y controles `ZM_FIN_003_ACCEPTANCE_CRITERIA_SATISFIED=true` / `ZM_FIN_003_READY_TO_CLOSE=true`. |
 | **18. Requiere migración DB** | No |
 | **19. Requiere OpenAPI/cliente TS** | No |
 | **20. Requiere cambios POS** | No |
@@ -882,13 +927,13 @@ Al terminar, reporta: resumen técnico; archivos modificados; migraciones; cambi
 | **6. Módulos afectados** | Tickets, pagos, usuarios, auditoría, reportes, exportaciones, backups y datos personales. |
 | **7. Archivos/áreas a inspeccionar** | Documentación de producto; modelos de identidad/venta/ticket/auditoría; exportaciones; configuración de retención. |
 | **8. Dependencias previas** | ZM-FIN-002 y participación del propietario/asesoría competente. |
-| **9. Cambios a implementar** | Inventariar datos y documentos; obtener requisitos aplicables; registrar decisiones de numeración, contenido de ticket, retención, acceso, eliminación, exportación y evidencia. |
+| **9. Cambios a implementar** | Inventariar datos/documentos y requisitos aplicables; validar para la entidad real de Sucursal Matriz la matriz `obligation -> module -> control -> evidence`; registrar numeración, ticket/CFDI/FiscalAdapter, retención, acceso, eliminación, exportación y blockers previos a G7/G8. |
 | **10. Restricciones arquitectónicas** | Conservar el monolito modular, FastAPI/SQLAlchemy/PostgreSQL, POS y Backoffice separados, OpenAPI como contrato fuente, tipos Decimal/Numeric, auditoría y outbox transaccionales. No introducir microservicios, repositorios paralelos, tipos de dominio manuales en frontend ni una reescritura amplia. |
 | **11. Decisiones a conservar** | Compatibilidad con la arquitectura vigente, la experiencia táctil del POS, el cliente generado y la trazabilidad por usuario, sucursal, caja, estación y turno. |
 | **12. Riesgos** | Asumir requisitos de una jurisdicción incorrecta o convertir asesoría técnica en asesoría legal. |
 | **13. Posibles regresiones** | Cambios posteriores de numeración, retención o contenido de ticket que invaliden datos históricos. |
 | **14. Pruebas requeridas** | Revisión de flujos y campos contra requisitos aprobados; pruebas de retención/exportación/redacción definidas, sin asumir una jurisdicción. |
-| **15. Criterios de aceptación** | Existe una matriz aprobada de obligación→módulo→control→evidencia; cualquier requisito fuera de alcance tiene aceptación explícita del propietario. |
+| **15. Criterios de aceptación** | Existe matriz aprobada para la entidad de Sucursal Matriz; todo requisito fiscal blocker está satisfecho antes de cutover; ticket operativo, CFDI y comprobante del proveedor permanecen separados; cualquier requisito fuera de alcance tiene aceptación explícita. |
 | **16. Definition of Done específica** | Existe una matriz aprobada de obligación→módulo→control→evidencia; cualquier requisito fuera de alcance tiene aceptación explícita del propietario. Los cambios aplicables, pruebas y documentación quedan integrados; no existen cambios accidentales y la evidencia solicitada está adjunta. |
 | **17. Evidencia de terminación** | Matriz aprobada, responsables y tareas derivadas; no se incluyen afirmaciones legales no verificadas. |
 | **18. Requiere migración DB** | No |
@@ -4395,13 +4440,13 @@ Al terminar, reporta: resumen técnico; archivos modificados; migraciones; cambi
 | **6. Módulos afectados** | Payments, terminal adapter, POS, worker/outbox, reconciliation y secrets. |
 | **7. Archivos/áreas a inspeccionar** | Interfaces de métodos de pago; POS payment UI; configuración; outbox; provider clients futuros. |
 | **8. Dependencias previas** | ZM-FIN-003, ZM-FIN-024, ZM-FIN-028, ZM-FIN-041 y proveedor/hardware aprobado. |
-| **9. Cambios a implementar** | Diseñar adapter; estados; idempotency provider/client; timeout/retry; webhook/polling; modo manual controlado; conciliación y reversa. |
+| **9. Cambios a implementar** | Implementar adapter/provider boundary BBVA; estados; binding workstation-terminal; idempotency provider/client; timeout/retry; webhook/polling; `UNKNOWN` recovery; separación sandbox/production; conciliación, refund/reversa, observabilidad y gate BBVA/PCI antes del piloto final en Sucursal Matriz. |
 | **10. Restricciones arquitectónicas** | Conservar el monolito modular, FastAPI/SQLAlchemy/PostgreSQL, POS y Backoffice separados, OpenAPI como contrato fuente, tipos Decimal/Numeric, auditoría y outbox transaccionales. No introducir microservicios, repositorios paralelos, tipos de dominio manuales en frontend ni una reescritura amplia. |
 | **11. Decisiones a conservar** | Compatibilidad con la arquitectura vigente, la experiencia táctil del POS, el cliente generado y la trazabilidad por usuario, sucursal, caja, estación y turno. |
 | **12. Riesgos** | Cobro doble, inconsistencia proveedor/local, manejo de datos sensibles y dependencia de red. |
 | **13. Posibles regresiones** | Pagos manuales existentes o cierre de caja con tarjeta. |
 | **14. Pruebas requeridas** | Aprobado/rechazado/timeout/duplicado; respuesta perdida; webhook repetido; terminal offline; refund; cierre con pago pendiente. |
-| **15. Criterios de aceptación** | Un pago electrónico no se marca confirmado sin evidencia; retries no duplican cargo; estados pendientes son visibles y conciliables. |
+| **15. Criterios de aceptación** | BBVA integrado sólo se habilita tras DEC-14 implementada y gate BBVA/PCI; no atraviesan datos sensibles prohibidos; un pago no confirma sin evidencia; retries no duplican; `UNKNOWN`, callbacks, refund/reversa y conciliación pasan; si no está listo, `FINAL_PILOT_START=POSTPONED`. |
 | **16. Definition of Done específica** | Un pago electrónico no se marca confirmado sin evidencia; retries no duplican cargo; estados pendientes son visibles y conciliables. Los cambios aplicables, pruebas y documentación quedan integrados; no existen cambios accidentales y la evidencia solicitada está adjunta. |
 | **17. Evidencia de terminación** | Pruebas contractuales con fake provider, certificación del hardware/proveedor y trazabilidad completa. |
 | **18. Requiere migración DB** | Sí |
@@ -5564,13 +5609,13 @@ Al terminar, reporta: resumen técnico; archivos modificados; migraciones; cambi
 | **6. Módulos afectados** | Tickets API, POS ticket UI, print renderer, sales/orders/refunds. |
 | **7. Archivos/áreas a inspeccionar** | Servicios de ticket; plantillas/componentes de impresión; rutas de tickets; folios. |
 | **8. Dependencias previas** | ZM-FIN-007, ZM-FIN-041–046 y ZM-FIN-056–058. |
-| **9. Cambios a implementar** | Definir snapshot inmutable del ticket; contenido/folio; render específico de impresión; reimpresión auditada; incluir descuentos, medios, devoluciones y metadatos aprobados. |
+| **9. Cambios a implementar** | Definir snapshot inmutable del ticket operativo; contenido/folio; render e impresión; reimpresión auditada; incluir descuentos, medios, devoluciones y metadatos; validar la frontera ticket/CFDI/comprobante y la matriz fiscal aplicable a Sucursal Matriz. |
 | **10. Restricciones arquitectónicas** | Conservar el monolito modular, FastAPI/SQLAlchemy/PostgreSQL, POS y Backoffice separados, OpenAPI como contrato fuente, tipos Decimal/Numeric, auditoría y outbox transaccionales. No introducir microservicios, repositorios paralelos, tipos de dominio manuales en frontend ni una reescritura amplia. |
 | **11. Decisiones a conservar** | Compatibilidad con la arquitectura vigente, la experiencia táctil del POS, el cliente generado y la trazabilidad por usuario, sucursal, caja, estación y turno. |
 | **12. Riesgos** | Recalcular históricos con reglas actuales o duplicar transacciones al reimprimir. |
 | **13. Posibles regresiones** | Consulta de tickets existente y estilos táctiles. |
 | **14. Pruebas requeridas** | Venta cash/card/mixta, pedido, devolución, reimpresión, producto largo, caracteres especiales, caída de impresora. |
-| **15. Criterios de aceptación** | Ticket/API/DB coinciden; reimpresión no crea venta/pago; contenido requerido está presente y es legible en hardware objetivo. |
+| **15. Criterios de aceptación** | Ticket/API/DB coinciden; reimpresión no crea venta/pago; contenido requerido es legible en hardware de Sucursal Matriz; no se presenta ticket como CFDI o comprobante BBVA y los blockers fiscales de la matriz están resueltos antes del piloto. |
 | **16. Definition of Done específica** | Ticket/API/DB coinciden; reimpresión no crea venta/pago; contenido requerido está presente y es legible en hardware objetivo. Los cambios aplicables, pruebas y documentación quedan integrados; no existen cambios accidentales y la evidencia solicitada está adjunta. |
 | **17. Evidencia de terminación** | Snapshots, pruebas de render, E2E y ejemplares impresos anonimizados. |
 | **18. Requiere migración DB** | Posible |
@@ -6098,13 +6143,13 @@ Al terminar, reporta: resumen técnico; archivos modificados; migraciones; cambi
 | **6. Módulos afectados** | POS payment UI, terminal adapter, payments, audit y support. |
 | **7. Archivos/áreas a inspeccionar** | Componentes de pago; workstation config; provider adapter; polling/webhook status. |
 | **8. Dependencias previas** | ZM-FIN-046, ZM-FIN-057 y hardware/proveedor aprobados. |
-| **9. Cambios a implementar** | Solicitar/cancelar/consultar pago; mostrar instrucciones/estado; recuperar por referencia; fallback manual sólo con permiso; evitar datos sensibles. |
+| **9. Cambios a implementar** | Solicitar/cancelar/consultar BBVA; mostrar instrucciones/estado; recuperar por referencia; manejar `UNKNOWN`, callbacks y retry; fallback sólo autorizado; evitar datos sensibles; validar terminal/binding y gate BBVA/PCI antes de habilitarlo en Sucursal Matriz. |
 | **10. Restricciones arquitectónicas** | Conservar el monolito modular, FastAPI/SQLAlchemy/PostgreSQL, POS y Backoffice separados, OpenAPI como contrato fuente, tipos Decimal/Numeric, auditoría y outbox transaccionales. No introducir microservicios, repositorios paralelos, tipos de dominio manuales en frontend ni una reescritura amplia. |
 | **11. Decisiones a conservar** | Compatibilidad con la arquitectura vigente, la experiencia táctil del POS, el cliente generado y la trazabilidad por usuario, sucursal, caja, estación y turno. |
 | **12. Riesgos** | Cobro doble, UX ambigua, exposición de datos de tarjeta o caída del proveedor. |
 | **13. Posibles regresiones** | Pago manual con tarjeta y flujo mixto. |
 | **14. Pruebas requeridas** | Aprobado, rechazado, timeout, terminal offline, cliente cancela, app recarga, webhook tardío y retry. |
-| **15. Criterios de aceptación** | El cajero puede determinar el estado definitivo; no se duplica cargo; la venta sólo confirma con pago aprobado según política. |
+| **15. Criterios de aceptación** | El cajero determina estado definitivo o `UNKNOWN` conciliable; no se duplica cargo; venta sólo confirma con evidencia aprobada; hardware, PCI, refunds/reversas, observabilidad y separación sandbox/production pasan; BBVA forma parte de la aceptación final o el piloto se pospone. |
 | **16. Definition of Done específica** | El cajero puede determinar el estado definitivo; no se duplica cargo; la venta sólo confirma con pago aprobado según política. Los cambios aplicables, pruebas y documentación quedan integrados; no existen cambios accidentales y la evidencia solicitada está adjunta. |
 | **17. Evidencia de terminación** | E2E sandbox/hardware, referencias externas y conciliación. |
 | **18. Requiere migración DB** | No |
@@ -9706,13 +9751,13 @@ Al terminar, reporta: resumen técnico; archivos modificados; migraciones; cambi
 | **6. Módulos afectados** | POS, Backoffice, support, security, operations y business governance. |
 | **7. Archivos/áreas a inspeccionar** | Docs operativas; runbooks; manuales por rol; matriz regulatoria; materiales de entrenamiento. |
 | **8. Dependencias previas** | ZM-FIN-007, ZM-FIN-056–103 y decisiones aprobadas. |
-| **9. Cambios a implementar** | Crear manuales por rol; apertura/cierre; venta/pedido/inventario/producción; incidentes; privacidad; retención; ticket; hardware; soporte y escalación. |
+| **9. Cambios a implementar** | Crear manuales por rol para apertura/cierre, venta/pedido/inventario/producción, STOP-B, pause/resume dual, contingencia stop-only y futura validación manual, privacidad/fiscalidad, BBVA, hardware, cutover, rollout, hotfix, reconciliación, soporte y escalación DEC-20. |
 | **10. Restricciones arquitectónicas** | Conservar el monolito modular, FastAPI/SQLAlchemy/PostgreSQL, POS y Backoffice separados, OpenAPI como contrato fuente, tipos Decimal/Numeric, auditoría y outbox transaccionales. No introducir microservicios, repositorios paralelos, tipos de dominio manuales en frontend ni una reescritura amplia. |
 | **11. Decisiones a conservar** | Compatibilidad con la arquitectura vigente, la experiencia táctil del POS, el cliente generado y la trazabilidad por usuario, sucursal, caja, estación y turno. |
 | **12. Riesgos** | Documentar un flujo distinto al sistema o convertir decisiones no aprobadas en política. |
 | **13. Posibles regresiones** | Ninguna funcional; riesgo de operación incorrecta. |
 | **14. Pruebas requeridas** | Usuario nuevo, terminal compartida, periférico caído, cierre con diferencia, restore, usuario dado de baja y solicitud de datos. |
-| **15. Criterios de aceptación** | Cada proceso productivo tiene SOP, responsable, precondiciones, controles, evidencia y contingencia; requisitos externos aprobados están cubiertos. |
+| **15. Criterios de aceptación** | Cada proceso productivo y de piloto tiene SOP, autoridad, precondiciones, controles, evidencia y criterio de salida; capacitación usa checklist observado/firmado; soporte cubre cutover/horario operativo/incidentes; requisitos externos y stop-only inicial están cubiertos. |
 | **16. Definition of Done específica** | Cada proceso productivo tiene SOP, responsable, precondiciones, controles, evidencia y contingencia; requisitos externos aprobados están cubiertos. Los cambios aplicables, pruebas y documentación quedan integrados; no existen cambios accidentales y la evidencia solicitada está adjunta. |
 | **17. Evidencia de terminación** | Walkthrough/UAT de manuales, firmas de responsables y materiales versionados. |
 | **18. Requiere migración DB** | No |
@@ -10069,13 +10114,13 @@ Al terminar, reporta: resumen técnico; archivos modificados; migraciones; cambi
 | **6. Módulos afectados** | API, worker, frontends, DB, infrastructure y alerting. |
 | **7. Archivos/áreas a inspeccionar** | Logging config; middleware; OpenTelemetry/metrics stack aprobada; probes; dashboards. |
 | **8. Dependencias previas** | ZM-FIN-040, ZM-FIN-082, ZM-FIN-087–093 y ZM-FIN-107–108. |
-| **9. Cambios a implementar** | Logs/redacción; correlation/causation; instrumentación DEC-18; traces; liveness/readiness; API/DB/primario/standby/backup/LAN/bridge/worker/outbox; dashboard local y Telegram con pending/retry. |
+| **9. Cambios a implementar** | Logs/redacción; correlation/causation; instrumentación DEC-18; traces; liveness/readiness; API/DB/primario/standby/backup/LAN/bridge/worker/outbox; dashboard/Telegram; subconjunto KPI de piloto; alertas A/B/C separadas de defectos; evidencia stop/resume, reconciliación y estabilidad por Sucursal Matriz. |
 | **10. Restricciones arquitectónicas** | Conservar el monolito modular, FastAPI/SQLAlchemy/PostgreSQL, POS y Backoffice separados, OpenAPI como contrato fuente, tipos Decimal/Numeric, auditoría y outbox transaccionales. No introducir microservicios, repositorios paralelos, tipos de dominio manuales en frontend ni una reescritura amplia. |
 | **11. Decisiones a conservar** | Compatibilidad con la arquitectura vigente, la experiencia táctil del POS, el cliente generado y la trazabilidad por usuario, sucursal, caja, estación y turno. |
 | **12. Riesgos** | Cardinalidad/costo altos, datos sensibles o alertas ruidosas. |
 | **13. Posibles regresiones** | Latencia y volumen de logs. |
 | **14. Pruebas requeridas** | DB caída, worker backlog, provider error, alta latencia, venta fallida, frontend error y secreto en input. |
-| **15. Criterios de aceptación** | Una venta se rastrea UI→API→DB→outbox→worker→fact layer; readiness refleja dependencias locales; Internet/Telegram caído no vuelve no-ready al backend local sano; logs sin secretos/PII innecesaria. |
+| **15. Criterios de aceptación** | Venta se rastrea UI→API→DB→outbox→worker→fact; readiness refleja dependencias locales; Internet/Telegram caído no afecta backend sano; KPI mínimos cubren dinero/inventario/outbox/DQ/backup/ACK; severidades no se mezclan y logs/evidencia no contienen secretos/PII innecesaria. |
 | **16. Definition of Done específica** | Una venta se rastrea UI→API→DB→outbox→worker; readiness refleja dependencias; logs no contienen secretos/PII innecesaria. Los cambios aplicables, pruebas y documentación quedan integrados; no existen cambios accidentales y la evidencia solicitada está adjunta. |
 | **17. Evidencia de terminación** | Dashboards, traces de casos, simulación de alertas y escaneo de logs. |
 | **18. Requiere migración DB** | No |
@@ -10339,13 +10384,13 @@ Al terminar, reporta: resumen técnico; archivos modificados; migraciones; cambi
 | **6. Módulos afectados** | PostgreSQL, object storage/backup service, security y runbooks. |
 | **7. Archivos/áreas a inspeccionar** | Infra DB; backup policies; encryption; restore scripts; validation queries. |
 | **8. Dependencias previas** | ZM-FIN-007, ZM-FIN-047, ZM-FIN-055 y ZM-FIN-107–111; RPO/RTO aprobados. |
-| **9. Cambios a implementar** | Configurar backup/PITR/replicación cifrados, copia off-site, retención/acceso; restore aislado/local/off-site; arrancar y reconciliar ledger/audit/outbox/fact layer; separar backup operacional de archivo HOT/WARM/COLD. |
+| **9. Cambios a implementar** | Configurar backup/PITR/replicación cifrados, copia off-site, retención/acceso; restore aislado/local/off-site; arrancar y reconciliar ledger/audit/outbox/fact; producir evidencia reusable para Sucursal Matriz sin restore destructivo en vivo; separar backup operacional de archivo HOT/WARM/COLD. |
 | **10. Restricciones arquitectónicas** | Conservar el monolito modular, FastAPI/SQLAlchemy/PostgreSQL, POS y Backoffice separados, OpenAPI como contrato fuente, tipos Decimal/Numeric, auditoría y outbox transaccionales. No introducir microservicios, repositorios paralelos, tipos de dominio manuales en frontend ni una reescritura amplia. |
 | **11. Decisiones a conservar** | Compatibilidad con la arquitectura vigente, la experiencia táctil del POS, el cliente generado y la trazabilidad por usuario, sucursal, caja, estación y turno. |
 | **12. Riesgos** | Backups no restaurables, acceso indebido o retención insuficiente/excesiva. |
 | **13. Posibles regresiones** | Carga/IO sobre DB y costos. |
 | **14. Pruebas requeridas** | Backup corrupto, punto en tiempo, secreto perdido, restore a versión distinta, backlog y PII. |
-| **15. Criterios de aceptación** | Backup candidato se restaura en entorno vacío y desde off-site; DB/app arrancan y reconciliaciones pasan; RPO/RTO observados se comparan con DEC-17; backup success no se confunde con restore ni archivo analítico. |
+| **15. Criterios de aceptación** | Backup se restaura en entorno vacío y desde off-site; DB/app arrancan y reconciliaciones pasan; evidencia vigente/trazable corresponde al release del piloto; RPO/RTO se comparan con DEC-17; no se provoca restore destructivo en Sucursal Matriz ni se confunde backup con archivo. |
 | **16. Definition of Done específica** | Un backup candidato se restaura en entorno vacío; DB arranca y reconciliaciones pasan; tiempos observados se comparan con objetivos. Los cambios aplicables, pruebas y documentación quedan integrados; no existen cambios accidentales y la evidencia solicitada está adjunta. |
 | **17. Evidencia de terminación** | Checksums, logs de restore, revisión restaurada y reconciliación firmada. |
 | **18. Requiere migración DB** | No |
@@ -10429,13 +10474,13 @@ Al terminar, reporta: resumen técnico; archivos modificados; migraciones; cambi
 | **6. Módulos afectados** | Application release, DB, worker, frontends, DNS y incident response. |
 | **7. Archivos/áreas a inspeccionar** | Deployment scripts; migration strategy; backups; feature flags; runbooks. |
 | **8. Dependencias previas** | ZM-FIN-108, ZM-FIN-110–112. |
-| **9. Cambios a implementar** | Definir roll-forward/rollback; compatibilidad N/N-1; restore lógico; worker pause/replay; promoción del standby con fencing; pérdida de sitio desde off-site/DR; reconciliar ledger/outbox/alertas/proyecciones; comunicación. |
+| **9. Cambios a implementar** | Definir roll-forward/rollback, stop-only inicial y aislamiento por sucursal; compatibilidad N/N-1; restore lógico; worker pause/replay; standby con fencing; pérdida de sitio/DR; reconciliar ledger/outbox/alertas/proyecciones; dual authority para resume crítico y comunicación DEC-20. |
 | **10. Restricciones arquitectónicas** | Conservar el monolito modular, FastAPI/SQLAlchemy/PostgreSQL, POS y Backoffice separados, OpenAPI como contrato fuente, tipos Decimal/Numeric, auditoría y outbox transaccionales. No introducir microservicios, repositorios paralelos, tipos de dominio manuales en frontend ni una reescritura amplia. |
 | **11. Decisiones a conservar** | Compatibilidad con la arquitectura vigente, la experiencia táctil del POS, el cliente generado y la trazabilidad por usuario, sucursal, caja, estación y turno. |
 | **12. Riesgos** | Rollback de app incompatible con schema o pérdida de eventos durante recuperación. |
 | **13. Posibles regresiones** | Complejidad de deployment y flags. |
 | **14. Pruebas requeridas** | App bad release, migration parcialmente aplicada, schema incompatible, worker corrupto, secret compromise y region/service outage. |
-| **15. Criterios de aceptación** | Cada fallo tiene procedimiento probado y RPO/RTO observado; no hay split-brain ni downgrade supuesto; Incident Commander opera runbook y restore destructivo exige aprobación técnica y de negocio independientes. |
+| **15. Criterios de aceptación** | Cada fallo tiene drill seguro y RPO/RTO observado; no hay split-brain ni downgrade supuesto; IC/supervisor pueden stop; reanudación crítica y restore destructivo exigen autoridad técnica/administrativa; rollback preserva DB/evidencia y no afecta otra sucursal sin alcance demostrado. |
 | **16. Definition of Done específica** | Cada clase de fallo tiene procedimiento probado; no se usa downgrade destructivo sin evidencia; restore/roll-forward preserva integridad. Los cambios aplicables, pruebas y documentación quedan integrados; no existen cambios accidentales y la evidencia solicitada está adjunta. |
 | **17. Evidencia de terminación** | Simulacros, tiempos observados, decisiones y acciones correctivas. |
 | **18. Requiere migración DB** | No |
@@ -10609,13 +10654,13 @@ Al terminar, reporta: resumen técnico; archivos modificados; migraciones; cambi
 | **6. Módulos afectados** | POS workstation, browser/kiosk, printer/drawer/terminal, network y support. |
 | **7. Archivos/áreas a inspeccionar** | Scripts/installer; workstation config; browser policies; hardware drivers/bridge; diagnostics. |
 | **8. Dependencias previas** | ZM-FIN-064–067, ZM-FIN-107, ZM-FIN-111 y ZM-FIN-114. |
-| **9. Cambios a implementar** | Definir imagen/checklist; registrar workstation; instalar drivers/bridge; auto-start/kiosk si aprobado; update/rollback; diagnóstico y soporte remoto seguro. |
+| **9. Cambios a implementar** | Definir imagen/checklist; inventariar hardware de Sucursal Matriz; registrar branch/workstation y binding de periféricos/BBVA; instalar drivers/bridge; auto-start/kiosk si aprobado; versión identificable, update/rollback, diagnóstico y soporte remoto seguro. |
 | **10. Restricciones arquitectónicas** | Conservar el monolito modular, FastAPI/SQLAlchemy/PostgreSQL, POS y Backoffice separados, OpenAPI como contrato fuente, tipos Decimal/Numeric, auditoría y outbox transaccionales. No introducir microservicios, repositorios paralelos, tipos de dominio manuales en frontend ni una reescritura amplia. |
 | **11. Decisiones a conservar** | Compatibilidad con la arquitectura vigente, la experiencia táctil del POS, el cliente generado y la trazabilidad por usuario, sucursal, caja, estación y turno. |
 | **12. Riesgos** | Configuración manual no reproducible, credenciales compartidas o soporte remoto inseguro. |
 | **13. Posibles regresiones** | Terminales existentes y compatibilidad de drivers. |
 | **14. Pruebas requeridas** | Terminal nueva, reinstall, hardware desconectado, cambio de sucursal/caja, browser update y pérdida de config. |
-| **15. Criterios de aceptación** | Una estación nueva se prepara siguiendo el runbook; obtiene sólo su contexto autorizado; hardware y actualización pasan smoke. |
+| **15. Criterios de aceptación** | Cada estación de Sucursal Matriz se prepara por runbook, obtiene sólo contexto autorizado y conserva inventario/config/release; principal/standby/LAN/periféricos pasan smoke; update/rollback no introduce drift ni cruza branches. |
 | **16. Definition of Done específica** | Una estación nueva se prepara siguiendo el runbook; obtiene sólo su contexto autorizado; hardware y actualización pasan smoke. Los cambios aplicables, pruebas y documentación quedan integrados; no existen cambios accidentales y la evidencia solicitada está adjunta. |
 | **17. Evidencia de terminación** | Checklist firmado, smoke por estación y matriz de versiones. |
 | **18. Requiere migración DB** | No |
@@ -10699,13 +10744,13 @@ Al terminar, reporta: resumen técnico; archivos modificados; migraciones; cambi
 | **6. Módulos afectados** | All services, observability, support, business operations y security. |
 | **7. Archivos/áreas a inspeccionar** | Dashboards/alerts; runbooks; incident templates; ownership; escalation. |
 | **8. Dependencias previas** | ZM-FIN-089, ZM-FIN-102, ZM-FIN-109–115 y objetivos aprobados. |
-| **9. Cambios a implementar** | Definir SLI/SLO sin cifras arbitrarias; CRITICAL-A/B/C; ACK 5/15/60m; owner/acción/dedup/escalamiento/resolución; dashboard local; Telegram crítico no bloqueante; runbooks/postmortem/ventanas. |
+| **9. Cambios a implementar** | Definir SLI/SLO sin cifras arbitrarias; CRITICAL-A/B/C y defectos CRITICAL/HIGH/MEDIUM/LOW separados; ACK 5/15/60m; STOP-B, pausa protectora, dual resume/expansion; owner/acción/dedup/escalamiento/resolución; dashboard/Telegram; soporte durante cutover/operación e incidentes; runbooks/postmortem. |
 | **10. Restricciones arquitectónicas** | Conservar el monolito modular, FastAPI/SQLAlchemy/PostgreSQL, POS y Backoffice separados, OpenAPI como contrato fuente, tipos Decimal/Numeric, auditoría y outbox transaccionales. No introducir microservicios, repositorios paralelos, tipos de dominio manuales en frontend ni una reescritura amplia. |
 | **11. Decisiones a conservar** | Compatibilidad con la arquitectura vigente, la experiencia táctil del POS, el cliente generado y la trazabilidad por usuario, sucursal, caja, estación y turno. |
 | **12. Riesgos** | Alert fatigue, objetivos irreales o responsabilidades ambiguas. |
 | **13. Posibles regresiones** | Carga operativa y costo de observabilidad. |
 | **14. Pruebas requeridas** | API down, DB degraded, worker backlog, payment provider, printer, stock mismatch, cash discrepancy y security incident. |
-| **15. Criterios de aceptación** | Cada alerta tiene condición/owner/acción/ACK/escalamiento/resolución y evidencia; sensibilidad conservadora; Telegram probado y no bloqueante; SLOs reflejan evidencia, no cifras arbitrarias. |
+| **15. Criterios de aceptación** | Cada alerta tiene condición/owner/acción/ACK/escalamiento/resolución; CRITICAL-A presume stop y defectos siguen su propia taxonomía; autoridad stop/resume/expansion está probada; Telegram no bloquea, soporte tiene capacidad y SLOs reflejan evidencia sin cifras arbitrarias. |
 | **16. Definition of Done específica** | Cada alerta tiene dueño/acción; incidentes críticos pueden diagnosticarse con evidencia; SLOs reflejan operación aprobada, no cifras arbitrarias. Los cambios aplicables, pruebas y documentación quedan integrados; no existen cambios accidentales y la evidencia solicitada está adjunta. |
 | **17. Evidencia de terminación** | Catálogo SLO/alertas, simulacros y postmortem de prueba. |
 | **18. Requiere migración DB** | No |
@@ -10792,13 +10837,13 @@ Al terminar, reporta: resumen técnico; archivos modificados; migraciones; cambi
 | **6. Módulos afectados** | All artifacts, infrastructure, DB, worker, frontends y providers sandbox. |
 | **7. Archivos/áreas a inspeccionar** | IaC; CI/CD; manifests; staging config; DNS/TLS; smoke scripts. |
 | **8. Dependencias previas** | ZM-FIN-106–116 y Gates Development/Feature/Data/Security/QA aprobables. |
-| **9. Cambios a implementar** | Provisionar/desplegar topología LOCAL_FIRST; cargar exclusivamente datos UAT clasificados; ensayar clean start/opening state idempotente y reconciliación; validar LAN/TLS/probes/standby; smoke API/POS/Backoffice/worker; simular Internet caído y delivery Telegram pendiente. |
+| **9. Cambios a implementar** | Provisionar/desplegar topología LOCAL_FIRST; cargar exclusivamente datos UAT clasificados; ensayar clean start/opening state idempotente y reconciliación; validar LAN/TLS/probes/standby; smoke API/POS/Backoffice/worker; simular Internet caído y delivery Telegram pendiente; ejecutar en staging/drill pérdida de nodo, split-brain, restore, failover, corrupción/provider outage y recuperación con la versión/semántica candidata. |
 | **10. Restricciones arquitectónicas** | Conservar el monolito modular, FastAPI/SQLAlchemy/PostgreSQL, POS y Backoffice separados, OpenAPI como contrato fuente, tipos Decimal/Numeric, auditoría y outbox transaccionales. No introducir microservicios, repositorios paralelos, tipos de dominio manuales en frontend ni una reescritura amplia. |
 | **11. Decisiones a conservar** | Compatibilidad con la arquitectura vigente, la experiencia táctil del POS, el cliente generado y la trazabilidad por usuario, sucursal, caja, estación y turno. |
 | **12. Riesgos** | Staging no equivalente, datos sensibles o pasos manuales ocultos. |
 | **13. Posibles regresiones** | Ninguna productiva; detectar incompatibilidades de entorno. |
 | **14. Pruebas requeridas** | Fresh deploy, rerun, migration fail, worker backlog, provider sandbox, cache frontend y rollback. |
-| **15. Criterios de aceptación** | Staging nace desde cero con el manifiesto candidato y dataset UAT identificado; clean start/opening state y reconciliación pasan; ningún seed se presenta como historia productiva; smoke/probes pasan y no hay drift ni cambios manuales no registrados. |
+| **15. Criterios de aceptación** | Staging nace desde cero con el manifiesto candidato y dataset UAT identificado; clean start/opening state y reconciliación pasan; ningún seed se presenta como historia productiva; fallos peligrosos tienen evidencia vigente/trazable reusable para go/no-go; smoke/probes pasan y no hay drift ni cambios manuales no registrados. |
 | **16. Definition of Done específica** | Staging nace desde cero con el manifiesto candidato; smoke y probes pasan; no hay drift/manual changes no registrados. Los cambios aplicables, pruebas y documentación quedan integrados; no existen cambios accidentales y la evidencia solicitada está adjunta. |
 | **17. Evidencia de terminación** | Manifiesto desplegado, logs, digests, schema revision y smoke results. |
 | **18. Requiere migración DB** | Sí |
@@ -10882,13 +10927,13 @@ Al terminar, reporta: resumen técnico; archivos modificados; migraciones; cambi
 | **6. Módulos afectados** | All business domains, staging DB, UAT scripts y privacy. |
 | **7. Archivos/áreas a inspeccionar** | Seeds/fixtures; data factory; scenario catalog; cleanup/reset seguro. |
 | **8. Dependencias previas** | ZM-FIN-003, ZM-FIN-007, ZM-FIN-099 y ZM-FIN-117. |
-| **9. Cambios a implementar** | Crear datos sintéticos: sucursales, roles, estaciones, catálogo, precios, recetas, stock, proveedores, pedidos y casos de excepción; mapear escenarios/roles/evidencia. |
+| **9. Cambios a implementar** | Crear datos sintéticos de sucursales, roles, estaciones, catálogo, precios, recetas, stock, proveedores, pedidos y excepciones; modelar Sucursal Matriz sin tratar `MAIN` como mapping productivo; mapear dos ciclos semanales, cadencias, stop/degraded/track, reconciliaciones, autoridades y evidencia. |
 | **10. Restricciones arquitectónicas** | Conservar el monolito modular, FastAPI/SQLAlchemy/PostgreSQL, POS y Backoffice separados, OpenAPI como contrato fuente, tipos Decimal/Numeric, auditoría y outbox transaccionales. No introducir microservicios, repositorios paralelos, tipos de dominio manuales en frontend ni una reescritura amplia. |
 | **11. Decisiones a conservar** | Compatibilidad con la arquitectura vigente, la experiencia táctil del POS, el cliente generado y la trazabilidad por usuario, sucursal, caja, estación y turno. |
 | **12. Riesgos** | Datos demasiado simples o copiar datos reales sin control. |
 | **13. Posibles regresiones** | Seeds locales o tests si se mezclan entornos. |
 | **14. Pruebas requeridas** | Estado vacío, múltiples sucursales, stock bajo, pagos mixtos, refunds, producción y cierre. |
-| **15. Criterios de aceptación** | Dataset es reproducible, no contiene PII real y permite ejecutar todos los casos UAT sin ajustes manuales ocultos. |
+| **15. Criterios de aceptación** | Dataset es reproducible, no contiene PII real, distingue Sucursal Matriz de seeds demo y permite ejecutar casos UAT de ciclos, stop, BBVA/fiscal gated y reconciliación sin ajustes manuales ocultos. |
 | **16. Definition of Done específica** | Dataset es reproducible, no contiene PII real y permite ejecutar todos los casos UAT sin ajustes manuales ocultos. Los cambios aplicables, pruebas y documentación quedan integrados; no existen cambios accidentales y la evidencia solicitada está adjunta. |
 | **17. Evidencia de terminación** | Seed versionado, catálogo de escenarios y hash/snapshot. |
 | **18. Requiere migración DB** | No |
@@ -10972,13 +11017,13 @@ Al terminar, reporta: resumen técnico; archivos modificados; migraciones; cambi
 | **6. Módulos afectados** | POS, Backoffice, API, worker, hardware sandbox y operations. |
 | **7. Archivos/áreas a inspeccionar** | UAT scripts; evidence capture; dashboards; runbooks. |
 | **8. Dependencias previas** | ZM-FIN-117–118 y todos los módulos Feature Complete. |
-| **9. Cambios a implementar** | Ejecutar ciclo completo; clean start/opening state; Superadministrador inicial y scopes; operaciones abiertas y rechazo de ambigüedad; mappings; atomic outbox; fact layer/rebuild; fórmulas KPI críticas; alertas A/B/C y Telegram; pérdida de Internet con operación LAN; fallos/recovery; firmas. |
+| **9. Cambios a implementar** | Ejecutar ciclo completo y cadencias representativas; clean start/opening state; Superadministrador inicial y scopes; operaciones abiertas y rechazo de ambigüedad; mappings; atomic outbox; fact layer/rebuild; fórmulas KPI críticas; alertas A/B/C frente a severidad de defectos; stop/resume con dual authority; contingencia stop-only y drill manual; BBVA/fiscal gated; pérdida de Internet con LAN sana; fallos/recovery; reconciliaciones extraordinarias y firmas. |
 | **10. Restricciones arquitectónicas** | Conservar el monolito modular, FastAPI/SQLAlchemy/PostgreSQL, POS y Backoffice separados, OpenAPI como contrato fuente, tipos Decimal/Numeric, auditoría y outbox transaccionales. No introducir microservicios, repositorios paralelos, tipos de dominio manuales en frontend ni una reescritura amplia. |
 | **11. Decisiones a conservar** | Compatibilidad con la arquitectura vigente, la experiencia táctil del POS, el cliente generado y la trazabilidad por usuario, sucursal, caja, estación y turno. |
 | **12. Riesgos** | UAT superficial o aprobación por apariencia sin persistencia/reconciliación. |
 | **13. Posibles regresiones** | Descubrir defectos tardíos; es el propósito de la tarea. |
 | **14. Pruebas requeridas** | Todos los casos auditados fallidos/bloqueados/no verificados, más escenarios profesionales añadidos. |
-| **15. Criterios de aceptación** | Cada requisito tiene caso aprobado; opening state, operaciones abiertas, mappings, hechos/proyecciones/KPI reconcilian; sólo el Superadministrador inicial tiene `GLOBAL`; Internet/Telegram no bloquea tienda local sana y discrepancias se convierten en tareas, no se aceptan silenciosamente. |
+| **15. Criterios de aceptación** | Cada requisito DEC-20 tiene caso aprobado; opening state, operaciones abiertas, mappings, hechos/proyecciones/KPI reconcilian; stop/resume, autoridades, contingencia, BBVA/fiscal y evidencia live frente a drill son inequívocos; sólo el Superadministrador inicial tiene `GLOBAL`; discrepancias se convierten en tareas. |
 | **16. Definition of Done específica** | Cada requisito de alcance tiene caso aprobado; discrepancias se convierten en tareas, no se aceptan silenciosamente. Los cambios aplicables, pruebas y documentación quedan integrados; no existen cambios accidentales y la evidencia solicitada está adjunta. |
 | **17. Evidencia de terminación** | Paquete UAT con resultado, IDs, capturas, logs, firmas y defectos. |
 | **18. Requiere migración DB** | No |
@@ -11062,13 +11107,13 @@ Al terminar, reporta: resumen técnico; archivos modificados; migraciones; cambi
 | **6. Módulos afectados** | Producto, engineering, QA, security, data, SRE y business ownership. |
 | **7. Archivos/áreas a inspeccionar** | Plan maestro; CI artifacts; audit evidence; risk register; decisions; release manifest. |
 | **8. Dependencias previas** | ZM-FIN-001–119. |
-| **9. Cambios a implementar** | Revisar criterios globales y evidencia Async/QA/Production actualizada por DEC-17/18; clasificar excepciones; rechazar gate por hallazgo crítico/alto, decisión bloqueante pendiente o evidencia incompleta; no exigir lakehouse/IA/WhatsApp. |
+| **9. Cambios a implementar** | Revisar criterios globales y evidencia actualizada por DEC-17–20; aprobar G1–G7 antes de G8; validar Sucursal Matriz, SITE-A, DUR-C, STOP-B, autoridades, stop-only, ROL-B, REL-C y gates BBVA/fiscales; clasificar excepciones y rechazar gate por crítico/alto, evidencia incompleta o contradicción; no exigir lakehouse/IA/WhatsApp. |
 | **10. Restricciones arquitectónicas** | Conservar el monolito modular, FastAPI/SQLAlchemy/PostgreSQL, POS y Backoffice separados, OpenAPI como contrato fuente, tipos Decimal/Numeric, auditoría y outbox transaccionales. No introducir microservicios, repositorios paralelos, tipos de dominio manuales en frontend ni una reescritura amplia. |
 | **11. Decisiones a conservar** | Compatibilidad con la arquitectura vigente, la experiencia táctil del POS, el cliente generado y la trazabilidad por usuario, sucursal, caja, estación y turno. |
 | **12. Riesgos** | Convertir gate en ceremonia o aceptar excepciones sin impacto/owner/fecha. |
 | **13. Posibles regresiones** | Ninguna funcional; riesgo de retrasar release por evidencia insuficiente, que es correcto. |
 | **14. Pruebas requeridas** | Evidencia faltante, test flaky, riesgo aceptado, módulo excluido visible, restore fallido y vulnerabilidad abierta. |
-| **15. Criterios de aceptación** | Cada gate tiene decisión explícita y firmada; Production Ready sólo se aprueba si todos los gates previos están aprobados sin contradicción. |
+| **15. Criterios de aceptación** | Cada gate tiene decisión explícita y firmada; Production Ready sólo se aprueba tras todos los gates previos y Pilot Ready sólo después de Production Ready, sin usar el piloto como sustituto de QA ni marcar G8/G9 por aprobación documental. |
 | **16. Definition of Done específica** | Cada gate tiene decisión explícita y firmada; Production Ready sólo se aprueba si todos los gates previos están aprobados sin contradicción. Los cambios aplicables, pruebas y documentación quedan integrados; no existen cambios accidentales y la evidencia solicitada está adjunta. |
 | **17. Evidencia de terminación** | Acta de gate con evidencia enlazada, excepciones, responsables y decisión go/no-go. |
 | **18. Requiere migración DB** | No |
@@ -11146,19 +11191,19 @@ Al terminar, reporta: resumen técnico; archivos modificados; migraciones; cambi
 |---|---|
 | **1. ID único** | ZM-FIN-121 |
 | **2. Nombre de la tarea** | Preparar sitio piloto, hardware, red y migración de datos |
-| **3. Objetivo** | Convertir una panadería real en un entorno controlado de piloto con reversa y soporte. |
+| **3. Objetivo** | Preparar exclusivamente Sucursal Matriz como única branch piloto inicial, con reversa, soporte y evidencia, sin mapping implícito con seed `MAIN`. |
 | **4. Problema que resuelve** | Hardware/red/migración real no fueron verificados y son necesarios para operación comercial. |
 | **5. Hallazgo relacionado** | Elementos no verificables de ambas auditorías. |
 | **6. Módulos afectados** | Pilot branch, workstations, network, hardware, users, catalog/inventory y production infrastructure. |
 | **7. Archivos/áreas a inspeccionar** | Site survey; installation package; migration tools; branch config; backup/cutover plan. |
 | **8. Dependencias previas** | Gate Production Ready aprobado y ZM-FIN-112–116. |
-| **9. Cambios a implementar** | Inventariar red/equipos; instalar mini-PC primario y standby controlado; LAN/estaciones; backup off-site; cargar master data aprobada; designar Superadministrador inicial explícito; registrar conteo físico y opening economic state; cerrar/reconciliar operaciones abiertas cuando sea viable y migrar excepciones sólo con causalidad completa; probar operación sin Internet, RPO/RTO, fallback y soporte. |
+| **9. Cambios a implementar** | Crear/identificar productivamente Sucursal Matriz (`pilot_branch_count=1`) sin inferir `MAIN`; inventariar energía/red/equipos; instalar mini-PC primario y standby, LAN/estaciones/hardware; backup off-site; cargar master data aprobada; configurar usuarios/roles/scopes y Superadministrador; registrar conteo/opening state; reconciliar operaciones abiertas; probar Internet caído, RPO/RTO, stop-only, rollback y soporte. |
 | **10. Restricciones arquitectónicas** | Conservar el monolito modular, FastAPI/SQLAlchemy/PostgreSQL, POS y Backoffice separados, OpenAPI como contrato fuente, tipos Decimal/Numeric, auditoría y outbox transaccionales. No introducir microservicios, repositorios paralelos, tipos de dominio manuales en frontend ni una reescritura amplia. |
 | **11. Decisiones a conservar** | Compatibilidad con la arquitectura vigente, la experiencia táctil del POS, el cliente generado y la trazabilidad por usuario, sucursal, caja, estación y turno. |
 | **12. Riesgos** | Datos iniciales incorrectos, hardware no soportado o red sin contingencia. |
 | **13. Posibles regresiones** | Operación actual de la sucursal durante transición. |
 | **14. Pruebas requeridas** | Equipo incompatible, red caída, saldo inicial, usuario incorrecto, printer/terminal, rollback y datos legacy. |
-| **15. Criterios de aceptación** | Sitio pasa checklist LOCAL_FIRST; historia productiva inicia limpia; master data, Superadministrador inicial, conteo/opening state y operaciones abiertas tienen evidencia firmada y reconcilian; no se migró historia demo/test; primario/standby/LAN/hardware/backup pasan smoke; sin Internet continúa por LAN sin browser offline y fallback está probado. |
+| **15. Criterios de aceptación** | `pilot_site=Sucursal Matriz`, `pilot_branch_count=1` y `seed_MAIN_is_not_implicitly_Matriz=true`; sitio pasa checklist LOCAL_FIRST; historia inicia limpia; scopes, master data, opening state y operaciones abiertas tienen evidencia firmada; primario/standby/LAN/hardware/backup/soporte pasan smoke; outage autoritativo aplica stop-only y no existe browser offline. |
 | **16. Definition of Done específica** | Sitio pasa checklist; datos iniciales reconcilian; hardware y connectivity smoke pasan; fallback probado. Los cambios aplicables, pruebas y documentación quedan integrados; no existen cambios accidentales y la evidencia solicitada está adjunta. |
 | **17. Evidencia de terminación** | Checklist firmado, inventario, reconciliación y plan de cutover. |
 | **18. Requiere migración DB** | Sí |
@@ -11242,13 +11287,13 @@ Al terminar, reporta: resumen técnico; archivos modificados; migraciones; cambi
 | **6. Módulos afectados** | Pilot users, POS/Backoffice, support, SRE y business owner. |
 | **7. Archivos/áreas a inspeccionar** | Training materials; SOPs; cutover checklist; support channels; release manifest. |
 | **8. Dependencias previas** | ZM-FIN-105, ZM-FIN-121 y Gate Pilot Ready. |
-| **9. Cambios a implementar** | Capacitar por rol; practicar escenarios; respaldar; congelar cambios; ejecutar deploy y cargas/opening state idempotentes; confirmar único `GLOBAL` inicial; reconciliar excepciones abiertas; smoke; abrir primera sesión bajo supervisión; definir abort/rollback. |
+| **9. Cambios a implementar** | Capacitar por rol con checklist observado/firmado; practicar stop, incidente y contingencia; respaldar y congelar; ejecutar cutover firmado con artefacto/opening state idempotentes; confirmar único `GLOBAL`; aplicar stop-only inicial; disponer rollback; exigir dual authority para resume crítico; habilitar BBVA sólo con gates completos; smoke y primera sesión supervisada. |
 | **10. Restricciones arquitectónicas** | Conservar el monolito modular, FastAPI/SQLAlchemy/PostgreSQL, POS y Backoffice separados, OpenAPI como contrato fuente, tipos Decimal/Numeric, auditoría y outbox transaccionales. No introducir microservicios, repositorios paralelos, tipos de dominio manuales en frontend ni una reescritura amplia. |
 | **11. Decisiones a conservar** | Compatibilidad con la arquitectura vigente, la experiencia táctil del POS, el cliente generado y la trazabilidad por usuario, sucursal, caja, estación y turno. |
 | **12. Riesgos** | Operar sin conocimiento, cambiar configuración durante cutover o no abortar ante discrepancia. |
 | **13. Posibles regresiones** | Interrupción del negocio piloto. |
 | **14. Pruebas requeridas** | Usuario ausente, credencial fallida, hardware failure, dato discrepante, payment provider y rollback. |
-| **15. Criterios de aceptación** | Usuarios demuestran tareas críticas; cutover usa artefacto/dataset aprobados, inicia historia limpia y conserva evidencia/mappings; opening state y excepciones reconcilian; smoke y primera apertura pasan; soporte, runbook y rollback están disponibles. |
+| **15. Criterios de aceptación** | Usuarios demuestran tareas críticas con evidencia firmada; cutover usa artefacto/dataset aprobados, stop-only inicial y rollback; resume crítico tiene aprobación técnica/administrativa; BBVA permanece deshabilitado hasta gates; opening state/excepciones reconcilian; soporte, runbooks, smoke y primera apertura pasan. |
 | **16. Definition of Done específica** | Usuarios demuestran tareas críticas; cutover usa artefacto aprobado; smoke y primera apertura pasan; soporte y rollback están disponibles. Los cambios aplicables, pruebas y documentación quedan integrados; no existen cambios accidentales y la evidencia solicitada está adjunta. |
 | **17. Evidencia de terminación** | Firmas de capacitación, checklist de cutover, release IDs y resultado de smoke. |
 | **18. Requiere migración DB** | No |
@@ -11332,13 +11377,13 @@ Al terminar, reporta: resumen técnico; archivos modificados; migraciones; cambi
 | **6. Módulos afectados** | Pilot branch, ledgers, cash closes, inventory, worker, observability y support. |
 | **7. Archivos/áreas a inspeccionar** | Reconciliation scripts; dashboards; incident process; audit logs. |
 | **8. Dependencias previas** | ZM-FIN-122 y runbooks/SLOs. |
-| **9. Cambios a implementar** | Tras cada ciclo reconciliar contra opening state aprobado, mappings, dominio, outbox/audit, fact layer/proyecciones y KPI; revisar validez/DQ y backlog de alertas/Telegram; clasificar incidentes; aplicar sólo runbooks/compensaciones aprobados. |
+| **9. Cambios a implementar** | Reconciliar cada cierre y diariamente contra opening state, mappings, ventas/orders/payments/PaymentLeg/refunds/caja/inventario/producción/merma/outbox/proyecciones; reconciliar adicionalmente tras incidente, hotfix, restore, failover, contingencia o correctivo; revisar alertas/Telegram, clasificar incidentes y preservar evidencia. |
 | **10. Restricciones arquitectónicas** | Conservar el monolito modular, FastAPI/SQLAlchemy/PostgreSQL, POS y Backoffice separados, OpenAPI como contrato fuente, tipos Decimal/Numeric, auditoría y outbox transaccionales. No introducir microservicios, repositorios paralelos, tipos de dominio manuales en frontend ni una reescritura amplia. |
 | **11. Decisiones a conservar** | Compatibilidad con la arquitectura vigente, la experiencia táctil del POS, el cliente generado y la trazabilidad por usuario, sucursal, caja, estación y turno. |
 | **12. Riesgos** | Normalizar discrepancias como operación cotidiana o corregir DB manualmente. |
 | **13. Posibles regresiones** | Carga operativa adicional durante piloto. |
 | **14. Pruebas requeridas** | Diferencia de caja, stock negativo, backlog, refund pendiente, hardware y red. |
-| **15. Criterios de aceptación** | No queda discrepancia de opening state, mapping, dominio o analytics sin causa/owner ni oculta por agregación; demo/test nunca se normaliza como real; críticos activan stop/rollback; datos/alertas se preservan y acciones se auditan. |
+| **15. Criterios de aceptación** | Cada cierre, día y evento extraordinario tiene reconciliación aplicable; antes de expansión existe reconciliación integral firmada; ninguna discrepancia queda sin causa/owner; demo/test no se normaliza como real; stop/rollback, alertas, incidentes y acciones quedan auditados. |
 | **16. Definition of Done específica** | No queda discrepancia sin causa/owner; incidentes críticos activan stop/rollback; datos se preservan y acciones quedan auditadas. Los cambios aplicables, pruebas y documentación quedan integrados; no existen cambios accidentales y la evidencia solicitada está adjunta. |
 | **17. Evidencia de terminación** | Reportes de reconciliación, incidentes, tiempos y decisiones diarias. |
 | **18. Requiere migración DB** | No |
@@ -11422,13 +11467,13 @@ Al terminar, reporta: resumen técnico; archivos modificados; migraciones; cambi
 | **6. Módulos afectados** | Producto, QA, security, data, SRE, support y business owner. |
 | **7. Archivos/áreas a inspeccionar** | Pilot logs; incidents; reconciliations; UAT; release history; user feedback. |
 | **8. Dependencias previas** | ZM-FIN-123 y cadencias operativas aprobadas. |
-| **9. Cambios a implementar** | Confirmar procesos recurrentes; cerrar defectos; repetir gates; evaluar dashboard selectivo y alerting conservador; iniciar calibración con 2–4 semanas reales; actualizar capacidad/runbooks; go/no-go sin exigir lakehouse. |
+| **9. Cambios a implementar** | Confirmar dos ciclos semanales operativos completos y cobertura live obligatoria; extender automáticamente por evidencia faltante; cerrar defectos; aplicar STOP-B y taxonomías separadas; repetir gates/evidencia invalidada por hotfix; evaluar KPI/alerting; actualizar capacidad/runbooks; obtener aprobación técnica y administrativa de expansión. |
 | **10. Restricciones arquitectónicas** | Conservar el monolito modular, FastAPI/SQLAlchemy/PostgreSQL, POS y Backoffice separados, OpenAPI como contrato fuente, tipos Decimal/Numeric, auditoría y outbox transaccionales. No introducir microservicios, repositorios paralelos, tipos de dominio manuales en frontend ni una reescritura amplia. |
 | **11. Decisiones a conservar** | Compatibilidad con la arquitectura vigente, la experiencia táctil del POS, el cliente generado y la trazabilidad por usuario, sucursal, caja, estación y turno. |
 | **12. Riesgos** | Expandir por presión comercial o considerar workaround como solución. |
 | **13. Posibles regresiones** | Ninguna funcional; decisión de go/no-go. |
 | **14. Pruebas requeridas** | Incidente reabierto, workaround manual, proceso no observado, discrepancia resuelta sin causa y release hotfix. |
-| **15. Criterios de aceptación** | No hay crítico/alto abierto; reconciliaciones y KPI de gate son válidos; procesos representativos observados; calibración documentada; soporte/usuarios aceptan; lakehouse no bloquea. |
+| **15. Criterios de aceptación** | Dos ciclos semanales completos y cadencias obligatorias están cubiertos; no hay `CRITICAL`, blocker `HIGH` ni `CRITICAL-A` activa sin resolver; reconciliaciones/KPI son válidos; no hay workaround inseguro ni paso manual crítico oculto; expansión tiene dual approval y lakehouse no bloquea. |
 | **16. Definition of Done específica** | No hay Sev crítico/alto abierto; reconciliaciones pasan; todos los procesos representativos fueron observados; soporte y usuarios aceptan operación. Los cambios aplicables, pruebas y documentación quedan integrados; no existen cambios accidentales y la evidencia solicitada está adjunta. |
 | **17. Evidencia de terminación** | Acta Pilot Ready→General Production con evidencia, riesgos residuales y alcance de expansión. |
 | **18. Requiere migración DB** | No |
@@ -11512,13 +11557,13 @@ Al terminar, reporta: resumen técnico; archivos modificados; migraciones; cambi
 | **6. Módulos afectados** | All branches, deployment, data migration, support y operations. |
 | **7. Archivos/áreas a inspeccionar** | Rollout plan; site checklists; release pipeline; branch configs; migration/reconciliation. |
 | **8. Dependencias previas** | ZM-FIN-124 y Gate General Production aprobado. |
-| **9. Cambios a implementar** | Agrupar sitios por riesgo/compatibilidad; repetir preparación/capacitación/cutover/reconciliación; pausar expansión ante criterio de stop; mantener mismo artefacto o release aprobado. |
+| **9. Cambios a implementar** | Aplicar `one_branch_per_wave=true`; repetir prepare/cutover/reconcile/stabilize/approve; mantener `controlled_release_line=true` con release piloto/hotfixes revalidados; pausar nuevas oleadas ante incidente material; demostrar aislamiento antes de continuar sitios operativos; conservar aprobación técnica/administrativa. |
 | **10. Restricciones arquitectónicas** | Conservar el monolito modular, FastAPI/SQLAlchemy/PostgreSQL, POS y Backoffice separados, OpenAPI como contrato fuente, tipos Decimal/Numeric, auditoría y outbox transaccionales. No introducir microservicios, repositorios paralelos, tipos de dominio manuales en frontend ni una reescritura amplia. |
 | **11. Decisiones a conservar** | Compatibilidad con la arquitectura vigente, la experiencia táctil del POS, el cliente generado y la trazabilidad por usuario, sucursal, caja, estación y turno. |
 | **12. Riesgos** | Blast radius, configuración cross-branch o soporte insuficiente. |
 | **13. Posibles regresiones** | Carga de plataforma y procesos del piloto. |
 | **14. Pruebas requeridas** | Sucursal con hardware distinto, datos legacy, zona horaria/red, incidente en una oleada y rollback selectivo. |
-| **15. Criterios de aceptación** | Cada sucursal pasa checklist y reconciliación antes de continuar; un fallo no compromete aislamiento de otras; rollout es trazable. |
+| **15. Criterios de aceptación** | Una sola sucursal entra por oleada; cada sitio pasa checklist, estabilización, reconciliación y aprobación antes de continuar; `wave_pause_on_material_incident=true`; no hay drift libre, big bang ni contaminación cross-branch; rollout es trazable. |
 | **16. Definition of Done específica** | Cada sucursal pasa checklist y reconciliación antes de continuar; un fallo no compromete aislamiento de otras; rollout es trazable. Los cambios aplicables, pruebas y documentación quedan integrados; no existen cambios accidentales y la evidencia solicitada está adjunta. |
 | **17. Evidencia de terminación** | Registro por sucursal, release IDs, reconciliaciones y decisiones de continuar/pausar. |
 | **18. Requiere migración DB** | Posible |
@@ -11602,13 +11647,13 @@ Al terminar, reporta: resumen técnico; archivos modificados; migraciones; cambi
 | **6. Módulos afectados** | Product, engineering, QA, security, SRE, support y business operations. |
 | **7. Archivos/áreas a inspeccionar** | Production dashboards; incident history; docs; ownership; backlog; release artifacts. |
 | **8. Dependencias previas** | ZM-FIN-125 y periodo/cadencias representativas aprobadas. |
-| **9. Cambios a implementar** | Verificar SLO, reconciliaciones, KPI/DQ, backups/restores, alertas, seguridad y soporte; cerrar/aceptar riesgos; archivar evidencia; transferir owners de KPI/alertas/archive/backup/event contracts. |
+| **9. Cambios a implementar** | Verificar por sucursal SLO, reconciliaciones, versión/configuración, KPI/DQ, backups/restores, alertas, seguridad, runbooks y capacidad de soporte; cerrar/aceptar riesgos; archivar evidencia; transferir ownership de operación, hardware, KPI, alertas, backup y contratos de eventos. |
 | **10. Restricciones arquitectónicas** | Conservar el monolito modular, FastAPI/SQLAlchemy/PostgreSQL, POS y Backoffice separados, OpenAPI como contrato fuente, tipos Decimal/Numeric, auditoría y outbox transaccionales. No introducir microservicios, repositorios paralelos, tipos de dominio manuales en frontend ni una reescritura amplia. |
 | **11. Decisiones a conservar** | Compatibilidad con la arquitectura vigente, la experiencia táctil del POS, el cliente generado y la trazabilidad por usuario, sucursal, caja, estación y turno. |
 | **12. Riesgos** | Declarar cierre mientras subsisten workarounds o conocimiento sólo en el equipo de implementación. |
 | **13. Posibles regresiones** | Ninguna funcional; transición de ownership. |
 | **14. Pruebas requeridas** | Incidente reciente, drift, backup no probado, alertas sin owner, dependencia vulnerable y proceso de baja frecuencia. |
-| **15. Criterios de aceptación** | Se cumplen criterios de ZeroMerma terminado y General Production; owners aceptan operación; no hay bloqueos críticos/altos abiertos. |
+| **15. Criterios de aceptación** | Se cumplen General Production y handover por sucursal; soporte acepta capacidad y escalamiento; reconciliación, versiones, runbooks, ownership y evidencia son trazables; no existen blockers críticos/altos abiertos ni pasos manuales críticos ocultos. |
 | **16. Definition of Done específica** | Se cumplen criterios de ZeroMerma terminado y General Production; owners aceptan operación; no hay bloqueos críticos/altos abiertos. Los cambios aplicables, pruebas y documentación quedan integrados; no existen cambios accidentales y la evidencia solicitada está adjunta. |
 | **17. Evidencia de terminación** | Informe final, hashes de release, actas de gates, ownership y backlog residual priorizado. |
 | **18. Requiere migración DB** | No |
