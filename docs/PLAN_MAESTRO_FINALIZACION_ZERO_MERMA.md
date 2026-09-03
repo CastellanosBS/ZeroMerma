@@ -294,6 +294,31 @@ El Plan Maestro no contiene una convención explícita de estado de tarea; no se
 **Validación de fase:** Estado Git inmutable durante inventario; toolchain reproducible; DB de pruebas protegida; fresh install/upgrade de esquema; decisiones y alcance aprobados.<br>
 **Gate de avance:** Baseline Ready: existe commit canónico, DB de pruebas segura, cadena de migraciones validada y ninguna decisión P0 queda implícita.
 
+#### Estado formal de G0 y cierre de Fase 0
+
+- **Gate:** G0 — Baseline Ready
+- **Estado:** `APROBADO`
+- **Fecha:** `2026-09-02`
+- **Fase 0:** `CERRADA`
+
+**Evidencia por criterio**
+
+- `G0_COMMIT_CANONICAL=true`: rama baseline vigente, HEAD canónico `d521443345256ca01d6f41d9e731af2d55909814`, working tree limpio al aprobar, Plan Maestro único y documento único de decisiones.
+- `G0_TOOLCHAIN_REPRODUCIBLE=true`: ZM-FIN-004, commit `d82f9ef454bfb362b7c8dc977bc0686bff0db10e`; Python 3.12.x, uv 0.11.4, Node 22.x, Corepack requerido y pnpm 10.33.0; instalaciones frozen, checkout limpio, lockfiles sin drift y preflight positivo/negativo validados.
+- `G0_TEST_DB_SAFE=true`: ZM-FIN-005, commit `e9af2ffb7698e9316791838a314f4e7508f4006f`; configuración de test separada sin fallback operacional, guardas preconnect/postconnect, PostgreSQL efímero, ejecuciones aisladas, deny con cero conexiones y volúmenes existentes preservados.
+- `G0_MIGRATIONS_VALIDATED=true`: ZM-FIN-006, commit `64ec6005baf85657c72e9ad6ef66d823cd49f3ef`; 39 revisiones, una raíz, un head, 39/39 checkpoints, fresh-to-head, preservación de datos, cero drift real sin resolver, unknown drift fail-closed, interrupción segura y dump/restore sanity.
+- `G0_SCOPE_APPROVED=true`: DEC-02 aprobada; scope, visibilidad y capacidades están clasificados sin inferir completitud por existencia de ruta o UI.
+- `G0_DECISIONS_APPROVED=true`: ZM-FIN-003 registra DEC-01–DEC-20 como `APROBADAS`, con cero decisiones pendientes.
+- `G0_EXTERNAL_REQUIREMENTS_TRACED=true`: ZM-FIN-007, commit `d521443345256ca01d6f41d9e731af2d55909814`; 53 requisitos, 53 pruebas, 6 validaciones externas, 7 exclusiones aprobadas, cero `PLAN_GAP`, cero decisiones del propietario pendientes, ZM-FIN-127–130 trazadas y DAG de 130 tareas sin ciclos.
+
+**Resultado y límites**
+
+- `G0_STATUS=APROBADO`; `G0_APPROVED=true`; `G0_APPROVED_DATE=2026-09-02`.
+- `FASE_0_STATUS=CERRADA`; `FASE_0_GATE=G0`; `FASE_0_GATE_STATUS=APROBADO`.
+- Fase 0 queda cerrada mediante G0; ZM-FIN-008 pasa a ser la siguiente tarea ejecutable, pero no se inicia por este registro.
+- `G0_APPROVED != G1_APPROVED`; `G0_APPROVED != FEATURE_COMPLETE`; `G0_APPROVED != PRODUCTION_READY`; `G0_APPROVED != PILOT_READY`.
+- G0 no declara implementados RBAC, idempotencia, ledgers, POS, Backoffice, BBVA, CFDI, privacidad, ARCO, retención ni infraestructura productiva; ZM-FIN-127–130 continúan pendientes de implementación.
+
 ### Fase 1 — Arquitectura, contratos y línea base de calidad
 
 **Objetivo:** Conocer el comportamiento real del sistema y hacer obligatorias las validaciones de fundación.<br>
