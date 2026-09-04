@@ -10,6 +10,7 @@ $Root = Get-ZeroMermaRepoRoot
 $ToolchainScript = Join-Path $PSScriptRoot "check-toolchain.ps1"
 $ApiTestScript = Join-Path $PSScriptRoot "run-api-tests.ps1"
 $MigrationValidationScript = Join-Path $PSScriptRoot "run-migration-validation.ps1"
+$FunctionalOperationMatrixScript = Join-Path $PSScriptRoot "check-functional-operation-matrix.py"
 
 function Test-ZeroMermaHttpServer {
   param(
@@ -64,6 +65,9 @@ try {
 
   Write-Host "Bootstrapping Python workspace with uv..."
   Invoke-ZeroMermaUv sync --all-packages --dev --frozen
+
+  Write-Host "Validating the functional operation matrix without database access..."
+  Invoke-ZeroMermaUv run --frozen python $FunctionalOperationMatrixScript
 
   Write-Host "Installing Node workspace dependencies..."
   Invoke-ZeroMermaPnpm install --frozen-lockfile
