@@ -29,13 +29,15 @@ def _login(client: TestClient, *, email: str, password: str) -> str:
 
 def _admin_headers(client: TestClient) -> dict[str, str]:
     return {
-        "Authorization": f"Bearer {_login(client, email=SEED_ADMIN_EMAIL, password=SEED_ADMIN_PASSWORD)}"
+        "Authorization": "Bearer "
+        + _login(client, email=SEED_ADMIN_EMAIL, password=SEED_ADMIN_PASSWORD)
     }
 
 
 def _cashier_headers(client: TestClient) -> dict[str, str]:
     return {
-        "Authorization": f"Bearer {_login(client, email=SEED_USER_EMAIL, password=SEED_USER_PASSWORD)}"
+        "Authorization": "Bearer "
+        + _login(client, email=SEED_USER_EMAIL, password=SEED_USER_PASSWORD)
     }
 
 
@@ -209,7 +211,7 @@ def test_admin_order_blocks_financial_actions_and_cancels_non_refundable_order(
         json={},
     )
     assert deliver_response.status_code == 409
-    assert "saldo pendiente" in deliver_response.json()["detail"]
+    assert "saldo pendiente" in deliver_response.json()["message"]
 
     refundable_cancel_response = client.post(
         f"/v1/admin/orders/{balance_order['id']}/cancel",
@@ -217,7 +219,7 @@ def test_admin_order_blocks_financial_actions_and_cancels_non_refundable_order(
         json={},
     )
     assert refundable_cancel_response.status_code == 409
-    assert "reembolso" in refundable_cancel_response.json()["detail"]
+    assert "reembolso" in refundable_cancel_response.json()["message"]
 
     non_refundable_order = _create_order(
         client,

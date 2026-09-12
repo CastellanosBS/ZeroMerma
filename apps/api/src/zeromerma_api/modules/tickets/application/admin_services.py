@@ -8,6 +8,7 @@ from typing import cast as type_cast
 from sqlalchemy import Select, String, and_, cast, exists, func, or_, select
 from sqlalchemy.engine import RowMapping
 from sqlalchemy.orm import Session
+from sqlalchemy.sql.elements import ColumnElement
 
 from zeromerma_api.modules.audit.application.service import AuditRecorder
 from zeromerma_api.modules.branches.infrastructure.models import Branch, Workstation
@@ -25,8 +26,8 @@ from zeromerma_api.modules.sales.infrastructure.models import Sale, SaleLine, Sa
 from zeromerma_api.modules.tickets.application.admin_schemas import (
     AdminSalesTicketBackendContractView,
     AdminSalesTicketDetailView,
-    AdminSalesTicketFilterOptionView,
     AdminSalesTicketFilterOptionsView,
+    AdminSalesTicketFilterOptionView,
     AdminSalesTicketLineView,
     AdminSalesTicketListItemView,
     AdminSalesTicketMetricsView,
@@ -104,33 +105,39 @@ class AdminSalesTicketService:
             .group_by(SaleLine.sale_id)
             .subquery()
         )
-        rows = session.execute(
-            select(
-                Sale.id,
-                Sale.confirmed_at,
-                Sale.total_amount,
-                Sale.currency_code,
-                Sale.status,
-                Sale.branch_id,
-                Branch.name.label("branch_name"),
-                Sale.workstation_id,
-                Workstation.code.label("workstation_code"),
-                Workstation.name.label("workstation_name"),
-                Sale.operator_id.label("cashier_id"),
-                User.full_name.label("cashier_name"),
-                func.coalesce(line_stats_subquery.c.item_count, 0).label("item_count"),
-                func.coalesce(line_stats_subquery.c.unit_count, ZERO_QUANTITY).label("unit_count"),
+        rows = (
+            session.execute(
+                select(
+                    Sale.id,
+                    Sale.confirmed_at,
+                    Sale.total_amount,
+                    Sale.currency_code,
+                    Sale.status,
+                    Sale.branch_id,
+                    Branch.name.label("branch_name"),
+                    Sale.workstation_id,
+                    Workstation.code.label("workstation_code"),
+                    Workstation.name.label("workstation_name"),
+                    Sale.operator_id.label("cashier_id"),
+                    User.full_name.label("cashier_name"),
+                    func.coalesce(line_stats_subquery.c.item_count, 0).label("item_count"),
+                    func.coalesce(line_stats_subquery.c.unit_count, ZERO_QUANTITY).label(
+                        "unit_count"
+                    ),
+                )
+                .select_from(Sale)
+                .join(Branch, Branch.id == Sale.branch_id)
+                .join(Workstation, Workstation.id == Sale.workstation_id)
+                .join(User, User.id == Sale.operator_id)
+                .outerjoin(line_stats_subquery, line_stats_subquery.c.sale_id == Sale.id)
+                .where(Sale.id.in_(sale_ids_statement))
+                .order_by(Sale.confirmed_at.desc(), Sale.id.desc())
+                .limit(resolved_page_size)
+                .offset((page - 1) * resolved_page_size)
             )
-            .select_from(Sale)
-            .join(Branch, Branch.id == Sale.branch_id)
-            .join(Workstation, Workstation.id == Sale.workstation_id)
-            .join(User, User.id == Sale.operator_id)
-            .outerjoin(line_stats_subquery, line_stats_subquery.c.sale_id == Sale.id)
-            .where(Sale.id.in_(sale_ids_statement))
-            .order_by(Sale.confirmed_at.desc(), Sale.id.desc())
-            .limit(resolved_page_size)
-            .offset((page - 1) * resolved_page_size)
-        ).mappings().all()
+            .mappings()
+            .all()
+        )
 
         sale_ids = [type_cast(uuid.UUID, row["id"]) for row in rows]
         payments_by_sale_id = self._get_payment_summary_by_sale_id(session, sale_ids=sale_ids)
@@ -164,67 +171,81 @@ class AdminSalesTicketService:
         *,
         ticket_id: uuid.UUID,
     ) -> AdminSalesTicketDetailView:
-        sale_record = session.execute(
-            select(
-                Sale.id,
-                Sale.status,
-                Sale.branch_id,
-                Branch.name.label("branch_name"),
-                Sale.workstation_id,
-                Workstation.code.label("workstation_code"),
-                Workstation.name.label("workstation_name"),
-                Sale.cash_session_id,
-                Sale.operator_id.label("cashier_id"),
-                User.email.label("cashier_email"),
-                User.full_name.label("cashier_name"),
-                Sale.currency_code,
-                Sale.subtotal_amount,
-                Sale.total_amount,
-                Sale.paid_amount,
-                Sale.change_amount,
-                Sale.confirmed_at,
+        sale_record = (
+            session.execute(
+                select(
+                    Sale.id,
+                    Sale.status,
+                    Sale.branch_id,
+                    Branch.name.label("branch_name"),
+                    Sale.workstation_id,
+                    Workstation.code.label("workstation_code"),
+                    Workstation.name.label("workstation_name"),
+                    Sale.cash_session_id,
+                    Sale.operator_id.label("cashier_id"),
+                    User.email.label("cashier_email"),
+                    User.full_name.label("cashier_name"),
+                    Sale.currency_code,
+                    Sale.subtotal_amount,
+                    Sale.total_amount,
+                    Sale.paid_amount,
+                    Sale.change_amount,
+                    Sale.confirmed_at,
+                )
+                .select_from(Sale)
+                .join(Branch, Branch.id == Sale.branch_id)
+                .join(Workstation, Workstation.id == Sale.workstation_id)
+                .join(User, User.id == Sale.operator_id)
+                .where(Sale.id == ticket_id)
             )
-            .select_from(Sale)
-            .join(Branch, Branch.id == Sale.branch_id)
-            .join(Workstation, Workstation.id == Sale.workstation_id)
-            .join(User, User.id == Sale.operator_id)
-            .where(Sale.id == ticket_id)
-        ).mappings().one_or_none()
+            .mappings()
+            .one_or_none()
+        )
         if sale_record is None:
             raise SaleNotFoundError("Ticket was not found.")
 
-        line_records = session.execute(
-            select(
-                SaleLine.id,
-                SaleLine.sequence,
-                SaleLine.capture_mode,
-                SaleLine.product_class_id,
-                SaleLine.product_id,
-                SaleLine.catalog_code_snapshot,
-                SaleLine.catalog_name_snapshot,
-                SaleLine.quantity,
-                SaleLine.unit_price,
-                SaleLine.line_total_amount,
-                SaleLine.physical_attribution_status,
+        line_records = (
+            session.execute(
+                select(
+                    SaleLine.id,
+                    SaleLine.sequence,
+                    SaleLine.capture_mode,
+                    SaleLine.product_class_id,
+                    SaleLine.product_id,
+                    SaleLine.catalog_code_snapshot,
+                    SaleLine.catalog_name_snapshot,
+                    SaleLine.quantity,
+                    SaleLine.unit_price,
+                    SaleLine.line_total_amount,
+                    SaleLine.physical_attribution_status,
+                )
+                .where(SaleLine.sale_id == ticket_id)
+                .order_by(SaleLine.sequence.asc())
             )
-            .where(SaleLine.sale_id == ticket_id)
-            .order_by(SaleLine.sequence.asc())
-        ).mappings().all()
-        payment_records = session.execute(
-            select(
-                SalePayment.id,
-                SalePayment.sequence,
-                SalePayment.payment_method_code,
-                SalePayment.tendered_amount,
-                SalePayment.applied_amount,
-                SalePayment.change_amount,
-                SalePayment.currency_code,
-                SalePayment.received_at,
+            .mappings()
+            .all()
+        )
+        payment_records = (
+            session.execute(
+                select(
+                    SalePayment.id,
+                    SalePayment.sequence,
+                    SalePayment.payment_method_code,
+                    SalePayment.tendered_amount,
+                    SalePayment.applied_amount,
+                    SalePayment.change_amount,
+                    SalePayment.currency_code,
+                    SalePayment.received_at,
+                )
+                .where(SalePayment.sale_id == ticket_id)
+                .order_by(SalePayment.sequence.asc())
             )
-            .where(SalePayment.sale_id == ticket_id)
-            .order_by(SalePayment.sequence.asc())
-        ).mappings().all()
-        return_summary = _get_return_summary_by_sale_ids(session, sale_ids=[ticket_id]).get(ticket_id)
+            .mappings()
+            .all()
+        )
+        return_summary = _get_return_summary_by_sale_ids(session, sale_ids=[ticket_id]).get(
+            ticket_id
+        )
         resolved_return_summary = _resolve_return_summary(return_summary)
 
         return AdminSalesTicketDetailView(
@@ -242,7 +263,9 @@ class AdminSalesTicketService:
                 paid_amount=type_cast(Decimal, sale_record["paid_amount"]),
                 change_amount=type_cast(Decimal, sale_record["change_amount"]),
                 item_count=len(line_records),
-                unit_count=sum((type_cast(Decimal, row["quantity"]) for row in line_records), ZERO_QUANTITY),
+                unit_count=sum(
+                    (type_cast(Decimal, row["quantity"]) for row in line_records), ZERO_QUANTITY
+                ),
                 return_count=int(resolved_return_summary["return_count"]),
                 returned_amount=type_cast(Decimal, resolved_return_summary["returned_amount"]),
                 return_status=str(resolved_return_summary["return_status"]),
@@ -294,7 +317,10 @@ class AdminSalesTicketService:
             printable_ticket=AdminSalesTicketPrintableView(
                 can_reprint=True,
                 preview_available=False,
-                note="La reimpresion registra auditoria; la vista imprimible se conectara al contrato de impresion.",
+                note=(
+                    "La reimpresion registra auditoria; la vista imprimible "
+                    "se conectara al contrato de impresion."
+                ),
             ),
             related_documents=self._get_related_documents(session, ticket_id=ticket_id),
         )
@@ -338,8 +364,8 @@ class AdminSalesTicketService:
         search: str | None,
         status_filter: str | None,
         workstation_id: uuid.UUID | None,
-    ) -> list[object]:
-        conditions: list[object] = []
+    ) -> list[ColumnElement[bool]]:
+        conditions: list[ColumnElement[bool]] = []
         if branch_id is not None:
             conditions.append(Sale.branch_id == branch_id)
         if workstation_id is not None:
@@ -400,7 +426,9 @@ class AdminSalesTicketService:
             raise SaleValidationError("Unsupported ticket status filter.")
         return conditions
 
-    def _build_sale_ids_statement(self, conditions: list[object]) -> Select[tuple[uuid.UUID]]:
+    def _build_sale_ids_statement(
+        self, conditions: list[ColumnElement[bool]]
+    ) -> Select[tuple[uuid.UUID]]:
         statement = (
             select(Sale.id)
             .select_from(Sale)
@@ -413,24 +441,40 @@ class AdminSalesTicketService:
         return statement
 
     def _build_filter_options(self, session: Session) -> AdminSalesTicketFilterOptionsView:
-        branches = session.execute(
-            select(Branch.id, Branch.name).order_by(Branch.name.asc())
-        ).mappings().all()
-        workstations = session.execute(
-            select(Workstation.id, Workstation.name, Workstation.code).order_by(Workstation.name.asc())
-        ).mappings().all()
-        cashiers = session.execute(
-            select(User.id, User.full_name)
-            .where(exists(select(Sale.id).where(Sale.operator_id == User.id)))
-            .order_by(User.full_name.asc())
-        ).mappings().all()
+        branches = (
+            session.execute(select(Branch.id, Branch.name).order_by(Branch.name.asc()))
+            .mappings()
+            .all()
+        )
+        workstations = (
+            session.execute(
+                select(Workstation.id, Workstation.name, Workstation.code).order_by(
+                    Workstation.name.asc()
+                )
+            )
+            .mappings()
+            .all()
+        )
+        cashiers = (
+            session.execute(
+                select(User.id, User.full_name)
+                .where(exists(select(Sale.id).where(Sale.operator_id == User.id)))
+                .order_by(User.full_name.asc())
+            )
+            .mappings()
+            .all()
+        )
         return AdminSalesTicketFilterOptionsView(
             branches=[
-                AdminSalesTicketFilterOptionView(id=str(row["id"]), label=type_cast(str, row["name"]))
+                AdminSalesTicketFilterOptionView(
+                    id=str(row["id"]), label=type_cast(str, row["name"])
+                )
                 for row in branches
             ],
             cashiers=[
-                AdminSalesTicketFilterOptionView(id=str(row["id"]), label=type_cast(str, row["full_name"]))
+                AdminSalesTicketFilterOptionView(
+                    id=str(row["id"]), label=type_cast(str, row["full_name"])
+                )
                 for row in cashiers
             ],
             payment_methods=[
@@ -457,22 +501,33 @@ class AdminSalesTicketService:
         *,
         sale_ids_statement: Select[tuple[uuid.UUID]],
     ) -> AdminSalesTicketMetricsView:
-        metrics_row = session.execute(
-            select(
-                func.count(Sale.id).label("ticket_count"),
-                func.coalesce(func.sum(Sale.total_amount), ZERO_MONEY).label("total_sales_amount"),
-                func.coalesce(func.avg(Sale.total_amount), ZERO_MONEY).label("average_ticket_amount"),
+        metrics_row = (
+            session.execute(
+                select(
+                    func.count(Sale.id).label("ticket_count"),
+                    func.coalesce(func.sum(Sale.total_amount), ZERO_MONEY).label(
+                        "total_sales_amount"
+                    ),
+                    func.coalesce(func.avg(Sale.total_amount), ZERO_MONEY).label(
+                        "average_ticket_amount"
+                    ),
+                ).where(Sale.id.in_(sale_ids_statement))
             )
-            .where(Sale.id.in_(sale_ids_statement))
-        ).mappings().one()
-        payment_rows = session.execute(
-            select(
-                SalePayment.payment_method_code,
-                func.coalesce(func.sum(SalePayment.applied_amount), ZERO_MONEY).label("amount"),
+            .mappings()
+            .one()
+        )
+        payment_rows = (
+            session.execute(
+                select(
+                    SalePayment.payment_method_code,
+                    func.coalesce(func.sum(SalePayment.applied_amount), ZERO_MONEY).label("amount"),
+                )
+                .where(SalePayment.sale_id.in_(sale_ids_statement))
+                .group_by(SalePayment.payment_method_code)
             )
-            .where(SalePayment.sale_id.in_(sale_ids_statement))
-            .group_by(SalePayment.payment_method_code)
-        ).mappings().all()
+            .mappings()
+            .all()
+        )
         payment_totals = {
             type_cast(str, row["payment_method_code"]): type_cast(Decimal, row["amount"])
             for row in payment_rows
@@ -501,17 +556,23 @@ class AdminSalesTicketService:
     ) -> dict[uuid.UUID, list[AdminSalesTicketPaymentSummaryView]]:
         if not sale_ids:
             return {}
-        rows = session.execute(
-            select(
-                SalePayment.sale_id,
-                SalePayment.payment_method_code,
-                SalePayment.currency_code,
-                func.coalesce(func.sum(SalePayment.applied_amount), ZERO_MONEY).label("amount"),
+        rows = (
+            session.execute(
+                select(
+                    SalePayment.sale_id,
+                    SalePayment.payment_method_code,
+                    SalePayment.currency_code,
+                    func.coalesce(func.sum(SalePayment.applied_amount), ZERO_MONEY).label("amount"),
+                )
+                .where(SalePayment.sale_id.in_(sale_ids))
+                .group_by(
+                    SalePayment.sale_id, SalePayment.payment_method_code, SalePayment.currency_code
+                )
+                .order_by(SalePayment.sale_id.asc(), SalePayment.payment_method_code.asc())
             )
-            .where(SalePayment.sale_id.in_(sale_ids))
-            .group_by(SalePayment.sale_id, SalePayment.payment_method_code, SalePayment.currency_code)
-            .order_by(SalePayment.sale_id.asc(), SalePayment.payment_method_code.asc())
-        ).mappings().all()
+            .mappings()
+            .all()
+        )
         result: dict[uuid.UUID, list[AdminSalesTicketPaymentSummaryView]] = {}
         for row in rows:
             result.setdefault(type_cast(uuid.UUID, row["sale_id"]), []).append(
@@ -529,16 +590,20 @@ class AdminSalesTicketService:
         *,
         ticket_id: uuid.UUID,
     ) -> list[AdminSalesTicketRelatedDocumentView]:
-        rows = session.execute(
-            select(
-                SaleReturn.id,
-                SaleReturn.status,
-                SaleReturn.total_refund_amount,
-                SaleReturn.created_at_utc,
+        rows = (
+            session.execute(
+                select(
+                    SaleReturn.id,
+                    SaleReturn.status,
+                    SaleReturn.total_refund_amount,
+                    SaleReturn.created_at_utc,
+                )
+                .where(SaleReturn.original_sale_id == ticket_id)
+                .order_by(SaleReturn.created_at_utc.desc())
             )
-            .where(SaleReturn.original_sale_id == ticket_id)
-            .order_by(SaleReturn.created_at_utc.desc())
-        ).mappings().all()
+            .mappings()
+            .all()
+        )
         return [
             AdminSalesTicketRelatedDocumentView(
                 id=type_cast(uuid.UUID, row["id"]),

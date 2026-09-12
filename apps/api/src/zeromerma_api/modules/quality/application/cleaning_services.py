@@ -1,9 +1,11 @@
 from __future__ import annotations
 
 import uuid
+from collections.abc import Callable, Iterable
 from dataclasses import dataclass
 from datetime import UTC, datetime
 
+from pydantic import TypeAdapter
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
@@ -35,6 +37,8 @@ from zeromerma_api.modules.quality.application.cleaning_schemas import (
     AdminCleaningTemplateItemView,
     AdminCleaningTemplateView,
     AdminCleaningWarningView,
+    CleaningLogStatus,
+    CleaningRiskLevel,
 )
 from zeromerma_api.modules.quality.domain.constants import (
     AUDIT_ACTION_CLEANING_LOG_CANCELLED,
@@ -101,6 +105,8 @@ from zeromerma_api.modules.quality.infrastructure.models import (
     CleaningTemplateItem,
 )
 
+_CLEANING_LOG_STATUS_ADAPTER: TypeAdapter[CleaningLogStatus] = TypeAdapter(CleaningLogStatus)
+_CLEANING_RISK_LEVEL_ADAPTER: TypeAdapter[CleaningRiskLevel] = TypeAdapter(CleaningRiskLevel)
 AREA_TYPE_LABELS = {
     CLEANING_AREA_TYPE_PRODUCTION: "Produccion",
     CLEANING_AREA_TYPE_COUNTER: "Mostrador / exhibicion",
@@ -578,10 +584,10 @@ class AdminCleaningLogService:
             id=row.log.id,
             responsible_user_id=row.responsible_user.id,
             responsible_user_name=row.responsible_user.full_name,
-            risk_level=row.log.risk_level,
+            risk_level=_CLEANING_RISK_LEVEL_ADAPTER.validate_python(row.log.risk_level),
             scheduled_at=row.log.scheduled_at,
             shift_code=row.log.shift_code,
-            status=row.log.status,
+            status=_CLEANING_LOG_STATUS_ADAPTER.validate_python(row.log.status),
             task_name=row.log.task_name,
             updated_at=row.log.updated_at,
             warning_state=self._warning_state(row),
@@ -629,11 +635,11 @@ class AdminCleaningLogService:
                 id=row.log.id,
                 responsible_user_id=row.responsible_user.id,
                 responsible_user_name=row.responsible_user.full_name,
-                risk_level=row.log.risk_level,
+                risk_level=_CLEANING_RISK_LEVEL_ADAPTER.validate_python(row.log.risk_level),
                 scheduled_at=row.log.scheduled_at,
                 shift_code=row.log.shift_code,
                 started_at=row.log.started_at,
-                status=row.log.status,
+                status=_CLEANING_LOG_STATUS_ADAPTER.validate_python(row.log.status),
                 task_name=row.log.task_name,
                 warning_state=self._warning_state(row),
             ),
@@ -646,7 +652,7 @@ class AdminCleaningLogService:
                 frequency=row.log.frequency,
                 method_summary=row.template.method_summary if row.template else None,
                 required_tools=row.template.required_tools if row.template else None,
-                risk_level=row.log.risk_level,
+                risk_level=_CLEANING_RISK_LEVEL_ADAPTER.validate_python(row.log.risk_level),
                 task_name=row.log.task_name,
                 task_template_id=row.template.id if row.template else None,
                 task_template_name=row.template.name if row.template else None,
@@ -770,7 +776,7 @@ class AdminCleaningLogService:
             name=template.name,
             requires_evidence=template.requires_evidence,
             required_tools=template.required_tools,
-            risk_level=template.risk_level,
+            risk_level=_CLEANING_RISK_LEVEL_ADAPTER.validate_python(template.risk_level),
         )
 
     def _resolve_checklist_inputs(
@@ -816,8 +822,8 @@ class AdminCleaningLogService:
             .scalars()
             .all()
         )
-        for item in existing:
-            session.delete(item)
+        for existing_item in existing:
+            session.delete(existing_item)
         session.flush()
 
         for index, item in enumerate(checklist_items, start=1):
@@ -1035,7 +1041,7 @@ class AdminCleaningLogService:
         self,
         rows: list[_CleaningRow],
         value: str | None,
-        getter,
+        getter: Callable[[_CleaningRow], str | None],
     ) -> list[_CleaningRow]:
         normalized = _normalize_optional(value)
         if not normalized or normalized == "all":
@@ -1046,7 +1052,7 @@ class AdminCleaningLogService:
         self,
         rows: list[_CleaningRow],
         value: str | None,
-        getter,
+        getter: Callable[[_CleaningRow], str],
     ) -> list[_CleaningRow]:
         normalized = _normalize_optional(value)
         if not normalized or normalized == "all":
@@ -1154,7 +1160,9 @@ def _has_text(value: str | None) -> bool:
     return bool(value and value.strip())
 
 
-def _dedupe_options(options) -> list[AdminCleaningFilterOptionView]:
+def _dedupe_options(
+    options: Iterable[AdminCleaningFilterOptionView],
+) -> list[AdminCleaningFilterOptionView]:
     result: dict[str, AdminCleaningFilterOptionView] = {}
     for option in options:
         if option.id not in result:

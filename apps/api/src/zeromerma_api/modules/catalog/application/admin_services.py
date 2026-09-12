@@ -12,6 +12,14 @@ from sqlalchemy.orm import Session
 from zeromerma_api.modules.audit.application.service import AuditRecorder
 from zeromerma_api.modules.branches.infrastructure.models import Branch, Brand
 from zeromerma_api.modules.catalog.application.admin_schemas import (
+    AdminPriceDetailView,
+    AdminPriceFilterOptionsView,
+    AdminPriceMetricsView,
+    AdminPriceRowView,
+    AdminPricesListResponse,
+    AdminPriceUpdateRequest,
+    AdminPriceWarningsView,
+    AdminProductAvailabilitySummaryView,
     AdminProductClassCreateRequest,
     AdminProductClassesListResponse,
     AdminProductClassFilterOptionsView,
@@ -21,6 +29,17 @@ from zeromerma_api.modules.catalog.application.admin_schemas import (
     AdminProductClassUpdateRequest,
     AdminProductClassView,
     AdminProductClassWarningsView,
+    AdminProductCreateRequest,
+    AdminProductFilterOptionsView,
+    AdminProductFilterOptionView,
+    AdminProductMetricsView,
+    AdminProductReadinessStatus,
+    AdminProductReadinessView,
+    AdminProductRelatedReadinessView,
+    AdminProductsListResponse,
+    AdminProductStatus,
+    AdminProductUpdateRequest,
+    AdminProductView,
     AdminRecipeCostDetailView,
     AdminRecipeCostFilterOptionsView,
     AdminRecipeCostMetricsView,
@@ -29,27 +48,9 @@ from zeromerma_api.modules.catalog.application.admin_schemas import (
     AdminRecipeCostWarningsView,
     AdminRecipeCreateRequest,
     AdminRecipeDuplicateRequest,
+    AdminRecipeInputCreateRequest,
     AdminRecipeInputView,
-    AdminRecipeState,
     AdminRecipeView,
-    AdminProductAvailabilitySummaryView,
-    AdminProductCreateRequest,
-    AdminProductFilterOptionView,
-    AdminProductFilterOptionsView,
-    AdminProductMetricsView,
-    AdminProductReadinessView,
-    AdminProductRelatedReadinessView,
-    AdminProductsListResponse,
-    AdminProductStatus,
-    AdminProductUpdateRequest,
-    AdminProductView,
-    AdminPriceDetailView,
-    AdminPriceFilterOptionsView,
-    AdminPriceMetricsView,
-    AdminPriceRowView,
-    AdminPricesListResponse,
-    AdminPriceUpdateRequest,
-    AdminPriceWarningsView,
 )
 from zeromerma_api.modules.catalog.domain.constants import (
     CATALOG_CAPTURE_MODE_CLASS_CAPTURE,
@@ -63,7 +64,12 @@ from zeromerma_api.modules.catalog.domain.exceptions import (
     ProductNotFoundError,
     RecipeNotFoundError,
 )
-from zeromerma_api.modules.catalog.infrastructure.models import Product, ProductClass, Recipe, RecipeInput
+from zeromerma_api.modules.catalog.infrastructure.models import (
+    Product,
+    ProductClass,
+    Recipe,
+    RecipeInput,
+)
 from zeromerma_api.modules.identity.application.schemas import AuthenticatedUser
 from zeromerma_api.modules.outbox.application.service import OutboxWriter
 
@@ -314,7 +320,9 @@ class AdminProductCatalogService:
             session.commit()
         except IntegrityError as error:
             session.rollback()
-            raise AdminProductValidationError("Product update violates catalog integrity.") from error
+            raise AdminProductValidationError(
+                "Product update violates catalog integrity."
+            ) from error
 
         return self.get_product_detail(session, product_id=product.id)
 
@@ -333,7 +341,9 @@ class AdminProductCatalogService:
             .select_from(Product)
             .join(ProductClass, ProductClass.id == Product.product_class_id)
             .join(Brand, Brand.id == ProductClass.brand_id)
-            .order_by(ProductClass.display_order.asc(), Product.display_order.asc(), Product.name.asc())
+            .order_by(
+                ProductClass.display_order.asc(), Product.display_order.asc(), Product.name.asc()
+            )
         )
         normalized_status = _normalize_optional(status_filter)
         if normalized_status == "active":
@@ -357,7 +367,9 @@ class AdminProductCatalogService:
                 CATALOG_CAPTURE_MODE_PRODUCT_DIRECT,
             ):
                 raise AdminProductValidationError("Unsupported capture mode filter.")
-            statement = statement.where(ProductClass.capture_mode_default == normalized_capture_mode)
+            statement = statement.where(
+                ProductClass.capture_mode_default == normalized_capture_mode
+            )
 
         normalized_search = _normalize_optional(search)
         if normalized_search:
@@ -440,9 +452,7 @@ class AdminProductCatalogService:
         )
         if brand_id is not None:
             class_statement = class_statement.where(ProductClass.brand_id == brand_id)
-        classes = session.execute(
-            class_statement
-        ).all()
+        classes = session.execute(class_statement).all()
         return AdminProductFilterOptionsView(
             branches=[
                 AdminProductFilterOptionView(id=branch_id, label=f"{branch_name} - {brand_name}")
@@ -521,7 +531,9 @@ class AdminProductCatalogService:
 
     def _next_display_order(self, session: Session, product_class_id: uuid.UUID) -> int:
         max_order = session.execute(
-            select(func.max(Product.display_order)).where(Product.product_class_id == product_class_id)
+            select(func.max(Product.display_order)).where(
+                Product.product_class_id == product_class_id
+            )
         ).scalar_one()
         return int(max_order or 0) + 10
 
@@ -757,7 +769,9 @@ class AdminProductClassCatalogService:
             session.commit()
         except IntegrityError as error:
             session.rollback()
-            raise AdminProductValidationError("Product class update violates catalog integrity.") from error
+            raise AdminProductValidationError(
+                "Product class update violates catalog integrity."
+            ) from error
 
         return self.get_class_detail(session, class_id=product_class.id)
 
@@ -820,7 +834,9 @@ class AdminProductClassCatalogService:
                 CATALOG_CAPTURE_MODE_PRODUCT_DIRECT,
             ):
                 raise AdminProductValidationError("Unsupported capture mode filter.")
-            statement = statement.where(ProductClass.capture_mode_default == normalized_capture_mode)
+            statement = statement.where(
+                ProductClass.capture_mode_default == normalized_capture_mode
+            )
 
         normalized_search = _normalize_optional(search)
         if normalized_search:
@@ -860,7 +876,9 @@ class AdminProductClassCatalogService:
     ) -> AdminProductClassView:
         product_class = row.product_class
         warnings = _build_class_warnings(row)
-        linked_products = self._list_class_products(session, product_class.id, limit=12 if include_products else 5)
+        linked_products = self._list_class_products(
+            session, product_class.id, limit=12 if include_products else 5
+        )
         readiness: AdminProductReadinessStatus = "ready"
         if "class_capture_missing_price" in warnings.codes:
             readiness = "incomplete"
@@ -915,15 +933,21 @@ class AdminProductClassCatalogService:
             for product in rows
         ]
 
-    def _build_class_metrics(self, items: list[AdminProductClassView]) -> AdminProductClassMetricsView:
+    def _build_class_metrics(
+        self, items: list[AdminProductClassView]
+    ) -> AdminProductClassMetricsView:
         return AdminProductClassMetricsView(
             total_classes=len(items),
             active_classes=sum(1 for item in items if item.status == "active"),
             class_capture=sum(
-                1 for item in items if item.capture_mode_default == CATALOG_CAPTURE_MODE_CLASS_CAPTURE
+                1
+                for item in items
+                if item.capture_mode_default == CATALOG_CAPTURE_MODE_CLASS_CAPTURE
             ),
             product_direct=sum(
-                1 for item in items if item.capture_mode_default == CATALOG_CAPTURE_MODE_PRODUCT_DIRECT
+                1
+                for item in items
+                if item.capture_mode_default == CATALOG_CAPTURE_MODE_PRODUCT_DIRECT
             ),
             without_products=sum(1 for item in items if item.product_count == 0),
             with_warnings=sum(1 for item in items if item.warnings.codes),
@@ -982,7 +1006,10 @@ class AdminProductClassCatalogService:
             raise AdminProductValidationError(
                 "CLASS_CAPTURE product classes require a class capture unit price."
             )
-        if capture_mode == CATALOG_CAPTURE_MODE_PRODUCT_DIRECT and class_capture_unit_price is not None:
+        if (
+            capture_mode == CATALOG_CAPTURE_MODE_PRODUCT_DIRECT
+            and class_capture_unit_price is not None
+        ):
             raise AdminProductValidationError(
                 "PRODUCT_DIRECT product classes cannot define a class capture unit price."
             )
@@ -1129,7 +1156,10 @@ class AdminPriceCatalogService:
         normalized_entity_type = _normalize_optional(entity_type)
         if normalized_entity_type == "product":
             product_row = self._get_price_product_row(session, entity_id)
-            if product_row.product_class.capture_mode_default != CATALOG_CAPTURE_MODE_PRODUCT_DIRECT:
+            if (
+                product_row.product_class.capture_mode_default
+                != CATALOG_CAPTURE_MODE_PRODUCT_DIRECT
+            ):
                 raise AdminProductValidationError(
                     "Only PRODUCT_DIRECT products can own product-level prices."
                 )
@@ -1335,7 +1365,9 @@ class AdminPriceCatalogService:
             delta = price - product.standard_cost
             if price != Decimal("0"):
                 margin_percent = (delta / price) * Decimal("100")
-        warnings = self._build_product_price_warnings(row, delta=delta, margin_percent=margin_percent)
+        warnings = self._build_product_price_warnings(
+            row, delta=delta, margin_percent=margin_percent
+        )
         health = self._resolve_price_health(price=price, warnings=warnings)
         return AdminPriceRowView(
             entity_id=product.id,
@@ -1399,17 +1431,32 @@ class AdminPriceCatalogService:
     ) -> AdminPriceWarningsView:
         warnings: list[tuple[str, str]] = []
         if row.product.unit_price <= Decimal("0"):
-            warnings.append(("missing_or_zero_price", "El producto directo no tiene precio comercial valido."))
+            warnings.append(
+                ("missing_or_zero_price", "El producto directo no tiene precio comercial valido.")
+            )
         if row.product.standard_cost is None:
-            warnings.append(("missing_standard_cost", "No hay costo estandar para comparar margen."))
+            warnings.append(
+                ("missing_standard_cost", "No hay costo estandar para comparar margen.")
+            )
         if delta is not None and delta < Decimal("0"):
-            warnings.append(("price_below_standard_cost", "El precio esta por debajo del costo estandar."))
+            warnings.append(
+                ("price_below_standard_cost", "El precio esta por debajo del costo estandar.")
+            )
         elif margin_percent is not None and margin_percent < LOW_MARGIN_WARNING_THRESHOLD:
-            warnings.append(("low_margin", "El margen estimado esta por debajo del umbral operativo."))
+            warnings.append(
+                ("low_margin", "El margen estimado esta por debajo del umbral operativo.")
+            )
         if self._product_price_status(row) == "inactive" and row.product.unit_price > Decimal("0"):
-            warnings.append(("inactive_entity_has_price", "La entidad no esta activa/vendible y conserva precio."))
+            warnings.append(
+                (
+                    "inactive_entity_has_price",
+                    "La entidad no esta activa/vendible y conserva precio.",
+                )
+            )
         if not row.product_class.is_active or not row.product_class.is_sellable:
-            warnings.append(("source_class_not_sellable", "La clase fuente no esta lista para venta."))
+            warnings.append(
+                ("source_class_not_sellable", "La clase fuente no esta lista para venta.")
+            )
 
         return AdminPriceWarningsView(
             codes=[code for code, _ in warnings],
@@ -1418,13 +1465,23 @@ class AdminPriceCatalogService:
 
     def _build_class_price_warnings(self, row: _PriceClassRow) -> AdminPriceWarningsView:
         warnings: list[tuple[str, str]] = []
-        if row.product_class.class_capture_unit_price is None or row.product_class.class_capture_unit_price <= Decimal("0"):
-            warnings.append(("missing_or_zero_price", "La clase CLASS_CAPTURE no tiene precio comercial valido."))
+        if (
+            row.product_class.class_capture_unit_price is None
+            or row.product_class.class_capture_unit_price <= Decimal("0")
+        ):
+            warnings.append(
+                (
+                    "missing_or_zero_price",
+                    "La clase CLASS_CAPTURE no tiene precio comercial valido.",
+                )
+            )
         if self._class_price_status(row.product_class) == "inactive" and (
             row.product_class.class_capture_unit_price is not None
             and row.product_class.class_capture_unit_price > Decimal("0")
         ):
-            warnings.append(("inactive_entity_has_price", "La clase no esta activa/vendible y conserva precio."))
+            warnings.append(
+                ("inactive_entity_has_price", "La clase no esta activa/vendible y conserva precio.")
+            )
         if row.product_count == 0:
             warnings.append(("class_without_products", "La clase no tiene productos asociados."))
 
@@ -1534,7 +1591,9 @@ class AdminPriceCatalogService:
             raise ProductNotFoundError("Product price entity was not found.")
         product, product_class, brand = row
         if product.product_kind != CATALOG_PRODUCT_KIND_FINISHED_GOOD:
-            raise AdminProductValidationError("Only finished goods can be commercial price entities.")
+            raise AdminProductValidationError(
+                "Only finished goods can be commercial price entities."
+            )
         return _PriceProductRow(product=product, product_class=product_class, brand=brand)
 
     def _get_price_class_row(self, session: Session, class_id: uuid.UUID) -> _PriceClassRow:
@@ -1761,7 +1820,9 @@ class AdminRecipeCostCatalogService:
             session.commit()
         except IntegrityError as error:
             session.rollback()
-            raise AdminProductValidationError("Recipe duplicate violates catalog integrity.") from error
+            raise AdminProductValidationError(
+                "Recipe duplicate violates catalog integrity."
+            ) from error
 
         return self.get_product_recipe_detail(session, product_id=new_recipe.product_id)
 
@@ -1777,7 +1838,9 @@ class AdminRecipeCostCatalogService:
         product = self._get_product(session, recipe.product_id)
         recipe_view = self._to_recipe_view(session, recipe)
         if recipe_view.calculated_unit_cost is None:
-            raise AdminProductValidationError("Recipe cost cannot be calculated while inputs miss standard cost.")
+            raise AdminProductValidationError(
+                "Recipe cost cannot be calculated while inputs miss standard cost."
+            )
 
         previous_cost = product.standard_cost
         product.standard_cost = recipe_view.calculated_unit_cost
@@ -1832,7 +1895,9 @@ class AdminRecipeCostCatalogService:
             .join(Brand, Brand.id == ProductClass.brand_id)
             .outerjoin(Recipe, and_(Recipe.product_id == Product.id, Recipe.is_active.is_(True)))
             .where(Product.product_kind == CATALOG_PRODUCT_KIND_FINISHED_GOOD)
-            .order_by(ProductClass.display_order.asc(), Product.display_order.asc(), Product.name.asc())
+            .order_by(
+                ProductClass.display_order.asc(), Product.display_order.asc(), Product.name.asc()
+            )
         )
         if brand_id is not None:
             statement = statement.where(ProductClass.brand_id == brand_id)
@@ -1860,7 +1925,9 @@ class AdminRecipeCostCatalogService:
                 active_recipe=recipe,
                 recipe_count=int(recipe_count_value or 0),
             )
-            for product, product_class, brand, recipe, recipe_count_value in session.execute(statement).all()
+            for product, product_class, brand, recipe, recipe_count_value in session.execute(
+                statement
+            ).all()
         ]
 
     def _to_recipe_cost_summary(
@@ -1868,7 +1935,9 @@ class AdminRecipeCostCatalogService:
         session: Session,
         row: _RecipeCostRow,
     ) -> AdminRecipeCostProductSummaryView:
-        recipe_view = self._to_recipe_view(session, row.active_recipe) if row.active_recipe else None
+        recipe_view = (
+            self._to_recipe_view(session, row.active_recipe) if row.active_recipe else None
+        )
         warnings = self._build_recipe_warnings(row, recipe_view)
         calculated_unit_cost = recipe_view.calculated_unit_cost if recipe_view else None
         cost_variance = None
@@ -1900,7 +1969,9 @@ class AdminRecipeCostCatalogService:
             product_unit_price=row.product.unit_price,
             currency_code=row.product.currency_code,
             active_recipe_id=row.active_recipe.id if row.active_recipe else None,
-            active_recipe_version_name=row.active_recipe.version_name if row.active_recipe else None,
+            active_recipe_version_name=row.active_recipe.version_name
+            if row.active_recipe
+            else None,
             active_recipe_updated_at=row.active_recipe.updated_at if row.active_recipe else None,
             recipe_input_count=recipe_view.input_count if recipe_view else 0,
             yield_qty=recipe_view.yield_qty if recipe_view else None,
@@ -1911,7 +1982,9 @@ class AdminRecipeCostCatalogService:
             cost_variance_percent=cost_variance_percent,
             health_status=health_status,  # type: ignore[arg-type]
             warnings=warnings,
-            updated_at=row.active_recipe.updated_at if row.active_recipe else row.product.updated_at,
+            updated_at=row.active_recipe.updated_at
+            if row.active_recipe
+            else row.product.updated_at,
         )
 
     def _build_recipe_warnings(
@@ -1923,7 +1996,9 @@ class AdminRecipeCostCatalogService:
         if row.active_recipe is None:
             warnings.append(("no_active_recipe", "El producto no tiene receta activa."))
         if row.product.standard_cost is None:
-            warnings.append(("missing_product_standard_cost", "El producto no tiene costo estandar."))
+            warnings.append(
+                ("missing_product_standard_cost", "El producto no tiene costo estandar.")
+            )
         if row.product.is_active and not row.product.is_sellable:
             warnings.append(("product_not_sellable", "El producto esta activo pero no vendible."))
         if recipe_view is not None:
@@ -1941,7 +2016,9 @@ class AdminRecipeCostCatalogService:
                     / row.product.standard_cost
                 ) * Decimal("100")
                 if variance_percent > COST_VARIANCE_WARNING_THRESHOLD:
-                    warnings.append(("high_cost_variance", "El costo calculado difiere del costo estandar."))
+                    warnings.append(
+                        ("high_cost_variance", "El costo calculado difiere del costo estandar.")
+                    )
             for recipe_input in recipe_view.inputs:
                 if recipe_input.status != "active":
                     warnings.append(("inactive_raw_material", "La receta usa insumos inactivos."))
@@ -1965,6 +2042,7 @@ class AdminRecipeCostCatalogService:
             if recipe_input.extended_cost is None:
                 total_batch_cost = None
                 break
+            assert total_batch_cost is not None
             total_batch_cost += recipe_input.extended_cost
         calculated_unit_cost = None
         if total_batch_cost is not None:
@@ -2005,7 +2083,9 @@ class AdminRecipeCostCatalogService:
             status=_product_status(input_product),
         )
 
-    def _list_recipe_versions(self, session: Session, product_id: uuid.UUID) -> list[AdminRecipeView]:
+    def _list_recipe_versions(
+        self, session: Session, product_id: uuid.UUID
+    ) -> list[AdminRecipeView]:
         recipes = session.execute(
             select(Recipe)
             .where(Recipe.product_id == product_id)
@@ -2024,7 +2104,9 @@ class AdminRecipeCostCatalogService:
                 .join(Product, Product.id == RecipeInput.input_product_id)
                 .where(RecipeInput.recipe_id == recipe_id)
                 .order_by(RecipeInput.display_order.asc(), Product.name.asc())
-            ).all()
+            )
+            .tuples()
+            .all()
         )
 
     def _build_recipe_cost_metrics(
@@ -2057,7 +2139,10 @@ class AdminRecipeCostCatalogService:
             class_statement = class_statement.where(ProductClass.brand_id == brand_id)
         raw_materials = session.execute(
             select(Product.id, Product.name)
-            .where(Product.product_kind == CATALOG_PRODUCT_KIND_RAW_MATERIAL, Product.is_active.is_(True))
+            .where(
+                Product.product_kind == CATALOG_PRODUCT_KIND_RAW_MATERIAL,
+                Product.is_active.is_(True),
+            )
             .order_by(Product.name.asc())
         ).all()
         return AdminRecipeCostFilterOptionsView(
@@ -2083,7 +2168,9 @@ class AdminRecipeCostCatalogService:
         return row
 
     def _get_product(self, session: Session, product_id: uuid.UUID) -> Product:
-        product = session.execute(select(Product).where(Product.id == product_id)).scalar_one_or_none()
+        product = session.execute(
+            select(Product).where(Product.id == product_id)
+        ).scalar_one_or_none()
         if product is None:
             raise ProductNotFoundError("Product was not found.")
         return product
@@ -2103,11 +2190,11 @@ class AdminRecipeCostCatalogService:
     def _validate_recipe_inputs(
         self,
         session: Session,
-        inputs: list[object],
+        inputs: list[AdminRecipeInputCreateRequest],
     ) -> None:
         if not inputs:
             raise AdminProductValidationError("Recipe requires at least one input.")
-        input_ids = [input_command.input_product_id for input_command in inputs]  # type: ignore[attr-defined]
+        input_ids = [input_command.input_product_id for input_command in inputs]
         if len(input_ids) != len(set(input_ids)):
             raise AdminProductValidationError("Recipe cannot contain duplicate input products.")
         products = session.execute(select(Product).where(Product.id.in_(input_ids))).scalars().all()
@@ -2167,7 +2254,9 @@ class AdminRecipeCostCatalogService:
             "is_active": recipe.is_active,
             "input_count": recipe_view.input_count,
             "total_batch_cost": (
-                str(recipe_view.total_batch_cost) if recipe_view.total_batch_cost is not None else None
+                str(recipe_view.total_batch_cost)
+                if recipe_view.total_batch_cost is not None
+                else None
             ),
             "calculated_unit_cost": (
                 str(recipe_view.calculated_unit_cost)
@@ -2191,13 +2280,22 @@ def _build_class_warnings(row: _ProductClassRow) -> AdminProductClassWarningsVie
         and product_class.class_capture_unit_price is None
     ):
         warnings.append(("class_capture_missing_price", "CLASS_CAPTURE requiere precio de clase."))
-    if product_class.capture_mode_default == CATALOG_CAPTURE_MODE_PRODUCT_DIRECT and row.product_count == 0:
-        warnings.append(("product_direct_without_products", "PRODUCT_DIRECT no tiene productos asociados."))
+    if (
+        product_class.capture_mode_default == CATALOG_CAPTURE_MODE_PRODUCT_DIRECT
+        and row.product_count == 0
+    ):
+        warnings.append(
+            ("product_direct_without_products", "PRODUCT_DIRECT no tiene productos asociados.")
+        )
     if product_class.is_active and not product_class.is_sellable:
         warnings.append(("active_not_sellable", "La clase esta activa pero no vendible."))
     if not product_class.is_active and row.active_product_count > 0:
-        warnings.append(("inactive_with_active_products", "La clase inactiva conserva productos activos."))
-    if not _normalize_optional(product_class.quick_name) and not _normalize_optional(product_class.search_aliases):
+        warnings.append(
+            ("inactive_with_active_products", "La clase inactiva conserva productos activos.")
+        )
+    if not _normalize_optional(product_class.quick_name) and not _normalize_optional(
+        product_class.search_aliases
+    ):
         warnings.append(("weak_search_metadata", "Faltan nombre corto o alias de busqueda."))
 
     return AdminProductClassWarningsView(
@@ -2223,7 +2321,9 @@ def _build_readiness(product: Product, product_class: ProductClass) -> AdminProd
     if product_class.capture_mode_default == CATALOG_CAPTURE_MODE_CLASS_CAPTURE:
         if product_class.class_capture_unit_price is None:
             missing_requirements.append("class_capture_price")
-        price_readiness = "ready" if product_class.class_capture_unit_price is not None else "incomplete"
+        price_readiness = (
+            "ready" if product_class.class_capture_unit_price is not None else "incomplete"
+        )
     else:
         price_readiness = "ready" if product.unit_price >= Decimal("0") else "incomplete"
 

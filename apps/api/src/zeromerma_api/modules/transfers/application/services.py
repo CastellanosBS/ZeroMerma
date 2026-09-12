@@ -98,60 +98,69 @@ class TransferQueryService:
         source_branch = Branch.__table__.alias("source_branch")
         destination_branch = Branch.__table__.alias("destination_branch")
 
-        records = session.execute(
-            select(
-                OperationDocument.id,
-                OperationDocument.source_branch_id,
-                source_branch.c.code.label("source_branch_code"),
-                source_branch.c.name.label("source_branch_name"),
-                OperationDocument.destination_branch_id,
-                destination_branch.c.code.label("destination_branch_code"),
-                destination_branch.c.name.label("destination_branch_name"),
-                OperationDocument.workstation_id,
-                Workstation.code.label("workstation_code"),
-                Workstation.name.label("workstation_name"),
-                OperationDocument.status,
-                OperationDocument.created_at_utc,
-                OperationDocument.committed_at_utc,
-                func.count(OperationDocumentLine.id).label("line_count"),
-                func.coalesce(func.sum(OperationDocumentLine.quantity), 0).label("total_quantity"),
+        records = (
+            session.execute(
+                select(
+                    OperationDocument.id,
+                    OperationDocument.source_branch_id,
+                    source_branch.c.code.label("source_branch_code"),
+                    source_branch.c.name.label("source_branch_name"),
+                    OperationDocument.destination_branch_id,
+                    destination_branch.c.code.label("destination_branch_code"),
+                    destination_branch.c.name.label("destination_branch_name"),
+                    OperationDocument.workstation_id,
+                    Workstation.code.label("workstation_code"),
+                    Workstation.name.label("workstation_name"),
+                    OperationDocument.status,
+                    OperationDocument.created_at_utc,
+                    OperationDocument.committed_at_utc,
+                    func.count(OperationDocumentLine.id).label("line_count"),
+                    func.coalesce(func.sum(OperationDocumentLine.quantity), 0).label(
+                        "total_quantity"
+                    ),
+                )
+                .select_from(OperationDocument)
+                .join(source_branch, source_branch.c.id == OperationDocument.source_branch_id)
+                .join(
+                    destination_branch,
+                    destination_branch.c.id == OperationDocument.destination_branch_id,
+                )
+                .join(Workstation, Workstation.id == OperationDocument.workstation_id)
+                .join(
+                    OperationDocumentLine,
+                    OperationDocumentLine.operation_document_id == OperationDocument.id,
+                )
+                .where(
+                    OperationDocument.document_type
+                    == OPERATION_DOCUMENT_TYPE_BRANCH_TRANSFER_SHIPMENT,
+                    OperationDocument.destination_branch_id == context.branch_id,
+                    OperationDocument.status == OPERATION_DOCUMENT_STATUS_IN_TRANSIT,
+                )
+                .group_by(
+                    OperationDocument.id,
+                    OperationDocument.source_branch_id,
+                    source_branch.c.code,
+                    source_branch.c.name,
+                    OperationDocument.destination_branch_id,
+                    destination_branch.c.code,
+                    destination_branch.c.name,
+                    OperationDocument.workstation_id,
+                    Workstation.code,
+                    Workstation.name,
+                    OperationDocument.status,
+                    OperationDocument.created_at_utc,
+                    OperationDocument.committed_at_utc,
+                )
+                .order_by(
+                    OperationDocument.committed_at_utc.asc(),
+                    OperationDocument.created_at_utc.asc(),
+                    OperationDocument.id.asc(),
+                )
+                .limit(MAX_TRANSFER_HISTORY_ITEMS)
             )
-            .select_from(OperationDocument)
-            .join(source_branch, source_branch.c.id == OperationDocument.source_branch_id)
-            .join(
-                destination_branch,
-                destination_branch.c.id == OperationDocument.destination_branch_id,
-            )
-            .join(Workstation, Workstation.id == OperationDocument.workstation_id)
-            .join(
-                OperationDocumentLine,
-                OperationDocumentLine.operation_document_id == OperationDocument.id,
-            )
-            .where(
-                OperationDocument.document_type == OPERATION_DOCUMENT_TYPE_BRANCH_TRANSFER_SHIPMENT,
-                OperationDocument.destination_branch_id == context.branch_id,
-                OperationDocument.status == OPERATION_DOCUMENT_STATUS_IN_TRANSIT,
-            )
-            .group_by(
-                OperationDocument.id,
-                OperationDocument.source_branch_id,
-                source_branch.c.code,
-                source_branch.c.name,
-                OperationDocument.destination_branch_id,
-                destination_branch.c.code,
-                destination_branch.c.name,
-                OperationDocument.workstation_id,
-                Workstation.code,
-                Workstation.name,
-                OperationDocument.status,
-                OperationDocument.created_at_utc,
-                OperationDocument.committed_at_utc,
-            )
-            .order_by(
-                OperationDocument.committed_at_utc.asc(),
-                OperationDocument.created_at_utc.asc(),
-            )
-        ).mappings().all()
+            .mappings()
+            .all()
+        )
 
         return PendingInboundTransfersResponse(
             workstation_code=workstation_code,
@@ -307,22 +316,30 @@ class TransferQueryService:
             ),
         )
 
-        available_user_rows = session.execute(
-            base_statement.with_only_columns(
-                OperationDocument.created_by_user_id,
-                User.full_name.label("created_by_user_full_name"),
+        available_user_rows = (
+            session.execute(
+                base_statement.with_only_columns(
+                    OperationDocument.created_by_user_id,
+                    User.full_name.label("created_by_user_full_name"),
+                )
+                .distinct()
+                .order_by(User.full_name.asc())
             )
-            .distinct()
-            .order_by(User.full_name.asc())
-        ).mappings().all()
-        available_destination_rows = session.execute(
-            base_statement.with_only_columns(
-                OperationDocument.destination_branch_id,
-                destination_branch.name.label("destination_branch_name"),
+            .mappings()
+            .all()
+        )
+        available_destination_rows = (
+            session.execute(
+                base_statement.with_only_columns(
+                    OperationDocument.destination_branch_id,
+                    destination_branch.name.label("destination_branch_name"),
+                )
+                .distinct()
+                .order_by(destination_branch.name.asc())
             )
-            .distinct()
-            .order_by(destination_branch.name.asc())
-        ).mappings().all()
+            .mappings()
+            .all()
+        )
 
         filtered_statement = base_statement
         if created_by_user_id is not None:
@@ -334,14 +351,17 @@ class TransferQueryService:
                 OperationDocument.destination_branch_id == destination_branch_id
             )
 
-        record_rows = session.execute(
-            filtered_statement
-            .order_by(
-                OperationDocument.committed_at_utc.desc().nullslast(),
-                OperationDocument.created_at_utc.desc(),
+        record_rows = (
+            session.execute(
+                filtered_statement.order_by(
+                    OperationDocument.committed_at_utc.desc().nullslast(),
+                    OperationDocument.created_at_utc.desc(),
+                    OperationDocument.id.desc(),
+                ).limit(MAX_TRANSFER_HISTORY_ITEMS)
             )
-            .limit(MAX_TRANSFER_HISTORY_ITEMS)
-        ).mappings().all()
+            .mappings()
+            .all()
+        )
 
         return TransferDispatchHistoryResponse(
             workstation_code=workstation_code,
@@ -418,9 +438,7 @@ class TransferQueryService:
         )
         normalized_scope = _validate_transfer_history_scope(scope)
         normalized_status = (
-            status.strip().upper()
-            if status is not None and status.strip()
-            else None
+            status.strip().upper() if status is not None and status.strip() else None
         )
         destination_branch = aliased(Branch)
 
@@ -496,27 +514,39 @@ class TransferQueryService:
             ),
         )
 
-        available_user_rows = session.execute(
-            base_statement.with_only_columns(
-                OperationDocument.created_by_user_id,
-                User.full_name.label("created_by_user_full_name"),
+        available_user_rows = (
+            session.execute(
+                base_statement.with_only_columns(
+                    OperationDocument.created_by_user_id,
+                    User.full_name.label("created_by_user_full_name"),
+                )
+                .distinct()
+                .order_by(User.full_name.asc())
             )
-            .distinct()
-            .order_by(User.full_name.asc())
-        ).mappings().all()
-        available_source_rows = session.execute(
-            base_statement.with_only_columns(
-                OperationDocument.source_branch_id,
-                Branch.name.label("source_branch_name"),
+            .mappings()
+            .all()
+        )
+        available_source_rows = (
+            session.execute(
+                base_statement.with_only_columns(
+                    OperationDocument.source_branch_id,
+                    Branch.name.label("source_branch_name"),
+                )
+                .distinct()
+                .order_by(Branch.name.asc())
             )
-            .distinct()
-            .order_by(Branch.name.asc())
-        ).mappings().all()
-        available_status_rows = session.execute(
-            base_statement.with_only_columns(OperationDocument.status)
-            .distinct()
-            .order_by(OperationDocument.status.asc())
-        ).scalars().all()
+            .mappings()
+            .all()
+        )
+        available_status_rows = (
+            session.execute(
+                base_statement.with_only_columns(OperationDocument.status)
+                .distinct()
+                .order_by(OperationDocument.status.asc())
+            )
+            .scalars()
+            .all()
+        )
 
         filtered_statement = base_statement
         if created_by_user_id is not None:
@@ -532,14 +562,17 @@ class TransferQueryService:
                 OperationDocument.status == normalized_status
             )
 
-        record_rows = session.execute(
-            filtered_statement
-            .order_by(
-                OperationDocument.committed_at_utc.desc().nullslast(),
-                OperationDocument.created_at_utc.desc(),
+        record_rows = (
+            session.execute(
+                filtered_statement.order_by(
+                    OperationDocument.committed_at_utc.desc().nullslast(),
+                    OperationDocument.created_at_utc.desc(),
+                    OperationDocument.id.desc(),
+                ).limit(MAX_TRANSFER_HISTORY_ITEMS)
             )
-            .limit(MAX_TRANSFER_HISTORY_ITEMS)
-        ).mappings().all()
+            .mappings()
+            .all()
+        )
 
         return TransferReceiptHistoryResponse(
             workstation_code=workstation_code,
@@ -632,9 +665,7 @@ class TransferCommandService:
             workstation_code=command.workstation_code,
         )
         if command.destination_branch_id == context.branch_id:
-            raise TransferValidationError(
-                "Destination branch must differ from the current branch."
-            )
+            raise TransferValidationError("Destination branch must differ from the current branch.")
 
         destination_branch = session.execute(
             select(Branch).where(
@@ -806,11 +837,15 @@ class TransferCommandService:
         if existing_receipt is not None:
             raise TransferAlreadyReceivedError("Transfer shipment is no longer pending receipt.")
 
-        shipment_lines = session.execute(
-            select(OperationDocumentLine)
-            .where(OperationDocumentLine.operation_document_id == shipment.id)
-            .order_by(OperationDocumentLine.line_number.asc())
-        ).scalars().all()
+        shipment_lines = (
+            session.execute(
+                select(OperationDocumentLine)
+                .where(OperationDocumentLine.operation_document_id == shipment.id)
+                .order_by(OperationDocumentLine.line_number.asc())
+            )
+            .scalars()
+            .all()
+        )
         if len(shipment_lines) == 0:
             raise OperationDocumentNotFoundError("Transfer shipment has no lines.")
 
@@ -846,12 +881,9 @@ class TransferCommandService:
                     raise TransferValidationError(
                         "Transfer receipt expected quantities must match the pending shipment."
                     )
-                if (
-                    receipt_line.received_quantity != shipment_line.quantity
-                    and (
-                        receipt_line.variance_reason is None
-                        or receipt_line.variance_reason.strip() == ""
-                    )
+                if receipt_line.received_quantity != shipment_line.quantity and (
+                    receipt_line.variance_reason is None
+                    or receipt_line.variance_reason.strip() == ""
                 ):
                     raise TransferValidationError(
                         "Variance reason is required when the received quantity "
@@ -1030,9 +1062,7 @@ def _build_transfer_document_summary(
         quantity_summary=TransferQuantitySummaryView(
             line_count=len(document.lines),
             expected_total_quantity=expected_total_quantity,
-            received_total_quantity=(
-                received_total_quantity if has_received_quantities else None
-            ),
+            received_total_quantity=(received_total_quantity if has_received_quantities else None),
             has_variance=variance_line_count > 0,
             variance_line_count=variance_line_count,
         ),
@@ -1040,11 +1070,7 @@ def _build_transfer_document_summary(
 
 
 def _build_transfer_folio(document_type: str, document_id: uuid.UUID) -> str:
-    prefix = (
-        "ENV"
-        if document_type == OPERATION_DOCUMENT_TYPE_BRANCH_TRANSFER_SHIPMENT
-        else "REC"
-    )
+    prefix = "ENV" if document_type == OPERATION_DOCUMENT_TYPE_BRANCH_TRANSFER_SHIPMENT else "REC"
     return f"{prefix}-{str(document_id).split('-', maxsplit=1)[0].upper()}"
 
 

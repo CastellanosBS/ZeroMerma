@@ -300,7 +300,7 @@ def test_class_capture_return_requires_exact_product_and_blocks_over_return(
         },
     )
     assert missing_product_response.status_code == 400
-    assert "producto exacto" in missing_product_response.json()["detail"]
+    assert "producto exacto" in missing_product_response.json()["message"]
 
     valid_response = client.post(
         "/v1/returns/commit",
@@ -341,7 +341,7 @@ def test_class_capture_return_requires_exact_product_and_blocks_over_return(
         },
     )
     assert over_return_response.status_code == 400
-    assert "supera" in over_return_response.json()["detail"]
+    assert "supera" in over_return_response.json()["message"]
 
 
 def test_class_capture_line_allows_returning_only_remaining_quantity(
@@ -429,7 +429,7 @@ def test_return_requires_reason_and_valid_refund_method(client: TestClient) -> N
         },
     )
     assert missing_reason_response.status_code == 400
-    assert "motivo" in missing_reason_response.json()["detail"].lower()
+    assert "motivo" in missing_reason_response.json()["message"].lower()
 
     invalid_refund_method_response = client.post(
         "/v1/returns/commit",
@@ -449,7 +449,7 @@ def test_return_requires_reason_and_valid_refund_method(client: TestClient) -> N
         },
     )
     assert invalid_refund_method_response.status_code == 400
-    assert "tarjeta" in invalid_refund_method_response.json()["detail"].lower()
+    assert "tarjeta" in invalid_refund_method_response.json()["message"].lower()
 
 
 def test_old_sale_return_requires_acknowledgement_and_prepares_backoffice_review(
@@ -489,7 +489,7 @@ def test_old_sale_return_requires_acknowledgement_and_prepares_backoffice_review
         },
     )
     assert blocked_response.status_code == 400
-    assert "alto riesgo" in blocked_response.json()["detail"].lower()
+    assert "alto riesgo" in blocked_response.json()["message"].lower()
 
     allowed_response = client.post(
         "/v1/returns/commit",

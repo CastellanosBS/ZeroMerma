@@ -1,6 +1,8 @@
-import type { components } from "@zeromerma/api-client";
+import { ApiError, requestApiJson, type components } from "@zeromerma/api-client";
 
 import { appEnv } from "../env";
+
+export { ApiError };
 
 export type HealthResponse = components["schemas"]["HealthResponse"];
 export type AuthenticatedUser = components["schemas"]["AuthenticatedUser"];
@@ -14,96 +16,23 @@ interface RequestJsonOptions {
   path: string;
 }
 
-interface ValidationErrorDetail {
-  msg?: string;
-}
-
-function isValidationErrorDetailArray(value: unknown): value is ValidationErrorDetail[] {
-  return Array.isArray(value);
-}
-
-function extractApiErrorMessage(payload: unknown, fallback: string): string {
-  if (!payload || typeof payload !== "object") {
-    return fallback;
-  }
-
-  const detail = (payload as { detail?: unknown }).detail;
-
-  if (typeof detail === "string" && detail.trim().length > 0) {
-    return detail;
-  }
-
-  if (isValidationErrorDetailArray(detail)) {
-    const message = detail.find((item) => typeof item.msg === "string" && item.msg.length > 0)?.msg;
-    if (message) {
-      return message;
-    }
-  }
-
-  return fallback;
-}
-
-export class ApiError extends Error {
-  readonly responseBody: unknown;
-  readonly statusCode: number;
-
-  constructor(statusCode: number, message: string, responseBody: unknown) {
-    super(message);
-    this.name = "ApiError";
-    this.statusCode = statusCode;
-    this.responseBody = responseBody;
-  }
-}
-
 export async function requestJson<TResponse>({
   accessToken,
   body,
   method = "GET",
   path,
 }: RequestJsonOptions): Promise<TResponse> {
-  const headers = new Headers();
-
-  if (accessToken) {
-    headers.set("Authorization", `Bearer ${accessToken}`);
-  }
-
-  if (body !== undefined) {
-    headers.set("Content-Type", "application/json");
-  }
-
-  const response = await fetch(`${appEnv.VITE_API_BASE_URL}${path}`, {
+  return requestApiJson<TResponse>({
+    accessToken,
+    baseUrl: appEnv.VITE_API_BASE_URL,
+    body,
     method,
-    headers,
-    body: body === undefined ? undefined : JSON.stringify(body),
+    path,
   });
-
-  if (!response.ok) {
-    let responseBody: unknown = null;
-
-    try {
-      responseBody = await response.json();
-    } catch {
-      responseBody = null;
-    }
-
-    throw new ApiError(
-      response.status,
-      extractApiErrorMessage(responseBody, `${method} ${path} failed.`),
-      responseBody,
-    );
-  }
-
-  return (await response.json()) as TResponse;
 }
 
 export async function fetchApiHealth(): Promise<HealthResponse> {
-  const response = await fetch(`${appEnv.VITE_API_BASE_URL}/health`);
-
-  if (!response.ok) {
-    throw new Error("API health check failed.");
-  }
-
-  return (await response.json()) as HealthResponse;
+  return requestJson<HealthResponse>({ path: "/health" });
 }
 
 export function loginBackofficeUser(payload: LoginRequest): Promise<LoginResponse> {

@@ -269,7 +269,7 @@ def test_cash_close_commit_blocks_unresolved_class_capture_mismatch(
     )
 
     assert response.status_code == 400
-    assert "ventas por clase" in response.json()["detail"]
+    assert "ventas por clase" in response.json()["message"]
 
 
 def test_cash_close_commit_with_empty_counter_registers_zero_bread_count(
@@ -373,7 +373,7 @@ def test_cash_close_empty_counter_still_requires_money_count(
     )
 
     assert response.status_code == 400
-    assert "conteo monetario" in response.json()["detail"]
+    assert "conteo monetario" in response.json()["message"]
 
 
 def test_cash_close_commit_with_manual_override_and_auto_discrepancy_resolution(

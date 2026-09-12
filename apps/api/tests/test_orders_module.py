@@ -466,7 +466,7 @@ def test_order_delivery_rejects_mixed_settlement_without_cash_and_card_breakdown
     )
     assert deliver_response.status_code == 400
     assert (
-        deliver_response.json()["detail"]
+        deliver_response.json()["message"]
         == "El cobro mixto de la liquidacion final requiere efectivo y tarjeta."
     )
 
@@ -494,7 +494,7 @@ def test_order_creation_rejects_removed_other_payment_method(client: TestClient)
     )
 
     assert response.status_code == 400
-    assert response.json()["detail"] == "Selecciona un metodo de pago valido."
+    assert response.json()["message"] == "Selecciona un metodo de pago valido."
 
 
 def test_order_creation_rejects_mixed_advance_without_cash_and_card_breakdown(
@@ -523,7 +523,7 @@ def test_order_creation_rejects_mixed_advance_without_cash_and_card_breakdown(
     )
 
     assert response.status_code == 400
-    assert response.json()["detail"] == "El cobro mixto del anticipo requiere efectivo y tarjeta."
+    assert response.json()["message"] == "El cobro mixto del anticipo requiere efectivo y tarjeta."
 
 
 def test_cancel_refunds_advance_when_order_is_canceled_before_cutoff(client: TestClient) -> None:
@@ -560,11 +560,15 @@ def test_cancel_refunds_advance_when_order_is_canceled_before_cutoff(client: Tes
     assert Decimal(str(canceled_payload["remaining_balance_amount"])) == Decimal("0.00")
 
     with SessionLocal() as session:
-        payment_records = session.execute(
-            select(CustomerOrderPayment)
-            .where(CustomerOrderPayment.customer_order_id == refundable_order["id"])
-            .order_by(CustomerOrderPayment.sequence)
-        ).scalars().all()
+        payment_records = (
+            session.execute(
+                select(CustomerOrderPayment)
+                .where(CustomerOrderPayment.customer_order_id == refundable_order["id"])
+                .order_by(CustomerOrderPayment.sequence)
+            )
+            .scalars()
+            .all()
+        )
         audit_record = session.execute(
             select(AuditLog).where(
                 AuditLog.action == "order.canceled",
@@ -620,11 +624,15 @@ def test_cancel_keeps_advance_when_order_is_canceled_after_cutoff(client: TestCl
     assert canceled_payload["cancellation_reason"] == "Cancelacion fuera de plazo."
 
     with SessionLocal() as session:
-        payment_records = session.execute(
-            select(CustomerOrderPayment)
-            .where(CustomerOrderPayment.customer_order_id == late_cancel_order["id"])
-            .order_by(CustomerOrderPayment.sequence)
-        ).scalars().all()
+        payment_records = (
+            session.execute(
+                select(CustomerOrderPayment)
+                .where(CustomerOrderPayment.customer_order_id == late_cancel_order["id"])
+                .order_by(CustomerOrderPayment.sequence)
+            )
+            .scalars()
+            .all()
+        )
 
     assert [(record.payment_type, Decimal(str(record.amount))) for record in payment_records] == [
         ("ADVANCE", Decimal("5.00"))
@@ -680,7 +688,7 @@ def test_cancel_rules_still_block_delivered_orders_and_allow_safe_cancel(
         },
     )
     assert delivered_cancel_response.status_code == 409
-    assert "ya fue entregado" in delivered_cancel_response.json()["detail"]
+    assert "ya fue entregado" in delivered_cancel_response.json()["message"]
 
     with SessionLocal() as session:
         audit_record = session.execute(
@@ -723,4 +731,4 @@ def test_cancel_requires_reason_and_rejects_invalid_date_range_filter(client: Te
         headers=_authorization_header(client),
     )
     assert invalid_date_response.status_code == 400
-    assert "fecha inicial" in invalid_date_response.json()["detail"]
+    assert "fecha inicial" in invalid_date_response.json()["message"]

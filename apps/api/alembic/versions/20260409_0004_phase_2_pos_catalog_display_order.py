@@ -7,8 +7,8 @@ Create Date: 2026-04-09 00:15:00.000000
 
 from collections.abc import Sequence
 
-from alembic import op
 import sqlalchemy as sa
+from alembic import op
 
 revision: str = "0004_phase_2_pos_catalog_order"
 down_revision: str | None = "0003_phase_2a_pos_sales"

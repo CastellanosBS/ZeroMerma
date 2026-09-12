@@ -149,8 +149,7 @@ def test_admin_products_search_capture_mode_class_and_pagination_filters(
     assert brand_payload["items"]
     assert all(item["brand_id"] == el_mejor_pan_brand_id for item in brand_payload["items"])
     assert all(
-        "El Mejor Pan" in option["label"]
-        for option in brand_payload["filter_options"]["branches"]
+        "El Mejor Pan" in option["label"] for option in brand_payload["filter_options"]["branches"]
     )
 
     merenna_brand_id = _get_brand_id(SEED_BRAND_MERENNA_CODE)
@@ -233,7 +232,7 @@ def test_admin_product_create_rejects_duplicate_code(client: TestClient) -> None
     )
 
     assert response.status_code == 409
-    assert "unique" in response.json()["detail"].lower()
+    assert "unique" in response.json()["message"].lower()
 
 
 def test_admin_product_patch_updates_supported_fields(client: TestClient) -> None:
@@ -274,4 +273,4 @@ def test_admin_product_availability_reports_pending_schema(client: TestClient) -
     )
 
     assert response.status_code == 501
-    assert "availability schema" in response.json()["detail"]
+    assert "availability schema" in response.json()["message"]

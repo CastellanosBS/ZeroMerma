@@ -3,6 +3,7 @@ from __future__ import annotations
 import uuid
 from dataclasses import dataclass
 
+from pydantic import TypeAdapter
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
@@ -38,6 +39,7 @@ from zeromerma_api.modules.suppliers.application.admin_schemas import (
     AdminSupplierProductAssociationView,
     AdminSupplierProductRequest,
     AdminSupplierRelatedDocumentView,
+    AdminSupplierStatus,
     AdminSupplierStatusRequest,
     AdminSupplierUpdateRequest,
     AdminSupplierWarningSeverity,
@@ -82,6 +84,7 @@ from zeromerma_api.modules.suppliers.infrastructure.models import (
     SupplierProduct,
 )
 
+_ADMIN_SUPPLIER_STATUS_ADAPTER: TypeAdapter[AdminSupplierStatus] = TypeAdapter(AdminSupplierStatus)
 PRODUCT_KIND_LABELS = {
     CATALOG_PRODUCT_KIND_FINISHED_GOOD: "Producto terminado",
     CATALOG_PRODUCT_KIND_RAW_MATERIAL: "Materia prima",
@@ -530,21 +533,32 @@ class AdminSupplierService:
             .scalars()
             .all()
         )
-        products = session.execute(
-            select(SupplierProduct, Product, ProductClass)
-            .join(Product, Product.id == SupplierProduct.product_id)
-            .join(ProductClass, ProductClass.id == Product.product_class_id)
-            .where(SupplierProduct.supplier_id == supplier.id)
-            .order_by(Product.name.asc(), Product.code.asc()),
-        ).all()
-        branches = session.execute(
-            select(SupplierBranch, Branch)
-            .join(Branch, Branch.id == SupplierBranch.branch_id)
-            .where(SupplierBranch.supplier_id == supplier.id)
-            .order_by(Branch.name.asc(), Branch.code.asc()),
-        ).all()
+        products = (
+            session.execute(
+                select(SupplierProduct, Product, ProductClass)
+                .join(Product, Product.id == SupplierProduct.product_id)
+                .join(ProductClass, ProductClass.id == Product.product_class_id)
+                .where(SupplierProduct.supplier_id == supplier.id)
+                .order_by(Product.name.asc(), Product.code.asc()),
+            )
+            .tuples()
+            .all()
+        )
+        branches = (
+            session.execute(
+                select(SupplierBranch, Branch)
+                .join(Branch, Branch.id == SupplierBranch.branch_id)
+                .where(SupplierBranch.supplier_id == supplier.id)
+                .order_by(Branch.name.asc(), Branch.code.asc()),
+            )
+            .tuples()
+            .all()
+        )
         return _SupplierRow(
-            branches=branches, contacts=contacts, products=products, supplier=supplier
+            branches=list(branches),
+            contacts=list(contacts),
+            products=list(products),
+            supplier=supplier,
         )
 
     def _to_list_item(self, row: _SupplierRow) -> AdminSupplierListItemView:
@@ -561,7 +575,7 @@ class AdminSupplierService:
             primary_contact_name=primary_contact.name if primary_contact else None,
             primary_contact_phone=primary_contact.phone if primary_contact else None,
             product_count=sum(1 for relation, _, _ in row.products if relation.is_active),
-            status=row.supplier.status,
+            status=_ADMIN_SUPPLIER_STATUS_ADAPTER.validate_python(row.supplier.status),
             tax_id=row.supplier.tax_id,
             terms_summary=self._terms_summary(row.supplier),
             updated_at=row.supplier.updated_at,
@@ -625,7 +639,7 @@ class AdminSupplierService:
                 id=row.supplier.id,
                 legal_name=row.supplier.legal_name,
                 readiness_state=self._warning_state(warnings),
-                status=row.supplier.status,
+                status=_ADMIN_SUPPLIER_STATUS_ADAPTER.validate_python(row.supplier.status),
                 tax_id=row.supplier.tax_id,
                 updated_at=row.supplier.updated_at,
             ),

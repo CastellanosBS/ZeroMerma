@@ -41,9 +41,17 @@ def upgrade() -> None:
         sa.Column("notes", sa.Text(), nullable=True),
         sa.Column("created_at", sa.DateTime(timezone=True), nullable=False),
         sa.Column("updated_at", sa.DateTime(timezone=True), nullable=False),
-        sa.CheckConstraint("actual_output_qty IS NULL OR actual_output_qty >= 0", name="ck_production_batches_actual_output_non_negative"),
-        sa.CheckConstraint("planned_output_qty > 0", name="ck_production_batches_planned_output_positive"),
-        sa.CheckConstraint("status IN ('DRAFT', 'IN_PROGRESS', 'COMPLETED', 'CANCELLED')", name="ck_production_batches_status_valid"),
+        sa.CheckConstraint(
+            "actual_output_qty IS NULL OR actual_output_qty >= 0",
+            name="ck_production_batches_actual_output_non_negative",
+        ),
+        sa.CheckConstraint(
+            "planned_output_qty > 0", name="ck_production_batches_planned_output_positive"
+        ),
+        sa.CheckConstraint(
+            "status IN ('DRAFT', 'IN_PROGRESS', 'COMPLETED', 'CANCELLED')",
+            name="ck_production_batches_status_valid",
+        ),
         sa.ForeignKeyConstraint(["branch_id"], ["branches.id"], ondelete="RESTRICT"),
         sa.ForeignKeyConstraint(["cancelled_by_user_id"], ["users.id"], ondelete="SET NULL"),
         sa.ForeignKeyConstraint(["completed_by_user_id"], ["users.id"], ondelete="SET NULL"),
@@ -68,15 +76,31 @@ def upgrade() -> None:
         sa.Column("display_order", sa.Integer(), nullable=False),
         sa.Column("created_at", sa.DateTime(timezone=True), nullable=False),
         sa.Column("updated_at", sa.DateTime(timezone=True), nullable=False),
-        sa.CheckConstraint("consumed_qty IS NULL OR consumed_qty >= 0", name="ck_production_batch_inputs_consumed_qty_non_negative"),
-        sa.CheckConstraint("required_qty > 0", name="ck_production_batch_inputs_required_qty_positive"),
-        sa.CheckConstraint("status IN ('available', 'insufficient', 'unavailable')", name="ck_production_batch_inputs_status_valid"),
+        sa.CheckConstraint(
+            "consumed_qty IS NULL OR consumed_qty >= 0",
+            name="ck_production_batch_inputs_consumed_qty_non_negative",
+        ),
+        sa.CheckConstraint(
+            "required_qty > 0", name="ck_production_batch_inputs_required_qty_positive"
+        ),
+        sa.CheckConstraint(
+            "status IN ('available', 'insufficient', 'unavailable')",
+            name="ck_production_batch_inputs_status_valid",
+        ),
         sa.ForeignKeyConstraint(["input_product_id"], ["products.id"], ondelete="RESTRICT"),
-        sa.ForeignKeyConstraint(["production_batch_id"], ["production_batches.id"], ondelete="CASCADE"),
+        sa.ForeignKeyConstraint(
+            ["production_batch_id"], ["production_batches.id"], ondelete="CASCADE"
+        ),
         sa.PrimaryKeyConstraint("id"),
-        sa.UniqueConstraint("production_batch_id", "input_product_id", name="uq_production_batch_inputs_batch_product"),
+        sa.UniqueConstraint(
+            "production_batch_id",
+            "input_product_id",
+            name="uq_production_batch_inputs_batch_product",
+        ),
     )
-    op.drop_constraint(op.f("ck_inventory_movements_type_valid"), "inventory_movements", type_="check")
+    op.drop_constraint(
+        op.f("ck_inventory_movements_type_valid"), "inventory_movements", type_="check"
+    )
     op.create_check_constraint(
         op.f("ck_inventory_movements_type_valid"),
         "inventory_movements",
@@ -92,7 +116,9 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
-    op.drop_constraint(op.f("ck_inventory_movements_type_valid"), "inventory_movements", type_="check")
+    op.drop_constraint(
+        op.f("ck_inventory_movements_type_valid"), "inventory_movements", type_="check"
+    )
     op.create_check_constraint(
         op.f("ck_inventory_movements_type_valid"),
         "inventory_movements",

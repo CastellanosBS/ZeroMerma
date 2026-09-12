@@ -67,7 +67,9 @@ def upgrade() -> None:
     )
     op.alter_column("branches", "brand_id", nullable=False)
 
-    op.add_column("product_classes", sa.Column("brand_id", postgresql.UUID(as_uuid=True), nullable=True))
+    op.add_column(
+        "product_classes", sa.Column("brand_id", postgresql.UUID(as_uuid=True), nullable=True)
+    )
     op.create_foreign_key(
         op.f("fk_product_classes_brand_id_brands"),
         "product_classes",
@@ -76,7 +78,9 @@ def upgrade() -> None:
         ["id"],
         ondelete="RESTRICT",
     )
-    op.create_index(op.f("ix_product_classes_brand_id"), "product_classes", ["brand_id"], unique=False)
+    op.create_index(
+        op.f("ix_product_classes_brand_id"), "product_classes", ["brand_id"], unique=False
+    )
     op.execute(
         sa.text("UPDATE product_classes SET brand_id = CAST(:brand_id AS uuid)").bindparams(
             brand_id=EL_MEJOR_PAN_BRAND_ID

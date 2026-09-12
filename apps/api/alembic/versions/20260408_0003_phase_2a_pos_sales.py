@@ -7,8 +7,8 @@ Create Date: 2026-04-08 01:30:00.000000
 
 from collections.abc import Sequence
 
-from alembic import op
 import sqlalchemy as sa
+from alembic import op
 from sqlalchemy.dialects import postgresql
 
 revision: str = "0003_phase_2a_pos_sales"
@@ -27,7 +27,9 @@ def upgrade() -> None:
         sa.Column("search_aliases", sa.Text(), nullable=True),
         sa.Column("capture_mode_default", sa.String(length=32), nullable=False),
         sa.Column("class_capture_unit_price", sa.Numeric(precision=12, scale=2), nullable=True),
-        sa.Column("currency_code", sa.String(length=3), nullable=False, server_default=sa.text("'MXN'")),
+        sa.Column(
+            "currency_code", sa.String(length=3), nullable=False, server_default=sa.text("'MXN'")
+        ),
         sa.Column("is_active", sa.Boolean(), nullable=False, server_default=sa.true()),
         sa.Column("is_sellable", sa.Boolean(), nullable=False, server_default=sa.true()),
         sa.Column("created_at", sa.DateTime(timezone=True), nullable=False),
@@ -67,7 +69,9 @@ def upgrade() -> None:
         sa.Column("quick_name", sa.String(length=80), nullable=True),
         sa.Column("search_aliases", sa.Text(), nullable=True),
         sa.Column("unit_price", sa.Numeric(precision=12, scale=2), nullable=False),
-        sa.Column("currency_code", sa.String(length=3), nullable=False, server_default=sa.text("'MXN'")),
+        sa.Column(
+            "currency_code", sa.String(length=3), nullable=False, server_default=sa.text("'MXN'")
+        ),
         sa.Column("is_active", sa.Boolean(), nullable=False, server_default=sa.true()),
         sa.Column("is_sellable", sa.Boolean(), nullable=False, server_default=sa.true()),
         sa.Column("created_at", sa.DateTime(timezone=True), nullable=False),
@@ -92,7 +96,9 @@ def upgrade() -> None:
         sa.Column("cash_session_id", postgresql.UUID(as_uuid=True), nullable=False),
         sa.Column("operator_id", postgresql.UUID(as_uuid=True), nullable=False),
         sa.Column("status", sa.String(length=20), nullable=False),
-        sa.Column("currency_code", sa.String(length=3), nullable=False, server_default=sa.text("'MXN'")),
+        sa.Column(
+            "currency_code", sa.String(length=3), nullable=False, server_default=sa.text("'MXN'")
+        ),
         sa.Column("subtotal_amount", sa.Numeric(precision=12, scale=2), nullable=False),
         sa.Column("total_amount", sa.Numeric(precision=12, scale=2), nullable=False),
         sa.Column("paid_amount", sa.Numeric(precision=12, scale=2), nullable=False),
@@ -109,7 +115,9 @@ def upgrade() -> None:
         sa.ForeignKeyConstraint(["workstation_id"], ["workstations.id"], ondelete="RESTRICT"),
         sa.PrimaryKeyConstraint("id", name=op.f("pk_sales")),
     )
-    op.create_index("ix_sales_branch_confirmed_at", "sales", ["branch_id", "confirmed_at"], unique=False)
+    op.create_index(
+        "ix_sales_branch_confirmed_at", "sales", ["branch_id", "confirmed_at"], unique=False
+    )
     op.create_index("ix_sales_cash_session_id", "sales", ["cash_session_id"], unique=False)
     op.create_index("ix_sales_workstation_id", "sales", ["workstation_id"], unique=False)
 
@@ -143,9 +151,11 @@ def upgrade() -> None:
         ),
         sa.CheckConstraint(
             "("
-            "(capture_mode = 'CLASS_CAPTURE' AND product_class_id IS NOT NULL AND product_id IS NULL)"
+            "(capture_mode = 'CLASS_CAPTURE' AND product_class_id IS NOT NULL "
+            "AND product_id IS NULL)"
             " OR "
-            "(capture_mode = 'PRODUCT_DIRECT' AND product_class_id IS NULL AND product_id IS NOT NULL)"
+            "(capture_mode = 'PRODUCT_DIRECT' AND product_class_id IS NULL "
+            "AND product_id IS NOT NULL)"
             ")",
             name="ck_sale_lines_reference_shape",
         ),
@@ -166,7 +176,9 @@ def upgrade() -> None:
         sa.Column("tendered_amount", sa.Numeric(precision=12, scale=2), nullable=False),
         sa.Column("applied_amount", sa.Numeric(precision=12, scale=2), nullable=False),
         sa.Column("change_amount", sa.Numeric(precision=12, scale=2), nullable=False),
-        sa.Column("currency_code", sa.String(length=3), nullable=False, server_default=sa.text("'MXN'")),
+        sa.Column(
+            "currency_code", sa.String(length=3), nullable=False, server_default=sa.text("'MXN'")
+        ),
         sa.Column("received_at", sa.DateTime(timezone=True), nullable=False),
         sa.CheckConstraint(
             "tendered_amount >= 0",
@@ -176,7 +188,9 @@ def upgrade() -> None:
             "applied_amount >= 0",
             name="ck_sale_payments_applied_amount_non_negative",
         ),
-        sa.CheckConstraint("change_amount >= 0", name="ck_sale_payments_change_amount_non_negative"),
+        sa.CheckConstraint(
+            "change_amount >= 0", name="ck_sale_payments_change_amount_non_negative"
+        ),
         sa.ForeignKeyConstraint(["sale_id"], ["sales.id"], ondelete="CASCADE"),
         sa.PrimaryKeyConstraint("id", name=op.f("pk_sale_payments")),
         sa.UniqueConstraint("sale_id", "sequence", name="uq_sale_payments_sale_sequence"),
@@ -195,7 +209,9 @@ def upgrade() -> None:
         sa.Column("direction", sa.String(length=10), nullable=False),
         sa.Column("payment_method_code", sa.String(length=40), nullable=False),
         sa.Column("amount", sa.Numeric(precision=12, scale=2), nullable=False),
-        sa.Column("currency_code", sa.String(length=3), nullable=False, server_default=sa.text("'MXN'")),
+        sa.Column(
+            "currency_code", sa.String(length=3), nullable=False, server_default=sa.text("'MXN'")
+        ),
         sa.Column("occurred_at", sa.DateTime(timezone=True), nullable=False),
         sa.CheckConstraint("direction IN ('IN', 'OUT')", name="ck_cash_movements_direction_valid"),
         sa.CheckConstraint("amount >= 0", name="ck_cash_movements_amount_non_negative"),
@@ -236,4 +252,3 @@ def downgrade() -> None:
 
     op.drop_index("ix_product_classes_pos_lookup", table_name="product_classes")
     op.drop_table("product_classes")
-

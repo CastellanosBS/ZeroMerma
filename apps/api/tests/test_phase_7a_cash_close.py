@@ -236,7 +236,7 @@ def test_cash_close_preview_rejects_duplicate_payment_methods(client: TestClient
 
     assert response.status_code == 400
     assert (
-        response.json()["detail"]
+        response.json()["message"]
         == "No se puede repetir un metodo de pago en el conteo del cierre."
     )
 

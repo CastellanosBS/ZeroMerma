@@ -21,6 +21,11 @@ BASELINE_COMMIT = "35b403c3cd85770b479c581e1e7e7acdd0d20bcf"
 MATRIX_PATH = Path("docs/architecture/FUNCTIONAL_OPERATION_MATRIX.json")
 PLAN_PATH = Path("docs/PLAN_MAESTRO_FINALIZACION_ZERO_MERMA.md")
 DECISIONS_PATH = Path("docs/DECISIONES_ZERO_MERMA.md")
+NON_FUNCTIONAL_VALIDATION_TOOLS = {
+    "scripts/dev/api-contracts.py",
+    "scripts/dev/run-web-integration.ps1",
+    "scripts/dev/seed-web-integration.py",
+}
 
 IMPLEMENTATION_STATES = {
     "IMPLEMENTED_VERIFIED",
@@ -429,6 +434,8 @@ def extract_internal_operations(root: Path) -> dict[str, dict[str, Any]]:
         if "/tests/" in f"/{relative}" or path.name.startswith("test_"):
             continue
         if relative.startswith("scripts/powershell/"):
+            continue
+        if relative in NON_FUNCTIONAL_VALIDATION_TOOLS:
             continue
         module = path.relative_to(root).with_suffix("").as_posix().replace("/", ".")
         key = f"INTERNAL:{module}:command"

@@ -5,7 +5,8 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 from decimal import Decimal
 
-from sqlalchemy import delete, exists, func, or_, select
+from pydantic import TypeAdapter
+from sqlalchemy import delete, exists, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, aliased
 
@@ -22,7 +23,10 @@ from zeromerma_api.modules.inventory.domain.constants import (
     INVENTORY_MOVEMENT_TYPE_TRANSFER_DISPATCH,
     INVENTORY_MOVEMENT_TYPE_TRANSFER_RECEIPT,
 )
-from zeromerma_api.modules.inventory.infrastructure.models import InventoryBalance, InventoryMovement
+from zeromerma_api.modules.inventory.infrastructure.models import (
+    InventoryBalance,
+    InventoryMovement,
+)
 from zeromerma_api.modules.operations.domain.constants import (
     OPERATION_BUCKET_BACKROOM,
     OPERATION_BUCKET_IN_TRANSIT,
@@ -36,7 +40,10 @@ from zeromerma_api.modules.operations.domain.constants import (
     OUTBOX_EVENT_TRANSFER_DISPATCHED_V1,
     OUTBOX_EVENT_TRANSFER_RECEIVED_V1,
 )
-from zeromerma_api.modules.operations.infrastructure.models import OperationDocument, OperationDocumentLine
+from zeromerma_api.modules.operations.infrastructure.models import (
+    OperationDocument,
+    OperationDocumentLine,
+)
 from zeromerma_api.modules.outbox.application.service import OutboxWriter
 from zeromerma_api.modules.transfers.application.admin_schemas import (
     AdminTransferAvailableActionsView,
@@ -45,8 +52,8 @@ from zeromerma_api.modules.transfers.application.admin_schemas import (
     AdminTransferCreateRequest,
     AdminTransferDetailView,
     AdminTransferDispatchRequest,
-    AdminTransferFilterOptionView,
     AdminTransferFilterOptionsView,
+    AdminTransferFilterOptionView,
     AdminTransferInventoryImpactView,
     AdminTransferInventoryMovementView,
     AdminTransferLineInput,
@@ -55,9 +62,11 @@ from zeromerma_api.modules.transfers.application.admin_schemas import (
     AdminTransferListResponse,
     AdminTransferMetricsView,
     AdminTransferOverviewView,
+    AdminTransferReceiptLineInput,
     AdminTransferReceiptView,
     AdminTransferReceiveRequest,
     AdminTransferRelatedDocumentView,
+    AdminTransferStatus,
     AdminTransferUpdateRequest,
     AdminTransferWarningSeverity,
     AdminTransferWarningView,
@@ -68,6 +77,7 @@ from zeromerma_api.modules.transfers.domain.exceptions import (
     TransferValidationError,
 )
 
+_ADMIN_TRANSFER_STATUS_ADAPTER: TypeAdapter[AdminTransferStatus] = TypeAdapter(AdminTransferStatus)
 ADMIN_TRANSFER_CREATED_EVENT = "admin.transfer.created.v1"
 ADMIN_TRANSFER_CANCELLED_EVENT = "admin.transfer.cancelled.v1"
 ADMIN_TRANSFER_RESOURCE_TYPE = "operation_document"
@@ -199,7 +209,9 @@ class AdminTransferService:
         try:
             session.add(shipment)
             session.flush()
-            self._replace_lines(session, shipment=shipment, lines=command.lines, resolved_products=resolved_products)
+            self._replace_lines(
+                session, shipment=shipment, lines=command.lines, resolved_products=resolved_products
+            )
             self._record_change(
                 session,
                 current_user=current_user,
@@ -234,18 +246,20 @@ class AdminTransferService:
         if shipment.status != OPERATION_DOCUMENT_STATUS_DRAFT:
             raise TransferValidationError("Only draft transfers can be edited.")
 
-        origin_branch = self._get_branch(session, command.origin_branch_id or shipment.source_branch_id)
-        if shipment.destination_branch_id is None and command.destination_branch_id is None:
-            raise TransferValidationError("Destination branch is required.")
-        destination_branch = self._get_branch(
-            session,
-            command.destination_branch_id or shipment.destination_branch_id,
+        origin_branch = self._get_branch(
+            session, command.origin_branch_id or shipment.source_branch_id
         )
+        destination_branch_id = command.destination_branch_id or shipment.destination_branch_id
+        if destination_branch_id is None:
+            raise TransferValidationError("Destination branch is required.")
+        destination_branch = self._get_branch(session, destination_branch_id)
         self._validate_transfer_branches(origin_branch, destination_branch, for_dispatch=False)
 
         shipment.source_branch_id = origin_branch.id
         shipment.destination_branch_id = destination_branch.id
-        shipment.workstation_id = self._get_active_workstation_for_branch(session, origin_branch.id).id
+        shipment.workstation_id = self._get_active_workstation_for_branch(
+            session, origin_branch.id
+        ).id
         if "notes" in command.model_fields_set:
             shipment.notes = command.notes
 
@@ -300,7 +314,9 @@ class AdminTransferService:
         if not shipment_lines:
             raise TransferValidationError("Transfer must contain at least one line.")
 
-        self._validate_origin_stock(session, shipment_lines=shipment_lines, origin_branch_id=origin_branch.id)
+        self._validate_origin_stock(
+            session, shipment_lines=shipment_lines, origin_branch_id=origin_branch.id
+        )
         committed_at = datetime.now(tz=UTC)
         shipment.status = OPERATION_DOCUMENT_STATUS_IN_TRANSIT
         shipment.committed_at_utc = committed_at
@@ -361,13 +377,19 @@ class AdminTransferService:
 
         receipt_by_line_id = {line.shipment_line_id: line for line in command.lines}
         if {line.id for line in shipment_lines} != set(receipt_by_line_id):
-            raise TransferValidationError("Transfer receipt lines must match the pending shipment lines exactly.")
+            raise TransferValidationError(
+                "Transfer receipt lines must match the pending shipment lines exactly."
+            )
 
         for shipment_line in shipment_lines:
             receipt_line = receipt_by_line_id[shipment_line.id]
-            if receipt_line.received_quantity != shipment_line.quantity and not receipt_line.variance_reason:
+            if (
+                receipt_line.received_quantity != shipment_line.quantity
+                and not receipt_line.variance_reason
+            ):
                 raise TransferValidationError(
-                    "Variance reason is required when the received quantity differs from the shipment."
+                    "Variance reason is required when the received quantity "
+                    "differs from the shipment."
                 )
 
         destination_branch = self._get_branch(session, shipment.destination_branch_id)
@@ -466,7 +488,11 @@ class AdminTransferService:
         shipment.status = OPERATION_DOCUMENT_STATUS_CANCELLED
         shipment.committed_at_utc = datetime.now(tz=UTC)
         if command.reason:
-            shipment.notes = command.reason if not shipment.notes else f"{shipment.notes}\nCancel: {command.reason}"
+            shipment.notes = (
+                command.reason
+                if not shipment.notes
+                else f"{shipment.notes}\nCancel: {command.reason}"
+            )
 
         self._record_change(
             session,
@@ -510,16 +536,23 @@ class AdminTransferService:
             )
             .select_from(OperationDocument)
             .join(origin_branch, origin_branch.id == OperationDocument.source_branch_id)
-            .join(destination_branch, destination_branch.id == OperationDocument.destination_branch_id)
+            .join(
+                destination_branch, destination_branch.id == OperationDocument.destination_branch_id
+            )
             .join(Workstation, Workstation.id == OperationDocument.workstation_id)
             .join(User, User.id == OperationDocument.created_by_user_id)
             .outerjoin(
                 receipt_document,
                 (receipt_document.reference_document_id == OperationDocument.id)
-                & (receipt_document.document_type == OPERATION_DOCUMENT_TYPE_BRANCH_TRANSFER_RECEIPT),
+                & (
+                    receipt_document.document_type
+                    == OPERATION_DOCUMENT_TYPE_BRANCH_TRANSFER_RECEIPT
+                ),
             )
             .outerjoin(receipt_user, receipt_user.id == receipt_document.created_by_user_id)
-            .where(OperationDocument.document_type == OPERATION_DOCUMENT_TYPE_BRANCH_TRANSFER_SHIPMENT)
+            .where(
+                OperationDocument.document_type == OPERATION_DOCUMENT_TYPE_BRANCH_TRANSFER_SHIPMENT
+            )
         )
 
         if date_from is not None:
@@ -563,23 +596,38 @@ class AdminTransferService:
                 shipment=shipment,
                 workstation=workstation,
             )
-            for shipment, origin, destination, workstation, created_by_user, receipt, receipt_user_record in rows
+            for (
+                shipment,
+                origin,
+                destination,
+                workstation,
+                created_by_user,
+                receipt,
+                receipt_user_record,
+            ) in rows
         ]
 
     def _get_row(self, session: Session, transfer_id: uuid.UUID) -> _AdminTransferRow:
-        return next(
-            (row for row in self._fetch_rows(
-                session,
-                date_from=None,
-                date_to=None,
-                destination_branch_id=None,
-                operator_user_id=None,
-                origin_branch_id=None,
-                product_id=None,
-                status_filter=None,
-            ) if row.shipment.id == transfer_id),
-            None,
-        ) or self._raise_not_found()
+        return (
+            next(
+                (
+                    row
+                    for row in self._fetch_rows(
+                        session,
+                        date_from=None,
+                        date_to=None,
+                        destination_branch_id=None,
+                        operator_user_id=None,
+                        origin_branch_id=None,
+                        product_id=None,
+                        status_filter=None,
+                    )
+                    if row.shipment.id == transfer_id
+                ),
+                None,
+            )
+            or self._raise_not_found()
+        )
 
     def _raise_not_found(self) -> _AdminTransferRow:
         raise TransferNotFoundError("Transfer was not found.")
@@ -609,7 +657,9 @@ class AdminTransferService:
             raise TransferValidationError("Branch was not found.")
         return branch
 
-    def _get_active_workstation_for_branch(self, session: Session, branch_id: uuid.UUID) -> Workstation:
+    def _get_active_workstation_for_branch(
+        self, session: Session, branch_id: uuid.UUID
+    ) -> Workstation:
         workstation = session.execute(
             select(Workstation)
             .where(Workstation.branch_id == branch_id, Workstation.is_active.is_(True))
@@ -617,7 +667,9 @@ class AdminTransferService:
             .limit(1)
         ).scalar_one_or_none()
         if workstation is None:
-            raise TransferValidationError("Branch needs an active workstation before transfers can be managed.")
+            raise TransferValidationError(
+                "Branch needs an active workstation before transfers can be managed."
+            )
         return workstation
 
     def _validate_transfer_branches(
@@ -648,7 +700,10 @@ class AdminTransferService:
             .join(ProductClass, ProductClass.id == Product.product_class_id)
             .where(Product.id.in_(set(product_ids)))
         ).all()
-        resolved = {product.id: _ResolvedProduct(product=product, product_class=product_class) for product, product_class in records}
+        resolved = {
+            product.id: _ResolvedProduct(product=product, product_class=product_class)
+            for product, product_class in records
+        }
         for product_id in product_ids:
             if product_id not in resolved:
                 raise TransferValidationError("Product was not found.")
@@ -664,7 +719,11 @@ class AdminTransferService:
         lines: list[AdminTransferLineInput],
         resolved_products: dict[uuid.UUID, _ResolvedProduct],
     ) -> None:
-        session.execute(delete(OperationDocumentLine).where(OperationDocumentLine.operation_document_id == shipment.id))
+        session.execute(
+            delete(OperationDocumentLine).where(
+                OperationDocumentLine.operation_document_id == shipment.id
+            )
+        )
         session.flush()
         for line_number, line in enumerate(lines, start=1):
             resolved = resolved_products[line.product_id]
@@ -686,12 +745,18 @@ class AdminTransferService:
                 )
             )
 
-    def _get_shipment_lines(self, session: Session, shipment_id: uuid.UUID) -> list[OperationDocumentLine]:
-        return session.execute(
-            select(OperationDocumentLine)
-            .where(OperationDocumentLine.operation_document_id == shipment_id)
-            .order_by(OperationDocumentLine.line_number.asc())
-        ).scalars().all()
+    def _get_shipment_lines(
+        self, session: Session, shipment_id: uuid.UUID
+    ) -> list[OperationDocumentLine]:
+        return list(
+            session.execute(
+                select(OperationDocumentLine)
+                .where(OperationDocumentLine.operation_document_id == shipment_id)
+                .order_by(OperationDocumentLine.line_number.asc())
+            )
+            .scalars()
+            .all()
+        )
 
     def _get_receipt_lines_by_shipment_line_id(
         self,
@@ -700,11 +765,15 @@ class AdminTransferService:
     ) -> dict[uuid.UUID, OperationDocumentLine]:
         if receipt is None:
             return {}
-        rows = session.execute(
-            select(OperationDocumentLine)
-            .where(OperationDocumentLine.operation_document_id == receipt.id)
-            .order_by(OperationDocumentLine.line_number.asc())
-        ).scalars().all()
+        rows = (
+            session.execute(
+                select(OperationDocumentLine)
+                .where(OperationDocumentLine.operation_document_id == receipt.id)
+                .order_by(OperationDocumentLine.line_number.asc())
+            )
+            .scalars()
+            .all()
+        )
         return {line.id: line for line in rows}
 
     def _validate_origin_stock(
@@ -772,7 +841,7 @@ class AdminTransferService:
         *,
         current_user: AuthenticatedUser,
         receipt: OperationDocument,
-        receipt_by_line_id: dict[uuid.UUID, object],
+        receipt_by_line_id: dict[uuid.UUID, AdminTransferReceiptLineInput],
         shipment: OperationDocument,
         shipment_lines: list[OperationDocumentLine],
     ) -> None:
@@ -787,14 +856,14 @@ class AdminTransferService:
                 delta=-shipment_line.quantity,
                 location_code=INVENTORY_LOCATION_IN_TRANSIT,
                 movement_type=INVENTORY_MOVEMENT_TYPE_TRANSFER_RECEIPT,
-                notes=getattr(receipt_line, "notes", None),
+                notes=receipt_line.notes,
                 product_id=shipment_line.product_id,
                 reason="Transfer receipt resolved in transit",
                 source_document_id=receipt.id,
                 source_document_type=TRANSFER_MOVEMENT_SOURCE_RECEIPT,
                 unit_of_measure=shipment_line.unit_of_measure_code,
             )
-            received_quantity = getattr(receipt_line, "received_quantity")
+            received_quantity = receipt_line.received_quantity
             if received_quantity > 0:
                 self._apply_stock_delta(
                     session,
@@ -803,7 +872,7 @@ class AdminTransferService:
                     delta=received_quantity,
                     location_code=INVENTORY_LOCATION_BACKROOM,
                     movement_type=INVENTORY_MOVEMENT_TYPE_TRANSFER_RECEIPT,
-                    notes=getattr(receipt_line, "notes", None),
+                    notes=receipt_line.notes,
                     product_id=shipment_line.product_id,
                     reason=getattr(receipt_line, "variance_reason", None) or "Transfer receipt",
                     source_document_id=receipt.id,
@@ -836,7 +905,9 @@ class AdminTransferService:
             location_code=location_code,
         )
         new_quantity = Decimal(balance.quantity_on_hand) + delta
-        direction = INVENTORY_MOVEMENT_DIRECTION_IN if delta > 0 else INVENTORY_MOVEMENT_DIRECTION_OUT
+        direction = (
+            INVENTORY_MOVEMENT_DIRECTION_IN if delta > 0 else INVENTORY_MOVEMENT_DIRECTION_OUT
+        )
         movement_quantity = abs(delta)
         balance.quantity_on_hand = new_quantity
         session.add(
@@ -957,7 +1028,9 @@ class AdminTransferService:
             destination_branch_code=row.destination_branch.code,
             destination_branch_id=row.destination_branch.id,
             destination_branch_name=row.destination_branch.name,
-            dispatched_at=row.shipment.committed_at_utc if row.shipment.status != OPERATION_DOCUMENT_STATUS_DRAFT else None,
+            dispatched_at=row.shipment.committed_at_utc
+            if row.shipment.status != OPERATION_DOCUMENT_STATUS_DRAFT
+            else None,
             folio=_build_transfer_folio(row.shipment.id),
             has_discrepancy=has_discrepancy,
             id=row.shipment.id,
@@ -970,7 +1043,7 @@ class AdminTransferService:
             received_unit_count=received_total,
             requested_unit_count=sent_total,
             sent_unit_count=sent_total,
-            status=row.shipment.status,
+            status=_ADMIN_TRANSFER_STATUS_ADAPTER.validate_python(row.shipment.status),
             warning_state=self._warning_state(warnings),
             warnings=warnings,
         )
@@ -1002,7 +1075,8 @@ class AdminTransferService:
         return AdminTransferDetailView(
             available_actions=AdminTransferAvailableActionsView(
                 can_cancel=row.shipment.status == OPERATION_DOCUMENT_STATUS_DRAFT,
-                can_dispatch=row.shipment.status == OPERATION_DOCUMENT_STATUS_DRAFT and len(shipment_lines) > 0,
+                can_dispatch=row.shipment.status == OPERATION_DOCUMENT_STATUS_DRAFT
+                and len(shipment_lines) > 0,
                 can_edit=row.shipment.status == OPERATION_DOCUMENT_STATUS_DRAFT,
                 can_receive=row.shipment.status == OPERATION_DOCUMENT_STATUS_IN_TRANSIT,
                 can_view_movements=True,
@@ -1026,14 +1100,16 @@ class AdminTransferService:
                 line_count=len(shipment_lines),
                 notes=row.shipment.notes,
                 received_at=row.receipt.committed_at_utc if row.receipt else None,
-                received_by_user_id=row.receipt_created_by_user.id if row.receipt_created_by_user else None,
+                received_by_user_id=row.receipt_created_by_user.id
+                if row.receipt_created_by_user
+                else None,
                 received_by_user_name=(
                     row.receipt_created_by_user.full_name if row.receipt_created_by_user else None
                 ),
                 received_unit_count=received_total,
                 requested_unit_count=sent_total,
                 sent_unit_count=sent_total,
-                status=row.shipment.status,
+                status=_ADMIN_TRANSFER_STATUS_ADAPTER.validate_python(row.shipment.status),
             ),
             receipt=AdminTransferReceiptView(
                 difference=(received_total - sent_total if received_total is not None else None),
@@ -1058,13 +1134,19 @@ class AdminTransferService:
         product_ids = {line.product_id for line in shipment_lines}
         products = {
             product.id: product
-            for product in session.execute(select(Product).where(Product.id.in_(product_ids))).scalars().all()
+            for product in session.execute(select(Product).where(Product.id.in_(product_ids)))
+            .scalars()
+            .all()
         }
         views: list[AdminTransferLineView] = []
         for shipment_line in shipment_lines:
             receipt_line = receipt_by_line_number.get(shipment_line.line_number)
             received_quantity = receipt_line.received_quantity if receipt_line is not None else None
-            difference = received_quantity - shipment_line.quantity if received_quantity is not None else None
+            difference = (
+                received_quantity - shipment_line.quantity
+                if received_quantity is not None
+                else None
+            )
             product = products.get(shipment_line.product_id)
             views.append(
                 AdminTransferLineView(
@@ -1086,7 +1168,9 @@ class AdminTransferService:
                     sent_quantity=shipment_line.quantity,
                     shipment_line_id=shipment_line.id,
                     unit_of_measure=shipment_line.unit_of_measure_code,
-                    variance_reason=receipt_line.variance_reason if receipt_line is not None else None,
+                    variance_reason=receipt_line.variance_reason
+                    if receipt_line is not None
+                    else None,
                 )
             )
         return views
@@ -1108,11 +1192,15 @@ class AdminTransferService:
         document_ids = [row.shipment.id]
         if row.receipt is not None:
             document_ids.append(row.receipt.id)
-        movements = session.execute(
-            select(InventoryMovement)
-            .where(InventoryMovement.source_document_id.in_(document_ids))
-            .order_by(InventoryMovement.occurred_at.asc())
-        ).scalars().all()
+        movements = (
+            session.execute(
+                select(InventoryMovement)
+                .where(InventoryMovement.source_document_id.in_(document_ids))
+                .order_by(InventoryMovement.occurred_at.asc())
+            )
+            .scalars()
+            .all()
+        )
         return AdminTransferInventoryImpactView(
             integration_available=True,
             movements=[
@@ -1131,7 +1219,9 @@ class AdminTransferService:
                 )
                 for movement in movements
             ],
-            notes=None if movements else "No hay movimientos de inventario vinculados a esta transferencia.",
+            notes=None
+            if movements
+            else "No hay movimientos de inventario vinculados a esta transferencia.",
         )
 
     def _related_documents(self, row: _AdminTransferRow) -> list[AdminTransferRelatedDocumentView]:
@@ -1154,30 +1244,54 @@ class AdminTransferService:
             )
         return documents
 
-    def _build_metrics(self, session: Session, rows: list[_AdminTransferRow]) -> AdminTransferMetricsView:
-        in_transit_rows = [row for row in rows if row.shipment.status == OPERATION_DOCUMENT_STATUS_IN_TRANSIT]
+    def _build_metrics(
+        self, session: Session, rows: list[_AdminTransferRow]
+    ) -> AdminTransferMetricsView:
+        in_transit_rows = [
+            row for row in rows if row.shipment.status == OPERATION_DOCUMENT_STATUS_IN_TRANSIT
+        ]
         return AdminTransferMetricsView(
-            cancelled_transfers=sum(1 for row in rows if row.shipment.status == OPERATION_DOCUMENT_STATUS_CANCELLED),
+            cancelled_transfers=sum(
+                1 for row in rows if row.shipment.status == OPERATION_DOCUMENT_STATUS_CANCELLED
+            ),
             in_transit_transfers=len(in_transit_rows),
             pending_receipt_transfers=len(in_transit_rows),
             received_transfers=sum(
                 1
                 for row in rows
                 if row.shipment.status
-                in (OPERATION_DOCUMENT_STATUS_RECEIVED, OPERATION_DOCUMENT_STATUS_RECEIVED_WITH_VARIANCE)
+                in (
+                    OPERATION_DOCUMENT_STATUS_RECEIVED,
+                    OPERATION_DOCUMENT_STATUS_RECEIVED_WITH_VARIANCE,
+                )
             ),
             total_transfers=len(rows),
             units_in_transit=sum(
-                (_sum_line_quantity(self._get_shipment_lines(session, row.shipment.id)) for row in in_transit_rows),
+                (
+                    _sum_line_quantity(self._get_shipment_lines(session, row.shipment.id))
+                    for row in in_transit_rows
+                ),
                 Decimal("0"),
             ),
             with_discrepancies=sum(1 for row in rows if self._has_discrepancy(session, row)),
         )
 
     def _build_filter_options(self, session: Session) -> AdminTransferFilterOptionsView:
-        branches = session.execute(select(Branch).order_by(Branch.name.asc(), Branch.code.asc())).scalars().all()
-        operators = session.execute(select(User).order_by(User.full_name.asc(), User.email.asc())).scalars().all()
-        products = session.execute(select(Product).order_by(Product.name.asc(), Product.code.asc())).scalars().all()
+        branches = (
+            session.execute(select(Branch).order_by(Branch.name.asc(), Branch.code.asc()))
+            .scalars()
+            .all()
+        )
+        operators = (
+            session.execute(select(User).order_by(User.full_name.asc(), User.email.asc()))
+            .scalars()
+            .all()
+        )
+        products = (
+            session.execute(select(Product).order_by(Product.name.asc(), Product.code.asc()))
+            .scalars()
+            .all()
+        )
         return AdminTransferFilterOptionsView(
             branches=[
                 AdminTransferFilterOptionView(id=branch.id, label=f"{branch.name} - {branch.code}")
@@ -1188,7 +1302,9 @@ class AdminTransferService:
                 for user in operators
             ],
             products=[
-                AdminTransferFilterOptionView(id=product.id, label=f"{product.name} - {product.code}")
+                AdminTransferFilterOptionView(
+                    id=product.id, label=f"{product.name} - {product.code}"
+                )
                 for product in products
             ],
             statuses=[
@@ -1311,11 +1427,15 @@ class AdminTransferService:
     ) -> list[OperationDocumentLine]:
         if receipt is None:
             return []
-        return session.execute(
-            select(OperationDocumentLine)
-            .where(OperationDocumentLine.operation_document_id == receipt.id)
-            .order_by(OperationDocumentLine.line_number.asc())
-        ).scalars().all()
+        return list(
+            session.execute(
+                select(OperationDocumentLine)
+                .where(OperationDocumentLine.operation_document_id == receipt.id)
+                .order_by(OperationDocumentLine.line_number.asc())
+            )
+            .scalars()
+            .all()
+        )
 
     def _matches_search(self, row: _AdminTransferRow, search: str) -> bool:
         haystack = " ".join(

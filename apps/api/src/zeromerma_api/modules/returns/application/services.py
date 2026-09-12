@@ -448,6 +448,9 @@ class ReturnsQueryService:
                     SaleReturn.reason_name.ilike(pattern),
                     User.full_name.ilike(pattern),
                     SaleReturn.id.cast(String).ilike(pattern),
+                    func.concat("DEV-", func.substr(SaleReturn.id.cast(String), 1, 8)).ilike(
+                        pattern
+                    ),
                     SaleReturn.original_sale_id.cast(String).ilike(pattern),
                 )
             )

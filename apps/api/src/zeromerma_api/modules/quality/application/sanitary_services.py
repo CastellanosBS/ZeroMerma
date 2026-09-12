@@ -1,9 +1,12 @@
 from __future__ import annotations
 
 import uuid
+from collections.abc import Callable, Iterable
 from dataclasses import dataclass
 from datetime import UTC, datetime
+from typing import TypedDict
 
+from pydantic import TypeAdapter
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
@@ -37,6 +40,10 @@ from zeromerma_api.modules.quality.application.sanitary_schemas import (
     AdminSanitaryVerificationListItemView,
     AdminSanitaryVerificationListResponse,
     AdminSanitaryWarningView,
+    SanitaryItemResult,
+    SanitaryResult,
+    SanitaryRiskLevel,
+    SanitaryStatus,
 )
 from zeromerma_api.modules.quality.domain.constants import (
     AUDIT_ACTION_SANITARY_VERIFICATION_CANCELLED,
@@ -109,6 +116,10 @@ from zeromerma_api.modules.quality.infrastructure.models import (
     SanitaryVerificationTemplateItem,
 )
 
+_SANITARY_ITEM_RESULT_ADAPTER: TypeAdapter[SanitaryItemResult] = TypeAdapter(SanitaryItemResult)
+_SANITARY_RESULT_ADAPTER: TypeAdapter[SanitaryResult] = TypeAdapter(SanitaryResult)
+_SANITARY_RISK_LEVEL_ADAPTER: TypeAdapter[SanitaryRiskLevel] = TypeAdapter(SanitaryRiskLevel)
+_SANITARY_STATUS_ADAPTER: TypeAdapter[SanitaryStatus] = TypeAdapter(SanitaryStatus)
 AREA_TYPE_LABELS = {
     CLEANING_AREA_TYPE_PRODUCTION: "Produccion",
     CLEANING_AREA_TYPE_COUNTER: "Mostrador / exhibicion",
@@ -183,6 +194,18 @@ class _SanitaryRow:
     verification: SanitaryVerification
 
 
+class _ComputedSanitaryResult(TypedDict):
+    failed: int
+    max_score: int | None
+    not_applicable: int
+    passed: int
+    requires_follow_up: bool
+    result: str
+    score_percent: int | None
+    status: str
+    total: int
+
+
 class AdminSanitaryVerificationService:
     def __init__(
         self,
@@ -220,9 +243,7 @@ class AdminSanitaryVerificationService:
         if branch_id is not None:
             rows = [row for row in rows if row.verification.branch_id == branch_id]
         if inspector_user_id is not None:
-            rows = [
-                row for row in rows if row.verification.inspector_user_id == inspector_user_id
-            ]
+            rows = [row for row in rows if row.verification.inspector_user_id == inspector_user_id]
         if template_id is not None:
             rows = [row for row in rows if row.verification.template_id == template_id]
 
@@ -504,8 +525,8 @@ class AdminSanitaryVerificationService:
                     is_required=item.is_required,
                     label=item.label,
                     notes=item.notes,
-                    result=item.result,
-                    risk_level=item.risk_level,
+                    result=_SANITARY_ITEM_RESULT_ADAPTER.validate_python(item.result),
+                    risk_level=_SANITARY_RISK_LEVEL_ADAPTER.validate_python(item.risk_level),
                 )
                 for item in row.checklist_items
             ]
@@ -676,10 +697,10 @@ class AdminSanitaryVerificationService:
             inspector_user_name=row.inspector_user.full_name,
             passed_count=row.verification.passed_count,
             process_name=row.verification.process_name,
-            result=row.verification.result,
-            risk_level=row.verification.risk_level,
+            result=_SANITARY_RESULT_ADAPTER.validate_python(row.verification.result),
+            risk_level=_SANITARY_RISK_LEVEL_ADAPTER.validate_python(row.verification.risk_level),
             scheduled_at=row.verification.scheduled_at,
-            status=row.verification.status,
+            status=_SANITARY_STATUS_ADAPTER.validate_python(row.verification.status),
             template_name=row.verification.template_name,
             updated_at=row.verification.updated_at,
             warning_state=self._warning_state(row),
@@ -708,7 +729,9 @@ class AdminSanitaryVerificationService:
                 passed_items=row.verification.passed_count,
                 pass_threshold_percent=row.verification.pass_threshold_percent,
                 process_type=row.verification.process_type,
-                risk_level=row.verification.risk_level,
+                risk_level=_SANITARY_RISK_LEVEL_ADAPTER.validate_python(
+                    row.verification.risk_level
+                ),
                 template_id=row.template.id if row.template else None,
                 template_name=row.verification.template_name,
                 total_items=len(row.checklist_items),
@@ -739,11 +762,13 @@ class AdminSanitaryVerificationService:
                 inspector_user_id=row.inspector_user.id,
                 inspector_user_name=row.inspector_user.full_name,
                 process_name=row.verification.process_name,
-                result=row.verification.result,
-                risk_level=row.verification.risk_level,
+                result=_SANITARY_RESULT_ADAPTER.validate_python(row.verification.result),
+                risk_level=_SANITARY_RISK_LEVEL_ADAPTER.validate_python(
+                    row.verification.risk_level
+                ),
                 scheduled_at=row.verification.scheduled_at,
                 started_at=row.verification.started_at,
-                status=row.verification.status,
+                status=_SANITARY_STATUS_ADAPTER.validate_python(row.verification.status),
                 warning_state=self._warning_state(row),
             ),
             related_cleaning_logs=self._related_cleaning_logs(session, row),
@@ -761,7 +786,7 @@ class AdminSanitaryVerificationService:
             score_result=AdminSanitaryScoreResultView(
                 max_score=row.verification.max_score,
                 percentage=row.verification.score_percent,
-                result=row.verification.result,
+                result=_SANITARY_RESULT_ADAPTER.validate_python(row.verification.result),
                 score=row.verification.passed_count,
                 threshold_percent=row.verification.pass_threshold_percent,
             ),
@@ -897,7 +922,7 @@ class AdminSanitaryVerificationService:
                     id=item.id,
                     is_required=item.is_required,
                     label=item.label,
-                    risk_level=item.risk_level,
+                    risk_level=_SANITARY_RISK_LEVEL_ADAPTER.validate_python(item.risk_level),
                 )
                 for item in items
             ],
@@ -905,7 +930,7 @@ class AdminSanitaryVerificationService:
             pass_threshold_percent=template.pass_threshold_percent,
             process_type=template.process_type,
             requires_evidence_on_failure=template.requires_evidence_on_failure,
-            risk_level=template.risk_level,
+            risk_level=_SANITARY_RISK_LEVEL_ADAPTER.validate_python(template.risk_level),
         )
 
     def _resolve_checklist_inputs(
@@ -938,8 +963,8 @@ class AdminSanitaryVerificationService:
                 expected_standard=item.expected_standard,
                 is_required=item.is_required,
                 label=item.label,
-                result=result,
-                risk_level=item.risk_level,
+                result=_SANITARY_ITEM_RESULT_ADAPTER.validate_python(result),
+                risk_level=_SANITARY_RISK_LEVEL_ADAPTER.validate_python(item.risk_level),
             )
             for item in template_items
         ]
@@ -959,8 +984,8 @@ class AdminSanitaryVerificationService:
             .scalars()
             .all()
         )
-        for item in existing:
-            session.delete(item)
+        for existing_item in existing:
+            session.delete(existing_item)
         session.flush()
 
         for index, item in enumerate(checklist_items, start=1):
@@ -1005,8 +1030,8 @@ class AdminSanitaryVerificationService:
             is_required=item.is_required,
             label=item.label,
             notes=item.notes,
-            result=item.result,
-            risk_level=item.risk_level,
+            result=_SANITARY_ITEM_RESULT_ADAPTER.validate_python(item.result),
+            risk_level=_SANITARY_RISK_LEVEL_ADAPTER.validate_python(item.risk_level),
         )
 
     def _compute_result(
@@ -1018,7 +1043,7 @@ class AdminSanitaryVerificationService:
         findings_notes: str | None,
         requires_evidence: bool,
         threshold_percent: int,
-    ) -> dict[str, int | str | bool | None]:
+    ) -> _ComputedSanitaryResult:
         self._validate_checklist_inputs(checklist_inputs)
         if not complete:
             return {
@@ -1085,9 +1110,7 @@ class AdminSanitaryVerificationService:
             result = SANITARY_RESULT_PASSED
 
         status = (
-            SANITARY_STATUS_REQUIRES_FOLLOW_UP
-            if requires_follow_up
-            else SANITARY_STATUS_COMPLETED
+            SANITARY_STATUS_REQUIRES_FOLLOW_UP if requires_follow_up else SANITARY_STATUS_COMPLETED
         )
         return {
             "failed": failed,
@@ -1265,9 +1288,7 @@ class AdminSanitaryVerificationService:
         matched: list[CleaningLog] = []
         area = row.verification.area_name.casefold()
         equipment = (
-            row.verification.equipment_name.casefold()
-            if row.verification.equipment_name
-            else None
+            row.verification.equipment_name.casefold() if row.verification.equipment_name else None
         )
         for log in logs:
             log_equipment = log.equipment_name.casefold() if log.equipment_name else None
@@ -1292,8 +1313,7 @@ class AdminSanitaryVerificationService:
 
     def _is_overdue(self, verification: SanitaryVerification) -> bool:
         return (
-            verification.status in OPEN_STATUSES
-            and _as_utc(verification.scheduled_at) < _utc_now()
+            verification.status in OPEN_STATUSES and _as_utc(verification.scheduled_at) < _utc_now()
         )
 
     def _is_high_risk_verification(self, verification: SanitaryVerification) -> bool:
@@ -1331,8 +1351,7 @@ class AdminSanitaryVerificationService:
             for item in checklist_inputs
         )
         return bool(template and template.requires_evidence_on_failure and high_risk_failure) or (
-            failed_evidence_required
-            and risk_level in {CLEANING_RISK_HIGH, CLEANING_RISK_CRITICAL}
+            failed_evidence_required and risk_level in {CLEANING_RISK_HIGH, CLEANING_RISK_CRITICAL}
         )
 
     def _matches_search(self, row: _SanitaryRow, search: str) -> bool:
@@ -1355,7 +1374,7 @@ class AdminSanitaryVerificationService:
         self,
         rows: list[_SanitaryRow],
         value: str | None,
-        getter,
+        getter: Callable[[_SanitaryRow], str | None],
     ) -> list[_SanitaryRow]:
         normalized = _normalize_optional(value)
         if not normalized or normalized == "all":
@@ -1366,7 +1385,7 @@ class AdminSanitaryVerificationService:
         self,
         rows: list[_SanitaryRow],
         value: str | None,
-        getter,
+        getter: Callable[[_SanitaryRow], str],
     ) -> list[_SanitaryRow]:
         normalized = _normalize_optional(value)
         if not normalized or normalized == "all":
@@ -1476,7 +1495,9 @@ def _has_text(value: str | None) -> bool:
     return bool(value and value.strip())
 
 
-def _dedupe_options(options) -> list[AdminSanitaryFilterOptionView]:
+def _dedupe_options(
+    options: Iterable[AdminSanitaryFilterOptionView],
+) -> list[AdminSanitaryFilterOptionView]:
     result: dict[str, AdminSanitaryFilterOptionView] = {}
     for option in options:
         if option.id not in result:

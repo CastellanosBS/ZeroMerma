@@ -537,14 +537,20 @@ class AdminInputSupplyService:
                 .join(Supplier, Supplier.id == SupplierProduct.supplier_id)
                 .where(SupplierProduct.product_id == product.id)
                 .order_by(SupplierProduct.is_active.desc(), Supplier.legal_name.asc())
-            ).all()
+            )
+            .tuples()
+            .all()
         )
-        inventory_rows = session.execute(
-            select(InventoryBalance, Branch)
-            .join(Branch, Branch.id == InventoryBalance.branch_id)
-            .where(InventoryBalance.product_id == product.id)
-            .order_by(Branch.name.asc(), InventoryBalance.location_code.asc())
-        ).all()
+        inventory_rows = (
+            session.execute(
+                select(InventoryBalance, Branch)
+                .join(Branch, Branch.id == InventoryBalance.branch_id)
+                .where(InventoryBalance.product_id == product.id)
+                .order_by(Branch.name.asc(), InventoryBalance.location_code.asc())
+            )
+            .tuples()
+            .all()
+        )
         by_branch: dict[uuid.UUID, _InventoryBranchStock] = {}
         for balance, branch in inventory_rows:
             previous = by_branch.get(branch.id)
@@ -565,7 +571,9 @@ class AdminInputSupplyService:
                 .join(Product, Product.id == Recipe.product_id)
                 .where(RecipeInput.input_product_id == product.id)
                 .order_by(Recipe.is_active.desc(), Product.name.asc())
-            ).all()
+            )
+            .tuples()
+            .all()
         )
         return _InputSupplyContext(
             inventory=list(by_branch.values()),
@@ -940,9 +948,9 @@ class AdminInputSupplyService:
             .all()
         )
         requested = set(supplier_ids)
-        for relation in existing:
-            if relation.supplier_id not in requested:
-                relation.is_active = False
+        for existing_relation in existing:
+            if existing_relation.supplier_id not in requested:
+                existing_relation.is_active = False
         for relation_command in relations:
             supplier = self._get_supplier(session, relation_command.supplier_id)
             relation = next(

@@ -27,13 +27,15 @@ def _login(client: TestClient, *, email: str, password: str) -> str:
 
 def _admin_headers(client: TestClient) -> dict[str, str]:
     return {
-        "Authorization": f"Bearer {_login(client, email=SEED_ADMIN_EMAIL, password=SEED_ADMIN_PASSWORD)}"
+        "Authorization": "Bearer "
+        + _login(client, email=SEED_ADMIN_EMAIL, password=SEED_ADMIN_PASSWORD)
     }
 
 
 def _cashier_headers(client: TestClient) -> dict[str, str]:
     return {
-        "Authorization": f"Bearer {_login(client, email=SEED_USER_EMAIL, password=SEED_USER_PASSWORD)}"
+        "Authorization": "Bearer "
+        + _login(client, email=SEED_USER_EMAIL, password=SEED_USER_PASSWORD)
     }
 
 
@@ -123,7 +125,9 @@ def _commit_counter_transfer(client: TestClient) -> dict[str, object]:
         headers=_cashier_headers(client),
         json={
             "workstation_code": SEED_WORKSTATION_CODE,
-            "lines": [{"product_id": _get_product_id(SEED_PRODUCT_CONCHA_VAN_CODE), "quantity": "4"}],
+            "lines": [
+                {"product_id": _get_product_id(SEED_PRODUCT_CONCHA_VAN_CODE), "quantity": "4"}
+            ],
             "notes": "Documento para correccion admin",
         },
     )
@@ -249,4 +253,4 @@ def test_admin_returns_corrections_require_backoffice_surface(client: TestClient
 
     assert returns_response.status_code == 403
     assert corrections_response.status_code == 403
-    assert returns_response.json()["detail"] == "Backoffice access is required."
+    assert returns_response.json()["message"] == "Backoffice access is required."

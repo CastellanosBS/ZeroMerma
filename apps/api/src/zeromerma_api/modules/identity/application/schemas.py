@@ -13,13 +13,17 @@ from zeromerma_api.modules.identity.domain.constants import (
 IdentitySurface = Literal["POS", "BACKOFFICE"]
 
 
+def _default_surfaces() -> list[IdentitySurface]:
+    return [IDENTITY_SURFACE_POS]
+
+
 class AuthenticatedUser(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     id: UUID
     email: str = Field(min_length=3, max_length=320)
     full_name: str
-    allowed_surfaces: list[IdentitySurface] = Field(default_factory=lambda: [IDENTITY_SURFACE_POS])
+    allowed_surfaces: list[IdentitySurface] = Field(default_factory=_default_surfaces)
     default_surface: IdentitySurface = Field(default=IDENTITY_SURFACE_POS)
     is_active: bool
 

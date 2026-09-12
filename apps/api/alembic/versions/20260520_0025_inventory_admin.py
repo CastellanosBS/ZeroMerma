@@ -57,8 +57,12 @@ def upgrade() -> None:
             name="uq_inventory_balances_product_branch_location",
         ),
     )
-    op.create_index(op.f("ix_inventory_balances_branch_id"), "inventory_balances", ["branch_id"], unique=False)
-    op.create_index(op.f("ix_inventory_balances_product_id"), "inventory_balances", ["product_id"], unique=False)
+    op.create_index(
+        op.f("ix_inventory_balances_branch_id"), "inventory_balances", ["branch_id"], unique=False
+    )
+    op.create_index(
+        op.f("ix_inventory_balances_product_id"), "inventory_balances", ["product_id"], unique=False
+    )
 
     op.create_table(
         "inventory_adjustments",
@@ -103,7 +107,12 @@ def upgrade() -> None:
         ),
         sa.PrimaryKeyConstraint("id", name=op.f("pk_inventory_adjustments")),
     )
-    op.create_index(op.f("ix_inventory_adjustments_branch_id"), "inventory_adjustments", ["branch_id"], unique=False)
+    op.create_index(
+        op.f("ix_inventory_adjustments_branch_id"),
+        "inventory_adjustments",
+        ["branch_id"],
+        unique=False,
+    )
     op.create_index(
         op.f("ix_inventory_adjustments_product_id"),
         "inventory_adjustments",
@@ -137,7 +146,9 @@ def upgrade() -> None:
             "movement_type IN ('MANUAL_ADJUSTMENT', 'STOCK_COUNT_ADJUSTMENT')",
             name=op.f("ck_inventory_movements_type_valid"),
         ),
-        sa.CheckConstraint("direction IN ('IN', 'OUT')", name=op.f("ck_inventory_movements_direction_valid")),
+        sa.CheckConstraint(
+            "direction IN ('IN', 'OUT')", name=op.f("ck_inventory_movements_direction_valid")
+        ),
         sa.CheckConstraint("quantity > 0", name=op.f("ck_inventory_movements_quantity_positive")),
         sa.ForeignKeyConstraint(
             ["adjustment_id"],
@@ -165,9 +176,21 @@ def upgrade() -> None:
         ),
         sa.PrimaryKeyConstraint("id", name=op.f("pk_inventory_movements")),
     )
-    op.create_index(op.f("ix_inventory_movements_branch_id"), "inventory_movements", ["branch_id"], unique=False)
-    op.create_index(op.f("ix_inventory_movements_product_id"), "inventory_movements", ["product_id"], unique=False)
-    op.create_index(op.f("ix_inventory_movements_occurred_at"), "inventory_movements", ["occurred_at"], unique=False)
+    op.create_index(
+        op.f("ix_inventory_movements_branch_id"), "inventory_movements", ["branch_id"], unique=False
+    )
+    op.create_index(
+        op.f("ix_inventory_movements_product_id"),
+        "inventory_movements",
+        ["product_id"],
+        unique=False,
+    )
+    op.create_index(
+        op.f("ix_inventory_movements_occurred_at"),
+        "inventory_movements",
+        ["occurred_at"],
+        unique=False,
+    )
 
 
 def downgrade() -> None:

@@ -4,11 +4,13 @@ import uuid
 from datetime import UTC, datetime
 from decimal import Decimal
 from typing import cast as type_cast
+from typing import overload
 
-from sqlalchemy import String, and_, cast, exists, func, or_, select
+from sqlalchemy import Select, String, and_, cast, exists, func, or_, select
 from sqlalchemy.engine import RowMapping
 from sqlalchemy.exc import IntegrityError
-from sqlalchemy.orm import Session, aliased
+from sqlalchemy.orm import InstrumentedAttribute, Session, aliased
+from sqlalchemy.sql.elements import ColumnElement
 
 from zeromerma_api.modules.audit.application.service import AuditRecorder
 from zeromerma_api.modules.branches.infrastructure.models import Branch, Workstation
@@ -273,7 +275,7 @@ class AdminReconciliationService:
             session,
             source_type=source_type,
             source_document_id=command.source_document_id,
-            payment_method=source["payment_method"],
+            payment_method=type_cast(str, source["payment_method"]),
         )
 
         now = datetime.now(tz=UTC)
@@ -388,7 +390,9 @@ class AdminReconciliationService:
         session.commit()
         return self.get_reconciliation_detail(session, reconciliation_id=record.id)
 
-    def _base_record_statement(self, conditions: list[object]):
+    def _base_record_statement(
+        self, conditions: list[ColumnElement[bool]]
+    ) -> Select[tuple[object, ...]]:
         operator_alias = aliased(User)
         created_alias = aliased(User)
         resolved_alias = aliased(User)
@@ -456,8 +460,8 @@ class AdminReconciliationService:
         source_type: str | None,
         status_filter: str | None,
         workstation_id: uuid.UUID | None,
-    ) -> list[object]:
-        conditions: list[object] = []
+    ) -> list[ColumnElement[bool]]:
+        conditions: list[ColumnElement[bool]] = []
         if branch_id is not None:
             conditions.append(FinancialReconciliation.branch_id == branch_id)
         if workstation_id is not None:
@@ -560,7 +564,7 @@ class AdminReconciliationService:
         if normalized_method and normalized_method != CASH_CLOSE_PAYMENT_METHOD_CASH:
             return []
 
-        conditions: list[object] = [
+        conditions: list[ColumnElement[bool]] = [
             CashSessionClose.status == CASH_CLOSE_STATUS_COMMITTED,
             CashSessionClose.cash_variance_amount.is_not(None),
             CashSessionClose.cash_variance_amount != ZERO_MONEY,
@@ -738,7 +742,7 @@ class AdminReconciliationService:
         session: Session,
         *,
         pending_items: list[AdminPendingDiscrepancyItemView],
-        record_conditions: list[object],
+        record_conditions: list[ColumnElement[bool]],
     ) -> AdminReconciliationMetricsView:
         record_statement = select(
             func.count()
@@ -821,7 +825,7 @@ class AdminReconciliationService:
             with_evidence_count=int(type_cast(int, row["with_evidence_count"])),
         )
 
-    def _get_cash_cut_source(self, session: Session, *, close_id: uuid.UUID) -> RowMapping:
+    def _get_cash_cut_source(self, session: Session, *, close_id: uuid.UUID) -> dict[str, object]:
         row = (
             session.execute(
                 select(
@@ -1233,7 +1237,10 @@ def _map_pending_row(row: RowMapping) -> AdminPendingDiscrepancyItemView:
     )
 
 
-def _difference_conditions(difference_column, discrepancy_type: str) -> list[object]:
+def _difference_conditions(
+    difference_column: InstrumentedAttribute[Decimal] | InstrumentedAttribute[Decimal | None],
+    discrepancy_type: str,
+) -> list[ColumnElement[bool]]:
     if discrepancy_type == DISCREPANCY_DIRECTION_SHORTAGE:
         return [difference_column < ZERO_MONEY]
     if discrepancy_type == DISCREPANCY_DIRECTION_OVERAGE:
@@ -1353,6 +1360,14 @@ def _coalesce_name(value: object) -> str:
     if isinstance(value, str) and value.strip():
         return value
     return "Sin operador"
+
+
+@overload
+def _reason_label(code: str) -> str: ...
+
+
+@overload
+def _reason_label(code: None) -> None: ...
 
 
 def _reason_label(code: str | None) -> str | None:

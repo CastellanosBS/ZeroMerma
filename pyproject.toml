@@ -35,7 +35,11 @@ known-first-party = ["zeromerma_api", "zeromerma_worker"]
 addopts = "-q"
 testpaths = [
   "apps/api/tests",
+  "apps/api/unit_tests",
+  "apps/api/migration_tests",
   "apps/worker/tests",
+  "apps/worker/integration_tests",
+  "scripts/dev/tests",
 ]
 pythonpath = [
   "apps/api/src",

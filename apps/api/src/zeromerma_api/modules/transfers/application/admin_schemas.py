@@ -80,7 +80,9 @@ class AdminTransferListItemView(BaseModel):
 
 
 class AdminTransferListResponse(BaseModel):
-    backend_contract: AdminTransferBackendContractView = Field(default_factory=AdminTransferBackendContractView)
+    backend_contract: AdminTransferBackendContractView = Field(
+        default_factory=AdminTransferBackendContractView
+    )
     filter_options: AdminTransferFilterOptionsView
     is_backend_connected: bool = True
     items: list[AdminTransferListItemView]
@@ -243,7 +245,9 @@ class AdminTransferUpdateRequest(BaseModel):
 
     @field_validator("lines")
     @classmethod
-    def validate_lines(cls, value: list[AdminTransferLineInput] | None) -> list[AdminTransferLineInput] | None:
+    def validate_lines(
+        cls, value: list[AdminTransferLineInput] | None
+    ) -> list[AdminTransferLineInput] | None:
         if value is not None and len(value) == 0:
             raise ValueError("Transfer must contain at least one line.")
         return value
@@ -307,4 +311,3 @@ class AdminTransferCancelRequest(BaseModel):
             return None
         normalized = value.strip()
         return normalized or None
-

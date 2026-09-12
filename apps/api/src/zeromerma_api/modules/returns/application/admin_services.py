@@ -8,6 +8,7 @@ from typing import cast as type_cast
 from sqlalchemy import Select, String, and_, cast, exists, func, or_, select
 from sqlalchemy.engine import RowMapping
 from sqlalchemy.orm import Session
+from sqlalchemy.sql.elements import ColumnElement
 
 from zeromerma_api.modules.audit.application.visibility import (
     AuditVisibilityQueryService,
@@ -20,6 +21,7 @@ from zeromerma_api.modules.returns.application.admin_schemas import (
     AdminReturnAvailableActionsView,
     AdminReturnCorrectionFilterOptionView,
     AdminReturnDetailView,
+    AdminReturnedLineView,
     AdminReturnFilterOptionsView,
     AdminReturnListItemView,
     AdminReturnMetricsView,
@@ -29,7 +31,6 @@ from zeromerma_api.modules.returns.application.admin_schemas import (
     AdminReturnRelatedDocumentView,
     AdminReturnsBackendContractView,
     AdminReturnsListResponse,
-    AdminReturnedLineView,
 )
 from zeromerma_api.modules.returns.domain.constants import (
     OUTBOX_EVENT_SALE_RETURN_BACKOFFICE_REVIEW_REQUESTED_V1,
@@ -41,7 +42,12 @@ from zeromerma_api.modules.returns.domain.exceptions import (
     SaleReturnValidationError,
 )
 from zeromerma_api.modules.returns.infrastructure.models import SaleReturn, SaleReturnLine
-from zeromerma_api.modules.sales.infrastructure.models import CashMovement, Sale, SaleLine, SalePayment
+from zeromerma_api.modules.sales.infrastructure.models import (
+    CashMovement,
+    Sale,
+    SaleLine,
+    SalePayment,
+)
 
 ADMIN_RETURN_PAGE_SIZE_MAX = 100
 CASH_MOVEMENT_TYPE_SALE_RETURN_REFUND = "SALE_RETURN_REFUND"
@@ -88,11 +94,15 @@ class AdminReturnsService:
                 select(func.count()).select_from(base_statement.order_by(None).subquery())
             ).scalar_one()
         )
-        rows = session.execute(
-            base_statement.order_by(SaleReturn.created_at_utc.desc(), SaleReturn.id.desc())
-            .limit(resolved_page_size)
-            .offset((resolved_page - 1) * resolved_page_size)
-        ).mappings().all()
+        rows = (
+            session.execute(
+                base_statement.order_by(SaleReturn.created_at_utc.desc(), SaleReturn.id.desc())
+                .limit(resolved_page_size)
+                .offset((resolved_page - 1) * resolved_page_size)
+            )
+            .mappings()
+            .all()
+        )
 
         return AdminReturnsListResponse(
             backend_contract=_backend_contract(),
@@ -106,61 +116,69 @@ class AdminReturnsService:
         )
 
     def get_return_detail(self, session: Session, *, return_id: uuid.UUID) -> AdminReturnDetailView:
-        return_record = _get_return_record(session, return_id=return_id)
-        overview_row = session.execute(
-            select(
-                SaleReturn.id,
-                SaleReturn.original_sale_id,
-                SaleReturn.status,
-                SaleReturn.created_by_user_id,
-                User.email.label("operator_email"),
-                User.full_name.label("operator_name"),
-                SaleReturn.reason_code,
-                SaleReturn.reason_name,
-                SaleReturn.refund_method_code,
-                SaleReturn.total_refund_amount,
-                SaleReturn.currency_code,
-                SaleReturn.notes,
-                SaleReturn.created_at_utc,
-                SaleReturn.branch_id,
-                Branch.name.label("branch_name"),
-                SaleReturn.workstation_id,
-                Workstation.code.label("workstation_code"),
-                Workstation.name.label("workstation_name"),
-                SaleReturn.cash_session_id,
-                Sale.status.label("sale_status"),
-                Sale.confirmed_at.label("sale_confirmed_at"),
-                Sale.total_amount.label("sale_total_amount"),
-                Sale.operator_id.label("sale_operator_id"),
-                Sale.cash_session_id.label("sale_cash_session_id"),
+        _get_return_record(session, return_id=return_id)
+        overview_row = (
+            session.execute(
+                select(
+                    SaleReturn.id,
+                    SaleReturn.original_sale_id,
+                    SaleReturn.status,
+                    SaleReturn.created_by_user_id,
+                    User.email.label("operator_email"),
+                    User.full_name.label("operator_name"),
+                    SaleReturn.reason_code,
+                    SaleReturn.reason_name,
+                    SaleReturn.refund_method_code,
+                    SaleReturn.total_refund_amount,
+                    SaleReturn.currency_code,
+                    SaleReturn.notes,
+                    SaleReturn.created_at_utc,
+                    SaleReturn.branch_id,
+                    Branch.name.label("branch_name"),
+                    SaleReturn.workstation_id,
+                    Workstation.code.label("workstation_code"),
+                    Workstation.name.label("workstation_name"),
+                    SaleReturn.cash_session_id,
+                    Sale.status.label("sale_status"),
+                    Sale.confirmed_at.label("sale_confirmed_at"),
+                    Sale.total_amount.label("sale_total_amount"),
+                    Sale.operator_id.label("sale_operator_id"),
+                    Sale.cash_session_id.label("sale_cash_session_id"),
+                )
+                .select_from(SaleReturn)
+                .join(User, User.id == SaleReturn.created_by_user_id)
+                .join(Branch, Branch.id == SaleReturn.branch_id)
+                .join(Workstation, Workstation.id == SaleReturn.workstation_id)
+                .join(Sale, Sale.id == SaleReturn.original_sale_id)
+                .where(SaleReturn.id == return_id)
             )
-            .select_from(SaleReturn)
-            .join(User, User.id == SaleReturn.created_by_user_id)
-            .join(Branch, Branch.id == SaleReturn.branch_id)
-            .join(Workstation, Workstation.id == SaleReturn.workstation_id)
-            .join(Sale, Sale.id == SaleReturn.original_sale_id)
-            .where(SaleReturn.id == return_id)
-        ).mappings().one()
+            .mappings()
+            .one()
+        )
 
-        line_rows = session.execute(
-            select(
-                SaleReturnLine.id,
-                SaleReturnLine.original_sale_line_id,
-                SaleReturnLine.returned_product_code_snapshot,
-                SaleReturnLine.returned_product_name_snapshot,
-                SaleReturnLine.returned_product_class_code_snapshot,
-                SaleReturnLine.returned_product_class_name_snapshot,
-                SaleReturnLine.returned_quantity,
-                SaleReturnLine.refund_unit_price,
-                SaleReturnLine.refund_line_total_amount,
-                SaleReturnLine.disposition_code,
-                SaleLine.quantity.label("original_quantity"),
+        line_rows = (
+            session.execute(
+                select(
+                    SaleReturnLine.id,
+                    SaleReturnLine.original_sale_line_id,
+                    SaleReturnLine.returned_product_code_snapshot,
+                    SaleReturnLine.returned_product_name_snapshot,
+                    SaleReturnLine.returned_product_class_code_snapshot,
+                    SaleReturnLine.returned_product_class_name_snapshot,
+                    SaleReturnLine.returned_quantity,
+                    SaleReturnLine.refund_unit_price,
+                    SaleReturnLine.refund_line_total_amount,
+                    SaleReturnLine.disposition_code,
+                    SaleLine.quantity.label("original_quantity"),
+                )
+                .select_from(SaleReturnLine)
+                .join(SaleLine, SaleLine.id == SaleReturnLine.original_sale_line_id)
+                .where(SaleReturnLine.sale_return_id == return_id)
+                .order_by(SaleReturnLine.line_number.asc())
             )
-            .select_from(SaleReturnLine)
-            .join(SaleLine, SaleLine.id == SaleReturnLine.original_sale_line_id)
-            .where(SaleReturnLine.sale_return_id == return_id)
-            .order_by(SaleReturnLine.line_number.asc())
-        ).mappings().all()
+            .mappings()
+            .all()
+        )
         payment_methods_label = _get_payment_methods_label(
             session,
             sale_id=type_cast(uuid.UUID, overview_row["original_sale_id"]),
@@ -202,7 +220,8 @@ class AdminReturnsService:
             audit_summary=audit_summary,
             available_actions=AdminReturnAvailableActionsView(
                 creation_note=(
-                    "Las devoluciones nuevas requieren caja abierta y se registran desde el flujo operativo."
+                    "Las devoluciones nuevas requieren caja abierta "
+                    "y se registran desde el flujo operativo."
                 )
             ),
             backend_contract=_backend_contract(),
@@ -288,7 +307,9 @@ def _backend_contract() -> AdminReturnsBackendContractView:
     )
 
 
-def _build_return_base_statement(conditions: list[object]) -> Select[tuple[object, ...]]:
+def _build_return_base_statement(
+    conditions: list[ColumnElement[bool]],
+) -> Select[tuple[object, ...]]:
     line_count_subquery = (
         select(
             SaleReturnLine.sale_return_id.label("sale_return_id"),
@@ -336,8 +357,8 @@ def _build_return_conditions(
     refund_method: str | None,
     search: str | None,
     status_filter: str | None,
-) -> list[object]:
-    conditions: list[object] = []
+) -> list[ColumnElement[bool]]:
+    conditions: list[ColumnElement[bool]] = []
     if branch_id is not None:
         conditions.append(SaleReturn.branch_id == branch_id)
     if operator_id is not None:
@@ -393,7 +414,9 @@ def _build_return_conditions(
 
 
 def _build_filter_options(session: Session) -> AdminReturnFilterOptionsView:
-    branch_rows = session.execute(select(Branch.id, Branch.name).order_by(Branch.name.asc())).mappings()
+    branch_rows = session.execute(
+        select(Branch.id, Branch.name).order_by(Branch.name.asc())
+    ).mappings()
     operator_rows = session.execute(
         select(User.id, User.full_name)
         .where(exists(select(SaleReturn.id).where(SaleReturn.created_by_user_id == User.id)))
@@ -401,11 +424,15 @@ def _build_filter_options(session: Session) -> AdminReturnFilterOptionsView:
     ).mappings()
     return AdminReturnFilterOptionsView(
         branches=[
-            AdminReturnCorrectionFilterOptionView(id=str(row["id"]), label=type_cast(str, row["name"]))
+            AdminReturnCorrectionFilterOptionView(
+                id=str(row["id"]), label=type_cast(str, row["name"])
+            )
             for row in branch_rows
         ],
         operators=[
-            AdminReturnCorrectionFilterOptionView(id=str(row["id"]), label=type_cast(str, row["full_name"]))
+            AdminReturnCorrectionFilterOptionView(
+                id=str(row["id"]), label=type_cast(str, row["full_name"])
+            )
             for row in operator_rows
         ],
         refund_methods=[
@@ -417,24 +444,30 @@ def _build_filter_options(session: Session) -> AdminReturnFilterOptionsView:
     )
 
 
-def _build_metrics(session: Session, conditions: list[object]) -> AdminReturnMetricsView:
-    return_ids_statement = _build_return_base_statement(conditions).with_only_columns(
-        SaleReturn.id
-    ).order_by(None)
-    metric_row = session.execute(
-        select(
-            func.count(SaleReturn.id).label("returns_count"),
-            func.coalesce(func.sum(SaleReturn.total_refund_amount), ZERO_MONEY).label(
-                "refunded_amount"
-            ),
-            func.coalesce(
-                func.sum(
-                    SaleReturn.total_refund_amount
-                ).filter(SaleReturn.refund_method_code == RETURN_REFUND_METHOD_CASH),
-                ZERO_MONEY,
-            ).label("cash_refunded_amount"),
-        ).where(SaleReturn.id.in_(return_ids_statement))
-    ).mappings().one()
+def _build_metrics(
+    session: Session, conditions: list[ColumnElement[bool]]
+) -> AdminReturnMetricsView:
+    return_ids_statement = (
+        _build_return_base_statement(conditions).with_only_columns(SaleReturn.id).order_by(None)
+    )
+    metric_row = (
+        session.execute(
+            select(
+                func.count(SaleReturn.id).label("returns_count"),
+                func.coalesce(func.sum(SaleReturn.total_refund_amount), ZERO_MONEY).label(
+                    "refunded_amount"
+                ),
+                func.coalesce(
+                    func.sum(SaleReturn.total_refund_amount).filter(
+                        SaleReturn.refund_method_code == RETURN_REFUND_METHOD_CASH
+                    ),
+                    ZERO_MONEY,
+                ).label("cash_refunded_amount"),
+            ).where(SaleReturn.id.in_(return_ids_statement))
+        )
+        .mappings()
+        .one()
+    )
     returned_line_count = int(
         session.execute(
             select(func.count(SaleReturnLine.id)).where(
@@ -516,7 +549,7 @@ def _is_partial_return(session: Session, *, sale_id: uuid.UUID) -> bool:
         .join(SaleLine, SaleLine.id == SaleReturnLine.original_sale_line_id)
         .where(SaleLine.sale_id == sale_id)
     ).scalar_one()
-    return type_cast(Decimal, returned_quantity) < type_cast(Decimal, sale_quantity)
+    return returned_quantity < sale_quantity
 
 
 def _build_sale_folio(sale_id: uuid.UUID) -> str:

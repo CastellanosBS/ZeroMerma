@@ -183,7 +183,7 @@ def test_ticket_lookup_requires_open_cash_session(client: TestClient) -> None:
 
     assert response.status_code == 409
     assert (
-        response.json()["detail"]
+        response.json()["message"]
         == "Necesitas una caja abierta en esta estacion para consultar tickets."
     )
 

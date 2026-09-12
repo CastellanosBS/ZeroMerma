@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import uuid
 from collections import defaultdict
+from collections.abc import Sequence
 from datetime import UTC, datetime
 from decimal import Decimal
 from typing import cast as type_cast
@@ -9,6 +10,7 @@ from typing import cast as type_cast
 from sqlalchemy import Select, String, and_, cast, exists, func, or_, select
 from sqlalchemy.engine import RowMapping
 from sqlalchemy.orm import Session
+from sqlalchemy.sql.elements import ColumnElement
 
 from zeromerma_api.modules.branches.infrastructure.models import Branch, Workstation
 from zeromerma_api.modules.cash.domain.constants import (
@@ -399,7 +401,7 @@ class AdminCashCutService:
             returns_refunds=returns_refunds,
         )
 
-    def _base_list_statement(self):
+    def _base_list_statement(self) -> Select[tuple[object, ...]]:
         return (
             select(
                 CashSession.id.label("cash_session_id"),
@@ -432,7 +434,7 @@ class AdminCashCutService:
         )
 
     def _build_cash_session_ids_statement(
-        self, conditions: list[object]
+        self, conditions: list[ColumnElement[bool]]
     ) -> Select[tuple[uuid.UUID]]:
         statement = (
             select(CashSession.id)
@@ -460,8 +462,8 @@ class AdminCashCutService:
         search: str | None,
         status_filter: str | None,
         workstation_id: uuid.UUID | None,
-    ) -> list[object]:
-        conditions: list[object] = []
+    ) -> list[ColumnElement[bool]]:
+        conditions: list[ColumnElement[bool]] = []
         if branch_id is not None:
             conditions.append(CashSession.branch_id == branch_id)
         if workstation_id is not None:
@@ -723,8 +725,8 @@ class AdminCashCutService:
             net_difference_amount=_money(
                 type_cast(Decimal, close_metrics["net_difference_amount"])
             ),
-            net_sales_amount=_money(type_cast(Decimal, sales_amount)),
-            operational_payments_amount=_money(type_cast(Decimal, operational_payments_amount)),
+            net_sales_amount=_money(sales_amount),
+            operational_payments_amount=_money(operational_payments_amount),
             pending_close_count=pending_close_count,
         )
 
@@ -765,7 +767,7 @@ class AdminCashCutService:
         self,
         session: Session,
         *,
-        rows: list[RowMapping],
+        rows: Sequence[RowMapping],
     ) -> dict[uuid.UUID, Decimal]:
         result: dict[uuid.UUID, Decimal] = {}
         for row in rows:
@@ -873,7 +875,7 @@ class AdminCashCutService:
         self,
         session: Session,
         *,
-        close_ids: list[uuid.UUID | None],
+        close_ids: Sequence[uuid.UUID | None],
     ) -> dict[uuid.UUID | None, int]:
         resolved_ids = [close_id for close_id in close_ids if close_id is not None]
         if not resolved_ids:
@@ -1597,7 +1599,7 @@ def _resolve_warning_state(
     return "ok"
 
 
-def _amounts_by_method(rows: list[RowMapping]) -> dict[str, Decimal]:
+def _amounts_by_method(rows: Sequence[RowMapping]) -> dict[str, Decimal]:
     result: dict[str, Decimal] = {}
     for row in rows:
         result[type_cast(str, row["payment_method_code"])] = _money(

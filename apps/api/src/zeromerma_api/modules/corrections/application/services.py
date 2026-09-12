@@ -651,6 +651,9 @@ class CorrectionQueryService:
             filtered_statement = filtered_statement.where(
                 or_(
                     CorrectionDocument.id.cast(String).ilike(pattern),
+                    func.concat(
+                        "COR-", func.substr(CorrectionDocument.id.cast(String), 1, 8)
+                    ).ilike(pattern),
                     CorrectionDocument.target_document_id.cast(String).ilike(pattern),
                     User.full_name.ilike(pattern),
                     CorrectionReason.name.ilike(pattern),

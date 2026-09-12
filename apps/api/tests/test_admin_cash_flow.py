@@ -184,9 +184,7 @@ def test_admin_cash_flow_lists_source_movements_metrics_and_trend(client: TestCl
     assert {"SALE", "RETURN_REFUND", "OPERATIONAL_PAYMENT", "CASH_CUT_DIFFERENCE"}.issubset(
         source_types
     )
-    assert Decimal(str(payload["summary"]["inflows_total"])) >= Decimal(
-        str(sale["total_amount"])
-    )
+    assert Decimal(str(payload["summary"]["inflows_total"])) >= Decimal(str(sale["total_amount"]))
     assert Decimal(str(payload["summary"]["operational_payments_total"])) == Decimal("25.00")
     assert Decimal(str(payload["summary"]["difference_total"])) == Decimal("5.00")
     assert Decimal(str(payload["summary"]["pending_reconciliation_total"])) == Decimal("5.00")
@@ -241,8 +239,7 @@ def test_admin_cash_flow_detail_links_source_cut_and_reconciliation(client: Test
     assert detail["source_document_context"]["cash_cut_folio"].startswith("CC-")
     assert detail["financial_classification"]["net_effect"] == "0.00"
     assert any(
-        document["document_type"] == "RECONCILIATION"
-        for document in detail["related_documents"]
+        document["document_type"] == "RECONCILIATION" for document in detail["related_documents"]
     )
 
 
@@ -250,4 +247,4 @@ def test_admin_cash_flow_requires_backoffice_surface(client: TestClient) -> None
     response = client.get("/v1/admin/cash-flow", headers=_cashier_headers(client))
 
     assert response.status_code == 403
-    assert response.json()["detail"] == "Backoffice access is required."
+    assert response.json()["message"] == "Backoffice access is required."

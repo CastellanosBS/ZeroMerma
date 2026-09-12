@@ -18,7 +18,10 @@ from zeromerma_api.db.session import SessionLocal
 from zeromerma_api.modules.audit.infrastructure.models import AuditLog
 from zeromerma_api.modules.branches.infrastructure.models import Branch
 from zeromerma_api.modules.catalog.infrastructure.models import Product
-from zeromerma_api.modules.inventory.infrastructure.models import InventoryBalance, InventoryMovement
+from zeromerma_api.modules.inventory.infrastructure.models import (
+    InventoryBalance,
+    InventoryMovement,
+)
 from zeromerma_api.modules.operations.infrastructure.models import OperationDocument
 from zeromerma_api.modules.outbox.infrastructure.models import OutboxEvent
 
@@ -59,7 +62,9 @@ def _get_product_id(code: str) -> str:
         return str(product.id)
 
 
-def _create_stock(client: TestClient, *, product_code: str, quantity: str = "20.000") -> dict[str, object]:
+def _create_stock(
+    client: TestClient, *, product_code: str, quantity: str = "20.000"
+) -> dict[str, object]:
     response = client.post(
         "/v1/admin/inventory/adjustments",
         headers=_admin_headers(client),
@@ -137,7 +142,9 @@ def test_admin_waste_create_confirms_document_inventory_movement_audit_and_outbo
     assert payload["product_inventory_context"]["stock_after"] == "17.000"
 
     with SessionLocal() as session:
-        document = session.execute(select(OperationDocument).where(OperationDocument.id == waste_id)).scalar_one()
+        document = session.execute(
+            select(OperationDocument).where(OperationDocument.id == waste_id)
+        ).scalar_one()
         balance = session.execute(
             select(InventoryBalance).where(
                 InventoryBalance.product_id == _get_product_id(SEED_PRODUCT_CONCHA_VAN_CODE),
@@ -175,11 +182,15 @@ def test_admin_waste_filters_search_reason_branch_and_product(client: TestClient
     )
     waste_id = created["overview"]["id"]
 
-    branch_response = client.get(f"/v1/admin/waste?branch_id={_get_branch_id()}", headers=_admin_headers(client))
+    branch_response = client.get(
+        f"/v1/admin/waste?branch_id={_get_branch_id()}", headers=_admin_headers(client)
+    )
     assert branch_response.status_code == 200
     assert [item["id"] for item in branch_response.json()["items"]] == [waste_id]
 
-    reason_response = client.get("/v1/admin/waste?reason_code=EXPIRED", headers=_admin_headers(client))
+    reason_response = client.get(
+        "/v1/admin/waste?reason_code=EXPIRED", headers=_admin_headers(client)
+    )
     assert reason_response.status_code == 200
     assert [item["id"] for item in reason_response.json()["items"]] == [waste_id]
 
@@ -190,15 +201,21 @@ def test_admin_waste_filters_search_reason_branch_and_product(client: TestClient
     assert product_response.status_code == 200
     assert [item["id"] for item in product_response.json()["items"]] == [waste_id]
 
-    product_kind_response = client.get("/v1/admin/waste?product_kind=FINISHED_GOOD", headers=_admin_headers(client))
+    product_kind_response = client.get(
+        "/v1/admin/waste?product_kind=FINISHED_GOOD", headers=_admin_headers(client)
+    )
     assert product_kind_response.status_code == 200
     assert [item["id"] for item in product_kind_response.json()["items"]] == [waste_id]
 
-    evidence_response = client.get("/v1/admin/waste?evidence_state=without_evidence", headers=_admin_headers(client))
+    evidence_response = client.get(
+        "/v1/admin/waste?evidence_state=without_evidence", headers=_admin_headers(client)
+    )
     assert evidence_response.status_code == 200
     assert [item["id"] for item in evidence_response.json()["items"]] == [waste_id]
 
-    with_evidence_response = client.get("/v1/admin/waste?evidence_state=with_evidence", headers=_admin_headers(client))
+    with_evidence_response = client.get(
+        "/v1/admin/waste?evidence_state=with_evidence", headers=_admin_headers(client)
+    )
     assert with_evidence_response.status_code == 200
     assert with_evidence_response.json()["items"] == []
 
@@ -220,22 +237,40 @@ def test_admin_waste_validates_note_reason_stock_and_quantity(client: TestClient
         "reason_code": "DAMAGED",
     }
 
-    quantity_response = client.post("/v1/admin/waste", headers=headers, json={**base_payload, "quantity": "0"})
+    quantity_response = client.post(
+        "/v1/admin/waste", headers=headers, json={**base_payload, "quantity": "0"}
+    )
     assert quantity_response.status_code == 422
 
-    missing_note_response = client.post("/v1/admin/waste", headers=headers, json={**base_payload, "notes": None})
+    missing_note_response = client.post(
+        "/v1/admin/waste", headers=headers, json={**base_payload, "notes": None}
+    )
     assert missing_note_response.status_code == 409
-    assert missing_note_response.json()["detail"] == "Notes are required for this waste reason or impact level."
+    assert (
+        missing_note_response.json()["message"]
+        == "Notes are required for this waste reason or impact level."
+    )
 
-    other_note_response = client.post("/v1/admin/waste", headers=headers, json={**base_payload, "reason_code": "OTHER", "notes": None})
+    other_note_response = client.post(
+        "/v1/admin/waste",
+        headers=headers,
+        json={**base_payload, "reason_code": "OTHER", "notes": None},
+    )
     assert other_note_response.status_code == 409
 
-    missing_reason_response = client.post("/v1/admin/waste", headers=headers, json={**base_payload, "reason_code": "NOPE"})
+    missing_reason_response = client.post(
+        "/v1/admin/waste", headers=headers, json={**base_payload, "reason_code": "NOPE"}
+    )
     assert missing_reason_response.status_code == 404
 
-    excess_response = client.post("/v1/admin/waste", headers=headers, json={**base_payload, "quantity": "5.000"})
+    excess_response = client.post(
+        "/v1/admin/waste", headers=headers, json={**base_payload, "quantity": "5.000"}
+    )
     assert excess_response.status_code == 409
-    assert excess_response.json()["detail"] == "Waste quantity exceeds available stock for selected branch and location."
+    assert (
+        excess_response.json()["message"]
+        == "Waste quantity exceeds available stock for selected branch and location."
+    )
 
 
 def test_admin_waste_high_impact_notifies_backoffice_without_supervisor_approval(
@@ -255,12 +290,24 @@ def test_admin_waste_high_impact_notifies_backoffice_without_supervisor_approval
     assert payload["warnings"][0]["code"] == "high_impact"
 
     with SessionLocal() as session:
-        audit_actions = session.execute(
-            select(AuditLog.action).where(AuditLog.resource_id == str(waste_id)).order_by(AuditLog.action.asc()),
-        ).scalars().all()
-        outbox_events = session.execute(
-            select(OutboxEvent.event_name).where(OutboxEvent.aggregate_id == str(waste_id)).order_by(OutboxEvent.event_name.asc()),
-        ).scalars().all()
+        audit_actions = (
+            session.execute(
+                select(AuditLog.action)
+                .where(AuditLog.resource_id == str(waste_id))
+                .order_by(AuditLog.action.asc()),
+            )
+            .scalars()
+            .all()
+        )
+        outbox_events = (
+            session.execute(
+                select(OutboxEvent.event_name)
+                .where(OutboxEvent.aggregate_id == str(waste_id))
+                .order_by(OutboxEvent.event_name.asc()),
+            )
+            .scalars()
+            .all()
+        )
 
     assert audit_actions == ["admin.waste.confirmed", "admin.waste.high_impact_notified"]
     assert outbox_events == ["waste_record.committed.v1", "waste_record.high_impact_alert.v1"]

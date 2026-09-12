@@ -1,9 +1,11 @@
 from __future__ import annotations
 
 import uuid
+from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import Any
 
+from pydantic import TypeAdapter
 from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
@@ -41,7 +43,7 @@ from zeromerma_api.modules.identity.application.admin_schemas import (
     AdminUserUpdateRequest,
     AdminUserWarningView,
 )
-from zeromerma_api.modules.identity.application.schemas import AuthenticatedUser
+from zeromerma_api.modules.identity.application.schemas import AuthenticatedUser, IdentitySurface
 from zeromerma_api.modules.identity.application.security import PasswordHasher
 from zeromerma_api.modules.identity.domain.constants import (
     IDENTITY_ALLOWED_SURFACES,
@@ -62,6 +64,10 @@ from zeromerma_api.modules.identity.infrastructure.models import (
 from zeromerma_api.modules.outbox.application.service import OutboxWriter
 from zeromerma_api.modules.sales.infrastructure.models import Sale
 
+_IDENTITY_SURFACE_ADAPTER: TypeAdapter[IdentitySurface] = TypeAdapter(IdentitySurface)
+_LIST_IDENTITY_SURFACE_ADAPTER: TypeAdapter[list[IdentitySurface]] = TypeAdapter(
+    list[IdentitySurface]
+)
 AUDIT_ACTION_ADMIN_USER_CREATED = "admin.user.created"
 AUDIT_ACTION_ADMIN_USER_UPDATED = "admin.user.updated"
 AUDIT_ACTION_ADMIN_USER_STATUS_CHANGED = "admin.user.status_changed"
@@ -73,9 +79,7 @@ AUDIT_ACTION_ADMIN_USER_ROLE_ASSIGNMENT_CHANGED = "admin.user.role_assignment_ch
 OUTBOX_EVENT_ADMIN_USER_CREATED_V1 = "admin.user.created.v1"
 OUTBOX_EVENT_ADMIN_USER_UPDATED_V1 = "admin.user.updated.v1"
 OUTBOX_EVENT_ADMIN_USER_SECURITY_CHANGED_V1 = "admin.user.security_changed.v1"
-OUTBOX_EVENT_ADMIN_USER_BRANCH_ASSIGNMENT_CHANGED_V1 = (
-    "admin.user.branch_assignment_changed.v1"
-)
+OUTBOX_EVENT_ADMIN_USER_BRANCH_ASSIGNMENT_CHANGED_V1 = "admin.user.branch_assignment_changed.v1"
 OUTBOX_EVENT_ADMIN_USER_ROLE_ASSIGNMENT_CHANGED_V1 = "admin.user.role_assignment_changed.v1"
 
 USER_RESOURCE_TYPE = "user"
@@ -232,8 +236,7 @@ class AdminUserService:
             raise UserValidationError("POS users require at least one branch assignment.")
 
         branches = [
-            self._get_branch(session, assignment.branch_id)
-            for assignment in branch_commands
+            self._get_branch(session, assignment.branch_id) for assignment in branch_commands
         ]
         user = User(
             email=email,
@@ -314,10 +317,7 @@ class AdminUserService:
         surfaces = self._normalize_surfaces(user.allowed_surfaces)
         if command.allowed_surfaces is not None:
             surfaces = self._normalize_surfaces(command.allowed_surfaces)
-            if (
-                user.id == current_user.id
-                and IDENTITY_SURFACE_BACKOFFICE not in surfaces
-            ):
+            if user.id == current_user.id and IDENTITY_SURFACE_BACKOFFICE not in surfaces:
                 raise UserConflictError("You cannot remove your own Backoffice access.")
             if (
                 user.is_active
@@ -648,8 +648,10 @@ class AdminUserService:
             full_name=context.user.full_name,
             email=context.user.email,
             status=_user_status(context.user),
-            allowed_surfaces=surfaces,
-            default_surface=self._resolve_default_surface(surfaces, context.user.default_surface),
+            allowed_surfaces=_LIST_IDENTITY_SURFACE_ADAPTER.validate_python(surfaces),
+            default_surface=_IDENTITY_SURFACE_ADAPTER.validate_python(
+                self._resolve_default_surface(surfaces, context.user.default_surface)
+            ),
             branch_count=len(active_branch_names),
             branch_names=active_branch_names,
             role_count=len(role_names),
@@ -684,8 +686,10 @@ class AdminUserService:
                 full_name=user.full_name,
                 email=user.email,
                 status=status_value,
-                allowed_surfaces=surfaces,
-                default_surface=self._resolve_default_surface(surfaces, user.default_surface),
+                allowed_surfaces=_LIST_IDENTITY_SURFACE_ADAPTER.validate_python(surfaces),
+                default_surface=_IDENTITY_SURFACE_ADAPTER.validate_python(
+                    self._resolve_default_surface(surfaces, user.default_surface)
+                ),
                 created_at=user.created_at,
                 updated_at=user.updated_at,
                 last_login_at=user.last_login_at,
@@ -705,13 +709,14 @@ class AdminUserService:
                 last_login_at=user.last_login_at,
             ),
             app_access=AdminUserAppAccessView(
-                allowed_surfaces=surfaces,
-                default_surface=self._resolve_default_surface(surfaces, user.default_surface),
+                allowed_surfaces=_LIST_IDENTITY_SURFACE_ADAPTER.validate_python(surfaces),
+                default_surface=_IDENTITY_SURFACE_ADAPTER.validate_python(
+                    self._resolve_default_surface(surfaces, user.default_surface)
+                ),
                 pos_enabled=IDENTITY_SURFACE_POS in surfaces,
                 backoffice_enabled=IDENTITY_SURFACE_BACKOFFICE in surfaces,
                 has_both_surfaces=(
-                    IDENTITY_SURFACE_POS in surfaces
-                    and IDENTITY_SURFACE_BACKOFFICE in surfaces
+                    IDENTITY_SURFACE_POS in surfaces and IDENTITY_SURFACE_BACKOFFICE in surfaces
                 ),
             ),
             branch_assignments=[
@@ -767,9 +772,7 @@ class AdminUserService:
         return AdminUserMetricsView(
             total_users=len(contexts),
             active_users=sum(
-                1
-                for context in contexts
-                if context.user.is_active and not context.user.is_locked
+                1 for context in contexts if context.user.is_active and not context.user.is_locked
             ),
             inactive_users=sum(1 for context in contexts if not context.user.is_active),
             locked_users=sum(1 for context in contexts if context.user.is_locked),
@@ -797,9 +800,11 @@ class AdminUserService:
         )
 
     def _build_filter_options(self, session: Session) -> AdminUserFilterOptionsView:
-        branches = session.execute(
-            select(Branch).order_by(Branch.name.asc(), Branch.code.asc())
-        ).scalars().all()
+        branches = (
+            session.execute(select(Branch).order_by(Branch.name.asc(), Branch.code.asc()))
+            .scalars()
+            .all()
+        )
         roles = session.execute(select(Role).order_by(Role.name.asc())).scalars().all()
         return AdminUserFilterOptionsView(
             branches=[
@@ -904,8 +909,10 @@ class AdminUserService:
         user: User,
         warnings: list[AdminUserWarningView],
     ) -> AdminUserReadinessState:
-        if not user.is_active or user.is_locked or any(
-            warning.severity == "critical" for warning in warnings
+        if (
+            not user.is_active
+            or user.is_locked
+            or any(warning.severity == "critical" for warning in warnings)
         ):
             return "blocked"
         if warnings:
@@ -931,14 +938,18 @@ class AdminUserService:
         recent_backoffice_activity_count = session.execute(
             select(func.count()).select_from(AuditLog).where(AuditLog.actor_id == user.id)
         ).scalar_one()
-        branch_names = session.execute(
-            select(Branch.name)
-            .join(Sale, Sale.branch_id == Branch.id)
-            .where(Sale.operator_id == user.id)
-            .distinct()
-            .order_by(Branch.name.asc())
-            .limit(5)
-        ).scalars().all()
+        branch_names = (
+            session.execute(
+                select(Branch.name)
+                .join(Sale, Sale.branch_id == Branch.id)
+                .where(Sale.operator_id == user.id)
+                .distinct()
+                .order_by(Branch.name.asc())
+                .limit(5)
+            )
+            .scalars()
+            .all()
+        )
         last_workstation_used = session.execute(
             select(Workstation.name)
             .join(Sale, Sale.workstation_id == Workstation.id)
@@ -959,15 +970,19 @@ class AdminUserService:
         session: Session,
         user_id: uuid.UUID,
     ) -> list[AdminUserAuditTimelineEventView]:
-        records = session.execute(
-            select(AuditLog)
-            .where(
-                AuditLog.resource_type == USER_RESOURCE_TYPE,
-                AuditLog.resource_id == str(user_id),
+        records = (
+            session.execute(
+                select(AuditLog)
+                .where(
+                    AuditLog.resource_type == USER_RESOURCE_TYPE,
+                    AuditLog.resource_id == str(user_id),
+                )
+                .order_by(AuditLog.occurred_at.desc())
+                .limit(20)
             )
-            .order_by(AuditLog.occurred_at.desc())
-            .limit(20)
-        ).scalars().all()
+            .scalars()
+            .all()
+        )
         return [
             AdminUserAuditTimelineEventView(
                 id=record.id,
@@ -990,7 +1005,9 @@ class AdminUserService:
                 .join(Branch, Branch.id == UserBranchAssignment.branch_id)
                 .where(UserBranchAssignment.user_id == user_id)
                 .order_by(Branch.name.asc(), Branch.code.asc())
-            ).all()
+            )
+            .tuples()
+            .all()
         )
 
     def _fetch_role_assignments(
@@ -1007,7 +1024,9 @@ class AdminUserService:
                     UserRoleAssignment.is_active.is_(True),
                 )
                 .order_by(Role.name.asc(), Role.code.asc())
-            ).all()
+            )
+            .tuples()
+            .all()
         )
 
     def _get_context(self, session: Session, user_id: uuid.UUID) -> _UserContext:
@@ -1158,21 +1177,29 @@ class AdminUserService:
         user: User,
         branch_id: uuid.UUID,
     ) -> None:
-        assignments = session.execute(
-            select(UserBranchAssignment).where(UserBranchAssignment.user_id == user.id)
-        ).scalars().all()
+        assignments = (
+            session.execute(
+                select(UserBranchAssignment).where(UserBranchAssignment.user_id == user.id)
+            )
+            .scalars()
+            .all()
+        )
         for assignment in assignments:
             assignment.is_default = assignment.branch_id == branch_id and assignment.is_active
 
     def _ensure_default_assignment(self, session: Session, *, user: User) -> None:
-        assignments = session.execute(
-            select(UserBranchAssignment)
-            .where(
-                UserBranchAssignment.user_id == user.id,
-                UserBranchAssignment.is_active.is_(True),
+        assignments = (
+            session.execute(
+                select(UserBranchAssignment)
+                .where(
+                    UserBranchAssignment.user_id == user.id,
+                    UserBranchAssignment.is_active.is_(True),
+                )
+                .order_by(UserBranchAssignment.created_at.asc())
             )
-            .order_by(UserBranchAssignment.created_at.asc())
-        ).scalars().all()
+            .scalars()
+            .all()
+        )
         if assignments and not any(assignment.is_default for assignment in assignments):
             assignments[0].is_default = True
 
@@ -1321,13 +1348,17 @@ class AdminUserService:
             not in self._normalize_surfaces(target_user.allowed_surfaces)
         ):
             return False
-        users = session.execute(
-            select(User).where(
-                User.id != target_user.id,
-                User.is_active.is_(True),
-                User.is_locked.is_(False),
+        users = (
+            session.execute(
+                select(User).where(
+                    User.id != target_user.id,
+                    User.is_active.is_(True),
+                    User.is_locked.is_(False),
+                )
             )
-        ).scalars().all()
+            .scalars()
+            .all()
+        )
         return not any(
             IDENTITY_SURFACE_BACKOFFICE in self._normalize_surfaces(user.allowed_surfaces)
             for user in users
@@ -1337,10 +1368,7 @@ class AdminUserService:
         surfaces = self._normalize_surfaces(user.allowed_surfaces)
         normalized = app_access.strip().upper()
         if normalized == "BOTH":
-            return (
-                IDENTITY_SURFACE_POS in surfaces
-                and IDENTITY_SURFACE_BACKOFFICE in surfaces
-            )
+            return IDENTITY_SURFACE_POS in surfaces and IDENTITY_SURFACE_BACKOFFICE in surfaces
         return normalized in surfaces
 
     def _normalize_email(self, email: str) -> str:
@@ -1349,7 +1377,7 @@ class AdminUserService:
             raise UserValidationError("Email must be valid.")
         return normalized
 
-    def _normalize_surfaces(self, values: list[str] | tuple[str, ...] | None) -> list[str]:
+    def _normalize_surfaces(self, values: Sequence[str] | None) -> list[str]:
         if values is None:
             return [IDENTITY_SURFACE_POS]
         normalized: list[str] = []

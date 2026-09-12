@@ -93,7 +93,9 @@ def upgrade() -> None:
         sa.PrimaryKeyConstraint("id", name=op.f("pk_commercial_discounts")),
         sa.UniqueConstraint("code", name=op.f("uq_commercial_discounts_code")),
     )
-    op.create_index(op.f("ix_commercial_discounts_brand_id"), "commercial_discounts", ["brand_id"], unique=False)
+    op.create_index(
+        op.f("ix_commercial_discounts_brand_id"), "commercial_discounts", ["brand_id"], unique=False
+    )
     op.create_index(
         op.f("ix_commercial_discounts_product_id"),
         "commercial_discounts",
@@ -106,7 +108,9 @@ def upgrade() -> None:
         ["product_class_id"],
         unique=False,
     )
-    op.create_index(op.f("ix_commercial_discounts_status"), "commercial_discounts", ["status"], unique=False)
+    op.create_index(
+        op.f("ix_commercial_discounts_status"), "commercial_discounts", ["status"], unique=False
+    )
     op.create_index(
         op.f("ix_commercial_discounts_target_scope"),
         "commercial_discounts",
@@ -118,7 +122,9 @@ def upgrade() -> None:
 def downgrade() -> None:
     op.drop_index(op.f("ix_commercial_discounts_target_scope"), table_name="commercial_discounts")
     op.drop_index(op.f("ix_commercial_discounts_status"), table_name="commercial_discounts")
-    op.drop_index(op.f("ix_commercial_discounts_product_class_id"), table_name="commercial_discounts")
+    op.drop_index(
+        op.f("ix_commercial_discounts_product_class_id"), table_name="commercial_discounts"
+    )
     op.drop_index(op.f("ix_commercial_discounts_product_id"), table_name="commercial_discounts")
     op.drop_index(op.f("ix_commercial_discounts_brand_id"), table_name="commercial_discounts")
     op.drop_table("commercial_discounts")

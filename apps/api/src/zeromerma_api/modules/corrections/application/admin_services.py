@@ -9,6 +9,7 @@ from typing import cast as type_cast
 from sqlalchemy import Select, String, and_, case, cast, exists, func, or_, select
 from sqlalchemy.engine import RowMapping
 from sqlalchemy.orm import Session, aliased
+from sqlalchemy.sql.elements import ColumnElement
 
 from zeromerma_api.modules.audit.application.visibility import (
     AuditVisibilityQueryService,
@@ -108,14 +109,18 @@ class AdminCorrectionsService:
                 select(func.count()).select_from(base_statement.order_by(None).subquery())
             ).scalar_one()
         )
-        rows = session.execute(
-            base_statement.order_by(
-                CorrectionDocument.created_at_utc.desc(),
-                CorrectionDocument.id.desc(),
+        rows = (
+            session.execute(
+                base_statement.order_by(
+                    CorrectionDocument.created_at_utc.desc(),
+                    CorrectionDocument.id.desc(),
+                )
+                .limit(resolved_page_size)
+                .offset((resolved_page - 1) * resolved_page_size)
             )
-            .limit(resolved_page_size)
-            .offset((resolved_page - 1) * resolved_page_size)
-        ).mappings().all()
+            .mappings()
+            .all()
+        )
         return AdminCorrectionsListResponse(
             backend_contract=_backend_contract(),
             filter_options=_build_filter_options(session),
@@ -138,67 +143,77 @@ class AdminCorrectionsService:
         target_branch = aliased(Branch)
         target_workstation = aliased(Workstation)
         target_user = aliased(User)
-        row = session.execute(
-            select(
-                CorrectionDocument.id,
-                CorrectionDocument.target_document_id,
-                CorrectionDocument.target_document_type,
-                CorrectionDocument.correction_type,
-                CorrectionDocument.source_branch_id,
-                source_branch.name.label("source_branch_name"),
-                CorrectionDocument.workstation_id,
-                Workstation.code.label("workstation_code"),
-                Workstation.name.label("workstation_name"),
-                CorrectionDocument.created_by_user_id,
-                User.email.label("operator_email"),
-                User.full_name.label("operator_name"),
-                CorrectionDocument.reason_code,
-                CorrectionReason.name.label("reason_name"),
-                CorrectionDocument.notes,
-                CorrectionDocument.status,
-                CorrectionDocument.created_at_utc,
-                CorrectionDocument.committed_at_utc,
-                OperationDocument.status.label("target_status"),
-                OperationDocument.created_at_utc.label("target_created_at"),
-                OperationDocument.committed_at_utc.label("target_committed_at"),
-                OperationDocument.created_by_user_id.label("target_created_by_user_id"),
-                target_user.full_name.label("target_operator_name"),
-                target_branch.name.label("target_branch_name"),
-                target_workstation.name.label("target_workstation_name"),
+        row = (
+            session.execute(
+                select(
+                    CorrectionDocument.id,
+                    CorrectionDocument.target_document_id,
+                    CorrectionDocument.target_document_type,
+                    CorrectionDocument.correction_type,
+                    CorrectionDocument.source_branch_id,
+                    source_branch.name.label("source_branch_name"),
+                    CorrectionDocument.workstation_id,
+                    Workstation.code.label("workstation_code"),
+                    Workstation.name.label("workstation_name"),
+                    CorrectionDocument.created_by_user_id,
+                    User.email.label("operator_email"),
+                    User.full_name.label("operator_name"),
+                    CorrectionDocument.reason_code,
+                    CorrectionReason.name.label("reason_name"),
+                    CorrectionDocument.notes,
+                    CorrectionDocument.status,
+                    CorrectionDocument.created_at_utc,
+                    CorrectionDocument.committed_at_utc,
+                    OperationDocument.status.label("target_status"),
+                    OperationDocument.created_at_utc.label("target_created_at"),
+                    OperationDocument.committed_at_utc.label("target_committed_at"),
+                    OperationDocument.created_by_user_id.label("target_created_by_user_id"),
+                    target_user.full_name.label("target_operator_name"),
+                    target_branch.name.label("target_branch_name"),
+                    target_workstation.name.label("target_workstation_name"),
+                )
+                .select_from(CorrectionDocument)
+                .join(source_branch, source_branch.id == CorrectionDocument.source_branch_id)
+                .join(Workstation, Workstation.id == CorrectionDocument.workstation_id)
+                .join(User, User.id == CorrectionDocument.created_by_user_id)
+                .join(CorrectionReason, CorrectionReason.code == CorrectionDocument.reason_code)
+                .join(
+                    OperationDocument, OperationDocument.id == CorrectionDocument.target_document_id
+                )
+                .join(target_branch, target_branch.id == OperationDocument.source_branch_id)
+                .join(target_workstation, target_workstation.id == OperationDocument.workstation_id)
+                .join(target_user, target_user.id == OperationDocument.created_by_user_id)
+                .where(CorrectionDocument.id == correction_id)
             )
-            .select_from(CorrectionDocument)
-            .join(source_branch, source_branch.id == CorrectionDocument.source_branch_id)
-            .join(Workstation, Workstation.id == CorrectionDocument.workstation_id)
-            .join(User, User.id == CorrectionDocument.created_by_user_id)
-            .join(CorrectionReason, CorrectionReason.code == CorrectionDocument.reason_code)
-            .join(OperationDocument, OperationDocument.id == CorrectionDocument.target_document_id)
-            .join(target_branch, target_branch.id == OperationDocument.source_branch_id)
-            .join(target_workstation, target_workstation.id == OperationDocument.workstation_id)
-            .join(target_user, target_user.id == OperationDocument.created_by_user_id)
-            .where(CorrectionDocument.id == correction_id)
-        ).mappings().one()
+            .mappings()
+            .one()
+        )
 
-        line_rows = session.execute(
-            select(
-                CorrectionDocumentLine.id,
-                CorrectionDocumentLine.target_line_id,
-                CorrectionDocumentLine.product_code_snapshot,
-                CorrectionDocumentLine.product_name_snapshot,
-                CorrectionDocumentLine.product_class_code_snapshot,
-                CorrectionDocumentLine.product_class_name_snapshot,
-                CorrectionDocumentLine.delta_quantity,
-                CorrectionDocumentLine.unit_of_measure_code,
-                CorrectionDocumentLine.notes,
-                OperationDocumentLine.quantity.label("original_quantity"),
+        line_rows = (
+            session.execute(
+                select(
+                    CorrectionDocumentLine.id,
+                    CorrectionDocumentLine.target_line_id,
+                    CorrectionDocumentLine.product_code_snapshot,
+                    CorrectionDocumentLine.product_name_snapshot,
+                    CorrectionDocumentLine.product_class_code_snapshot,
+                    CorrectionDocumentLine.product_class_name_snapshot,
+                    CorrectionDocumentLine.delta_quantity,
+                    CorrectionDocumentLine.unit_of_measure_code,
+                    CorrectionDocumentLine.notes,
+                    OperationDocumentLine.quantity.label("original_quantity"),
+                )
+                .select_from(CorrectionDocumentLine)
+                .outerjoin(
+                    OperationDocumentLine,
+                    OperationDocumentLine.id == CorrectionDocumentLine.target_line_id,
+                )
+                .where(CorrectionDocumentLine.correction_document_id == correction_id)
+                .order_by(CorrectionDocumentLine.line_number.asc())
             )
-            .select_from(CorrectionDocumentLine)
-            .outerjoin(
-                OperationDocumentLine,
-                OperationDocumentLine.id == CorrectionDocumentLine.target_line_id,
-            )
-            .where(CorrectionDocumentLine.correction_document_id == correction_id)
-            .order_by(CorrectionDocumentLine.line_number.asc())
-        ).mappings().all()
+            .mappings()
+            .all()
+        )
         total_units_affected = _sum_abs(line["delta_quantity"] for line in line_rows)
         net_effect_quantity = sum(
             (type_cast(Decimal, line["delta_quantity"]) for line in line_rows),
@@ -226,13 +241,11 @@ class AdminCorrectionsService:
         net_effect_label = _net_effect_label(net_effect_quantity)
 
         return AdminCorrectionDetailView(
-            affected_lines=[
-                _map_affected_line(line)
-                for line in line_rows
-            ],
+            affected_lines=[_map_affected_line(line) for line in line_rows],
             available_actions=AdminCorrectionAvailableActionsView(
                 creation_note=(
-                    "Las correcciones nuevas requieren caja/workstation operativo y se registran desde el flujo de ajustes."
+                    "Las correcciones nuevas requieren caja/workstation operativo "
+                    "y se registran desde el flujo de ajustes."
                 )
             ),
             backend_contract=_backend_contract(),
@@ -256,7 +269,9 @@ class AdminCorrectionsService:
                 operator_name=type_cast(str, row["target_operator_name"]),
                 branch_name=type_cast(str, row["target_branch_name"]),
                 workstation_name=type_cast(str, row["target_workstation_name"]),
-                route_hint=_route_hint_for_document_type(type_cast(str, row["target_document_type"])),
+                route_hint=_route_hint_for_document_type(
+                    type_cast(str, row["target_document_type"])
+                ),
             ),
             overview=AdminCorrectionOverviewView(
                 id=type_cast(uuid.UUID, row["id"]),
@@ -299,7 +314,9 @@ class AdminCorrectionsService:
                     status=type_cast(str, row["target_status"]),
                     occurred_at=type_cast(datetime | None, row["target_committed_at"])
                     or type_cast(datetime, row["target_created_at"]),
-                    route_hint=_route_hint_for_document_type(type_cast(str, row["target_document_type"])),
+                    route_hint=_route_hint_for_document_type(
+                        type_cast(str, row["target_document_type"])
+                    ),
                 )
             ],
         )
@@ -314,7 +331,9 @@ def _backend_contract() -> AdminCorrectionsBackendContractView:
     )
 
 
-def _build_correction_base_statement(conditions: list[object]) -> Select[tuple[object, ...]]:
+def _build_correction_base_statement(
+    conditions: list[ColumnElement[bool]],
+) -> Select[tuple[object, ...]]:
     line_stats = (
         select(
             CorrectionDocumentLine.correction_document_id.label("correction_document_id"),
@@ -322,9 +341,9 @@ def _build_correction_base_statement(conditions: list[object]) -> Select[tuple[o
             func.coalesce(func.sum(CorrectionDocumentLine.delta_quantity), ZERO_QUANTITY).label(
                 "net_effect_quantity"
             ),
-            func.coalesce(func.sum(func.abs(CorrectionDocumentLine.delta_quantity)), ZERO_QUANTITY).label(
-                "total_units_affected"
-            ),
+            func.coalesce(
+                func.sum(func.abs(CorrectionDocumentLine.delta_quantity)), ZERO_QUANTITY
+            ).label("total_units_affected"),
         )
         .group_by(CorrectionDocumentLine.correction_document_id)
         .subquery()
@@ -379,8 +398,8 @@ def _build_correction_conditions(
     search: str | None,
     status_filter: str | None,
     target_document_type: str | None,
-) -> list[object]:
-    conditions: list[object] = []
+) -> list[ColumnElement[bool]]:
+    conditions: list[ColumnElement[bool]] = []
     if branch_id is not None:
         conditions.append(CorrectionDocument.source_branch_id == branch_id)
     if operator_id is not None:
@@ -450,10 +469,18 @@ def _build_correction_conditions(
 
 
 def _build_filter_options(session: Session) -> AdminCorrectionFilterOptionsView:
-    branch_rows = session.execute(select(Branch.id, Branch.name).order_by(Branch.name.asc())).mappings()
+    branch_rows = session.execute(
+        select(Branch.id, Branch.name).order_by(Branch.name.asc())
+    ).mappings()
     operator_rows = session.execute(
         select(User.id, User.full_name)
-        .where(exists(select(CorrectionDocument.id).where(CorrectionDocument.created_by_user_id == User.id)))
+        .where(
+            exists(
+                select(CorrectionDocument.id).where(
+                    CorrectionDocument.created_by_user_id == User.id
+                )
+            )
+        )
         .order_by(User.full_name.asc())
     ).mappings()
     reason_rows = session.execute(
@@ -461,7 +488,9 @@ def _build_filter_options(session: Session) -> AdminCorrectionFilterOptionsView:
     ).mappings()
     return AdminCorrectionFilterOptionsView(
         branches=[
-            AdminReturnCorrectionFilterOptionView(id=str(row["id"]), label=type_cast(str, row["name"]))
+            AdminReturnCorrectionFilterOptionView(
+                id=str(row["id"]), label=type_cast(str, row["name"])
+            )
             for row in branch_rows
         ],
         correction_types=[
@@ -475,15 +504,21 @@ def _build_filter_options(session: Session) -> AdminCorrectionFilterOptionsView:
             ),
         ],
         operators=[
-            AdminReturnCorrectionFilterOptionView(id=str(row["id"]), label=type_cast(str, row["full_name"]))
+            AdminReturnCorrectionFilterOptionView(
+                id=str(row["id"]), label=type_cast(str, row["full_name"])
+            )
             for row in operator_rows
         ],
         reasons=[
-            AdminReturnCorrectionFilterOptionView(id=type_cast(str, row["code"]), label=type_cast(str, row["name"]))
+            AdminReturnCorrectionFilterOptionView(
+                id=type_cast(str, row["code"]), label=type_cast(str, row["name"])
+            )
             for row in reason_rows
         ],
         statuses=[
-            AdminReturnCorrectionFilterOptionView(id=CORRECTION_STATUS_COMMITTED, label="Confirmada")
+            AdminReturnCorrectionFilterOptionView(
+                id=CORRECTION_STATUS_COMMITTED, label="Confirmada"
+            )
         ],
         target_document_types=[
             AdminReturnCorrectionFilterOptionView(id=value, label=_document_type_label(value))
@@ -492,30 +527,38 @@ def _build_filter_options(session: Session) -> AdminCorrectionFilterOptionsView:
     )
 
 
-def _build_metrics(session: Session, conditions: list[object]) -> AdminCorrectionMetricsView:
-    correction_ids_statement = _build_correction_base_statement(conditions).with_only_columns(
-        CorrectionDocument.id
-    ).order_by(None)
-    metric_row = session.execute(
-        select(
-            func.count(func.distinct(CorrectionDocument.id)).label("corrections_count"),
-            func.coalesce(func.sum(func.abs(CorrectionDocumentLine.delta_quantity)), ZERO_QUANTITY).label(
-                "total_units_affected"
-            ),
-            func.count(
-                case((CorrectionDocumentLine.delta_quantity > 0, 1))
-            ).label("positive_effect_count"),
-            func.count(
-                case((CorrectionDocumentLine.delta_quantity < 0, 1))
-            ).label("negative_effect_count"),
+def _build_metrics(
+    session: Session, conditions: list[ColumnElement[bool]]
+) -> AdminCorrectionMetricsView:
+    correction_ids_statement = (
+        _build_correction_base_statement(conditions)
+        .with_only_columns(CorrectionDocument.id)
+        .order_by(None)
+    )
+    metric_row = (
+        session.execute(
+            select(
+                func.count(func.distinct(CorrectionDocument.id)).label("corrections_count"),
+                func.coalesce(
+                    func.sum(func.abs(CorrectionDocumentLine.delta_quantity)), ZERO_QUANTITY
+                ).label("total_units_affected"),
+                func.count(case((CorrectionDocumentLine.delta_quantity > 0, 1))).label(
+                    "positive_effect_count"
+                ),
+                func.count(case((CorrectionDocumentLine.delta_quantity < 0, 1))).label(
+                    "negative_effect_count"
+                ),
+            )
+            .select_from(CorrectionDocument)
+            .outerjoin(
+                CorrectionDocumentLine,
+                CorrectionDocumentLine.correction_document_id == CorrectionDocument.id,
+            )
+            .where(CorrectionDocument.id.in_(correction_ids_statement))
         )
-        .select_from(CorrectionDocument)
-        .outerjoin(
-            CorrectionDocumentLine,
-            CorrectionDocumentLine.correction_document_id == CorrectionDocument.id,
-        )
-        .where(CorrectionDocument.id.in_(correction_ids_statement))
-    ).mappings().one()
+        .mappings()
+        .one()
+    )
     return AdminCorrectionMetricsView(
         corrections_count=int(metric_row["corrections_count"] or 0),
         total_units_affected=type_cast(Decimal, metric_row["total_units_affected"]),
@@ -534,7 +577,9 @@ def _map_correction_list_item(row: RowMapping) -> AdminCorrectionListItemView:
         id=correction_id,
         folio=_build_correction_folio(correction_id),
         original_document_id=target_document_id,
-        original_document_folio=_build_target_document_folio(target_document_type, target_document_id),
+        original_document_folio=_build_target_document_folio(
+            target_document_type, target_document_id
+        ),
         original_document_type=target_document_type,
         correction_type=type_cast(str, row["correction_type"]),
         created_at=type_cast(datetime, row["created_at_utc"]),
@@ -559,7 +604,9 @@ def _map_correction_list_item(row: RowMapping) -> AdminCorrectionListItemView:
 def _map_affected_line(row: RowMapping) -> AdminCorrectionAffectedLineView:
     original_quantity = type_cast(Decimal | None, row["original_quantity"])
     delta_quantity = type_cast(Decimal, row["delta_quantity"])
-    corrected_quantity = original_quantity + delta_quantity if original_quantity is not None else None
+    corrected_quantity = (
+        original_quantity + delta_quantity if original_quantity is not None else None
+    )
     return AdminCorrectionAffectedLineView(
         id=type_cast(uuid.UUID, row["id"]),
         target_line_id=type_cast(uuid.UUID | None, row["target_line_id"]),

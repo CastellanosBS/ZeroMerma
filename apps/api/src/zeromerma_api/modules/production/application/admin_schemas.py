@@ -75,7 +75,9 @@ class AdminProductionListItemView(BaseModel):
 
 
 class AdminProductionListResponse(BaseModel):
-    backend_contract: AdminProductionBackendContractView = Field(default_factory=AdminProductionBackendContractView)
+    backend_contract: AdminProductionBackendContractView = Field(
+        default_factory=AdminProductionBackendContractView
+    )
     filter_options: AdminProductionFilterOptionsView
     is_backend_connected: bool = True
     items: list[AdminProductionListItemView]
@@ -158,7 +160,10 @@ class AdminProductionOutputYieldView(BaseModel):
 
 class AdminProductionWasteScrapView(BaseModel):
     integration_available: bool = False
-    notes: str = "Waste/scrap is represented as production yield variance; dedicated merma documents are pending contract."
+    notes: str = (
+        "Waste/scrap is represented as production yield variance; "
+        "dedicated merma documents are pending contract."
+    )
     records: list[dict[str, str]] = Field(default_factory=list)
 
 

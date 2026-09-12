@@ -129,7 +129,9 @@ def test_admin_discounts_create_fixed_class_discount_and_detail(client: TestClie
     assert Decimal(str(payload["base_price"])) == Decimal("12.00")
     assert Decimal(str(payload["preview_price"])) == Decimal("10.00")
 
-    detail_response = client.get(f"/v1/admin/discounts/{payload['id']}", headers=_admin_headers(client))
+    detail_response = client.get(
+        f"/v1/admin/discounts/{payload['id']}", headers=_admin_headers(client)
+    )
 
     assert detail_response.status_code == 200
     detail_payload = detail_response.json()

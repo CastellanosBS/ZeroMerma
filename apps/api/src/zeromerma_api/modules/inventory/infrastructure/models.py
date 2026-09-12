@@ -4,7 +4,15 @@ import uuid
 from datetime import UTC, datetime
 from decimal import Decimal
 
-from sqlalchemy import CheckConstraint, DateTime, ForeignKey, Numeric, String, Text, UniqueConstraint
+from sqlalchemy import (
+    CheckConstraint,
+    DateTime,
+    ForeignKey,
+    Numeric,
+    String,
+    Text,
+    UniqueConstraint,
+)
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -52,7 +60,9 @@ class InventoryBalance(Base):
         default=INVENTORY_LOCATION_BACKROOM,
         nullable=False,
     )
-    quantity_on_hand: Mapped[Decimal] = mapped_column(Numeric(12, 3), default=Decimal("0"), nullable=False)
+    quantity_on_hand: Mapped[Decimal] = mapped_column(
+        Numeric(12, 3), default=Decimal("0"), nullable=False
+    )
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         default=utc_now,
@@ -133,7 +143,9 @@ class InventoryMovement(Base):
             ")",
             name="ck_inventory_movements_type_valid",
         ),
-        CheckConstraint("direction IN ('IN', 'OUT')", name="ck_inventory_movements_direction_valid"),
+        CheckConstraint(
+            "direction IN ('IN', 'OUT')", name="ck_inventory_movements_direction_valid"
+        ),
         CheckConstraint("quantity > 0", name="ck_inventory_movements_quantity_positive"),
     )
 

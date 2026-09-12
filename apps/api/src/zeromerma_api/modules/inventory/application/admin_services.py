@@ -1,11 +1,13 @@
 from __future__ import annotations
 
 import uuid
+from collections.abc import Sequence
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 
-from sqlalchemy import and_, func, or_, select
+from pydantic import TypeAdapter
+from sqlalchemy import Select, and_, func, or_, select
 from sqlalchemy.orm import Session
 
 from zeromerma_api.modules.audit.application.service import AuditRecorder
@@ -21,18 +23,21 @@ from zeromerma_api.modules.identity.application.schemas import AuthenticatedUser
 from zeromerma_api.modules.identity.infrastructure.models import User
 from zeromerma_api.modules.inventory.application.admin_schemas import (
     AdminInventoryAdjustmentRequest,
+    AdminInventoryAdjustmentType,
     AdminInventoryAdjustmentView,
     AdminInventoryBranchLocationView,
     AdminInventoryDetailView,
-    AdminInventoryFilterOptionView,
     AdminInventoryFilterOptionsView,
+    AdminInventoryFilterOptionView,
     AdminInventoryListItemView,
     AdminInventoryListResponse,
     AdminInventoryLocationCode,
     AdminInventoryMetricsView,
-    AdminInventoryMovementSummaryView,
+    AdminInventoryMovementDirection,
     AdminInventoryMovementsResponse,
+    AdminInventoryMovementSummaryView,
     AdminInventoryMovementView,
+    AdminInventoryProductKind,
     AdminInventoryProductView,
     AdminInventoryRelatedActionsView,
     AdminInventoryStockBreakdownView,
@@ -69,6 +74,18 @@ from zeromerma_api.modules.inventory.infrastructure.models import (
 )
 from zeromerma_api.modules.outbox.application.service import OutboxWriter
 
+_ADMIN_INVENTORY_ADJUSTMENT_TYPE_ADAPTER: TypeAdapter[AdminInventoryAdjustmentType] = TypeAdapter(
+    AdminInventoryAdjustmentType
+)
+_ADMIN_INVENTORY_LOCATION_CODE_ADAPTER: TypeAdapter[AdminInventoryLocationCode] = TypeAdapter(
+    AdminInventoryLocationCode
+)
+_ADMIN_INVENTORY_MOVEMENT_DIRECTION_ADAPTER: TypeAdapter[AdminInventoryMovementDirection] = (
+    TypeAdapter(AdminInventoryMovementDirection)
+)
+_ADMIN_INVENTORY_PRODUCT_KIND_ADAPTER: TypeAdapter[AdminInventoryProductKind] = TypeAdapter(
+    AdminInventoryProductKind
+)
 AUDIT_ACTION_ADMIN_INVENTORY_ADJUSTMENT_CREATED = "admin.inventory.adjustment.created"
 INVENTORY_BALANCE_RESOURCE_TYPE = "inventory_balance"
 INVENTORY_ADJUSTMENT_SOURCE_DOCUMENT_TYPE = "INVENTORY_ADJUSTMENT"
@@ -291,13 +308,17 @@ class AdminInventoryService:
         session.commit()
 
         return AdminInventoryAdjustmentView(
-            adjustment_type=adjustment.adjustment_type,
+            adjustment_type=_ADMIN_INVENTORY_ADJUSTMENT_TYPE_ADAPTER.validate_python(
+                adjustment.adjustment_type
+            ),
             balance_id=balance.id,
             branch_id=adjustment.branch_id,
             created_at=adjustment.created_at,
             created_by_user_id=adjustment.created_by_user_id,
             id=adjustment.id,
-            location_code=adjustment.location_code,
+            location_code=_ADMIN_INVENTORY_LOCATION_CODE_ADAPTER.validate_python(
+                adjustment.location_code
+            ),
             new_quantity=adjustment.new_quantity,
             notes=adjustment.notes,
             previous_quantity=adjustment.previous_quantity,
@@ -385,7 +406,9 @@ class AdminInventoryService:
             )
 
         records = session.execute(
-            query.order_by(Branch.name.asc(), Product.name.asc(), InventoryBalance.location_code.asc()),
+            query.order_by(
+                Branch.name.asc(), Product.name.asc(), InventoryBalance.location_code.asc()
+            ),
         ).all()
         return [
             _InventoryRow(
@@ -438,12 +461,16 @@ class AdminInventoryService:
             class_name=row.product_class.name,
             in_transit_quantity=None,
             last_movement_at=row.last_movement_at,
-            location_code=row.balance.location_code,
+            location_code=_ADMIN_INVENTORY_LOCATION_CODE_ADAPTER.validate_python(
+                row.balance.location_code
+            ),
             location_name=self._location_name(row.balance.location_code),
             product_code=row.product.code,
             product_id=row.product.id,
             product_is_active=row.product.is_active,
-            product_kind=row.product.product_kind,
+            product_kind=_ADMIN_INVENTORY_PRODUCT_KIND_ADAPTER.validate_python(
+                row.product.product_kind
+            ),
             product_name=row.product.name,
             quantity_on_hand=row.balance.quantity_on_hand,
             reserved_quantity=None,
@@ -454,9 +481,13 @@ class AdminInventoryService:
         )
 
     def _to_detail(self, session: Session, row: _InventoryRow) -> AdminInventoryDetailView:
-        movements = session.execute(
-            self._movement_query(row).order_by(InventoryMovement.occurred_at.desc()).limit(20),
-        ).scalars().all()
+        movements = (
+            session.execute(
+                self._movement_query(row).order_by(InventoryMovement.occurred_at.desc()).limit(20),
+            )
+            .scalars()
+            .all()
+        )
         warnings = self._build_warnings(row)
         estimated_value = self._estimated_value(row)
 
@@ -466,7 +497,9 @@ class AdminInventoryService:
                 branch_id=row.branch.id,
                 branch_is_active=row.branch.is_active,
                 branch_name=row.branch.name,
-                location_code=row.balance.location_code,
+                location_code=_ADMIN_INVENTORY_LOCATION_CODE_ADAPTER.validate_python(
+                    row.balance.location_code
+                ),
                 location_name=self._location_name(row.balance.location_code),
             ),
             movement_summary=self._movement_summary(movements),
@@ -479,7 +512,9 @@ class AdminInventoryService:
                 is_active=row.product.is_active,
                 is_sellable=row.product.is_sellable,
                 name=row.product.name,
-                product_kind=row.product.product_kind,
+                product_kind=_ADMIN_INVENTORY_PRODUCT_KIND_ADAPTER.validate_python(
+                    row.product.product_kind
+                ),
                 standard_cost=row.product.standard_cost,
                 unit_of_measure=row.product.unit_of_measure,
             ),
@@ -498,7 +533,9 @@ class AdminInventoryService:
 
     def _build_metrics(self, rows: list[_InventoryRow]) -> AdminInventoryMetricsView:
         return AdminInventoryMetricsView(
-            estimated_value=sum((self._estimated_value(row) or Decimal("0")) for row in rows),
+            estimated_value=sum(
+                ((self._estimated_value(row) or Decimal("0")) for row in rows), Decimal("0")
+            ),
             negative_stock=sum(1 for row in rows if row.balance.quantity_on_hand < 0),
             products_with_stock=sum(1 for row in rows if row.balance.quantity_on_hand > 0),
             stale_stock=sum(1 for row in rows if self._is_stale(row)),
@@ -506,11 +543,23 @@ class AdminInventoryService:
         )
 
     def _build_filter_options(self, session: Session) -> AdminInventoryFilterOptionsView:
-        branches = session.execute(select(Branch).order_by(Branch.name.asc(), Branch.code.asc())).scalars().all()
-        classes = session.execute(
-            select(ProductClass).order_by(ProductClass.name.asc(), ProductClass.code.asc()),
-        ).scalars().all()
-        products = session.execute(select(Product).order_by(Product.name.asc(), Product.code.asc())).scalars().all()
+        branches = (
+            session.execute(select(Branch).order_by(Branch.name.asc(), Branch.code.asc()))
+            .scalars()
+            .all()
+        )
+        classes = (
+            session.execute(
+                select(ProductClass).order_by(ProductClass.name.asc(), ProductClass.code.asc()),
+            )
+            .scalars()
+            .all()
+        )
+        products = (
+            session.execute(select(Product).order_by(Product.name.asc(), Product.code.asc()))
+            .scalars()
+            .all()
+        )
         return AdminInventoryFilterOptionsView(
             branches=[
                 AdminInventoryFilterOptionView(id=branch.id, label=f"{branch.name} - {branch.code}")
@@ -525,7 +574,9 @@ class AdminInventoryService:
                 for code, label in LOCATION_LABELS.items()
             ],
             products=[
-                AdminInventoryFilterOptionView(id=product.id, label=f"{product.name} - {product.code}")
+                AdminInventoryFilterOptionView(
+                    id=product.id, label=f"{product.name} - {product.code}"
+                )
                 for product in products
             ],
             product_kinds=[
@@ -585,20 +636,30 @@ class AdminInventoryService:
             return INVENTORY_STOCK_STATE_OUT_OF_STOCK
         return INVENTORY_STOCK_STATE_IN_STOCK
 
-    def _movement_query(self, row: _InventoryRow):
+    def _movement_query(self, row: _InventoryRow) -> Select[tuple[InventoryMovement]]:
         return select(InventoryMovement).where(
             InventoryMovement.product_id == row.balance.product_id,
             InventoryMovement.branch_id == row.balance.branch_id,
             InventoryMovement.location_code == row.balance.location_code,
         )
 
-    def _movement_summary(self, movements: list[InventoryMovement]) -> AdminInventoryMovementSummaryView:
+    def _movement_summary(
+        self, movements: Sequence[InventoryMovement]
+    ) -> AdminInventoryMovementSummaryView:
         last_inbound = next(
-            (movement.occurred_at for movement in movements if movement.direction == INVENTORY_MOVEMENT_DIRECTION_IN),
+            (
+                movement.occurred_at
+                for movement in movements
+                if movement.direction == INVENTORY_MOVEMENT_DIRECTION_IN
+            ),
             None,
         )
         last_outbound = next(
-            (movement.occurred_at for movement in movements if movement.direction == INVENTORY_MOVEMENT_DIRECTION_OUT),
+            (
+                movement.occurred_at
+                for movement in movements
+                if movement.direction == INVENTORY_MOVEMENT_DIRECTION_OUT
+            ),
             None,
         )
         last_adjustment = next(
@@ -616,16 +677,22 @@ class AdminInventoryService:
             last_outbound_at=last_outbound,
         )
 
-    def _to_movement_view(self, session: Session, movement: InventoryMovement) -> AdminInventoryMovementView:
+    def _to_movement_view(
+        self, session: Session, movement: InventoryMovement
+    ) -> AdminInventoryMovementView:
         branch = session.get(Branch, movement.branch_id)
         user = session.get(User, movement.operator_user_id) if movement.operator_user_id else None
         return AdminInventoryMovementView(
             balance_after=movement.balance_after,
             branch_id=movement.branch_id,
             branch_name=branch.name if branch else "Sucursal no disponible",
-            direction=movement.direction,
+            direction=_ADMIN_INVENTORY_MOVEMENT_DIRECTION_ADAPTER.validate_python(
+                movement.direction
+            ),
             id=movement.id,
-            location_code=movement.location_code,
+            location_code=_ADMIN_INVENTORY_LOCATION_CODE_ADAPTER.validate_python(
+                movement.location_code
+            ),
             movement_type=movement.movement_type,
             notes=movement.notes,
             occurred_at=movement.occurred_at,

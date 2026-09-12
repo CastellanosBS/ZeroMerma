@@ -1,11 +1,13 @@
 from __future__ import annotations
 
 import uuid
+from collections.abc import Callable, Iterable
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 from typing import cast
 
+from pydantic import TypeAdapter
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
@@ -128,6 +130,19 @@ from zeromerma_api.modules.quality.infrastructure.models import (
     SanitaryVerification,
 )
 
+_EQUIPMENT_OPERATIONAL_STATUS_ADAPTER: TypeAdapter[EquipmentOperationalStatus] = TypeAdapter(
+    EquipmentOperationalStatus
+)
+_EQUIPMENT_RISK_LEVEL_ADAPTER: TypeAdapter[EquipmentRiskLevel] = TypeAdapter(EquipmentRiskLevel)
+_MAINTENANCE_RESULT_ADAPTER: TypeAdapter[MaintenanceResult] = TypeAdapter(MaintenanceResult)
+_MAINTENANCE_RESULT_NONE_ADAPTER: TypeAdapter[MaintenanceResult | None] = TypeAdapter(
+    MaintenanceResult | None
+)
+_MAINTENANCE_STATUS_ADAPTER: TypeAdapter[MaintenanceStatus] = TypeAdapter(MaintenanceStatus)
+_MAINTENANCE_TYPE_ADAPTER: TypeAdapter[MaintenanceType] = TypeAdapter(MaintenanceType)
+_MAINTENANCE_TYPE_NONE_ADAPTER: TypeAdapter[MaintenanceType | None] = TypeAdapter(
+    MaintenanceType | None
+)
 EQUIPMENT_TYPE_LABELS = {
     EQUIPMENT_TYPE_OVEN: "Horno",
     EQUIPMENT_TYPE_MIXER: "Batidora / mezcladora",
@@ -208,6 +223,7 @@ def _maintenance_type(value: str) -> MaintenanceType:
 
 def _maintenance_result(value: str | None) -> MaintenanceResult | None:
     return cast(MaintenanceResult, value) if value is not None else None
+
 
 FINAL_MAINTENANCE_STATUSES = {
     MAINTENANCE_STATUS_COMPLETED,
@@ -546,7 +562,7 @@ class AdminEquipmentMaintenanceService:
         row = self._get_row(session, command.equipment_id)
         self._validate_maintenance_create(command)
         now = _utc_now()
-        status = command.status
+        status: str = command.status
         if command.start_immediately:
             status = MAINTENANCE_STATUS_IN_PROGRESS
         elif (
@@ -809,7 +825,10 @@ class AdminEquipmentMaintenanceService:
             (record.evidence_note for record in row.maintenance_records if record.evidence_note),
             None,
         )
-        lifetime_cost = sum((record.cost or Decimal("0")) for record in row.maintenance_records)
+        lifetime_cost = sum(
+            ((record.cost or Decimal("0")) for record in row.maintenance_records),
+            Decimal("0"),
+        )
         current_open = self._current_open_record(row)
         return AdminEquipmentDetailView(
             available_actions=self._available_actions(row),
@@ -834,8 +853,12 @@ class AdminEquipmentMaintenanceService:
                     else "operational"
                 ),
                 last_maintenance_at=last_completed.completed_at if last_completed else None,
-                last_maintenance_result=last_completed.result if last_completed else None,
-                last_maintenance_type=last_completed.maintenance_type if last_completed else None,
+                last_maintenance_result=_MAINTENANCE_RESULT_NONE_ADAPTER.validate_python(
+                    last_completed.result if last_completed else None
+                ),
+                last_maintenance_type=_MAINTENANCE_TYPE_NONE_ADAPTER.validate_python(
+                    last_completed.maintenance_type if last_completed else None
+                ),
                 next_scheduled_maintenance_at=self._next_scheduled_maintenance_at(row),
                 overdue=self._is_overdue(row),
             ),
@@ -874,8 +897,10 @@ class AdminEquipmentMaintenanceService:
                 equipment_type=row.equipment.equipment_type,
                 id=row.equipment.id,
                 name=row.equipment.name,
-                operational_status=row.equipment.operational_status,
-                risk_level=row.equipment.risk_level,
+                operational_status=_EQUIPMENT_OPERATIONAL_STATUS_ADAPTER.validate_python(
+                    row.equipment.operational_status
+                ),
+                risk_level=_EQUIPMENT_RISK_LEVEL_ADAPTER.validate_python(row.equipment.risk_level),
                 updated_at=row.equipment.updated_at,
                 warning_state=list_item.warning_state,
             ),
@@ -890,6 +915,7 @@ class AdminEquipmentMaintenanceService:
         date_from: datetime | None,
         date_to: datetime | None,
     ) -> AdminEquipmentListItemView:
+        last_completed = self._last_completed(row)
         return AdminEquipmentListItemView(
             area_name=row.equipment.area_name,
             branch_id=row.branch.id,
@@ -897,16 +923,16 @@ class AdminEquipmentMaintenanceService:
             code=row.equipment.code,
             equipment_type=row.equipment.equipment_type,
             id=row.equipment.id,
-            last_maintenance_at=(
-                self._last_completed(row).completed_at if self._last_completed(row) else None
-            ),
+            last_maintenance_at=(last_completed.completed_at if last_completed else None),
             maintenance_status=self._maintenance_state(row),
             name=row.equipment.name,
             next_maintenance_at=self._next_scheduled_maintenance_at(row),
             open_incident_count=self._open_incident_count(row),
-            operational_status=row.equipment.operational_status,
+            operational_status=_EQUIPMENT_OPERATIONAL_STATUS_ADAPTER.validate_python(
+                row.equipment.operational_status
+            ),
             period_cost=self._period_cost(row, date_from=date_from, date_to=date_to),
-            risk_level=row.equipment.risk_level,
+            risk_level=_EQUIPMENT_RISK_LEVEL_ADAPTER.validate_python(row.equipment.risk_level),
             updated_at=row.equipment.updated_at,
             warning_state=self._warning_state(row),
             warnings=self._warnings(row),
@@ -923,14 +949,16 @@ class AdminEquipmentMaintenanceService:
             folio=record.folio,
             has_evidence=record.has_evidence,
             id=record.id,
-            maintenance_type=record.maintenance_type,
+            maintenance_type=_MAINTENANCE_TYPE_ADAPTER.validate_python(record.maintenance_type),
             notes=record.notes,
             provider_name=record.provider_name,
             related_incident_reference=record.related_incident_reference,
-            result=record.result,
+            result=_MAINTENANCE_RESULT_ADAPTER.validate_python(record.result),
             scheduled_at=record.scheduled_at,
             started_at=record.started_at,
-            status=self._effective_record_status(record),
+            status=_MAINTENANCE_STATUS_ADAPTER.validate_python(
+                self._effective_record_status(record)
+            ),
             technician_name=record.technician_name,
             warning_state=self._record_warning_state(record),
         )
@@ -1266,13 +1294,11 @@ class AdminEquipmentMaintenanceService:
 
     def _last_completed(self, row: _EquipmentRow) -> EquipmentMaintenanceRecord | None:
         completed = [
-            record
+            (record, record.completed_at)
             for record in row.maintenance_records
             if record.status == MAINTENANCE_STATUS_COMPLETED and record.completed_at is not None
         ]
-        return (
-            max(completed, key=lambda record: _as_utc(record.completed_at)) if completed else None
-        )
+        return max(completed, key=lambda item: _as_utc(item[1]))[0] if completed else None
 
     def _next_scheduled_maintenance_at(self, row: _EquipmentRow) -> datetime | None:
         open_scheduled = [
@@ -1283,7 +1309,11 @@ class AdminEquipmentMaintenanceService:
         if open_scheduled:
             return min(_as_utc(value) for value in open_scheduled)
         last_completed = self._last_completed(row)
-        if last_completed and row.equipment.maintenance_frequency_days:
+        if (
+            last_completed is not None
+            and last_completed.completed_at is not None
+            and row.equipment.maintenance_frequency_days
+        ):
             return _as_utc(last_completed.completed_at) + timedelta(
                 days=row.equipment.maintenance_frequency_days
             )
@@ -1514,7 +1544,10 @@ class AdminEquipmentMaintenanceService:
         return search.casefold() in haystack
 
     def _filter_by_code(
-        self, rows: list[_EquipmentRow], value: str | None, getter
+        self,
+        rows: list[_EquipmentRow],
+        value: str | None,
+        getter: Callable[[_EquipmentRow], str | None],
     ) -> list[_EquipmentRow]:
         normalized = _normalize_optional(value)
         if not normalized or normalized == "all":
@@ -1522,7 +1555,10 @@ class AdminEquipmentMaintenanceService:
         return [row for row in rows if getter(row) == normalized]
 
     def _filter_by_text(
-        self, rows: list[_EquipmentRow], value: str | None, getter
+        self,
+        rows: list[_EquipmentRow],
+        value: str | None,
+        getter: Callable[[_EquipmentRow], str],
     ) -> list[_EquipmentRow]:
         normalized = _normalize_optional(value)
         if not normalized or normalized == "all":
@@ -1685,7 +1721,9 @@ def _has_text(value: str | None) -> bool:
     return bool(value and value.strip())
 
 
-def _dedupe_options(options) -> list[AdminEquipmentFilterOptionView]:
+def _dedupe_options(
+    options: Iterable[AdminEquipmentFilterOptionView],
+) -> list[AdminEquipmentFilterOptionView]:
     result: dict[str, AdminEquipmentFilterOptionView] = {}
     for option in options:
         if option.id not in result:

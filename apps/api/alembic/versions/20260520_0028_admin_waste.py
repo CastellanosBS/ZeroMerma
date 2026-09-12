@@ -16,7 +16,9 @@ depends_on: str | Sequence[str] | None = None
 
 
 def upgrade() -> None:
-    op.drop_constraint(op.f("ck_inventory_movements_type_valid"), "inventory_movements", type_="check")
+    op.drop_constraint(
+        op.f("ck_inventory_movements_type_valid"), "inventory_movements", type_="check"
+    )
     op.create_check_constraint(
         op.f("ck_inventory_movements_type_valid"),
         "inventory_movements",
@@ -33,7 +35,9 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
-    op.drop_constraint(op.f("ck_inventory_movements_type_valid"), "inventory_movements", type_="check")
+    op.drop_constraint(
+        op.f("ck_inventory_movements_type_valid"), "inventory_movements", type_="check"
+    )
     op.create_check_constraint(
         op.f("ck_inventory_movements_type_valid"),
         "inventory_movements",

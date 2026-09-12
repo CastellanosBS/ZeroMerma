@@ -85,8 +85,7 @@ def test_admin_product_classes_filters_search_capture_mode_product_presence_and_
     assert capture_response.status_code == 200
     assert capture_response.json()["items"]
     assert all(
-        item["capture_mode_default"] == "CLASS_CAPTURE"
-        for item in capture_response.json()["items"]
+        item["capture_mode_default"] == "CLASS_CAPTURE" for item in capture_response.json()["items"]
     )
 
     presence_response = client.get(
@@ -189,7 +188,7 @@ def test_admin_product_class_create_class_capture_requires_price(
     )
 
     assert missing_price_response.status_code == 409
-    assert "require" in missing_price_response.json()["detail"].lower()
+    assert "require" in missing_price_response.json()["message"].lower()
 
     valid_response = client.post(
         "/v1/admin/product-classes",
@@ -232,7 +231,7 @@ def test_admin_product_class_rejects_product_direct_with_class_price(
     )
 
     assert response.status_code == 409
-    assert "cannot" in response.json()["detail"].lower()
+    assert "cannot" in response.json()["message"].lower()
 
 
 def test_admin_product_class_create_rejects_duplicate_code(client: TestClient) -> None:
@@ -254,7 +253,7 @@ def test_admin_product_class_create_rejects_duplicate_code(client: TestClient) -
     )
 
     assert response.status_code == 409
-    assert "unique" in response.json()["detail"].lower()
+    assert "unique" in response.json()["message"].lower()
 
 
 def test_admin_product_class_patch_updates_status_order_and_audit(

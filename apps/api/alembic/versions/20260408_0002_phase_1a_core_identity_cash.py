@@ -7,8 +7,8 @@ Create Date: 2026-04-08 00:30:00.000000
 
 from collections.abc import Sequence
 
-from alembic import op
 import sqlalchemy as sa
+from alembic import op
 from sqlalchemy.dialects import postgresql
 
 revision: str = "0002_phase_1a_core_identity_cash"
@@ -89,7 +89,9 @@ def upgrade() -> None:
         sa.Column("opening_amount", sa.Numeric(precision=12, scale=2), nullable=False),
         sa.Column("opened_at", sa.DateTime(timezone=True), nullable=False),
         sa.Column("closed_at", sa.DateTime(timezone=True), nullable=True),
-        sa.CheckConstraint("opening_amount >= 0", name="ck_cash_sessions_opening_amount_non_negative"),
+        sa.CheckConstraint(
+            "opening_amount >= 0", name="ck_cash_sessions_opening_amount_non_negative"
+        ),
         sa.CheckConstraint(
             "status IN ('OPEN', 'CLOSED')",
             name="ck_cash_sessions_status_valid",

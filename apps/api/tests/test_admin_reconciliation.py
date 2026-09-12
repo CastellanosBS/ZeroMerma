@@ -303,7 +303,7 @@ def test_admin_reconciliation_requires_reason_notes_and_backoffice_surface(
         headers=_cashier_headers(client),
     )
     assert cashier_response.status_code == 403
-    assert cashier_response.json()["detail"] == "Backoffice access is required."
+    assert cashier_response.json()["message"] == "Backoffice access is required."
 
     other_without_note_response = client.post(
         "/v1/admin/reconciliation",
@@ -316,4 +316,4 @@ def test_admin_reconciliation_requires_reason_notes_and_backoffice_surface(
         },
     )
     assert other_without_note_response.status_code == 400
-    assert "Notes are required" in other_without_note_response.json()["detail"]
+    assert "Notes are required" in other_without_note_response.json()["message"]

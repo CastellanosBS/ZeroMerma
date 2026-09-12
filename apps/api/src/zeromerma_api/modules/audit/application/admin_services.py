@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import uuid
+from collections.abc import Iterable
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import Any
@@ -314,9 +315,13 @@ class AdminAuditService:
             query = query.where(AuditLog.occurred_at >= date_from)
         if date_to is not None:
             query = query.where(AuditLog.occurred_at <= date_to)
-        records = session.execute(
-            query.order_by(AuditLog.occurred_at.desc(), AuditLog.id.desc()),
-        ).scalars().all()
+        records = (
+            session.execute(
+                query.order_by(AuditLog.occurred_at.desc(), AuditLog.id.desc()),
+            )
+            .scalars()
+            .all()
+        )
         return [self._build_context(session, record) for record in records]
 
     def _build_context(self, session: Session, record: AuditLog) -> _AuditContext:
@@ -348,14 +353,10 @@ class AdminAuditService:
         normalized_search = _normalize(search)
         if normalized_search:
             filtered = [
-                context
-                for context in filtered
-                if normalized_search in self._search_blob(context)
+                context for context in filtered if normalized_search in self._search_blob(context)
             ]
         if actor_user_id is not None:
-            filtered = [
-                context for context in filtered if context.record.actor_id == actor_user_id
-            ]
+            filtered = [context for context in filtered if context.record.actor_id == actor_user_id]
         normalized_actor_email = _normalize(actor_email)
         if normalized_actor_email:
             filtered = [
@@ -367,16 +368,12 @@ class AdminAuditService:
         normalized_module = _normalize_filter(module)
         if normalized_module:
             filtered = [
-                context
-                for context in filtered
-                if self._domain(context.record) == normalized_module
+                context for context in filtered if self._domain(context.record) == normalized_module
             ]
         normalized_action = _normalize_filter(action)
         if normalized_action:
             filtered = [
-                context
-                for context in filtered
-                if context.record.action == normalized_action
+                context for context in filtered if context.record.action == normalized_action
             ]
         normalized_entity_type = _normalize_filter(entity_type)
         if normalized_entity_type:
@@ -424,9 +421,7 @@ class AdminAuditService:
         normalized_result = _normalize_filter(result)
         if normalized_result:
             filtered = [
-                context
-                for context in filtered
-                if self._result(context.record) == normalized_result
+                context for context in filtered if self._result(context.record) == normalized_result
             ]
         normalized_source_app = _normalize_filter(source_app)
         if normalized_source_app:
@@ -503,9 +498,7 @@ class AdminAuditService:
             1 for context in contexts if self._domain(context.record) in INVENTORY_DOMAINS
         )
         system_events = sum(
-            1
-            for context in contexts
-            if self._source_app(context.record) == SOURCE_APP_SYSTEM
+            1 for context in contexts if self._source_app(context.record) == SOURCE_APP_SYSTEM
         )
         return AdminAuditSummaryView(
             access_events=access_events,
@@ -569,24 +562,32 @@ class AdminAuditService:
                 can_open_user=False,
             )
 
-        roles = session.execute(
-            select(Role.name)
-            .join(UserRoleAssignment, UserRoleAssignment.role_id == Role.id)
-            .where(
-                UserRoleAssignment.user_id == actor.id,
-                UserRoleAssignment.is_active.is_(True),
+        roles = (
+            session.execute(
+                select(Role.name)
+                .join(UserRoleAssignment, UserRoleAssignment.role_id == Role.id)
+                .where(
+                    UserRoleAssignment.user_id == actor.id,
+                    UserRoleAssignment.is_active.is_(True),
+                )
+                .order_by(Role.name.asc()),
             )
-            .order_by(Role.name.asc()),
-        ).scalars().all()
-        branches = session.execute(
-            select(Branch.name)
-            .join(UserBranchAssignment, UserBranchAssignment.branch_id == Branch.id)
-            .where(
-                UserBranchAssignment.user_id == actor.id,
-                UserBranchAssignment.is_active.is_(True),
+            .scalars()
+            .all()
+        )
+        branches = (
+            session.execute(
+                select(Branch.name)
+                .join(UserBranchAssignment, UserBranchAssignment.branch_id == Branch.id)
+                .where(
+                    UserBranchAssignment.user_id == actor.id,
+                    UserBranchAssignment.is_active.is_(True),
+                )
+                .order_by(Branch.name.asc()),
             )
-            .order_by(Branch.name.asc()),
-        ).scalars().all()
+            .scalars()
+            .all()
+        )
         return AdminAuditActorContextView(
             user_id=actor.id,
             full_name=actor.full_name,
@@ -709,12 +710,16 @@ class AdminAuditService:
         else:
             return []
 
-        records = session.execute(
-            select(AuditLog)
-            .where(*conditions)
-            .order_by(AuditLog.occurred_at.desc(), AuditLog.id.desc())
-            .limit(6),
-        ).scalars().all()
+        records = (
+            session.execute(
+                select(AuditLog)
+                .where(*conditions)
+                .order_by(AuditLog.occurred_at.desc(), AuditLog.id.desc())
+                .limit(6),
+            )
+            .scalars()
+            .all()
+        )
         contexts = [self._build_context(session, item) for item in records]
         return [
             AdminAuditTimelineEventView(
@@ -1027,6 +1032,7 @@ def _humanize(value: str) -> str:
 
 
 def _options(values: set[str] | dict[str, str]) -> list[AdminAuditFilterOptionView]:
+    items: Iterable[tuple[str, str]]
     if isinstance(values, dict):
         items = values.items()
     else:

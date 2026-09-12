@@ -8,6 +8,28 @@
 4. Este plan distingue: **hecho auditado**, **inferencia técnica**, **propuesta de ingeniería** y **decisión de negocio pendiente**.
 5. Ninguna tarea se declara terminada por existencia de archivo, ruta, pantalla o migración. Se exige prueba y evidencia.
 6. Sólo existe un plan maestro y un documento vigente de decisiones. Los resultados de Codex actualizan esos documentos; no crean roadmaps paralelos.
+### 0.1 Registro de ejecución — bloque ZM-FIN-009–014
+
+El bloque de fundación del 2026-09-12 integra la política contractual, las líneas base
+de API y worker, los harness de navegador reales de POS y Backoffice y el pipeline de
+ocho etapas. La implementación está en `codex/zm-fin-009-014-foundation` y su aceptación
+exige el resultado verde de **Foundation required** para el commit entregado, con
+checkout limpio y evidencia de rechazo controlado. La protección de `main` exige ese
+check también a administradores.
+
+| Tareas | Implementación y evidencia ejecutable |
+|---|---|
+| ZM-FIN-009 | [Política y generación contractual](architecture/api-contracts.md): una fuente backend y tres artefactos derivados, errores canónicos y gate de cero deriva. |
+| ZM-FIN-010 | [Línea base API](implementation/api-foundation-baseline.md): calidad estricta, descubrimiento completo, fallos corregidos y pruebas en PostgreSQL efímero. |
+| ZM-FIN-011 | [Línea base worker](implementation/worker-foundation-baseline.md): configuración, ciclo de vida y lectura de outbox caracterizados. |
+| ZM-FIN-012–013 | [Línea base web](implementation/web-foundation-baseline.md): pruebas existentes y recorridos reales autenticados con datos aislados. |
+| ZM-FIN-014 | [Validación de fundación](implementation/foundation-validation.md): comandos, ejecuciones, hashes, CI y bloqueo de integración. |
+
+El run de CI y el SHA inmutable se adjuntan a la entrega de este bloque. Este registro
+no certifica los gates Development Complete, Feature Complete o Production Ready.
+El siguiente bloque por dependencia es ZM-FIN-015–022, autorización y alcance por
+sucursal; el resto del plan conserva sus criterios de aceptación.
+
 ## 1. Resumen ejecutivo
 
 ZeroMerma posee una base adecuada para evolucionar sin reescritura: monolito modular, FastAPI/SQLAlchemy/PostgreSQL, POS y Backoffice separados, OpenAPI generado, precisión decimal, auditoría y outbox transaccionales. La auditoría activa demostró que una parte importante de ventas, pagos, pedidos, documentos y administración es real. También demostró defectos sistémicos: el POS no alimenta el inventario canónico; el pago de pedido no entra en caja/corte; el worker no procesa eventos; la trazabilidad de identidad/origen es incorrecta; y varias superficies administrativas son simuladas o incompletas.

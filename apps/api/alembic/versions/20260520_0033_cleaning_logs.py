@@ -135,7 +135,9 @@ def upgrade() -> None:
         sa.ForeignKeyConstraint(["branch_id"], ["branches.id"], ondelete="RESTRICT"),
         sa.ForeignKeyConstraint(["created_by_user_id"], ["users.id"], ondelete="RESTRICT"),
         sa.ForeignKeyConstraint(["responsible_user_id"], ["users.id"], ondelete="RESTRICT"),
-        sa.ForeignKeyConstraint(["task_template_id"], ["cleaning_templates.id"], ondelete="SET NULL"),
+        sa.ForeignKeyConstraint(
+            ["task_template_id"], ["cleaning_templates.id"], ondelete="SET NULL"
+        ),
         sa.PrimaryKeyConstraint("id"),
         sa.UniqueConstraint("folio"),
     )
@@ -152,7 +154,9 @@ def upgrade() -> None:
         sa.Column("created_at", sa.DateTime(timezone=True), nullable=False),
         sa.Column("updated_at", sa.DateTime(timezone=True), nullable=False),
         sa.ForeignKeyConstraint(["cleaning_log_id"], ["cleaning_logs.id"], ondelete="CASCADE"),
-        sa.ForeignKeyConstraint(["template_item_id"], ["cleaning_template_items.id"], ondelete="SET NULL"),
+        sa.ForeignKeyConstraint(
+            ["template_item_id"], ["cleaning_template_items.id"], ondelete="SET NULL"
+        ),
         sa.PrimaryKeyConstraint("id"),
         sa.UniqueConstraint(
             "cleaning_log_id",

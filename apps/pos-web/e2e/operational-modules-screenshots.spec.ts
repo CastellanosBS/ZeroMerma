@@ -1,15 +1,10 @@
 import { mkdirSync } from "node:fs";
 import path from "node:path";
 
-import { test, type Page, type Route } from "@playwright/test";
-
-const SCREENSHOT_DIR = path.resolve(
-  process.cwd(),
-  ".artifacts",
-  "operational-module-screenshots-after",
-);
+import { expect, test, type Page, type Route } from "@playwright/test";
 
 const branch = {
+  brand_key: "EMP",
   code: "MAIN",
   name: "Sucursal Centro",
   timezone: "America/Hermosillo",
@@ -125,6 +120,7 @@ const ticketDetail = {
   ...ticketListItem,
   branch,
   can_reprint: true,
+  has_returnable_quantity: true,
   lines: [
     {
       id: "ticket-line-1",
@@ -170,6 +166,7 @@ const returnSaleSearchItem = {
 
 const returnSaleDetail = {
   branch,
+  has_returnable_lines: true,
   change_amount: "0.00",
   confirmed_at: "2026-04-15T09:30:00Z",
   folio: "TK-5001",
@@ -201,6 +198,7 @@ const correctionSearchDocument = {
   correction_count: 0,
   destination_branch_name: "Sucursal Norte",
   display_title: "ENV-2001",
+  folio: "ENV-2001",
   document_type: "BRANCH_TRANSFER_SHIPMENT",
   id: "correction-target-1",
   source_branch_name: "Sucursal Centro",
@@ -320,21 +318,59 @@ const inboundTransferDetail = {
 };
 
 const cashCloseBootstrap = {
+  baseline_snapshot: {
+    captured_at_utc: "2026-04-15T19:00:00Z",
+    is_available: true,
+    is_first_controlled_close: false,
+    latest_snapshot_id: "snapshot-1",
+    snapshot_type: "COUNTER_BASELINE",
+    source_cash_session_close_id: null,
+  },
+  blockers: [],
   branch,
+  branch_brand_key: branch.brand_key,
+  can_start_close: true,
   current_open_cash_session: activeCashSession,
-  payment_method_catalog: paymentMethods,
+  local_timestamp: "2026-04-15T19:30:00Z",
+  payment_method_catalog: [
+    {
+      currency_code: "MXN",
+      display_order: 10,
+      is_active: true,
+      is_expected_supported: true,
+      payment_method_code: "CASH",
+    },
+    {
+      currency_code: "MXN",
+      display_order: 20,
+      is_active: true,
+      is_expected_supported: true,
+      payment_method_code: "CARD",
+    },
+  ],
+  pending_class_capture: {
+    has_pending_class_capture: true,
+    pending_class_capture_classes_count: 1,
+    pending_class_capture_total_quantity: "5.000",
+  },
   user,
+  warnings: [],
   workstation,
 };
 
 const cashCloseSummary = {
+  baseline_snapshot: cashCloseBootstrap.baseline_snapshot,
   blockers: [],
-  expected_cash_amount: "650.00",
+  can_start_close: true,
+  cash_session: activeCashSession,
+  currency_code: "MXN",
+  expected_cash_amount: "180.00",
   movement_breakdown: [],
-  opening_amount: "500.00",
-  pending_class_capture: {
-    pending_class_capture_classes_count: 1,
-  },
+  opening_amount: activeCashSession.opening_amount,
+  pending_class_capture: cashCloseBootstrap.pending_class_capture,
+  reconciliation_status: "REVIEW_REQUIRED",
+  total_cash_in: "205.00",
+  total_cash_out: "10.00",
   warnings: [],
 };
 
@@ -447,6 +483,14 @@ async function installApiMocks(page: Page) {
     if (pathname === "/v1/operations/bootstrap") {
       await fulfillJson(route, {
         branch,
+        local_timestamp: "2026-04-15T19:30:00Z",
+        waste_controls: {
+          attachment_evidence_supported: false,
+          high_impact_quantity_threshold: "10",
+          high_impact_requires_acknowledgement: true,
+          high_impact_requires_note: true,
+          stock_validated_source_bucket_codes: ["COUNTER"],
+        },
         destination_branches: [
           { code: "NORTE", id: "branch-north", name: "Sucursal Norte" },
           { code: "SUR", id: "branch-south", name: "Sucursal Sur" },
@@ -523,6 +567,7 @@ async function installApiMocks(page: Page) {
         branch,
         default_scope: "CURRENT_SHIFT",
         user,
+        workstation,
       });
       return;
     }
@@ -546,6 +591,27 @@ async function installApiMocks(page: Page) {
         ],
         branch,
         default_scope: "CURRENT_SHIFT",
+        current_open_cash_session: activeCashSession,
+        local_timestamp: "2026-04-15T19:30:00Z",
+        refund_methods: [
+          { availability_note: null, code: "CASH", is_enabled: true, label: "Efectivo" },
+          {
+            availability_note: "Reverso de tarjeta pendiente de integracion.",
+            code: "CARD",
+            is_enabled: false,
+            label: "Tarjeta",
+          },
+        ],
+        return_controls: {
+          high_refund_amount_threshold: "200.00",
+          high_risk_requires_acknowledgement: true,
+          old_sale_days_threshold: 7,
+        },
+        return_operations_allowed: true,
+        return_reasons: [
+          { code: "WRONG_ITEM", label: "Producto incorrecto" },
+          { code: "QUALITY_ISSUE", label: "Problema de calidad" },
+        ],
         user,
       });
       return;
@@ -564,6 +630,14 @@ async function installApiMocks(page: Page) {
     if (pathname === "/v1/corrections/bootstrap") {
       await fulfillJson(route, {
         branch,
+        correction_controls: {
+          high_impact_quantity_threshold: "10",
+          high_impact_requires_acknowledgement: true,
+        },
+        correction_operations_allowed: true,
+        current_open_cash_session: activeCashSession,
+        local_timestamp: "2026-04-15T19:30:00Z",
+        workstation,
         correction_reasons: [
           { code: "COUNT_MISMATCH", name: "Descuadre de conteo" },
           { code: "WRONG_DESTINATION", name: "Wrong Destination" },
@@ -609,8 +683,18 @@ async function installApiMocks(page: Page) {
       await fulfillJson(route, {
         active_categories: categoryCatalog,
         active_payment_methods: paymentMethods,
+        available_scopes: [
+          { code: "CURRENT_SHIFT", label: "Turno actual" },
+          { code: "TODAY", label: "Hoy" },
+          { code: "RECENT", label: "Recientes" },
+        ],
         branch,
+        current_open_cash_session: activeCashSession,
+        default_scope: "CURRENT_SHIFT",
+        local_timestamp: "2026-04-15T19:30:00Z",
+        payment_registration_allowed: true,
         user,
+        workstation,
       });
       return;
     }
@@ -660,10 +744,11 @@ async function openModule(page: Page, modulePath: string, waitForText: string) {
 }
 
 async function saveModuleScreenshot(page: Page, filename: string) {
-  mkdirSync(SCREENSHOT_DIR, { recursive: true });
+  const screenshotDirectory = test.info().outputPath("screenshots");
+  mkdirSync(screenshotDirectory, { recursive: true });
   await page.screenshot({
     fullPage: false,
-    path: path.join(SCREENSHOT_DIR, filename),
+    path: path.join(screenshotDirectory, filename),
   });
 }
 
@@ -677,7 +762,7 @@ test("captures operational module screenshots", async ({ page }) => {
 
   await openModule(page, "/pos", "Punto de venta");
   await page.locator("button:has-text('Pan dulce')").first().click();
-  await page.getByPlaceholder("0").first().fill("4");
+  await page.getByPlaceholder("0", { exact: true }).first().fill("4");
   await page.getByRole("button", { name: "Agregar" }).click();
   await saveModuleScreenshot(page, "pos.png");
 
@@ -685,35 +770,45 @@ test("captures operational module screenshots", async ({ page }) => {
   await page.getByLabel("Sucursal destino").selectOption("branch-north");
   await page.locator("button:has-text('Pan dulce')").first().click();
   await page.locator("button:has-text('Concha vainilla')").first().click();
-  await page.getByLabel("Cantidad").fill("12");
-  await page.getByRole("button", { name: "Agregar" }).click();
+  await page.getByRole("textbox", { name: "Cantidad", exact: true }).fill("12");
+  await page.getByRole("button", { name: "Agregar linea", exact: true }).click();
   await saveModuleScreenshot(page, "enviar-a-sucursal.png");
 
   await openModule(page, "/pedidos", "Pedidos");
   await page.getByRole("button", { name: "Nuevo pedido" }).click();
   await page.getByPlaceholder("Nombre del cliente").fill("Maria Lopez");
   await page.getByPlaceholder("Telefono").fill("6621234567");
-  await page.locator("input[type='date']").first().fill("2026-04-16");
+  const pickupDate = new Date(Date.now() + 86_400_000).toISOString().slice(0, 10);
+  await page.locator("input[type='date']").first().fill(pickupDate);
+  await page.getByPlaceholder("00", { exact: true }).nth(0).fill("12");
+  await page.getByPlaceholder("00", { exact: true }).nth(1).fill("00");
   await page.locator("button:has-text('Pan dulce')").first().click();
   await page.locator("button:has-text('Concha vainilla')").first().click();
-  await page.getByPlaceholder("0").first().fill("12");
+  await page.getByPlaceholder("0", { exact: true }).first().fill("12");
   await page.getByRole("button", { name: "Agregar linea" }).click();
   await saveModuleScreenshot(page, "pedidos.png");
 
   await openModule(page, "/tickets", "Tickets");
-  await page.getByText("Detalle del ticket", { exact: false }).waitFor();
+  await page.getByRole("row").filter({ hasText: "TK-5001" }).click();
+  await page.getByRole("button", { name: "Iniciar devolucion" }).waitFor();
   await saveModuleScreenshot(page, "tickets.png");
 
   await openModule(page, "/devoluciones", "Devoluciones");
-  await page.getByRole("button", { name: /TK-5001/ }).click();
-  await page.getByRole("button", { name: "Revisar lineas devolvibles" }).click();
-  await page.getByRole("button", { name: "Agregar" }).first().click();
-  await page.getByText("Borrador de devolucion", { exact: false }).first().waitFor();
+  await page.getByRole("row").filter({ hasText: "TK-5001" }).click();
+  const returnQuantity = page.getByRole("textbox", {
+    name: "Cantidad a devolver de Concha vainilla",
+  });
+  await returnQuantity.click();
+  await returnQuantity.fill("1");
+  await expect(returnQuantity).toHaveValue("1");
   await saveModuleScreenshot(page, "devoluciones.png");
 
-  await openModule(page, "/correcciones", "Correcciones");
-  await page.getByRole("button", { name: /ENV-2001/ }).click();
-  await page.getByRole("button", { name: "Ajustar" }).first().click();
+  await openModule(page, "/correcciones", "Ajustes");
+  await page.getByRole("row").filter({ hasText: "ENV-2001" }).click();
+  await page
+    .getByRole("button", { name: /^Editar cantidad de/ })
+    .first()
+    .click();
   await page.waitForTimeout(300);
   await saveModuleScreenshot(page, "correcciones.png");
 
@@ -725,27 +820,23 @@ test("captures operational module screenshots", async ({ page }) => {
   await page.getByRole("button", { name: /Efectivo/ }).click();
   await saveModuleScreenshot(page, "pagos.png");
 
-  await openModule(page, "/descuentos", "Descuentos operativos");
-  await page.getByRole("button", { name: "Nuevo descuento" }).click();
-  await page.getByLabel("Persona o entidad").fill("Equipo de reparto");
-  await page.getByLabel("Categoria").selectOption("STAFF");
-  await page.getByLabel("Monto").fill("180");
-  await page.getByRole("button", { name: /Tarjeta/ }).click();
-  await saveModuleScreenshot(page, "descuentos.png");
+  await page.goto("/descuentos");
+  await expect(page).toHaveURL(/\/pos$/);
+  await saveModuleScreenshot(page, "discounts-release-redirect.png");
 
   await openModule(page, "/recibir-envio", "Recibir envio");
-  await page.getByRole("button", { name: /ENV-3101/ }).click();
+  await page.getByRole("row").filter({ hasText: "ENV-3101" }).click();
   await saveModuleScreenshot(page, "recibir-envio.png");
 
   await openModule(page, "/registrar-merma", "Registrar merma");
-  await page.getByRole("button", { name: "Mostrador" }).click();
-  await page.getByRole("button", { name: "Caducado" }).click();
+  await page.getByRole("button", { name: "Mostrador", exact: true }).click();
+  await page.getByRole("button", { name: "Caducado", exact: true }).click();
   await page.locator("button:has-text('Pan dulce')").first().click();
   await page.locator("button:has-text('Concha vainilla')").first().click();
-  await page.getByLabel("Cantidad").fill("3");
-  await page.getByRole("button", { name: "Agregar" }).click();
+  await page.getByRole("textbox", { name: "Cantidad", exact: true }).fill("3");
+  await page.getByRole("button", { name: /^Agregar( linea)?$/ }).click();
   await saveModuleScreenshot(page, "registrar-merma.png");
 
-  await openModule(page, "/cerrar-turno", "Consola de cierre");
+  await openModule(page, "/cerrar-turno", "Cierre de turno");
   await saveModuleScreenshot(page, "cerrar-turno.png");
 });

@@ -5,9 +5,10 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 from decimal import Decimal
 
+from pydantic import TypeAdapter
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import InstrumentedAttribute, Session
 
 from zeromerma_api.modules.audit.application.service import AuditRecorder
 from zeromerma_api.modules.branches.infrastructure.models import Branch
@@ -53,7 +54,9 @@ from zeromerma_api.modules.purchases.application.admin_schemas import (
     AdminPurchaseReceiptSummaryView,
     AdminPurchaseReceiveRequest,
     AdminPurchaseRelatedDocumentView,
+    AdminPurchaseStatus,
     AdminPurchaseSupplierContextView,
+    AdminPurchaseType,
     AdminPurchaseUpdateRequest,
     AdminPurchaseWarningSeverity,
     AdminPurchaseWarningView,
@@ -100,6 +103,8 @@ from zeromerma_api.modules.suppliers.infrastructure.models import (
     SupplierProduct,
 )
 
+_ADMIN_PURCHASE_STATUS_ADAPTER: TypeAdapter[AdminPurchaseStatus] = TypeAdapter(AdminPurchaseStatus)
+_ADMIN_PURCHASE_TYPE_ADAPTER: TypeAdapter[AdminPurchaseType] = TypeAdapter(AdminPurchaseType)
 ZERO = Decimal("0")
 
 PRODUCT_KIND_LABELS = {
@@ -777,7 +782,7 @@ class AdminPurchaseService:
             branch_name=row.branch.name,
             created_at=row.document.created_at,
             document_date=row.document.document_date,
-            document_type=row.document.document_type,
+            document_type=_ADMIN_PURCHASE_TYPE_ADAPTER.validate_python(row.document.document_type),
             external_document_number=row.document.external_document_number,
             folio=row.document.folio,
             has_discrepancy=self._has_discrepancy(session, row),
@@ -786,7 +791,7 @@ class AdminPurchaseService:
             operator_name=row.created_by_user.full_name,
             received_at=row.document.received_at,
             received_unit_count=self._received_quantity(row.lines),
-            status=row.document.status,
+            status=_ADMIN_PURCHASE_STATUS_ADAPTER.validate_python(row.document.status),
             supplier_id=row.supplier.id,
             supplier_name=row.supplier.legal_name,
             total_amount=self._document_total(row.lines),
@@ -850,7 +855,9 @@ class AdminPurchaseService:
                 created_by_user_id=row.created_by_user.id,
                 created_by_user_name=row.created_by_user.full_name,
                 document_date=row.document.document_date,
-                document_type=row.document.document_type,
+                document_type=_ADMIN_PURCHASE_TYPE_ADAPTER.validate_python(
+                    row.document.document_type
+                ),
                 external_document_number=row.document.external_document_number,
                 external_document_type=row.document.external_document_type,
                 folio=row.document.folio,
@@ -860,7 +867,7 @@ class AdminPurchaseService:
                 notes=row.document.notes,
                 received_at=row.document.received_at,
                 received_unit_count=self._received_quantity(row.lines),
-                status=row.document.status,
+                status=_ADMIN_PURCHASE_STATUS_ADAPTER.validate_python(row.document.status),
                 supplier_id=row.supplier.id,
                 supplier_name=row.supplier.legal_name,
                 total_amount=self._document_total(row.lines),
@@ -1157,8 +1164,8 @@ class AdminPurchaseService:
         lines: list[AdminPurchaseLineInput],
         products: dict[uuid.UUID, Product],
     ) -> None:
-        for line in self._get_lines(session, document.id):
-            session.delete(line)
+        for existing_line in self._get_lines(session, document.id):
+            session.delete(existing_line)
         session.flush()
         for index, line in enumerate(lines, start=1):
             product = products[line.product_id]
@@ -1207,10 +1214,10 @@ class AdminPurchaseService:
         )
         if for_update:
             query = query.with_for_update()
-        return session.execute(query).scalars().all()
+        return list(session.execute(query).scalars().all())
 
     def _get_receipts(self, session: Session, document_id: uuid.UUID) -> list[PurchaseReceipt]:
-        return (
+        return list(
             session.execute(
                 select(PurchaseReceipt)
                 .where(PurchaseReceipt.purchase_document_id == document_id)
@@ -1223,7 +1230,7 @@ class AdminPurchaseService:
     def _receipt_lines_for_document(
         self, session: Session, document_id: uuid.UUID
     ) -> list[PurchaseReceiptLine]:
-        return (
+        return list(
             session.execute(
                 select(PurchaseReceiptLine)
                 .join(
@@ -1242,7 +1249,7 @@ class AdminPurchaseService:
         receipt_ids = [receipt.id for receipt in receipts]
         if not receipt_ids:
             return []
-        return (
+        return list(
             session.execute(
                 select(InventoryMovement)
                 .where(
@@ -1404,7 +1411,9 @@ class AdminPurchaseService:
     def _generate_receipt_folio(self, session: Session) -> str:
         return self._generate_unique_code(session, "REC", PurchaseReceipt.folio)
 
-    def _generate_unique_code(self, session: Session, prefix: str, column) -> str:
+    def _generate_unique_code(
+        self, session: Session, prefix: str, column: InstrumentedAttribute[str]
+    ) -> str:
         for _ in range(20):
             code = f"{prefix}-{str(uuid.uuid4()).split('-', maxsplit=1)[0].upper()}"
             if session.execute(select(column).where(column == code)).scalar_one_or_none() is None:

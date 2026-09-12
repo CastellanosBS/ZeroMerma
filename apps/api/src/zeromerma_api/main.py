@@ -1,15 +1,17 @@
 from __future__ import annotations
 
 import logging
-from typing import Iterable
+from collections.abc import Iterable
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from zeromerma_api import __version__
-from zeromerma_api.core.config import get_settings
+from zeromerma_api.core.config import ApiSettings, get_settings
 from zeromerma_api.core.logging import configure_logging
 from zeromerma_api.presentation.api import api_router
+from zeromerma_api.presentation.contracts import install_contract_openapi
+from zeromerma_api.presentation.errors import error_responses, install_error_handlers
 
 logger = logging.getLogger(__name__)
 
@@ -42,7 +44,7 @@ def _normalize_origins(origins: str | Iterable[str] | None) -> list[str]:
     return normalized
 
 
-def _build_allowed_origins(settings) -> list[str]:
+def _build_allowed_origins(settings: ApiSettings) -> list[str]:
     """
     Merge configured origins with safe development defaults.
     Important: these must be FRONTEND origins, not the API URL.
@@ -78,6 +80,7 @@ def create_app() -> FastAPI:
         docs_url="/docs",
         redoc_url="/redoc",
         openapi_url="/openapi.json",
+        responses=error_responses(),
     )
 
     app.add_middleware(
@@ -89,6 +92,8 @@ def create_app() -> FastAPI:
     )
 
     app.include_router(api_router)
+    install_error_handlers(app)
+    install_contract_openapi(app)
     return app
 
 

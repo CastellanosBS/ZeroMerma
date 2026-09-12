@@ -40,12 +40,23 @@ def upgrade() -> None:
         sa.Column("notes", sa.Text(), nullable=True),
         sa.Column("created_at", sa.DateTime(timezone=True), nullable=False),
         sa.Column("updated_at", sa.DateTime(timezone=True), nullable=False),
-        sa.CheckConstraint("category IN ('RAW_MATERIALS', 'PACKAGING', 'SERVICES', 'MIXED', 'OTHER')", name=op.f("ck_suppliers_category_valid")),
+        sa.CheckConstraint(
+            "category IN ('RAW_MATERIALS', 'PACKAGING', 'SERVICES', 'MIXED', 'OTHER')",
+            name=op.f("ck_suppliers_category_valid"),
+        ),
         sa.CheckConstraint("credit_days >= 0", name=op.f("ck_suppliers_credit_days_non_negative")),
         sa.CheckConstraint("lead_time_days >= 0", name=op.f("ck_suppliers_lead_time_non_negative")),
-        sa.CheckConstraint("minimum_order_amount IS NULL OR minimum_order_amount >= 0", name=op.f("ck_suppliers_minimum_order_non_negative")),
-        sa.CheckConstraint("payment_terms_type IN ('CASH', 'CREDIT', 'TRANSFER', 'MIXED')", name=op.f("ck_suppliers_payment_terms_valid")),
-        sa.CheckConstraint("status IN ('ACTIVE', 'INACTIVE', 'BLOCKED')", name=op.f("ck_suppliers_status_valid")),
+        sa.CheckConstraint(
+            "minimum_order_amount IS NULL OR minimum_order_amount >= 0",
+            name=op.f("ck_suppliers_minimum_order_non_negative"),
+        ),
+        sa.CheckConstraint(
+            "payment_terms_type IN ('CASH', 'CREDIT', 'TRANSFER', 'MIXED')",
+            name=op.f("ck_suppliers_payment_terms_valid"),
+        ),
+        sa.CheckConstraint(
+            "status IN ('ACTIVE', 'INACTIVE', 'BLOCKED')", name=op.f("ck_suppliers_status_valid")
+        ),
         sa.PrimaryKeyConstraint("id"),
         sa.UniqueConstraint("code"),
         sa.UniqueConstraint("tax_id"),
@@ -64,7 +75,10 @@ def upgrade() -> None:
         sa.Column("notes", sa.Text(), nullable=True),
         sa.Column("created_at", sa.DateTime(timezone=True), nullable=False),
         sa.Column("updated_at", sa.DateTime(timezone=True), nullable=False),
-        sa.CheckConstraint("email IS NULL OR position('@' in email) > 1", name=op.f("ck_supplier_contacts_email_shape")),
+        sa.CheckConstraint(
+            "email IS NULL OR position('@' in email) > 1",
+            name=op.f("ck_supplier_contacts_email_shape"),
+        ),
         sa.ForeignKeyConstraint(["supplier_id"], ["suppliers.id"], ondelete="CASCADE"),
         sa.PrimaryKeyConstraint("id"),
     )
@@ -83,13 +97,23 @@ def upgrade() -> None:
         sa.Column("notes", sa.Text(), nullable=True),
         sa.Column("created_at", sa.DateTime(timezone=True), nullable=False),
         sa.Column("updated_at", sa.DateTime(timezone=True), nullable=False),
-        sa.CheckConstraint("last_known_price IS NULL OR last_known_price >= 0", name=op.f("ck_supplier_products_last_price_non_negative")),
-        sa.CheckConstraint("lead_time_days >= 0", name=op.f("ck_supplier_products_lead_time_non_negative")),
-        sa.CheckConstraint("minimum_order_qty IS NULL OR minimum_order_qty >= 0", name=op.f("ck_supplier_products_minimum_qty_non_negative")),
+        sa.CheckConstraint(
+            "last_known_price IS NULL OR last_known_price >= 0",
+            name=op.f("ck_supplier_products_last_price_non_negative"),
+        ),
+        sa.CheckConstraint(
+            "lead_time_days >= 0", name=op.f("ck_supplier_products_lead_time_non_negative")
+        ),
+        sa.CheckConstraint(
+            "minimum_order_qty IS NULL OR minimum_order_qty >= 0",
+            name=op.f("ck_supplier_products_minimum_qty_non_negative"),
+        ),
         sa.ForeignKeyConstraint(["product_id"], ["products.id"], ondelete="RESTRICT"),
         sa.ForeignKeyConstraint(["supplier_id"], ["suppliers.id"], ondelete="CASCADE"),
         sa.PrimaryKeyConstraint("id"),
-        sa.UniqueConstraint("supplier_id", "product_id", name=op.f("uq_supplier_products_supplier_product")),
+        sa.UniqueConstraint(
+            "supplier_id", "product_id", name=op.f("uq_supplier_products_supplier_product")
+        ),
     )
     op.create_table(
         "supplier_branches",
@@ -103,7 +127,9 @@ def upgrade() -> None:
         sa.ForeignKeyConstraint(["branch_id"], ["branches.id"], ondelete="RESTRICT"),
         sa.ForeignKeyConstraint(["supplier_id"], ["suppliers.id"], ondelete="CASCADE"),
         sa.PrimaryKeyConstraint("id"),
-        sa.UniqueConstraint("supplier_id", "branch_id", name=op.f("uq_supplier_branches_supplier_branch")),
+        sa.UniqueConstraint(
+            "supplier_id", "branch_id", name=op.f("uq_supplier_branches_supplier_branch")
+        ),
     )
 
 

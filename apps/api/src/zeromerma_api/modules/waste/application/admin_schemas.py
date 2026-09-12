@@ -93,7 +93,9 @@ class AdminWasteListItemView(BaseModel):
 
 
 class AdminWasteListResponse(BaseModel):
-    backend_contract: AdminWasteBackendContractView = Field(default_factory=AdminWasteBackendContractView)
+    backend_contract: AdminWasteBackendContractView = Field(
+        default_factory=AdminWasteBackendContractView
+    )
     filter_options: AdminWasteFilterOptionsView
     is_backend_connected: bool = True
     items: list[AdminWasteListItemView]

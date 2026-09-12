@@ -255,4 +255,4 @@ def test_admin_branch_deactivation_blocks_open_cash_session(client: TestClient) 
     )
 
     assert response.status_code == 409
-    assert "open cash sessions" in response.json()["detail"]
+    assert "open cash sessions" in response.json()["message"]

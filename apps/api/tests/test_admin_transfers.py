@@ -12,7 +12,6 @@ from zeromerma_api.bootstrap.seed_local import (
     SEED_BRANCH_CODE,
     SEED_DESTINATION_BRANCH_CODE,
     SEED_PRODUCT_BOLILLO_STD_CODE,
-    SEED_PRODUCT_CAFE_AMERICANO_CODE,
     SEED_USER_EMAIL,
     SEED_USER_PASSWORD,
 )
@@ -20,7 +19,9 @@ from zeromerma_api.db.session import SessionLocal
 from zeromerma_api.modules.audit.infrastructure.models import AuditLog
 from zeromerma_api.modules.branches.infrastructure.models import Branch
 from zeromerma_api.modules.catalog.infrastructure.models import Product
-from zeromerma_api.modules.inventory.infrastructure.models import InventoryBalance, InventoryMovement
+from zeromerma_api.modules.inventory.infrastructure.models import (
+    InventoryMovement,
+)
 from zeromerma_api.modules.outbox.infrastructure.models import OutboxEvent
 
 
@@ -168,7 +169,9 @@ def test_admin_transfer_create_update_filters_and_detail(client: TestClient) -> 
     assert product_response.status_code == 200
     assert product_response.json()["total"] == 1
 
-    detail_response = client.get(f"/v1/admin/transfers/{transfer_id}", headers=_admin_headers(client))
+    detail_response = client.get(
+        f"/v1/admin/transfers/{transfer_id}", headers=_admin_headers(client)
+    )
     assert detail_response.status_code == 200
     detail = detail_response.json()
     assert detail["overview"]["status"] == "DRAFT"
@@ -212,7 +215,7 @@ def test_admin_transfer_validates_same_branch_empty_lines_and_stock(client: Test
         json={},
     )
     assert dispatch_without_stock.status_code == 400
-    assert "Origin stock is insufficient" in dispatch_without_stock.json()["detail"]
+    assert "Origin stock is insufficient" in dispatch_without_stock.json()["message"]
 
 
 def test_admin_transfer_dispatch_writes_inventory_movements_audit_and_outbox(
@@ -226,9 +229,15 @@ def test_admin_transfer_dispatch_writes_inventory_movements_audit_and_outbox(
     assert len(transfer["inventory_impact"]["movements"]) == 2
 
     with SessionLocal() as session:
-        movements = session.execute(
-            select(InventoryMovement).where(InventoryMovement.source_document_id == UUID(transfer_id)),
-        ).scalars().all()
+        movements = (
+            session.execute(
+                select(InventoryMovement).where(
+                    InventoryMovement.source_document_id == UUID(transfer_id)
+                ),
+            )
+            .scalars()
+            .all()
+        )
         audit_record = session.execute(
             select(AuditLog).where(
                 AuditLog.action == "transfer.dispatched",
@@ -294,7 +303,7 @@ def test_admin_transfer_receive_requires_discrepancy_reason_and_records_variance
         json={"lines": [{"received_quantity": "3.000", "shipment_line_id": shipment_line_id}]},
     )
     assert missing_reason_response.status_code == 400
-    assert "Variance reason is required" in missing_reason_response.json()["detail"]
+    assert "Variance reason is required" in missing_reason_response.json()["message"]
 
     receive_response = client.post(
         f"/v1/admin/transfers/{transfer_id}/receive",

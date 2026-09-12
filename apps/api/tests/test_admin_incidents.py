@@ -206,7 +206,7 @@ def test_admin_incidents_filter_detail_and_validation(client: TestClient) -> Non
         },
     )
     assert invalid_response.status_code == 409
-    assert "requires notes" in invalid_response.json()["detail"]
+    assert "requires notes" in invalid_response.json()["message"]
 
 
 def test_admin_incident_follow_up_status_resolve_and_reopen(client: TestClient) -> None:

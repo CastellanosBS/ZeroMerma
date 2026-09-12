@@ -4,6 +4,7 @@ import uuid
 from dataclasses import dataclass
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
+from pydantic import TypeAdapter
 from sqlalchemy import func, or_, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
@@ -13,8 +14,9 @@ from zeromerma_api.modules.branches.application.admin_schemas import (
     AdminBranchAvailableActionsView,
     AdminBranchCreateRequest,
     AdminBranchDetailView,
-    AdminBranchFilterOptionView,
+    AdminBranchesListResponse,
     AdminBranchFilterOptionsView,
+    AdminBranchFilterOptionView,
     AdminBranchListItemView,
     AdminBranchLocationContactView,
     AdminBranchMetricsView,
@@ -22,13 +24,13 @@ from zeromerma_api.modules.branches.application.admin_schemas import (
     AdminBranchOverviewView,
     AdminBranchReadinessStatus,
     AdminBranchRelatedOperationsSummaryView,
-    AdminBranchesListResponse,
+    AdminBranchStatus,
     AdminBranchUpdateRequest,
     AdminBranchUserAssignmentView,
     AdminBranchUsersSummaryView,
     AdminBranchWarningView,
-    AdminBranchWorkstationView,
     AdminBranchWorkstationsSummaryView,
+    AdminBranchWorkstationView,
     AdminWorkstationAccessContextView,
     AdminWorkstationAccessUserView,
     AdminWorkstationAvailableActionsView,
@@ -45,6 +47,7 @@ from zeromerma_api.modules.branches.application.admin_schemas import (
     AdminWorkstationOverviewView,
     AdminWorkstationReadinessStatus,
     AdminWorkstationsListResponse,
+    AdminWorkstationStatus,
     AdminWorkstationUpdateRequest,
 )
 from zeromerma_api.modules.branches.domain.exceptions import (
@@ -57,12 +60,19 @@ from zeromerma_api.modules.branches.domain.exceptions import (
     WorkstationValidationError,
 )
 from zeromerma_api.modules.branches.infrastructure.models import Branch, Brand, Workstation
-from zeromerma_api.modules.cash.domain.constants import CASH_SESSION_STATUS_CLOSED, CASH_SESSION_STATUS_OPEN
+from zeromerma_api.modules.cash.domain.constants import (
+    CASH_SESSION_STATUS_CLOSED,
+    CASH_SESSION_STATUS_OPEN,
+)
 from zeromerma_api.modules.cash.infrastructure.models import CashSession
 from zeromerma_api.modules.identity.application.schemas import AuthenticatedUser
 from zeromerma_api.modules.identity.infrastructure.models import User, UserBranchAssignment
 from zeromerma_api.modules.outbox.application.service import OutboxWriter
 
+_ADMIN_BRANCH_STATUS_ADAPTER: TypeAdapter[AdminBranchStatus] = TypeAdapter(AdminBranchStatus)
+_ADMIN_WORKSTATION_STATUS_ADAPTER: TypeAdapter[AdminWorkstationStatus] = TypeAdapter(
+    AdminWorkstationStatus
+)
 AUDIT_ACTION_ADMIN_BRANCH_CREATED = "admin.branch.created"
 AUDIT_ACTION_ADMIN_BRANCH_UPDATED = "admin.branch.updated"
 OUTBOX_EVENT_ADMIN_BRANCH_CREATED_V1 = "admin.branch.created.v1"
@@ -312,7 +322,9 @@ class AdminBranchService:
 
         branch_rows = session.execute(query.order_by(Branch.name.asc(), Branch.code.asc())).all()
         branch_ids = [branch.id for branch, _brand in branch_rows]
-        workstation_counts, active_workstation_counts = self._workstation_counts(session, branch_ids)
+        workstation_counts, active_workstation_counts = self._workstation_counts(
+            session, branch_ids
+        )
         assignment_counts = self._assignment_counts(session, branch_ids)
         open_cash_session_counts = self._open_cash_session_counts(session, branch_ids)
 
@@ -361,7 +373,7 @@ class AdminBranchService:
             id=row.branch.id,
             name=row.branch.name,
             readiness=self._readiness(row, warnings),
-            status=_branch_status(row.branch),
+            status=_ADMIN_BRANCH_STATUS_ADAPTER.validate_python(_branch_status(row.branch)),
             timezone=row.branch.timezone,
             updated_at=row.branch.updated_at,
             warnings=warnings,
@@ -402,7 +414,7 @@ class AdminBranchService:
                 id=row.branch.id,
                 name=row.branch.name,
                 readiness=readiness,
-                status=_branch_status(row.branch),
+                status=_ADMIN_BRANCH_STATUS_ADAPTER.validate_python(_branch_status(row.branch)),
                 timezone=row.branch.timezone,
                 updated_at=row.branch.updated_at,
             ),
@@ -881,7 +893,9 @@ class AdminWorkstationService:
         workstation_ids = [workstation.id for workstation, _branch in raw_rows]
         branch_ids = [branch.id for _workstation, branch in raw_rows]
         active_sessions, last_closed_sessions = self._cash_session_maps(session, workstation_ids)
-        assigned_user_counts, active_assigned_user_counts = self._assignment_counts(session, branch_ids)
+        assigned_user_counts, active_assigned_user_counts = self._assignment_counts(
+            session, branch_ids
+        )
 
         return [
             _WorkstationAdminRow(
@@ -906,7 +920,9 @@ class AdminWorkstationService:
 
         workstation, branch = result
         active_sessions, last_closed_sessions = self._cash_session_maps(session, [workstation.id])
-        assigned_user_counts, active_assigned_user_counts = self._assignment_counts(session, [branch.id])
+        assigned_user_counts, active_assigned_user_counts = self._assignment_counts(
+            session, [branch.id]
+        )
         return _WorkstationAdminRow(
             active_assigned_user_count=active_assigned_user_counts.get(branch.id, 0),
             active_session=active_sessions.get(workstation.id),
@@ -937,7 +953,9 @@ class AdminWorkstationService:
             ),
             name=row.workstation.name,
             readiness=self._readiness(row, warnings),
-            status=_workstation_status(row.workstation),
+            status=_ADMIN_WORKSTATION_STATUS_ADAPTER.validate_python(
+                _workstation_status(row.workstation)
+            ),
             updated_at=row.workstation.updated_at,
             warnings=warnings,
         )
@@ -979,7 +997,9 @@ class AdminWorkstationService:
                 id=row.workstation.id,
                 name=row.workstation.name,
                 readiness=readiness,
-                status=_workstation_status(row.workstation),
+                status=_ADMIN_WORKSTATION_STATUS_ADAPTER.validate_python(
+                    _workstation_status(row.workstation)
+                ),
                 updated_at=row.workstation.updated_at,
             ),
             warnings=warnings,
@@ -996,7 +1016,11 @@ class AdminWorkstationService:
         )
 
     def _build_filter_options(self, session: Session) -> AdminWorkstationFilterOptionsView:
-        branches = session.execute(select(Branch).order_by(Branch.name.asc(), Branch.code.asc())).scalars().all()
+        branches = (
+            session.execute(select(Branch).order_by(Branch.name.asc(), Branch.code.asc()))
+            .scalars()
+            .all()
+        )
         return AdminWorkstationFilterOptionsView(
             branches=[
                 AdminBranchFilterOptionView(id=branch.id, label=f"{branch.name} - {branch.code}")
@@ -1026,7 +1050,9 @@ class AdminWorkstationService:
             warnings.append(
                 AdminBranchWarningView(
                     code="no_branch_users",
-                    message="La sucursal no tiene usuarios activos asignados para operar esta estacion.",
+                    message=(
+                        "La sucursal no tiene usuarios activos asignados para operar esta estacion."
+                    ),
                     severity="warning",
                 ),
             )
@@ -1087,12 +1113,9 @@ class AdminWorkstationService:
             ):
                 active_sessions[cash_session.workstation_id] = cash_session
             if (
-                (
-                    cash_session.status == CASH_SESSION_STATUS_CLOSED
-                    or cash_session.closed_at is not None
-                )
-                and cash_session.workstation_id not in last_closed_sessions
-            ):
+                cash_session.status == CASH_SESSION_STATUS_CLOSED
+                or cash_session.closed_at is not None
+            ) and cash_session.workstation_id not in last_closed_sessions:
                 last_closed_sessions[cash_session.workstation_id] = cash_session
         return active_sessions, last_closed_sessions
 

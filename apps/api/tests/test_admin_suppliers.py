@@ -103,7 +103,9 @@ def _supplier_payload(
     }
 
 
-def _create_supplier(client: TestClient, *, code: str = "SUP-TRIGO", tax_id: str = "XAXX010101000") -> dict[str, object]:
+def _create_supplier(
+    client: TestClient, *, code: str = "SUP-TRIGO", tax_id: str = "XAXX010101000"
+) -> dict[str, object]:
     response = client.post(
         "/v1/admin/suppliers",
         headers={**_admin_headers(client), "X-Request-ID": "admin-supplier-test"},
@@ -134,7 +136,6 @@ def test_admin_suppliers_list_empty_and_rejects_pos_surface_user(client: TestCli
 def test_admin_suppliers_create_detail_audit_and_outbox(client: TestClient) -> None:
     payload = _create_supplier(client)
     supplier_id = payload["overview"]["id"]
-    supplier_uuid = uuid.UUID(str(supplier_id))
 
     assert payload["overview"]["code"] == "SUP-TRIGO"
     assert payload["overview"]["status"] == "ACTIVE"
@@ -145,9 +146,15 @@ def test_admin_suppliers_create_detail_audit_and_outbox(client: TestClient) -> N
     assert payload["warnings"] == []
 
     with SessionLocal() as session:
-        supplier = session.execute(select(Supplier).where(Supplier.id == supplier_uuid)).scalar_one()
-        audit_record = session.execute(select(AuditLog).where(AuditLog.resource_id == str(supplier_id))).scalar_one()
-        outbox_event = session.execute(select(OutboxEvent).where(OutboxEvent.aggregate_id == str(supplier_id))).scalar_one()
+        supplier = session.execute(
+            select(Supplier).where(Supplier.id == uuid.UUID(str(supplier_id)))
+        ).scalar_one()
+        audit_record = session.execute(
+            select(AuditLog).where(AuditLog.resource_id == str(supplier_id))
+        ).scalar_one()
+        outbox_event = session.execute(
+            select(OutboxEvent).where(OutboxEvent.aggregate_id == str(supplier_id))
+        ).scalar_one()
 
     assert supplier.tax_id == "XAXX010101000"
     assert audit_record.action == "admin.supplier.created"
@@ -155,10 +162,11 @@ def test_admin_suppliers_create_detail_audit_and_outbox(client: TestClient) -> N
     assert outbox_event.event_name == "admin.supplier.created.v1"
 
 
-def test_admin_suppliers_filters_search_status_category_product_kind_and_branch(client: TestClient) -> None:
+def test_admin_suppliers_filters_search_status_category_product_kind_and_branch(
+    client: TestClient,
+) -> None:
     created = _create_supplier(client)
     supplier_id = created["overview"]["id"]
-    supplier_uuid = uuid.UUID(str(supplier_id))
 
     searches = [
         "/v1/admin/suppliers?search=trigo",
@@ -172,23 +180,35 @@ def test_admin_suppliers_filters_search_status_category_product_kind_and_branch(
         assert response.status_code == 200
         assert [item["id"] for item in response.json()["items"]] == [supplier_id]
 
-    warnings_response = client.get("/v1/admin/suppliers?warning_state=without_warnings", headers=_admin_headers(client))
+    warnings_response = client.get(
+        "/v1/admin/suppliers?warning_state=without_warnings", headers=_admin_headers(client)
+    )
     assert warnings_response.status_code == 200
     assert [item["id"] for item in warnings_response.json()["items"]] == [supplier_id]
 
 
-def test_admin_suppliers_validates_required_fields_duplicates_and_contact_channel(client: TestClient) -> None:
+def test_admin_suppliers_validates_required_fields_duplicates_and_contact_channel(
+    client: TestClient,
+) -> None:
     headers = _admin_headers(client)
-    missing_name_response = client.post("/v1/admin/suppliers", headers=headers, json={**_supplier_payload(), "legal_name": ""})
+    missing_name_response = client.post(
+        "/v1/admin/suppliers", headers=headers, json={**_supplier_payload(), "legal_name": ""}
+    )
     assert missing_name_response.status_code == 422
 
     bad_contact_response = client.post(
         "/v1/admin/suppliers",
         headers=headers,
-        json={**_supplier_payload(code="SUP-BAD", tax_id="BAD010101000"), "contacts": [{"name": "Sin contacto", "is_primary": True}]},
+        json={
+            **_supplier_payload(code="SUP-BAD", tax_id="BAD010101000"),
+            "contacts": [{"name": "Sin contacto", "is_primary": True}],
+        },
     )
     assert bad_contact_response.status_code == 409
-    assert bad_contact_response.json()["detail"] == "Supplier contact needs at least one contact channel."
+    assert (
+        bad_contact_response.json()["message"]
+        == "Supplier contact needs at least one contact channel."
+    )
 
     _create_supplier(client)
     duplicate_code_response = client.post(
@@ -206,17 +226,24 @@ def test_admin_suppliers_validates_required_fields_duplicates_and_contact_channe
     assert duplicate_tax_response.status_code == 409
 
 
-def test_admin_suppliers_update_status_contact_product_and_branch_relations(client: TestClient) -> None:
+def test_admin_suppliers_update_status_contact_product_and_branch_relations(
+    client: TestClient,
+) -> None:
     created = _create_supplier(client)
     supplier_id = created["overview"]["id"]
-    supplier_uuid = uuid.UUID(str(supplier_id))
     headers = _admin_headers(client)
 
-    updated_payload = _supplier_payload(code="SUP-TRIGO", product_code=SEED_PRODUCT_BOLILLO_STD_CODE)
+    updated_payload = _supplier_payload(
+        code="SUP-TRIGO", product_code=SEED_PRODUCT_BOLILLO_STD_CODE
+    )
     updated_payload["legal_name"] = "Harinas del Trigo Actualizado SA de CV"
-    update_response = client.patch(f"/v1/admin/suppliers/{supplier_id}", headers=headers, json=updated_payload)
+    update_response = client.patch(
+        f"/v1/admin/suppliers/{supplier_id}", headers=headers, json=updated_payload
+    )
     assert update_response.status_code == 200
-    assert update_response.json()["overview"]["legal_name"] == "Harinas del Trigo Actualizado SA de CV"
+    assert (
+        update_response.json()["overview"]["legal_name"] == "Harinas del Trigo Actualizado SA de CV"
+    )
 
     status_response = client.post(
         f"/v1/admin/suppliers/{supplier_id}/status",
@@ -246,7 +273,11 @@ def test_admin_suppliers_update_status_contact_product_and_branch_relations(clie
         },
     )
     assert product_response.status_code == 201
-    relation = next(item for item in product_response.json()["product_associations"] if item["product_code"] == SEED_PRODUCT_CONCHA_VAN_CODE)
+    relation = next(
+        item
+        for item in product_response.json()["product_associations"]
+        if item["product_code"] == SEED_PRODUCT_CONCHA_VAN_CODE
+    )
     assert relation["is_active"] is False
 
     branch_response = client.post(
@@ -258,12 +289,18 @@ def test_admin_suppliers_update_status_contact_product_and_branch_relations(clie
     assert branch_response.json()["branch_applicability"][0]["is_active"] is False
 
     with SessionLocal() as session:
-        actions = session.execute(
-            select(AuditLog.action).where(AuditLog.resource_id == str(supplier_id)).order_by(AuditLog.occurred_at.asc()),
-        ).scalars().all()
+        actions = (
+            session.execute(
+                select(AuditLog.action)
+                .where(AuditLog.resource_id == str(supplier_id))
+                .order_by(AuditLog.occurred_at.asc()),
+            )
+            .scalars()
+            .all()
+        )
         inactive_relation = session.execute(
             select(SupplierProduct).where(
-                SupplierProduct.supplier_id == supplier_uuid,
+                SupplierProduct.supplier_id == uuid.UUID(str(supplier_id)),
                 SupplierProduct.product_id == _get_product_id(SEED_PRODUCT_CONCHA_VAN_CODE),
             ),
         ).scalar_one()

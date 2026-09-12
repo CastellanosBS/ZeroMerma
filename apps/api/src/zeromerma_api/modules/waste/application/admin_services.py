@@ -1,10 +1,12 @@
 from __future__ import annotations
 
 import uuid
+from collections.abc import Sequence
 from dataclasses import dataclass
 from datetime import UTC, datetime
-from decimal import Decimal, ROUND_HALF_UP
+from decimal import ROUND_HALF_UP, Decimal
 
+from pydantic import TypeAdapter
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
@@ -22,7 +24,10 @@ from zeromerma_api.modules.inventory.domain.constants import (
     INVENTORY_MOVEMENT_DIRECTION_OUT,
     INVENTORY_MOVEMENT_TYPE_WASTE_RECORD,
 )
-from zeromerma_api.modules.inventory.infrastructure.models import InventoryBalance, InventoryMovement
+from zeromerma_api.modules.inventory.infrastructure.models import (
+    InventoryBalance,
+    InventoryMovement,
+)
 from zeromerma_api.modules.operations.domain.constants import (
     OPERATION_BUCKET_WASTE,
     OPERATION_DOCUMENT_STATUS_CANCELLED,
@@ -47,19 +52,23 @@ from zeromerma_api.modules.waste.application.admin_schemas import (
     AdminWasteCreateRequest,
     AdminWasteDetailView,
     AdminWasteEvidenceView,
-    AdminWasteFilterOptionView,
     AdminWasteFilterOptionsView,
+    AdminWasteFilterOptionView,
+    AdminWasteImpactLevel,
     AdminWasteInventoryImpactView,
     AdminWasteInventoryMovementView,
     AdminWasteLineView,
     AdminWasteListItemView,
     AdminWasteListResponse,
+    AdminWasteLocationCode,
     AdminWasteMetricsView,
     AdminWasteOverviewView,
     AdminWasteProductInventoryContextView,
+    AdminWasteProductKind,
     AdminWasteReasonClassificationView,
     AdminWasteReasonView,
     AdminWasteRelatedDocumentView,
+    AdminWasteStatus,
     AdminWasteWarningSeverity,
     AdminWasteWarningView,
 )
@@ -73,6 +82,16 @@ from zeromerma_api.modules.waste.domain.constants import (
 )
 from zeromerma_api.modules.waste.domain.exceptions import WasteNotFoundError, WasteValidationError
 
+_ADMIN_WASTE_IMPACT_LEVEL_ADAPTER: TypeAdapter[AdminWasteImpactLevel] = TypeAdapter(
+    AdminWasteImpactLevel
+)
+_ADMIN_WASTE_LOCATION_CODE_ADAPTER: TypeAdapter[AdminWasteLocationCode] = TypeAdapter(
+    AdminWasteLocationCode
+)
+_ADMIN_WASTE_PRODUCT_KIND_ADAPTER: TypeAdapter[AdminWasteProductKind] = TypeAdapter(
+    AdminWasteProductKind
+)
+_ADMIN_WASTE_STATUS_ADAPTER: TypeAdapter[AdminWasteStatus] = TypeAdapter(AdminWasteStatus)
 DECIMAL_3 = Decimal("0.001")
 ZERO = Decimal("0")
 
@@ -165,12 +184,18 @@ class AdminWasteService:
         )
 
         if class_id is not None:
-            rows = [row for row in rows if any(line.product_class.id == class_id for line in row.lines)]
+            rows = [
+                row for row in rows if any(line.product_class.id == class_id for line in row.lines)
+            ]
         if product_id is not None:
             rows = [row for row in rows if any(line.product.id == product_id for line in row.lines)]
         normalized_kind = _normalize_optional(product_kind)
         if normalized_kind and normalized_kind != "all":
-            rows = [row for row in rows if any(line.product.product_kind == normalized_kind for line in row.lines)]
+            rows = [
+                row
+                for row in rows
+                if any(line.product.product_kind == normalized_kind for line in row.lines)
+            ]
         normalized_evidence = _normalize_optional(evidence_state)
         if normalized_evidence == "with_evidence":
             rows = [row for row in rows if self._has_evidence(row)]
@@ -210,7 +235,9 @@ class AdminWasteService:
                 select(WasteReason)
                 .where(WasteReason.is_active.is_(True))
                 .order_by(WasteReason.display_order.asc(), WasteReason.name.asc()),
-            ).scalars().all(),
+            )
+            .scalars()
+            .all(),
         )
 
     def create_waste(
@@ -245,7 +272,9 @@ class AdminWasteService:
             for_update=True,
         )
         if balance is None or Decimal(balance.quantity_on_hand) < quantity:
-            raise WasteValidationError("Waste quantity exceeds available stock for selected branch and location.")
+            raise WasteValidationError(
+                "Waste quantity exceeds available stock for selected branch and location."
+            )
 
         previous_quantity = _q3(Decimal(balance.quantity_on_hand))
         new_quantity = _q3(previous_quantity - quantity)
@@ -357,7 +386,9 @@ class AdminWasteService:
 
         document_rows = session.execute(query).all()
         documents = [document for document, _, _, _, _ in document_rows]
-        lines_by_document = self._lines_by_document(session, [document.id for document in documents])
+        lines_by_document = self._lines_by_document(
+            session, [document.id for document in documents]
+        )
         return [
             _WasteRow(
                 branch=branch,
@@ -409,7 +440,10 @@ class AdminWasteService:
             .join(Product, Product.id == OperationDocumentLine.product_id)
             .join(ProductClass, ProductClass.id == Product.product_class_id)
             .where(OperationDocumentLine.operation_document_id.in_(document_ids))
-            .order_by(OperationDocumentLine.operation_document_id.asc(), OperationDocumentLine.line_number.asc()),
+            .order_by(
+                OperationDocumentLine.operation_document_id.asc(),
+                OperationDocumentLine.line_number.asc(),
+            ),
         ).all()
         grouped: dict[uuid.UUID, list[_WasteLine]] = {}
         for line, product, product_class in rows:
@@ -430,19 +464,25 @@ class AdminWasteService:
             folio=_build_folio(row.document.id),
             has_evidence=self._has_evidence(row),
             id=row.document.id,
-            impact_level=self._impact_level(row),
+            impact_level=_ADMIN_WASTE_IMPACT_LEVEL_ADAPTER.validate_python(self._impact_level(row)),
             line_count=len(row.lines),
-            location_code=row.document.source_bucket_code or INVENTORY_LOCATION_BACKROOM,
+            location_code=_ADMIN_WASTE_LOCATION_CODE_ADAPTER.validate_python(
+                row.document.source_bucket_code or INVENTORY_LOCATION_BACKROOM
+            ),
             location_name=self._location_name(row.document.source_bucket_code),
             operator_name=row.created_by_user.full_name,
             product_code=primary.product.code,
             product_id=primary.product.id,
-            product_kind=primary.product.product_kind,
-            product_name=primary.product.name if len(row.lines) == 1 else f"{primary.product.name} +{len(row.lines) - 1}",
+            product_kind=_ADMIN_WASTE_PRODUCT_KIND_ADAPTER.validate_python(
+                primary.product.product_kind
+            ),
+            product_name=primary.product.name
+            if len(row.lines) == 1
+            else f"{primary.product.name} +{len(row.lines) - 1}",
             quantity=quantity,
             reason_code=row.reason.code,
             reason_label=row.reason.name,
-            status=row.document.status,
+            status=_ADMIN_WASTE_STATUS_ADAPTER.validate_python(row.document.status),
             uom=primary.product.unit_of_measure if len(row.lines) == 1 else "mixed",
             warning_state=self._warning_state_from_warnings(warnings),
             warnings=warnings,
@@ -452,9 +492,15 @@ class AdminWasteService:
         primary = row.lines[0]
         warnings = self._build_warnings(row, session)
         movements = self._inventory_movements(session, row.document.id)
-        primary_movement = next((movement for movement in movements if movement.product_id == primary.product.id), None)
+        primary_movement = next(
+            (movement for movement in movements if movement.product_id == primary.product.id), None
+        )
         stock_after = primary_movement.balance_after if primary_movement else None
-        stock_before = _q3(Decimal(stock_after) + Decimal(primary.line.quantity)) if stock_after is not None else None
+        stock_before = (
+            _q3(Decimal(stock_after) + Decimal(primary.line.quantity))
+            if stock_after is not None
+            else None
+        )
         current_balance = self._get_balance(
             session,
             branch_id=row.branch.id,
@@ -468,7 +514,9 @@ class AdminWasteService:
             inventory_impact=AdminWasteInventoryImpactView(
                 integration_available=True,
                 movements=[self._to_movement_view(movement) for movement in movements],
-                notes=None if movements else "No hay movimiento de inventario vinculado a este documento.",
+                notes=None
+                if movements
+                else "No hay movimiento de inventario vinculado a este documento.",
             ),
             lines=[
                 AdminWasteLineView(
@@ -476,7 +524,9 @@ class AdminWasteService:
                     line_number=line.line.line_number,
                     product_code=line.product.code,
                     product_id=line.product.id,
-                    product_kind=line.product.product_kind,
+                    product_kind=_ADMIN_WASTE_PRODUCT_KIND_ADAPTER.validate_python(
+                        line.product.product_kind
+                    ),
                     product_name=line.product.name,
                     quantity=line.line.quantity,
                     uom=line.line.unit_of_measure_code,
@@ -491,8 +541,12 @@ class AdminWasteService:
                 folio=_build_folio(row.document.id),
                 has_evidence=self._has_evidence(row),
                 id=row.document.id,
-                impact_level=self._impact_level(row),
-                location_code=row.document.source_bucket_code or INVENTORY_LOCATION_BACKROOM,
+                impact_level=_ADMIN_WASTE_IMPACT_LEVEL_ADAPTER.validate_python(
+                    self._impact_level(row)
+                ),
+                location_code=_ADMIN_WASTE_LOCATION_CODE_ADAPTER.validate_python(
+                    row.document.source_bucket_code or INVENTORY_LOCATION_BACKROOM
+                ),
                 location_name=self._location_name(row.document.source_bucket_code),
                 notes=row.document.notes,
                 operator_id=row.created_by_user.id,
@@ -500,7 +554,7 @@ class AdminWasteService:
                 quantity=self._total_quantity(row),
                 reason_code=row.reason.code,
                 reason_label=row.reason.name,
-                status=row.document.status,
+                status=_ADMIN_WASTE_STATUS_ADAPTER.validate_python(row.document.status),
                 uom=primary.line.unit_of_measure_code if len(row.lines) == 1 else "mixed",
                 warning_state=self._warning_state_from_warnings(warnings),
                 workstation_code=row.workstation.code,
@@ -515,7 +569,9 @@ class AdminWasteService:
                 product_code=primary.product.code,
                 product_id=primary.product.id,
                 product_is_active=primary.product.is_active,
-                product_kind=primary.product.product_kind,
+                product_kind=_ADMIN_WASTE_PRODUCT_KIND_ADAPTER.validate_python(
+                    primary.product.product_kind
+                ),
                 product_name=primary.product.name,
                 stock_after=stock_after,
                 stock_before=stock_before,
@@ -533,28 +589,54 @@ class AdminWasteService:
         )
 
     def _build_filter_options(self, session: Session) -> AdminWasteFilterOptionsView:
-        branches = session.execute(select(Branch).order_by(Branch.name.asc(), Branch.code.asc())).scalars().all()
-        classes = session.execute(
-            select(ProductClass).order_by(ProductClass.name.asc(), ProductClass.code.asc()),
-        ).scalars().all()
-        products = session.execute(select(Product).order_by(Product.name.asc(), Product.code.asc())).scalars().all()
-        operators = session.execute(
-            select(User)
-            .join(OperationDocument, OperationDocument.created_by_user_id == User.id)
-            .where(OperationDocument.document_type == OPERATION_DOCUMENT_TYPE_WASTE_RECORD)
-            .order_by(User.full_name.asc()),
-        ).scalars().unique().all()
-        reasons = session.execute(
-            select(WasteReason)
-            .where(WasteReason.is_active.is_(True))
-            .order_by(WasteReason.display_order.asc(), WasteReason.name.asc()),
-        ).scalars().all()
+        branches = (
+            session.execute(select(Branch).order_by(Branch.name.asc(), Branch.code.asc()))
+            .scalars()
+            .all()
+        )
+        classes = (
+            session.execute(
+                select(ProductClass).order_by(ProductClass.name.asc(), ProductClass.code.asc()),
+            )
+            .scalars()
+            .all()
+        )
+        products = (
+            session.execute(select(Product).order_by(Product.name.asc(), Product.code.asc()))
+            .scalars()
+            .all()
+        )
+        operators = (
+            session.execute(
+                select(User)
+                .join(OperationDocument, OperationDocument.created_by_user_id == User.id)
+                .where(OperationDocument.document_type == OPERATION_DOCUMENT_TYPE_WASTE_RECORD)
+                .order_by(User.full_name.asc()),
+            )
+            .scalars()
+            .unique()
+            .all()
+        )
+        reasons = (
+            session.execute(
+                select(WasteReason)
+                .where(WasteReason.is_active.is_(True))
+                .order_by(WasteReason.display_order.asc(), WasteReason.name.asc()),
+            )
+            .scalars()
+            .all()
+        )
         return AdminWasteFilterOptionsView(
             branches=[
-                AdminWasteFilterOptionView(id=str(branch.id), label=f"{branch.name} - {branch.code}")
+                AdminWasteFilterOptionView(
+                    id=str(branch.id), label=f"{branch.name} - {branch.code}"
+                )
                 for branch in branches
             ],
-            classes=[AdminWasteFilterOptionView(id=str(product_class.id), label=product_class.name) for product_class in classes],
+            classes=[
+                AdminWasteFilterOptionView(id=str(product_class.id), label=product_class.name)
+                for product_class in classes
+            ],
             evidence_states=[
                 AdminWasteFilterOptionView(id="with_evidence", label="Con evidencia"),
                 AdminWasteFilterOptionView(id="without_evidence", label="Sin evidencia"),
@@ -567,19 +649,28 @@ class AdminWasteService:
                 AdminWasteFilterOptionView(id=code, label=label)
                 for code, label in LOCATION_LABELS.items()
             ],
-            operators=[AdminWasteFilterOptionView(id=str(user.id), label=user.full_name) for user in operators],
+            operators=[
+                AdminWasteFilterOptionView(id=str(user.id), label=user.full_name)
+                for user in operators
+            ],
             product_kinds=[
                 AdminWasteFilterOptionView(id=code, label=label)
                 for code, label in PRODUCT_KIND_LABELS.items()
             ],
             products=[
-                AdminWasteFilterOptionView(id=str(product.id), label=f"{product.name} - {product.code}")
+                AdminWasteFilterOptionView(
+                    id=str(product.id), label=f"{product.name} - {product.code}"
+                )
                 for product in products
             ],
             reasons=self._reason_views(reasons),
             statuses=[
-                AdminWasteFilterOptionView(id=OPERATION_DOCUMENT_STATUS_COMMITTED, label="Confirmada"),
-                AdminWasteFilterOptionView(id=OPERATION_DOCUMENT_STATUS_CANCELLED, label="Cancelada"),
+                AdminWasteFilterOptionView(
+                    id=OPERATION_DOCUMENT_STATUS_COMMITTED, label="Confirmada"
+                ),
+                AdminWasteFilterOptionView(
+                    id=OPERATION_DOCUMENT_STATUS_CANCELLED, label="Cancelada"
+                ),
             ],
         )
 
@@ -587,12 +678,16 @@ class AdminWasteService:
         estimated_values = [self._estimated_value(row) for row in rows]
         return AdminWasteMetricsView(
             contaminated_or_damaged=sum(
-                1 for row in rows if row.reason.code in {WASTE_REASON_CONTAMINATED, WASTE_REASON_DAMAGED}
+                1
+                for row in rows
+                if row.reason.code in {WASTE_REASON_CONTAMINATED, WASTE_REASON_DAMAGED}
             ),
             evidence_records=sum(1 for row in rows if self._has_evidence(row)),
             estimated_value=sum((value or ZERO for value in estimated_values), ZERO),
             expired_records=sum(1 for row in rows if row.reason.code == WASTE_REASON_EXPIRED),
-            high_impact_records=sum(1 for row in rows if self._impact_level(row) == ADMIN_WASTE_IMPACT_LEVEL_HIGH),
+            high_impact_records=sum(
+                1 for row in rows if self._impact_level(row) == ADMIN_WASTE_IMPACT_LEVEL_HIGH
+            ),
             total_quantity=sum((self._total_quantity(row) for row in rows), ZERO),
             total_records=len(rows),
         )
@@ -668,15 +763,43 @@ class AdminWasteService:
     def _build_warnings(self, row: _WasteRow, session: Session) -> list[AdminWasteWarningView]:
         warnings: list[AdminWasteWarningView] = []
         if not row.branch.is_active:
-            warnings.append(AdminWasteWarningView(code="inactive_branch", message="La sucursal esta inactiva.", severity="warning"))
+            warnings.append(
+                AdminWasteWarningView(
+                    code="inactive_branch", message="La sucursal esta inactiva.", severity="warning"
+                )
+            )
         if any(not line.product.is_active for line in row.lines):
-            warnings.append(AdminWasteWarningView(code="inactive_product", message="La merma incluye producto inactivo.", severity="warning"))
+            warnings.append(
+                AdminWasteWarningView(
+                    code="inactive_product",
+                    message="La merma incluye producto inactivo.",
+                    severity="warning",
+                )
+            )
         if self._impact_level(row) == ADMIN_WASTE_IMPACT_LEVEL_HIGH:
-            warnings.append(AdminWasteWarningView(code="high_impact", message="Merma marcada como alto impacto.", severity="warning"))
+            warnings.append(
+                AdminWasteWarningView(
+                    code="high_impact",
+                    message="Merma marcada como alto impacto.",
+                    severity="warning",
+                )
+            )
         if not self._inventory_movements(session, row.document.id):
-            warnings.append(AdminWasteWarningView(code="missing_inventory_movement", message="No hay movimiento de inventario vinculado.", severity="critical"))
+            warnings.append(
+                AdminWasteWarningView(
+                    code="missing_inventory_movement",
+                    message="No hay movimiento de inventario vinculado.",
+                    severity="critical",
+                )
+            )
         if self._estimated_value(row) is None:
-            warnings.append(AdminWasteWarningView(code="missing_standard_cost", message="No hay costo estandar para estimar valor.", severity="info"))
+            warnings.append(
+                AdminWasteWarningView(
+                    code="missing_standard_cost",
+                    message="No hay costo estandar para estimar valor.",
+                    severity="info",
+                )
+            )
         return warnings
 
     def _related_documents(
@@ -703,15 +826,21 @@ class AdminWasteService:
         )
         return documents
 
-    def _inventory_movements(self, session: Session, waste_id: uuid.UUID) -> list[InventoryMovement]:
-        return session.execute(
-            select(InventoryMovement)
-            .where(
-                InventoryMovement.source_document_id == waste_id,
-                InventoryMovement.source_document_type == ADMIN_WASTE_SOURCE_DOCUMENT_TYPE,
+    def _inventory_movements(
+        self, session: Session, waste_id: uuid.UUID
+    ) -> list[InventoryMovement]:
+        return list(
+            session.execute(
+                select(InventoryMovement)
+                .where(
+                    InventoryMovement.source_document_id == waste_id,
+                    InventoryMovement.source_document_type == ADMIN_WASTE_SOURCE_DOCUMENT_TYPE,
+                )
+                .order_by(InventoryMovement.occurred_at.asc()),
             )
-            .order_by(InventoryMovement.occurred_at.asc()),
-        ).scalars().all()
+            .scalars()
+            .all()
+        )
 
     def _to_movement_view(self, movement: InventoryMovement) -> AdminWasteInventoryMovementView:
         return AdminWasteInventoryMovementView(
@@ -727,7 +856,7 @@ class AdminWasteService:
             unit_of_measure=movement.unit_of_measure,
         )
 
-    def _reason_views(self, reasons: list[WasteReason]) -> list[AdminWasteReasonView]:
+    def _reason_views(self, reasons: Sequence[WasteReason]) -> list[AdminWasteReasonView]:
         return [
             AdminWasteReasonView(
                 code=reason.code,
@@ -756,7 +885,9 @@ class AdminWasteService:
             raise WasteNotFoundError("Branch was not found.")
         return branch
 
-    def _get_active_workstation_for_branch(self, session: Session, branch_id: uuid.UUID) -> Workstation:
+    def _get_active_workstation_for_branch(
+        self, session: Session, branch_id: uuid.UUID
+    ) -> Workstation:
         workstation = session.execute(
             select(Workstation)
             .where(Workstation.branch_id == branch_id, Workstation.is_active.is_(True))
@@ -764,12 +895,16 @@ class AdminWasteService:
             .limit(1),
         ).scalar_one_or_none()
         if workstation is None:
-            raise WasteValidationError("Branch needs an active workstation before waste can be managed.")
+            raise WasteValidationError(
+                "Branch needs an active workstation before waste can be managed."
+            )
         return workstation
 
     def _get_reason(self, session: Session, reason_code: str) -> WasteReason:
         reason = session.execute(
-            select(WasteReason).where(WasteReason.code == reason_code, WasteReason.is_active.is_(True)),
+            select(WasteReason).where(
+                WasteReason.code == reason_code, WasteReason.is_active.is_(True)
+            ),
         ).scalar_one_or_none()
         if reason is None:
             raise WasteNotFoundError("Waste reason was not found.")
@@ -856,7 +991,9 @@ class AdminWasteService:
         return None
 
     def _location_name(self, location_code: str | None) -> str:
-        return LOCATION_LABELS.get(location_code or INVENTORY_LOCATION_BACKROOM, location_code or "BACKROOM")
+        return LOCATION_LABELS.get(
+            location_code or INVENTORY_LOCATION_BACKROOM, location_code or "BACKROOM"
+        )
 
 
 def _normalize_optional(value: str | None) -> str | None:

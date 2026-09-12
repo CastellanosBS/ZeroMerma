@@ -8,6 +8,9 @@ const bootstrapResponse = {
   },
   local_timestamp: "2026-04-13T10:00:00Z",
   user: {
+    email: "cashier@zeromerma.local",
+    default_surface: "POS",
+    allowed_surfaces: ["POS"],
     full_name: "Main Branch Cashier",
     id: "user-1",
   },
@@ -19,6 +22,7 @@ const bootstrapResponse = {
 
 const activeCashSession = {
   id: "cash-session-1",
+  status: "OPEN",
   opening_amount: "500.00",
   opened_at: "2026-04-13T09:00:00Z",
   user_id: "user-1",
@@ -96,6 +100,7 @@ export async function installPosApiMocks(
     await fulfillJson(route, {
       access_token: "test-access-token",
       token_type: "bearer",
+      user: bootstrapResponse.user,
     });
   });
 

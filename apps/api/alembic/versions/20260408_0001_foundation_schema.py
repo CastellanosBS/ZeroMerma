@@ -7,8 +7,8 @@ Create Date: 2026-04-08 00:00:00.000000
 
 from collections.abc import Sequence
 
-from alembic import op
 import sqlalchemy as sa
+from alembic import op
 from sqlalchemy.dialects import postgresql
 
 revision: str = "0001_foundation_schema"
@@ -39,7 +39,9 @@ def upgrade() -> None:
     op.create_index(op.f("ix_audit_log_action"), "audit_log", ["action"], unique=False)
     op.create_index(op.f("ix_audit_log_branch_id"), "audit_log", ["branch_id"], unique=False)
     op.create_index(op.f("ix_audit_log_occurred_at"), "audit_log", ["occurred_at"], unique=False)
-    op.create_index(op.f("ix_audit_log_resource"), "audit_log", ["resource_type", "resource_id"], unique=False)
+    op.create_index(
+        op.f("ix_audit_log_resource"), "audit_log", ["resource_type", "resource_id"], unique=False
+    )
 
     op.create_table(
         "outbox_events",
@@ -62,7 +64,9 @@ def upgrade() -> None:
         sa.Column("occurred_at", sa.DateTime(timezone=True), nullable=False),
         sa.Column("available_at", sa.DateTime(timezone=True), nullable=False),
         sa.Column("processed_at", sa.DateTime(timezone=True), nullable=True),
-        sa.Column("status", sa.String(length=32), server_default=sa.text("'pending'"), nullable=False),
+        sa.Column(
+            "status", sa.String(length=32), server_default=sa.text("'pending'"), nullable=False
+        ),
         sa.Column("attempts", sa.Integer(), server_default=sa.text("0"), nullable=False),
         sa.Column("last_error", sa.Text(), nullable=True),
         sa.PrimaryKeyConstraint("id", name=op.f("pk_outbox_events")),
@@ -73,7 +77,9 @@ def upgrade() -> None:
         ["status", "available_at", "occurred_at"],
         unique=False,
     )
-    op.create_index(op.f("ix_outbox_events_event_name"), "outbox_events", ["event_name"], unique=False)
+    op.create_index(
+        op.f("ix_outbox_events_event_name"), "outbox_events", ["event_name"], unique=False
+    )
 
 
 def downgrade() -> None:

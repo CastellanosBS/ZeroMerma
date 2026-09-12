@@ -4,20 +4,22 @@ import uuid
 from datetime import UTC, datetime
 from decimal import Decimal
 
-from sqlalchemy import Boolean, CheckConstraint, DateTime, ForeignKey, Integer, Numeric, String, Text
+from sqlalchemy import (
+    Boolean,
+    CheckConstraint,
+    DateTime,
+    ForeignKey,
+    Integer,
+    Numeric,
+    String,
+    Text,
+)
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
 from zeromerma_api.db.base import Base
 from zeromerma_api.modules.discounts.domain.constants import (
-    COMMERCIAL_DISCOUNT_SCOPE_CLASS,
-    COMMERCIAL_DISCOUNT_SCOPE_GLOBAL,
-    COMMERCIAL_DISCOUNT_SCOPE_PRODUCT,
-    COMMERCIAL_DISCOUNT_STATUS_ACTIVE,
-    COMMERCIAL_DISCOUNT_STATUS_ARCHIVED,
     COMMERCIAL_DISCOUNT_STATUS_INACTIVE,
-    COMMERCIAL_DISCOUNT_TYPE_FIXED_AMOUNT,
-    COMMERCIAL_DISCOUNT_TYPE_PERCENTAGE,
     DISCOUNT_STATUS_COMMITTED,
     PAYMENT_METHOD_CASH,
 )
@@ -132,9 +134,6 @@ class OperationalDiscount(Base):
     )
 
 
-_ = (DISCOUNT_STATUS_COMMITTED,)
-
-
 class CommercialDiscount(Base):
     __tablename__ = "commercial_discounts"
     __table_args__ = (
@@ -215,16 +214,3 @@ class CommercialDiscount(Base):
         onupdate=utc_now,
         nullable=False,
     )
-
-
-_ = (
-    COMMERCIAL_DISCOUNT_SCOPE_CLASS,
-    COMMERCIAL_DISCOUNT_SCOPE_GLOBAL,
-    COMMERCIAL_DISCOUNT_SCOPE_PRODUCT,
-    COMMERCIAL_DISCOUNT_STATUS_ACTIVE,
-    COMMERCIAL_DISCOUNT_STATUS_ARCHIVED,
-    COMMERCIAL_DISCOUNT_STATUS_INACTIVE,
-    COMMERCIAL_DISCOUNT_TYPE_FIXED_AMOUNT,
-    COMMERCIAL_DISCOUNT_TYPE_PERCENTAGE,
-    DISCOUNT_STATUS_COMMITTED,
-)

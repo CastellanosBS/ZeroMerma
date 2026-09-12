@@ -363,7 +363,7 @@ def test_admin_purchases_partial_receipt_requires_reason_and_prevents_over_recei
     )
     assert missing_reason_response.status_code == 409
     assert (
-        missing_reason_response.json()["detail"]
+        missing_reason_response.json()["message"]
         == "Discrepancy reason is required when received quantity differs from pending quantity."
     )
 
@@ -398,7 +398,7 @@ def test_admin_purchases_partial_receipt_requires_reason_and_prevents_over_recei
         },
     )
     assert over_response.status_code == 409
-    assert over_response.json()["detail"] == "Received quantity cannot exceed pending quantity."
+    assert over_response.json()["message"] == "Received quantity cannot exceed pending quantity."
 
 
 def test_admin_purchases_direct_entry_creates_received_document_and_inventory(

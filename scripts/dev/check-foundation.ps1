@@ -1,151 +1,98 @@
+[CmdletBinding()]
 param(
-  [switch]$CiIsolated
+  [ValidateSet("All", "Preflight", "Backend", "Worker", "Migrations", "Contracts", "Web", "Browser", "Negative")]
+  [string]$Stage = "All"
 )
 
+Set-StrictMode -Version 3.0
 $ErrorActionPreference = "Stop"
-$ToolsScript = Join-Path $PSScriptRoot "..\powershell\ZeroMerma.Tools.ps1"
-. $ToolsScript
+. (Join-Path $PSScriptRoot "..\powershell\ZeroMerma.Tools.ps1")
+$root = Get-ZeroMermaRepoRoot
+$runId = [Guid]::NewGuid().ToString("N")
+$evidenceDirectory = Join-Path $root ".tmp/validation/foundation/$runId"
+New-Item -ItemType Directory -Path $evidenceDirectory -Force | Out-Null
+$stages = if ($Stage -eq "All") {
+  @("Preflight", "Backend", "Worker", "Migrations", "Contracts", "Web", "Browser", "Negative")
+} else { @($Stage) }
 
-$Root = Get-ZeroMermaRepoRoot
-$ToolchainScript = Join-Path $PSScriptRoot "check-toolchain.ps1"
-$ApiTestScript = Join-Path $PSScriptRoot "run-api-tests.ps1"
-$MigrationValidationScript = Join-Path $PSScriptRoot "run-migration-validation.ps1"
-$FunctionalOperationMatrixScript = Join-Path $PSScriptRoot "check-functional-operation-matrix.py"
-
-function Test-ZeroMermaHttpServer {
-  param(
-    [string]$Name,
-    [scriptblock]$ScriptBlock,
-    [object[]]$ArgumentList,
-    [string]$Url,
-    [int]$Attempts = 40,
-    [int]$DelayMilliseconds = 500
-  )
-
-  Write-Host "Checking $Name at $Url..."
-  $job = Start-Job -ScriptBlock $ScriptBlock -ArgumentList $ArgumentList
-
-  try {
-    for ($attempt = 1; $attempt -le $Attempts; $attempt++) {
-      Start-Sleep -Milliseconds $DelayMilliseconds
-
-      if ($job.State -eq "Failed") {
-        Receive-Job $job | Write-Host
-        throw "$Name process failed before responding at $Url."
-      }
-
-      try {
-        $response = Invoke-WebRequest -Uri $Url -UseBasicParsing -TimeoutSec 2
-        if ($response.StatusCode -eq 200) {
-          Write-Host "$Name responded successfully."
-          return
+Push-Location $root
+try {
+  foreach ($currentStage in $stages) {
+    $started = [DateTime]::UtcNow
+    $passed = $false
+    Start-Transcript -Path (Join-Path $evidenceDirectory "$currentStage.log") | Out-Null
+    try {
+      & (Join-Path $PSScriptRoot "check-toolchain.ps1")
+      switch ($currentStage) {
+        "Preflight" {
+          Invoke-ZeroMermaUv sync --all-packages --dev --frozen
+          Invoke-ZeroMermaPnpm install --frozen-lockfile
+          $dockerType = & docker info --format '{{.OSType}}'
+          if ($LASTEXITCODE -ne 0 -or $dockerType -ne "linux") {
+            throw "Foundation validation requires the Linux Docker engine"
+          }
+        }
+        "Backend" {
+          Invoke-ZeroMermaUv run --frozen python -m compileall -q apps/api/src
+          Invoke-ZeroMermaUv run --frozen ruff check .
+          Invoke-ZeroMermaUv run --frozen mypy apps/api/src apps/worker/src
+          & (Join-Path $PSScriptRoot "run-api-tests.ps1") -TestTarget @(
+            "apps/api/tests", "apps/api/unit_tests",
+            "--junitxml=$evidenceDirectory/backend.xml"
+          )
+        }
+        "Worker" {
+          Invoke-ZeroMermaUv run --frozen python -m compileall -q apps/worker/src
+          Invoke-ZeroMermaUv run --frozen pytest apps/worker/tests "--junitxml=$evidenceDirectory/worker-unit.xml"
+          & (Join-Path $PSScriptRoot "run-api-tests.ps1") -TestTarget @(
+            "apps/worker/integration_tests", "--junitxml=$evidenceDirectory/worker-postgres.xml"
+          )
+          Invoke-ZeroMermaUv run --frozen --project apps/worker python -m zeromerma_worker --once --skip-db-check
+        }
+        "Migrations" {
+          & (Join-Path $PSScriptRoot "run-migration-validation.ps1") -Mode Full
+        }
+        "Contracts" {
+          Invoke-ZeroMermaUv run --frozen python scripts/dev/check-functional-operation-matrix.py
+          Invoke-ZeroMermaPnpm contracts:check
+          Invoke-ZeroMermaUv run --frozen pytest scripts/dev/tests/test_api_contracts.py scripts/dev/tests/test_functional_operation_matrix.py "--junitxml=$evidenceDirectory/contracts.xml"
+        }
+        "Web" {
+          Invoke-ZeroMermaPnpm lint
+          Invoke-ZeroMermaPnpm typecheck
+          Invoke-ZeroMermaPnpm test
+          Invoke-ZeroMermaPnpm build
+          Invoke-ZeroMermaPnpm test:e2e
+        }
+        "Browser" {
+          & (Join-Path $PSScriptRoot "run-web-integration.ps1") -Surface All
+        }
+        "Negative" {
+          Invoke-ZeroMermaUv run --frozen pytest scripts/dev/tests/test_foundation_gates.py "--junitxml=$evidenceDirectory/negative-gates.xml"
         }
       }
-      catch {
-      }
+      $passed = $true
     }
-
-    Receive-Job $job | Write-Host
-    throw "$Name did not respond at $Url. Check whether the port is available and rerun this script from the repository root."
+    finally {
+      Stop-Transcript | Out-Null
+      $result = [ordered]@{
+        stage = $currentStage
+        passed = $passed
+        started_at = $started.ToString("o")
+        finished_at = [DateTime]::UtcNow.ToString("o")
+        commit = (& git rev-parse HEAD)
+        working_tree_clean = (@(& git status --porcelain).Count -eq 0)
+        artifact_sha256 = [ordered]@{}
+      }
+      foreach ($artifact in @(
+        "uv.lock", "pnpm-lock.yaml", "packages/api-client/openapi.json",
+        "packages/api-client/src/generated/schema.ts", "docs/architecture/API_CONTRACT_INVENTORY.json"
+      )) {
+        $result.artifact_sha256[$artifact] = (Get-FileHash -LiteralPath $artifact -Algorithm SHA256).Hash.ToLowerInvariant()
+      }
+      $result | ConvertTo-Json | Set-Content -LiteralPath (Join-Path $evidenceDirectory "$currentStage.json")
+    }
   }
-  finally {
-    Stop-Job $job -ErrorAction SilentlyContinue
-    Remove-Job $job -Force -ErrorAction SilentlyContinue
-  }
+  Write-Host "Foundation validation passed. Evidence: $evidenceDirectory"
 }
-
-Push-Location $Root
-try {
-  & $ToolchainScript
-
-  Write-Host "Resolving required tools..."
-  $UvPath = Resolve-ZeroMermaUvPath
-  $Pnpm = Resolve-ZeroMermaPnpmCommand
-  $null = Resolve-ZeroMermaDockerPath
-
-  Write-Host "Bootstrapping Python workspace with uv..."
-  Invoke-ZeroMermaUv sync --all-packages --dev --frozen
-
-  Write-Host "Validating the functional operation matrix without database access..."
-  Invoke-ZeroMermaUv run --frozen python $FunctionalOperationMatrixScript
-
-  Write-Host "Installing Node workspace dependencies..."
-  Invoke-ZeroMermaPnpm install --frozen-lockfile
-
-  if (-not $CiIsolated) {
-    Write-Host "Validating Docker Compose configuration..."
-    Invoke-ZeroMermaDockerCompose config
-    Start-ZeroMermaPostgres
-    Wait-ZeroMermaPostgres
-
-    Write-Host "Applying database migrations to the local development database..."
-    Invoke-ZeroMermaApiMigrations
-
-    Write-Host "Seeding local development data..."
-    Invoke-ZeroMermaApiSeedLocalData
-  }
-
-  Write-Host "Running Python validation..."
-  Invoke-ZeroMermaUv run ruff check apps/api/src apps/api/tests apps/api/unit_tests apps/worker/src apps/worker/tests
-  Invoke-ZeroMermaUv run mypy apps/api/src apps/worker/src
-  Invoke-ZeroMermaUv run --frozen pytest apps/api/unit_tests/test_database_safety.py
-  & $ApiTestScript
-  & $MigrationValidationScript -Mode Fast
-
-  Write-Host "Verifying worker bootability without database access..."
-  Invoke-ZeroMermaUv run --project apps/worker python -m zeromerma_worker --once --skip-db-check
-
-  Write-Host "Generating API client contracts..."
-  Invoke-ZeroMermaPnpm contracts:generate
-
-  Write-Host "Running frontend validation..."
-  Invoke-ZeroMermaPnpm lint
-  Invoke-ZeroMermaPnpm test
-  Invoke-ZeroMermaPnpm build
-
-  if (-not $CiIsolated) {
-    Write-Host "Verifying worker bootability against PostgreSQL..."
-    Invoke-ZeroMermaUv run --project apps/worker python -m zeromerma_worker --once
-
-    Test-ZeroMermaHttpServer `
-      -Name "API health endpoint" `
-      -Url "http://127.0.0.1:18000/health" `
-      -ScriptBlock {
-        param($RootPath, $UvExecutable)
-        Set-Location -LiteralPath $RootPath
-        & $UvExecutable run --project apps/api uvicorn zeromerma_api.main:create_app --factory --app-dir apps/api/src --host 127.0.0.1 --port 18000
-      } `
-      -ArgumentList @($Root, $UvPath)
-  }
-
-  Test-ZeroMermaHttpServer `
-    -Name "POS web app" `
-    -Url "http://127.0.0.1:15173" `
-    -ScriptBlock {
-      param($RootPath, $PnpmExecutable, $PnpmBaseArguments)
-      Set-Location -LiteralPath $RootPath
-      $arguments = @()
-      $arguments += $PnpmBaseArguments
-      $arguments += @("--filter", "@zeromerma/pos-web", "exec", "vite", "--host", "127.0.0.1", "--port", "15173", "--strictPort")
-      & $PnpmExecutable @arguments
-    } `
-    -ArgumentList @($Root, $Pnpm.Path, $Pnpm.Arguments)
-
-  Test-ZeroMermaHttpServer `
-    -Name "Backoffice web app" `
-    -Url "http://127.0.0.1:15174" `
-    -ScriptBlock {
-      param($RootPath, $PnpmExecutable, $PnpmBaseArguments)
-      Set-Location -LiteralPath $RootPath
-      $arguments = @()
-      $arguments += $PnpmBaseArguments
-      $arguments += @("--filter", "@zeromerma/backoffice-web", "exec", "vite", "--host", "127.0.0.1", "--port", "15174", "--strictPort")
-      & $PnpmExecutable @arguments
-    } `
-    -ArgumentList @($Root, $Pnpm.Path, $Pnpm.Arguments)
-
-  Write-Host "Foundation validation completed successfully."
-}
-finally {
-  Pop-Location
-}
+finally { Pop-Location }

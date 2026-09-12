@@ -298,9 +298,11 @@ def test_sale_confirmation_supports_card_payment_without_cash_movement(
         payment_record = session.execute(
             select(SalePayment).where(SalePayment.sale_id == sale_record.id)
         ).scalar_one()
-        cash_movement_records = session.execute(
-            select(CashMovement).where(CashMovement.sale_id == sale_record.id)
-        ).scalars().all()
+        cash_movement_records = (
+            session.execute(select(CashMovement).where(CashMovement.sale_id == sale_record.id))
+            .scalars()
+            .all()
+        )
 
     assert payment_record.payment_method_code == "CARD"
     assert cash_movement_records == []
@@ -347,11 +349,15 @@ def test_sale_confirmation_supports_mixed_cash_and_card_payment(
 
     with SessionLocal() as session:
         sale_record = session.execute(select(Sale).where(Sale.id == payload["id"])).scalar_one()
-        payment_records = session.execute(
-            select(SalePayment)
-            .where(SalePayment.sale_id == sale_record.id)
-            .order_by(SalePayment.sequence.asc())
-        ).scalars().all()
+        payment_records = (
+            session.execute(
+                select(SalePayment)
+                .where(SalePayment.sale_id == sale_record.id)
+                .order_by(SalePayment.sequence.asc())
+            )
+            .scalars()
+            .all()
+        )
         cash_movement_record = session.execute(
             select(CashMovement).where(CashMovement.sale_id == sale_record.id)
         ).scalar_one()
@@ -392,7 +398,7 @@ def test_sale_confirmation_rejects_removed_other_payment_method(
     )
 
     assert response.status_code == 409
-    assert response.json()["detail"] == "El metodo de pago OTHER no esta disponible."
+    assert response.json()["message"] == "El metodo de pago OTHER no esta disponible."
 
 
 def test_sale_confirmation_rejects_insufficient_cash(client: TestClient) -> None:
@@ -420,7 +426,7 @@ def test_sale_confirmation_rejects_insufficient_cash(client: TestClient) -> None
     )
 
     assert response.status_code == 409
-    assert response.json()["detail"] == "El efectivo registrado no cubre el total pendiente."
+    assert response.json()["message"] == "El efectivo registrado no cubre el total pendiente."
 
 
 def test_sale_confirmation_requires_open_cash_session(client: TestClient) -> None:
@@ -446,4 +452,4 @@ def test_sale_confirmation_requires_open_cash_session(client: TestClient) -> Non
     )
 
     assert response.status_code == 409
-    assert "requires an OPEN cash session" in response.json()["detail"]
+    assert "requires an OPEN cash session" in response.json()["message"]

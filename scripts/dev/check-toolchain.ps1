@@ -75,13 +75,13 @@ function Assert-PolicyFileContains {
   }
 }
 
-$overrideValues = @(
+$overrideValues = @(@(
   $PythonVersionOverride,
   $UvVersionOverride,
   $NodeVersionOverride,
   $CorepackVersionOverride,
   $PnpmVersionOverride
-) | Where-Object { -not [string]::IsNullOrWhiteSpace($_) }
+) | Where-Object { -not [string]::IsNullOrWhiteSpace($_) })
 
 if ($overrideValues.Count -gt 0 -and -not $TestMode) {
   throw "Version overrides are allowed only with -TestMode."

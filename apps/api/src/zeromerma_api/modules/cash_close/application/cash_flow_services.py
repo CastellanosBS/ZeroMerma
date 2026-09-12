@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import uuid
+from collections.abc import Iterable
 from dataclasses import dataclass
 from datetime import UTC, date, datetime
 from decimal import Decimal
@@ -632,8 +633,7 @@ class AdminCashFlowService:
                     FinancialReconciliation.status,
                     FinancialReconciliation.reason_code,
                 ).where(
-                    FinancialReconciliation.source_type
-                    == FINANCIAL_RECONCILIATION_SOURCE_CASH_CUT
+                    FinancialReconciliation.source_type == FINANCIAL_RECONCILIATION_SOURCE_CASH_CUT
                 )
             )
             .mappings()
@@ -1075,7 +1075,7 @@ def _movement_matches_search(movement: CashFlowMovement, search: str) -> bool:
 
 
 def _dedupe_options(
-    options: object,
+    options: Iterable[AdminCashFlowFilterOptionView],
 ) -> list[AdminCashFlowFilterOptionView]:
     result: dict[str, AdminCashFlowFilterOptionView] = {}
     for option in options:
@@ -1152,7 +1152,7 @@ def _money(value: Decimal) -> Decimal:
     return Decimal(value).quantize(MONEY_QUANTIZER)
 
 
-def _sum_money(values: object) -> Decimal:
+def _sum_money(values: Iterable[Decimal]) -> Decimal:
     total = ZERO_MONEY
     for value in values:
         total += Decimal(value)

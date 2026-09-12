@@ -205,11 +205,15 @@ def test_card_payment_does_not_reduce_drawer_cash_but_stays_visible_in_close_sum
     assert cash_response.status_code == 201
 
     with SessionLocal() as session:
-        movement_rows = session.execute(
-            select(CashMovement)
-            .where(CashMovement.movement_type == "OPERATIONAL_PAYMENT")
-            .order_by(CashMovement.occurred_at.asc())
-        ).scalars().all()
+        movement_rows = (
+            session.execute(
+                select(CashMovement)
+                .where(CashMovement.movement_type == "OPERATIONAL_PAYMENT")
+                .order_by(CashMovement.occurred_at.asc())
+            )
+            .scalars()
+            .all()
+        )
 
     assert len(movement_rows) == 1
     assert Decimal(str(movement_rows[0].amount)) == Decimal("40.00")
@@ -234,7 +238,7 @@ def test_payments_require_open_session_and_reject_unsupported_methods(
     )
     assert no_session_response.status_code == 409
     assert (
-        no_session_response.json()["detail"]
+        no_session_response.json()["message"]
         == "Necesitas una caja abierta en esta estacion para registrar pagos."
     )
 
@@ -251,7 +255,7 @@ def test_payments_require_open_session_and_reject_unsupported_methods(
         },
     )
     assert unsupported_method_response.status_code == 400
-    assert "efectivo o tarjeta" in unsupported_method_response.json()["detail"]
+    assert "efectivo o tarjeta" in unsupported_method_response.json()["message"]
 
 
 def test_payments_list_supports_scope_and_operator_filters(client: TestClient) -> None:
@@ -282,9 +286,7 @@ def test_payments_list_supports_scope_and_operator_filters(client: TestClient) -
 
     with SessionLocal() as session:
         current_payment = session.execute(
-            select(OperationalPayment).where(
-                OperationalPayment.id == create_response.json()["id"]
-            )
+            select(OperationalPayment).where(OperationalPayment.id == create_response.json()["id"])
         ).scalar_one()
 
         second_user = User(

@@ -177,7 +177,7 @@ def test_opening_second_session_for_same_workstation_is_rejected(client: TestCli
     )
 
     assert second_response.status_code == 409
-    assert "already has an open cash session" in second_response.json()["detail"]
+    assert "already has an open cash session" in second_response.json()["message"]
 
 
 def test_opening_second_session_for_same_user_on_another_workstation_is_rejected(
@@ -216,4 +216,4 @@ def test_opening_second_session_for_same_user_on_another_workstation_is_rejected
     )
 
     assert second_response.status_code == 409
-    assert second_response.json()["detail"] == "User already has an open cash session."
+    assert second_response.json()["message"] == "User already has an open cash session."

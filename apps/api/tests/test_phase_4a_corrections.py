@@ -252,10 +252,9 @@ def test_correction_commit_keeps_original_document_and_writes_audit_and_outbox(
         detail_payload["applied_corrections"][0]["lines"][0]["product_code_snapshot"]
         == SEED_PRODUCT_CONCHA_VAN_CODE
     )
-    assert (
-        Decimal(str(detail_payload["applied_corrections"][0]["lines"][0]["delta_quantity"]))
-        == Decimal("-2.000")
-    )
+    assert Decimal(
+        str(detail_payload["applied_corrections"][0]["lines"][0]["delta_quantity"])
+    ) == Decimal("-2.000")
 
     with SessionLocal() as session:
         target_document = session.execute(
@@ -349,7 +348,7 @@ def test_shipment_correction_after_receipt_is_rejected(client: TestClient) -> No
         },
     )
     assert commit_response.status_code == 409
-    assert "ya fue recibido" in commit_response.json()["detail"]
+    assert "ya fue recibido" in commit_response.json()["message"]
 
 
 def test_correction_commit_supports_wrong_product_delta_composition(client: TestClient) -> None:
@@ -502,7 +501,7 @@ def test_correction_history_and_detail_expose_safe_audit_summary(
         history_detail_payload["audit_summary"]["confirmed_by"]["full_name"]
         == "Main Branch Cashier"
     )
-    assert history_detail_payload["audit_summary"]["reason_label"] == "Cantidad incorrecta"
+    assert history_detail_payload["audit_summary"]["reason_label"] == "Wrong Quantity"
     assert history_detail_payload["audit_summary"]["notes"] == "Ajuste auditado para historial."
 
     target_detail_response = client.get(
@@ -544,7 +543,7 @@ def test_high_impact_correction_requires_acknowledgement_and_emits_alert_outbox(
     )
 
     assert blocked_response.status_code == 400
-    assert "alto impacto" in blocked_response.json()["detail"]
+    assert "alto impacto" in blocked_response.json()["message"]
 
     response = client.post(
         "/v1/corrections/commit",
@@ -572,16 +571,24 @@ def test_high_impact_correction_requires_acknowledgement_and_emits_alert_outbox(
     payload = response.json()
 
     with SessionLocal() as session:
-        audit_records = session.execute(
-            select(AuditLog)
-            .where(AuditLog.resource_id == payload["id"])
-            .order_by(AuditLog.occurred_at_utc.asc())
-        ).scalars().all()
-        outbox_events = session.execute(
-            select(OutboxEvent)
-            .where(OutboxEvent.aggregate_id == payload["id"])
-            .order_by(OutboxEvent.occurred_at_utc.asc())
-        ).scalars().all()
+        audit_records = (
+            session.execute(
+                select(AuditLog)
+                .where(AuditLog.resource_id == payload["id"])
+                .order_by(AuditLog.occurred_at.asc())
+            )
+            .scalars()
+            .all()
+        )
+        outbox_events = (
+            session.execute(
+                select(OutboxEvent)
+                .where(OutboxEvent.aggregate_id == payload["id"])
+                .order_by(OutboxEvent.occurred_at.asc())
+            )
+            .scalars()
+            .all()
+        )
 
     assert [record.action for record in audit_records] == [
         "correction.committed",

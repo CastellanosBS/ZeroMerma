@@ -144,23 +144,33 @@ def test_admin_inventory_filters_search_stock_state_and_detail(client: TestClien
     balance_id = str(adjustment["balance_id"])
     branch_id = _get_branch_id(SEED_BRANCH_CODE)
 
-    search_response = client.get("/v1/admin/inventory?search=concha", headers=_admin_headers(client))
+    search_response = client.get(
+        "/v1/admin/inventory?search=concha", headers=_admin_headers(client)
+    )
     assert search_response.status_code == 200
     assert [item["balance_id"] for item in search_response.json()["items"]] == [balance_id]
 
-    branch_response = client.get(f"/v1/admin/inventory?branch_id={branch_id}", headers=_admin_headers(client))
+    branch_response = client.get(
+        f"/v1/admin/inventory?branch_id={branch_id}", headers=_admin_headers(client)
+    )
     assert branch_response.status_code == 200
     assert [item["balance_id"] for item in branch_response.json()["items"]] == [balance_id]
 
-    kind_response = client.get("/v1/admin/inventory?product_kind=FINISHED_GOOD", headers=_admin_headers(client))
+    kind_response = client.get(
+        "/v1/admin/inventory?product_kind=FINISHED_GOOD", headers=_admin_headers(client)
+    )
     assert kind_response.status_code == 200
     assert [item["balance_id"] for item in kind_response.json()["items"]] == [balance_id]
 
-    stock_state_response = client.get("/v1/admin/inventory?stock_state=in_stock", headers=_admin_headers(client))
+    stock_state_response = client.get(
+        "/v1/admin/inventory?stock_state=in_stock", headers=_admin_headers(client)
+    )
     assert stock_state_response.status_code == 200
     assert [item["stock_state"] for item in stock_state_response.json()["items"]] == ["in_stock"]
 
-    detail_response = client.get(f"/v1/admin/inventory/{balance_id}", headers=_admin_headers(client))
+    detail_response = client.get(
+        f"/v1/admin/inventory/{balance_id}", headers=_admin_headers(client)
+    )
     assert detail_response.status_code == 200
     detail_payload = detail_response.json()
     assert detail_payload["balance_id"] == balance_id
@@ -180,7 +190,9 @@ def test_admin_inventory_negative_stock_warning_and_movements(client: TestClient
     )
     balance_id = str(adjustment["balance_id"])
 
-    response = client.get("/v1/admin/inventory?stock_state=negative_stock", headers=_admin_headers(client))
+    response = client.get(
+        "/v1/admin/inventory?stock_state=negative_stock", headers=_admin_headers(client)
+    )
     assert response.status_code == 200
     payload = response.json()
     assert [item["balance_id"] for item in payload["items"]] == [balance_id]

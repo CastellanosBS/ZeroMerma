@@ -1,0 +1,1133 @@
+{
+  "application_baseline_commit": "c020649885869cbf7e2987c39e9d14a16d5c3e89",
+  "generator": {
+    "command": "openapi-typescript",
+    "lockfile_resolved_version": "7.13.0",
+    "package_manifest_range": "^7.4.4"
+  },
+  "collections": {
+    "allowed_classifications": [
+      "PAGINATION_REQUIRED",
+      "BOUNDED_REFERENCE_LIST",
+      "BOUNDED_OPERATIONAL_WINDOW",
+      "EXPLICIT_COMPLETE_EXPORT",
+      "NOT_APPLICABLE"
+    ],
+    "operations": {
+      "export_admin_audit_events_v1_admin_audit_export_get": {
+        "bound": "export scope is explicitly selected by typed filters",
+        "classification": "EXPLICIT_COMPLETE_EXPORT",
+        "evidence": "apps/api/src/zeromerma_api/modules/audit/presentation/router.py#export_admin_audit_events",
+        "expected_growth": "COMPLETE_EXPORT",
+        "query_parameters": [
+          "action",
+          "actor_email",
+          "actor_user_id",
+          "branch_id",
+          "date_from",
+          "date_to",
+          "entity_id",
+          "entity_type",
+          "module",
+          "related_reference",
+          "result",
+          "search",
+          "sensitive",
+          "severity",
+          "source_app",
+          "warning_state",
+          "workstation"
+        ],
+        "reason": "GET /v1/admin/audit/export is an explicit complete export rather than an interactive list.",
+        "stable_order": "Export order is fixed by the application service and documented filters."
+      },
+      "get_inbound_transfer_history_v1_transfers_inbound_history_get": {
+        "bound": "MAX_TRANSFER_HISTORY_ITEMS=50",
+        "classification": "BOUNDED_OPERATIONAL_WINDOW",
+        "evidence": "apps/api/src/zeromerma_api/modules/transfers/presentation/router.py#get_inbound_transfer_history",
+        "expected_growth": "GROWING",
+        "query_parameters": [
+          "created_by_user_id",
+          "scope",
+          "source_branch_id",
+          "status",
+          "workstation_code"
+        ],
+        "reason": "GET /v1/transfers/inbound/history returns a server-capped operational working set; it is not advertised as a complete export.",
+        "stable_order": "Domain timestamp order with deterministic document identity tie-break required."
+      },
+      "get_operations_catalog_v1_operations_catalog_get": {
+        "bound": "active sellable catalog constrained by workstation/branch and optional class/query",
+        "classification": "BOUNDED_REFERENCE_LIST",
+        "evidence": "apps/api/src/zeromerma_api/modules/operations/presentation/router.py#get_operations_catalog",
+        "expected_growth": "CONFIGURATION_BOUNDED",
+        "query_parameters": [
+          "module",
+          "query",
+          "workstation_code"
+        ],
+        "reason": "GET /v1/operations/catalog is a scoped selection/reference registry, not an unbounded event or transaction history.",
+        "stable_order": "Configured display order followed by stable code/name identity."
+      },
+      "get_operations_class_products_v1_operations_classes__class_id__products_get": {
+        "bound": "active sellable catalog constrained by workstation/branch and optional class/query",
+        "classification": "BOUNDED_REFERENCE_LIST",
+        "evidence": "apps/api/src/zeromerma_api/modules/operations/presentation/router.py#get_operations_class_products",
+        "expected_growth": "CONFIGURATION_BOUNDED",
+        "query_parameters": [
+          "module",
+          "query",
+          "workstation_code"
+        ],
+        "reason": "GET /v1/operations/classes/{class_id}/products is a scoped selection/reference registry, not an unbounded event or transaction history.",
+        "stable_order": "Configured display order followed by stable code/name identity."
+      },
+      "get_operations_history_v1_operations_history_get": {
+        "bound": "MAX_OPERATION_HISTORY_ITEMS=50",
+        "classification": "BOUNDED_OPERATIONAL_WINDOW",
+        "evidence": "apps/api/src/zeromerma_api/modules/operations/presentation/router.py#get_operations_history",
+        "expected_growth": "GROWING",
+        "query_parameters": [
+          "created_by_user_id",
+          "destination_bucket_code",
+          "document_type",
+          "product_id",
+          "reason_code",
+          "scope",
+          "source_bucket_code",
+          "workstation_code"
+        ],
+        "reason": "GET /v1/operations/history returns a server-capped operational working set; it is not advertised as a complete export.",
+        "stable_order": "Domain timestamp order with deterministic document identity tie-break required."
+      },
+      "get_orders_catalog_v1_orders_catalog_get": {
+        "bound": "active sellable catalog constrained by workstation/branch and optional class/query",
+        "classification": "BOUNDED_REFERENCE_LIST",
+        "evidence": "apps/api/src/zeromerma_api/modules/orders/presentation/router.py#get_orders_catalog",
+        "expected_growth": "CONFIGURATION_BOUNDED",
+        "query_parameters": [
+          "query",
+          "workstation_code"
+        ],
+        "reason": "GET /v1/orders/catalog is a scoped selection/reference registry, not an unbounded event or transaction history.",
+        "stable_order": "Configured display order followed by stable code/name identity."
+      },
+      "get_orders_class_products_v1_orders_classes__class_id__products_get": {
+        "bound": "active sellable catalog constrained by workstation/branch and optional class/query",
+        "classification": "BOUNDED_REFERENCE_LIST",
+        "evidence": "apps/api/src/zeromerma_api/modules/orders/presentation/router.py#get_orders_class_products",
+        "expected_growth": "CONFIGURATION_BOUNDED",
+        "query_parameters": [
+          "query",
+          "workstation_code"
+        ],
+        "reason": "GET /v1/orders/classes/{class_id}/products is a scoped selection/reference registry, not an unbounded event or transaction history.",
+        "stable_order": "Configured display order followed by stable code/name identity."
+      },
+      "get_outbound_transfer_history_v1_transfers_outbound_history_get": {
+        "bound": "MAX_TRANSFER_HISTORY_ITEMS=50",
+        "classification": "BOUNDED_OPERATIONAL_WINDOW",
+        "evidence": "apps/api/src/zeromerma_api/modules/transfers/presentation/router.py#get_outbound_transfer_history",
+        "expected_growth": "GROWING",
+        "query_parameters": [
+          "created_by_user_id",
+          "destination_branch_id",
+          "scope",
+          "workstation_code"
+        ],
+        "reason": "GET /v1/transfers/outbound/history returns a server-capped operational working set; it is not advertised as a complete export.",
+        "stable_order": "Domain timestamp order with deterministic document identity tie-break required."
+      },
+      "get_pending_inbound_transfers_v1_transfers_inbound_pending_get": {
+        "bound": "MAX_TRANSFER_HISTORY_ITEMS=50",
+        "classification": "BOUNDED_OPERATIONAL_WINDOW",
+        "evidence": "apps/api/src/zeromerma_api/modules/transfers/presentation/router.py#get_pending_inbound_transfers",
+        "expected_growth": "GROWING",
+        "query_parameters": [
+          "workstation_code"
+        ],
+        "reason": "GET /v1/transfers/inbound/pending returns a server-capped operational working set; it is not advertised as a complete export.",
+        "stable_order": "Domain timestamp order with deterministic document identity tie-break required."
+      },
+      "get_pos_catalog_v1_pos_catalog_get": {
+        "bound": "active sellable catalog constrained by workstation/branch and optional class/query",
+        "classification": "BOUNDED_REFERENCE_LIST",
+        "evidence": "apps/api/src/zeromerma_api/modules/catalog/presentation/router.py#get_pos_catalog",
+        "expected_growth": "CONFIGURATION_BOUNDED",
+        "query_parameters": [
+          "query",
+          "workstation_code"
+        ],
+        "reason": "GET /v1/pos/catalog is a scoped selection/reference registry, not an unbounded event or transaction history.",
+        "stable_order": "Configured display order followed by stable code/name identity."
+      },
+      "get_pos_class_products_v1_pos_classes__class_id__products_get": {
+        "bound": "active sellable catalog constrained by workstation/branch and optional class/query",
+        "classification": "BOUNDED_REFERENCE_LIST",
+        "evidence": "apps/api/src/zeromerma_api/modules/catalog/presentation/router.py#get_pos_class_products",
+        "expected_growth": "CONFIGURATION_BOUNDED",
+        "query_parameters": [
+          "query",
+          "workstation_code"
+        ],
+        "reason": "GET /v1/pos/classes/{class_id}/products is a scoped selection/reference registry, not an unbounded event or transaction history.",
+        "stable_order": "Configured display order followed by stable code/name identity."
+      },
+      "get_returns_class_products_v1_returns_classes__class_id__products_get": {
+        "bound": "active sellable catalog constrained by workstation/branch and optional class/query",
+        "classification": "BOUNDED_REFERENCE_LIST",
+        "evidence": "apps/api/src/zeromerma_api/modules/returns/presentation/router.py#get_returns_class_products",
+        "expected_growth": "CONFIGURATION_BOUNDED",
+        "query_parameters": [
+          "query",
+          "workstation_code"
+        ],
+        "reason": "GET /v1/returns/classes/{class_id}/products is a scoped selection/reference registry, not an unbounded event or transaction history.",
+        "stable_order": "Configured display order followed by stable code/name identity."
+      },
+      "list_admin_audit_events_v1_admin_audit_get": {
+        "bound": "page_size default=25, maximum=100 as declared by OpenAPI",
+        "classification": "PAGINATION_REQUIRED",
+        "evidence": "apps/api/src/zeromerma_api/modules/audit/presentation/router.py#list_admin_audit_events",
+        "expected_growth": "GROWING",
+        "query_parameters": [
+          "action",
+          "actor_email",
+          "actor_user_id",
+          "branch_id",
+          "date_from",
+          "date_to",
+          "entity_id",
+          "entity_type",
+          "module",
+          "page",
+          "page_size",
+          "related_reference",
+          "result",
+          "search",
+          "sensitive",
+          "severity",
+          "source_app",
+          "warning_state",
+          "workstation"
+        ],
+        "reason": "GET /v1/admin/audit is a growing administrative collection with page/page_size and a total-bearing response envelope.",
+        "stable_order": "Fixed service order with deterministic identity tie-break required for page stability."
+      },
+      "list_admin_branches_v1_admin_branches_get": {
+        "bound": "page_size default=25, maximum=100 as declared by OpenAPI",
+        "classification": "PAGINATION_REQUIRED",
+        "evidence": "apps/api/src/zeromerma_api/modules/branches/presentation/router.py#list_admin_branches",
+        "expected_growth": "GROWING",
+        "query_parameters": [
+          "brand_id",
+          "has_active_workstations",
+          "page",
+          "page_size",
+          "search",
+          "status",
+          "warning_state"
+        ],
+        "reason": "GET /v1/admin/branches is a growing administrative collection with page/page_size and a total-bearing response envelope.",
+        "stable_order": "Fixed service order with deterministic identity tie-break required for page stability."
+      },
+      "list_admin_cash_cuts_v1_admin_cash_cuts_get": {
+        "bound": "page_size default=25, maximum=100 as declared by OpenAPI",
+        "classification": "PAGINATION_REQUIRED",
+        "evidence": "apps/api/src/zeromerma_api/modules/cash_close/presentation/router.py#list_admin_cash_cuts",
+        "expected_growth": "GROWING",
+        "query_parameters": [
+          "branch_id",
+          "cashier_id",
+          "date_from",
+          "date_to",
+          "difference_state",
+          "has_operational_payments",
+          "has_refunds",
+          "page",
+          "page_size",
+          "payment_method",
+          "search",
+          "status",
+          "workstation_id"
+        ],
+        "reason": "GET /v1/admin/cash-cuts is a growing administrative collection with page/page_size and a total-bearing response envelope.",
+        "stable_order": "Fixed service order with deterministic identity tie-break required for page stability."
+      },
+      "list_admin_cash_flow_movements_v1_admin_cash_flow_get": {
+        "bound": "page_size default=25, maximum=100 as declared by OpenAPI",
+        "classification": "PAGINATION_REQUIRED",
+        "evidence": "apps/api/src/zeromerma_api/modules/cash_close/presentation/router.py#list_admin_cash_flow_movements",
+        "expected_growth": "GROWING",
+        "query_parameters": [
+          "amount_max",
+          "amount_min",
+          "branch_id",
+          "category",
+          "date_from",
+          "date_to",
+          "direction",
+          "operator_id",
+          "page",
+          "page_size",
+          "payment_method",
+          "reconciliation_state",
+          "search",
+          "source_type",
+          "workstation_id"
+        ],
+        "reason": "GET /v1/admin/cash-flow is a growing administrative collection with page/page_size and a total-bearing response envelope.",
+        "stable_order": "Fixed service order with deterministic identity tie-break required for page stability."
+      },
+      "list_admin_cleaning_logs_v1_admin_cleaning_logs_get": {
+        "bound": "page_size default=25, maximum=100 as declared by OpenAPI",
+        "classification": "PAGINATION_REQUIRED",
+        "evidence": "apps/api/src/zeromerma_api/modules/quality/presentation/router.py#list_admin_cleaning_logs",
+        "expected_growth": "GROWING",
+        "query_parameters": [
+          "area_name",
+          "area_type",
+          "branch_id",
+          "cleaning_type",
+          "date_from",
+          "date_to",
+          "evidence_state",
+          "observation_state",
+          "page",
+          "page_size",
+          "responsible_user_id",
+          "risk_level",
+          "search",
+          "shift_code",
+          "status",
+          "template_id",
+          "warning_state"
+        ],
+        "reason": "GET /v1/admin/cleaning-logs is a growing administrative collection with page/page_size and a total-bearing response envelope.",
+        "stable_order": "Fixed service order with deterministic identity tie-break required for page stability."
+      },
+      "list_admin_cleaning_templates_v1_admin_cleaning_logs_templates_get": {
+        "bound": "active versioned template registry",
+        "classification": "BOUNDED_REFERENCE_LIST",
+        "evidence": "apps/api/src/zeromerma_api/modules/quality/presentation/router.py#list_admin_cleaning_templates",
+        "expected_growth": "CONFIGURATION_BOUNDED",
+        "query_parameters": [],
+        "reason": "GET /v1/admin/cleaning-logs/templates is a scoped selection/reference registry, not an unbounded event or transaction history.",
+        "stable_order": "Configured display order followed by stable code/name identity."
+      },
+      "list_admin_corrections_v1_admin_returns_corrections_corrections_get": {
+        "bound": "page_size default=25, maximum=100 as declared by OpenAPI",
+        "classification": "PAGINATION_REQUIRED",
+        "evidence": "apps/api/src/zeromerma_api/modules/corrections/presentation/router.py#list_admin_corrections",
+        "expected_growth": "GROWING",
+        "query_parameters": [
+          "branch_id",
+          "correction_type",
+          "date_from",
+          "date_to",
+          "net_effect",
+          "operator_id",
+          "page",
+          "page_size",
+          "reason_code",
+          "search",
+          "status",
+          "target_document_type"
+        ],
+        "reason": "GET /v1/admin/returns-corrections/corrections is a growing administrative collection with page/page_size and a total-bearing response envelope.",
+        "stable_order": "Fixed service order with deterministic identity tie-break required for page stability."
+      },
+      "list_admin_discounts_v1_admin_discounts_get": {
+        "bound": "page_size default=25, maximum=100 as declared by OpenAPI",
+        "classification": "PAGINATION_REQUIRED",
+        "evidence": "apps/api/src/zeromerma_api/modules/discounts/presentation/router.py#list_admin_discounts",
+        "expected_growth": "GROWING",
+        "query_parameters": [
+          "brand_id",
+          "class_id",
+          "discount_type",
+          "page",
+          "page_size",
+          "search",
+          "status",
+          "target_scope",
+          "validity",
+          "warning_state"
+        ],
+        "reason": "GET /v1/admin/discounts is a growing administrative collection with page/page_size and a total-bearing response envelope.",
+        "stable_order": "Fixed service order with deterministic identity tie-break required for page stability."
+      },
+      "list_admin_equipment_v1_admin_equipment_maintenance_equipment_get": {
+        "bound": "page_size default=25, maximum=100 as declared by OpenAPI",
+        "classification": "PAGINATION_REQUIRED",
+        "evidence": "apps/api/src/zeromerma_api/modules/quality/presentation/router.py#list_admin_equipment",
+        "expected_growth": "GROWING",
+        "query_parameters": [
+          "area_name",
+          "area_type",
+          "branch_id",
+          "date_from",
+          "date_to",
+          "equipment_type",
+          "incident_state",
+          "maintenance_status",
+          "maintenance_type",
+          "operational_status",
+          "overdue_state",
+          "page",
+          "page_size",
+          "provider_name",
+          "risk_level",
+          "search",
+          "technician_name"
+        ],
+        "reason": "GET /v1/admin/equipment-maintenance/equipment is a growing administrative collection with page/page_size and a total-bearing response envelope.",
+        "stable_order": "Fixed service order with deterministic identity tie-break required for page stability."
+      },
+      "list_admin_incidents_v1_admin_incidents_get": {
+        "bound": "page_size default=25, maximum=100 as declared by OpenAPI",
+        "classification": "PAGINATION_REQUIRED",
+        "evidence": "apps/api/src/zeromerma_api/modules/quality/presentation/router.py#list_admin_incidents",
+        "expected_growth": "GROWING",
+        "query_parameters": [
+          "area_name",
+          "branch_id",
+          "date_from",
+          "date_to",
+          "due_state",
+          "evidence_state",
+          "incident_type",
+          "page",
+          "page_size",
+          "related_document_state",
+          "reported_by_user_id",
+          "responsible_user_id",
+          "search",
+          "severity",
+          "source_type",
+          "status",
+          "warning_state"
+        ],
+        "reason": "GET /v1/admin/incidents is a growing administrative collection with page/page_size and a total-bearing response envelope.",
+        "stable_order": "Fixed service order with deterministic identity tie-break required for page stability."
+      },
+      "list_admin_inputs_supplies_v1_admin_inputs_supplies_get": {
+        "bound": "page_size default=25, maximum=100 as declared by OpenAPI",
+        "classification": "PAGINATION_REQUIRED",
+        "evidence": "apps/api/src/zeromerma_api/modules/catalog/presentation/admin_router.py#list_admin_inputs_supplies",
+        "expected_growth": "GROWING",
+        "query_parameters": [
+          "class_id",
+          "cost_state",
+          "inventory_tracked",
+          "page",
+          "page_size",
+          "product_kind",
+          "purchasable",
+          "recipe_usage",
+          "search",
+          "status",
+          "stock_state",
+          "supplier_id",
+          "usage_type",
+          "warning_state",
+          "without_supplier"
+        ],
+        "reason": "GET /v1/admin/inputs-supplies is a growing administrative collection with page/page_size and a total-bearing response envelope.",
+        "stable_order": "Fixed service order with deterministic identity tie-break required for page stability."
+      },
+      "list_admin_inventory_movements_v1_admin_inventory__balance_id__movements_get": {
+        "bound": "page_size default=25, maximum=100 as declared by OpenAPI",
+        "classification": "PAGINATION_REQUIRED",
+        "evidence": "apps/api/src/zeromerma_api/modules/inventory/presentation/router.py#list_admin_inventory_movements",
+        "expected_growth": "GROWING",
+        "query_parameters": [
+          "page",
+          "page_size"
+        ],
+        "reason": "GET /v1/admin/inventory/{balance_id}/movements is a growing administrative collection with page/page_size and a total-bearing response envelope.",
+        "stable_order": "Fixed service order with deterministic identity tie-break required for page stability."
+      },
+      "list_admin_inventory_v1_admin_inventory_get": {
+        "bound": "page_size default=25, maximum=100 as declared by OpenAPI",
+        "classification": "PAGINATION_REQUIRED",
+        "evidence": "apps/api/src/zeromerma_api/modules/inventory/presentation/router.py#list_admin_inventory",
+        "expected_growth": "GROWING",
+        "query_parameters": [
+          "branch_id",
+          "class_id",
+          "location_code",
+          "page",
+          "page_size",
+          "product_kind",
+          "product_status",
+          "search",
+          "stock_state"
+        ],
+        "reason": "GET /v1/admin/inventory is a growing administrative collection with page/page_size and a total-bearing response envelope.",
+        "stable_order": "Fixed service order with deterministic identity tie-break required for page stability."
+      },
+      "list_admin_orders_v1_admin_orders_get": {
+        "bound": "page_size default=25, maximum=100 as declared by OpenAPI",
+        "classification": "PAGINATION_REQUIRED",
+        "evidence": "apps/api/src/zeromerma_api/modules/orders/presentation/router.py#list_admin_orders",
+        "expected_growth": "GROWING",
+        "query_parameters": [
+          "branch_id",
+          "cashier_id",
+          "date_from",
+          "date_to",
+          "page",
+          "page_size",
+          "payment_state",
+          "search",
+          "status",
+          "workstation_id"
+        ],
+        "reason": "GET /v1/admin/orders is a growing administrative collection with page/page_size and a total-bearing response envelope.",
+        "stable_order": "Fixed service order with deterministic identity tie-break required for page stability."
+      },
+      "list_admin_pending_reconciliation_discrepancies_v1_admin_reconciliation_pending_get": {
+        "bound": "literal limit=100 in AdminReconciliationService",
+        "classification": "BOUNDED_OPERATIONAL_WINDOW",
+        "evidence": "apps/api/src/zeromerma_api/modules/cash_close/presentation/router.py#list_admin_pending_reconciliation_discrepancies",
+        "expected_growth": "GROWING",
+        "query_parameters": [
+          "amount_max",
+          "amount_min",
+          "branch_id",
+          "cashier_id",
+          "date_from",
+          "date_to",
+          "discrepancy_type",
+          "payment_method",
+          "search",
+          "source_type",
+          "workstation_id"
+        ],
+        "reason": "GET /v1/admin/reconciliation/pending returns a server-capped operational working set; it is not advertised as a complete export.",
+        "stable_order": "Domain timestamp order with deterministic document identity tie-break required."
+      },
+      "list_admin_prices_v1_admin_prices_get": {
+        "bound": "page_size default=25, maximum=100 as declared by OpenAPI",
+        "classification": "PAGINATION_REQUIRED",
+        "evidence": "apps/api/src/zeromerma_api/modules/catalog/presentation/admin_router.py#list_admin_prices",
+        "expected_growth": "GROWING",
+        "query_parameters": [
+          "brand_id",
+          "capture_mode",
+          "class_id",
+          "entity_type",
+          "page",
+          "page_size",
+          "price_health",
+          "search",
+          "status",
+          "updated_from",
+          "updated_to"
+        ],
+        "reason": "GET /v1/admin/prices is a growing administrative collection with page/page_size and a total-bearing response envelope.",
+        "stable_order": "Fixed service order with deterministic identity tie-break required for page stability."
+      },
+      "list_admin_product_classes_v1_admin_product_classes_get": {
+        "bound": "page_size default=25, maximum=100 as declared by OpenAPI",
+        "classification": "PAGINATION_REQUIRED",
+        "evidence": "apps/api/src/zeromerma_api/modules/catalog/presentation/admin_router.py#list_admin_product_classes",
+        "expected_growth": "GROWING",
+        "query_parameters": [
+          "brand_id",
+          "capture_mode",
+          "page",
+          "page_size",
+          "product_presence",
+          "search",
+          "status"
+        ],
+        "reason": "GET /v1/admin/product-classes is a growing administrative collection with page/page_size and a total-bearing response envelope.",
+        "stable_order": "Fixed service order with deterministic identity tie-break required for page stability."
+      },
+      "list_admin_production_v1_admin_production_get": {
+        "bound": "page_size default=25, maximum=100 as declared by OpenAPI",
+        "classification": "PAGINATION_REQUIRED",
+        "evidence": "apps/api/src/zeromerma_api/modules/production/presentation/router.py#list_admin_production",
+        "expected_growth": "GROWING",
+        "query_parameters": [
+          "branch_id",
+          "date_from",
+          "date_to",
+          "operator_user_id",
+          "page",
+          "page_size",
+          "product_id",
+          "recipe_id",
+          "search",
+          "status",
+          "variance_state",
+          "warning_state"
+        ],
+        "reason": "GET /v1/admin/production is a growing administrative collection with page/page_size and a total-bearing response envelope.",
+        "stable_order": "Fixed service order with deterministic identity tie-break required for page stability."
+      },
+      "list_admin_products_v1_admin_products_get": {
+        "bound": "page_size default=25, maximum=100 as declared by OpenAPI",
+        "classification": "PAGINATION_REQUIRED",
+        "evidence": "apps/api/src/zeromerma_api/modules/catalog/presentation/admin_router.py#list_admin_products",
+        "expected_growth": "GROWING",
+        "query_parameters": [
+          "branch_id",
+          "brand_id",
+          "capture_mode",
+          "class_id",
+          "page",
+          "page_size",
+          "readiness",
+          "search",
+          "status"
+        ],
+        "reason": "GET /v1/admin/products is a growing administrative collection with page/page_size and a total-bearing response envelope.",
+        "stable_order": "Fixed service order with deterministic identity tie-break required for page stability."
+      },
+      "list_admin_purchases_v1_admin_purchases_get": {
+        "bound": "page_size default=25, maximum=100 as declared by OpenAPI",
+        "classification": "PAGINATION_REQUIRED",
+        "evidence": "apps/api/src/zeromerma_api/modules/purchases/presentation/router.py#list_admin_purchases",
+        "expected_growth": "GROWING",
+        "query_parameters": [
+          "amount_max",
+          "amount_min",
+          "branch_id",
+          "date_from",
+          "date_to",
+          "discrepancy_state",
+          "operator_user_id",
+          "page",
+          "page_size",
+          "product_id",
+          "product_kind",
+          "search",
+          "status",
+          "supplier_id",
+          "warning_state"
+        ],
+        "reason": "GET /v1/admin/purchases is a growing administrative collection with page/page_size and a total-bearing response envelope.",
+        "stable_order": "Fixed service order with deterministic identity tie-break required for page stability."
+      },
+      "list_admin_recipe_cost_products_v1_admin_recipes_costs_products_get": {
+        "bound": "page_size default=25, maximum=100 as declared by OpenAPI",
+        "classification": "PAGINATION_REQUIRED",
+        "evidence": "apps/api/src/zeromerma_api/modules/catalog/presentation/admin_router.py#list_admin_recipe_cost_products",
+        "expected_growth": "GROWING",
+        "query_parameters": [
+          "brand_id",
+          "class_id",
+          "page",
+          "page_size",
+          "recipe_state",
+          "search"
+        ],
+        "reason": "GET /v1/admin/recipes-costs/products is a growing administrative collection with page/page_size and a total-bearing response envelope.",
+        "stable_order": "Fixed service order with deterministic identity tie-break required for page stability."
+      },
+      "list_admin_reconciliations_v1_admin_reconciliation_get": {
+        "bound": "page_size default=25, maximum=100 as declared by OpenAPI",
+        "classification": "PAGINATION_REQUIRED",
+        "evidence": "apps/api/src/zeromerma_api/modules/cash_close/presentation/router.py#list_admin_reconciliations",
+        "expected_growth": "GROWING",
+        "query_parameters": [
+          "amount_max",
+          "amount_min",
+          "branch_id",
+          "cashier_id",
+          "date_from",
+          "date_to",
+          "discrepancy_type",
+          "evidence_state",
+          "page",
+          "page_size",
+          "payment_method",
+          "search",
+          "source_type",
+          "status",
+          "workstation_id"
+        ],
+        "reason": "GET /v1/admin/reconciliation is a growing administrative collection with page/page_size and a total-bearing response envelope.",
+        "stable_order": "Fixed service order with deterministic identity tie-break required for page stability."
+      },
+      "list_admin_reports_v1_admin_reports_get": {
+        "bound": "versioned report-definition registry",
+        "classification": "BOUNDED_REFERENCE_LIST",
+        "evidence": "apps/api/src/zeromerma_api/modules/reports/presentation/router.py#list_admin_reports",
+        "expected_growth": "CONFIGURATION_BOUNDED",
+        "query_parameters": [
+          "category",
+          "export_support",
+          "search",
+          "sensitivity",
+          "source_module",
+          "status"
+        ],
+        "reason": "GET /v1/admin/reports is a scoped selection/reference registry, not an unbounded event or transaction history.",
+        "stable_order": "Configured display order followed by stable code/name identity."
+      },
+      "list_admin_returns_v1_admin_returns_corrections_returns_get": {
+        "bound": "page_size default=25, maximum=100 as declared by OpenAPI",
+        "classification": "PAGINATION_REQUIRED",
+        "evidence": "apps/api/src/zeromerma_api/modules/returns/presentation/router.py#list_admin_returns",
+        "expected_growth": "GROWING",
+        "query_parameters": [
+          "branch_id",
+          "date_from",
+          "date_to",
+          "max_amount",
+          "min_amount",
+          "operator_id",
+          "page",
+          "page_size",
+          "refund_method",
+          "search",
+          "status"
+        ],
+        "reason": "GET /v1/admin/returns-corrections/returns is a growing administrative collection with page/page_size and a total-bearing response envelope.",
+        "stable_order": "Fixed service order with deterministic identity tie-break required for page stability."
+      },
+      "list_admin_role_permissions_v1_admin_roles_permissions_get": {
+        "bound": "versioned application capability registry",
+        "classification": "BOUNDED_REFERENCE_LIST",
+        "evidence": "apps/api/src/zeromerma_api/modules/identity/presentation/router.py#list_admin_role_permissions",
+        "expected_growth": "CONFIGURATION_BOUNDED",
+        "query_parameters": [],
+        "reason": "GET /v1/admin/roles/permissions is a scoped selection/reference registry, not an unbounded event or transaction history.",
+        "stable_order": "Configured display order followed by stable code/name identity."
+      },
+      "list_admin_roles_v1_admin_roles_get": {
+        "bound": "page_size default=25, maximum=100 as declared by OpenAPI",
+        "classification": "PAGINATION_REQUIRED",
+        "evidence": "apps/api/src/zeromerma_api/modules/identity/presentation/router.py#list_admin_roles",
+        "expected_growth": "GROWING",
+        "query_parameters": [
+          "app_surface",
+          "has_users",
+          "high_privilege",
+          "page",
+          "page_size",
+          "permission_module",
+          "search",
+          "status",
+          "system_state",
+          "warning_state"
+        ],
+        "reason": "GET /v1/admin/roles is a growing administrative collection with page/page_size and a total-bearing response envelope.",
+        "stable_order": "Fixed service order with deterministic identity tie-break required for page stability."
+      },
+      "list_admin_sales_tickets_v1_admin_sales_tickets_get": {
+        "bound": "page_size default=25, maximum=100 as declared by OpenAPI",
+        "classification": "PAGINATION_REQUIRED",
+        "evidence": "apps/api/src/zeromerma_api/modules/tickets/presentation/router.py#list_admin_sales_tickets",
+        "expected_growth": "GROWING",
+        "query_parameters": [
+          "branch_id",
+          "cashier_id",
+          "date_from",
+          "date_to",
+          "max_amount",
+          "min_amount",
+          "page",
+          "page_size",
+          "payment_method",
+          "search",
+          "status",
+          "workstation_id"
+        ],
+        "reason": "GET /v1/admin/sales/tickets is a growing administrative collection with page/page_size and a total-bearing response envelope.",
+        "stable_order": "Fixed service order with deterministic identity tie-break required for page stability."
+      },
+      "list_admin_sanitary_templates_v1_admin_sanitary_verifications_templates_get": {
+        "bound": "active versioned template registry",
+        "classification": "BOUNDED_REFERENCE_LIST",
+        "evidence": "apps/api/src/zeromerma_api/modules/quality/presentation/router.py#list_admin_sanitary_templates",
+        "expected_growth": "CONFIGURATION_BOUNDED",
+        "query_parameters": [],
+        "reason": "GET /v1/admin/sanitary-verifications/templates is a scoped selection/reference registry, not an unbounded event or transaction history.",
+        "stable_order": "Configured display order followed by stable code/name identity."
+      },
+      "list_admin_sanitary_verifications_v1_admin_sanitary_verifications_get": {
+        "bound": "page_size default=25, maximum=100 as declared by OpenAPI",
+        "classification": "PAGINATION_REQUIRED",
+        "evidence": "apps/api/src/zeromerma_api/modules/quality/presentation/router.py#list_admin_sanitary_verifications",
+        "expected_growth": "GROWING",
+        "query_parameters": [
+          "area_name",
+          "area_type",
+          "branch_id",
+          "date_from",
+          "date_to",
+          "evidence_state",
+          "incident_state",
+          "inspector_user_id",
+          "page",
+          "page_size",
+          "process_name",
+          "process_type",
+          "result",
+          "risk_level",
+          "search",
+          "status",
+          "template_id",
+          "warning_state"
+        ],
+        "reason": "GET /v1/admin/sanitary-verifications is a growing administrative collection with page/page_size and a total-bearing response envelope.",
+        "stable_order": "Fixed service order with deterministic identity tie-break required for page stability."
+      },
+      "list_admin_settings_v1_admin_settings_get": {
+        "bound": "versioned system-setting definition registry",
+        "classification": "BOUNDED_REFERENCE_LIST",
+        "evidence": "apps/api/src/zeromerma_api/modules/configuration/presentation/router.py#list_admin_settings",
+        "expected_growth": "CONFIGURATION_BOUNDED",
+        "query_parameters": [
+          "affected_module",
+          "category",
+          "readonly",
+          "scope",
+          "search",
+          "sensitivity",
+          "status"
+        ],
+        "reason": "GET /v1/admin/settings is a scoped selection/reference registry, not an unbounded event or transaction history.",
+        "stable_order": "Configured display order followed by stable code/name identity."
+      },
+      "list_admin_suppliers_v1_admin_suppliers_get": {
+        "bound": "page_size default=25, maximum=100 as declared by OpenAPI",
+        "classification": "PAGINATION_REQUIRED",
+        "evidence": "apps/api/src/zeromerma_api/modules/suppliers/presentation/router.py#list_admin_suppliers",
+        "expected_growth": "GROWING",
+        "query_parameters": [
+          "branch_id",
+          "category",
+          "page",
+          "page_size",
+          "product_kind",
+          "search",
+          "status",
+          "warning_state"
+        ],
+        "reason": "GET /v1/admin/suppliers is a growing administrative collection with page/page_size and a total-bearing response envelope.",
+        "stable_order": "Fixed service order with deterministic identity tie-break required for page stability."
+      },
+      "list_admin_transfers_v1_admin_transfers_get": {
+        "bound": "page_size default=25, maximum=100 as declared by OpenAPI",
+        "classification": "PAGINATION_REQUIRED",
+        "evidence": "apps/api/src/zeromerma_api/modules/transfers/presentation/router.py#list_admin_transfers",
+        "expected_growth": "GROWING",
+        "query_parameters": [
+          "date_from",
+          "date_to",
+          "destination_branch_id",
+          "discrepancy_state",
+          "operator_user_id",
+          "origin_branch_id",
+          "page",
+          "page_size",
+          "product_id",
+          "search",
+          "status"
+        ],
+        "reason": "GET /v1/admin/transfers is a growing administrative collection with page/page_size and a total-bearing response envelope.",
+        "stable_order": "Fixed service order with deterministic identity tie-break required for page stability."
+      },
+      "list_admin_users_v1_admin_users_get": {
+        "bound": "page_size default=25, maximum=100 as declared by OpenAPI",
+        "classification": "PAGINATION_REQUIRED",
+        "evidence": "apps/api/src/zeromerma_api/modules/identity/presentation/router.py#list_admin_users",
+        "expected_growth": "GROWING",
+        "query_parameters": [
+          "app_access",
+          "branch_id",
+          "last_login_state",
+          "page",
+          "page_size",
+          "role_id",
+          "search",
+          "status",
+          "warning_state"
+        ],
+        "reason": "GET /v1/admin/users is a growing administrative collection with page/page_size and a total-bearing response envelope.",
+        "stable_order": "Fixed service order with deterministic identity tie-break required for page stability."
+      },
+      "list_admin_waste_reasons_v1_admin_waste_reasons_get": {
+        "bound": "versioned operational reason registry",
+        "classification": "BOUNDED_REFERENCE_LIST",
+        "evidence": "apps/api/src/zeromerma_api/modules/waste/presentation/router.py#list_admin_waste_reasons",
+        "expected_growth": "CONFIGURATION_BOUNDED",
+        "query_parameters": [],
+        "reason": "GET /v1/admin/waste/reasons is a scoped selection/reference registry, not an unbounded event or transaction history.",
+        "stable_order": "Configured display order followed by stable code/name identity."
+      },
+      "list_admin_waste_v1_admin_waste_get": {
+        "bound": "page_size default=25, maximum=100 as declared by OpenAPI",
+        "classification": "PAGINATION_REQUIRED",
+        "evidence": "apps/api/src/zeromerma_api/modules/waste/presentation/router.py#list_admin_waste",
+        "expected_growth": "GROWING",
+        "query_parameters": [
+          "branch_id",
+          "class_id",
+          "date_from",
+          "date_to",
+          "evidence_state",
+          "impact_level",
+          "location_code",
+          "operator_user_id",
+          "page",
+          "page_size",
+          "product_id",
+          "product_kind",
+          "reason_code",
+          "search",
+          "status",
+          "warning_state"
+        ],
+        "reason": "GET /v1/admin/waste is a growing administrative collection with page/page_size and a total-bearing response envelope.",
+        "stable_order": "Fixed service order with deterministic identity tie-break required for page stability."
+      },
+      "list_admin_workstations_v1_admin_workstations_get": {
+        "bound": "page_size default=25, maximum=100 as declared by OpenAPI",
+        "classification": "PAGINATION_REQUIRED",
+        "evidence": "apps/api/src/zeromerma_api/modules/branches/presentation/router.py#list_admin_workstations",
+        "expected_growth": "GROWING",
+        "query_parameters": [
+          "branch_id",
+          "cash_session_state",
+          "page",
+          "page_size",
+          "readiness",
+          "search",
+          "status",
+          "warning_state"
+        ],
+        "reason": "GET /v1/admin/workstations is a growing administrative collection with page/page_size and a total-bearing response envelope.",
+        "stable_order": "Fixed service order with deterministic identity tie-break required for page stability."
+      },
+      "list_correction_history_v1_corrections_history_get": {
+        "bound": "MAX_CORRECTION_HISTORY_RESULTS=80",
+        "classification": "BOUNDED_OPERATIONAL_WINDOW",
+        "evidence": "apps/api/src/zeromerma_api/modules/corrections/presentation/router.py#list_correction_history",
+        "expected_growth": "GROWING",
+        "query_parameters": [
+          "created_by_user_id",
+          "query",
+          "reason_code",
+          "scope",
+          "target_document_type",
+          "workstation_code"
+        ],
+        "reason": "GET /v1/corrections/history returns a server-capped operational working set; it is not advertised as a complete export.",
+        "stable_order": "Domain timestamp order with deterministic document identity tie-break required."
+      },
+      "list_discounts_v1_discounts_get": {
+        "bound": "MAX_DISCOUNTS_PER_LIST=80",
+        "classification": "BOUNDED_OPERATIONAL_WINDOW",
+        "evidence": "apps/api/src/zeromerma_api/modules/discounts/presentation/router.py#list_discounts",
+        "expected_growth": "GROWING",
+        "query_parameters": [
+          "category",
+          "created_by_user_id",
+          "payment_method",
+          "query",
+          "scope",
+          "workstation_code"
+        ],
+        "reason": "GET /v1/discounts returns a server-capped operational working set; it is not advertised as a complete export.",
+        "stable_order": "Domain timestamp order with deterministic document identity tie-break required."
+      },
+      "list_orders_v1_orders_get": {
+        "bound": "service limit=60",
+        "classification": "BOUNDED_OPERATIONAL_WINDOW",
+        "evidence": "apps/api/src/zeromerma_api/modules/orders/presentation/router.py#list_orders",
+        "expected_growth": "GROWING",
+        "query_parameters": [
+          "date_from",
+          "date_to",
+          "query",
+          "status",
+          "workstation_code"
+        ],
+        "reason": "GET /v1/orders returns a server-capped operational working set; it is not advertised as a complete export.",
+        "stable_order": "Domain timestamp order with deterministic document identity tie-break required."
+      },
+      "list_payments_v1_payments_get": {
+        "bound": "MAX_PAYMENTS_PER_LIST=80",
+        "classification": "BOUNDED_OPERATIONAL_WINDOW",
+        "evidence": "apps/api/src/zeromerma_api/modules/payments/presentation/router.py#list_payments",
+        "expected_growth": "GROWING",
+        "query_parameters": [
+          "category",
+          "created_by_user_id",
+          "payment_method",
+          "query",
+          "scope",
+          "workstation_code"
+        ],
+        "reason": "GET /v1/payments returns a server-capped operational working set; it is not advertised as a complete export.",
+        "stable_order": "Domain timestamp order with deterministic document identity tie-break required."
+      },
+      "list_return_history_v1_returns_history_get": {
+        "bound": "MAX_RETURN_SEARCH_RESULTS=80",
+        "classification": "BOUNDED_OPERATIONAL_WINDOW",
+        "evidence": "apps/api/src/zeromerma_api/modules/returns/presentation/router.py#list_return_history",
+        "expected_growth": "GROWING",
+        "query_parameters": [
+          "created_by_user_id",
+          "date_from",
+          "date_to",
+          "query",
+          "reason_code",
+          "scope",
+          "workstation_code"
+        ],
+        "reason": "GET /v1/returns/history returns a server-capped operational working set; it is not advertised as a complete export.",
+        "stable_order": "Domain timestamp order with deterministic document identity tie-break required."
+      },
+      "list_tickets_v1_tickets_get": {
+        "bound": "MAX_TICKETS_PER_LIST=80",
+        "classification": "BOUNDED_OPERATIONAL_WINDOW",
+        "evidence": "apps/api/src/zeromerma_api/modules/tickets/presentation/router.py#list_tickets",
+        "expected_growth": "GROWING",
+        "query_parameters": [
+          "query",
+          "scope",
+          "workstation_code"
+        ],
+        "reason": "GET /v1/tickets returns a server-capped operational working set; it is not advertised as a complete export.",
+        "stable_order": "Domain timestamp order with deterministic document identity tie-break required."
+      },
+      "search_correction_products_v1_corrections_products_get": {
+        "bound": "active sellable catalog constrained by workstation/branch and optional class/query",
+        "classification": "BOUNDED_REFERENCE_LIST",
+        "evidence": "apps/api/src/zeromerma_api/modules/corrections/presentation/router.py#search_correction_products",
+        "expected_growth": "CONFIGURATION_BOUNDED",
+        "query_parameters": [
+          "query",
+          "workstation_code"
+        ],
+        "reason": "GET /v1/corrections/products is a scoped selection/reference registry, not an unbounded event or transaction history.",
+        "stable_order": "Configured display order followed by stable code/name identity."
+      },
+      "search_correction_targets_v1_corrections_search_get": {
+        "bound": "MAX_CORRECTION_SEARCH_RESULTS=80",
+        "classification": "BOUNDED_OPERATIONAL_WINDOW",
+        "evidence": "apps/api/src/zeromerma_api/modules/corrections/presentation/router.py#search_correction_targets",
+        "expected_growth": "GROWING",
+        "query_parameters": [
+          "document_type",
+          "query",
+          "workstation_code"
+        ],
+        "reason": "GET /v1/corrections/search returns a server-capped operational working set; it is not advertised as a complete export.",
+        "stable_order": "Domain timestamp order with deterministic document identity tie-break required."
+      },
+      "search_return_sales_v1_returns_search_sales_get": {
+        "bound": "MAX_RETURN_SEARCH_RESULTS=80",
+        "classification": "BOUNDED_OPERATIONAL_WINDOW",
+        "evidence": "apps/api/src/zeromerma_api/modules/returns/presentation/router.py#search_return_sales",
+        "expected_growth": "GROWING",
+        "query_parameters": [
+          "date_from",
+          "date_to",
+          "query",
+          "scope",
+          "workstation_code"
+        ],
+        "reason": "GET /v1/returns/search-sales returns a server-capped operational working set; it is not advertised as a complete export.",
+        "stable_order": "Domain timestamp order with deterministic document identity tie-break required."
+      }
+    }
+  },
+  "decimals": {
+    "backend": "decimal.Decimal/PostgreSQL Numeric",
+    "binary_float_domain_authority": false,
+    "rounding": "DOMAIN_POLICY_UNCHANGED",
+    "input": {
+      "accepted_wire": "JSON_NUMBER_OR_STRING",
+      "preferred_wire": "JSON_STRING",
+      "typescript": "number | string"
+    },
+    "output": {
+      "wire": "JSON_STRING",
+      "typescript": "string"
+    },
+    "numeric_input_precision": "PRECISION_ALREADY_LOST_IN_A_CLIENT_NUMBER_CANNOT_BE_RECOVERED"
+  },
+  "enums_nullability": {
+    "empty_string_distinct_from_null": true,
+    "enums": "EXPLICIT_CLOSED_VALUES",
+    "missing_distinct_from_null": true,
+    "nullable": "OPENAPI_3_1_ANYOF_NULL",
+    "zero_distinct_from_null": true
+  },
+  "error_contract": {
+    "compatibility_aliases_allowed": false,
+    "required_fields": [
+      "code",
+      "message",
+      "details",
+      "request_id",
+      "field_errors"
+    ],
+    "schema": "ApiErrorResponse",
+    "statuses": [
+      400,
+      401,
+      403,
+      404,
+      409,
+      422,
+      500
+    ]
+  },
+  "frontend": {
+    "feature_level_fetch_allowed": false,
+    "generated_type_source": "packages/api-client/src/generated/schema.ts",
+    "manual_wire_contracts_allowed": false,
+    "raw_http_baseline_count": 158,
+    "transport": "packages/api-client/src/transport.ts",
+    "view_models_allowed": true
+  },
+  "generated_artifacts": [
+    "packages/api-client/openapi.json",
+    "packages/api-client/src/generated/schema.ts",
+    "docs/architecture/API_CONTRACT_INVENTORY.json"
+  ],
+  "identifiers": {
+    "internal_id_distinct_from_visible_folio": true,
+    "natural_codes": "JSON_STRING",
+    "numeric_ids_forbidden": true,
+    "uuid": "JSON_STRING_WITH_FORMAT_UUID"
+  },
+  "schema_version": "1.0.0",
+  "source_chain": [
+    "FastAPI/Pydantic",
+    "runtime OpenAPI",
+    "packages/api-client/openapi.json",
+    "packages/api-client/src/generated/schema.ts",
+    "packages/api-client/src/transport.ts",
+    "POS/Backoffice adapters"
+  ],
+  "temporal": {
+    "date": "ISO8601_CALENDAR_DATE",
+    "datetime_serialization": "ISO8601_DATETIME",
+    "aware_datetime_wire": "RFC3339_WITH_UTC_OR_NUMERIC_OFFSET",
+    "offset_serialization": "PRESERVED_BY_PYDANTIC_NOT_AUTOMATICALLY_NORMALIZED",
+    "preferred_instant_zone": "UTC",
+    "local_timezone": "PRESENTATION_OR_EXPLICIT_CONFIGURATION_ONLY",
+    "naive_authoritative_datetime_allowed_by_policy": false,
+    "naive_request_acceptance": "EXISTING_DATETIME_FIELDS_MAY_ACCEPT_NAIVE_VALUES",
+    "strict_timezone_enforcement": "NOT_IMPLEMENTED_BY_CONTRACT_ANNOTATIONS",
+    "follow_up": "VALIDATE_TIMEZONE_REQUIREMENTS_IN_THE_OWNING_BUSINESS_TASK_BEFORE_AUTHORITATIVE_USE"
+  },
+  "versioning": {
+    "additive": "NON_BREAKING",
+    "breaking": "COORDINATED_CUTOVER_OR_NEW_API_VERSION",
+    "current_path_version": "v1",
+    "deprecation": "EXPLICIT_WITH_REPLACEMENT_AND_WINDOW",
+    "v2_created_by_this_task": false
+  }
+}

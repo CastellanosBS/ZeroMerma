@@ -41,6 +41,12 @@ def test_canonical_matrix_passes() -> None:
     assert _errors(CANONICAL_MATRIX) == []
 
 
+def test_contract_generation_tool_is_not_a_functional_operation() -> None:
+    assert "INTERNAL:scripts.dev.api-contracts:command" not in INVENTORY.internal
+    assert "INTERNAL:scripts.dev.run-web-integration:command" not in INVENTORY.internal
+    assert "INTERNAL:scripts.dev.seed-web-integration:command" not in INVENTORY.internal
+
+
 @pytest.mark.parametrize(
     ("mutate", "expected_error"),
     [

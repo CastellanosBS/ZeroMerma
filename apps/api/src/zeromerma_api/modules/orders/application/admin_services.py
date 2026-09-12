@@ -1,11 +1,15 @@
 from __future__ import annotations
 
 import uuid
+from collections.abc import Sequence
 from datetime import UTC, datetime, time
 from decimal import Decimal
 
-from sqlalchemy import Select, String, and_, case, cast, func, or_, select
+from sqlalchemy import String, and_, case, cast, func, or_, select
+from sqlalchemy.engine import RowMapping
 from sqlalchemy.orm import Session
+from sqlalchemy.sql.elements import ColumnElement
+from sqlalchemy.sql.selectable import Subquery
 
 from zeromerma_api.modules.audit.application.service import AuditRecorder
 from zeromerma_api.modules.branches.infrastructure.models import Branch, Workstation
@@ -14,20 +18,18 @@ from zeromerma_api.modules.orders.application.admin_schemas import (
     AdminOrderAvailableActionsView,
     AdminOrderCustomerView,
     AdminOrderDetailView,
-    AdminOrderFilterOptionView,
     AdminOrderFilterOptionsView,
+    AdminOrderFilterOptionView,
     AdminOrderLineView,
     AdminOrderListItemView,
     AdminOrderMetricsView,
     AdminOrderOverviewView,
     AdminOrderPaymentView,
-    AdminOrderRelatedDocumentView,
     AdminOrdersBackendContractView,
     AdminOrdersListResponse,
     AdminOrderTimelineEventView,
 )
 from zeromerma_api.modules.orders.application.services import (
-    MONEY_QUANTIZER,
     ORDER_STATUS_SEQUENCE,
     ZERO_MONEY,
     _build_order_folio,
@@ -162,10 +164,7 @@ class AdminOrdersService:
             backend_contract=_backend_contract(),
             filter_options=_build_filter_options(session),
             is_backend_connected=True,
-            items=[
-                _map_order_list_item(record, effective_at=now)
-                for record in records
-            ],
+            items=[_map_order_list_item(record, effective_at=now) for record in records],
             metrics=metrics,
             page=normalized_page,
             page_size=normalized_page_size,
@@ -243,7 +242,8 @@ class AdminOrdersService:
             )
         if _quantize_money(order.remaining_balance_amount) > ZERO_MONEY:
             raise OrderStateConflictError(
-                "Este pedido tiene saldo pendiente. Cobra el saldo desde una caja abierta antes de entregarlo."
+                "Este pedido tiene saldo pendiente. Cobra el saldo desde una caja abierta "
+                "antes de entregarlo."
             )
         now = datetime.now(tz=UTC)
         order.status = ORDER_STATUS_DELIVERED
@@ -305,7 +305,8 @@ class AdminOrdersService:
         refund_amount = _get_cancellation_refund_amount(order, effective_at=now)
         if refund_amount > ZERO_MONEY:
             raise OrderStateConflictError(
-                "La cancelacion requiere reembolso de anticipo. Procesa el reembolso desde una caja abierta."
+                "La cancelacion requiere reembolso de anticipo. "
+                "Procesa el reembolso desde una caja abierta."
             )
         order.status = ORDER_STATUS_CANCELED
         order.remaining_balance_amount = ZERO_MONEY
@@ -357,52 +358,63 @@ class AdminOrdersService:
     def _build_metrics(
         self,
         session: Session,
-        conditions: list[object],
+        conditions: list[ColumnElement[bool]],
     ) -> AdminOrderMetricsView:
         now = datetime.now(tz=UTC)
         today_start = datetime.combine(now.date(), time.min, tzinfo=UTC)
         today_end = datetime.combine(now.date(), time.max, tzinfo=UTC)
-        record = session.execute(
-            select(
-                func.count(
-                    case((CustomerOrder.status.in_([ORDER_STATUS_PENDING, ORDER_STATUS_READY]), 1))
-                ).label("active_orders"),
-                func.count(case((CustomerOrder.status == ORDER_STATUS_READY, 1))).label(
-                    "ready_orders"
-                ),
-                func.count(
-                    case(
-                        (
-                            and_(
-                                CustomerOrder.requested_for_at >= today_start,
-                                CustomerOrder.requested_for_at <= today_end,
-                            ),
-                            1,
-                        )
-                    )
-                ).label("due_today"),
-                func.coalesce(func.sum(CustomerOrder.advance_amount), ZERO_MONEY).label(
-                    "deposits_received_amount"
-                ),
-                func.coalesce(
-                    func.sum(
+        record = (
+            session.execute(
+                select(
+                    func.count(
                         case(
                             (
                                 CustomerOrder.status.in_(
                                     [ORDER_STATUS_PENDING, ORDER_STATUS_READY]
                                 ),
-                                CustomerOrder.remaining_balance_amount,
-                            ),
-                            else_=ZERO_MONEY,
+                                1,
+                            )
                         )
+                    ).label("active_orders"),
+                    func.count(case((CustomerOrder.status == ORDER_STATUS_READY, 1))).label(
+                        "ready_orders"
                     ),
-                    ZERO_MONEY,
-                ).label("outstanding_balance_amount"),
-                func.count(case((CustomerOrder.status == ORDER_STATUS_CANCELED, 1))).label(
-                    "canceled_orders"
-                ),
-            ).where(*conditions)
-        ).mappings().one()
+                    func.count(
+                        case(
+                            (
+                                and_(
+                                    CustomerOrder.requested_for_at >= today_start,
+                                    CustomerOrder.requested_for_at <= today_end,
+                                ),
+                                1,
+                            )
+                        )
+                    ).label("due_today"),
+                    func.coalesce(func.sum(CustomerOrder.advance_amount), ZERO_MONEY).label(
+                        "deposits_received_amount"
+                    ),
+                    func.coalesce(
+                        func.sum(
+                            case(
+                                (
+                                    CustomerOrder.status.in_(
+                                        [ORDER_STATUS_PENDING, ORDER_STATUS_READY]
+                                    ),
+                                    CustomerOrder.remaining_balance_amount,
+                                ),
+                                else_=ZERO_MONEY,
+                            )
+                        ),
+                        ZERO_MONEY,
+                    ).label("outstanding_balance_amount"),
+                    func.count(case((CustomerOrder.status == ORDER_STATUS_CANCELED, 1))).label(
+                        "canceled_orders"
+                    ),
+                ).where(*conditions)
+            )
+            .mappings()
+            .one()
+        )
         return AdminOrderMetricsView(
             active_orders=int(record["active_orders"] or 0),
             ready_orders=int(record["ready_orders"] or 0),
@@ -425,7 +437,7 @@ def _backend_contract() -> AdminOrdersBackendContractView:
     )
 
 
-def _order_item_stats_subquery() -> object:
+def _order_item_stats_subquery() -> Subquery:
     return (
         select(
             CustomerOrderItem.customer_order_id.label("customer_order_id"),
@@ -449,8 +461,8 @@ def _build_order_conditions(
     search: str | None,
     status_filter: str | None,
     workstation_id: uuid.UUID | None,
-) -> list[object]:
-    conditions: list[object] = []
+) -> list[ColumnElement[bool]]:
+    conditions: list[ColumnElement[bool]] = []
     if branch_id is not None:
         conditions.append(CustomerOrder.branch_id == branch_id)
     if cashier_id is not None:
@@ -481,7 +493,7 @@ def _build_order_conditions(
     return conditions
 
 
-def _payment_state_condition(payment_state: str) -> object:
+def _payment_state_condition(payment_state: str) -> ColumnElement[bool]:
     if payment_state == PAYMENT_STATE_NO_DEPOSIT:
         return and_(
             CustomerOrder.status != ORDER_STATUS_CANCELED,
@@ -512,9 +524,7 @@ def _build_filter_options(session: Session) -> AdminOrderFilterOptionsView:
         select(Branch.id, Branch.name).order_by(Branch.name.asc())
     ).mappings()
     workstations = session.execute(
-        select(Workstation.id, Workstation.name, Workstation.code).order_by(
-            Workstation.name.asc()
-        )
+        select(Workstation.id, Workstation.name, Workstation.code).order_by(Workstation.name.asc())
     ).mappings()
     cashiers = session.execute(
         select(User.id, User.full_name)
@@ -552,7 +562,7 @@ def _build_filter_options(session: Session) -> AdminOrderFilterOptionsView:
 
 
 def _map_order_list_item(
-    record: dict[str, object],
+    record: RowMapping,
     *,
     effective_at: datetime,
 ) -> AdminOrderListItemView:
@@ -595,7 +605,7 @@ def _map_order_list_item(
 
 
 def _get_record_cancellation_refund_amount(
-    record: dict[str, object],
+    record: RowMapping,
     *,
     effective_at: datetime,
 ) -> Decimal:
@@ -625,8 +635,12 @@ def _build_order_detail(session: Session, order: CustomerOrder) -> AdminOrderDet
     branch = session.get(Branch, order.branch_id)
     workstation = session.get(Workstation, order.workstation_id_created)
     created_by = session.get(User, order.created_by_user_id)
-    delivered_by = session.get(User, order.delivered_by_user_id) if order.delivered_by_user_id else None
-    canceled_by = session.get(User, order.canceled_by_user_id) if order.canceled_by_user_id else None
+    delivered_by = (
+        session.get(User, order.delivered_by_user_id) if order.delivered_by_user_id else None
+    )
+    canceled_by = (
+        session.get(User, order.canceled_by_user_id) if order.canceled_by_user_id else None
+    )
     if branch is None or workstation is None or created_by is None:
         raise OrderStateConflictError("No fue posible reconstruir el pedido.")
     lines = session.execute(
@@ -634,12 +648,16 @@ def _build_order_detail(session: Session, order: CustomerOrder) -> AdminOrderDet
         .where(CustomerOrderItem.customer_order_id == order.id)
         .order_by(CustomerOrderItem.line_number.asc())
     ).scalars()
-    payment_records = session.execute(
-        select(CustomerOrderPayment, User.full_name)
-        .join(User, User.id == CustomerOrderPayment.recorded_by_user_id)
-        .where(CustomerOrderPayment.customer_order_id == order.id)
-        .order_by(CustomerOrderPayment.sequence.asc())
-    ).all()
+    payment_records = (
+        session.execute(
+            select(CustomerOrderPayment, User.full_name)
+            .join(User, User.id == CustomerOrderPayment.recorded_by_user_id)
+            .where(CustomerOrderPayment.customer_order_id == order.id)
+            .order_by(CustomerOrderPayment.sequence.asc())
+        )
+        .tuples()
+        .all()
+    )
     now = datetime.now(tz=UTC)
     refund_amount = _get_cancellation_refund_amount(order, effective_at=now)
     payment_state = _derive_payment_state(
@@ -734,9 +752,8 @@ def _build_available_actions(
 ) -> AdminOrderAvailableActionsView:
     has_balance_due = _quantize_money(order.remaining_balance_amount) > ZERO_MONEY
     can_deliver_without_payment = order.status == ORDER_STATUS_READY and not has_balance_due
-    requires_financial_action = (
-        (order.status == ORDER_STATUS_READY and has_balance_due)
-        or (order.status in {ORDER_STATUS_PENDING, ORDER_STATUS_READY} and refund_amount > ZERO_MONEY)
+    requires_financial_action = (order.status == ORDER_STATUS_READY and has_balance_due) or (
+        order.status in {ORDER_STATUS_PENDING, ORDER_STATUS_READY} and refund_amount > ZERO_MONEY
     )
     financial_note = None
     if order.status == ORDER_STATUS_READY and has_balance_due:
@@ -760,7 +777,7 @@ def _build_available_actions(
 
 def _build_timeline(
     order: CustomerOrder,
-    payment_records: list[tuple[CustomerOrderPayment, str]],
+    payment_records: Sequence[tuple[CustomerOrderPayment, str]],
 ) -> list[AdminOrderTimelineEventView]:
     events = [
         AdminOrderTimelineEventView(

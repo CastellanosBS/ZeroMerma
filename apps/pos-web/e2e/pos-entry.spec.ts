@@ -27,7 +27,7 @@ test("routes an authenticated operator with an active session directly into POS 
   await expect(page.getByRole("heading", { name: "Punto de venta" })).toBeVisible();
 
   await page.getByRole("button", { name: /Pan dulce/ }).click();
-  await page.getByLabel("Cantidad").fill("2");
+  await page.getByRole("textbox", { name: "Cantidad", exact: true }).fill("2");
   await page.getByRole("button", { name: "Agregar" }).click();
   await page.getByLabel("Dinero recibido").click();
   await expect(page.getByLabel("Dinero recibido")).toBeFocused();
@@ -38,7 +38,9 @@ test("routes an authenticated operator with an active session directly into POS 
 
   await expect(page.locator("body")).toContainText("Venta registrada.");
   await expect(
-    page.getByText("El ticket esta vacio. Agrega productos desde el catalogo para empezar la venta."),
+    page.getByText(
+      "El ticket esta vacio. Agrega productos desde el catalogo para empezar la venta.",
+    ),
   ).toBeVisible();
 });
 
@@ -61,16 +63,11 @@ test("sends an authenticated operator without an active session to the cash-sess
   await page.keyboard.press("Enter");
 
   await expect(page.getByRole("status")).toContainText("Caja abierta · Turno iniciado");
-  await expect(page.getByRole("heading", { name: "Caja abierta" })).toBeVisible();
-  await page.getByRole("button", { name: "Ir al POS" }).click();
-
   await expect(page).toHaveURL(/\/pos$/);
   await expect(page.getByRole("heading", { name: "Punto de venta" })).toBeVisible();
 });
 
-test("shows the already-open state on the cash-session gate when a session exists", async ({
-  page,
-}) => {
+test("resumes POS from the cash-session gate when a session already exists", async ({ page }) => {
   await installPosApiMocks(page, { hasActiveCashSession: true });
 
   await page.addInitScript(() => {
@@ -87,7 +84,6 @@ test("shows the already-open state on the cash-session gate when a session exist
 
   await page.goto("/cash-session/open");
 
-  await expect(page.getByRole("heading", { name: "Caja abierta" })).toBeVisible();
-  await expect(page.getByRole("button", { name: "Ir al POS" })).toBeVisible();
+  await expect(page).toHaveURL(/\/pos$/);
+  await expect(page.getByRole("heading", { name: "Punto de venta" })).toBeVisible();
 });
-

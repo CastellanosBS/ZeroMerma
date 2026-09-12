@@ -47,7 +47,9 @@ def _get_product_class(code: str) -> ProductClass:
 
 def _create_zero_price_class() -> str:
     with SessionLocal() as session:
-        brand = session.execute(select(Brand).where(Brand.code == SEED_BRAND_EL_MEJOR_PAN_CODE)).scalar_one()
+        brand = session.execute(
+            select(Brand).where(Brand.code == SEED_BRAND_EL_MEJOR_PAN_CODE)
+        ).scalar_one()
         product_class = ProductClass(
             brand_id=brand.id,
             code="PRICE-ZERO-CLASS",
@@ -111,7 +113,9 @@ def test_admin_prices_filters_search_capture_mode_and_health(client: TestClient)
 def test_admin_prices_detail_exposes_price_owner_and_cost_comparison(client: TestClient) -> None:
     product = _get_product(SEED_PRODUCT_COCA_355_CODE)
     with SessionLocal() as session:
-        product_record = session.execute(select(Product).where(Product.id == product.id)).scalar_one()
+        product_record = session.execute(
+            select(Product).where(Product.id == product.id)
+        ).scalar_one()
         product_record.standard_cost = Decimal("10.00")
         session.commit()
 
@@ -141,7 +145,9 @@ def test_admin_prices_update_product_direct_writes_product_owner_and_audits(
     assert payload["price"]["price_owner"] == "product_unit_price"
 
     with SessionLocal() as session:
-        updated_product = session.execute(select(Product).where(Product.id == product.id)).scalar_one()
+        updated_product = session.execute(
+            select(Product).where(Product.id == product.id)
+        ).scalar_one()
         audit_record = session.execute(
             select(AuditLog).where(
                 AuditLog.resource_id == str(product.id),
@@ -169,7 +175,9 @@ def test_admin_prices_update_class_capture_writes_class_owner_and_audits(
     assert payload["price"]["price_owner"] == "class_capture_unit_price"
 
     with SessionLocal() as session:
-        updated_class = session.execute(select(ProductClass).where(ProductClass.id == product_class.id)).scalar_one()
+        updated_class = session.execute(
+            select(ProductClass).where(ProductClass.id == product_class.id)
+        ).scalar_one()
         audit_record = session.execute(
             select(AuditLog).where(
                 AuditLog.resource_id == str(product_class.id),

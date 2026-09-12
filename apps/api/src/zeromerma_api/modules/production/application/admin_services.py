@@ -3,8 +3,9 @@ from __future__ import annotations
 import uuid
 from dataclasses import dataclass
 from datetime import UTC, datetime
-from decimal import Decimal, ROUND_HALF_UP
+from decimal import ROUND_HALF_UP, Decimal
 
+from pydantic import TypeAdapter
 from sqlalchemy import String, cast, delete, or_, select
 from sqlalchemy.orm import Session
 
@@ -21,7 +22,10 @@ from zeromerma_api.modules.inventory.domain.constants import (
     INVENTORY_MOVEMENT_TYPE_PRODUCTION_CONSUMPTION,
     INVENTORY_MOVEMENT_TYPE_PRODUCTION_OUTPUT,
 )
-from zeromerma_api.modules.inventory.infrastructure.models import InventoryBalance, InventoryMovement
+from zeromerma_api.modules.inventory.infrastructure.models import (
+    InventoryBalance,
+    InventoryMovement,
+)
 from zeromerma_api.modules.outbox.application.service import OutboxWriter
 from zeromerma_api.modules.production.application.admin_schemas import (
     AdminProductionActualConsumptionLineView,
@@ -30,9 +34,10 @@ from zeromerma_api.modules.production.application.admin_schemas import (
     AdminProductionCompleteRequest,
     AdminProductionCreateRequest,
     AdminProductionDetailView,
-    AdminProductionFilterOptionView,
     AdminProductionFilterOptionsView,
+    AdminProductionFilterOptionView,
     AdminProductionInputLineView,
+    AdminProductionInputStatus,
     AdminProductionInventoryImpactView,
     AdminProductionInventoryMovementView,
     AdminProductionListItemView,
@@ -43,6 +48,7 @@ from zeromerma_api.modules.production.application.admin_schemas import (
     AdminProductionProductRecipeView,
     AdminProductionRelatedDocumentView,
     AdminProductionStartRequest,
+    AdminProductionStatus,
     AdminProductionUpdateRequest,
     AdminProductionWarningSeverity,
     AdminProductionWarningView,
@@ -73,8 +79,17 @@ from zeromerma_api.modules.production.domain.exceptions import (
     ProductionNotFoundError,
     ProductionValidationError,
 )
-from zeromerma_api.modules.production.infrastructure.models import ProductionBatch, ProductionBatchInput
+from zeromerma_api.modules.production.infrastructure.models import (
+    ProductionBatch,
+    ProductionBatchInput,
+)
 
+_ADMIN_PRODUCTION_INPUT_STATUS_ADAPTER: TypeAdapter[AdminProductionInputStatus] = TypeAdapter(
+    AdminProductionInputStatus
+)
+_ADMIN_PRODUCTION_STATUS_ADAPTER: TypeAdapter[AdminProductionStatus] = TypeAdapter(
+    AdminProductionStatus
+)
 DECIMAL_3 = Decimal("0.001")
 DECIMAL_4 = Decimal("0.0001")
 ZERO = Decimal("0")
@@ -174,7 +189,9 @@ class AdminProductionService:
             total=total,
         )
 
-    def get_production_detail(self, session: Session, *, production_id: uuid.UUID) -> AdminProductionDetailView:
+    def get_production_detail(
+        self, session: Session, *, production_id: uuid.UUID
+    ) -> AdminProductionDetailView:
         return self._to_detail(session, self._get_row(session, production_id))
 
     def create_production(
@@ -231,7 +248,9 @@ class AdminProductionService:
         if command.product_id is not None and command.product_id != row.product.id:
             product = self._get_finished_product(session, command.product_id)
 
-        recipe_id = command.recipe_id if command.recipe_id is not None else row.recipe.id
+        recipe_id: uuid.UUID | None = (
+            command.recipe_id if command.recipe_id is not None else row.recipe.id
+        )
         if product.id != row.product.id and command.recipe_id is None:
             recipe_id = None
         recipe = self._resolve_recipe(session, product_id=product.id, recipe_id=recipe_id)
@@ -279,7 +298,9 @@ class AdminProductionService:
         self._replace_input_plan(session, batch=row.batch, recipe=row.recipe, branch=row.branch)
         shortages = self._list_inputs(session, row.batch.id)
         if any((line.shortage_qty_snapshot or ZERO) > ZERO for line in shortages):
-            raise ProductionValidationError("Production cannot start while raw material shortages exist.")
+            raise ProductionValidationError(
+                "Production cannot start while raw material shortages exist."
+            )
 
         row.batch.status = PRODUCTION_STATUS_IN_PROGRESS
         row.batch.started_at = _utc_now()
@@ -335,7 +356,9 @@ class AdminProductionService:
             available = Decimal(balance.quantity_on_hand) if balance is not None else ZERO
             required = Decimal(input_line.required_qty)
             if available < required:
-                raise ProductionValidationError("Raw material stock changed and is no longer sufficient.")
+                raise ProductionValidationError(
+                    "Raw material stock changed and is no longer sufficient."
+                )
             assert balance is not None
             balance.quantity_on_hand = _q3(available - required)
             input_line.consumed_qty = required
@@ -422,7 +445,10 @@ class AdminProductionService:
     ) -> AdminProductionDetailView:
         row = self._get_row(session, production_id)
         if row.batch.status == PRODUCTION_STATUS_COMPLETED:
-            raise ProductionValidationError("Completed production cannot be cancelled. Use corrections or inventory adjustments.")
+            raise ProductionValidationError(
+                "Completed production cannot be cancelled. "
+                "Use corrections or inventory adjustments."
+            )
         if row.batch.status == PRODUCTION_STATUS_CANCELLED:
             raise ProductionValidationError("Production is already cancelled.")
         row.batch.status = PRODUCTION_STATUS_CANCELLED
@@ -492,7 +518,9 @@ class AdminProductionService:
                 ),
             )
         return [
-            _ProductionRow(batch=batch, branch=branch, created_by_user=user, product=product, recipe=recipe)
+            _ProductionRow(
+                batch=batch, branch=branch, created_by_user=user, product=product, recipe=recipe
+            )
             for batch, branch, product, recipe, user in session.execute(query).all()
         ]
 
@@ -508,14 +536,24 @@ class AdminProductionService:
         if row is None:
             raise ProductionNotFoundError("Production batch was not found.")
         batch, branch, product, recipe, user = row
-        return _ProductionRow(batch=batch, branch=branch, created_by_user=user, product=product, recipe=recipe)
+        return _ProductionRow(
+            batch=batch, branch=branch, created_by_user=user, product=product, recipe=recipe
+        )
 
     def _to_detail(self, session: Session, row: _ProductionRow) -> AdminProductionDetailView:
         input_rows = self._list_inputs(session, row.batch.id)
         warnings = self._build_warnings(session, row)
         warning_state = self._warning_state_from_warnings(warnings)
-        started_by = session.get(User, row.batch.started_by_user_id) if row.batch.started_by_user_id else None
-        completed_by = session.get(User, row.batch.completed_by_user_id) if row.batch.completed_by_user_id else None
+        started_by = (
+            session.get(User, row.batch.started_by_user_id)
+            if row.batch.started_by_user_id
+            else None
+        )
+        completed_by = (
+            session.get(User, row.batch.completed_by_user_id)
+            if row.batch.completed_by_user_id
+            else None
+        )
         return AdminProductionDetailView(
             actual_consumption=[
                 AdminProductionActualConsumptionLineView(
@@ -534,7 +572,8 @@ class AdminProductionService:
                 for input_line, input_product in self._input_rows_with_products(session, input_rows)
             ],
             available_actions=AdminProductionAvailableActionsView(
-                can_cancel=row.batch.status in {PRODUCTION_STATUS_DRAFT, PRODUCTION_STATUS_IN_PROGRESS},
+                can_cancel=row.batch.status
+                in {PRODUCTION_STATUS_DRAFT, PRODUCTION_STATUS_IN_PROGRESS},
                 can_complete=row.batch.status == PRODUCTION_STATUS_IN_PROGRESS,
                 can_edit=row.batch.status == PRODUCTION_STATUS_DRAFT,
                 can_start=row.batch.status == PRODUCTION_STATUS_DRAFT,
@@ -568,7 +607,7 @@ class AdminProductionService:
                 started_at=row.batch.started_at,
                 started_by_user_id=started_by.id if started_by else None,
                 started_by_user_name=started_by.full_name if started_by else None,
-                status=row.batch.status,
+                status=_ADMIN_PRODUCTION_STATUS_ADAPTER.validate_python(row.batch.status),
                 variance_percent=row.batch.variance_percent,
                 variance_qty=row.batch.variance_qty,
                 variance_reason=row.batch.variance_reason,
@@ -583,7 +622,9 @@ class AdminProductionService:
                     required_qty=input_line.required_qty,
                     shortage_qty=input_line.shortage_qty_snapshot,
                     standard_cost=input_line.standard_cost_snapshot,
-                    status=input_line.status,
+                    status=_ADMIN_PRODUCTION_INPUT_STATUS_ADAPTER.validate_python(
+                        input_line.status
+                    ),
                     uom=input_line.unit_of_measure,
                 )
                 for input_line, input_product in self._input_rows_with_products(session, input_rows)
@@ -624,7 +665,7 @@ class AdminProductionService:
             recipe_id=row.recipe.id,
             recipe_name=_recipe_name(row.recipe),
             started_at=row.batch.started_at,
-            status=row.batch.status,
+            status=_ADMIN_PRODUCTION_STATUS_ADAPTER.validate_python(row.batch.status),
             variance_percent=row.batch.variance_percent,
             variance_qty=row.batch.variance_qty,
             warning_state=self._warning_state_from_warnings(warnings),
@@ -639,7 +680,9 @@ class AdminProductionService:
         branch: Branch,
         recipe: Recipe,
     ) -> None:
-        session.execute(delete(ProductionBatchInput).where(ProductionBatchInput.production_batch_id == batch.id))
+        session.execute(
+            delete(ProductionBatchInput).where(ProductionBatchInput.production_batch_id == batch.id)
+        )
         session.flush()
         for plan in self._build_input_plan(session, batch=batch, branch=branch, recipe=recipe):
             session.add(
@@ -676,7 +719,11 @@ class AdminProductionService:
 
         plans: list[_InputPlan] = []
         for recipe_input, input_product in recipe_inputs:
-            required = _q3(Decimal(recipe_input.quantity) * Decimal(batch.planned_output_qty) / Decimal(recipe.yield_qty))
+            required = _q3(
+                Decimal(recipe_input.quantity)
+                * Decimal(batch.planned_output_qty)
+                / Decimal(recipe.yield_qty)
+            )
             balance = self._get_balance(
                 session,
                 product_id=input_product.id,
@@ -705,13 +752,23 @@ class AdminProductionService:
             )
         return plans
 
-    def _build_metrics(self, session: Session, rows: list[_ProductionRow]) -> AdminProductionMetricsView:
+    def _build_metrics(
+        self, session: Session, rows: list[_ProductionRow]
+    ) -> AdminProductionMetricsView:
         return AdminProductionMetricsView(
-            completed_batches=sum(1 for row in rows if row.batch.status == PRODUCTION_STATUS_COMPLETED),
-            in_progress_batches=sum(1 for row in rows if row.batch.status == PRODUCTION_STATUS_IN_PROGRESS),
+            completed_batches=sum(
+                1 for row in rows if row.batch.status == PRODUCTION_STATUS_COMPLETED
+            ),
+            in_progress_batches=sum(
+                1 for row in rows if row.batch.status == PRODUCTION_STATUS_IN_PROGRESS
+            ),
             pending_batches=sum(1 for row in rows if row.batch.status == PRODUCTION_STATUS_DRAFT),
             produced_units=sum(
-                (Decimal(row.batch.actual_output_qty or ZERO) for row in rows if row.batch.status == PRODUCTION_STATUS_COMPLETED),
+                (
+                    Decimal(row.batch.actual_output_qty or ZERO)
+                    for row in rows
+                    if row.batch.status == PRODUCTION_STATUS_COMPLETED
+                ),
                 ZERO,
             ),
             total_batches=len(rows),
@@ -721,56 +778,128 @@ class AdminProductionService:
 
     def _build_filter_options(self, session: Session) -> AdminProductionFilterOptionsView:
         branches = session.execute(select(Branch).order_by(Branch.name.asc())).scalars().all()
-        products = session.execute(
-            select(Product)
-            .where(Product.product_kind == CATALOG_PRODUCT_KIND_FINISHED_GOOD)
-            .order_by(Product.name.asc()),
-        ).scalars().all()
-        recipes = session.execute(select(Recipe, Product).join(Product, Product.id == Recipe.product_id).order_by(Product.name.asc())).all()
-        operators = session.execute(
-            select(User)
-            .join(ProductionBatch, ProductionBatch.created_by_user_id == User.id)
-            .order_by(User.full_name.asc()),
-        ).scalars().unique().all()
+        products = (
+            session.execute(
+                select(Product)
+                .where(Product.product_kind == CATALOG_PRODUCT_KIND_FINISHED_GOOD)
+                .order_by(Product.name.asc()),
+            )
+            .scalars()
+            .all()
+        )
+        recipes = session.execute(
+            select(Recipe, Product)
+            .join(Product, Product.id == Recipe.product_id)
+            .order_by(Product.name.asc())
+        ).all()
+        operators = (
+            session.execute(
+                select(User)
+                .join(ProductionBatch, ProductionBatch.created_by_user_id == User.id)
+                .order_by(User.full_name.asc()),
+            )
+            .scalars()
+            .unique()
+            .all()
+        )
         return AdminProductionFilterOptionsView(
             branches=[
-                AdminProductionFilterOptionView(id=str(branch.id), label=f"{branch.name} - {branch.code}")
+                AdminProductionFilterOptionView(
+                    id=str(branch.id), label=f"{branch.name} - {branch.code}"
+                )
                 for branch in branches
             ],
-            operators=[AdminProductionFilterOptionView(id=str(user.id), label=user.full_name) for user in operators],
+            operators=[
+                AdminProductionFilterOptionView(id=str(user.id), label=user.full_name)
+                for user in operators
+            ],
             products=[
-                AdminProductionFilterOptionView(id=str(product.id), label=f"{product.name} - {product.code}")
+                AdminProductionFilterOptionView(
+                    id=str(product.id), label=f"{product.name} - {product.code}"
+                )
                 for product in products
             ],
             recipes=[
-                AdminProductionFilterOptionView(id=str(recipe.id), label=f"{product.name} - {_recipe_name(recipe)}")
+                AdminProductionFilterOptionView(
+                    id=str(recipe.id), label=f"{product.name} - {_recipe_name(recipe)}"
+                )
                 for recipe, product in recipes
             ],
             statuses=[
                 AdminProductionFilterOptionView(id=PRODUCTION_STATUS_DRAFT, label="Pendiente"),
-                AdminProductionFilterOptionView(id=PRODUCTION_STATUS_IN_PROGRESS, label="En proceso"),
+                AdminProductionFilterOptionView(
+                    id=PRODUCTION_STATUS_IN_PROGRESS, label="En proceso"
+                ),
                 AdminProductionFilterOptionView(id=PRODUCTION_STATUS_COMPLETED, label="Completada"),
                 AdminProductionFilterOptionView(id=PRODUCTION_STATUS_CANCELLED, label="Cancelada"),
             ],
         )
 
-    def _build_warnings(self, session: Session, row: _ProductionRow) -> list[AdminProductionWarningView]:
+    def _build_warnings(
+        self, session: Session, row: _ProductionRow
+    ) -> list[AdminProductionWarningView]:
         warnings: list[AdminProductionWarningView] = []
         if not row.branch.is_active:
-            warnings.append(AdminProductionWarningView(code="inactive_branch", message="La sucursal esta inactiva.", severity="critical"))
+            warnings.append(
+                AdminProductionWarningView(
+                    code="inactive_branch",
+                    message="La sucursal esta inactiva.",
+                    severity="critical",
+                )
+            )
         if not row.product.is_active:
-            warnings.append(AdminProductionWarningView(code="inactive_product", message="El producto terminado esta inactivo.", severity="critical"))
+            warnings.append(
+                AdminProductionWarningView(
+                    code="inactive_product",
+                    message="El producto terminado esta inactivo.",
+                    severity="critical",
+                )
+            )
         if not row.recipe.is_active:
-            warnings.append(AdminProductionWarningView(code="inactive_recipe", message="La receta usada no esta activa.", severity="critical"))
-        if self._has_shortage(session, row.batch.id) and row.batch.status in {PRODUCTION_STATUS_DRAFT, PRODUCTION_STATUS_IN_PROGRESS}:
-            warnings.append(AdminProductionWarningView(code="raw_material_shortage", message="Hay faltantes de insumos para esta produccion.", severity="critical"))
-        if row.batch.status == PRODUCTION_STATUS_COMPLETED and row.batch.variance_qty not in (None, ZERO):
-            warnings.append(AdminProductionWarningView(code="yield_variance", message="La produccion cerro con variacion de rendimiento.", severity="warning"))
-        if row.batch.status == PRODUCTION_STATUS_COMPLETED and not self._inventory_movements(session, row.batch.id):
-            warnings.append(AdminProductionWarningView(code="missing_inventory_movements", message="No hay movimientos de inventario vinculados.", severity="critical"))
+            warnings.append(
+                AdminProductionWarningView(
+                    code="inactive_recipe",
+                    message="La receta usada no esta activa.",
+                    severity="critical",
+                )
+            )
+        if self._has_shortage(session, row.batch.id) and row.batch.status in {
+            PRODUCTION_STATUS_DRAFT,
+            PRODUCTION_STATUS_IN_PROGRESS,
+        }:
+            warnings.append(
+                AdminProductionWarningView(
+                    code="raw_material_shortage",
+                    message="Hay faltantes de insumos para esta produccion.",
+                    severity="critical",
+                )
+            )
+        if row.batch.status == PRODUCTION_STATUS_COMPLETED and row.batch.variance_qty not in (
+            None,
+            ZERO,
+        ):
+            warnings.append(
+                AdminProductionWarningView(
+                    code="yield_variance",
+                    message="La produccion cerro con variacion de rendimiento.",
+                    severity="warning",
+                )
+            )
+        if row.batch.status == PRODUCTION_STATUS_COMPLETED and not self._inventory_movements(
+            session, row.batch.id
+        ):
+            warnings.append(
+                AdminProductionWarningView(
+                    code="missing_inventory_movements",
+                    message="No hay movimientos de inventario vinculados.",
+                    severity="critical",
+                )
+            )
         return warnings
 
-    def _warning_state(self, session: Session, row: _ProductionRow) -> AdminProductionWarningSeverity | None:
+    def _warning_state(
+        self, session: Session, row: _ProductionRow
+    ) -> AdminProductionWarningSeverity | None:
         return self._warning_state_from_warnings(self._build_warnings(session, row))
 
     def _warning_state_from_warnings(
@@ -785,13 +914,20 @@ class AdminProductionService:
             return "info"
         return None
 
-    def _inventory_impact(self, session: Session, batch_id: uuid.UUID) -> AdminProductionInventoryImpactView:
+    def _inventory_impact(
+        self, session: Session, batch_id: uuid.UUID
+    ) -> AdminProductionInventoryImpactView:
         return AdminProductionInventoryImpactView(
             integration_available=True,
-            movements=[self._to_movement_view(movement) for movement in self._inventory_movements(session, batch_id)],
+            movements=[
+                self._to_movement_view(movement)
+                for movement in self._inventory_movements(session, batch_id)
+            ],
         )
 
-    def _to_movement_view(self, movement: InventoryMovement) -> AdminProductionInventoryMovementView:
+    def _to_movement_view(
+        self, movement: InventoryMovement
+    ) -> AdminProductionInventoryMovementView:
         return AdminProductionInventoryMovementView(
             balance_after=movement.balance_after,
             branch_id=movement.branch_id,
@@ -824,11 +960,15 @@ class AdminProductionService:
         return documents
 
     def _list_inputs(self, session: Session, batch_id: uuid.UUID) -> list[ProductionBatchInput]:
-        return session.execute(
-            select(ProductionBatchInput)
-            .where(ProductionBatchInput.production_batch_id == batch_id)
-            .order_by(ProductionBatchInput.display_order.asc()),
-        ).scalars().all()
+        return list(
+            session.execute(
+                select(ProductionBatchInput)
+                .where(ProductionBatchInput.production_batch_id == batch_id)
+                .order_by(ProductionBatchInput.display_order.asc()),
+            )
+            .scalars()
+            .all()
+        )
 
     def _input_rows_with_products(
         self,
@@ -838,8 +978,12 @@ class AdminProductionService:
         products = {
             product.id: product
             for product in session.execute(
-                select(Product).where(Product.id.in_([input_line.input_product_id for input_line in input_rows])),
-            ).scalars().all()
+                select(Product).where(
+                    Product.id.in_([input_line.input_product_id for input_line in input_rows])
+                ),
+            )
+            .scalars()
+            .all()
         }
         return [(input_line, products[input_line.input_product_id]) for input_line in input_rows]
 
@@ -847,15 +991,21 @@ class AdminProductionService:
         inputs = self._list_inputs(session, batch_id)
         return any((line.shortage_qty_snapshot or ZERO) > ZERO for line in inputs)
 
-    def _inventory_movements(self, session: Session, batch_id: uuid.UUID) -> list[InventoryMovement]:
-        return session.execute(
-            select(InventoryMovement)
-            .where(
-                InventoryMovement.source_document_type == PRODUCTION_SOURCE_DOCUMENT_TYPE,
-                InventoryMovement.source_document_id == batch_id,
+    def _inventory_movements(
+        self, session: Session, batch_id: uuid.UUID
+    ) -> list[InventoryMovement]:
+        return list(
+            session.execute(
+                select(InventoryMovement)
+                .where(
+                    InventoryMovement.source_document_type == PRODUCTION_SOURCE_DOCUMENT_TYPE,
+                    InventoryMovement.source_document_id == batch_id,
+                )
+                .order_by(InventoryMovement.occurred_at.asc()),
             )
-            .order_by(InventoryMovement.occurred_at.asc()),
-        ).scalars().all()
+            .scalars()
+            .all()
+        )
 
     def _get_branch(self, session: Session, branch_id: uuid.UUID) -> Branch:
         branch = session.get(Branch, branch_id)
@@ -887,7 +1037,9 @@ class AdminProductionService:
                 select(Recipe).where(Recipe.product_id == product_id, Recipe.is_active.is_(True)),
             ).scalar_one_or_none()
             if recipe is None:
-                raise ProductionValidationError("Product requires an active recipe before production.")
+                raise ProductionValidationError(
+                    "Product requires an active recipe before production."
+                )
             return recipe
 
         recipe = session.get(Recipe, recipe_id)

@@ -207,11 +207,15 @@ def test_card_discount_does_not_change_drawer_cash_but_cash_discount_does(
     assert cash_response.status_code == 201
 
     with SessionLocal() as session:
-        movement_rows = session.execute(
-            select(CashMovement)
-            .where(CashMovement.movement_type == "OPERATIONAL_DISCOUNT")
-            .order_by(CashMovement.occurred_at.asc())
-        ).scalars().all()
+        movement_rows = (
+            session.execute(
+                select(CashMovement)
+                .where(CashMovement.movement_type == "OPERATIONAL_DISCOUNT")
+                .order_by(CashMovement.occurred_at.asc())
+            )
+            .scalars()
+            .all()
+        )
 
     assert len(movement_rows) == 1
     assert Decimal(str(movement_rows[0].amount)) == Decimal("40.00")
@@ -227,7 +231,7 @@ def test_discounts_require_open_session_and_reject_unsupported_methods_and_missi
     )
     assert no_session_response.status_code == 409
     assert (
-        no_session_response.json()["detail"]
+        no_session_response.json()["message"]
         == "Necesitas una caja abierta en esta estacion para registrar descuentos."
     )
 
@@ -244,7 +248,7 @@ def test_discounts_require_open_session_and_reject_unsupported_methods_and_missi
         },
     )
     assert unsupported_method_response.status_code == 400
-    assert "efectivo o tarjeta" in unsupported_method_response.json()["detail"]
+    assert "efectivo o tarjeta" in unsupported_method_response.json()["message"]
 
     high_value_response = client.post(
         "/v1/discounts",
@@ -259,7 +263,7 @@ def test_discounts_require_open_session_and_reject_unsupported_methods_and_missi
         },
     )
     assert high_value_response.status_code == 400
-    assert "alto valor" in high_value_response.json()["detail"]
+    assert "alto valor" in high_value_response.json()["message"]
 
 
 def test_discounts_list_supports_scope_and_operator_filters_and_high_value_alerts(
@@ -447,9 +451,9 @@ def test_discounts_list_supports_scope_and_operator_filters_and_high_value_alert
             )
         ).scalar_one()
 
-    assert audit_record.metadata["high_value"] is True
-    assert audit_record.metadata["high_value_acknowledged"] is True
-    assert alert_audit_record.metadata["notification_target"] == "backoffice"
+    assert audit_record.metadata_["high_value"] is True
+    assert audit_record.metadata_["high_value_acknowledged"] is True
+    assert alert_audit_record.metadata_["notification_target"] == "backoffice"
     assert alert_event.payload["notification_target"] == "backoffice"
 
     detail_response = client.get(

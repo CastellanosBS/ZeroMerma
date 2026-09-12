@@ -27,13 +27,15 @@ def _login(client: TestClient, *, email: str, password: str) -> str:
 
 def _admin_headers(client: TestClient) -> dict[str, str]:
     return {
-        "Authorization": f"Bearer {_login(client, email=SEED_ADMIN_EMAIL, password=SEED_ADMIN_PASSWORD)}"
+        "Authorization": "Bearer "
+        + _login(client, email=SEED_ADMIN_EMAIL, password=SEED_ADMIN_PASSWORD)
     }
 
 
 def _cashier_headers(client: TestClient) -> dict[str, str]:
     return {
-        "Authorization": f"Bearer {_login(client, email=SEED_USER_EMAIL, password=SEED_USER_PASSWORD)}"
+        "Authorization": "Bearer "
+        + _login(client, email=SEED_USER_EMAIL, password=SEED_USER_PASSWORD)
     }
 
 
@@ -209,4 +211,4 @@ def test_admin_sales_tickets_require_backoffice_surface(client: TestClient) -> N
     response = client.get("/v1/admin/sales/tickets", headers=_cashier_headers(client))
 
     assert response.status_code == 403
-    assert response.json()["detail"] == "Backoffice access is required."
+    assert response.json()["message"] == "Backoffice access is required."

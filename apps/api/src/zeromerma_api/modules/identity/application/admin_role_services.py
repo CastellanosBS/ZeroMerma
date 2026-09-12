@@ -1,9 +1,11 @@
 from __future__ import annotations
 
 import uuid
+from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import Any
 
+from pydantic import TypeAdapter
 from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
@@ -36,7 +38,7 @@ from zeromerma_api.modules.identity.application.admin_role_schemas import (
     AdminRoleWarningView,
 )
 from zeromerma_api.modules.identity.application.permissions import SENSITIVE_PERMISSION_CODES
-from zeromerma_api.modules.identity.application.schemas import AuthenticatedUser
+from zeromerma_api.modules.identity.application.schemas import AuthenticatedUser, IdentitySurface
 from zeromerma_api.modules.identity.domain.constants import (
     IDENTITY_ALLOWED_SURFACES,
     IDENTITY_SURFACE_BACKOFFICE,
@@ -57,6 +59,9 @@ from zeromerma_api.modules.identity.infrastructure.models import (
 )
 from zeromerma_api.modules.outbox.application.service import OutboxWriter
 
+_LIST_IDENTITY_SURFACE_ADAPTER: TypeAdapter[list[IdentitySurface]] = TypeAdapter(
+    list[IdentitySurface]
+)
 AUDIT_ACTION_ADMIN_ROLE_CREATED = "admin.role.created"
 AUDIT_ACTION_ADMIN_ROLE_UPDATED = "admin.role.updated"
 AUDIT_ACTION_ADMIN_ROLE_STATUS_CHANGED = "admin.role.status_changed"
@@ -66,9 +71,7 @@ AUDIT_ACTION_ADMIN_ROLE_USER_REMOVED = "admin.role.user_removed"
 OUTBOX_EVENT_ADMIN_ROLE_CREATED_V1 = "admin.role.created.v1"
 OUTBOX_EVENT_ADMIN_ROLE_UPDATED_V1 = "admin.role.updated.v1"
 OUTBOX_EVENT_ADMIN_ROLE_STATUS_CHANGED_V1 = "admin.role.status_changed.v1"
-OUTBOX_EVENT_ADMIN_ROLE_USER_ASSIGNMENT_CHANGED_V1 = (
-    "admin.role.user_assignment_changed.v1"
-)
+OUTBOX_EVENT_ADMIN_ROLE_USER_ASSIGNMENT_CHANGED_V1 = "admin.role.user_assignment_changed.v1"
 
 ROLE_RESOURCE_TYPE = "role"
 
@@ -123,9 +126,7 @@ class AdminRoleService:
         normalized_status = _normalize_optional(status_filter)
         if normalized_status and normalized_status != "all":
             contexts = [
-                context
-                for context in contexts
-                if _role_status(context.role) == normalized_status
+                context for context in contexts if _role_status(context.role) == normalized_status
             ]
 
         normalized_surface = _normalize_optional(app_surface)
@@ -279,8 +280,7 @@ class AdminRoleService:
 
         new_permission_codes = {permission.code for permission in permissions}
         added_sensitive = bool(
-            (new_permission_codes - previous_permission_codes)
-            & set(SENSITIVE_PERMISSION_CODES)
+            (new_permission_codes - previous_permission_codes) & set(SENSITIVE_PERMISSION_CODES)
         )
         removing_manage_roles = (
             "roles.manage" in previous_permission_codes
@@ -461,7 +461,9 @@ class AdminRoleService:
             name=context.role.name,
             description=context.role.description,
             status=_role_status(context.role),
-            surfaces=self._normalize_surfaces(context.role.surfaces),
+            surfaces=_LIST_IDENTITY_SURFACE_ADAPTER.validate_python(
+                self._normalize_surfaces(context.role.surfaces)
+            ),
             permission_count=len(context.permissions),
             assigned_user_count=len(context.assigned_users),
             is_system=context.role.is_system,
@@ -488,7 +490,9 @@ class AdminRoleService:
                 name=context.role.name,
                 description=context.role.description,
                 status=_role_status(context.role),
-                surfaces=self._normalize_surfaces(context.role.surfaces),
+                surfaces=_LIST_IDENTITY_SURFACE_ADAPTER.validate_python(
+                    self._normalize_surfaces(context.role.surfaces)
+                ),
                 is_system=context.role.is_system,
                 is_high_privilege=self._is_high_privilege(context),
                 created_at=context.role.created_at,
@@ -496,7 +500,9 @@ class AdminRoleService:
                 warning_state=self._readiness(context.role, warnings),
             ),
             access_surfaces=AdminRoleAccessSurfacesView(
-                surfaces=self._normalize_surfaces(context.role.surfaces),
+                surfaces=_LIST_IDENTITY_SURFACE_ADAPTER.validate_python(
+                    self._normalize_surfaces(context.role.surfaces)
+                ),
                 pos_enabled=IDENTITY_SURFACE_POS in self._normalize_surfaces(context.role.surfaces),
                 backoffice_enabled=IDENTITY_SURFACE_BACKOFFICE
                 in self._normalize_surfaces(context.role.surfaces),
@@ -544,8 +550,7 @@ class AdminRoleService:
             backoffice_roles=sum(
                 1
                 for context in contexts
-                if IDENTITY_SURFACE_BACKOFFICE
-                in self._normalize_surfaces(context.role.surfaces)
+                if IDENTITY_SURFACE_BACKOFFICE in self._normalize_surfaces(context.role.surfaces)
             ),
             with_warnings=sum(1 for context in contexts if self._build_warnings(context)),
         )
@@ -678,7 +683,9 @@ class AdminRoleService:
             module=permission.module,
             module_label=permission.module_label,
             action=permission.action,
-            surfaces=self._normalize_surfaces(permission.surfaces),
+            surfaces=_LIST_IDENTITY_SURFACE_ADAPTER.validate_python(
+                self._normalize_surfaces(permission.surfaces)
+            ),
             is_sensitive=permission.is_sensitive,
             is_enabled=is_enabled,
         )
@@ -690,15 +697,19 @@ class AdminRoleService:
     ) -> list[AdminRoleAssignedUserView]:
         views: list[AdminRoleAssignedUserView] = []
         for assignment, user in assigned_users:
-            branch_names = session.execute(
-                select(Branch.name)
-                .join(UserBranchAssignment, UserBranchAssignment.branch_id == Branch.id)
-                .where(
-                    UserBranchAssignment.user_id == user.id,
-                    UserBranchAssignment.is_active.is_(True),
+            branch_names = (
+                session.execute(
+                    select(Branch.name)
+                    .join(UserBranchAssignment, UserBranchAssignment.branch_id == Branch.id)
+                    .where(
+                        UserBranchAssignment.user_id == user.id,
+                        UserBranchAssignment.is_active.is_(True),
+                    )
+                    .order_by(Branch.name.asc())
                 )
-                .order_by(Branch.name.asc())
-            ).scalars().all()
+                .scalars()
+                .all()
+            )
             views.append(
                 AdminRoleAssignedUserView(
                     user_id=user.id,
@@ -706,7 +717,9 @@ class AdminRoleService:
                     email=user.email,
                     status=_user_status(user),
                     branch_summary=", ".join(branch_names) if branch_names else "Sin sucursal",
-                    surfaces=self._normalize_surfaces(user.allowed_surfaces),
+                    surfaces=_LIST_IDENTITY_SURFACE_ADAPTER.validate_python(
+                        self._normalize_surfaces(user.allowed_surfaces)
+                    ),
                     assigned_at=assignment.created_at,
                 )
             )
@@ -717,15 +730,19 @@ class AdminRoleService:
         session: Session,
         role_id: uuid.UUID,
     ) -> list[AdminRoleAuditEventView]:
-        records = session.execute(
-            select(AuditLog)
-            .where(
-                AuditLog.resource_type == ROLE_RESOURCE_TYPE,
-                AuditLog.resource_id == str(role_id),
+        records = (
+            session.execute(
+                select(AuditLog)
+                .where(
+                    AuditLog.resource_type == ROLE_RESOURCE_TYPE,
+                    AuditLog.resource_id == str(role_id),
+                )
+                .order_by(AuditLog.occurred_at.desc())
+                .limit(20)
             )
-            .order_by(AuditLog.occurred_at.desc())
-            .limit(20)
-        ).scalars().all()
+            .scalars()
+            .all()
+        )
         return [
             AdminRoleAuditEventView(
                 id=record.id,
@@ -764,7 +781,9 @@ class AdminRoleService:
                 .join(RolePermission, RolePermission.permission_id == Permission.id)
                 .where(RolePermission.role_id == role_id)
                 .order_by(Permission.module.asc(), Permission.code.asc())
-            ).scalars().all()
+            )
+            .scalars()
+            .all()
         )
 
     def _fetch_all_permissions(self, session: Session) -> list[Permission]:
@@ -773,7 +792,9 @@ class AdminRoleService:
                 select(Permission)
                 .where(Permission.is_active.is_(True))
                 .order_by(Permission.module.asc(), Permission.code.asc())
-            ).scalars().all()
+            )
+            .scalars()
+            .all()
         )
 
     def _fetch_assigned_users(
@@ -790,7 +811,9 @@ class AdminRoleService:
                     UserRoleAssignment.is_active.is_(True),
                 )
                 .order_by(User.full_name.asc(), User.email.asc())
-            ).all()
+            )
+            .tuples()
+            .all()
         )
 
     def _get_permissions_by_codes(
@@ -803,9 +826,11 @@ class AdminRoleService:
         )
         if not normalized_codes:
             raise RoleValidationError("At least one permission is required.")
-        permissions = session.execute(
-            select(Permission).where(Permission.code.in_(normalized_codes))
-        ).scalars().all()
+        permissions = (
+            session.execute(select(Permission).where(Permission.code.in_(normalized_codes)))
+            .scalars()
+            .all()
+        )
         by_code = {permission.code: permission for permission in permissions}
         missing = [code for code in normalized_codes if code not in by_code]
         if missing:
@@ -819,9 +844,11 @@ class AdminRoleService:
         role: Role,
         permissions: list[Permission],
     ) -> None:
-        existing = session.execute(
-            select(RolePermission).where(RolePermission.role_id == role.id)
-        ).scalars().all()
+        existing = (
+            session.execute(select(RolePermission).where(RolePermission.role_id == role.id))
+            .scalars()
+            .all()
+        )
         for row in existing:
             session.delete(row)
         session.flush()
@@ -901,10 +928,7 @@ class AdminRoleService:
         surfaces = self._normalize_surfaces(role.surfaces)
         normalized = app_surface.strip().upper()
         if normalized == "BOTH":
-            return (
-                IDENTITY_SURFACE_POS in surfaces
-                and IDENTITY_SURFACE_BACKOFFICE in surfaces
-            )
+            return IDENTITY_SURFACE_POS in surfaces and IDENTITY_SURFACE_BACKOFFICE in surfaces
         return normalized in surfaces
 
     def _scope_summary(self) -> str:
@@ -980,7 +1004,7 @@ class AdminRoleService:
             ],
         }
 
-    def _normalize_surfaces(self, values: list[str] | tuple[str, ...] | None) -> list[str]:
+    def _normalize_surfaces(self, values: Sequence[str] | None) -> list[str]:
         if values is None:
             return [IDENTITY_SURFACE_POS]
         normalized: list[str] = []

@@ -32,7 +32,7 @@ Canonical greenfield monorepo for a multi-branch bakery operations platform.
 - Corepack from the canonical Node.js distribution, explicitly enabled
 - `pnpm` `10.33.0` (exact version and integrity in root `packageManager`)
 - Docker with Docker Compose
-- Windows PowerShell for local scripts
+- PowerShell 7 (`pwsh`) for canonical validation on Windows and Linux
 
 Do not work from a random external Python virtual environment. ZeroMerma scripts resolve the `uv` CLI directly and let `uv` manage the repository `.venv`.
 
@@ -186,23 +186,50 @@ Backend OpenAPI is the source of truth. Regenerate TypeScript contracts with:
 
 ```powershell
 corepack pnpm contracts:generate
+corepack pnpm contracts:check
 ```
 
-This writes:
+`contracts:generate` writes the three reviewed derived artifacts:
 
 - `packages/api-client/openapi.json`
 - `packages/api-client/src/generated/schema.ts`
+- `docs/architecture/API_CONTRACT_INVENTORY.json`
+
+`contracts:check` generates into a temporary directory and fails on drift without rewriting
+tracked files. The policy, collection classifications, error envelope, wire types, and endpoint
+change workflow are documented in
+[`docs/architecture/api-contracts.md`](docs/architecture/api-contracts.md).
 
 Do not handwrite shared domain types between Python and TypeScript.
 
 ## Validation
 
-Destructive API tests never use the application `DATABASE_URL` or the local Compose database.
-Run them through the isolated harness:
+Foundation validation always uses disposable PostgreSQL databases for database work. It never
+uses the application `DATABASE_URL` or the local Compose database. Run the complete pipeline
+from PowerShell 7 with Linux Docker and the canonical toolchain available:
+
+```powershell
+.\scripts\dev\check-foundation.ps1 -Stage All
+```
+
+The eight stages are `Preflight`, `Backend`, `Worker`, `Migrations`, `Contracts`, `Web`,
+`Browser`, and `Negative`. Select a single stage with `-Stage Worker`, for example. Each
+stage records logs and a result manifest under `.tmp/validation/foundation/<run-id>/`.
+The same stages run as isolated CI jobs; `Foundation required` aggregates their results.
+The pipeline and its evidence boundaries are documented in
+[`docs/implementation/foundation-validation.md`](docs/implementation/foundation-validation.md).
+
+Run the Python suites through the isolated harness:
 
 ```powershell
 .\scripts\dev\run-api-tests.ps1
 ```
+
+Without `-TestTarget`, this discovers every suite declared in `pyproject.toml`: API integration,
+API unit and migration tests, worker unit and integration tests, and development-script tests.
+To narrow a run, pass an explicit target, such as
+`-TestTarget apps/worker/integration_tests`. Full discovery also runs the contract and toolchain
+gate probes, so it needs the frozen Node dependencies and PowerShell 7.
 
 Each invocation generates a unique run ID, database name, container name, test-only credential,
 and loopback port. PostgreSQL 16 stores its data in container `tmpfs`; the harness removes the
@@ -246,33 +273,45 @@ The complete migration policy, checkpoint inventory, lock-risk classification, a
 roll-forward evidence are documented in
 [`docs/operations/database-migrations.md`](docs/operations/database-migrations.md).
 
-Run all foundation checks locally:
+Run browser integration against a fresh database and dedicated API/POS/Backoffice servers:
 
 ```powershell
-.\scripts\dev\check-foundation.ps1
+corepack pnpm --filter @zeromerma/pos-web exec playwright install chromium
+.\scripts\dev\run-web-integration.ps1 -Surface All
 ```
 
-This script uses the local development PostgreSQL only for local API/worker boot checks. Backend
-pytest always runs through a separate ephemeral PostgreSQL container. CI calls the same script with
-`-CiIsolated`, which skips the local development database and runs only the ephemeral test harness.
-Both modes also verify the web apps through lint/test/build and bounded Vite boot checks.
+The browser harness also accepts `-Surface POS` or `-Surface Backoffice`. It supplies unique
+test users, credentials, database identity and loopback ports; runs canonical migrations and
+fixture loading behind the database guards; and cleans up its processes and database on exit.
+Real suites use `playwright.real.config.ts` and do not intercept API requests. Existing
+`corepack pnpm test:e2e` browser/component tests remain a separate layer with fixtures/mocks.
+
+Read the task-specific baselines and their limitations:
+
+- [API foundation](docs/implementation/api-foundation-baseline.md)
+- [Worker foundation](docs/implementation/worker-foundation-baseline.md)
+- [POS and Backoffice foundation](docs/implementation/web-foundation-baseline.md)
 
 Individual commands:
 
 ```powershell
-uv run ruff check apps/api/src apps/api/tests apps/worker/src apps/worker/tests
-uv run mypy apps/api/src apps/worker/src
+uv run --frozen ruff check .
+uv run --frozen mypy apps/api/src apps/worker/src
 uv run --frozen pytest apps/api/unit_tests/test_database_safety.py
+uv run --frozen pytest apps/worker/tests
 .\scripts\dev\run-api-tests.ps1
-uv run --project apps/worker python -m zeromerma_worker --once --skip-db-check
-corepack pnpm contracts:generate
+uv run --frozen --project apps/worker python -m zeromerma_worker --once --skip-db-check
+corepack pnpm contracts:check
 corepack pnpm lint
+corepack pnpm typecheck
 corepack pnpm test
 corepack pnpm build
-docker compose -f infra\docker\docker-compose.yml config
-uv run --project apps/api alembic -c apps/api/alembic.ini upgrade head
-uv run --project apps/worker python -m zeromerma_worker --once
+corepack pnpm test:e2e
+.\scripts\dev\run-web-integration.ps1 -Surface All
 ```
+
+The following historical manual checks use the explicitly started local development instance;
+they are not automated foundation validation and must not target operational or production data.
 
 Manual API validation for Phase 1A:
 
@@ -440,7 +479,7 @@ Manual POS validation for the Phase 2 corrective patch:
 14. Press `Enter` only while payment capture is active and confirm the sale succeeds, the ticket clears, the cash field resets, and the POS returns to class selection.
 15. Collapse and expand the sidebar, open a placeholder module such as `Pedidos`, and confirm the shell remains stable.
 
-Optional Playwright e2e smoke tests:
+Existing browser/component smoke tests, also run by the foundation `Web` stage:
 
 ```powershell
 corepack pnpm test:e2e

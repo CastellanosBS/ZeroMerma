@@ -8,13 +8,13 @@ from pathlib import Path
 from zeromerma_api.main import create_app
 
 
+def canonical_openapi_bytes() -> bytes:
+    return (json.dumps(create_app().openapi(), indent=2, sort_keys=True) + "\n").encode("utf-8")
+
+
 def export_openapi(output_path: Path) -> None:
-    app = create_app()
     output_path.parent.mkdir(parents=True, exist_ok=True)
-    output_path.write_text(
-        json.dumps(app.openapi(), indent=2, sort_keys=True) + "\n",
-        encoding="utf-8",
-    )
+    output_path.write_bytes(canonical_openapi_bytes())
 
 
 def main(argv: Sequence[str] | None = None) -> int:

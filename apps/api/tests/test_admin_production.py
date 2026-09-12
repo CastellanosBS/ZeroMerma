@@ -20,8 +20,16 @@ from zeromerma_api.db.session import SessionLocal
 from zeromerma_api.modules.audit.infrastructure.models import AuditLog
 from zeromerma_api.modules.branches.infrastructure.models import Branch
 from zeromerma_api.modules.catalog.domain.constants import CATALOG_PRODUCT_KIND_RAW_MATERIAL
-from zeromerma_api.modules.catalog.infrastructure.models import Product, ProductClass, Recipe, RecipeInput
-from zeromerma_api.modules.inventory.infrastructure.models import InventoryBalance, InventoryMovement
+from zeromerma_api.modules.catalog.infrastructure.models import (
+    Product,
+    ProductClass,
+    Recipe,
+    RecipeInput,
+)
+from zeromerma_api.modules.inventory.infrastructure.models import (
+    InventoryBalance,
+    InventoryMovement,
+)
 from zeromerma_api.modules.outbox.infrastructure.models import OutboxEvent
 from zeromerma_api.modules.production.infrastructure.models import ProductionBatch
 
@@ -97,7 +105,9 @@ def _create_active_recipe(
 ) -> str:
     with SessionLocal() as session:
         product = session.execute(select(Product).where(Product.code == output_code)).scalar_one()
-        session.query(Recipe).filter(Recipe.product_id == product.id, Recipe.is_active.is_(True)).update(
+        session.query(Recipe).filter(
+            Recipe.product_id == product.id, Recipe.is_active.is_(True)
+        ).update(
             {Recipe.is_active: False},
             synchronize_session=False,
         )
@@ -161,7 +171,9 @@ def _seed_raw_stock(client: TestClient, *, product_id: str, quantity: str = "10.
     assert response.status_code == 201
 
 
-def _create_started_production(client: TestClient, *, actual_stock: str = "10.000") -> dict[str, object]:
+def _create_started_production(
+    client: TestClient, *, actual_stock: str = "10.000"
+) -> dict[str, object]:
     raw_material_id = _create_raw_material("RAW-PROD-FLOUR")
     recipe_id = _create_active_recipe(raw_material_id=raw_material_id)
     _seed_raw_stock(client, product_id=raw_material_id, quantity=actual_stock)
@@ -212,7 +224,9 @@ def test_admin_production_create_filters_detail_and_shortage_warning(client: Tes
     assert production["planned_inputs"][0]["status"] == "unavailable"
     assert production["warnings"][0]["code"] == "raw_material_shortage"
 
-    search_response = client.get("/v1/admin/production?search=concha", headers=_admin_headers(client))
+    search_response = client.get(
+        "/v1/admin/production?search=concha", headers=_admin_headers(client)
+    )
     assert search_response.status_code == 200
     assert [item["id"] for item in search_response.json()["items"]] == [production_id]
 
@@ -223,15 +237,21 @@ def test_admin_production_create_filters_detail_and_shortage_warning(client: Tes
     assert folio_response.status_code == 200
     assert [item["id"] for item in folio_response.json()["items"]] == [production_id]
 
-    status_response = client.get("/v1/admin/production?status=DRAFT", headers=_admin_headers(client))
+    status_response = client.get(
+        "/v1/admin/production?status=DRAFT", headers=_admin_headers(client)
+    )
     assert status_response.status_code == 200
     assert status_response.json()["total"] == 1
 
-    warning_response = client.get("/v1/admin/production?warning_state=critical", headers=_admin_headers(client))
+    warning_response = client.get(
+        "/v1/admin/production?warning_state=critical", headers=_admin_headers(client)
+    )
     assert warning_response.status_code == 200
     assert [item["id"] for item in warning_response.json()["items"]] == [production_id]
 
-    detail_response = client.get(f"/v1/admin/production/{production_id}", headers=_admin_headers(client))
+    detail_response = client.get(
+        f"/v1/admin/production/{production_id}", headers=_admin_headers(client)
+    )
     assert detail_response.status_code == 200
     detail = detail_response.json()
     assert detail["overview"]["id"] == production_id
@@ -256,7 +276,7 @@ def test_admin_production_validates_target_recipe_and_quantity(client: TestClien
         },
     )
     assert raw_target_response.status_code == 409
-    assert "FINISHED_GOOD" in raw_target_response.json()["detail"]
+    assert "FINISHED_GOOD" in raw_target_response.json()["message"]
 
     invalid_recipe_response = client.post(
         "/v1/admin/production",
@@ -269,7 +289,7 @@ def test_admin_production_validates_target_recipe_and_quantity(client: TestClien
         },
     )
     assert invalid_recipe_response.status_code == 409
-    assert "does not belong" in invalid_recipe_response.json()["detail"]
+    assert "does not belong" in invalid_recipe_response.json()["message"]
 
     quantity_response = client.post(
         "/v1/admin/production",
@@ -296,7 +316,7 @@ def test_admin_production_start_blocks_shortages_then_succeeds(client: TestClien
         json={},
     )
     assert blocked_response.status_code == 409
-    assert "shortages" in blocked_response.json()["detail"]
+    assert "shortages" in blocked_response.json()["message"]
 
     _seed_raw_stock(client, product_id=raw_material_id)
     start_response = client.post(
@@ -338,10 +358,18 @@ def test_admin_production_complete_writes_inventory_movements_audit_and_outbox(
     assert len(payload["inventory_impact"]["movements"]) == 2
 
     with SessionLocal() as session:
-        batch = session.execute(select(ProductionBatch).where(ProductionBatch.id == UUID(production_id))).scalar_one()
-        movements = session.execute(
-            select(InventoryMovement).where(InventoryMovement.source_document_id == UUID(production_id)),
-        ).scalars().all()
+        batch = session.execute(
+            select(ProductionBatch).where(ProductionBatch.id == UUID(production_id))
+        ).scalar_one()
+        movements = (
+            session.execute(
+                select(InventoryMovement).where(
+                    InventoryMovement.source_document_id == UUID(production_id)
+                ),
+            )
+            .scalars()
+            .all()
+        )
         output_balance = session.execute(
             select(InventoryBalance).where(
                 InventoryBalance.branch_id == batch.branch_id,
@@ -388,7 +416,7 @@ def test_admin_production_complete_validates_output_and_variance_reason(client: 
         json={"actual_output_qty": "18.000"},
     )
     assert missing_reason_response.status_code == 409
-    assert "variance" in missing_reason_response.json()["detail"].lower()
+    assert "variance" in missing_reason_response.json()["message"].lower()
 
     zero_response = client.post(
         f"/v1/admin/production/{production_id}/complete",
@@ -396,10 +424,12 @@ def test_admin_production_complete_validates_output_and_variance_reason(client: 
         json={"actual_output_qty": "0.000"},
     )
     assert zero_response.status_code == 409
-    assert "Zero output" in zero_response.json()["detail"]
+    assert "Zero output" in zero_response.json()["message"]
 
 
-def test_admin_production_cancel_draft_and_blocks_completed_cancellation(client: TestClient) -> None:
+def test_admin_production_cancel_draft_and_blocks_completed_cancellation(
+    client: TestClient,
+) -> None:
     raw_material_id = _create_raw_material("RAW-PROD-CANCEL")
     recipe_id = _create_active_recipe(raw_material_id=raw_material_id)
     production = _create_production(client, recipe_id=recipe_id)

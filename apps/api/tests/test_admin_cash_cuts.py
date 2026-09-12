@@ -259,4 +259,4 @@ def test_admin_cash_cuts_require_backoffice_surface(client: TestClient) -> None:
     response = client.get("/v1/admin/cash-cuts", headers=_cashier_headers(client))
 
     assert response.status_code == 403
-    assert response.json()["detail"] == "Backoffice access is required."
+    assert response.json()["message"] == "Backoffice access is required."

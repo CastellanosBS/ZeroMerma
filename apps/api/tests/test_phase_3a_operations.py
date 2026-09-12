@@ -331,7 +331,7 @@ def test_waste_commit_requires_operational_notes_for_sensitive_reasons(
     )
 
     assert response.status_code == 400
-    assert response.json()["detail"] == "Operational notes are required for this waste record."
+    assert response.json()["message"] == "Operational notes are required for this waste record."
 
 
 def test_high_impact_waste_requires_acknowledgement_and_emits_alert_outbox(
@@ -357,7 +357,7 @@ def test_high_impact_waste_requires_acknowledgement_and_emits_alert_outbox(
 
     assert missing_ack_response.status_code == 400
     assert (
-        missing_ack_response.json()["detail"]
+        missing_ack_response.json()["message"]
         == "High-impact waste must be acknowledged before commit."
     )
 
@@ -386,16 +386,24 @@ def test_high_impact_waste_requires_acknowledgement_and_emits_alert_outbox(
     payload = response.json()
 
     with SessionLocal() as session:
-        audit_records = session.execute(
-            select(AuditLog)
-            .where(AuditLog.resource_id == payload["id"])
-            .order_by(AuditLog.action.asc())
-        ).scalars().all()
-        outbox_events = session.execute(
-            select(OutboxEvent)
-            .where(OutboxEvent.aggregate_id == payload["id"])
-            .order_by(OutboxEvent.event_name.asc())
-        ).scalars().all()
+        audit_records = (
+            session.execute(
+                select(AuditLog)
+                .where(AuditLog.resource_id == payload["id"])
+                .order_by(AuditLog.action.asc())
+            )
+            .scalars()
+            .all()
+        )
+        outbox_events = (
+            session.execute(
+                select(OutboxEvent)
+                .where(OutboxEvent.aggregate_id == payload["id"])
+                .order_by(OutboxEvent.event_name.asc())
+            )
+            .scalars()
+            .all()
+        )
 
     assert [record.action for record in audit_records] == [
         "waste_record.committed",
@@ -518,12 +526,9 @@ def test_transfer_dispatch_pending_detail_and_receive_work_end_to_end(client: Te
     assert detail_payload["shipment"]["id"] == shipment["id"]
     assert detail_payload["shipment_summary"]["document_id"] == shipment["id"]
     assert detail_payload["shipment_summary"]["folio"].startswith("ENV-")
-    assert (
-        Decimal(
-            str(detail_payload["shipment_summary"]["quantity_summary"]["expected_total_quantity"])
-        )
-        == Decimal("8.000")
-    )
+    assert Decimal(
+        str(detail_payload["shipment_summary"]["quantity_summary"]["expected_total_quantity"])
+    ) == Decimal("8.000")
     assert detail_payload["shipment_summary"]["quantity_summary"]["has_variance"] is False
     assert detail_payload["receipt"] is None
     assert detail_payload["receipt_summary"] is None
@@ -564,12 +569,9 @@ def test_transfer_dispatch_pending_detail_and_receive_work_end_to_end(client: Te
     assert Decimal(str(receive_payload["receipt"]["lines"][0]["received_quantity"])) == Decimal(
         "6.000"
     )
-    assert (
-        Decimal(
-            str(receive_payload["receipt_summary"]["quantity_summary"]["received_total_quantity"])
-        )
-        == Decimal("8.000")
-    )
+    assert Decimal(
+        str(receive_payload["receipt_summary"]["quantity_summary"]["received_total_quantity"])
+    ) == Decimal("8.000")
 
     with SessionLocal() as session:
         shipment_record = session.execute(
@@ -580,19 +582,29 @@ def test_transfer_dispatch_pending_detail_and_receive_work_end_to_end(client: Te
                 OperationDocument.reference_document_id == shipment_record.id
             )
         ).scalar_one()
-        receipt_lines = session.execute(
-            select(OperationDocumentLine).where(
-                OperationDocumentLine.operation_document_id == receipt_record.id
+        receipt_lines = (
+            session.execute(
+                select(OperationDocumentLine).where(
+                    OperationDocumentLine.operation_document_id == receipt_record.id
+                )
             )
-        ).scalars().all()
-        dispatch_outbox = session.execute(
-            select(OutboxEvent).where(OutboxEvent.aggregate_id == shipment["id"])
-        ).scalars().all()
-        transfer_audit_records = session.execute(
-            select(AuditLog)
-            .where(AuditLog.action.in_(["transfer.dispatched", "transfer.received"]))
-            .order_by(AuditLog.occurred_at.asc())
-        ).scalars().all()
+            .scalars()
+            .all()
+        )
+        dispatch_outbox = (
+            session.execute(select(OutboxEvent).where(OutboxEvent.aggregate_id == shipment["id"]))
+            .scalars()
+            .all()
+        )
+        transfer_audit_records = (
+            session.execute(
+                select(AuditLog)
+                .where(AuditLog.action.in_(["transfer.dispatched", "transfer.received"]))
+                .order_by(AuditLog.occurred_at.asc())
+            )
+            .scalars()
+            .all()
+        )
 
     assert shipment_record.status == "RECEIVED"
     assert receipt_record.status == "RECEIVED"
@@ -729,7 +741,7 @@ def test_transfer_dispatch_rejects_same_branch_destination(client: TestClient) -
     )
 
     assert response.status_code == 400
-    assert response.json()["detail"] == "Destination branch must differ from the current branch."
+    assert response.json()["message"] == "Destination branch must differ from the current branch."
 
 
 def test_transfer_receive_rejects_already_received_transfer(client: TestClient) -> None:
@@ -781,7 +793,7 @@ def test_transfer_receive_rejects_already_received_transfer(client: TestClient) 
         },
     )
     assert second_receive.status_code == 409
-    assert second_receive.json()["detail"] == "Transfer shipment is no longer pending receipt."
+    assert second_receive.json()["message"] == "Transfer shipment is no longer pending receipt."
 
 
 def test_transfer_receive_with_variance_marks_receipt_and_shipment(client: TestClient) -> None:
@@ -855,12 +867,16 @@ def test_transfer_receive_with_variance_marks_receipt_and_shipment(client: TestC
                 OperationDocument.reference_document_id == shipment_record.id
             )
         ).scalar_one()
-        outbox_events = session.execute(
-            select(OutboxEvent).where(
-                OutboxEvent.aggregate_id == shipment["id"],
-                OutboxEvent.event_name == "transfer.received.v1",
+        outbox_events = (
+            session.execute(
+                select(OutboxEvent).where(
+                    OutboxEvent.aggregate_id == shipment["id"],
+                    OutboxEvent.event_name == "transfer.received.v1",
+                )
             )
-        ).scalars().all()
+            .scalars()
+            .all()
+        )
         audit_record = session.execute(
             select(AuditLog).where(
                 AuditLog.action == "transfer.received",
@@ -910,6 +926,6 @@ def test_transfer_receive_requires_variance_reason_when_quantity_differs(
     )
 
     assert receive_response.status_code == 400
-    assert receive_response.json()["detail"] == (
+    assert receive_response.json()["message"] == (
         "Variance reason is required when the received quantity differs from the shipment."
     )

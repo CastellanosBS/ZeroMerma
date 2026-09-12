@@ -111,7 +111,9 @@ def test_admin_recipe_create_calculates_cost_and_writes_audit(
 
     with SessionLocal() as session:
         recipe = session.execute(
-            select(Recipe).where(Recipe.product_id == uuid.UUID(product_id), Recipe.is_active.is_(True))
+            select(Recipe).where(
+                Recipe.product_id == uuid.UUID(product_id), Recipe.is_active.is_(True)
+            )
         ).scalar_one()
         audit_record = session.execute(
             select(AuditLog).where(AuditLog.resource_id == str(recipe.id))
@@ -143,7 +145,7 @@ def test_admin_recipe_rejects_non_finished_good_target(client: TestClient) -> No
     )
 
     assert response.status_code == 409
-    assert "finished goods" in response.json()["detail"]
+    assert "finished goods" in response.json()["message"]
 
 
 def test_admin_recipe_rejects_non_raw_material_input(client: TestClient) -> None:
@@ -164,7 +166,7 @@ def test_admin_recipe_rejects_non_raw_material_input(client: TestClient) -> None
     )
 
     assert response.status_code == 409
-    assert "RAW_MATERIAL" in response.json()["detail"]
+    assert "RAW_MATERIAL" in response.json()["message"]
 
 
 def test_admin_recipe_rejects_duplicate_inputs_and_invalid_shape(client: TestClient) -> None:
@@ -188,7 +190,7 @@ def test_admin_recipe_rejects_duplicate_inputs_and_invalid_shape(client: TestCli
     )
 
     assert duplicate_response.status_code == 409
-    assert "duplicate" in duplicate_response.json()["detail"].lower()
+    assert "duplicate" in duplicate_response.json()["message"].lower()
 
     missing_inputs_response = client.post(
         "/v1/admin/recipes-costs/recipes",
@@ -258,10 +260,18 @@ def test_admin_recipe_activation_deactivates_previous_active_version(
     assert second_recipe_id != first_recipe_id
 
     with SessionLocal() as session:
-        active_recipes = session.execute(
-            select(Recipe).where(Recipe.product_id == uuid.UUID(product_id), Recipe.is_active.is_(True))
-        ).scalars().all()
-        first_recipe = session.execute(select(Recipe).where(Recipe.id == uuid.UUID(first_recipe_id))).scalar_one()
+        active_recipes = (
+            session.execute(
+                select(Recipe).where(
+                    Recipe.product_id == uuid.UUID(product_id), Recipe.is_active.is_(True)
+                )
+            )
+            .scalars()
+            .all()
+        )
+        first_recipe = session.execute(
+            select(Recipe).where(Recipe.id == uuid.UUID(first_recipe_id))
+        ).scalar_one()
 
     assert len(active_recipes) == 1
     assert str(active_recipes[0].id) == second_recipe_id
@@ -296,7 +306,9 @@ def test_admin_recipe_apply_standard_cost_updates_product(client: TestClient) ->
     assert Decimal(str(response.json()["product"]["product_standard_cost"])) == Decimal("10.0000")
 
     with SessionLocal() as session:
-        product = session.execute(select(Product).where(Product.id == uuid.UUID(product_id))).scalar_one()
+        product = session.execute(
+            select(Product).where(Product.id == uuid.UUID(product_id))
+        ).scalar_one()
         audit_record = session.execute(
             select(AuditLog).where(
                 AuditLog.resource_id == str(product.id),

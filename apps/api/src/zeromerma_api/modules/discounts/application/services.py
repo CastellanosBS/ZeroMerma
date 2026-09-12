@@ -3,8 +3,10 @@ from __future__ import annotations
 import uuid
 from datetime import UTC, datetime, time, timedelta
 from decimal import ROUND_HALF_UP, Decimal
+from typing import TypedDict
 from zoneinfo import ZoneInfo
 
+from pydantic import TypeAdapter
 from sqlalchemy import Select, String, cast, func, or_, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
@@ -29,10 +31,11 @@ from zeromerma_api.modules.discounts.application.schemas import (
     AdminCommercialDiscountBackendContractView,
     AdminCommercialDiscountCreateRequest,
     AdminCommercialDiscountDuplicateRequest,
-    AdminCommercialDiscountFilterOptionView,
     AdminCommercialDiscountFilterOptionsView,
+    AdminCommercialDiscountFilterOptionView,
     AdminCommercialDiscountMetricsView,
     AdminCommercialDiscountsListResponse,
+    AdminCommercialDiscountStatus,
     AdminCommercialDiscountUpdateRequest,
     AdminCommercialDiscountView,
     AdminCommercialDiscountWarningsView,
@@ -97,10 +100,17 @@ from zeromerma_api.modules.sales.domain.constants import (
 )
 from zeromerma_api.modules.sales.infrastructure.models import CashMovement
 
+_ADMIN_COMMERCIAL_DISCOUNT_STATUS_ADAPTER: TypeAdapter[AdminCommercialDiscountStatus] = TypeAdapter(
+    AdminCommercialDiscountStatus
+)
 MAX_DISCOUNTS_PER_LIST = 80
 MONEY_QUANTIZER = Decimal("0.01")
 ZERO_MONEY = Decimal("0.00")
 COMMERCIAL_DISCOUNT_PAGE_SIZE_MAX = 100
+
+_DiscountTarget = TypedDict(
+    "_DiscountTarget", {"product": Product | None, "class": ProductClass | None}
+)
 
 
 class AdminCommercialDiscountService:
@@ -140,7 +150,10 @@ class AdminCommercialDiscountService:
                 item
                 for item in items
                 if str(item.target_class_id) == normalized_class_id
-                or (item.target_scope == COMMERCIAL_DISCOUNT_SCOPE_CLASS and str(item.target_id) == normalized_class_id)
+                or (
+                    item.target_scope == COMMERCIAL_DISCOUNT_SCOPE_CLASS
+                    and str(item.target_id) == normalized_class_id
+                )
             ]
 
         normalized_status = _normalize_optional(status_filter)
@@ -205,7 +218,9 @@ class AdminCommercialDiscountService:
         command: AdminCommercialDiscountCreateRequest,
         request_id: str | None,
     ) -> AdminCommercialDiscountView:
-        target = self._resolve_target(session, target_scope=command.target_scope, target_id=command.target_id)
+        target = self._resolve_target(
+            session, target_scope=command.target_scope, target_id=command.target_id
+        )
         brand_id = self._resolve_brand_id(
             explicit_brand_id=command.brand_id,
             target_scope=command.target_scope,
@@ -221,7 +236,10 @@ class AdminCommercialDiscountService:
         discount = CommercialDiscount(
             brand_id=brand_id,
             product_id=target["product"].id if target["product"] is not None else None,
-            product_class_id=target["class"].id if command.target_scope == COMMERCIAL_DISCOUNT_SCOPE_CLASS else None,
+            product_class_id=target["class"].id
+            if command.target_scope == COMMERCIAL_DISCOUNT_SCOPE_CLASS
+            and target["class"] is not None
+            else None,
             code=_normalize_optional(command.code),
             name=command.name.strip(),
             description=_normalize_optional(command.description),
@@ -268,14 +286,24 @@ class AdminCommercialDiscountService:
         discount = self._get_discount(session, discount_id)
         previous_snapshot = self._discount_snapshot(discount)
 
-        next_scope = command.target_scope if command.target_scope is not None else discount.target_scope
+        next_scope = (
+            command.target_scope if command.target_scope is not None else discount.target_scope
+        )
         next_target_id = command.target_id
         if command.target_scope is None and "target_id" not in command.model_fields_set:
-            next_target_id = discount.product_id if discount.target_scope == COMMERCIAL_DISCOUNT_SCOPE_PRODUCT else discount.product_class_id
+            next_target_id = (
+                discount.product_id
+                if discount.target_scope == COMMERCIAL_DISCOUNT_SCOPE_PRODUCT
+                else discount.product_class_id
+            )
         target = self._resolve_target(session, target_scope=next_scope, target_id=next_target_id)
-        next_type = command.discount_type if command.discount_type is not None else discount.discount_type
+        next_type = (
+            command.discount_type if command.discount_type is not None else discount.discount_type
+        )
         next_value = command.value if command.value is not None else discount.value
-        next_currency = command.currency_code if command.currency_code is not None else discount.currency_code
+        next_currency = (
+            command.currency_code if command.currency_code is not None else discount.currency_code
+        )
         self._validate_discount_shape(
             discount_type=next_type,
             value=next_value,
@@ -300,7 +328,9 @@ class AdminCommercialDiscountService:
             discount.target_scope = next_scope
             discount.product_id = target["product"].id if target["product"] is not None else None
             discount.product_class_id = (
-                target["class"].id if next_scope == COMMERCIAL_DISCOUNT_SCOPE_CLASS else None
+                target["class"].id
+                if next_scope == COMMERCIAL_DISCOUNT_SCOPE_CLASS and target["class"] is not None
+                else None
             )
         if "brand_id" in command.model_fields_set:
             discount.brand_id = self._resolve_brand_id(
@@ -344,7 +374,9 @@ class AdminCommercialDiscountService:
             session.commit()
         except IntegrityError as error:
             session.rollback()
-            raise OperationalDiscountValidationError("Discount update violates commercial rules.") from error
+            raise OperationalDiscountValidationError(
+                "Discount update violates commercial rules."
+            ) from error
 
         return self.get_discount_detail(session, discount_id=discount.id)
 
@@ -366,7 +398,9 @@ class AdminCommercialDiscountService:
             is_pos_eligible=source.is_pos_eligible,
             name=(command.name or f"{source.name} copia").strip(),
             priority=source.priority + 1,
-            status=COMMERCIAL_DISCOUNT_STATUS_INACTIVE,
+            status=_ADMIN_COMMERCIAL_DISCOUNT_STATUS_ADAPTER.validate_python(
+                COMMERCIAL_DISCOUNT_STATUS_INACTIVE
+            ),
             target_id=source.product_id or source.product_class_id,
             target_scope=source.target_scope,  # type: ignore[arg-type]
             value=source.value,
@@ -427,7 +461,9 @@ class AdminCommercialDiscountService:
         base_price = self._resolve_base_price(discount, target)
         preview_price = self._calculate_preview_price(discount, base_price)
         validity_status = self._validity_status(discount)
-        warnings = self._build_warnings(discount, target, base_price, preview_price, validity_status)
+        warnings = self._build_warnings(
+            discount, target, base_price, preview_price, validity_status
+        )
         health = self._resolve_health(warnings, validity_status)
 
         target_product = target["product"]
@@ -490,16 +526,26 @@ class AdminCommercialDiscountService:
         self,
         session: Session,
         discount: CommercialDiscount,
-    ) -> dict[str, Product | ProductClass | None]:
-        if discount.target_scope == COMMERCIAL_DISCOUNT_SCOPE_PRODUCT and discount.product_id is not None:
-            product = session.execute(select(Product).where(Product.id == discount.product_id)).scalar_one_or_none()
+    ) -> _DiscountTarget:
+        if (
+            discount.target_scope == COMMERCIAL_DISCOUNT_SCOPE_PRODUCT
+            and discount.product_id is not None
+        ):
+            product = session.execute(
+                select(Product).where(Product.id == discount.product_id)
+            ).scalar_one_or_none()
             product_class = (
-                session.execute(select(ProductClass).where(ProductClass.id == product.product_class_id)).scalar_one_or_none()
+                session.execute(
+                    select(ProductClass).where(ProductClass.id == product.product_class_id)
+                ).scalar_one_or_none()
                 if product is not None
                 else None
             )
             return {"product": product, "class": product_class}
-        if discount.target_scope == COMMERCIAL_DISCOUNT_SCOPE_CLASS and discount.product_class_id is not None:
+        if (
+            discount.target_scope == COMMERCIAL_DISCOUNT_SCOPE_CLASS
+            and discount.product_class_id is not None
+        ):
             product_class = session.execute(
                 select(ProductClass).where(ProductClass.id == discount.product_class_id)
             ).scalar_one_or_none()
@@ -512,38 +558,48 @@ class AdminCommercialDiscountService:
         *,
         target_scope: str,
         target_id: uuid.UUID | None,
-    ) -> dict[str, Product | ProductClass | None]:
+    ) -> _DiscountTarget:
         self._validate_scope_filter(target_scope)
         if target_scope == COMMERCIAL_DISCOUNT_SCOPE_GLOBAL:
             if target_id is not None:
-                raise OperationalDiscountValidationError("Global discounts cannot reference a target entity.")
+                raise OperationalDiscountValidationError(
+                    "Global discounts cannot reference a target entity."
+                )
             return {"product": None, "class": None}
         if target_id is None:
             raise OperationalDiscountValidationError("Discount target is required for this scope.")
         if target_scope == COMMERCIAL_DISCOUNT_SCOPE_PRODUCT:
-            product = session.execute(select(Product).where(Product.id == target_id)).scalar_one_or_none()
+            product = session.execute(
+                select(Product).where(Product.id == target_id)
+            ).scalar_one_or_none()
             if product is None:
                 raise OperationalDiscountNotFoundError("Discount target product was not found.")
             product_class = session.execute(
                 select(ProductClass).where(ProductClass.id == product.product_class_id)
             ).scalar_one()
             return {"product": product, "class": product_class}
-        product_class = session.execute(select(ProductClass).where(ProductClass.id == target_id)).scalar_one_or_none()
-        if product_class is None:
+        target_class = session.execute(
+            select(ProductClass).where(ProductClass.id == target_id)
+        ).scalar_one_or_none()
+        if target_class is None:
             raise OperationalDiscountNotFoundError("Discount target class was not found.")
-        return {"product": None, "class": product_class}
+        return {"product": None, "class": target_class}
 
     def _resolve_existing_brand(
         self,
         session: Session,
         discount: CommercialDiscount,
-        target: dict[str, Product | ProductClass | None],
+        target: _DiscountTarget,
     ) -> Brand | None:
         if discount.brand_id is not None:
-            return session.execute(select(Brand).where(Brand.id == discount.brand_id)).scalar_one_or_none()
+            return session.execute(
+                select(Brand).where(Brand.id == discount.brand_id)
+            ).scalar_one_or_none()
         target_class = target["class"]
         if isinstance(target_class, ProductClass):
-            return session.execute(select(Brand).where(Brand.id == target_class.brand_id)).scalar_one_or_none()
+            return session.execute(
+                select(Brand).where(Brand.id == target_class.brand_id)
+            ).scalar_one_or_none()
         return None
 
     def _resolve_brand_id(
@@ -551,7 +607,7 @@ class AdminCommercialDiscountService:
         *,
         explicit_brand_id: uuid.UUID | None,
         target_scope: str,
-        target: dict[str, Product | ProductClass | None],
+        target: _DiscountTarget,
     ) -> uuid.UUID | None:
         target_class = target["class"]
         if isinstance(target_class, ProductClass):
@@ -565,14 +621,18 @@ class AdminCommercialDiscountService:
     def _resolve_base_price(
         self,
         discount: CommercialDiscount,
-        target: dict[str, Product | ProductClass | None],
+        target: _DiscountTarget,
     ) -> Decimal | None:
         if discount.target_scope == COMMERCIAL_DISCOUNT_SCOPE_PRODUCT:
             product = target["product"]
             return product.unit_price if isinstance(product, Product) else None
         if discount.target_scope == COMMERCIAL_DISCOUNT_SCOPE_CLASS:
             product_class = target["class"]
-            return product_class.class_capture_unit_price if isinstance(product_class, ProductClass) else None
+            return (
+                product_class.class_capture_unit_price
+                if isinstance(product_class, ProductClass)
+                else None
+            )
         return None
 
     def _calculate_preview_price(
@@ -585,7 +645,9 @@ class AdminCommercialDiscountService:
         if discount.discount_type == COMMERCIAL_DISCOUNT_TYPE_PERCENTAGE:
             multiplier = (Decimal("100") - discount.value) / Decimal("100")
             return (base_price * multiplier).quantize(MONEY_QUANTIZER, rounding=ROUND_HALF_UP)
-        return max(ZERO_MONEY, base_price - discount.value).quantize(MONEY_QUANTIZER, rounding=ROUND_HALF_UP)
+        return max(ZERO_MONEY, base_price - discount.value).quantize(
+            MONEY_QUANTIZER, rounding=ROUND_HALF_UP
+        )
 
     def _validity_status(self, discount: CommercialDiscount) -> str:
         now = datetime.now(tz=UTC)
@@ -600,7 +662,7 @@ class AdminCommercialDiscountService:
     def _build_warnings(
         self,
         discount: CommercialDiscount,
-        target: dict[str, Product | ProductClass | None],
+        target: _DiscountTarget,
         base_price: Decimal | None,
         preview_price: Decimal | None,
         validity_status: str,
@@ -608,33 +670,54 @@ class AdminCommercialDiscountService:
         warnings: list[tuple[str, str]] = []
         if discount.value <= ZERO_MONEY:
             warnings.append(("invalid_value", "El descuento debe ser mayor a cero."))
-        if discount.discount_type == COMMERCIAL_DISCOUNT_TYPE_PERCENTAGE and discount.value > Decimal("100"):
+        if (
+            discount.discount_type == COMMERCIAL_DISCOUNT_TYPE_PERCENTAGE
+            and discount.value > Decimal("100")
+        ):
             warnings.append(("invalid_percentage", "El porcentaje no puede ser mayor a 100."))
         if discount.status == COMMERCIAL_DISCOUNT_STATUS_ACTIVE and validity_status == "expired":
             warnings.append(("active_expired", "El descuento esta activo pero su vigencia expiro."))
-        if discount.target_scope in {COMMERCIAL_DISCOUNT_SCOPE_PRODUCT, COMMERCIAL_DISCOUNT_SCOPE_CLASS}:
+        if discount.target_scope in {
+            COMMERCIAL_DISCOUNT_SCOPE_PRODUCT,
+            COMMERCIAL_DISCOUNT_SCOPE_CLASS,
+        }:
             if target["product"] is None and target["class"] is None:
                 warnings.append(("missing_target", "El descuento no tiene un objetivo valido."))
         product = target["product"]
         product_class = target["class"]
         if isinstance(product, Product) and (not product.is_active or not product.is_sellable):
-            warnings.append(("target_product_inactive", "El producto objetivo no esta activo o vendible."))
-        if isinstance(product_class, ProductClass) and (not product_class.is_active or not product_class.is_sellable):
-            warnings.append(("target_class_inactive", "La clase objetivo no esta activa o vendible."))
-        if base_price is not None and discount.discount_type == COMMERCIAL_DISCOUNT_TYPE_FIXED_AMOUNT:
+            warnings.append(
+                ("target_product_inactive", "El producto objetivo no esta activo o vendible.")
+            )
+        if isinstance(product_class, ProductClass) and (
+            not product_class.is_active or not product_class.is_sellable
+        ):
+            warnings.append(
+                ("target_class_inactive", "La clase objetivo no esta activa o vendible.")
+            )
+        if (
+            base_price is not None
+            and discount.discount_type == COMMERCIAL_DISCOUNT_TYPE_FIXED_AMOUNT
+        ):
             if discount.value >= base_price:
-                warnings.append(("fixed_discount_exceeds_price", "El descuento fijo deja el precio en cero."))
+                warnings.append(
+                    ("fixed_discount_exceeds_price", "El descuento fijo deja el precio en cero.")
+                )
         if preview_price is not None and preview_price <= ZERO_MONEY:
             warnings.append(("zero_preview_price", "El precio estimado queda en cero."))
         if discount.status == COMMERCIAL_DISCOUNT_STATUS_ACTIVE and not discount.is_pos_eligible:
-            warnings.append(("active_not_pos_eligible", "El descuento esta activo pero no elegible para POS."))
+            warnings.append(
+                ("active_not_pos_eligible", "El descuento esta activo pero no elegible para POS.")
+            )
 
         return AdminCommercialDiscountWarningsView(
             codes=[code for code, _ in warnings],
             messages=[message for _, message in warnings],
         )
 
-    def _resolve_health(self, warnings: AdminCommercialDiscountWarningsView, validity_status: str) -> str:
+    def _resolve_health(
+        self, warnings: AdminCommercialDiscountWarningsView, validity_status: str
+    ) -> str:
         invalid_codes = {"invalid_value", "invalid_percentage", "missing_target"}
         if any(code in invalid_codes for code in warnings.codes):
             return "invalid"
@@ -650,12 +733,18 @@ class AdminCommercialDiscountService:
     ) -> AdminCommercialDiscountMetricsView:
         return AdminCommercialDiscountMetricsView(
             total_discounts=len(items),
-            active_discounts=sum(1 for item in items if item.status == COMMERCIAL_DISCOUNT_STATUS_ACTIVE),
+            active_discounts=sum(
+                1 for item in items if item.status == COMMERCIAL_DISCOUNT_STATUS_ACTIVE
+            ),
             upcoming_discounts=sum(1 for item in items if item.validity_status == "upcoming"),
             expired_discounts=sum(1 for item in items if item.validity_status == "expired"),
             with_warnings=sum(1 for item in items if item.warnings.codes),
-            product_scoped=sum(1 for item in items if item.target_scope == COMMERCIAL_DISCOUNT_SCOPE_PRODUCT),
-            class_scoped=sum(1 for item in items if item.target_scope == COMMERCIAL_DISCOUNT_SCOPE_CLASS),
+            product_scoped=sum(
+                1 for item in items if item.target_scope == COMMERCIAL_DISCOUNT_SCOPE_PRODUCT
+            ),
+            class_scoped=sum(
+                1 for item in items if item.target_scope == COMMERCIAL_DISCOUNT_SCOPE_CLASS
+            ),
         )
 
     def _build_filter_options(self, session: Session) -> AdminCommercialDiscountFilterOptionsView:
@@ -702,16 +791,23 @@ class AdminCommercialDiscountService:
         value: Decimal,
         currency_code: str,
         target_scope: str,
-        target: dict[str, Product | ProductClass | None],
+        target: _DiscountTarget,
     ) -> None:
         self._validate_type_filter(discount_type)
         self._validate_scope_filter(target_scope)
         if value <= ZERO_MONEY:
             raise OperationalDiscountValidationError("Discount value must be greater than zero.")
         if discount_type == COMMERCIAL_DISCOUNT_TYPE_PERCENTAGE and value > Decimal("100"):
-            raise OperationalDiscountValidationError("Percentage discounts must be less than or equal to 100.")
-        if discount_type == COMMERCIAL_DISCOUNT_TYPE_FIXED_AMOUNT and len(currency_code.strip()) != 3:
-            raise OperationalDiscountValidationError("Fixed discounts require a three-letter currency code.")
+            raise OperationalDiscountValidationError(
+                "Percentage discounts must be less than or equal to 100."
+            )
+        if (
+            discount_type == COMMERCIAL_DISCOUNT_TYPE_FIXED_AMOUNT
+            and len(currency_code.strip()) != 3
+        ):
+            raise OperationalDiscountValidationError(
+                "Fixed discounts require a three-letter currency code."
+            )
         if target_scope == COMMERCIAL_DISCOUNT_SCOPE_PRODUCT and target["product"] is None:
             raise OperationalDiscountValidationError("Product discount requires a product target.")
         if target_scope == COMMERCIAL_DISCOUNT_SCOPE_CLASS and target["class"] is None:
@@ -726,7 +822,10 @@ class AdminCommercialDiscountService:
             raise OperationalDiscountValidationError("Validity range must end after it starts.")
 
     def _validate_type_filter(self, value: str) -> None:
-        if value not in {COMMERCIAL_DISCOUNT_TYPE_PERCENTAGE, COMMERCIAL_DISCOUNT_TYPE_FIXED_AMOUNT}:
+        if value not in {
+            COMMERCIAL_DISCOUNT_TYPE_PERCENTAGE,
+            COMMERCIAL_DISCOUNT_TYPE_FIXED_AMOUNT,
+        }:
             raise OperationalDiscountValidationError("Unsupported commercial discount type.")
 
     def _validate_scope_filter(self, value: str) -> None:
@@ -780,14 +879,18 @@ class AdminCommercialDiscountService:
             "id": str(discount.id),
             "brand_id": str(discount.brand_id) if discount.brand_id else None,
             "product_id": str(discount.product_id) if discount.product_id else None,
-            "product_class_id": str(discount.product_class_id) if discount.product_class_id else None,
+            "product_class_id": str(discount.product_class_id)
+            if discount.product_class_id
+            else None,
             "code": discount.code,
             "name": discount.name,
             "discount_type": discount.discount_type,
             "target_scope": discount.target_scope,
             "value": str(discount.value),
             "currency_code": discount.currency_code,
-            "valid_from_utc": discount.valid_from_utc.isoformat() if discount.valid_from_utc else None,
+            "valid_from_utc": discount.valid_from_utc.isoformat()
+            if discount.valid_from_utc
+            else None,
             "valid_to_utc": discount.valid_to_utc.isoformat() if discount.valid_to_utc else None,
             "priority": discount.priority,
             "is_pos_eligible": discount.is_pos_eligible,

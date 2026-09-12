@@ -1,10 +1,11 @@
 from __future__ import annotations
 
 import uuid
-from collections.abc import Iterable
+from collections.abc import Callable, Iterable
 from dataclasses import dataclass
 from datetime import UTC, datetime
 
+from pydantic import TypeAdapter
 from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
@@ -37,6 +38,10 @@ from zeromerma_api.modules.quality.application.incident_schemas import (
     AdminIncidentTimelineItemView,
     AdminIncidentUpdateRequest,
     AdminIncidentWarningView,
+    IncidentSeverity,
+    IncidentSourceType,
+    IncidentStatus,
+    IncidentType,
 )
 from zeromerma_api.modules.quality.domain.constants import (
     AUDIT_ACTION_INCIDENT_CREATED,
@@ -90,6 +95,10 @@ from zeromerma_api.modules.quality.infrastructure.models import (
     SanitaryVerification,
 )
 
+_INCIDENT_SEVERITY_ADAPTER: TypeAdapter[IncidentSeverity] = TypeAdapter(IncidentSeverity)
+_INCIDENT_SOURCE_TYPE_ADAPTER: TypeAdapter[IncidentSourceType] = TypeAdapter(IncidentSourceType)
+_INCIDENT_STATUS_ADAPTER: TypeAdapter[IncidentStatus] = TypeAdapter(IncidentStatus)
+_INCIDENT_TYPE_ADAPTER: TypeAdapter[IncidentType] = TypeAdapter(IncidentType)
 INCIDENT_TYPE_LABELS = {
     "SANITATION_ISSUE": "Problema sanitario",
     "CLEANING_NON_COMPLIANCE": "Incumplimiento de limpieza",
@@ -542,22 +551,27 @@ class AdminIncidentService:
     def _load_rows(self, session: Session) -> list[_IncidentRow]:
         incidents = session.scalars(select(QualityIncident)).all()
         branch_ids = {incident.branch_id for incident in incidents}
-        user_ids = {
-            incident.reported_by_user_id
-            for incident in incidents
-        } | {
+        user_ids = {incident.reported_by_user_id for incident in incidents} | {
             incident.responsible_user_id
             for incident in incidents
             if incident.responsible_user_id is not None
         }
-        branches = {
-            branch.id: branch
-            for branch in session.scalars(select(Branch).where(Branch.id.in_(branch_ids))).all()
-        } if branch_ids else {}
-        users = {
-            user.id: user
-            for user in session.scalars(select(User).where(User.id.in_(user_ids))).all()
-        } if user_ids else {}
+        branches = (
+            {
+                branch.id: branch
+                for branch in session.scalars(select(Branch).where(Branch.id.in_(branch_ids))).all()
+            }
+            if branch_ids
+            else {}
+        )
+        users = (
+            {
+                user.id: user
+                for user in session.scalars(select(User).where(User.id.in_(user_ids))).all()
+            }
+            if user_ids
+            else {}
+        )
         follow_ups = session.scalars(select(QualityIncidentFollowUp)).all()
         follow_up_map: dict[uuid.UUID, list[QualityIncidentFollowUp]] = {}
         for follow_up in follow_ups:
@@ -603,11 +617,11 @@ class AdminIncidentService:
             description_classification=AdminIncidentDescriptionClassificationView(
                 description=incident.description,
                 food_safety_impact=incident.food_safety_impact,
-                incident_type=incident.incident_type,
+                incident_type=_INCIDENT_TYPE_ADAPTER.validate_python(incident.incident_type),
                 notes=self._latest_note(row),
                 operational_impact=incident.operational_impact,
-                risk_level=incident.risk_level,
-                severity=incident.severity,
+                risk_level=_INCIDENT_SEVERITY_ADAPTER.validate_python(incident.risk_level),
+                severity=_INCIDENT_SEVERITY_ADAPTER.validate_python(incident.severity),
             ),
             evidence=AdminIncidentEvidenceView(
                 evidence_note=incident.evidence_note,
@@ -645,16 +659,16 @@ class AdminIncidentService:
             folio=incident.folio,
             has_evidence=incident.has_evidence,
             id=incident.id,
-            incident_type=incident.incident_type,
+            incident_type=_INCIDENT_TYPE_ADAPTER.validate_python(incident.incident_type),
             related_document_count=self._related_document_count(session, row),
             reported_by_user_id=incident.reported_by_user_id,
             reported_by_user_name=row.reported_by.full_name,
             responsible_user_id=incident.responsible_user_id,
             responsible_user_name=row.responsible.full_name if row.responsible else None,
-            severity=incident.severity,
+            severity=_INCIDENT_SEVERITY_ADAPTER.validate_python(incident.severity),
             source_reference=incident.source_reference,
-            source_type=incident.source_type,
-            status=incident.status,
+            source_type=_INCIDENT_SOURCE_TYPE_ADAPTER.validate_python(incident.source_type),
+            status=_INCIDENT_STATUS_ADAPTER.validate_python(incident.status),
             title=incident.title,
             updated_at=incident.updated_at,
             warning_state=self._warning_state(incident),
@@ -833,7 +847,7 @@ class AdminIncidentService:
             source_document_id=incident.source_document_id,
             source_reference=incident.source_reference,
             source_summary=incident.source_summary,
-            source_type=incident.source_type,
+            source_type=_INCIDENT_SOURCE_TYPE_ADAPTER.validate_python(incident.source_type),
         )
 
     def _related_documents(
@@ -964,9 +978,7 @@ class AdminIncidentService:
                     code=INCIDENT_WARNING_HIGH_RISK,
                     message="Incidencia de alto riesgo.",
                     severity=(
-                        "critical"
-                        if incident.severity == INCIDENT_SEVERITY_CRITICAL
-                        else "warning"
+                        "critical" if incident.severity == INCIDENT_SEVERITY_CRITICAL else "warning"
                     ),
                 )
             )
@@ -1078,7 +1090,7 @@ class AdminIncidentService:
         self,
         rows: list[_IncidentRow],
         value: object,
-        getter,
+        getter: Callable[[_IncidentRow], str | uuid.UUID | None],
     ) -> list[_IncidentRow]:
         normalized = _normalize_optional(str(value) if value is not None else None)
         if not normalized or normalized == "all":
@@ -1089,7 +1101,7 @@ class AdminIncidentService:
         self,
         rows: list[_IncidentRow],
         value: str | None,
-        getter,
+        getter: Callable[[_IncidentRow], str],
     ) -> list[_IncidentRow]:
         normalized = _normalize_optional(value)
         if not normalized or normalized == "all":

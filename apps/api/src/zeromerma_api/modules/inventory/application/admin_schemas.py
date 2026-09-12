@@ -76,7 +76,9 @@ class AdminInventoryListItemView(BaseModel):
 
 
 class AdminInventoryListResponse(BaseModel):
-    backend_contract: AdminInventoryBackendContractView = Field(default_factory=AdminInventoryBackendContractView)
+    backend_contract: AdminInventoryBackendContractView = Field(
+        default_factory=AdminInventoryBackendContractView
+    )
     filter_options: AdminInventoryFilterOptionsView
     is_backend_connected: bool = True
     items: list[AdminInventoryListItemView]

@@ -225,7 +225,7 @@ class AdminCommercialDiscountCreateRequest(BaseModel):
     status: AdminCommercialDiscountStatus = "INACTIVE"
 
     @model_validator(mode="after")
-    def validate_shape(self) -> "AdminCommercialDiscountCreateRequest":
+    def validate_shape(self) -> AdminCommercialDiscountCreateRequest:
         if self.discount_type == "PERCENTAGE" and self.value > Decimal("100"):
             raise ValueError("Percentage discounts must be less than or equal to 100.")
         if self.discount_type == "FIXED_AMOUNT" and len(self.currency_code.strip()) != 3:
@@ -247,7 +247,9 @@ class AdminCommercialDiscountUpdateRequest(BaseModel):
     target_scope: AdminCommercialDiscountScope | None = None
     target_id: UUID | None = None
     brand_id: UUID | None = None
-    value: Decimal | None = Field(default=None, gt=Decimal("0.0000"), max_digits=12, decimal_places=4)
+    value: Decimal | None = Field(
+        default=None, gt=Decimal("0.0000"), max_digits=12, decimal_places=4
+    )
     currency_code: str | None = Field(default=None, min_length=3, max_length=3)
     valid_from_utc: datetime | None = None
     valid_to_utc: datetime | None = None
@@ -256,8 +258,12 @@ class AdminCommercialDiscountUpdateRequest(BaseModel):
     status: AdminCommercialDiscountStatus | None = None
 
     @model_validator(mode="after")
-    def validate_values(self) -> "AdminCommercialDiscountUpdateRequest":
-        if self.discount_type == "PERCENTAGE" and self.value is not None and self.value > Decimal("100"):
+    def validate_values(self) -> AdminCommercialDiscountUpdateRequest:
+        if (
+            self.discount_type == "PERCENTAGE"
+            and self.value is not None
+            and self.value > Decimal("100")
+        ):
             raise ValueError("Percentage discounts must be less than or equal to 100.")
         if self.valid_from_utc and self.valid_to_utc and self.valid_from_utc >= self.valid_to_utc:
             raise ValueError("Validity range must end after it starts.")

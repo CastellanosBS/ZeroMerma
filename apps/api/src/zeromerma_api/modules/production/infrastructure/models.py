@@ -4,7 +4,16 @@ import uuid
 from datetime import UTC, datetime
 from decimal import Decimal
 
-from sqlalchemy import CheckConstraint, DateTime, ForeignKey, Integer, Numeric, String, Text, UniqueConstraint
+from sqlalchemy import (
+    CheckConstraint,
+    DateTime,
+    ForeignKey,
+    Integer,
+    Numeric,
+    String,
+    Text,
+    UniqueConstraint,
+)
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -26,7 +35,9 @@ class ProductionBatch(Base):
             "status IN ('DRAFT', 'IN_PROGRESS', 'COMPLETED', 'CANCELLED')",
             name="ck_production_batches_status_valid",
         ),
-        CheckConstraint("planned_output_qty > 0", name="ck_production_batches_planned_output_positive"),
+        CheckConstraint(
+            "planned_output_qty > 0", name="ck_production_batches_planned_output_positive"
+        ),
         CheckConstraint(
             "actual_output_qty IS NULL OR actual_output_qty >= 0",
             name="ck_production_batches_actual_output_non_negative",
@@ -80,7 +91,9 @@ class ProductionBatch(Base):
     )
     variance_reason: Mapped[str | None] = mapped_column(String(180), nullable=True)
     notes: Mapped[str | None] = mapped_column(Text, nullable=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=utc_now, nullable=False
+    )
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         default=utc_now,
@@ -97,7 +110,9 @@ class ProductionBatchInput(Base):
             "input_product_id",
             name="uq_production_batch_inputs_batch_product",
         ),
-        CheckConstraint("required_qty > 0", name="ck_production_batch_inputs_required_qty_positive"),
+        CheckConstraint(
+            "required_qty > 0", name="ck_production_batch_inputs_required_qty_positive"
+        ),
         CheckConstraint(
             "consumed_qty IS NULL OR consumed_qty >= 0",
             name="ck_production_batch_inputs_consumed_qty_non_negative",
@@ -131,7 +146,9 @@ class ProductionBatchInput(Base):
     )
     standard_cost_snapshot: Mapped[Decimal | None] = mapped_column(Numeric(12, 4), nullable=True)
     display_order: Mapped[int] = mapped_column(Integer, default=1000, nullable=False)
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=utc_now, nullable=False
+    )
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         default=utc_now,

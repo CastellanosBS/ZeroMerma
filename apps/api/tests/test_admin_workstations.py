@@ -54,7 +54,9 @@ def _get_branch_id(code: str) -> str:
 
 def _get_workstation_id(code: str) -> str:
     with SessionLocal() as session:
-        workstation = session.execute(select(Workstation).where(Workstation.code == code)).scalar_one()
+        workstation = session.execute(
+            select(Workstation).where(Workstation.code == code)
+        ).scalar_one()
         return str(workstation.id)
 
 
@@ -250,4 +252,4 @@ def test_admin_workstation_deactivation_blocks_open_cash_session(client: TestCli
     )
 
     assert response.status_code == 409
-    assert "open cash session" in response.json()["detail"]
+    assert "open cash session" in response.json()["message"]

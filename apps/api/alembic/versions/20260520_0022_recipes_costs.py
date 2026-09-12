@@ -101,9 +101,13 @@ def upgrade() -> None:
             ondelete="CASCADE",
         ),
         sa.PrimaryKeyConstraint("id", name=op.f("pk_recipe_inputs")),
-        sa.UniqueConstraint("recipe_id", "input_product_id", name=op.f("uq_recipe_inputs_recipe_product")),
+        sa.UniqueConstraint(
+            "recipe_id", "input_product_id", name=op.f("uq_recipe_inputs_recipe_product")
+        ),
     )
-    op.create_index(op.f("ix_recipe_inputs_recipe_id"), "recipe_inputs", ["recipe_id"], unique=False)
+    op.create_index(
+        op.f("ix_recipe_inputs_recipe_id"), "recipe_inputs", ["recipe_id"], unique=False
+    )
     op.create_index(
         op.f("ix_recipe_inputs_input_product_id"),
         "recipe_inputs",
