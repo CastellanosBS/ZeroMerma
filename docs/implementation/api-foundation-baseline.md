@@ -90,6 +90,8 @@ pnpm 10.33.0, and disposable PostgreSQL 16. The repository toolchain preflight p
 | Canonical full migration stage | Passed; stage evidence `366da7f65e604ae6bdb3776ef67e43aa/Migrations.json`. |
 | First focused rerun of the six initial failures | 4 passed, 2 failed in 33.03 seconds; exposed two further incorrect test expectations, corrected below. |
 | Final focused rerun of the six initial failures | 6 passed in 38.74 seconds on disposable run `67180e04c4b34d2f9ee192e11fd26a44`; cleanup completed. |
+| First hosted backend run, commit `972909772274f6c43e367d778b7d36cc5ee9eb57` | 313 passed, 1 failed in 366.58 seconds; Ruff and strict mypy (295 files) passed. The remaining test expected a server-error detail intentionally removed by ZM-FIN-009. |
+| Focused server-error contract correction | 2 passed in 6.49 seconds: database-backed product-availability test and explicit safe-server-error unit test; disposable run `18ee3930a2e64e89aa356ebadf1c0327` cleaned up. |
 | Final canonical backend stage | The `Validate Backend` CI job executes the complete integrated API/unit snapshot; its successful result and JUnit are required by `Foundation required`. See the foundation validation map. |
 
 The first pytest process had already imported its test snapshot before the supplier
@@ -103,6 +105,17 @@ The first focused rerun verified both folio searches and exposed two later asser
 in the corrections tests: the outbox timestamp used the same nonexistent `_utc`
 suffix, and the expected reason label did not match the unchanged canonical seed.
 Both now assert the actual mapped field and exact seeded label.
+
+The first hosted run executed all 314 API/unit cases on Ubuntu with Python 3.12.14.
+Its single failure was the existing product-availability test expecting a schema
+detail from a `501` response. ZM-FIN-009 deliberately hides all server-error details.
+The test retains its name and `501` assertion and now verifies the exact canonical
+envelope, request correlation, null details/field errors, and absence of schema
+internals. The availability endpoint remains unimplemented; no handler, schema, or
+business behavior was changed to satisfy this test.
+
+The hosted log is `.tmp/ci-backend-34724946542.log`; the focused correction produced
+`.tmp/api-foundation-safe-5xx.log` and `.tmp/api-foundation-safe-5xx.xml`.
 
 Local command logs are in `.tmp/zm-fin-010-ruff.log`, `.tmp/zm-fin-010-mypy.log`,
 `.tmp/api-baseline-tests.log`, `.tmp/api-foundation-failures.log`, and

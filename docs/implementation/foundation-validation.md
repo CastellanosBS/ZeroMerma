@@ -149,6 +149,13 @@ workflow is not a passing result. Controlled failure evidence must show both the
 rejection and a failed aggregate required check; the disposable probe branch is never
 merged into the implementation branch.
 
+The [controlled failure run](https://github.com/CastellanosBS/ZeroMerma/actions/runs/34724965016)
+executed commit `329e9c10dce530de02603554a81fc877f9f5c632`, changing only `.node-version`
+from 22 to 24 relative to the first integrated candidate. All eight jobs rejected the
+inconsistent toolchain policy with exit 1; **Foundation required** also failed. The
+workflow definition itself was unchanged. The temporary branch/worktree was removed
+after its logs and SHA-256 evidence were saved; the immutable run remains accessible.
+
 Foundation evidence does not replace the later full authorization, idempotency,
 concurrency, financial/inventory reconciliation, business E2E, hardware, load, security,
 backup/restore, production platform, or pilot gates. Browser success validates the

@@ -268,9 +268,19 @@ def test_admin_product_availability_reports_pending_schema(client: TestClient) -
     product_id = _get_product_id(SEED_PRODUCT_COCA_355_CODE)
     response = client.post(
         f"/v1/admin/products/{product_id}/availability",
-        headers=_admin_headers(client),
+        headers={
+            **_admin_headers(client),
+            "X-Request-ID": "admin-product-availability-pending",
+        },
         json={"branch_ids": [], "visible_in_pos": True},
     )
 
     assert response.status_code == 501
-    assert "availability schema" in response.json()["message"]
+    assert response.json() == {
+        "code": "REQUEST_FAILED",
+        "message": "An unexpected error occurred.",
+        "details": None,
+        "request_id": "admin-product-availability-pending",
+        "field_errors": None,
+    }
+    assert "availability schema" not in response.text
