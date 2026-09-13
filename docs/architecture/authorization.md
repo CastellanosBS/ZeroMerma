@@ -78,6 +78,14 @@ identity mutations take the exclusive lock. A permission revocation therefore
 cannot overtake an already authorized economic commit. A command that starts
 after revocation resolves the revoked authority and is denied.
 
+Economic writes lock active branch rows and read current workstation ownership and
+activity under shared locks until commit. Station administration locks branches
+in UUID order before taking the station's exclusive lock, then checks open cash
+sessions. Branch deactivation takes its exclusive lock before checking open
+sessions. These boundaries prevent moving or disabling a location during a cash
+opening. Transfer receipts retain the original source branch but validate their
+station against the receiving branch; authorization still covers both ends.
+
 Outbox headers preserve the authorization context of the committed action. The
 current worker only observes due metadata and does not execute domain jobs or
 grant authority from those headers. Delayed observation after revocation leaves

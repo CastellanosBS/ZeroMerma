@@ -193,7 +193,19 @@ def test_mutations_reject_foreign_branch_and_shared_master_without_side_effects(
         session.rollback()
 
 
-def test_foreign_workstation_reference_is_rejected_even_if_both_branches_are_allowed() -> None:
+@pytest.mark.parametrize(
+    "document_type,station_side,allowed",
+    [
+        ("BRANCH_TRANSFER_SHIPMENT", "destination", False),
+        ("BRANCH_TRANSFER_RECEIPT", "destination", True),
+        ("BRANCH_TRANSFER_RECEIPT", "source", False),
+    ],
+)
+def test_foreign_workstation_reference_is_rejected_even_if_both_branches_are_allowed(
+    document_type: str,
+    station_side: str,
+    allowed: bool,
+) -> None:
     with SessionLocal() as session:
         stations = list(session.scalars(select(Workstation).order_by(Workstation.code)))
         source = stations[0]
@@ -203,6 +215,7 @@ def test_foreign_workstation_reference_is_rejected_even_if_both_branches_are_all
             foreign.branch_id,
             foreign.id,
         )
+        station_id = foreign_station if station_side == "destination" else source.id
         actor = _actor(session, ("transfers.manage",), [source_branch, foreign_branch])
         bind_authorization_scope(
             session, user=actor, capabilities=("transfers.manage",), mutation=True
@@ -211,15 +224,18 @@ def test_foreign_workstation_reference_is_rejected_even_if_both_branches_are_all
             OperationDocument(
                 source_branch_id=source_branch,
                 destination_branch_id=foreign_branch,
-                workstation_id=foreign_station,
+                workstation_id=station_id,
                 created_by_user_id=actor.id,
-                document_type="BRANCH_TRANSFER_SHIPMENT",
+                document_type=document_type,
                 status="DRAFT",
             )
         )
-        with pytest.raises(HTTPException) as denied:
+        if allowed:
             session.flush()
-        assert denied.value.status_code == 403
+        else:
+            with pytest.raises(HTTPException) as denied:
+                session.flush()
+            assert denied.value.status_code == 403
         session.rollback()
 
 

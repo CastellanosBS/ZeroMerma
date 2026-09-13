@@ -26,11 +26,24 @@ test("real login, mandatory opening and persisted read state", async ({ page, ne
   await expect(page).toHaveURL(/\/pos$/);
   await expect(page.getByRole("heading", { name: "Punto de venta", exact: true })).toBeVisible();
 
-  const current = page.waitForResponse(
-    (response) => new URL(response.url()).pathname === "/v1/cash-sessions/current" && response.ok(),
-  );
+  const current = page
+    .waitForEvent("framenavigated", (frame) => frame === page.mainFrame())
+    .then(async () => {
+      // Bind to a request from the reloaded document, not an earlier in-flight response.
+      const request = await page.waitForRequest(
+        (request) =>
+          new URL(request.url()).pathname === "/v1/cash-sessions/current" &&
+          request.method() === "GET",
+      );
+      const response = await request.response();
+      if (!response) {
+        throw new Error("The reloaded POS current-session request did not produce a response");
+      }
+      expect(response.status()).toBe(200);
+      return response.json();
+    });
   await page.reload();
-  const session = await (await current).json();
+  const session = await current;
   expect(session.status).toBe("OPEN");
   expect(session.opening_amount).toBe("0.00");
   await expect(page).toHaveURL(/\/pos$/);

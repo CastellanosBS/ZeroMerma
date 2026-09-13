@@ -822,6 +822,28 @@ class AdminWorkstationService:
         command: AdminWorkstationUpdateRequest,
         request_id: str | None,
     ) -> AdminWorkstationDetailView:
+        original_branch_id = session.scalar(
+            select(Workstation.branch_id).where(Workstation.id == workstation_id)
+        )
+        if original_branch_id is None:
+            raise WorkstationAdminNotFoundError("Workstation was not found.")
+        branch_ids = {original_branch_id}
+        if command.branch_id is not None:
+            branch_ids.add(command.branch_id)
+        # Match economic validation's branch-before-workstation lock order, including moves.
+        session.scalars(
+            select(Branch.id)
+            .where(Branch.id.in_(branch_ids))
+            .order_by(Branch.id)
+            .with_for_update(read=True)
+        ).all()
+        locked_branch_id = session.scalar(
+            select(Workstation.branch_id).where(Workstation.id == workstation_id).with_for_update()
+        )
+        if locked_branch_id != original_branch_id:
+            raise WorkstationConflictError(
+                "Workstation branch changed concurrently. Retry the operation."
+            )
         row = self._get_row(session, workstation_id)
         workstation = row.workstation
         branch = row.branch

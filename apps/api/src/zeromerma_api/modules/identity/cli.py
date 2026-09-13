@@ -44,7 +44,7 @@ foreach ($rule in $acl.GetAccessRules(
 
 
 def _private_permissions(path: Path, *, protect: bool) -> None:
-    if os.name == "nt":
+    if sys.platform == "win32":
         executable = shutil.which("pwsh") or shutil.which("powershell")
         if executable is None:
             raise ValueError("PowerShell is required to enforce private recovery-file permissions.")

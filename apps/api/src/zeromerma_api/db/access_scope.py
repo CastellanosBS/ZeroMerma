@@ -22,6 +22,7 @@ from sqlalchemy.sql.elements import ClauseElement, ColumnElement, TextClause
 
 from zeromerma_api.db.base import Base
 from zeromerma_api.modules.audit.infrastructure.models import AuditLog
+from zeromerma_api.modules.branches.infrastructure.models import Workstation
 from zeromerma_api.modules.identity.application.authorization import (
     require_branches,
     resolve_authorization,
@@ -628,8 +629,20 @@ def _validate_entity(
             ):
                 continue
             parent_model = models[parent_table]
-            parent = _reference(session, parent_model, foreign_key.column.name, value)
-            related_branches = _entity_branches(session, parent, models)
+            if parent_table == "workstations" and context.economic:
+                # The service may have cached this workstation before another request changed it.
+                # Read authoritative columns under the lock held until the economic commit.
+                workstation = session.execute(
+                    select(Workstation.branch_id, Workstation.is_active)
+                    .where(Workstation.id == value)
+                    .with_for_update(read=True)
+                ).one_or_none()
+                if workstation is None or not workstation.is_active:
+                    raise _deny("An ordinary economic operation requires an active workstation.")
+                related_branches = {workstation.branch_id}
+            else:
+                parent = _reference(session, parent_model, foreign_key.column.name, value)
+                related_branches = _entity_branches(session, parent, models)
             for capability in context.capabilities:
                 require_branches(context.user, capability, related_branches)
             if len(branches) == 1 and name not in {"operation_documents", "correction_documents"}:
@@ -639,7 +652,12 @@ def _validate_entity(
                 expected = getattr(
                     instance, "source_branch_id", getattr(instance, "branch_id", None)
                 )
-                if expected is not None and _value(parent, "branch_id") != expected:
+                if (
+                    name == "operation_documents"
+                    and getattr(instance, "document_type", None) == "BRANCH_TRANSFER_RECEIPT"
+                ):
+                    expected = getattr(instance, "destination_branch_id", None)
+                if expected is not None and related_branches != {expected}:
                     raise _deny("The workstation does not belong to the document branch.")
     cash_session_id = getattr(
         instance, "cash_session_id", getattr(instance, "active_cash_session_id", None)

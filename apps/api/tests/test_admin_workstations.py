@@ -1,9 +1,13 @@
 from __future__ import annotations
 
+from concurrent.futures import ThreadPoolExecutor
 from decimal import Decimal
+from time import monotonic, sleep
 
+import pytest
+from fastapi import HTTPException
 from fastapi.testclient import TestClient
-from sqlalchemy import select
+from sqlalchemy import func, select, text
 
 from zeromerma_api.bootstrap.seed_local import (
     SEED_ADMIN_EMAIL,
@@ -14,13 +18,116 @@ from zeromerma_api.bootstrap.seed_local import (
     SEED_WORKSTATION_CODE,
     SEED_WORKSTATION_NAME,
 )
+from zeromerma_api.db.access_scope import bind_authorization_scope
 from zeromerma_api.db.session import SessionLocal
 from zeromerma_api.modules.audit.infrastructure.models import AuditLog
 from zeromerma_api.modules.branches.infrastructure.models import Branch, Workstation
 from zeromerma_api.modules.cash.infrastructure.models import CashSession
+from zeromerma_api.modules.identity.application.authorization import resolve_authorization
 from zeromerma_api.modules.identity.infrastructure.models import User
 from zeromerma_api.modules.outbox.infrastructure.models import OutboxEvent
 from zeromerma_api.testing.authorization import owner_headers
+
+
+@pytest.mark.parametrize("change", ["move", "deactivate"])
+def test_workstation_change_rechecks_sessions_after_concurrent_economic_open(
+    client: TestClient,
+    change: str,
+) -> None:
+    headers = owner_headers()
+    with SessionLocal() as session:
+        workstation = session.scalars(
+            select(Workstation).where(Workstation.code == SEED_WORKSTATION_CODE)
+        ).one()
+        station_id, source_id = workstation.id, workstation.branch_id
+        destination_id = session.scalars(select(Branch.id).where(Branch.id != source_id)).first()
+        assert destination_id is not None
+        cashier = session.scalars(select(User).where(User.email == SEED_USER_EMAIL)).one()
+        actor = resolve_authorization(session, cashier, surface="POS")
+    payload = {"branch_id": str(destination_id)} if change == "move" else {"is_active": False}
+    with ThreadPoolExecutor(max_workers=1) as executor, SessionLocal() as economic:
+        blocking_pid = economic.scalar(select(func.pg_backend_pid()))
+        bind_authorization_scope(
+            economic, user=actor, capabilities=("pos.operate",), mutation=True, surface="POS"
+        )
+        economic.add(
+            CashSession(
+                branch_id=source_id, workstation_id=station_id, user_id=actor.id, opening_amount=0
+            )
+        )
+        economic.flush()
+        future = executor.submit(
+            client.patch, f"/v1/admin/workstations/{station_id}", headers=headers, json=payload
+        )
+        blocked = False
+        try:
+            deadline = monotonic() + 10
+            while monotonic() < deadline:
+                with SessionLocal() as observer:
+                    blocked = bool(
+                        observer.scalar(
+                            text(
+                                "SELECT EXISTS (SELECT 1 FROM pg_stat_activity "
+                                "WHERE :pid = ANY(pg_blocking_pids(pid)))"
+                            ),
+                            {"pid": blocking_pid},
+                        )
+                    )
+                if blocked:
+                    break
+                sleep(0.02)
+        finally:
+            economic.commit()
+        response = future.result(timeout=15)
+    assert blocked, "Workstation mutation must wait until the authorized economic commit."
+    assert response.status_code == 409, response.text
+    assert "open cash session" in response.json()["message"]
+    with SessionLocal() as session:
+        workstation = session.get(Workstation, station_id)
+        assert workstation is not None and workstation.is_active
+        assert workstation.branch_id == source_id
+        assert session.scalar(select(func.count(CashSession.id))) == 1
+
+
+@pytest.mark.parametrize("change", ["move", "deactivate"])
+def test_economic_write_rechecks_workstation_projection_after_cached_context_changes(
+    client: TestClient,
+    change: str,
+) -> None:
+    headers = owner_headers()
+    with SessionLocal() as session:
+        cashier = session.scalars(select(User).where(User.email == SEED_USER_EMAIL)).one()
+        actor = resolve_authorization(session, cashier, surface="POS")
+        station_id = session.scalar(
+            select(Workstation.id).where(Workstation.code == SEED_WORKSTATION_CODE)
+        )
+        assert station_id is not None
+    with SessionLocal() as economic:
+        bind_authorization_scope(
+            economic, user=actor, capabilities=("pos.operate",), mutation=True, surface="POS"
+        )
+        cached = economic.get(Workstation, station_id)
+        assert cached is not None and cached.is_active
+        source_id = cached.branch_id
+        with SessionLocal() as lookup:
+            destination_id = lookup.scalars(select(Branch.id).where(Branch.id != source_id)).first()
+        payload = {"branch_id": str(destination_id)} if change == "move" else {"is_active": False}
+        response = client.patch(
+            f"/v1/admin/workstations/{station_id}", headers=headers, json=payload
+        )
+        assert response.status_code == 200, response.text
+        assert cached.branch_id == source_id and cached.is_active
+        economic.add(
+            CashSession(
+                branch_id=source_id, workstation_id=station_id, user_id=actor.id, opening_amount=0
+            )
+        )
+        with pytest.raises(HTTPException) as denied:
+            economic.flush()
+        assert denied.value.status_code == 403
+        economic.rollback()
+    with SessionLocal() as session:
+        assert session.scalar(select(func.count(CashSession.id))) == 0
 
 
 def _login_admin(client: TestClient) -> str:

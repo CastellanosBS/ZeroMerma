@@ -119,7 +119,12 @@ record for the immutable committed checkout.
 | Delayed worker observation after revocation | 1 passed; causal headers retained and new mutation denied | `.tmp/validation/authorization/worker-scope.xml` |
 | Final CLI and bootstrap regression | 10 passed, including real PostgreSQL commits followed by simulated lost acknowledgements during both provisioning and recovery | `.tmp/validation/authorization/cli-final.xml` |
 | Branch and cash regression | 15 passed, including concurrent cash-session opening versus branch deactivation and complete cash-cut/flow reads | `.tmp/validation/authorization/cash-focused.xml` |
+| Cash-close and reconciliation regression | 9 passed with the final authorization guard | `.tmp/validation/authorization/cash-regressions-current.log` |
+| Transfer and physical-operation regression | 24 passed, covering both transfer ends, receipts with variance, duplicate receipt rejection, corrections and exact surface-denial responses | `.tmp/validation/authorization/physical-regressions-final.xml` |
+| Branch-local order date | 1 passed; the test filter uses the branch timezone across UTC midnight | `.tmp/validation/authorization/order-local-date.log` |
 | Operation scope and denial regression | 21 passed; mapped joins, all admin collections, SQL bypass rejection, rollback and revocation; 4 final lock/regression cases also passed | `.tmp/operation-authorization-tests-final4.log`, `.tmp/operation-authorization-lock-final.log` |
+| Final workstation and operation-scope regression | 35 passed, including station moves/deactivation concurrent with cash opening, stale cached station state and transfer-receipt station ownership | `.tmp/workstation-authorization-final.log` |
+| HTTP mutation-denial coverage | 2 passed: 94 Backoffice and 17 POS operations, 222 unauthenticated/unauthorized requests, unchanged persisted business/identity/outbox rows and 111 private-material-free denial audit records | `.tmp/validation/authorization/route-denials.xml` |
 | Worker Foundation stage | 26 unit and 4 PostgreSQL tests passed; real `--once` command completed | `.tmp/validation/foundation/4edfbe30e51f4ed9a2a47a425a4aa7eb/` |
 | Negative Foundation stage | 10 passed, including unsafe-database refusal before engine creation | `.tmp/validation/foundation/188970b38afa4a8d8dce2b925a795194/` |
 | Real browser integration | 8 passed: 2 POS and 6 Backoffice; scope denial, missing grants and live revocation verified | `.tmp/validation/web/7227425c36864b02a666e9b91c6daccd/` |
@@ -131,6 +136,15 @@ scope validation at flush. Mapped aliases used by cash-close and transfer querie
 must preserve their own SQL identity when scope criteria are attached. Tests retain
 negative cases for unclassified raw SQL/Core aliases and positive cases for mapped
 aliases, joins, subqueries, counts and authorized lifecycle operations.
+
+The privileged CLI uses an explicit Windows platform boundary for ACL operations.
+Static typing passes for all 305 source files with both Linux and Windows targets;
+the four private-file CLI unit tests also pass on the Windows host.
+
+The POS reload test correlates the current-session request with the new main-frame
+navigation before reading its response body. Its two real browser cases pass with
+the persisted-session, catalog, UI and exact mutation assertions retained, without
+retries (`.tmp/validation/web/248593528eeb4ac788e284cb178b0d42/`).
 
 The final delivery identifies the successful hosted run and commit. It must include
 all eight Foundation stages and the aggregate **Foundation required** check. Hosted
