@@ -2,6 +2,8 @@ import { adminModules, adminSections, getAdminModulesBySection } from "../adminM
 import { isAdminModuleVisibleInCurrentRelease } from "../releaseVisibility";
 import type { AdminModuleKey, AdminSectionKey } from "../adminTypes";
 import type { AdminNavigationIconName } from "./AdminNavigationIcon";
+import type { AuthenticatedUser } from "../../../lib/api";
+import { canReadAdminModule } from "./adminCapabilities";
 
 export type AdminRoutePath = (typeof adminModules)[number]["path"] | "/admin";
 
@@ -51,6 +53,19 @@ export const adminNavigationSections: AdminNavigationSection[] = adminSections
   .filter((section) => section.items.length > 0);
 
 export const adminNavigationItems = adminNavigationSections.flatMap((section) => section.items);
+
+export function getAuthorizedAdminNavigation(user: AuthenticatedUser | null) {
+  return adminNavigationSections
+    .map((section) => ({
+      ...section,
+      items: section.items.filter((item) => canReadAdminModule(user, item.key)),
+    }))
+    .filter((section) => section.items.length > 0);
+}
+
+export function getAuthorizedAdminLanding(user: AuthenticatedUser | null) {
+  return getAuthorizedAdminNavigation(user)[0]?.items[0]?.path ?? null;
+}
 
 export function getAdminNavigationItem(pathname: string): AdminNavigationItem {
   return (

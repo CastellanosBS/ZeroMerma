@@ -5,8 +5,9 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import Any
 
+from fastapi import HTTPException
 from pydantic import TypeAdapter
-from sqlalchemy import func, select
+from sqlalchemy import func, select, true
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
@@ -16,6 +17,7 @@ from zeromerma_api.modules.branches.infrastructure.models import Branch, Worksta
 from zeromerma_api.modules.cash.domain.constants import CASH_SESSION_STATUS_OPEN
 from zeromerma_api.modules.cash.infrastructure.models import CashSession
 from zeromerma_api.modules.identity.application.admin_schemas import (
+    AdminAssignmentScopeRequest,
     AdminUserAccountStatusView,
     AdminUserAppAccessView,
     AdminUserAuditTimelineEventView,
@@ -43,7 +45,26 @@ from zeromerma_api.modules.identity.application.admin_schemas import (
     AdminUserUpdateRequest,
     AdminUserWarningView,
 )
-from zeromerma_api.modules.identity.application.schemas import AuthenticatedUser, IdentitySurface
+from zeromerma_api.modules.identity.application.authorization import (
+    require_branches,
+    require_capability,
+)
+from zeromerma_api.modules.identity.application.privileged_access import (
+    assignment_branch_ids,
+    authorize_privileged_change,
+    can_access_user,
+    ensure_superadmin_remains,
+    lock_privileged_lifecycle,
+    refresh_actor,
+    require_user_scope,
+    set_role_assignment,
+    user_scope_predicate,
+)
+from zeromerma_api.modules.identity.application.schemas import (
+    AuthenticatedUser,
+    IdentitySurface,
+    ScopeType,
+)
 from zeromerma_api.modules.identity.application.security import PasswordHasher
 from zeromerma_api.modules.identity.domain.constants import (
     IDENTITY_ALLOWED_SURFACES,
@@ -65,6 +86,7 @@ from zeromerma_api.modules.outbox.application.service import OutboxWriter
 from zeromerma_api.modules.sales.infrastructure.models import Sale
 
 _IDENTITY_SURFACE_ADAPTER: TypeAdapter[IdentitySurface] = TypeAdapter(IdentitySurface)
+_SCOPE_TYPE_ADAPTER: TypeAdapter[ScopeType] = TypeAdapter(ScopeType)
 _LIST_IDENTITY_SURFACE_ADAPTER: TypeAdapter[list[IdentitySurface]] = TypeAdapter(
     list[IdentitySurface]
 )
@@ -107,6 +129,7 @@ class AdminUserService:
         self,
         session: Session,
         *,
+        current_user: AuthenticatedUser,
         search: str | None,
         status_filter: str | None,
         app_access: str | None,
@@ -117,8 +140,16 @@ class AdminUserService:
         page: int,
         page_size: int,
     ) -> AdminUsersListResponse:
+        current_user = refresh_actor(session, current_user)
+        require_capability(current_user, "users.view")
+        if branch_id is not None:
+            require_branches(current_user, "users.view", [branch_id])
         users = (
-            session.execute(select(User).order_by(User.full_name.asc(), User.email.asc()))
+            session.execute(
+                select(User)
+                .where(user_scope_predicate(current_user, "users.view"))
+                .order_by(User.full_name.asc(), User.email.asc())
+            )
             .scalars()
             .all()
         )
@@ -193,7 +224,7 @@ class AdminUserService:
         offset = (safe_page - 1) * safe_page_size
 
         return AdminUsersListResponse(
-            filter_options=self._build_filter_options(session),
+            filter_options=self._build_filter_options(session, current_user=current_user),
             items=items[offset : offset + safe_page_size],
             metrics=self._build_metrics(contexts),
             page=safe_page,
@@ -208,6 +239,8 @@ class AdminUserService:
         user_id: uuid.UUID,
         current_user: AuthenticatedUser,
     ) -> AdminUserDetailView:
+        current_user = refresh_actor(session, current_user)
+        require_user_scope(session, current_user, "users.view", user_id)
         context = self._get_context(session, user_id)
         return self._to_detail(session, context, current_user=current_user)
 
@@ -219,6 +252,12 @@ class AdminUserService:
         command: AdminUserCreateRequest,
         request_id: str | None,
     ) -> AdminUserDetailView:
+        lock_privileged_lifecycle(session)
+        current_user = refresh_actor(session, current_user)
+        branch_ids = [item.branch_id for item in command.branch_assignments]
+        require_branches(current_user, "users.manage", branch_ids, global_only=not branch_ids)
+        if branch_ids:
+            require_branches(current_user, "role_assignments.manage", branch_ids)
         if command.send_invitation:
             raise UserValidationError("Invitation flow is not available in this backend.")
         if command.temporary_password is None:
@@ -230,8 +269,6 @@ class AdminUserService:
         surfaces = self._normalize_surfaces(command.allowed_surfaces)
         default_surface = self._resolve_default_surface(surfaces, command.default_surface)
         branch_commands = self._deduplicate_branch_commands(command.branch_assignments)
-        roles = self._get_roles_by_ids(session, command.role_ids)
-        self._ensure_roles_are_active(roles)
         if IDENTITY_SURFACE_POS in surfaces and not branch_commands:
             raise UserValidationError("POS users require at least one branch assignment.")
 
@@ -258,22 +295,7 @@ class AdminUserService:
                 branch_commands=branch_commands,
                 branches=branches,
             )
-            self._replace_role_assignments(
-                session,
-                current_user=current_user,
-                user=user,
-                roles=roles,
-            )
             session.flush()
-            for role in roles:
-                self._record_role_assignment_change(
-                    session,
-                    current_user=current_user,
-                    user=user,
-                    role=role,
-                    request_id=request_id,
-                    metadata={"action": "assigned_on_create", **self._user_metadata(user)},
-                )
             self._record_change(
                 session,
                 current_user=current_user,
@@ -283,12 +305,15 @@ class AdminUserService:
                 request_id=request_id,
                 metadata=self._user_metadata(user),
             )
+            ensure_superadmin_remains(session)
             session.commit()
         except IntegrityError as error:
             session.rollback()
             raise UserValidationError("Email must be unique.") from error
 
-        return self.get_user_detail(session, user_id=user.id, current_user=current_user)
+        return self._to_detail(
+            session, self._get_context(session, user.id), current_user=current_user
+        )
 
     def update_user(
         self,
@@ -298,8 +323,30 @@ class AdminUserService:
         user_id: uuid.UUID,
         command: AdminUserUpdateRequest,
         request_id: str | None,
+        approval_id: uuid.UUID | None = None,
     ) -> AdminUserDetailView:
+        current_user = authorize_privileged_change(
+            session,
+            current_user=current_user,
+            operation="USER_UPDATE",
+            target_user_id=user_id,
+            payload=command.model_dump(mode="json", exclude_unset=True),
+            approval_id=approval_id,
+            request_id=request_id,
+        )
+        require_user_scope(session, current_user, "users.manage", user_id)
         user = self._get_user(session, user_id)
+        if command.allowed_surfaces is not None and set(command.allowed_surfaces) != set(
+            user.allowed_surfaces
+        ):
+            require_user_scope(session, current_user, "role_assignments.manage", user_id)
+            if user_id == current_user.id and not set(command.allowed_surfaces) <= set(
+                user.allowed_surfaces
+            ):
+                raise HTTPException(
+                    status_code=403,
+                    detail="Self-elevation through application access is forbidden.",
+                )
         previous_metadata = self._user_metadata(user)
 
         if "email" in command.model_fields_set and command.email is not None:
@@ -319,14 +366,6 @@ class AdminUserService:
             surfaces = self._normalize_surfaces(command.allowed_surfaces)
             if user.id == current_user.id and IDENTITY_SURFACE_BACKOFFICE not in surfaces:
                 raise UserConflictError("You cannot remove your own Backoffice access.")
-            if (
-                user.is_active
-                and not user.is_locked
-                and IDENTITY_SURFACE_BACKOFFICE in self._normalize_surfaces(user.allowed_surfaces)
-                and IDENTITY_SURFACE_BACKOFFICE not in surfaces
-                and self._is_last_backoffice_user(session, user)
-            ):
-                raise UserConflictError("Cannot remove Backoffice access from the last admin user.")
             user.allowed_surfaces = surfaces
 
         default_surface = command.default_surface
@@ -355,12 +394,15 @@ class AdminUserService:
                     "current": self._user_metadata(user),
                 },
             )
+            ensure_superadmin_remains(session)
             session.commit()
         except IntegrityError as error:
             session.rollback()
             raise UserValidationError("Email must be unique.") from error
 
-        return self.get_user_detail(session, user_id=user.id, current_user=current_user)
+        return self._to_detail(
+            session, self._get_context(session, user.id), current_user=current_user
+        )
 
     def change_status(
         self,
@@ -370,16 +412,21 @@ class AdminUserService:
         user_id: uuid.UUID,
         command: AdminUserStatusChangeRequest,
         request_id: str | None,
+        approval_id: uuid.UUID | None = None,
     ) -> AdminUserDetailView:
+        current_user = authorize_privileged_change(
+            session,
+            current_user=current_user,
+            operation="USER_STATUS",
+            target_user_id=user_id,
+            payload=command.model_dump(mode="json", exclude_unset=True),
+            approval_id=approval_id,
+            request_id=request_id,
+        )
+        require_user_scope(session, current_user, "users.manage", user_id)
         user = self._get_user(session, user_id)
         if user.id == current_user.id and not command.is_active:
             raise UserConflictError("You cannot deactivate your own account.")
-        if (
-            user.is_active
-            and not command.is_active
-            and self._is_last_backoffice_user(session, user)
-        ):
-            raise UserConflictError("Cannot deactivate the last active Backoffice user.")
 
         previous_status = _user_status(user)
         user.is_active = command.is_active
@@ -397,8 +444,11 @@ class AdminUserService:
                 "new_status": _user_status(user),
             },
         )
+        ensure_superadmin_remains(session)
         session.commit()
-        return self.get_user_detail(session, user_id=user.id, current_user=current_user)
+        return self._to_detail(
+            session, self._get_context(session, user.id), current_user=current_user
+        )
 
     def lock_user(
         self,
@@ -408,12 +458,21 @@ class AdminUserService:
         user_id: uuid.UUID,
         command: AdminUserLockRequest,
         request_id: str | None,
+        approval_id: uuid.UUID | None = None,
     ) -> AdminUserDetailView:
+        current_user = authorize_privileged_change(
+            session,
+            current_user=current_user,
+            operation="USER_LOCK",
+            target_user_id=user_id,
+            payload=command.model_dump(mode="json", exclude_unset=True),
+            approval_id=approval_id,
+            request_id=request_id,
+        )
+        require_user_scope(session, current_user, "users.manage", user_id)
         user = self._get_user(session, user_id)
         if user.id == current_user.id:
             raise UserConflictError("You cannot lock your own account.")
-        if not user.is_locked and self._is_last_backoffice_user(session, user):
-            raise UserConflictError("Cannot lock the last active Backoffice user.")
 
         user.is_locked = True
         user.lock_reason = command.reason
@@ -427,8 +486,11 @@ class AdminUserService:
             request_id=request_id,
             metadata=self._user_metadata(user),
         )
+        ensure_superadmin_remains(session)
         session.commit()
-        return self.get_user_detail(session, user_id=user.id, current_user=current_user)
+        return self._to_detail(
+            session, self._get_context(session, user.id), current_user=current_user
+        )
 
     def unlock_user(
         self,
@@ -437,7 +499,18 @@ class AdminUserService:
         current_user: AuthenticatedUser,
         user_id: uuid.UUID,
         request_id: str | None,
+        approval_id: uuid.UUID | None = None,
     ) -> AdminUserDetailView:
+        current_user = authorize_privileged_change(
+            session,
+            current_user=current_user,
+            operation="USER_UNLOCK",
+            target_user_id=user_id,
+            payload={},
+            approval_id=approval_id,
+            request_id=request_id,
+        )
+        require_user_scope(session, current_user, "users.manage", user_id)
         user = self._get_user(session, user_id)
         user.is_locked = False
         user.lock_reason = None
@@ -451,8 +524,11 @@ class AdminUserService:
             request_id=request_id,
             metadata=self._user_metadata(user),
         )
+        ensure_superadmin_remains(session)
         session.commit()
-        return self.get_user_detail(session, user_id=user.id, current_user=current_user)
+        return self._to_detail(
+            session, self._get_context(session, user.id), current_user=current_user
+        )
 
     def add_branch_assignment(
         self,
@@ -462,9 +538,33 @@ class AdminUserService:
         user_id: uuid.UUID,
         command: AdminUserBranchAssignmentCommand,
         request_id: str | None,
+        approval_id: uuid.UUID | None = None,
     ) -> AdminUserDetailView:
+        current_user = authorize_privileged_change(
+            session,
+            current_user=current_user,
+            operation="USER_BRANCH_ASSIGNMENT",
+            target_user_id=user_id,
+            payload=command.model_dump(mode="json", exclude_unset=True),
+            approval_id=approval_id,
+            request_id=request_id,
+        )
+        require_user_scope(session, current_user, "role_assignments.manage", user_id)
+        require_branches(current_user, "role_assignments.manage", [command.branch_id])
         user = self._get_user(session, user_id)
         branch = self._get_branch(session, command.branch_id)
+        if user_id == current_user.id:
+            existing_membership = session.scalar(
+                select(UserBranchAssignment.id).where(
+                    UserBranchAssignment.user_id == user_id,
+                    UserBranchAssignment.branch_id == command.branch_id,
+                    UserBranchAssignment.is_active.is_(True),
+                )
+            )
+            if existing_membership is None:
+                raise HTTPException(
+                    status_code=403, detail="Self-elevation through branch membership is forbidden."
+                )
         had_active_assignments = self._active_assignment_count(session, user.id) > 0
         assignment = session.execute(
             select(UserBranchAssignment).where(
@@ -496,8 +596,11 @@ class AdminUserService:
             request_id=request_id,
             metadata={"action": "assigned", **self._user_metadata(user)},
         )
+        ensure_superadmin_remains(session)
         session.commit()
-        return self.get_user_detail(session, user_id=user.id, current_user=current_user)
+        return self._to_detail(
+            session, self._get_context(session, user.id), current_user=current_user
+        )
 
     def deactivate_branch_assignment(
         self,
@@ -507,7 +610,19 @@ class AdminUserService:
         user_id: uuid.UUID,
         branch_id: uuid.UUID,
         request_id: str | None,
+        approval_id: uuid.UUID | None = None,
     ) -> AdminUserDetailView:
+        current_user = authorize_privileged_change(
+            session,
+            current_user=current_user,
+            operation="USER_BRANCH_REMOVAL",
+            target_user_id=user_id,
+            payload={"branch_id": str(branch_id)},
+            approval_id=approval_id,
+            request_id=request_id,
+        )
+        require_user_scope(session, current_user, "role_assignments.manage", user_id)
+        require_branches(current_user, "role_assignments.manage", [branch_id])
         user = self._get_user(session, user_id)
         branch = self._get_branch(session, branch_id)
         assignment = self._get_assignment(session, user_id=user.id, branch_id=branch.id)
@@ -528,8 +643,11 @@ class AdminUserService:
             request_id=request_id,
             metadata={"action": "deactivated", **self._user_metadata(user)},
         )
+        ensure_superadmin_remains(session)
         session.commit()
-        return self.get_user_detail(session, user_id=user.id, current_user=current_user)
+        return self._to_detail(
+            session, self._get_context(session, user.id), current_user=current_user
+        )
 
     def set_default_branch_assignment(
         self,
@@ -539,7 +657,19 @@ class AdminUserService:
         user_id: uuid.UUID,
         branch_id: uuid.UUID,
         request_id: str | None,
+        approval_id: uuid.UUID | None = None,
     ) -> AdminUserDetailView:
+        current_user = authorize_privileged_change(
+            session,
+            current_user=current_user,
+            operation="USER_BRANCH_DEFAULT",
+            target_user_id=user_id,
+            payload={"branch_id": str(branch_id)},
+            approval_id=approval_id,
+            request_id=request_id,
+        )
+        require_user_scope(session, current_user, "role_assignments.manage", user_id)
+        require_branches(current_user, "role_assignments.manage", [branch_id])
         user = self._get_user(session, user_id)
         branch = self._get_branch(session, branch_id)
         assignment = self._get_assignment(session, user_id=user.id, branch_id=branch.id)
@@ -556,8 +686,11 @@ class AdminUserService:
             request_id=request_id,
             metadata={"action": "default_changed", **self._user_metadata(user)},
         )
+        ensure_superadmin_remains(session)
         session.commit()
-        return self.get_user_detail(session, user_id=user.id, current_user=current_user)
+        return self._to_detail(
+            session, self._get_context(session, user.id), current_user=current_user
+        )
 
     def assign_role(
         self,
@@ -566,40 +699,46 @@ class AdminUserService:
         current_user: AuthenticatedUser,
         user_id: uuid.UUID,
         role_id: uuid.UUID,
+        command: AdminAssignmentScopeRequest,
         request_id: str | None,
+        approval_id: uuid.UUID | None = None,
     ) -> AdminUserDetailView:
+        current_user = authorize_privileged_change(
+            session,
+            current_user=current_user,
+            operation="ROLE_ASSIGNMENT",
+            target_user_id=user_id,
+            target_role_id=role_id,
+            payload=command.model_dump(mode="json", exclude_unset=True),
+            approval_id=approval_id,
+            request_id=request_id,
+        )
+        require_user_scope(session, current_user, "role_assignments.manage", user_id)
         user = self._get_user(session, user_id)
         role = self._get_role(session, role_id)
         if not role.is_active:
             raise UserValidationError("Inactive roles cannot be assigned.")
-        assignment = session.execute(
-            select(UserRoleAssignment).where(
-                UserRoleAssignment.user_id == user.id,
-                UserRoleAssignment.role_id == role.id,
-            )
-        ).scalar_one_or_none()
-        if assignment is None:
-            assignment = UserRoleAssignment(
-                user_id=user.id,
-                role_id=role.id,
-                is_active=True,
-                assigned_by_user_id=current_user.id,
-            )
-            session.add(assignment)
-        else:
-            assignment.is_active = True
-            assignment.assigned_by_user_id = current_user.id
-        session.flush()
+        assignment_metadata = set_role_assignment(
+            session, actor=current_user, user_id=user_id, role_id=role_id, scope=command
+        )
         self._record_role_assignment_change(
             session,
             current_user=current_user,
             user=user,
             role=role,
             request_id=request_id,
-            metadata={"action": "assigned", **self._user_metadata(user)},
+            metadata={
+                **assignment_metadata,
+                "action": "assigned",
+                "scope": command.model_dump(mode="json"),
+                **self._user_metadata(user),
+            },
         )
+        ensure_superadmin_remains(session)
         session.commit()
-        return self.get_user_detail(session, user_id=user.id, current_user=current_user)
+        return self._to_detail(
+            session, self._get_context(session, user.id), current_user=current_user
+        )
 
     def remove_role(
         self,
@@ -609,32 +748,37 @@ class AdminUserService:
         user_id: uuid.UUID,
         role_id: uuid.UUID,
         request_id: str | None,
+        approval_id: uuid.UUID | None = None,
     ) -> AdminUserDetailView:
+        current_user = authorize_privileged_change(
+            session,
+            current_user=current_user,
+            operation="ROLE_REMOVAL",
+            target_user_id=user_id,
+            target_role_id=role_id,
+            payload={},
+            approval_id=approval_id,
+            request_id=request_id,
+        )
+        require_user_scope(session, current_user, "role_assignments.manage", user_id)
         user = self._get_user(session, user_id)
         role = self._get_role(session, role_id)
-        assignment = session.execute(
-            select(UserRoleAssignment).where(
-                UserRoleAssignment.user_id == user.id,
-                UserRoleAssignment.role_id == role.id,
-                UserRoleAssignment.is_active.is_(True),
-            )
-        ).scalar_one_or_none()
-        if assignment is None:
-            raise UserNotFoundError("Role assignment was not found.")
-        if user.is_active and self._active_role_count(session, user.id) <= 1:
-            raise UserConflictError("Cannot remove the last active role from an active user.")
-        assignment.is_active = False
-        session.flush()
+        assignment_metadata = set_role_assignment(
+            session, actor=current_user, user_id=user_id, role_id=role_id, scope=None
+        )
         self._record_role_assignment_change(
             session,
             current_user=current_user,
             user=user,
             role=role,
             request_id=request_id,
-            metadata={"action": "removed", **self._user_metadata(user)},
+            metadata={**assignment_metadata, "action": "removed", **self._user_metadata(user)},
         )
+        ensure_superadmin_remains(session)
         session.commit()
-        return self.get_user_detail(session, user_id=user.id, current_user=current_user)
+        return self._to_detail(
+            session, self._get_context(session, user.id), current_user=current_user
+        )
 
     def _to_list_item(self, context: _UserContext) -> AdminUserListItemView:
         warnings = self._build_warnings(context)
@@ -678,6 +822,12 @@ class AdminUserService:
         can_deactivate = user.is_active and user.id != current_user.id
         can_activate = not user.is_active
         can_unlock = user.is_locked
+        can_manage = can_access_user(session, current_user, "users.manage", user.id)
+        can_assign = can_access_user(session, current_user, "role_assignments.manage", user.id)
+        can_lock = can_lock and can_manage
+        can_unlock = can_unlock and can_manage
+        can_activate = can_activate and can_manage
+        can_deactivate = can_deactivate and can_manage
         readiness = self._readiness(user, warnings)
 
         return AdminUserDetailView(
@@ -742,7 +892,8 @@ class AdminUserService:
                         role_id=str(role.id),
                         role_name=role.name,
                         role_description=role.description,
-                        scope="Sin restricciones",
+                        scope_type=_SCOPE_TYPE_ADAPTER.validate_python(assignment.scope_type),
+                        branch_ids=assignment_branch_ids(session, assignment.id),
                         assigned_at=assignment.created_at,
                     )
                     for assignment, role in context.roles
@@ -757,9 +908,15 @@ class AdminUserService:
                 can_deactivate=can_deactivate,
             ),
             operational_context=self._build_operational_context(session, user),
-            audit_timeline=self._fetch_audit_timeline(session, user.id),
+            audit_timeline=self._fetch_audit_timeline(session, user.id)
+            if can_access_user(session, current_user, "audit.view", user.id)
+            else [],
             available_actions=AdminUserAvailableActionsView(
-                can_edit_role_assignments=True,
+                can_edit_profile=can_manage,
+                can_open_audit=can_access_user(session, current_user, "audit.view", user.id),
+                can_edit_app_access=can_manage and can_assign,
+                can_edit_branch_assignments=can_assign,
+                can_edit_role_assignments=can_assign,
                 can_activate=can_activate,
                 can_deactivate=can_deactivate,
                 can_lock=can_lock,
@@ -799,9 +956,16 @@ class AdminUserService:
             ),
         )
 
-    def _build_filter_options(self, session: Session) -> AdminUserFilterOptionsView:
+    def _build_filter_options(
+        self, session: Session, *, current_user: AuthenticatedUser
+    ) -> AdminUserFilterOptionsView:
+        grant = require_capability(current_user, "users.view")
         branches = (
-            session.execute(select(Branch).order_by(Branch.name.asc(), Branch.code.asc()))
+            session.execute(
+                select(Branch)
+                .where(Branch.id.in_(grant.branch_ids) if grant.scope_type != "GLOBAL" else true())
+                .order_by(Branch.name.asc(), Branch.code.asc())
+            )
             .scalars()
             .all()
         )
@@ -1055,25 +1219,6 @@ class AdminUserService:
             raise UserValidationError("Role was not found.")
         return role
 
-    def _get_roles_by_ids(self, session: Session, role_ids: list[str]) -> list[Role]:
-        if not role_ids:
-            return []
-        parsed_ids = list(
-            dict.fromkeys(
-                self._parse_uuid(role_id, "Role id must be valid.") for role_id in role_ids
-            )
-        )
-        roles = session.execute(select(Role).where(Role.id.in_(parsed_ids))).scalars().all()
-        by_id = {role.id: role for role in roles}
-        missing = [role_id for role_id in parsed_ids if role_id not in by_id]
-        if missing:
-            raise UserValidationError("Role was not found.")
-        return [by_id[role_id] for role_id in parsed_ids]
-
-    def _ensure_roles_are_active(self, roles: list[Role]) -> None:
-        if any(not role.is_active for role in roles):
-            raise UserValidationError("Inactive roles cannot be assigned.")
-
     def _get_assignment(
         self,
         session: Session,
@@ -1149,24 +1294,6 @@ class AdminUserService:
                     branch_id=branch.id,
                     is_active=True,
                     is_default=index == default_index,
-                )
-            )
-
-    def _replace_role_assignments(
-        self,
-        session: Session,
-        *,
-        current_user: AuthenticatedUser,
-        user: User,
-        roles: list[Role],
-    ) -> None:
-        for role in roles:
-            session.add(
-                UserRoleAssignment(
-                    user_id=user.id,
-                    role_id=role.id,
-                    is_active=True,
-                    assigned_by_user_id=current_user.id,
                 )
             )
 
@@ -1339,30 +1466,6 @@ class AdminUserService:
             return uuid.UUID(str(value))
         except ValueError as error:
             raise UserValidationError(message) from error
-
-    def _is_last_backoffice_user(self, session: Session, target_user: User) -> bool:
-        if (
-            not target_user.is_active
-            or target_user.is_locked
-            or IDENTITY_SURFACE_BACKOFFICE
-            not in self._normalize_surfaces(target_user.allowed_surfaces)
-        ):
-            return False
-        users = (
-            session.execute(
-                select(User).where(
-                    User.id != target_user.id,
-                    User.is_active.is_(True),
-                    User.is_locked.is_(False),
-                )
-            )
-            .scalars()
-            .all()
-        )
-        return not any(
-            IDENTITY_SURFACE_BACKOFFICE in self._normalize_surfaces(user.allowed_surfaces)
-            for user in users
-        )
 
     def _matches_app_access(self, user: User, app_access: str) -> bool:
         surfaces = self._normalize_surfaces(user.allowed_surfaces)

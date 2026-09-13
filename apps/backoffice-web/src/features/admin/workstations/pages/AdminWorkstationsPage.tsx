@@ -78,9 +78,21 @@ function AdminWorkstationsMetricStrip({
 }) {
   const loadingValue = isLoading ? "Cargando" : null;
   const items = [
-    { label: "Total", title: "Estaciones totales", value: loadingValue ?? metrics.totalWorkstations },
-    { label: "Activas", title: "Estaciones activas", value: loadingValue ?? metrics.activeWorkstations },
-    { label: "Inactivas", title: "Estaciones inactivas", value: loadingValue ?? metrics.inactiveWorkstations },
+    {
+      label: "Total",
+      title: "Estaciones totales",
+      value: loadingValue ?? metrics.totalWorkstations,
+    },
+    {
+      label: "Activas",
+      title: "Estaciones activas",
+      value: loadingValue ?? metrics.activeWorkstations,
+    },
+    {
+      label: "Inactivas",
+      title: "Estaciones inactivas",
+      value: loadingValue ?? metrics.inactiveWorkstations,
+    },
     {
       label: "Caja abierta",
       title: "Estaciones con caja abierta",
@@ -91,12 +103,18 @@ function AdminWorkstationsMetricStrip({
       title: "Estaciones con sucursal inactiva",
       value: loadingValue ?? metrics.withoutActiveBranch,
     },
-    { label: "Revisar", title: "Estaciones con advertencias", value: loadingValue ?? metrics.withWarnings },
+    {
+      label: "Revisar",
+      title: "Estaciones con advertencias",
+      value: loadingValue ?? metrics.withWarnings,
+    },
   ];
 
   return (
     <section className="flex min-w-0 flex-wrap items-center gap-2 rounded-[18px] border border-[var(--ui-color-border)] bg-white px-3 py-2 text-xs text-slate-600">
-      <span className="shrink-0 font-semibold uppercase tracking-[0.12em] text-slate-500">Resumen</span>
+      <span className="shrink-0 font-semibold uppercase tracking-[0.12em] text-slate-500">
+        Resumen
+      </span>
       {items.map((item) => (
         <span
           className="inline-flex min-w-0 max-w-full items-center gap-1.5 rounded-full border border-[var(--ui-color-border)] bg-slate-50 px-2.5 py-1"
@@ -126,11 +144,15 @@ function getWorkstationId(workstation: AdminWorkstationDetail | AdminWorkstation
   return "overview" in workstation ? workstation.overview.id : workstation.id;
 }
 
-function getWorkstationStatus(workstation: AdminWorkstationDetail | AdminWorkstationListItem): "active" | "inactive" {
+function getWorkstationStatus(
+  workstation: AdminWorkstationDetail | AdminWorkstationListItem,
+): "active" | "inactive" {
   return "overview" in workstation ? workstation.overview.status : workstation.status;
 }
 
-function getWorkstationName(workstation: AdminWorkstationDetail | AdminWorkstationListItem): string {
+function getWorkstationName(
+  workstation: AdminWorkstationDetail | AdminWorkstationListItem,
+): string {
   return "overview" in workstation ? workstation.overview.name : workstation.name;
 }
 
@@ -138,7 +160,9 @@ function getWorkstationWarnings(workstation: AdminWorkstationDetail | AdminWorks
   return "overview" in workstation ? workstation.warnings : workstation.warnings;
 }
 
-function hasOpenCashSession(workstation: AdminWorkstationDetail | AdminWorkstationListItem): boolean {
+function hasOpenCashSession(
+  workstation: AdminWorkstationDetail | AdminWorkstationListItem,
+): boolean {
   if ("cashSessionContext" in workstation) {
     return Boolean(workstation.cashSessionContext.activeSession);
   }
@@ -150,12 +174,14 @@ export function AdminWorkstationsPage() {
   const accessToken = useBackofficeAuthStore((state) => state.accessToken);
   const queryClient = useQueryClient();
   const [filters, setFilters] = useState<AdminWorkstationListFilters>(getInitialFilters);
-  const [formMode, setFormMode] = useState<"create" | { type: "edit"; detail: AdminWorkstationDetail } | null>(
-    null,
-  );
+  const [formMode, setFormMode] = useState<
+    "create" | { type: "edit"; detail: AdminWorkstationDetail } | null
+  >(null);
   const [pendingEditWorkstationId, setPendingEditWorkstationId] = useState<string | null>(null);
   const [selectedWorkstationId, setSelectedWorkstationId] = useState<string | null>(null);
-  const [feedback, setFeedback] = useState<{ tone: "success" | "error"; message: string } | null>(null);
+  const [feedback, setFeedback] = useState<{ tone: "success" | "error"; message: string } | null>(
+    null,
+  );
 
   const workstationsQuery = useQuery({
     enabled: Boolean(accessToken),
@@ -178,7 +204,8 @@ export function AdminWorkstationsPage() {
   });
 
   const createWorkstationMutation = useMutation({
-    mutationFn: (payload: AdminWorkstationCreatePayload) => createAdminWorkstation(accessToken ?? "", payload),
+    mutationFn: (payload: AdminWorkstationCreatePayload) =>
+      createAdminWorkstation(accessToken ?? "", payload),
     onError: (error) => {
       setFeedback({
         tone: "error",
@@ -195,8 +222,13 @@ export function AdminWorkstationsPage() {
   });
 
   const updateWorkstationMutation = useMutation({
-    mutationFn: ({ payload, workstationId }: { payload: AdminWorkstationUpdatePayload; workstationId: string }) =>
-      updateAdminWorkstation(accessToken ?? "", workstationId, payload),
+    mutationFn: ({
+      payload,
+      workstationId,
+    }: {
+      payload: AdminWorkstationUpdatePayload;
+      workstationId: string;
+    }) => updateAdminWorkstation(accessToken ?? "", workstationId, payload),
     onError: (error) => {
       setFeedback({
         tone: "error",
@@ -214,7 +246,10 @@ export function AdminWorkstationsPage() {
   });
 
   useEffect(() => {
-    if (pendingEditWorkstationId && workstationDetailQuery.data?.overview.id === pendingEditWorkstationId) {
+    if (
+      pendingEditWorkstationId &&
+      workstationDetailQuery.data?.overview.id === pendingEditWorkstationId
+    ) {
       setFormMode({ type: "edit", detail: workstationDetailQuery.data });
       setPendingEditWorkstationId(null);
     }
@@ -222,14 +257,23 @@ export function AdminWorkstationsPage() {
 
   const detailWorkstation = workstationDetailQuery.data ?? null;
   const listErrorMessage = workstationsQuery.isError
-    ? toBackofficeErrorMessage(workstationsQuery.error, "No se pudieron cargar las estaciones. Intenta nuevamente.")
+    ? toBackofficeErrorMessage(
+        workstationsQuery.error,
+        "No se pudieron cargar las estaciones. Intenta nuevamente.",
+      )
     : null;
   const detailErrorMessage = workstationDetailQuery.isError
-    ? toBackofficeErrorMessage(workstationDetailQuery.error, "No se pudo cargar el detalle de la estacion.")
+    ? toBackofficeErrorMessage(
+        workstationDetailQuery.error,
+        "No se pudo cargar el detalle de la estacion.",
+      )
     : null;
   const formErrorMessage =
     createWorkstationMutation.isError || updateWorkstationMutation.isError
-      ? toBackofficeErrorMessage(createWorkstationMutation.error ?? updateWorkstationMutation.error, "No se pudo guardar.")
+      ? toBackofficeErrorMessage(
+          createWorkstationMutation.error ?? updateWorkstationMutation.error,
+          "No se pudo guardar.",
+        )
       : null;
   const pageStatusLabel = workstationsQuery.isLoading
     ? "Validando API"
@@ -270,7 +314,9 @@ export function AdminWorkstationsPage() {
     setPendingEditWorkstationId(workstationId);
   }
 
-  function handleSubmitWorkstation(payload: AdminWorkstationCreatePayload | AdminWorkstationUpdatePayload) {
+  function handleSubmitWorkstation(
+    payload: AdminWorkstationCreatePayload | AdminWorkstationUpdatePayload,
+  ) {
     if (!accessToken || isSaving) {
       return;
     }
@@ -338,6 +384,7 @@ export function AdminWorkstationsPage() {
   return (
     <section className="flex min-h-0 min-w-0 flex-col overflow-hidden rounded-[28px] border border-[var(--ui-color-border)] bg-white shadow-[var(--ui-shadow-subtle)] lg:h-full">
       <AdminPageHeader
+        actionCapability="workstations.manage"
         actionLabel="Nueva estacion"
         description="Administra las estaciones de operacion del POS, su sucursal, estado y preparacion para abrir caja."
         meta={[pageStatusLabel]}
@@ -356,7 +403,10 @@ export function AdminWorkstationsPage() {
           onChange={patchFilters}
         />
 
-        <AdminWorkstationsMetricStrip metrics={workstationList.metrics} isLoading={workstationsQuery.isLoading} />
+        <AdminWorkstationsMetricStrip
+          metrics={workstationList.metrics}
+          isLoading={workstationsQuery.isLoading}
+        />
 
         {feedback ? (
           <p

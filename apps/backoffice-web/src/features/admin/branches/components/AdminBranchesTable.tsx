@@ -1,6 +1,10 @@
 import { AdminEmptyState } from "../../components/AdminEmptyState";
 import { AdminRowActionsMenu } from "../../components/AdminRowActionsMenu";
-import type { AdminBranchBackendContract, AdminBranchListItem, AdminBranchReadiness } from "../types";
+import type {
+  AdminBranchBackendContract,
+  AdminBranchListItem,
+  AdminBranchReadiness,
+} from "../types";
 
 function formatStatus(status: AdminBranchListItem["status"]): string {
   return status === "active" ? "Activa" : "Inactiva";
@@ -105,16 +109,28 @@ export function AdminBranchesTable({
 
       <div className="min-h-0 min-w-0 flex-1 overflow-y-auto p-2.5">
         {isLoading ? (
-          <AdminEmptyState description="Consultando la red multisucursal." title="Cargando sucursales" />
+          <AdminEmptyState
+            description="Consultando la red multisucursal."
+            title="Cargando sucursales"
+          />
         ) : errorMessage ? (
-          <AdminEmptyState description={errorMessage} title="No se pudieron cargar las sucursales" />
+          <AdminEmptyState
+            description={errorMessage}
+            title="No se pudieron cargar las sucursales"
+          />
         ) : branches.length > 0 ? (
           <div className="grid min-w-0 gap-1.5">
             {branches.map((item) => {
               const isSelected = item.id === selectedBranchId;
               const readinessTone =
-                item.readiness === "ready" ? "success" : item.readiness === "inactive" ? "neutral" : "warning";
-              const criticalWarning = item.warnings.some((warning) => warning.severity === "critical");
+                item.readiness === "ready"
+                  ? "success"
+                  : item.readiness === "inactive"
+                    ? "neutral"
+                    : "warning";
+              const criticalWarning = item.warnings.some(
+                (warning) => warning.severity === "critical",
+              );
 
               return (
                 <article
@@ -132,8 +148,12 @@ export function AdminBranchesTable({
                     type="button"
                     onClick={() => onSelectBranch(item)}
                   >
-                    <span className="block truncate text-sm font-semibold text-slate-950">{item.name}</span>
-                    <span className="mt-0.5 block truncate text-xs text-slate-500">{item.code}</span>
+                    <span className="block truncate text-sm font-semibold text-slate-950">
+                      {item.name}
+                    </span>
+                    <span className="mt-0.5 block truncate text-xs text-slate-500">
+                      {item.code}
+                    </span>
                   </button>
 
                   <button
@@ -142,8 +162,12 @@ export function AdminBranchesTable({
                     type="button"
                     onClick={() => onSelectBranch(item)}
                   >
-                    <span className="block truncate text-sm font-semibold text-slate-800">{item.brandName}</span>
-                    <span className="mt-0.5 block truncate text-xs text-slate-500">{item.timezone}</span>
+                    <span className="block truncate text-sm font-semibold text-slate-800">
+                      {item.brandName}
+                    </span>
+                    <span className="mt-0.5 block truncate text-xs text-slate-500">
+                      {item.timezone}
+                    </span>
                   </button>
 
                   <button
@@ -177,7 +201,9 @@ export function AdminBranchesTable({
                       <StatusChip tone={item.status === "active" ? "success" : "neutral"}>
                         {formatStatus(item.status)}
                       </StatusChip>
-                      <StatusChip tone={readinessTone}>{formatReadiness(item.readiness)}</StatusChip>
+                      <StatusChip tone={readinessTone}>
+                        {formatReadiness(item.readiness)}
+                      </StatusChip>
                       {item.warnings.length > 0 ? (
                         <StatusChip tone={criticalWarning ? "critical" : "warning"}>
                           {`${item.warnings.length} alertas`}
@@ -194,10 +220,18 @@ export function AdminBranchesTable({
                       </button>
                       <AdminRowActionsMenu
                         actions={[
-                          { disabled: isUpdating, label: "Editar", onSelect: () => onEditBranch(item) },
+                          {
+                            capability: "branches.manage",
+                            branchIds: [item.id],
+                            disabled: isUpdating,
+                            label: "Editar",
+                            onSelect: () => onEditBranch(item),
+                          },
                           { label: "Copiar codigo", onSelect: () => onCopyCode(item) },
                           {
                             destructive: item.status === "active",
+                            capability: "branches.manage",
+                            branchIds: [item.id],
                             disabled: isUpdating,
                             label: item.status === "active" ? "Desactivar" : "Activar",
                             onSelect: () => onToggleStatus(item),

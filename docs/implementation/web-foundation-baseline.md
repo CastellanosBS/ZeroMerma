@@ -6,12 +6,11 @@ complete financial, inventory, authorization, hardware, or administrative featur
 
 ## Test layers
 
-| Layer                                                                                                  | Command                                                                                                                                                                                 | Evidence and limits                                                                                                                                            |
-| ------------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Unit/component                                                                                         | `corepack pnpm --filter @zeromerma/pos-web --filter @zeromerma/backoffice-web test`                                                                                                     | Vitest fixtures characterize components, stores and API adapters. Mocks are expected here.                                                                     |
-| Existing browser/component                                                                             | App `test:e2e`                                                                                                                                                                          | Explicit `playwright.config.ts`, `e2e/` only. POS intercepts API requests; Backoffice covers its public development shell. These are not integration evidence. |
-| Real browser integration                                                                               | `corepack pnpm --filter @zeromerma/pos-web --filter @zeromerma/backoffice-web test:e2e`                                                                                                 | **9/9 mocked browser tests pass**: POS 8 (25.7 s), Backoffice 1 (11.7 s). Generated screenshots stay in ignored test results; no tracked artifact changes.     |
-| `powershell -NoProfile -ExecutionPolicy Bypass -File scripts/dev/run-web-integration.ps1 -Surface All` | Fresh PostgreSQL container, canonical migrations and disposable seed, real API, worker readiness and separate local web servers. Uses `playwright.real.config.ts` and `e2e-real/` only. |
+| Layer                      | Command                                                                                                | Evidence and limits                                                                                                                                           |
+| -------------------------- | ------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Unit/component             | `corepack pnpm --filter @zeromerma/pos-web --filter @zeromerma/backoffice-web test`                    | Vitest components, stores and API adapters use declared fixtures.                                                                                             |
+| Existing browser/component | App `test:e2e`                                                                                         | Explicit `playwright.config.ts`, `e2e/` only. POS intercepts API requests; Backoffice covers its public shell. These are not integration evidence.            |
+| Real browser integration   | `powershell -NoProfile -ExecutionPolicy Bypass -File scripts/dev/run-web-integration.ps1 -Surface All` | Fresh PostgreSQL, canonical migrations and disposable seed, API, worker readiness and separate web servers. Uses `playwright.real.config.ts` and `e2e-real/`. |
 
 The isolated harness also accepts `-Surface POS` or `-Surface Backoffice`. Run it with
 the canonical Node.js 22, pnpm 10.33.0, Python 3.12 and uv 0.11.4 toolchain and an
@@ -61,11 +60,14 @@ visible page headings and an authenticated reload. It asserts that login is its 
 non-GET request. Sales and incident collections may be empty; successful empty reads
 count as integration, not as proof that a create workflow is complete.
 
-The fixture reader has Backoffice surface access without a superadministrator role.
-That deliberately exposes the current access baseline rather than masking it with
-superadministrator permissions. A successful read is **not** evidence that module/action/
-branch authorization is implemented. Full 403, capability and cross-branch coverage
-belongs to ZM-FIN-015–022 and ZM-FIN-095.
+The original foundation reader characterized surface access without an administrative
+role. ZM-FIN-015–022 now replaces that fixture with seven explicit view capabilities,
+each scoped to the same single active branch. It remains a non-superadministrator.
+The added authorization suite checks accounts without grants, foreign branch reads,
+independent management/export and revocation in an open browser session. See
+[administrative authorization presentation](web-authorization.md) for the current
+contract and validation evidence. The original five-test foundation results below
+remain historical evidence for ZM-FIN-012/013.
 
 ## Placeholders and unreleased surfaces
 
@@ -133,7 +135,8 @@ to make the smoke pass. Test discovery by itself is not completion evidence.
 ## Remaining scope
 
 The foundation smoke does not approve Development Complete or Feature Complete. Real
-business journeys and negative authorization remain ZM-FIN-095 and ZM-FIN-100–102.
+business journeys and broader cross-module authorization regression remain ZM-FIN-095
+and ZM-FIN-100–102; the authorization block above supplies its specific negative tests.
 Disconnected administration remains ZM-FIN-080/082/091. Integration tests intentionally
 preserve current UX and do not fix those features. Existing router fast-refresh warnings
 and large production bundle warnings are tracked as non-blocking foundation debt rather

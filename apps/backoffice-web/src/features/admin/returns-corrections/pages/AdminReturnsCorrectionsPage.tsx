@@ -109,7 +109,9 @@ function formatMoney(value: string, currencyCode = "MXN") {
   if (!Number.isFinite(numericValue)) {
     return `${value} ${currencyCode}`;
   }
-  return new Intl.NumberFormat("es-MX", { currency: currencyCode, style: "currency" }).format(numericValue);
+  return new Intl.NumberFormat("es-MX", { currency: currencyCode, style: "currency" }).format(
+    numericValue,
+  );
 }
 
 function AdminReturnsCorrectionsMetricStrip({
@@ -125,9 +127,21 @@ function AdminReturnsCorrectionsMetricStrip({
 }) {
   const loadingValue = isLoading ? "Cargando" : null;
   const items = [
-    { label: "Devoluciones", title: "Devoluciones del periodo", value: loadingValue ?? String(returns.returnsCount) },
-    { label: "Reembolsado", title: "Monto reembolsado", value: loadingValue ?? formatMoney(returns.refundedAmount) },
-    { label: "Lineas dev.", title: "Articulos devueltos", value: loadingValue ?? String(returns.returnedLineCount) },
+    {
+      label: "Devoluciones",
+      title: "Devoluciones del periodo",
+      value: loadingValue ?? String(returns.returnsCount),
+    },
+    {
+      label: "Reembolsado",
+      title: "Monto reembolsado",
+      value: loadingValue ?? formatMoney(returns.refundedAmount),
+    },
+    {
+      label: "Lineas dev.",
+      title: "Articulos devueltos",
+      value: loadingValue ?? String(returns.returnedLineCount),
+    },
     {
       label: "Correcciones",
       title: "Correcciones registradas",
@@ -168,10 +182,13 @@ export function AdminReturnsCorrectionsPage() {
   const accessToken = useBackofficeAuthStore((state) => state.accessToken);
   const [activeTab, setActiveTab] = useState<AdminReturnsCorrectionsTab>("returns");
   const [returnFilters, setReturnFilters] = useState<AdminReturnListFilters>(initialReturnFilters);
-  const [correctionFilters, setCorrectionFilters] = useState<AdminCorrectionListFilters>(initialCorrectionFilters);
+  const [correctionFilters, setCorrectionFilters] =
+    useState<AdminCorrectionListFilters>(initialCorrectionFilters);
   const [selectedReturnId, setSelectedReturnId] = useState<string | null>(null);
   const [selectedCorrectionId, setSelectedCorrectionId] = useState<string | null>(null);
-  const [feedback, setFeedback] = useState<{ tone: "success" | "error"; message: string } | null>(null);
+  const [feedback, setFeedback] = useState<{ tone: "success" | "error"; message: string } | null>(
+    null,
+  );
 
   const returnsQuery = useQuery({
     enabled: Boolean(accessToken),
@@ -190,7 +207,8 @@ export function AdminReturnsCorrectionsPage() {
   const returnsList = returnsQuery.data ?? emptyReturnsList;
   const correctionsList = correctionsQuery.data ?? emptyCorrectionsList;
   const activeList = activeTab === "returns" ? returnsList : correctionsList;
-  const isActiveLoading = activeTab === "returns" ? returnsQuery.isLoading : correctionsQuery.isLoading;
+  const isActiveLoading =
+    activeTab === "returns" ? returnsQuery.isLoading : correctionsQuery.isLoading;
 
   const selectedReturn = useMemo(
     () => returnsList.items.find((item) => item.id === selectedReturnId) ?? null,
@@ -219,13 +237,22 @@ export function AdminReturnsCorrectionsPage() {
     activeTab === "returns" && returnsQuery.isError
       ? toBackofficeErrorMessage(returnsQuery.error, "No se pudieron cargar las devoluciones.")
       : activeTab === "corrections" && correctionsQuery.isError
-        ? toBackofficeErrorMessage(correctionsQuery.error, "No se pudieron cargar las correcciones.")
+        ? toBackofficeErrorMessage(
+            correctionsQuery.error,
+            "No se pudieron cargar las correcciones.",
+          )
         : null;
   const detailErrorMessage =
     activeTab === "returns" && returnDetailQuery.isError
-      ? toBackofficeErrorMessage(returnDetailQuery.error, "No se pudo cargar el detalle de la devolucion.")
+      ? toBackofficeErrorMessage(
+          returnDetailQuery.error,
+          "No se pudo cargar el detalle de la devolucion.",
+        )
       : activeTab === "corrections" && correctionDetailQuery.isError
-        ? toBackofficeErrorMessage(correctionDetailQuery.error, "No se pudo cargar el detalle de la correccion.")
+        ? toBackofficeErrorMessage(
+            correctionDetailQuery.error,
+            "No se pudo cargar el detalle de la correccion.",
+          )
         : null;
   const pageStatusLabel =
     returnsQuery.isLoading || correctionsQuery.isLoading
@@ -266,6 +293,7 @@ export function AdminReturnsCorrectionsPage() {
   return (
     <section className="flex min-h-0 min-w-0 flex-col overflow-hidden rounded-[28px] border border-[var(--ui-color-border)] bg-white shadow-[var(--ui-shadow-subtle)] lg:h-full">
       <AdminPageHeader
+        actionCapability="returns_corrections.view"
         actionLabel="Actualizar"
         description="Consulta devoluciones, reembolsos y ajustes auditados vinculados a ventas, tickets y documentos operativos."
         meta={[pageStatusLabel]}
@@ -365,7 +393,11 @@ export function AdminReturnsCorrectionsPage() {
             activeTab={activeTab}
             correctionDetail={correctionDetailQuery.data ?? null}
             detailErrorMessage={detailErrorMessage}
-            isLoading={activeTab === "returns" ? returnDetailQuery.isLoading : correctionDetailQuery.isLoading}
+            isLoading={
+              activeTab === "returns"
+                ? returnDetailQuery.isLoading
+                : correctionDetailQuery.isLoading
+            }
             returnDetail={returnDetailQuery.data ?? null}
             selectedCorrection={selectedCorrection}
             selectedReturn={selectedReturn}

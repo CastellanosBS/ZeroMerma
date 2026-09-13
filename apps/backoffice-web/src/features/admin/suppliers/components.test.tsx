@@ -1,3 +1,4 @@
+import { withCapabilities } from "../../../test-support/authorization";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import type { ReactElement } from "react";
 import { renderToString } from "react-dom/server";
@@ -53,7 +54,9 @@ const supplier: AdminSupplierListItem = {
   termsSummary: "Credito 15 dias",
   updatedAt: "2026-05-20T10:00:00Z",
   warningState: "warning",
-  warnings: [{ code: "missing_branch", message: "Proveedor sin sucursales asociadas.", severity: "warning" }],
+  warnings: [
+    { code: "missing_branch", message: "Proveedor sin sucursales asociadas.", severity: "warning" },
+  ],
 };
 
 const supplierDetail: AdminSupplierDetail = {
@@ -107,7 +110,8 @@ const supplierDetail: AdminSupplierDetail = {
   },
   operationalActivity: {
     integrationAvailable: false,
-    notes: "Purchase orders, receipts, invoices and supplier payments are pending canonical backend modules.",
+    notes:
+      "Purchase orders, receipts, invoices and supplier payments are pending canonical backend modules.",
     openPurchaseOrders: null,
     recentPurchaseOrders: null,
   },
@@ -141,11 +145,13 @@ const supplierDetail: AdminSupplierDetail = {
     },
   ],
   relatedDocuments: [],
-  warnings: [{ code: "missing_branch", message: "Proveedor sin sucursales asociadas.", severity: "warning" }],
+  warnings: [
+    { code: "missing_branch", message: "Proveedor sin sucursales asociadas.", severity: "warning" },
+  ],
 };
 
 function render(element: ReactElement) {
-  return renderToString(element);
+  return renderToString(withCapabilities(element, ["suppliers.manage"]));
 }
 
 describe("admin suppliers UI components", () => {
@@ -160,12 +166,19 @@ describe("admin suppliers UI components", () => {
 
     expect(html).toContain("Proveedores");
     expect(html).toContain("Nuevo proveedor");
-    expect(html).toContain("Selecciona un proveedor para revisar contactos, condiciones comerciales y productos asociados.");
+    expect(html).toContain(
+      "Selecciona un proveedor para revisar contactos, condiciones comerciales y productos asociados.",
+    );
   });
 
   it("renders compact supplier filter toolbar", () => {
     const html = render(
-      <AdminSuppliersFilters filters={filters} isBackendConnected={true} options={filterOptions} onChange={() => undefined} />,
+      <AdminSuppliersFilters
+        filters={filters}
+        isBackendConnected={true}
+        options={filterOptions}
+        onChange={() => undefined}
+      />,
     );
 
     expect(html).toContain("Proveedor, comercial, RFC, contacto, producto");
@@ -197,7 +210,9 @@ describe("admin suppliers UI components", () => {
         onSelectSupplier={() => undefined}
       />,
     );
-    expect(emptyHtml).toContain("No hay proveedores registrados. Crea el primer proveedor para iniciar la gestion de compras.");
+    expect(emptyHtml).toContain(
+      "No hay proveedores registrados. Crea el primer proveedor para iniciar la gestion de compras.",
+    );
 
     const tableHtml = render(
       <AdminSuppliersTable

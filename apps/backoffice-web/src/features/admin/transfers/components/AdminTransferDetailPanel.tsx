@@ -1,3 +1,4 @@
+import { AdminActionButton } from "../../components/AdminActionButton";
 import type { ReactNode } from "react";
 
 import type {
@@ -34,10 +35,16 @@ function formatDate(value: string | null | undefined): string {
 function InfoRow({ label, value }: { label: string; value?: string | number | null }) {
   return (
     <div className="grid min-w-0 grid-cols-[7.25rem_minmax(0,1fr)] gap-2 text-xs">
-      <span className="truncate font-semibold uppercase tracking-[0.08em] text-slate-500" title={label}>
+      <span
+        className="truncate font-semibold uppercase tracking-[0.08em] text-slate-500"
+        title={label}
+      >
         {label}
       </span>
-      <span className="min-w-0 truncate font-medium text-slate-900" title={String(value ?? "No disponible")}>
+      <span
+        className="min-w-0 truncate font-medium text-slate-900"
+        title={String(value ?? "No disponible")}
+      >
         {value ?? "No disponible"}
       </span>
     </div>
@@ -47,7 +54,10 @@ function InfoRow({ label, value }: { label: string; value?: string | number | nu
 function Section({ children, title }: { children: ReactNode; title: string }) {
   return (
     <div className="rounded-[18px] border border-[var(--ui-color-border)] bg-white p-3">
-      <h4 className="mb-2 truncate text-xs font-semibold uppercase tracking-[0.12em] text-slate-500" title={title}>
+      <h4
+        className="mb-2 truncate text-xs font-semibold uppercase tracking-[0.12em] text-slate-500"
+        title={title}
+      >
         {title}
       </h4>
       {children}
@@ -64,7 +74,10 @@ function WarningItem({ warning }: { warning: AdminTransferWarning }) {
         : "border-[var(--ui-color-border)] bg-slate-50 text-slate-600";
 
   return (
-    <li className={`rounded-[14px] border px-3 py-2 text-xs leading-5 ${toneClass}`} title={warning.message}>
+    <li
+      className={`rounded-[14px] border px-3 py-2 text-xs leading-5 ${toneClass}`}
+      title={warning.message}
+    >
       <span className="font-semibold">{warning.code}</span>: {warning.message}
     </li>
   );
@@ -82,15 +95,23 @@ function MovementRow({ movement }: { movement: AdminTransferInventoryMovement })
         <span className="truncate font-semibold text-slate-950" title={movement.movementType}>
           {movement.movementType}
         </span>
-        <span className={`shrink-0 rounded-full border px-2 py-0.5 font-semibold ${directionClass}`}>
+        <span
+          className={`shrink-0 rounded-full border px-2 py-0.5 font-semibold ${directionClass}`}
+        >
           {movement.direction}
         </span>
       </div>
       <div className="grid min-w-0 grid-cols-[minmax(0,1fr)_5rem] gap-2">
-        <span className="truncate text-slate-500" title={`${movement.locationCode} - ${movement.sourceDocumentType ?? ""}`}>
+        <span
+          className="truncate text-slate-500"
+          title={`${movement.locationCode} - ${movement.sourceDocumentType ?? ""}`}
+        >
           {movement.locationCode}
         </span>
-        <span className="truncate text-right font-semibold text-slate-900" title={movement.quantity}>
+        <span
+          className="truncate text-right font-semibold text-slate-900"
+          title={movement.quantity}
+        >
           {movement.quantity}
         </span>
       </div>
@@ -132,12 +153,17 @@ export function AdminTransferDetailPanel({
     return (
       <aside className="flex min-h-0 min-w-0 flex-col overflow-hidden rounded-[20px] border border-[var(--ui-color-border)] bg-white">
         <div className="border-b border-[var(--ui-color-border)] px-3 py-2.5">
-          <h3 className="truncate text-base font-semibold text-slate-950">Detalle de transferencia</h3>
+          <h3 className="truncate text-base font-semibold text-slate-950">
+            Detalle de transferencia
+          </h3>
         </div>
         <div className="flex min-h-0 flex-1 items-center p-3">
           <div className="rounded-[18px] border border-dashed border-[var(--ui-color-border)] bg-slate-50 p-4 text-sm leading-6 text-slate-600">
             <p className="font-semibold text-slate-950">Sin transferencia seleccionada</p>
-            <p>Selecciona una transferencia para revisar origen, destino, lineas, recepcion e impacto en inventario.</p>
+            <p>
+              Selecciona una transferencia para revisar origen, destino, lineas, recepcion e impacto
+              en inventario.
+            </p>
           </div>
         </div>
       </aside>
@@ -148,7 +174,8 @@ export function AdminTransferDetailPanel({
   const status = transferDetail?.overview.status ?? transferPreview?.status ?? "DRAFT";
   const warnings = transferDetail?.warnings ?? transferPreview?.warnings ?? [];
   const originBranchId = transferDetail?.origin.branchId ?? transferPreview?.originBranchId ?? "";
-  const destinationBranchId = transferDetail?.destination.branchId ?? transferPreview?.destinationBranchId ?? "";
+  const destinationBranchId =
+    transferDetail?.destination.branchId ?? transferPreview?.destinationBranchId ?? "";
 
   return (
     <aside className="flex min-h-0 min-w-0 flex-col overflow-hidden rounded-[20px] border border-[var(--ui-color-border)] bg-white">
@@ -161,7 +188,7 @@ export function AdminTransferDetailPanel({
             {formatStatus(status)}
           </p>
         </div>
-        {transferDetail?.overview.hasDiscrepancy ?? transferPreview?.hasDiscrepancy ? (
+        {(transferDetail?.overview.hasDiscrepancy ?? transferPreview?.hasDiscrepancy) ? (
           <span className="shrink-0 rounded-full border border-rose-200 bg-[var(--ui-color-danger-soft)] px-2.5 py-1 text-xs font-semibold text-[var(--ui-color-danger)]">
             Discrepancia
           </span>
@@ -187,11 +214,28 @@ export function AdminTransferDetailPanel({
         <Section title="Resumen">
           <div className="grid gap-1.5">
             <InfoRow label="Estado" value={formatStatus(status)} />
-            <InfoRow label="Creada" value={formatDate(transferDetail?.overview.createdAt ?? transferPreview?.createdAt)} />
-            <InfoRow label="Enviada" value={formatDate(transferDetail?.overview.dispatchedAt ?? transferPreview?.dispatchedAt)} />
-            <InfoRow label="Recibida" value={formatDate(transferDetail?.overview.receivedAt ?? transferPreview?.receivedAt)} />
-            <InfoRow label="Lineas" value={transferDetail?.overview.lineCount ?? transferPreview?.lineCount} />
-            <InfoRow label="Unidades" value={`${transferDetail?.overview.sentUnitCount ?? transferPreview?.sentUnitCount ?? "0"} enviadas`} />
+            <InfoRow
+              label="Creada"
+              value={formatDate(transferDetail?.overview.createdAt ?? transferPreview?.createdAt)}
+            />
+            <InfoRow
+              label="Enviada"
+              value={formatDate(
+                transferDetail?.overview.dispatchedAt ?? transferPreview?.dispatchedAt,
+              )}
+            />
+            <InfoRow
+              label="Recibida"
+              value={formatDate(transferDetail?.overview.receivedAt ?? transferPreview?.receivedAt)}
+            />
+            <InfoRow
+              label="Lineas"
+              value={transferDetail?.overview.lineCount ?? transferPreview?.lineCount}
+            />
+            <InfoRow
+              label="Unidades"
+              value={`${transferDetail?.overview.sentUnitCount ?? transferPreview?.sentUnitCount ?? "0"} enviadas`}
+            />
           </div>
         </Section>
 
@@ -215,8 +259,14 @@ export function AdminTransferDetailPanel({
             />
             {transferDetail ? (
               <>
-                <InfoRow label="Origen activo" value={transferDetail.origin.branchIsActive ? "Si" : "No"} />
-                <InfoRow label="Destino activo" value={transferDetail.destination.branchIsActive ? "Si" : "No"} />
+                <InfoRow
+                  label="Origen activo"
+                  value={transferDetail.origin.branchIsActive ? "Si" : "No"}
+                />
+                <InfoRow
+                  label="Destino activo"
+                  value={transferDetail.destination.branchIsActive ? "Si" : "No"}
+                />
                 <InfoRow label="Zona origen" value={transferDetail.origin.timezone} />
               </>
             ) : null}
@@ -234,10 +284,15 @@ export function AdminTransferDetailPanel({
                       key={line.shipmentLineId}
                     >
                       <div className="flex min-w-0 items-center justify-between gap-2">
-                        <span className="truncate font-semibold text-slate-950" title={line.productName}>
+                        <span
+                          className="truncate font-semibold text-slate-950"
+                          title={line.productName}
+                        >
                           {line.productName}
                         </span>
-                        <span className="shrink-0 font-mono text-slate-500">{line.productCode}</span>
+                        <span className="shrink-0 font-mono text-slate-500">
+                          {line.productCode}
+                        </span>
                       </div>
                       <div className="grid min-w-0 grid-cols-3 gap-2 text-slate-600">
                         <span className="truncate" title={`Solicitado ${line.requestedQuantity}`}>
@@ -246,20 +301,26 @@ export function AdminTransferDetailPanel({
                         <span className="truncate" title={`Enviado ${line.sentQuantity}`}>
                           Env. {line.sentQuantity}
                         </span>
-                        <span className="truncate" title={`Recibido ${line.receivedQuantity ?? "Pendiente"}`}>
+                        <span
+                          className="truncate"
+                          title={`Recibido ${line.receivedQuantity ?? "Pendiente"}`}
+                        >
                           Rec. {line.receivedQuantity ?? "Pend."}
                         </span>
                       </div>
                       {line.difference && line.difference !== "0.000" ? (
                         <p className="rounded-[12px] border border-rose-200 bg-[var(--ui-color-danger-soft)] px-2 py-1 font-semibold text-[var(--ui-color-danger)]">
-                          Diferencia {line.difference}. {line.varianceReason ?? "Sin razon registrada"}
+                          Diferencia {line.difference}.{" "}
+                          {line.varianceReason ?? "Sin razon registrada"}
                         </p>
                       ) : null}
                     </li>
                   ))}
                 </ul>
               ) : (
-                <p className="text-sm leading-6 text-slate-600">Esta transferencia no tiene lineas registradas.</p>
+                <p className="text-sm leading-6 text-slate-600">
+                  Esta transferencia no tiene lineas registradas.
+                </p>
               )}
             </Section>
 
@@ -267,8 +328,14 @@ export function AdminTransferDetailPanel({
               <div className="grid gap-1.5">
                 <InfoRow label="Estado" value={transferDetail.receipt.state} />
                 <InfoRow label="Esperado" value={transferDetail.receipt.expectedTotalQuantity} />
-                <InfoRow label="Recibido" value={transferDetail.receipt.receivedTotalQuantity ?? "Pendiente"} />
-                <InfoRow label="Diferencia" value={transferDetail.receipt.difference ?? "Pendiente"} />
+                <InfoRow
+                  label="Recibido"
+                  value={transferDetail.receipt.receivedTotalQuantity ?? "Pendiente"}
+                />
+                <InfoRow
+                  label="Diferencia"
+                  value={transferDetail.receipt.difference ?? "Pendiente"}
+                />
               </div>
               {!transferDetail.receipt.hasDiscrepancy ? (
                 <p className="mt-2 rounded-[14px] border border-emerald-200 bg-[var(--ui-color-success-soft)] px-3 py-2 text-xs font-semibold text-[var(--ui-color-success)]">
@@ -305,17 +372,25 @@ export function AdminTransferDetailPanel({
                       className="rounded-[14px] border border-[var(--ui-color-border)] bg-slate-50 px-3 py-2 text-xs"
                       key={`${document.documentType}-${document.documentId}`}
                     >
-                      <span className="block truncate font-semibold text-slate-950" title={document.folio}>
+                      <span
+                        className="block truncate font-semibold text-slate-950"
+                        title={document.folio}
+                      >
                         {document.folio}
                       </span>
-                      <span className="block truncate text-slate-500" title={`${document.documentType} - ${document.status}`}>
+                      <span
+                        className="block truncate text-slate-500"
+                        title={`${document.documentType} - ${document.status}`}
+                      >
                         {document.documentType} - {document.status}
                       </span>
                     </li>
                   ))}
                 </ul>
               ) : (
-                <p className="text-sm leading-6 text-slate-600">Esta transferencia no tiene documentos relacionados.</p>
+                <p className="text-sm leading-6 text-slate-600">
+                  Esta transferencia no tiene documentos relacionados.
+                </p>
               )}
             </Section>
           </>
@@ -329,51 +404,61 @@ export function AdminTransferDetailPanel({
               ))}
             </ul>
           ) : (
-            <p className="text-sm leading-6 text-slate-600">No hay advertencias para esta transferencia.</p>
+            <p className="text-sm leading-6 text-slate-600">
+              No hay advertencias para esta transferencia.
+            </p>
           )}
         </Section>
       </div>
 
       <div className="flex shrink-0 flex-wrap gap-2 border-t border-[var(--ui-color-border)] p-3 text-xs">
         {transferDetail?.availableActions.canDispatch ? (
-          <button
+          <AdminActionButton
+            capability="transfers.execute"
+            branchIds={[originBranchId, destinationBranchId]}
             className="rounded-full border border-[var(--ui-color-border)] bg-white px-3 py-1.5 font-semibold text-[var(--ui-color-info)] transition hover:bg-[var(--ui-color-surface-tint)] focus:outline-none focus:ring-4 focus:ring-[var(--ui-color-ring)] disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-400"
             disabled={isSubmitting}
             type="button"
             onClick={() => onDispatch(transferDetail)}
           >
             Enviar transferencia
-          </button>
+          </AdminActionButton>
         ) : null}
         {transferDetail?.availableActions.canEdit ? (
-          <button
+          <AdminActionButton
+            capability="transfers.manage"
+            branchIds={[originBranchId, destinationBranchId]}
             className="rounded-full border border-[var(--ui-color-border)] bg-white px-3 py-1.5 font-semibold text-slate-700 transition hover:bg-slate-50 focus:outline-none focus:ring-4 focus:ring-[var(--ui-color-ring)] disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-400"
             disabled={isSubmitting}
             type="button"
             onClick={() => onEdit(transferDetail)}
           >
             Editar
-          </button>
+          </AdminActionButton>
         ) : null}
         {transferDetail?.availableActions.canReceive ? (
-          <button
+          <AdminActionButton
+            capability="transfers.execute"
+            branchIds={[originBranchId, destinationBranchId]}
             className="rounded-full border border-[var(--ui-color-border)] bg-white px-3 py-1.5 font-semibold text-[var(--ui-color-info)] transition hover:bg-[var(--ui-color-surface-tint)] focus:outline-none focus:ring-4 focus:ring-[var(--ui-color-ring)] disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-400"
             disabled={isSubmitting}
             type="button"
             onClick={() => onReceive(transferDetail)}
           >
             Recibir
-          </button>
+          </AdminActionButton>
         ) : null}
         {transferDetail?.availableActions.canCancel ? (
-          <button
+          <AdminActionButton
+            capability="transfers.cancel"
+            branchIds={[originBranchId, destinationBranchId]}
             className="rounded-full border border-[var(--ui-color-border)] bg-white px-3 py-1.5 font-semibold text-slate-700 transition hover:bg-slate-50 focus:outline-none focus:ring-4 focus:ring-[var(--ui-color-ring)] disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-400"
             disabled={isSubmitting}
             type="button"
             onClick={() => onCancel(transferDetail)}
           >
             Cancelar
-          </button>
+          </AdminActionButton>
         ) : null}
         <button
           className="rounded-full border border-[var(--ui-color-border)] bg-white px-3 py-1.5 font-semibold text-slate-700 transition hover:bg-slate-50 focus:outline-none focus:ring-4 focus:ring-[var(--ui-color-ring)]"

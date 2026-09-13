@@ -1,3 +1,4 @@
+import { AdminActionButton } from "../../components/AdminActionButton";
 import { useEffect, useMemo, useState } from "react";
 
 import type {
@@ -683,14 +684,16 @@ export function AdminInputSupplyFormPanel({
         >
           Cancelar
         </button>
-        <button
+        <AdminActionButton
+          capability="catalog.manage"
+          globalOnly
           className="rounded-xl bg-[var(--ui-color-primary)] px-4 py-2 text-sm font-semibold text-white disabled:opacity-60"
           disabled={isSubmitting}
           type="button"
           onClick={handleSubmit}
         >
           Guardar insumo
-        </button>
+        </AdminActionButton>
       </div>
     </section>
   );

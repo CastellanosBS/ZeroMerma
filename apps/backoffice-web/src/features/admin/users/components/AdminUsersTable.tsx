@@ -168,7 +168,9 @@ export function AdminUsersTable({
                       title={item.warnings.map((warning) => warning.message).join(" | ")}
                     >
                       <span className="truncate">
-                        {item.warnings.length > 0 ? `${item.warnings.length} alertas` : "Sin alertas"}
+                        {item.warnings.length > 0
+                          ? `${item.warnings.length} alertas`
+                          : "Sin alertas"}
                       </span>
                     </span>
                     <div className="flex min-w-0 items-center justify-end gap-1">
@@ -181,7 +183,12 @@ export function AdminUsersTable({
                       </button>
                       <AdminRowActionsMenu
                         actions={[
-                          { label: "Editar", onSelect: () => onEdit(item) },
+                          {
+                            capability: "users.manage",
+                            globalOnly: true,
+                            label: "Editar",
+                            onSelect: () => onEdit(item),
+                          },
                           { label: "Copiar correo", onSelect: () => onCopyEmail(item) },
                         ]}
                         label={`Acciones para ${item.email}`}

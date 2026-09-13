@@ -1,3 +1,4 @@
+import { AdminActionButton } from "../../components/AdminActionButton";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useMemo, useState } from "react";
 
@@ -318,6 +319,8 @@ export function AdminInputsSuppliesPage() {
   return (
     <section className="flex min-h-0 min-w-0 flex-col overflow-hidden rounded-[28px] border border-[var(--ui-color-border)] bg-white shadow-[var(--ui-shadow-subtle)] lg:h-full">
       <AdminPageHeader
+        actionGlobalOnly
+        actionCapability="catalog.manage"
         actionLabel="Nuevo insumo"
         description="Administra materias primas, consumibles, desechables y materiales de operacion usados en compras, inventario, recetas y produccion."
         meta={[pageStatusLabel, "Catalogo canonico"]}
@@ -393,13 +396,15 @@ export function AdminInputsSuppliesPage() {
           />
           <div className="flex min-h-0 flex-col gap-2.5 overflow-hidden">
             {inputDetailQuery.data ? (
-              <button
+              <AdminActionButton
+                capability="catalog.manage"
+                globalOnly
                 className="rounded-[16px] border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700"
                 type="button"
                 onClick={handleEditCurrent}
               >
                 Editar insumo
-              </button>
+              </AdminActionButton>
             ) : null}
             <AdminInputSupplyDetailPanel
               errorMessage={detailErrorMessage}

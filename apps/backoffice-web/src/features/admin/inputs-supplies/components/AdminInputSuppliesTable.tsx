@@ -1,3 +1,4 @@
+import { AdminActionButton } from "../../components/AdminActionButton";
 import { AdminEmptyState } from "../../components/AdminEmptyState";
 import type {
   AdminInputSupplyBackendContract,
@@ -257,14 +258,16 @@ export function AdminInputSuppliesTable({
                       >
                         Copiar codigo
                       </button>
-                      <button
+                      <AdminActionButton
+                        globalOnly
+                        capability="catalog.manage"
                         className="rounded-full border border-[var(--ui-color-border)] bg-white px-2 py-1 font-semibold text-slate-600"
                         type="button"
                         onClick={() => onChangeStatus(item, !item.isActive)}
                         disabled={isSubmitting}
                       >
                         {item.isActive ? "Desactivar" : "Activar"}
-                      </button>
+                      </AdminActionButton>
                       <button
                         className="rounded-full border border-[var(--ui-color-border)] bg-white px-2 py-1 font-semibold text-slate-600"
                         type="button"

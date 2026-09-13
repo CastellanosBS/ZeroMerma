@@ -90,18 +90,48 @@ function AdminProductionMetricStrip({
 }) {
   const loadingValue = isLoading ? "Cargando" : null;
   const items = [
-    { label: "Periodo", title: "Producciones del periodo", value: loadingValue ?? metrics.totalBatches },
-    { label: "En proceso", title: "Lotes en proceso", value: loadingValue ?? metrics.inProgressBatches },
-    { label: "Pendientes", title: "Lotes pendientes", value: loadingValue ?? metrics.pendingBatches },
-    { label: "Completadas", title: "Lotes completados", value: loadingValue ?? metrics.completedBatches },
-    { label: "Faltantes", title: "Con faltantes de insumos", value: loadingValue ?? metrics.withShortages },
-    { label: "Variacion", title: "Con variacion de rendimiento", value: loadingValue ?? metrics.withVariance },
-    { label: "Unid. prod.", title: "Unidades producidas", value: loadingValue ?? metrics.producedUnits },
+    {
+      label: "Periodo",
+      title: "Producciones del periodo",
+      value: loadingValue ?? metrics.totalBatches,
+    },
+    {
+      label: "En proceso",
+      title: "Lotes en proceso",
+      value: loadingValue ?? metrics.inProgressBatches,
+    },
+    {
+      label: "Pendientes",
+      title: "Lotes pendientes",
+      value: loadingValue ?? metrics.pendingBatches,
+    },
+    {
+      label: "Completadas",
+      title: "Lotes completados",
+      value: loadingValue ?? metrics.completedBatches,
+    },
+    {
+      label: "Faltantes",
+      title: "Con faltantes de insumos",
+      value: loadingValue ?? metrics.withShortages,
+    },
+    {
+      label: "Variacion",
+      title: "Con variacion de rendimiento",
+      value: loadingValue ?? metrics.withVariance,
+    },
+    {
+      label: "Unid. prod.",
+      title: "Unidades producidas",
+      value: loadingValue ?? metrics.producedUnits,
+    },
   ];
 
   return (
     <section className="flex min-w-0 flex-wrap items-center gap-2 rounded-[18px] border border-[var(--ui-color-border)] bg-white px-3 py-2 text-xs text-slate-600">
-      <span className="shrink-0 font-semibold uppercase tracking-[0.12em] text-slate-500">Resumen</span>
+      <span className="shrink-0 font-semibold uppercase tracking-[0.12em] text-slate-500">
+        Resumen
+      </span>
       {items.map((item) => (
         <span
           className="inline-flex min-w-0 max-w-full items-center gap-1.5 rounded-full border border-[var(--ui-color-border)] bg-slate-50 px-2.5 py-1"
@@ -123,7 +153,9 @@ export function AdminProductionPage() {
   const [selectedProductionId, setSelectedProductionId] = useState<string | null>(null);
   const [workflowMode, setWorkflowMode] = useState<WorkflowMode | null>(null);
   const [workflowProductionId, setWorkflowProductionId] = useState<string | null>(null);
-  const [feedback, setFeedback] = useState<{ tone: "success" | "error"; message: string } | null>(null);
+  const [feedback, setFeedback] = useState<{ tone: "success" | "error"; message: string } | null>(
+    null,
+  );
 
   const productionQuery = useQuery({
     enabled: Boolean(accessToken),
@@ -153,7 +185,13 @@ export function AdminProductionPage() {
   });
 
   const createMutation = useMutation({
-    mutationFn: async ({ payload, startNow }: { payload: AdminProductionCreatePayload; startNow: boolean }) => {
+    mutationFn: async ({
+      payload,
+      startNow,
+    }: {
+      payload: AdminProductionCreatePayload;
+      startNow: boolean;
+    }) => {
       const created = await createAdminProduction(accessToken ?? "", payload);
       if (!startNow) {
         return created;
@@ -176,8 +214,13 @@ export function AdminProductionPage() {
   });
 
   const updateMutation = useMutation({
-    mutationFn: ({ payload, productionId }: { payload: AdminProductionUpdatePayload; productionId: string }) =>
-      updateAdminProduction(accessToken ?? "", productionId, payload),
+    mutationFn: ({
+      payload,
+      productionId,
+    }: {
+      payload: AdminProductionUpdatePayload;
+      productionId: string;
+    }) => updateAdminProduction(accessToken ?? "", productionId, payload),
     onError: (error) => {
       setFeedback({
         tone: "error",
@@ -212,8 +255,13 @@ export function AdminProductionPage() {
   });
 
   const completeMutation = useMutation({
-    mutationFn: ({ payload, productionId }: { payload: AdminProductionCompletePayload; productionId: string }) =>
-      completeAdminProduction(accessToken ?? "", productionId, payload),
+    mutationFn: ({
+      payload,
+      productionId,
+    }: {
+      payload: AdminProductionCompletePayload;
+      productionId: string;
+    }) => completeAdminProduction(accessToken ?? "", productionId, payload),
     onError: (error) => {
       setFeedback({
         tone: "error",
@@ -256,15 +304,26 @@ export function AdminProductionPage() {
 
   const detailProduction = productionDetailQuery.data ?? null;
   const workflowProduction =
-    workflowProductionQuery.data ?? (workflowProductionId === selectedProductionId ? detailProduction : null);
+    workflowProductionQuery.data ??
+    (workflowProductionId === selectedProductionId ? detailProduction : null);
   const listErrorMessage = productionQuery.isError
-    ? toBackofficeErrorMessage(productionQuery.error, "No se pudo cargar produccion. Intenta nuevamente.")
+    ? toBackofficeErrorMessage(
+        productionQuery.error,
+        "No se pudo cargar produccion. Intenta nuevamente.",
+      )
     : null;
   const detailErrorMessage = productionDetailQuery.isError
-    ? toBackofficeErrorMessage(productionDetailQuery.error, "No se pudo cargar el detalle de produccion.")
+    ? toBackofficeErrorMessage(
+        productionDetailQuery.error,
+        "No se pudo cargar el detalle de produccion.",
+      )
     : null;
   const workflowErrorMessage =
-    createMutation.isError || updateMutation.isError || startMutation.isError || completeMutation.isError || cancelMutation.isError
+    createMutation.isError ||
+    updateMutation.isError ||
+    startMutation.isError ||
+    completeMutation.isError ||
+    cancelMutation.isError
       ? feedback?.tone === "error"
         ? feedback.message
         : "No se pudo completar la operacion."
@@ -373,6 +432,7 @@ export function AdminProductionPage() {
   return (
     <section className="flex min-h-0 min-w-0 flex-col overflow-hidden rounded-[28px] border border-[var(--ui-color-border)] bg-white shadow-[var(--ui-shadow-subtle)] lg:h-full">
       <AdminPageHeader
+        actionCapability="production.manage"
         actionLabel="Nueva produccion"
         description="Planea, ejecuta y cierra lotes de produccion; valida insumos, registra salida terminada y variaciones."
         meta={[pageStatusLabel, "Inventario auditable"]}
@@ -388,7 +448,10 @@ export function AdminProductionPage() {
           onChange={patchFilters}
         />
 
-        <AdminProductionMetricStrip isLoading={productionQuery.isLoading} metrics={productionList.metrics} />
+        <AdminProductionMetricStrip
+          isLoading={productionQuery.isLoading}
+          metrics={productionList.metrics}
+        />
 
         {feedback ? (
           <p

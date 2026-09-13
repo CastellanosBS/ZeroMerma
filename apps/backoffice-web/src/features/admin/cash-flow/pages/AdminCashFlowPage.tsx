@@ -257,6 +257,7 @@ export function AdminCashFlowPage() {
   return (
     <section className="flex min-h-0 min-w-0 flex-col overflow-hidden rounded-[28px] border border-[var(--ui-color-border)] bg-white shadow-[var(--ui-shadow-subtle)] lg:h-full">
       <AdminPageHeader
+        actionCapability="cash_finance.view"
         actionLabel="Actualizar"
         description="Analiza entradas, salidas, flujo neto, metodos de pago y documentos que explican el movimiento de caja."
         meta={[pageStatusLabel]}

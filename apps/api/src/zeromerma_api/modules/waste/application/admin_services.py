@@ -15,6 +15,7 @@ from zeromerma_api.core.config import ApiSettings, get_settings
 from zeromerma_api.modules.audit.application.service import AuditRecorder
 from zeromerma_api.modules.branches.infrastructure.models import Branch, Workstation
 from zeromerma_api.modules.catalog.infrastructure.models import Product, ProductClass
+from zeromerma_api.modules.identity.application.actions import restrict_actions
 from zeromerma_api.modules.identity.application.schemas import AuthenticatedUser
 from zeromerma_api.modules.identity.infrastructure.models import User
 from zeromerma_api.modules.inventory.domain.constants import (
@@ -509,7 +510,16 @@ class AdminWasteService:
             for_update=False,
         )
         return AdminWasteDetailView(
-            available_actions=AdminWasteAvailableActionsView(),
+            available_actions=restrict_actions(
+                session,
+                AdminWasteAvailableActionsView(),
+                {
+                    "can_create_correction": "returns_corrections.manage",
+                    "can_open_inventory_movement": "inventory.view",
+                },
+                branch_ids=(row.branch.id,),
+                global_only=False,
+            ),
             evidence=AdminWasteEvidenceView(notes=row.document.notes),
             inventory_impact=AdminWasteInventoryImpactView(
                 integration_available=True,

@@ -5,7 +5,6 @@ from sqlalchemy import select
 
 from zeromerma_api.bootstrap.seed_local import (
     SEED_ADMIN_EMAIL,
-    SEED_ADMIN_PASSWORD,
     SEED_BRANCH_CODE,
     SEED_DESTINATION_BRANCH_CODE,
     SEED_USER_EMAIL,
@@ -21,6 +20,7 @@ from zeromerma_api.modules.identity.domain.constants import (
 )
 from zeromerma_api.modules.identity.infrastructure.models import User, UserBranchAssignment
 from zeromerma_api.modules.outbox.infrastructure.models import OutboxEvent
+from zeromerma_api.testing.authorization import TEST_OWNER_EMAIL, owner_headers
 
 
 def _login(client: TestClient, *, email: str, password: str) -> str:
@@ -30,8 +30,7 @@ def _login(client: TestClient, *, email: str, password: str) -> str:
 
 
 def _admin_headers(client: TestClient) -> dict[str, str]:
-    token = _login(client, email=SEED_ADMIN_EMAIL, password=SEED_ADMIN_PASSWORD)
-    return {"Authorization": f"Bearer {token}"}
+    return owner_headers()
 
 
 def _cashier_headers(client: TestClient) -> dict[str, str]:
@@ -211,7 +210,7 @@ def test_admin_user_create_validates_email_pos_branch_and_missing_contracts(
             "role_ids": ["admin"],
         },
     )
-    assert role_response.status_code == 400
+    assert role_response.status_code == 422
 
 
 def test_admin_user_detail_update_status_and_lock_flow(client: TestClient) -> None:
@@ -254,10 +253,13 @@ def test_admin_user_detail_update_status_and_lock_flow(client: TestClient) -> No
     )
     assert deactivate_response.status_code == 200
     assert deactivate_response.json()["overview"]["status"] == "inactive"
-    assert client.post(
-        "/v1/auth/login",
-        json={"email": "security-flow@zeromerma.local", "password": "TempUser123!"},
-    ).status_code == 401
+    assert (
+        client.post(
+            "/v1/auth/login",
+            json={"email": "security-flow@zeromerma.local", "password": "TempUser123!"},
+        ).status_code
+        == 401
+    )
 
     activate_response = client.post(
         f"/v1/admin/users/{user_id}/status",
@@ -330,7 +332,7 @@ def test_admin_user_access_rules_do_not_allow_self_deactivation_or_pos_bootstrap
     client: TestClient,
 ) -> None:
     headers = _admin_headers(client)
-    admin_user_id = _get_user_id(SEED_ADMIN_EMAIL)
+    admin_user_id = _get_user_id(TEST_OWNER_EMAIL)
 
     self_deactivate_response = client.post(
         f"/v1/admin/users/{admin_user_id}/status",

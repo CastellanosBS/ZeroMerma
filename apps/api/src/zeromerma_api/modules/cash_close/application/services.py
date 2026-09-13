@@ -10,7 +10,7 @@ from zoneinfo import ZoneInfo
 
 from sqlalchemy import func, or_, select
 from sqlalchemy.exc import IntegrityError
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, aliased
 
 from zeromerma_api.modules.audit.application.service import AuditRecorder
 from zeromerma_api.modules.branches.application.access import (
@@ -2379,21 +2379,21 @@ def _get_counter_correction_deltas(
     workstation_id: uuid.UUID,
     opened_at: datetime,
 ) -> dict[uuid.UUID, Decimal]:
-    target_document = OperationDocument.__table__.alias("target_document")
+    target_document = aliased(OperationDocument, name="target_document")
     records = (
         session.execute(
             select(
                 CorrectionDocumentLine.product_id,
                 CorrectionDocumentLine.delta_quantity,
-                target_document.c.document_type.label("target_document_type"),
-                target_document.c.source_bucket_code.label("target_source_bucket_code"),
+                target_document.document_type.label("target_document_type"),
+                target_document.source_bucket_code.label("target_source_bucket_code"),
             )
             .select_from(CorrectionDocumentLine)
             .join(
                 CorrectionDocument,
                 CorrectionDocument.id == CorrectionDocumentLine.correction_document_id,
             )
-            .join(target_document, target_document.c.id == CorrectionDocument.target_document_id)
+            .join(target_document, target_document.id == CorrectionDocument.target_document_id)
             .where(
                 CorrectionDocument.workstation_id == workstation_id,
                 CorrectionDocument.status == CORRECTION_STATUS_COMMITTED,

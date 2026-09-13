@@ -163,6 +163,7 @@ def test_browser_seed_refuses_unsafe_context_before_creating_engine(
         monkeypatch.setenv(name, value)
     create_engine = MagicMock(side_effect=AssertionError("Unsafe seed attempted engine creation"))
     monkeypatch.setattr("sqlalchemy.create_engine", create_engine)
+    monkeypatch.setattr("sys.argv", ["seed-web-integration.py"])
 
     with pytest.raises(RuntimeError, match=expected_message) as error:
         runpy.run_path(str(ROOT / "scripts/dev/seed-web-integration.py"), run_name="__main__")

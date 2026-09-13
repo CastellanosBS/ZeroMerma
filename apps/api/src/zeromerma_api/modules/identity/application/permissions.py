@@ -1,16 +1,87 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from typing import Literal, get_args
 
-from zeromerma_api.modules.identity.domain.constants import (
-    IDENTITY_SURFACE_BACKOFFICE,
-    IDENTITY_SURFACE_POS,
+PermissionCode = Literal[
+    "pos.operate",
+    "sales_tickets.view",
+    "sales_tickets.reprint",
+    "orders.view",
+    "orders.manage",
+    "orders.cancel",
+    "returns_corrections.view",
+    "returns_corrections.manage",
+    "catalog.view",
+    "catalog.manage",
+    "catalog.availability.manage",
+    "pricing.view",
+    "pricing.manage",
+    "recipes.view",
+    "recipes.manage",
+    "discounts.view",
+    "discounts.manage",
+    "inventory.view",
+    "inventory.adjust",
+    "branches.view",
+    "branches.manage",
+    "workstations.view",
+    "workstations.manage",
+    "transfers.view",
+    "transfers.manage",
+    "transfers.execute",
+    "transfers.cancel",
+    "production.view",
+    "production.manage",
+    "production.execute",
+    "production.cancel",
+    "waste.view",
+    "waste.manage",
+    "suppliers.view",
+    "suppliers.manage",
+    "purchases.view",
+    "purchases.manage",
+    "purchases.confirm",
+    "purchases.receive",
+    "purchases.cancel",
+    "cash_finance.view",
+    "cash_finance.manage",
+    "quality_hygiene.view",
+    "quality_hygiene.manage",
+    "users.view",
+    "users.manage",
+    "roles.view",
+    "roles.manage",
+    "role_assignments.manage",
+    "audit.view",
+    "audit.export",
+    "reports.view",
+    "reports.export",
+    "config.view",
+    "config.manage",
+]
+
+SUPERADMIN_ROLE_CODE = "explicit_superadmin"
+INITIAL_OWNER_DESIGNATION = "ZEROMERMA_OWNER"
+
+# Shared operations explicitly classified by the canonical functional operation matrix.
+POS_PERMISSION_CODES: tuple[PermissionCode, ...] = (
+    "pos.operate",
+    "orders.view",
+    "orders.manage",
+    "orders.cancel",
+    "sales_tickets.view",
+    "sales_tickets.reprint",
+    "transfers.view",
+    "transfers.execute",
+    "returns_corrections.manage",
+    "discounts.manage",
 )
 
 
 @dataclass(frozen=True)
 class PermissionDefinition:
-    code: str
+    code: PermissionCode
     label: str
     description: str
     module: str
@@ -20,176 +91,66 @@ class PermissionDefinition:
     is_sensitive: bool = False
 
 
-PERMISSION_CATALOG: tuple[PermissionDefinition, ...] = (
-    PermissionDefinition(
-        code="pos.operate",
-        label="Operar POS",
-        description="Permite operar el punto de venta en sucursales asignadas.",
-        module="pos",
-        module_label="POS",
-        action="operate",
-        surfaces=(IDENTITY_SURFACE_POS,),
-    ),
-    PermissionDefinition(
-        code="sales_tickets.view",
-        label="Consultar ventas / tickets",
-        description="Permite revisar ventas, tickets y su trazabilidad.",
-        module="sales_tickets",
-        module_label="Ventas / Tickets",
-        action="view",
-        surfaces=(IDENTITY_SURFACE_BACKOFFICE,),
-    ),
-    PermissionDefinition(
-        code="orders.manage",
-        label="Gestionar pedidos",
-        description="Permite consultar y actualizar pedidos operativos.",
-        module="orders",
-        module_label="Pedidos",
-        action="manage",
-        surfaces=(IDENTITY_SURFACE_BACKOFFICE,),
-    ),
-    PermissionDefinition(
-        code="returns_corrections.manage",
-        label="Gestionar devoluciones / correcciones",
-        description="Permite operar reversas y correcciones auditadas.",
-        module="returns_corrections",
-        module_label="Devoluciones / Correcciones",
-        action="manage",
-        surfaces=(IDENTITY_SURFACE_BACKOFFICE,),
-        is_sensitive=True,
-    ),
-    PermissionDefinition(
-        code="catalog_products.manage",
-        label="Gestionar catalogo y precios",
-        description="Permite administrar productos, clases, recetas, costos y precios.",
-        module="catalog_costs",
-        module_label="Catalogo y costos",
-        action="manage",
-        surfaces=(IDENTITY_SURFACE_BACKOFFICE,),
-        is_sensitive=True,
-    ),
-    PermissionDefinition(
-        code="discounts.manage",
-        label="Gestionar descuentos",
-        description="Permite crear y modificar reglas de descuento.",
-        module="discounts",
-        module_label="Descuentos",
-        action="manage",
-        surfaces=(IDENTITY_SURFACE_BACKOFFICE,),
-        is_sensitive=True,
-    ),
-    PermissionDefinition(
-        code="inventory.adjust",
-        label="Ajustar inventario",
-        description="Permite ejecutar ajustes de inventario auditados.",
-        module="inventory",
-        module_label="Inventario",
-        action="adjust",
-        surfaces=(IDENTITY_SURFACE_BACKOFFICE,),
-        is_sensitive=True,
-    ),
-    PermissionDefinition(
-        code="multibranch_operations.manage",
-        label="Gestionar operaciones multisucursal",
-        description="Permite administrar sucursales, estaciones, transferencias y produccion.",
-        module="multibranch_operations",
-        module_label="Operacion multisucursal",
-        action="manage",
-        surfaces=(IDENTITY_SURFACE_BACKOFFICE,),
-        is_sensitive=True,
-    ),
-    PermissionDefinition(
-        code="purchases_supply.manage",
-        label="Gestionar compras y abastecimiento",
-        description="Permite administrar proveedores, compras e insumos.",
-        module="purchases_supply",
-        module_label="Compras y abastecimiento",
-        action="manage",
-        surfaces=(IDENTITY_SURFACE_BACKOFFICE,),
-        is_sensitive=True,
-    ),
-    PermissionDefinition(
-        code="cash_finance.view",
-        label="Consultar caja y finanzas",
-        description="Permite revisar cortes, conciliacion y flujo de efectivo.",
-        module="cash_finance",
-        module_label="Caja y finanzas",
-        action="view",
-        surfaces=(IDENTITY_SURFACE_BACKOFFICE,),
-        is_sensitive=True,
-    ),
-    PermissionDefinition(
-        code="cash_finance.manage",
-        label="Gestionar conciliaciones financieras",
-        description="Permite crear y resolver documentos financieros auditados.",
-        module="cash_finance",
-        module_label="Caja y finanzas",
-        action="manage",
-        surfaces=(IDENTITY_SURFACE_BACKOFFICE,),
-        is_sensitive=True,
-    ),
-    PermissionDefinition(
-        code="quality_hygiene.manage",
-        label="Gestionar calidad e higiene",
-        description="Permite administrar limpieza, verificaciones, incidencias y mantenimiento.",
-        module="quality_hygiene",
-        module_label="Calidad e higiene",
-        action="manage",
-        surfaces=(IDENTITY_SURFACE_BACKOFFICE,),
-    ),
-    PermissionDefinition(
-        code="users.manage",
-        label="Gestionar usuarios",
-        description="Permite crear usuarios, cambiar estado y administrar accesos.",
-        module="control",
-        module_label="Control",
-        action="manage_users",
-        surfaces=(IDENTITY_SURFACE_BACKOFFICE,),
-        is_sensitive=True,
-    ),
-    PermissionDefinition(
-        code="roles.manage",
-        label="Gestionar roles y permisos",
-        description="Permite modificar roles, permisos y asignaciones.",
-        module="control",
-        module_label="Control",
-        action="manage_roles",
-        surfaces=(IDENTITY_SURFACE_BACKOFFICE,),
-        is_sensitive=True,
-    ),
-    PermissionDefinition(
-        code="audit.view",
-        label="Consultar auditoria",
-        description="Permite revisar eventos auditables del sistema.",
-        module="audit",
-        module_label="Auditoria",
-        action="view",
-        surfaces=(IDENTITY_SURFACE_BACKOFFICE,),
-        is_sensitive=True,
-    ),
-    PermissionDefinition(
-        code="reports.export",
-        label="Exportar reportes",
-        description="Permite descargar reportes operativos disponibles.",
-        module="reports",
-        module_label="Reportes",
-        action="export",
-        surfaces=(IDENTITY_SURFACE_BACKOFFICE,),
-    ),
-    PermissionDefinition(
-        code="config.manage",
-        label="Gestionar configuracion",
-        description="Permite modificar configuracion operativa del sistema.",
-        module="configuration",
-        module_label="Configuracion",
-        action="manage",
-        surfaces=(IDENTITY_SURFACE_BACKOFFICE,),
-        is_sensitive=True,
-    ),
-)
+_MODULE_LABELS = {
+    "pos": "POS",
+    "sales_tickets": "Ventas / Tickets",
+    "orders": "Pedidos",
+    "returns_corrections": "Devoluciones / Correcciones",
+    "catalog": "Catálogo",
+    "pricing": "Precios",
+    "recipes": "Recetas",
+    "discounts": "Descuentos",
+    "inventory": "Inventario",
+    "branches": "Sucursales",
+    "workstations": "Estaciones",
+    "transfers": "Transferencias",
+    "production": "Producción",
+    "waste": "Merma",
+    "suppliers": "Proveedores",
+    "purchases": "Compras",
+    "cash_finance": "Caja y finanzas",
+    "quality_hygiene": "Calidad e higiene",
+    "users": "Usuarios",
+    "roles": "Roles",
+    "role_assignments": "Asignaciones de roles",
+    "audit": "Auditoría",
+    "reports": "Reportes",
+    "config": "Configuración",
+}
+_ACTION_LABELS = {
+    "view": "Consultar",
+    "manage": "Gestionar",
+    "operate": "Operar",
+    "reprint": "Reimprimir",
+    "cancel": "Cancelar",
+    "adjust": "Ajustar",
+    "execute": "Ejecutar",
+    "confirm": "Confirmar",
+    "receive": "Recibir",
+    "export": "Exportar",
+    "availability.manage": "Gestionar disponibilidad",
+}
 
-PERMISSION_CODES = tuple(permission.code for permission in PERMISSION_CATALOG)
+
+def _definition(code: PermissionCode) -> PermissionDefinition:
+    module, action = code.split(".", maxsplit=1)
+    label = f"{_ACTION_LABELS[action]} {_MODULE_LABELS[module]}"
+    return PermissionDefinition(
+        code=code,
+        label=label,
+        description=f"{label} dentro del alcance autorizado.",
+        module=module,
+        module_label=_MODULE_LABELS[module],
+        action=action,
+        surfaces=("POS",)
+        if code == "pos.operate"
+        else (("POS", "BACKOFFICE") if code in POS_PERMISSION_CODES else ("BACKOFFICE",)),
+        is_sensitive=action != "view" or module in {"audit", "config", "users", "roles"},
+    )
+
+
+PERMISSION_CODES: tuple[PermissionCode, ...] = get_args(PermissionCode)
+PERMISSION_CATALOG = tuple(_definition(code) for code in PERMISSION_CODES)
 SENSITIVE_PERMISSION_CODES = tuple(
     permission.code for permission in PERMISSION_CATALOG if permission.is_sensitive
 )
-

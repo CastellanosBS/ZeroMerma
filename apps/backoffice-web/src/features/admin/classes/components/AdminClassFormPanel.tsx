@@ -1,3 +1,4 @@
+import { AdminActionButton } from "../../components/AdminActionButton";
 import type { FormEvent, ReactNode } from "react";
 import { useEffect, useMemo, useState } from "react";
 
@@ -162,11 +163,15 @@ export function AdminClassFormPanel({
           <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
             Gobierno de catalogo
           </p>
-          <h3 className="mt-1 truncate text-base font-semibold text-slate-950" title={isEditing ? "Editar clase" : "Nueva clase"}>
+          <h3
+            className="mt-1 truncate text-base font-semibold text-slate-950"
+            title={isEditing ? "Editar clase" : "Nueva clase"}
+          >
             {isEditing ? "Editar clase" : "Nueva clase"}
           </h3>
           <p className="mt-1 max-w-4xl text-sm leading-5 text-slate-600">
-            Define identidad, modo de captura POS, precio de clase cuando aplica y visibilidad operativa.
+            Define identidad, modo de captura POS, precio de clase cuando aplica y visibilidad
+            operativa.
           </p>
         </div>
         <button
@@ -304,15 +309,18 @@ export function AdminClassFormPanel({
 
       <div className="mt-4 flex min-w-0 flex-wrap items-center justify-between gap-3 border-t border-[var(--ui-color-border)] pt-3">
         <p className="min-w-0 text-sm leading-5 text-slate-600">
-          Los productos vinculados se administran en Productos. Recetas, costos y listas de precio viven en sus modulos.
+          Los productos vinculados se administran en Productos. Recetas, costos y listas de precio
+          viven en sus modulos.
         </p>
-        <button
+        <AdminActionButton
+          capability="catalog.manage"
+          globalOnly
           className="shrink-0 rounded-2xl bg-[var(--ui-color-info)] px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:brightness-95 focus:outline-none focus:ring-4 focus:ring-[var(--ui-color-ring)] disabled:cursor-not-allowed disabled:bg-slate-300 disabled:text-slate-600"
           disabled={!canSubmit}
           type="submit"
         >
           {isSubmitting ? "Guardando..." : isEditing ? "Guardar cambios" : "Guardar clase"}
-        </button>
+        </AdminActionButton>
       </div>
     </form>
   );

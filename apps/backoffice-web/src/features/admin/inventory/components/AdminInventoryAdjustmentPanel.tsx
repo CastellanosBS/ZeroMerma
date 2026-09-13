@@ -1,3 +1,4 @@
+import { AdminActionButton } from "../../components/AdminActionButton";
 import { useMemo, useState } from "react";
 import type { FormEvent } from "react";
 
@@ -19,7 +20,9 @@ const adjustmentTypeOptions: Array<{ label: string; value: AdminInventoryAdjustm
   { value: "SET_COUNTED", label: "Fijar cantidad contada" },
 ];
 
-function getDefaultProductId(source?: AdminInventoryDetail | AdminInventoryListItem | null): string {
+function getDefaultProductId(
+  source?: AdminInventoryDetail | AdminInventoryListItem | null,
+): string {
   if (!source) {
     return "";
   }
@@ -45,7 +48,9 @@ function getDefaultLocationCode(
   return "branchLocation" in source ? source.branchLocation.locationCode : source.locationCode;
 }
 
-function getSourceDescription(source?: AdminInventoryDetail | AdminInventoryListItem | null): string {
+function getSourceDescription(
+  source?: AdminInventoryDetail | AdminInventoryListItem | null,
+): string {
   if (!source) {
     return "Selecciona producto, sucursal y ubicacion desde datos reales del backend.";
   }
@@ -79,22 +84,30 @@ export function AdminInventoryAdjustmentPanel({
   productOptions,
 }: AdminInventoryAdjustmentPanelProps) {
   const [adjustmentType, setAdjustmentType] = useState<AdminInventoryAdjustmentType>("INCREASE");
-  const [branchId, setBranchId] = useState(getDefaultBranchId(initialInventory) || branchOptions[0]?.id || "");
+  const [branchId, setBranchId] = useState(
+    getDefaultBranchId(initialInventory) || branchOptions[0]?.id || "",
+  );
   const [locationCode, setLocationCode] = useState<AdminInventoryLocationCode | "">(
-    getDefaultLocationCode(initialInventory) || (locationOptions[0]?.id as AdminInventoryLocationCode | undefined) || "",
+    getDefaultLocationCode(initialInventory) ||
+      (locationOptions[0]?.id as AdminInventoryLocationCode | undefined) ||
+      "",
   );
   const [notes, setNotes] = useState("");
-  const [productId, setProductId] = useState(getDefaultProductId(initialInventory) || productOptions[0]?.id || "");
+  const [productId, setProductId] = useState(
+    getDefaultProductId(initialInventory) || productOptions[0]?.id || "",
+  );
   const [quantity, setQuantity] = useState("");
   const [reason, setReason] = useState("");
   const [localError, setLocalError] = useState<string | null>(null);
 
   const selectedProductLabel = useMemo(
-    () => productOptions.find((option) => option.id === productId)?.label ?? "Producto no seleccionado",
+    () =>
+      productOptions.find((option) => option.id === productId)?.label ?? "Producto no seleccionado",
     [productId, productOptions],
   );
   const selectedBranchLabel = useMemo(
-    () => branchOptions.find((option) => option.id === branchId)?.label ?? "Sucursal no seleccionada",
+    () =>
+      branchOptions.find((option) => option.id === branchId)?.label ?? "Sucursal no seleccionada",
     [branchId, branchOptions],
   );
 
@@ -141,8 +154,13 @@ export function AdminInventoryAdjustmentPanel({
     >
       <div className="flex min-w-0 items-start justify-between gap-3">
         <div className="min-w-0">
-          <h3 className="truncate text-base font-semibold text-slate-950">Nuevo ajuste de inventario</h3>
-          <p className="truncate text-xs text-slate-500" title={getSourceDescription(initialInventory)}>
+          <h3 className="truncate text-base font-semibold text-slate-950">
+            Nuevo ajuste de inventario
+          </h3>
+          <p
+            className="truncate text-xs text-slate-500"
+            title={getSourceDescription(initialInventory)}
+          >
             {getSourceDescription(initialInventory)}
           </p>
         </div>
@@ -171,7 +189,9 @@ export function AdminInventoryAdjustmentPanel({
             value={productId}
             onChange={(event) => setProductId(event.target.value)}
           >
-            {productOptions.length === 0 ? <option value="">Productos pendientes de API</option> : null}
+            {productOptions.length === 0 ? (
+              <option value="">Productos pendientes de API</option>
+            ) : null}
             {productOptions.map((option) => (
               <option key={option.id} title={option.label} value={option.id}>
                 {option.label}
@@ -189,7 +209,9 @@ export function AdminInventoryAdjustmentPanel({
             value={branchId}
             onChange={(event) => setBranchId(event.target.value)}
           >
-            {branchOptions.length === 0 ? <option value="">Sucursales pendientes de API</option> : null}
+            {branchOptions.length === 0 ? (
+              <option value="">Sucursales pendientes de API</option>
+            ) : null}
             {branchOptions.map((option) => (
               <option key={option.id} title={option.label} value={option.id}>
                 {option.label}
@@ -206,7 +228,9 @@ export function AdminInventoryAdjustmentPanel({
             value={locationCode}
             onChange={(event) => setLocationCode(event.target.value as AdminInventoryLocationCode)}
           >
-            {locationOptions.length === 0 ? <option value="">Ubicaciones pendientes de API</option> : null}
+            {locationOptions.length === 0 ? (
+              <option value="">Ubicaciones pendientes de API</option>
+            ) : null}
             {locationOptions.map((option) => (
               <option key={option.id} title={option.label} value={option.id}>
                 {option.label}
@@ -222,7 +246,9 @@ export function AdminInventoryAdjustmentPanel({
           <select
             className={inputClassName}
             value={adjustmentType}
-            onChange={(event) => setAdjustmentType(event.target.value as AdminInventoryAdjustmentType)}
+            onChange={(event) =>
+              setAdjustmentType(event.target.value as AdminInventoryAdjustmentType)
+            }
           >
             {adjustmentTypeOptions.map((option) => (
               <option key={option.value} value={option.value}>
@@ -269,8 +295,8 @@ export function AdminInventoryAdjustmentPanel({
       </label>
 
       <p className="rounded-[16px] border border-[var(--ui-color-border)] bg-slate-50 px-3 py-2 text-xs leading-5 text-slate-600">
-        El ajuste crea un documento y movimiento auditado. No se edita la existencia historica ni se modifica el kardex
-        de forma destructiva.
+        El ajuste crea un documento y movimiento auditado. No se edita la existencia historica ni se
+        modifica el kardex de forma destructiva.
       </p>
 
       <div className="flex min-w-0 flex-wrap justify-end gap-2 border-t border-[var(--ui-color-border)] pt-3">
@@ -281,13 +307,15 @@ export function AdminInventoryAdjustmentPanel({
         >
           Cancelar
         </button>
-        <button
+        <AdminActionButton
+          capability="inventory.adjust"
+          branchIds={[branchId]}
           className="rounded-2xl bg-[var(--ui-color-primary)] px-4 py-2 text-sm font-semibold text-white transition hover:bg-[var(--ui-color-primary-strong)] focus:outline-none focus:ring-4 focus:ring-[var(--ui-color-ring)] disabled:cursor-not-allowed disabled:bg-slate-300 disabled:text-slate-600"
           disabled={isSubmitting}
           type="submit"
         >
           {isSubmitting ? "Guardando" : "Guardar ajuste"}
-        </button>
+        </AdminActionButton>
       </div>
     </form>
   );

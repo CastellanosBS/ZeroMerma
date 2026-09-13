@@ -1,3 +1,7 @@
+import type { components } from "@zeromerma/api-client";
+
+export type AdminUserRoleAssignmentPayload =
+  components["schemas"]["AdminUserRoleAssignmentRequest"];
 export type AdminUserStatus = "active" | "inactive" | "locked";
 export type AdminUserSurface = "POS" | "BACKOFFICE";
 export type AdminUserWarningState = "ready" | "warning" | "blocked";
@@ -110,7 +114,8 @@ export interface AdminUserRoleAssignment {
   roleDescription: string | null;
   roleId: string;
   roleName: string;
-  scope: string | null;
+  scopeType: AdminUserRoleAssignmentPayload["scope_type"];
+  branchIds: string[];
 }
 
 export interface AdminUserDetail {
@@ -197,7 +202,7 @@ export interface AdminUserCreatePayload {
   fullName: string;
   notes: string | null;
   phone: string | null;
-  roleIds: string[];
+
   sendInvitation: boolean;
   temporaryPassword: string | null;
 }

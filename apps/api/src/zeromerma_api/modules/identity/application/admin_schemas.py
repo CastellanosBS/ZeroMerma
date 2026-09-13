@@ -4,7 +4,7 @@ from datetime import datetime
 from typing import Any, Literal
 from uuid import UUID
 
-from pydantic import BaseModel, Field, field_validator, model_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from zeromerma_api.modules.identity.application.schemas import IdentitySurface
 from zeromerma_api.modules.identity.domain.constants import IDENTITY_ALLOWED_SURFACES
@@ -153,7 +153,8 @@ class AdminUserRoleAssignmentView(BaseModel):
     role_id: str
     role_name: str
     role_description: str | None = None
-    scope: str | None = None
+    scope_type: Literal["GLOBAL", "BRANCH_SET"]
+    branch_ids: list[UUID]
     assigned_at: datetime | None = None
 
 
@@ -226,13 +227,14 @@ class AdminUserBranchAssignmentCommand(BaseModel):
 
 
 class AdminUserCreateRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     full_name: str = Field(min_length=1, max_length=160)
     email: str = Field(min_length=3, max_length=320)
     temporary_password: str | None = Field(default=None, min_length=8, max_length=128)
     allowed_surfaces: list[IdentitySurface] = Field(min_length=1)
     default_surface: IdentitySurface | None = None
     branch_assignments: list[AdminUserBranchAssignmentCommand] = Field(default_factory=list)
-    role_ids: list[str] = Field(default_factory=list)
     send_invitation: bool = False
     phone: str | None = Field(default=None, max_length=40)
     notes: str | None = None
@@ -341,5 +343,21 @@ class AdminUserLockRequest(BaseModel):
         return normalized or None
 
 
-class AdminUserRoleAssignmentRequest(BaseModel):
-    role_id: str = Field(min_length=1, max_length=120)
+class AdminAssignmentScopeRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    scope_type: Literal["GLOBAL", "BRANCH_SET"]
+    branch_ids: list[UUID]
+
+    @model_validator(mode="after")
+    def validate_explicit_scope(self) -> AdminAssignmentScopeRequest:
+        if len(set(self.branch_ids)) != len(self.branch_ids):
+            raise ValueError("Scope branches must be unique.")
+        if (self.scope_type == "GLOBAL") != (len(self.branch_ids) == 0):
+            raise ValueError("GLOBAL requires no branches; BRANCH_SET requires at least one.")
+        self.branch_ids = sorted(self.branch_ids, key=str)
+        return self
+
+
+class AdminUserRoleAssignmentRequest(AdminAssignmentScopeRequest):
+    role_id: UUID

@@ -91,6 +91,7 @@ from zeromerma_api.modules.transfers.presentation.router import (
 )
 from zeromerma_api.modules.transfers.presentation.router import router as transfers_router
 from zeromerma_api.modules.waste.presentation.router import admin_router as admin_waste_router
+from zeromerma_api.presentation.access_policy import install_access_policies
 from zeromerma_api.presentation.health import router as health_router
 
 api_router = APIRouter()
@@ -140,3 +141,5 @@ api_router.include_router(returns_router)
 api_router.include_router(tickets_router)
 api_router.include_router(transfers_router)
 api_router.include_router(sales_router)
+
+install_access_policies(api_router)

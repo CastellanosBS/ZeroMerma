@@ -4,8 +4,6 @@ from fastapi.testclient import TestClient
 from sqlalchemy import select
 
 from zeromerma_api.bootstrap.seed_local import (
-    SEED_ADMIN_EMAIL,
-    SEED_ADMIN_PASSWORD,
     SEED_USER_EMAIL,
     SEED_USER_PASSWORD,
 )
@@ -19,6 +17,7 @@ from zeromerma_api.modules.identity.domain.constants import (
 )
 from zeromerma_api.modules.identity.infrastructure.models import Role, User, UserRoleAssignment
 from zeromerma_api.modules.outbox.infrastructure.models import OutboxEvent
+from zeromerma_api.testing.authorization import owner_headers
 
 
 def _login(client: TestClient, *, email: str, password: str) -> str:
@@ -28,8 +27,7 @@ def _login(client: TestClient, *, email: str, password: str) -> str:
 
 
 def _admin_headers(client: TestClient) -> dict[str, str]:
-    token = _login(client, email=SEED_ADMIN_EMAIL, password=SEED_ADMIN_PASSWORD)
-    return {"Authorization": f"Bearer {token}"}
+    return owner_headers()
 
 
 def _cashier_headers(client: TestClient) -> dict[str, str]:
@@ -57,7 +55,7 @@ def test_admin_roles_list_permissions_metrics_and_contract(client: TestClient) -
     codes = {item["code"] for item in payload["items"]}
     assert IDENTITY_ROLE_ADMIN in codes
     assert IDENTITY_ROLE_CASHIER in codes
-    assert payload["backend_contract"]["scoped_roles_supported"] is False
+    assert payload["backend_contract"]["scoped_roles_supported"] is True
     assert payload["backend_contract"]["destructive_delete_supported"] is False
     assert payload["metrics"]["total_roles"] >= 3
     assert payload["metrics"]["high_privilege"] >= 1
@@ -83,8 +81,7 @@ def test_admin_roles_filter_and_detail(client: TestClient) -> None:
     surface_response = client.get("/v1/admin/roles?app_surface=BACKOFFICE", headers=headers)
     assert surface_response.status_code == 200
     assert all(
-        IDENTITY_SURFACE_BACKOFFICE in item["surfaces"]
-        for item in surface_response.json()["items"]
+        IDENTITY_SURFACE_BACKOFFICE in item["surfaces"] for item in surface_response.json()["items"]
     )
 
     high_response = client.get("/v1/admin/roles?high_privilege=yes", headers=headers)
@@ -98,7 +95,7 @@ def test_admin_roles_filter_and_detail(client: TestClient) -> None:
     assert detail["permission_matrix"]
     assert detail["sensitive_permissions"]
     assert detail["assigned_users"]
-    assert detail["scopes"]["is_supported"] is False
+    assert detail["scopes"]["is_supported"] is True
 
 
 def test_admin_role_create_update_status_audit_and_outbox(client: TestClient) -> None:
@@ -151,12 +148,14 @@ def test_admin_role_create_update_status_audit_and_outbox(client: TestClient) ->
     assert deactivate_response.json()["overview"]["status"] == "inactive"
 
     with SessionLocal() as session:
-        audit_events = session.execute(
-            select(AuditLog).where(AuditLog.resource_id == role_id)
-        ).scalars().all()
-        outbox_events = session.execute(
-            select(OutboxEvent).where(OutboxEvent.aggregate_id == role_id)
-        ).scalars().all()
+        audit_events = (
+            session.execute(select(AuditLog).where(AuditLog.resource_id == role_id)).scalars().all()
+        )
+        outbox_events = (
+            session.execute(select(OutboxEvent).where(OutboxEvent.aggregate_id == role_id))
+            .scalars()
+            .all()
+        )
 
     assert {event.action for event in audit_events} >= {
         "admin.role.created",
@@ -222,13 +221,18 @@ def test_admin_role_user_assignment_flow_and_user_module_integration(
             "name": "Auxiliar POS",
             "surfaces": [IDENTITY_SURFACE_POS],
             "permission_codes": ["pos.operate"],
+            "confirmed_high_risk_change": True,
         },
     )
     assert role_response.status_code == 201
     role_id = role_response.json()["overview"]["id"]
     user_id = _user_id(SEED_USER_EMAIL)
 
-    assign_response = client.post(f"/v1/admin/roles/{role_id}/users/{user_id}", headers=headers)
+    assign_response = client.post(
+        f"/v1/admin/roles/{role_id}/users/{user_id}",
+        headers=headers,
+        json={"scope_type": "GLOBAL", "branch_ids": []},
+    )
     assert assign_response.status_code == 200
     assert any(user["user_id"] == user_id for user in assign_response.json()["assigned_users"])
 
@@ -259,4 +263,3 @@ def test_admin_role_user_assignment_flow_and_user_module_integration(
             )
         ).scalar_one()
     assert assignment.is_active is False
-

@@ -1,3 +1,4 @@
+import { AdminActionButton } from "../../components/AdminActionButton";
 import { AdminEmptyState } from "../../components/AdminEmptyState";
 import type { AdminIncidentListItem } from "../types";
 
@@ -177,10 +178,16 @@ export function AdminIncidentsTable({
                     <span className="truncate text-slate-700" title={item.areaName ?? "N/A"}>
                       {item.areaName ?? "N/A"}
                     </span>
-                    <span className="truncate text-slate-700" title={incidentTypeLabel(item.incidentType)}>
+                    <span
+                      className="truncate text-slate-700"
+                      title={incidentTypeLabel(item.incidentType)}
+                    >
                       {incidentTypeLabel(item.incidentType)}
                     </span>
-                    <span className="truncate text-slate-700" title={sourceTypeLabel(item.sourceType)}>
+                    <span
+                      className="truncate text-slate-700"
+                      title={sourceTypeLabel(item.sourceType)}
+                    >
                       {sourceTypeLabel(item.sourceType)}
                     </span>
                     <span
@@ -228,22 +235,26 @@ export function AdminIncidentsTable({
                       >
                         Ver
                       </button>
-                      <button
+                      <AdminActionButton
+                        capability="quality_hygiene.manage"
+                        branchIds={[item.branchId]}
                         className="rounded-full border border-[var(--ui-color-border)] bg-white px-2 py-1 text-xs font-semibold text-slate-700 transition hover:border-[var(--ui-color-info)] disabled:cursor-not-allowed disabled:opacity-40"
                         disabled={item.status === "CLOSED" || item.status === "CANCELLED"}
                         type="button"
                         onClick={() => onAddFollowUp(item)}
                       >
                         Nota
-                      </button>
-                      <button
+                      </AdminActionButton>
+                      <AdminActionButton
+                        capability="quality_hygiene.manage"
+                        branchIds={[item.branchId]}
                         className="rounded-full border border-[var(--ui-color-border)] bg-white px-2 py-1 text-xs font-semibold text-slate-700 transition hover:border-[var(--ui-color-info)] disabled:cursor-not-allowed disabled:opacity-40"
                         disabled={!canResolve}
                         type="button"
                         onClick={() => onResolve(item)}
                       >
                         Resolver
-                      </button>
+                      </AdminActionButton>
                       <button
                         className="rounded-full border border-[var(--ui-color-border)] bg-white px-2 py-1 text-xs font-semibold text-slate-700 transition hover:border-[var(--ui-color-info)]"
                         type="button"

@@ -1420,6 +1420,74 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/admin/roles/privileged-changes": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Propose Privileged Change */
+        post: operations["propose_privileged_change_v1_admin_roles_privileged_changes_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/admin/roles/privileged-changes/{change_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Privileged Change */
+        get: operations["get_privileged_change_v1_admin_roles_privileged_changes__change_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/admin/roles/privileged-changes/{change_id}/approve": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Approve Privileged Change */
+        post: operations["approve_privileged_change_v1_admin_roles_privileged_changes__change_id__approve_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/admin/roles/privileged-changes/{change_id}/execute": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Execute Privileged Change */
+        post: operations["execute_privileged_change_v1_admin_roles_privileged_changes__change_id__execute_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/admin/roles/{role_id}": {
         parameters: {
             query?: never;
@@ -11523,12 +11591,19 @@ export interface components {
              * Format: date-time
              */
             assigned_at: string;
+            /** Branch Ids */
+            branch_ids: string[];
             /** Branch Summary */
             branch_summary: string;
             /** Email */
             email: string;
             /** Full Name */
             full_name: string;
+            /**
+             * Scope Type
+             * @enum {string}
+             */
+            scope_type: "GLOBAL" | "BRANCH_SET";
             /** Status */
             status: string;
             /** Surfaces */
@@ -11632,7 +11707,7 @@ export interface components {
             remove_user_endpoint: string;
             /**
              * Scoped Roles Supported
-             * @default false
+             * @default true
              */
             scoped_roles_supported: boolean;
             /**
@@ -11818,17 +11893,17 @@ export interface components {
         AdminRoleScopeView: {
             /**
              * Is Supported
-             * @default false
+             * @default true
              */
             is_supported: boolean;
             /**
              * Missing Contract Note
-             * @default Branch-scoped roles are not available yet.
+             * @default
              */
             missing_contract_note: string;
             /**
              * Scope Summary
-             * @default Sin restricciones de alcance configuradas.
+             * @default Explicit scope is configured per user role assignment.
              */
             scope_summary: string;
         };
@@ -11859,6 +11934,16 @@ export interface components {
             permission_codes?: string[] | null;
             /** Surfaces */
             surfaces?: ("POS" | "BACKOFFICE")[] | null;
+        };
+        /** AdminRoleUserAssignmentRequest */
+        AdminRoleUserAssignmentRequest: {
+            /** Branch Ids */
+            branch_ids: string[];
+            /**
+             * Scope Type
+             * @enum {string}
+             */
+            scope_type: "GLOBAL" | "BRANCH_SET";
         };
         /** AdminRoleWarningView */
         AdminRoleWarningView: {
@@ -14367,8 +14452,6 @@ export interface components {
             notes?: string | null;
             /** Phone */
             phone?: string | null;
-            /** Role Ids */
-            role_ids?: string[];
             /**
              * Send Invitation
              * @default false
@@ -14573,21 +14656,36 @@ export interface components {
         };
         /** AdminUserRoleAssignmentRequest */
         AdminUserRoleAssignmentRequest: {
-            /** Role Id */
+            /** Branch Ids */
+            branch_ids: string[];
+            /**
+             * Role Id
+             * Format: uuid
+             */
             role_id: string;
+            /**
+             * Scope Type
+             * @enum {string}
+             */
+            scope_type: "GLOBAL" | "BRANCH_SET";
         };
         /** AdminUserRoleAssignmentView */
         AdminUserRoleAssignmentView: {
             /** Assigned At */
             assigned_at?: string | null;
+            /** Branch Ids */
+            branch_ids: string[];
             /** Role Description */
             role_description?: string | null;
             /** Role Id */
             role_id: string;
             /** Role Name */
             role_name: string;
-            /** Scope */
-            scope?: string | null;
+            /**
+             * Scope Type
+             * @enum {string}
+             */
+            scope_type: "GLOBAL" | "BRANCH_SET";
         };
         /** AdminUserRoleAssignmentsView */
         AdminUserRoleAssignmentsView: {
@@ -15566,12 +15664,21 @@ export interface components {
         AuthenticatedUser: {
             /** Allowed Surfaces */
             allowed_surfaces?: ("POS" | "BACKOFFICE")[];
+            /** Authorization Surface */
+            authorization_surface?: ("POS" | "BACKOFFICE") | null;
+            /**
+             * Authorization Version
+             * @default
+             */
+            authorization_version: string;
             /**
              * Default Surface
              * @default POS
              * @enum {string}
              */
             default_surface: "POS" | "BACKOFFICE";
+            /** Effective Grants */
+            effective_grants?: components["schemas"]["EffectiveGrant"][];
             /** Email */
             email: string;
             /** Full Name */
@@ -15583,6 +15690,11 @@ export interface components {
             id: string;
             /** Is Active */
             is_active: boolean;
+            /**
+             * Is Superadministrator
+             * @default false
+             */
+            is_superadministrator: boolean;
         };
         /** BranchSummary */
         BranchSummary: {
@@ -16884,6 +16996,21 @@ export interface components {
             /** Workstation Code */
             workstation_code: string;
         };
+        /** EffectiveGrant */
+        EffectiveGrant: {
+            /** Branch Ids */
+            branch_ids: string[];
+            /**
+             * Capability
+             * @enum {string}
+             */
+            capability: "pos.operate" | "sales_tickets.view" | "sales_tickets.reprint" | "orders.view" | "orders.manage" | "orders.cancel" | "returns_corrections.view" | "returns_corrections.manage" | "catalog.view" | "catalog.manage" | "catalog.availability.manage" | "pricing.view" | "pricing.manage" | "recipes.view" | "recipes.manage" | "discounts.view" | "discounts.manage" | "inventory.view" | "inventory.adjust" | "branches.view" | "branches.manage" | "workstations.view" | "workstations.manage" | "transfers.view" | "transfers.manage" | "transfers.execute" | "transfers.cancel" | "production.view" | "production.manage" | "production.execute" | "production.cancel" | "waste.view" | "waste.manage" | "suppliers.view" | "suppliers.manage" | "purchases.view" | "purchases.manage" | "purchases.confirm" | "purchases.receive" | "purchases.cancel" | "cash_finance.view" | "cash_finance.manage" | "quality_hygiene.view" | "quality_hygiene.manage" | "users.view" | "users.manage" | "roles.view" | "roles.manage" | "role_assignments.manage" | "audit.view" | "audit.export" | "reports.view" | "reports.export" | "config.view" | "config.manage";
+            /**
+             * Scope Type
+             * @enum {string}
+             */
+            scope_type: "GLOBAL" | "BRANCH_SET";
+        };
         /** HealthResponse */
         HealthResponse: {
             /** Environment */
@@ -17808,6 +17935,80 @@ export interface components {
             products: components["schemas"]["PosCatalogProductView"][];
             /** Query */
             query?: string | null;
+        };
+        /** PrivilegedChangeConfirmationRequest */
+        PrivilegedChangeConfirmationRequest: {
+            /** Payload Sha256 */
+            payload_sha256: string;
+        };
+        /** PrivilegedChangeCreateRequest */
+        PrivilegedChangeCreateRequest: {
+            /**
+             * Expires In Minutes
+             * @default 15
+             */
+            expires_in_minutes: number;
+            /**
+             * Operation
+             * @enum {string}
+             */
+            operation: "USER_UPDATE" | "USER_STATUS" | "USER_LOCK" | "USER_UNLOCK" | "USER_BRANCH_ASSIGNMENT" | "USER_BRANCH_REMOVAL" | "USER_BRANCH_DEFAULT" | "ROLE_ASSIGNMENT" | "ROLE_REMOVAL" | "ROLE_UPDATE" | "ROLE_STATUS";
+            /** Payload */
+            payload: {
+                [key: string]: unknown;
+            };
+            /** Reason */
+            reason: string;
+            /** Target Role Id */
+            target_role_id?: string | null;
+            /** Target User Id */
+            target_user_id?: string | null;
+        };
+        /** PrivilegedChangeView */
+        PrivilegedChangeView: {
+            /** Approved At */
+            approved_at: string | null;
+            /** Approver User Id */
+            approver_user_id: string | null;
+            /** Consumed At */
+            consumed_at: string | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /**
+             * Expires At
+             * Format: date-time
+             */
+            expires_at: string;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /**
+             * Initiator User Id
+             * Format: uuid
+             */
+            initiator_user_id: string;
+            /**
+             * Operation
+             * @enum {string}
+             */
+            operation: "USER_UPDATE" | "USER_STATUS" | "USER_LOCK" | "USER_UNLOCK" | "USER_BRANCH_ASSIGNMENT" | "USER_BRANCH_REMOVAL" | "USER_BRANCH_DEFAULT" | "ROLE_ASSIGNMENT" | "ROLE_REMOVAL" | "ROLE_UPDATE" | "ROLE_STATUS";
+            /** Payload */
+            payload: {
+                [key: string]: unknown;
+            };
+            /** Payload Sha256 */
+            payload_sha256: string;
+            /** Reason */
+            reason: string;
+            /** Target Role Id */
+            target_role_id: string | null;
+            /** Target User Id */
+            target_user_id: string | null;
         };
         /** ReturnCommitLineRequest */
         ReturnCommitLineRequest: {
@@ -28153,6 +28354,356 @@ export interface operations {
             };
         };
     };
+    propose_privileged_change_v1_admin_roles_privileged_changes_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PrivilegedChangeCreateRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PrivilegedChangeView"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorResponse"];
+                };
+            };
+            /** @description Authentication Required */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorResponse"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorResponse"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorResponse"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorResponse"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorResponse"];
+                };
+            };
+        };
+    };
+    get_privileged_change_v1_admin_roles_privileged_changes__change_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                change_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PrivilegedChangeView"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorResponse"];
+                };
+            };
+            /** @description Authentication Required */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorResponse"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorResponse"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorResponse"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorResponse"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorResponse"];
+                };
+            };
+        };
+    };
+    approve_privileged_change_v1_admin_roles_privileged_changes__change_id__approve_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                change_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PrivilegedChangeConfirmationRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PrivilegedChangeView"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorResponse"];
+                };
+            };
+            /** @description Authentication Required */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorResponse"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorResponse"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorResponse"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorResponse"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorResponse"];
+                };
+            };
+        };
+    };
+    execute_privileged_change_v1_admin_roles_privileged_changes__change_id__execute_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                change_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PrivilegedChangeConfirmationRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PrivilegedChangeView"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorResponse"];
+                };
+            };
+            /** @description Authentication Required */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorResponse"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorResponse"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorResponse"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorResponse"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorResponse"];
+                };
+            };
+        };
+    };
     get_admin_role_detail_v1_admin_roles__role_id__get: {
         parameters: {
             query?: never;
@@ -28426,7 +28977,11 @@ export interface operations {
             };
             cookie?: never;
         };
-        requestBody?: never;
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AdminRoleUserAssignmentRequest"];
+            };
+        };
         responses: {
             /** @description Successful Response */
             200: {
@@ -33216,7 +33771,9 @@ export interface operations {
     };
     me_v1_auth_me_get: {
         parameters: {
-            query?: never;
+            query?: {
+                surface?: ("POS" | "BACKOFFICE") | null;
+            };
             header?: never;
             path?: never;
             cookie?: never;

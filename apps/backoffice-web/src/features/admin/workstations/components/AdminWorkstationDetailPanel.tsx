@@ -1,3 +1,4 @@
+import { AdminActionButton } from "../../components/AdminActionButton";
 import type { ReactNode } from "react";
 
 import type {
@@ -10,7 +11,9 @@ function formatStatus(status: "active" | "inactive"): string {
   return status === "active" ? "Activa" : "Inactiva";
 }
 
-function formatReadiness(value: AdminWorkstationDetail["overview"]["readiness"] | AdminWorkstationListItem["readiness"]) {
+function formatReadiness(
+  value: AdminWorkstationDetail["overview"]["readiness"] | AdminWorkstationListItem["readiness"],
+) {
   const labels = {
     blocked: "Bloqueada",
     ready: "Lista para POS",
@@ -34,10 +37,16 @@ function formatDate(value: string | null | undefined): string {
 function InfoRow({ label, value }: { label: string; value?: string | number | null }) {
   return (
     <div className="grid min-w-0 grid-cols-[7rem_minmax(0,1fr)] gap-2 text-xs">
-      <span className="truncate font-semibold uppercase tracking-[0.08em] text-slate-500" title={label}>
+      <span
+        className="truncate font-semibold uppercase tracking-[0.08em] text-slate-500"
+        title={label}
+      >
         {label}
       </span>
-      <span className="min-w-0 truncate font-medium text-slate-900" title={String(value ?? "No registrado")}>
+      <span
+        className="min-w-0 truncate font-medium text-slate-900"
+        title={String(value ?? "No registrado")}
+      >
         {value ?? "No registrado"}
       </span>
     </div>
@@ -47,7 +56,10 @@ function InfoRow({ label, value }: { label: string; value?: string | number | nu
 function Section({ children, title }: { children: ReactNode; title: string }) {
   return (
     <div className="rounded-[18px] border border-[var(--ui-color-border)] bg-white p-3">
-      <h4 className="mb-2 truncate text-xs font-semibold uppercase tracking-[0.12em] text-slate-500" title={title}>
+      <h4
+        className="mb-2 truncate text-xs font-semibold uppercase tracking-[0.12em] text-slate-500"
+        title={title}
+      >
         {title}
       </h4>
       {children}
@@ -64,7 +76,10 @@ function WarningItem({ warning }: { warning: AdminWorkstationWarning }) {
         : "border-[var(--ui-color-border)] bg-slate-50 text-slate-600";
 
   return (
-    <li className={`rounded-[14px] border px-3 py-2 text-xs leading-5 ${toneClass}`} title={warning.message}>
+    <li
+      className={`rounded-[14px] border px-3 py-2 text-xs leading-5 ${toneClass}`}
+      title={warning.message}
+    >
       <span className="font-semibold">{warning.code}</span>: {warning.message}
     </li>
   );
@@ -98,7 +113,9 @@ export function AdminWorkstationDetailPanel({
         <div className="flex min-h-0 flex-1 items-center p-3">
           <div className="rounded-[18px] border border-dashed border-[var(--ui-color-border)] bg-slate-50 p-4 text-sm leading-6 text-slate-600">
             <p className="font-semibold text-slate-950">Sin estacion seleccionada</p>
-            <p>Selecciona una estacion para revisar su sucursal, estado operativo y sesiones de caja.</p>
+            <p>
+              Selecciona una estacion para revisar su sucursal, estado operativo y sesiones de caja.
+            </p>
           </div>
         </div>
       </aside>
@@ -114,7 +131,8 @@ export function AdminWorkstationDetailPanel({
   const warnings = workstationDetail?.warnings ?? workstationPreview?.warnings ?? [];
   const activeSession = workstationDetail?.cashSessionContext.activeSession ?? null;
   const lastClosedSession = workstationDetail?.cashSessionContext.lastClosedSession ?? null;
-  const hasActiveSession = Boolean(activeSession) || Boolean(workstationPreview?.hasActiveCashSession);
+  const hasActiveSession =
+    Boolean(activeSession) || Boolean(workstationPreview?.hasActiveCashSession);
 
   return (
     <aside className="flex min-h-0 min-w-0 flex-col overflow-hidden rounded-[20px] border border-[var(--ui-color-border)] bg-white">
@@ -162,7 +180,9 @@ export function AdminWorkstationDetailPanel({
                 <InfoRow label="Zona" value={workstationDetail.branchRelationship.branchTimezone} />
                 <InfoRow
                   label="Estado"
-                  value={workstationDetail.branchRelationship.branchIsActive ? "Activa" : "Inactiva"}
+                  value={
+                    workstationDetail.branchRelationship.branchIsActive ? "Activa" : "Inactiva"
+                  }
                 />
                 <button
                   className="mt-1 justify-self-start rounded-full border border-[var(--ui-color-border)] bg-white px-3 py-1.5 text-xs font-semibold text-[var(--ui-color-info)] transition hover:bg-[var(--ui-color-surface-tint)] focus:outline-none focus:ring-4 focus:ring-[var(--ui-color-ring)]"
@@ -176,8 +196,14 @@ export function AdminWorkstationDetailPanel({
 
             <Section title="Configuracion operativa">
               <div className="grid gap-1.5">
-                <InfoRow label="Activa" value={workstationDetail.operationalConfig.isActive ? "Si" : "No"} />
-                <InfoRow label="POS" value={workstationDetail.operationalConfig.posEnabled ? "Habilitado" : "No listo"} />
+                <InfoRow
+                  label="Activa"
+                  value={workstationDetail.operationalConfig.isActive ? "Si" : "No"}
+                />
+                <InfoRow
+                  label="POS"
+                  value={workstationDetail.operationalConfig.posEnabled ? "Habilitado" : "No listo"}
+                />
                 <InfoRow label="Codigo" value={workstationDetail.overview.code} />
               </div>
             </Section>
@@ -191,7 +217,9 @@ export function AdminWorkstationDetailPanel({
                   <InfoRow label="Monto inicial" value={activeSession.openingAmount} />
                 </div>
               ) : (
-                <p className="text-sm leading-6 text-slate-600">Esta estacion no tiene una caja abierta actualmente.</p>
+                <p className="text-sm leading-6 text-slate-600">
+                  Esta estacion no tiene una caja abierta actualmente.
+                </p>
               )}
               {lastClosedSession ? (
                 <div className="mt-2 rounded-[14px] bg-slate-50 px-2.5 py-2 text-xs text-slate-600">
@@ -208,7 +236,10 @@ export function AdminWorkstationDetailPanel({
                     value={`${workstationDetail.accessContext.activeAssignedUserCount} activos / ${workstationDetail.accessContext.assignedUserCount} total`}
                   />
                   {workstationDetail.accessContext.users.slice(0, 5).map((user) => (
-                    <div className="min-w-0 rounded-[14px] bg-slate-50 px-2.5 py-2 text-xs" key={user.userId}>
+                    <div
+                      className="min-w-0 rounded-[14px] bg-slate-50 px-2.5 py-2 text-xs"
+                      key={user.userId}
+                    >
                       <p className="truncate font-semibold text-slate-900" title={user.userName}>
                         {user.userName}
                       </p>
@@ -235,27 +266,33 @@ export function AdminWorkstationDetailPanel({
               ))}
             </ul>
           ) : (
-            <p className="text-sm leading-6 text-slate-600">Sin advertencias operativas detectadas.</p>
+            <p className="text-sm leading-6 text-slate-600">
+              Sin advertencias operativas detectadas.
+            </p>
           )}
         </Section>
       </div>
 
       <div className="flex shrink-0 flex-wrap gap-2 border-t border-[var(--ui-color-border)] p-3 text-xs">
-        <button
+        <AdminActionButton
+          capability="workstations.manage"
+          branchIds={[branch!.branchId]}
           className="rounded-full border border-[var(--ui-color-border)] bg-white px-3 py-1.5 font-semibold text-slate-700 transition hover:bg-slate-50 focus:outline-none focus:ring-4 focus:ring-[var(--ui-color-ring)]"
           type="button"
           onClick={() => onEdit(workstationDetail ?? workstationPreview!)}
         >
           Editar
-        </button>
-        <button
+        </AdminActionButton>
+        <AdminActionButton
+          capability="workstations.manage"
+          branchIds={[branch!.branchId]}
           className="rounded-full border border-[var(--ui-color-border)] bg-white px-3 py-1.5 font-semibold text-[var(--ui-color-info)] transition hover:bg-[var(--ui-color-surface-tint)] focus:outline-none focus:ring-4 focus:ring-[var(--ui-color-ring)] disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-400"
           disabled={overview.status === "active" && hasActiveSession}
           type="button"
           onClick={() => onToggleStatus(workstationDetail ?? workstationPreview!)}
         >
           {overview.status === "active" ? "Desactivar" : "Activar"}
-        </button>
+        </AdminActionButton>
       </div>
     </aside>
   );

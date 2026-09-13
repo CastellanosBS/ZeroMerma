@@ -1,3 +1,4 @@
+import { AdminActionButton } from "../../components/AdminActionButton";
 import { useMemo, useState } from "react";
 import type { FormEvent } from "react";
 
@@ -34,7 +35,9 @@ export function AdminBranchFormPanel({
   onSubmit,
 }: AdminBranchFormPanelProps) {
   const isEdit = Boolean(branchDetail);
-  const [brandId, setBrandId] = useState(branchDetail?.overview.brandId ?? brandOptions[0]?.id ?? "");
+  const [brandId, setBrandId] = useState(
+    branchDetail?.overview.brandId ?? brandOptions[0]?.id ?? "",
+  );
   const [code, setCode] = useState(branchDetail?.overview.code ?? "");
   const [name, setName] = useState(branchDetail?.overview.name ?? "");
   const [timezone, setTimezone] = useState(branchDetail?.overview.timezone ?? "");
@@ -45,7 +48,9 @@ export function AdminBranchFormPanel({
   const [country, setCountry] = useState(branchDetail?.locationContact.country ?? "");
   const [postalCode, setPostalCode] = useState(branchDetail?.locationContact.postalCode ?? "");
   const [phone, setPhone] = useState(branchDetail?.locationContact.phone ?? "");
-  const [contactEmail, setContactEmail] = useState(branchDetail?.locationContact.contactEmail ?? "");
+  const [contactEmail, setContactEmail] = useState(
+    branchDetail?.locationContact.contactEmail ?? "",
+  );
   const [notes, setNotes] = useState(branchDetail?.locationContact.notes ?? "");
   const [localError, setLocalError] = useState<string | null>(null);
 
@@ -123,7 +128,11 @@ export function AdminBranchFormPanel({
       <div className="grid min-w-0 gap-2 lg:grid-cols-4">
         <label className="grid min-w-0 gap-1 text-xs font-semibold uppercase tracking-[0.1em] text-slate-500">
           Marca
-          <select className={inputClassName} value={brandId} onChange={(event) => setBrandId(event.target.value)}>
+          <select
+            className={inputClassName}
+            value={brandId}
+            onChange={(event) => setBrandId(event.target.value)}
+          >
             {brandOptions.length === 0 ? <option value="">Marcas pendientes de API</option> : null}
             {brandOptions.map((option) => (
               <option key={option.id} title={option.label} value={option.id}>
@@ -134,11 +143,19 @@ export function AdminBranchFormPanel({
         </label>
         <label className="grid min-w-0 gap-1 text-xs font-semibold uppercase tracking-[0.1em] text-slate-500">
           Codigo
-          <input className={inputClassName} value={code} onChange={(event) => setCode(event.target.value)} />
+          <input
+            className={inputClassName}
+            value={code}
+            onChange={(event) => setCode(event.target.value)}
+          />
         </label>
         <label className="grid min-w-0 gap-1 text-xs font-semibold uppercase tracking-[0.1em] text-slate-500 lg:col-span-2">
           Nombre
-          <input className={inputClassName} value={name} onChange={(event) => setName(event.target.value)} />
+          <input
+            className={inputClassName}
+            value={name}
+            onChange={(event) => setName(event.target.value)}
+          />
         </label>
         <label className="grid min-w-0 gap-1 text-xs font-semibold uppercase tracking-[0.1em] text-slate-500">
           Zona horaria
@@ -150,7 +167,11 @@ export function AdminBranchFormPanel({
           />
         </label>
         <label className="flex min-w-0 items-center gap-2 rounded-2xl border border-[var(--ui-color-border)] bg-slate-50 px-3 py-2 text-sm font-semibold text-slate-700">
-          <input checked={isActive} type="checkbox" onChange={(event) => setIsActive(event.target.checked)} />
+          <input
+            checked={isActive}
+            type="checkbox"
+            onChange={(event) => setIsActive(event.target.checked)}
+          />
           Activa
         </label>
       </div>
@@ -166,15 +187,27 @@ export function AdminBranchFormPanel({
         </label>
         <label className="grid min-w-0 gap-1 text-xs font-semibold uppercase tracking-[0.1em] text-slate-500">
           Ciudad
-          <input className={inputClassName} value={city} onChange={(event) => setCity(event.target.value)} />
+          <input
+            className={inputClassName}
+            value={city}
+            onChange={(event) => setCity(event.target.value)}
+          />
         </label>
         <label className="grid min-w-0 gap-1 text-xs font-semibold uppercase tracking-[0.1em] text-slate-500">
           Estado
-          <input className={inputClassName} value={state} onChange={(event) => setState(event.target.value)} />
+          <input
+            className={inputClassName}
+            value={state}
+            onChange={(event) => setState(event.target.value)}
+          />
         </label>
         <label className="grid min-w-0 gap-1 text-xs font-semibold uppercase tracking-[0.1em] text-slate-500">
           Pais
-          <input className={inputClassName} value={country} onChange={(event) => setCountry(event.target.value)} />
+          <input
+            className={inputClassName}
+            value={country}
+            onChange={(event) => setCountry(event.target.value)}
+          />
         </label>
         <label className="grid min-w-0 gap-1 text-xs font-semibold uppercase tracking-[0.1em] text-slate-500">
           Codigo postal
@@ -186,7 +219,11 @@ export function AdminBranchFormPanel({
         </label>
         <label className="grid min-w-0 gap-1 text-xs font-semibold uppercase tracking-[0.1em] text-slate-500">
           Telefono
-          <input className={inputClassName} value={phone} onChange={(event) => setPhone(event.target.value)} />
+          <input
+            className={inputClassName}
+            value={phone}
+            onChange={(event) => setPhone(event.target.value)}
+          />
         </label>
         <label className="grid min-w-0 gap-1 text-xs font-semibold uppercase tracking-[0.1em] text-slate-500">
           Correo
@@ -215,13 +252,16 @@ export function AdminBranchFormPanel({
         >
           Cancelar
         </button>
-        <button
+        <AdminActionButton
+          capability="branches.manage"
+          globalOnly={!isEdit}
+          branchIds={branchDetail ? [branchDetail.overview.id] : []}
           className="rounded-2xl bg-[var(--ui-color-primary)] px-4 py-2 text-sm font-semibold text-white transition hover:bg-[var(--ui-color-primary-strong)] focus:outline-none focus:ring-4 focus:ring-[var(--ui-color-ring)] disabled:cursor-not-allowed disabled:bg-slate-300 disabled:text-slate-600"
           disabled={isSubmitting}
           type="submit"
         >
           {isSubmitting ? "Guardando" : "Guardar sucursal"}
-        </button>
+        </AdminActionButton>
       </div>
     </form>
   );

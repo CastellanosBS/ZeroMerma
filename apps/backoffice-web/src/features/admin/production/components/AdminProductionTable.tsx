@@ -1,3 +1,4 @@
+import { AdminActionButton } from "../../components/AdminActionButton";
 import { AdminEmptyState } from "../../components/AdminEmptyState";
 import type {
   AdminProductionBackendContract,
@@ -119,7 +120,10 @@ export function AdminProductionTable({
     <section className="flex min-h-0 min-w-0 flex-col overflow-hidden rounded-[20px] border border-[var(--ui-color-border)] bg-white">
       <div className="flex min-w-0 shrink-0 items-center justify-between gap-3 border-b border-[var(--ui-color-border)] px-3 py-2.5">
         <div className="min-w-0">
-          <h3 className="truncate text-base font-semibold text-slate-950" title="Lotes de produccion">
+          <h3
+            className="truncate text-base font-semibold text-slate-950"
+            title="Lotes de produccion"
+          >
             Lotes de produccion
           </h3>
           <p className="truncate text-xs text-slate-500">
@@ -133,16 +137,22 @@ export function AdminProductionTable({
 
       <div className="min-h-0 min-w-0 flex-1 overflow-y-auto p-2.5">
         {isLoading ? (
-          <AdminEmptyState description="Consultando producciones reales del backend." title="Cargando producciones" />
+          <AdminEmptyState
+            description="Consultando producciones reales del backend."
+            title="Cargando producciones"
+          />
         ) : errorMessage ? (
           <AdminEmptyState description={errorMessage} title="No se pudo cargar produccion" />
         ) : productions.length > 0 ? (
           <div className="grid min-w-0 gap-1.5">
             {productions.map((item) => {
               const isSelected = item.id === selectedProductionId;
-              const warningLabel = item.warnings.length > 0 ? `${item.warnings.length} alertas` : "Sin alertas";
+              const warningLabel =
+                item.warnings.length > 0 ? `${item.warnings.length} alertas` : "Sin alertas";
               const varianceLabel =
-                item.varianceQty && item.varianceQty !== "0.000" ? `Var. ${item.varianceQty}` : "Sin variacion";
+                item.varianceQty && item.varianceQty !== "0.000"
+                  ? `Var. ${item.varianceQty}`
+                  : "Sin variacion";
 
               return (
                 <article
@@ -160,8 +170,12 @@ export function AdminProductionTable({
                     type="button"
                     onClick={() => onSelectProduction(item)}
                   >
-                    <span className="block truncate font-mono text-sm font-semibold text-slate-950">{item.folio}</span>
-                    <span className="mt-0.5 block truncate text-xs text-slate-500">{formatDate(item.plannedAt)}</span>
+                    <span className="block truncate font-mono text-sm font-semibold text-slate-950">
+                      {item.folio}
+                    </span>
+                    <span className="mt-0.5 block truncate text-xs text-slate-500">
+                      {formatDate(item.plannedAt)}
+                    </span>
                   </button>
 
                   <button
@@ -170,8 +184,12 @@ export function AdminProductionTable({
                     type="button"
                     onClick={() => onSelectProduction(item)}
                   >
-                    <span className="block truncate text-sm font-semibold text-slate-900">{item.productName}</span>
-                    <span className="mt-0.5 block truncate font-mono text-xs text-slate-500">{item.productCode}</span>
+                    <span className="block truncate text-sm font-semibold text-slate-900">
+                      {item.productName}
+                    </span>
+                    <span className="mt-0.5 block truncate font-mono text-xs text-slate-500">
+                      {item.productCode}
+                    </span>
                   </button>
 
                   <button
@@ -180,8 +198,12 @@ export function AdminProductionTable({
                     type="button"
                     onClick={() => onSelectProduction(item)}
                   >
-                    <span className="block truncate text-sm font-semibold text-slate-900">{item.recipeName}</span>
-                    <span className="mt-0.5 block truncate text-xs text-slate-500">{item.branchName}</span>
+                    <span className="block truncate text-sm font-semibold text-slate-900">
+                      {item.recipeName}
+                    </span>
+                    <span className="mt-0.5 block truncate text-xs text-slate-500">
+                      {item.branchName}
+                    </span>
                   </button>
 
                   <button
@@ -207,13 +229,21 @@ export function AdminProductionTable({
                     <span className="block truncate text-sm font-semibold text-slate-950">
                       {item.actualOutputQty ?? "Pend."}
                     </span>
-                    <span className="mt-0.5 block truncate text-xs text-slate-500">Plan {item.plannedOutputQty}</span>
+                    <span className="mt-0.5 block truncate text-xs text-slate-500">
+                      Plan {item.plannedOutputQty}
+                    </span>
                   </button>
 
                   <div className="flex min-w-0 flex-col gap-1.5 xl:items-end">
                     <div className="flex min-w-0 flex-wrap gap-1.5 xl:justify-end">
-                      <StatusChip tone={statusTone(item.status)}>{formatStatus(item.status)}</StatusChip>
-                      <StatusChip tone={item.varianceQty && item.varianceQty !== "0.000" ? "warning" : "neutral"}>
+                      <StatusChip tone={statusTone(item.status)}>
+                        {formatStatus(item.status)}
+                      </StatusChip>
+                      <StatusChip
+                        tone={
+                          item.varianceQty && item.varianceQty !== "0.000" ? "warning" : "neutral"
+                        }
+                      >
                         {varianceLabel}
                       </StatusChip>
                       <StatusChip tone={warningTone(item.warningState)}>{warningLabel}</StatusChip>
@@ -234,34 +264,40 @@ export function AdminProductionTable({
                         Receta
                       </button>
                       {item.status === "DRAFT" ? (
-                        <button
+                        <AdminActionButton
+                          capability="production.execute"
+                          branchIds={[item.branchId]}
                           className="rounded-full border border-[var(--ui-color-border)] bg-white px-2 py-1 font-semibold text-[var(--ui-color-info)] transition hover:bg-[var(--ui-color-surface-tint)] focus:outline-none focus:ring-4 focus:ring-[var(--ui-color-ring)] disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-400"
                           disabled={isSubmitting}
                           type="button"
                           onClick={() => onStart(item)}
                         >
                           Iniciar
-                        </button>
+                        </AdminActionButton>
                       ) : null}
                       {item.status === "IN_PROGRESS" ? (
-                        <button
+                        <AdminActionButton
+                          capability="production.execute"
+                          branchIds={[item.branchId]}
                           className="rounded-full border border-[var(--ui-color-border)] bg-white px-2 py-1 font-semibold text-[var(--ui-color-info)] transition hover:bg-[var(--ui-color-surface-tint)] focus:outline-none focus:ring-4 focus:ring-[var(--ui-color-ring)] disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-400"
                           disabled={isSubmitting}
                           type="button"
                           onClick={() => onComplete(item)}
                         >
                           Completar
-                        </button>
+                        </AdminActionButton>
                       ) : null}
                       {item.status === "DRAFT" || item.status === "IN_PROGRESS" ? (
-                        <button
+                        <AdminActionButton
+                          capability="production.cancel"
+                          branchIds={[item.branchId]}
                           className="rounded-full border border-[var(--ui-color-border)] bg-white px-2 py-1 font-semibold text-slate-600 transition hover:bg-slate-50 focus:outline-none focus:ring-4 focus:ring-[var(--ui-color-ring)] disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-400"
                           disabled={isSubmitting}
                           type="button"
                           onClick={() => onCancel(item)}
                         >
                           Cancelar
-                        </button>
+                        </AdminActionButton>
                       ) : null}
                     </div>
                   </div>
@@ -271,10 +307,13 @@ export function AdminProductionTable({
           </div>
         ) : (
           <div className="grid gap-2">
-            <AdminEmptyState description="No hay producciones para los filtros seleccionados." title="Sin producciones" />
+            <AdminEmptyState
+              description="No hay producciones para los filtros seleccionados."
+              title="Sin producciones"
+            />
             <p className="rounded-[16px] border border-[var(--ui-color-border)] bg-slate-50 px-3 py-2 text-xs leading-5 text-slate-600">
-              Contrato activo: {backendContract.listEndpoint}. Las producciones aparecen cuando existen lotes persistidos
-              en backend.
+              Contrato activo: {backendContract.listEndpoint}. Las producciones aparecen cuando
+              existen lotes persistidos en backend.
             </p>
           </div>
         )}

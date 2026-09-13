@@ -1,3 +1,4 @@
+import { AdminActionButton } from "../../components/AdminActionButton";
 import type { FormEvent, ReactNode } from "react";
 import { useMemo, useState } from "react";
 
@@ -83,8 +84,12 @@ export function AdminDiscountFormPanel({
   const [name, setName] = useState(discount?.name ?? "");
   const [code, setCode] = useState(discount?.code ?? "");
   const [description, setDescription] = useState(discount?.description ?? "");
-  const [discountType, setDiscountType] = useState<AdminDiscountType>(discount?.discountType ?? "PERCENTAGE");
-  const [targetScope, setTargetScope] = useState<AdminDiscountScope>(discount?.targetScope ?? "PRODUCT");
+  const [discountType, setDiscountType] = useState<AdminDiscountType>(
+    discount?.discountType ?? "PERCENTAGE",
+  );
+  const [targetScope, setTargetScope] = useState<AdminDiscountScope>(
+    discount?.targetScope ?? "PRODUCT",
+  );
   const [targetId, setTargetId] = useState(discount?.targetId ?? "");
   const [brandId, setBrandId] = useState(discount?.brandId ?? "");
   const [value, setValue] = useState(discount?.value ?? "");
@@ -96,7 +101,8 @@ export function AdminDiscountFormPanel({
   const [isPosEligible, setIsPosEligible] = useState(discount?.isPosEligible ?? true);
   const [clientError, setClientError] = useState<string | null>(null);
 
-  const targetOptions = targetScope === "CLASS" ? classOptions : targetScope === "PRODUCT" ? productOptions : [];
+  const targetOptions =
+    targetScope === "CLASS" ? classOptions : targetScope === "PRODUCT" ? productOptions : [];
   const canSubmit = useMemo(() => {
     const numericValue = Number(value);
     const numericPriority = Number(priority);
@@ -174,11 +180,15 @@ export function AdminDiscountFormPanel({
           <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
             Gobierno comercial
           </p>
-          <h3 className="mt-1 truncate text-base font-semibold text-slate-950" title={isEditing ? "Editar descuento" : "Nuevo descuento"}>
+          <h3
+            className="mt-1 truncate text-base font-semibold text-slate-950"
+            title={isEditing ? "Editar descuento" : "Nuevo descuento"}
+          >
             {isEditing ? "Editar descuento" : "Nuevo descuento"}
           </h3>
           <p className="mt-1 max-w-4xl text-sm leading-5 text-slate-600">
-            Define una regla comercial. El precio base se mantiene en Precios; aqui solo vive la reduccion.
+            Define una regla comercial. El precio base se mantiene en Precios; aqui solo vive la
+            reduccion.
           </p>
         </div>
         <button
@@ -358,13 +368,15 @@ export function AdminDiscountFormPanel({
         <p className="min-w-0 text-sm leading-5 text-slate-600">
           Los descuentos reducen el precio base; no editan precios, recetas ni historial de tickets.
         </p>
-        <button
+        <AdminActionButton
+          capability="discounts.manage"
+          globalOnly
           className="shrink-0 rounded-2xl bg-[var(--ui-color-info)] px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:brightness-95 focus:outline-none focus:ring-4 focus:ring-[var(--ui-color-ring)] disabled:cursor-not-allowed disabled:bg-slate-300 disabled:text-slate-600"
           disabled={!canSubmit}
           type="submit"
         >
           {isSubmitting ? "Guardando..." : isEditing ? "Guardar cambios" : "Guardar descuento"}
-        </button>
+        </AdminActionButton>
       </div>
     </form>
   );

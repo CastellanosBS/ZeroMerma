@@ -82,7 +82,9 @@ export function AdminSuppliersTable({
           <h2 className="text-sm font-semibold text-slate-950">Directorio de proveedores</h2>
           <p className="text-xs text-slate-500">{backendContract.listEndpoint}</p>
         </div>
-        <span className="rounded-full bg-slate-50 px-3 py-1 text-xs font-semibold text-slate-600">{total} proveedores</span>
+        <span className="rounded-full bg-slate-50 px-3 py-1 text-xs font-semibold text-slate-600">
+          {total} proveedores
+        </span>
       </div>
 
       {errorMessage ? (
@@ -113,21 +115,30 @@ export function AdminSuppliersTable({
           <tbody className="divide-y divide-slate-100">
             {isLoading ? (
               <tr>
-                <td className="px-4 py-8 text-center text-sm font-semibold text-slate-500" colSpan={13}>
+                <td
+                  className="px-4 py-8 text-center text-sm font-semibold text-slate-500"
+                  colSpan={13}
+                >
                   Cargando proveedores.
                 </td>
               </tr>
             ) : suppliers.length === 0 ? (
               <tr>
-                <td className="px-4 py-8 text-center text-sm font-semibold text-slate-500" colSpan={13}>
-                  No hay proveedores registrados. Crea el primer proveedor para iniciar la gestion de compras.
+                <td
+                  className="px-4 py-8 text-center text-sm font-semibold text-slate-500"
+                  colSpan={13}
+                >
+                  No hay proveedores registrados. Crea el primer proveedor para iniciar la gestion
+                  de compras.
                 </td>
               </tr>
             ) : (
               suppliers.map((item) => (
                 <tr
                   className={`cursor-pointer hover:bg-slate-50 ${
-                    selectedSupplierId === item.id ? "bg-[var(--ui-color-primary-soft)]" : "bg-white"
+                    selectedSupplierId === item.id
+                      ? "bg-[var(--ui-color-primary-soft)]"
+                      : "bg-white"
                   }`}
                   key={item.id}
                   onClick={() => onSelectSupplier(item)}
@@ -136,18 +147,26 @@ export function AdminSuppliersTable({
                     <div className="font-semibold text-slate-950">{item.legalName}</div>
                     <div className="text-xs text-slate-500">{item.code}</div>
                   </td>
-                  <td className="px-4 py-3 text-slate-700">{item.commercialName ?? "No registrado"}</td>
+                  <td className="px-4 py-3 text-slate-700">
+                    {item.commercialName ?? "No registrado"}
+                  </td>
                   <td className="px-4 py-3 text-slate-700">{item.taxId ?? "No registrado"}</td>
                   <td className="px-4 py-3 text-slate-700">{item.category}</td>
                   <td className="px-4 py-3">
-                    <span className={`rounded-full border px-2.5 py-1 text-xs font-semibold ${statusClass(item.status)}`}>
+                    <span
+                      className={`rounded-full border px-2.5 py-1 text-xs font-semibold ${statusClass(item.status)}`}
+                    >
                       {statusLabel(item.status)}
                     </span>
                   </td>
-                  <td className="px-4 py-3 text-slate-700">{item.primaryContactName ?? "Sin contacto"}</td>
+                  <td className="px-4 py-3 text-slate-700">
+                    {item.primaryContactName ?? "Sin contacto"}
+                  </td>
                   <td className="px-4 py-3 text-slate-700">
                     <div>{item.primaryContactPhone ?? "Sin telefono"}</div>
-                    <div className="text-xs text-slate-500">{item.primaryContactEmail ?? "Sin email"}</div>
+                    <div className="text-xs text-slate-500">
+                      {item.primaryContactEmail ?? "Sin email"}
+                    </div>
                   </td>
                   <td className="px-4 py-3 font-semibold text-slate-950">{item.productCount}</td>
                   <td className="px-4 py-3 font-semibold text-slate-950">{item.branchCount}</td>
@@ -178,13 +197,21 @@ export function AdminSuppliersTable({
                             },
                             {
                               destructive: item.status === "ACTIVE",
+                              capability: "suppliers.manage",
+                              globalOnly: true,
                               label: item.status === "ACTIVE" ? "Desactivar" : "Activar",
-                              onSelect: () => onChangeStatus(item.id, item.status === "ACTIVE" ? "INACTIVE" : "ACTIVE"),
+                              onSelect: () =>
+                                onChangeStatus(
+                                  item.id,
+                                  item.status === "ACTIVE" ? "INACTIVE" : "ACTIVE",
+                                ),
                             },
                             ...(item.status !== "BLOCKED"
                               ? [
                                   {
                                     destructive: true,
+                                    capability: "suppliers.manage" as const,
+                                    globalOnly: true,
                                     label: "Bloquear",
                                     onSelect: () => onChangeStatus(item.id, "BLOCKED" as const),
                                   },
@@ -208,10 +235,20 @@ export function AdminSuppliersTable({
           Pagina {page} de {totalPages}
         </span>
         <div className="flex gap-2">
-          <button className="rounded-full border border-slate-200 px-3 py-1.5 font-semibold disabled:opacity-50" disabled={page <= 1} type="button" onClick={() => onPageChange(page - 1)}>
+          <button
+            className="rounded-full border border-slate-200 px-3 py-1.5 font-semibold disabled:opacity-50"
+            disabled={page <= 1}
+            type="button"
+            onClick={() => onPageChange(page - 1)}
+          >
             Anterior
           </button>
-          <button className="rounded-full border border-slate-200 px-3 py-1.5 font-semibold disabled:opacity-50" disabled={page >= totalPages} type="button" onClick={() => onPageChange(page + 1)}>
+          <button
+            className="rounded-full border border-slate-200 px-3 py-1.5 font-semibold disabled:opacity-50"
+            disabled={page >= totalPages}
+            type="button"
+            onClick={() => onPageChange(page + 1)}
+          >
             Siguiente
           </button>
         </div>

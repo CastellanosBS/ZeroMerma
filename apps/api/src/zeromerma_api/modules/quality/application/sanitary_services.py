@@ -13,7 +13,9 @@ from sqlalchemy.orm import Session
 
 from zeromerma_api.modules.audit.application.service import AuditRecorder
 from zeromerma_api.modules.branches.infrastructure.models import Branch
+from zeromerma_api.modules.identity.application.actions import restrict_actions
 from zeromerma_api.modules.identity.application.schemas import AuthenticatedUser
+from zeromerma_api.modules.identity.application.visibility import operational_user_predicate
 from zeromerma_api.modules.identity.infrastructure.models import User
 from zeromerma_api.modules.outbox.application.service import OutboxWriter
 from zeromerma_api.modules.quality.application.sanitary_schemas import (
@@ -719,7 +721,7 @@ class AdminSanitaryVerificationService:
         )
         checklist = [self._checklist_view(item) for item in row.checklist_items]
         return AdminSanitaryVerificationDetailView(
-            available_actions=self._available_actions(row),
+            available_actions=self._available_actions(session, row),
             checklist_results=checklist,
             checklist_template=AdminSanitaryChecklistTemplateView(
                 area_type=row.verification.area_type,
@@ -799,7 +801,9 @@ class AdminSanitaryVerificationService:
         rows: list[_SanitaryRow],
     ) -> AdminSanitaryFilterOptionsView:
         branches = session.execute(select(Branch).order_by(Branch.name.asc())).scalars().all()
-        users = session.execute(select(User).order_by(User.full_name.asc())).scalars().all()
+        users = session.scalars(
+            select(User).where(operational_user_predicate(session)).order_by(User.full_name.asc())
+        ).all()
         templates = (
             session.execute(
                 select(SanitaryVerificationTemplate)
@@ -1233,29 +1237,44 @@ class AdminSanitaryVerificationService:
             )
         return warnings
 
-    def _available_actions(self, row: _SanitaryRow) -> AdminSanitaryAvailableActionsView:
+    def _available_actions(
+        self, session: Session, row: _SanitaryRow
+    ) -> AdminSanitaryAvailableActionsView:
         is_open = row.verification.status in OPEN_STATUSES
         is_pending = row.verification.status in {
             SANITARY_STATUS_SCHEDULED,
             SANITARY_STATUS_PENDING,
         }
         is_final = row.verification.status in FINAL_STATUSES
-        return AdminSanitaryAvailableActionsView(
-            can_add_evidence=is_open,
-            can_cancel=is_open,
-            can_complete=is_open,
-            can_create_incident=row.verification.failed_count > 0
-            or row.verification.status == SANITARY_STATUS_REQUIRES_FOLLOW_UP,
-            can_edit=is_open,
-            can_export=False,
-            can_print=False,
-            can_start=is_pending,
-            note=(
-                "Incidencias, adjuntos de archivo y exportacion requieren contratos backend "
-                "dedicados."
-                if not is_final
-                else "Verificacion cerrada; el checklist es de solo lectura."
+        return restrict_actions(
+            session,
+            AdminSanitaryAvailableActionsView(
+                can_add_evidence=is_open,
+                can_cancel=is_open,
+                can_complete=is_open,
+                can_create_incident=row.verification.failed_count > 0
+                or row.verification.status == SANITARY_STATUS_REQUIRES_FOLLOW_UP,
+                can_edit=is_open,
+                can_export=False,
+                can_print=False,
+                can_start=is_pending,
+                note=(
+                    "Incidencias, adjuntos de archivo y exportacion requieren contratos backend "
+                    "dedicados."
+                    if not is_final
+                    else "Verificacion cerrada; el checklist es de solo lectura."
+                ),
             ),
+            {
+                "can_add_evidence": "quality_hygiene.manage",
+                "can_cancel": "quality_hygiene.manage",
+                "can_complete": "quality_hygiene.manage",
+                "can_create_incident": "quality_hygiene.manage",
+                "can_edit": "quality_hygiene.manage",
+                "can_start": "quality_hygiene.manage",
+            },
+            branch_ids=(row.verification.branch_id,),
+            global_only=False,
         )
 
     def _related_documents(self, row: _SanitaryRow) -> list[AdminSanitaryRelatedDocumentView]:

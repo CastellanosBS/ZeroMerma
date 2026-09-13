@@ -33,7 +33,10 @@ from zeromerma_api.modules.discounts.domain.constants import (
     DISCOUNT_CATEGORY_PAYROLL_ADVANCE_ADJUSTMENT,
 )
 from zeromerma_api.modules.discounts.infrastructure.models import OperationalDiscountCategory
-from zeromerma_api.modules.identity.application.permissions import PERMISSION_CATALOG
+from zeromerma_api.modules.identity.application.permissions import (
+    PERMISSION_CATALOG,
+    POS_PERMISSION_CODES,
+)
 from zeromerma_api.modules.identity.application.security import PasswordHasher
 from zeromerma_api.modules.identity.domain.constants import (
     IDENTITY_ROLE_ADMIN,
@@ -49,6 +52,7 @@ from zeromerma_api.modules.identity.infrastructure.models import (
     User,
     UserBranchAssignment,
     UserRoleAssignment,
+    UserRoleAssignmentBranchScope,
 )
 from zeromerma_api.modules.operations.domain.constants import (
     WASTE_REASON_CONTAMINATED,
@@ -116,6 +120,7 @@ SEED_PRODUCT_COCA_355_CODE = "COCA-355"
 SEED_PRODUCT_CAFE_AMERICANO_CODE = "CAFE-AMERICANO"
 SEED_PRODUCT_PASTEL_CHOC_IND_CODE = "PASTEL-CHOC-IND"
 SEED_PRODUCT_REBANADA_TRES_LECHES_CODE = "REBANADA-TRES-LECHES"
+
 
 def _upsert_brand(
     session: Session,
@@ -297,9 +302,11 @@ def _upsert_role(
     role.is_system = is_system
     session.flush()
 
-    existing = session.execute(
-        select(RolePermission).where(RolePermission.role_id == role.id)
-    ).scalars().all()
+    existing = (
+        session.execute(select(RolePermission).where(RolePermission.role_id == role.id))
+        .scalars()
+        .all()
+    )
     for row in existing:
         session.delete(row)
     session.flush()
@@ -332,10 +339,39 @@ def _upsert_user_role_assignment(
             user_id=user_id,
             role_id=role_id,
             assigned_by_user_id=assigned_by_user_id,
+            scope_type="BRANCH_SET",
         )
         session.add(assignment)
     assignment.is_active = True
     assignment.assigned_by_user_id = assigned_by_user_id
+    session.flush()
+    assignment.scope_type = "BRANCH_SET"
+    existing_scopes = list(
+        session.scalars(
+            select(UserRoleAssignmentBranchScope).where(
+                UserRoleAssignmentBranchScope.assignment_id == assignment.id,
+            )
+        )
+    )
+    for scope in existing_scopes:
+        session.delete(scope)
+    session.flush()
+    branch_ids = list(
+        session.scalars(
+            select(UserBranchAssignment.branch_id).where(
+                UserBranchAssignment.user_id == user_id,
+                UserBranchAssignment.is_active.is_(True),
+            )
+        )
+    )
+    if not branch_ids:
+        raise ValueError("Demo roles require explicit active branch assignments.")
+    session.add_all(
+        [
+            UserRoleAssignmentBranchScope(assignment_id=assignment.id, branch_id=branch_id)
+            for branch_id in branch_ids
+        ]
+    )
     session.flush()
     return assignment
 
@@ -911,9 +947,9 @@ def seed_local_data(session: Session) -> None:
         session,
         code=IDENTITY_ROLE_ADMIN,
         name="Administrador",
-        description="Acceso administrativo completo a Backoffice.",
+        description="Administración de demostración limitada a sucursales asignadas.",
         surfaces=[IDENTITY_SURFACE_BACKOFFICE],
-        permission_codes=list(permissions.keys()),
+        permission_codes=[code for code in permissions if code != "pos.operate"],
         permissions=permissions,
         is_system=True,
     )
@@ -923,7 +959,7 @@ def seed_local_data(session: Session) -> None:
         name="Cajero POS",
         description="Operacion basica de punto de venta en sucursales asignadas.",
         surfaces=[IDENTITY_SURFACE_POS],
-        permission_codes=["pos.operate"],
+        permission_codes=list(POS_PERMISSION_CODES),
         permissions=permissions,
         is_system=True,
     )

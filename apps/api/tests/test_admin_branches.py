@@ -1,9 +1,11 @@
 from __future__ import annotations
 
+from concurrent.futures import ThreadPoolExecutor
 from decimal import Decimal
+from time import monotonic, sleep
 
 from fastapi.testclient import TestClient
-from sqlalchemy import select
+from sqlalchemy import select, text
 
 from zeromerma_api.bootstrap.seed_local import (
     SEED_ADMIN_EMAIL,
@@ -15,12 +17,15 @@ from zeromerma_api.bootstrap.seed_local import (
     SEED_USER_PASSWORD,
     SEED_WORKSTATION_CODE,
 )
-from zeromerma_api.db.session import SessionLocal
+from zeromerma_api.db.access_scope import bind_authorization_scope
+from zeromerma_api.db.session import SessionLocal, engine
 from zeromerma_api.modules.audit.infrastructure.models import AuditLog
 from zeromerma_api.modules.branches.infrastructure.models import Branch, Brand, Workstation
 from zeromerma_api.modules.cash.infrastructure.models import CashSession
+from zeromerma_api.modules.identity.application.authorization import resolve_authorization
 from zeromerma_api.modules.identity.infrastructure.models import User
 from zeromerma_api.modules.outbox.infrastructure.models import OutboxEvent
+from zeromerma_api.testing.authorization import owner_headers
 
 
 def _login_admin(client: TestClient) -> str:
@@ -44,7 +49,7 @@ def _login_cashier(client: TestClient) -> str:
 
 
 def _admin_headers(client: TestClient) -> dict[str, str]:
-    return {"Authorization": f"Bearer {_login_admin(client)}"}
+    return owner_headers()
 
 
 def _get_brand_id(code: str) -> str:
@@ -256,3 +261,65 @@ def test_admin_branch_deactivation_blocks_open_cash_session(client: TestClient) 
 
     assert response.status_code == 409
     assert "open cash sessions" in response.json()["message"]
+
+
+def test_branch_deactivation_rechecks_sessions_after_concurrent_authorized_open(
+    client: TestClient,
+) -> None:
+    headers = _admin_headers(client)
+    with SessionLocal() as session:
+        branch_id = session.scalar(select(Branch.id).where(Branch.code == SEED_BRANCH_CODE))
+        workstation_id = session.scalar(
+            select(Workstation.id).where(Workstation.code == SEED_WORKSTATION_CODE)
+        )
+        cashier = session.scalars(select(User).where(User.email == SEED_USER_EMAIL)).one()
+        actor = resolve_authorization(session, cashier, surface="POS")
+    with SessionLocal() as economic, ThreadPoolExecutor(max_workers=1) as executor:
+        blocking_pid = economic.scalar(text("SELECT pg_backend_pid()"))
+        bind_authorization_scope(
+            economic, user=actor, capabilities=("pos.operate",), mutation=True, surface="POS"
+        )
+        economic.add(
+            CashSession(
+                branch_id=branch_id,
+                workstation_id=workstation_id,
+                user_id=actor.id,
+                opening_amount=Decimal("100.00"),
+            )
+        )
+        economic.flush()
+        future = executor.submit(
+            client.patch,
+            f"/v1/admin/branches/{branch_id}",
+            headers=headers,
+            json={"is_active": False},
+        )
+        blocked = False
+        try:
+            deadline = monotonic() + 10
+            while monotonic() < deadline:
+                with engine.connect() as observer:
+                    blocked = bool(
+                        observer.scalar(
+                            text(
+                                "SELECT EXISTS (SELECT 1 FROM pg_stat_activity "
+                                "WHERE :pid = ANY(pg_blocking_pids(pid)))"
+                            ),
+                            {"pid": blocking_pid},
+                        )
+                    )
+                if blocked:
+                    break
+                sleep(0.05)
+        finally:
+            economic.commit()
+        response = future.result(timeout=15)
+    assert blocked, "The branch mutation must wait for the authorized economic transaction."
+    assert response.status_code == 409, response.json()
+    assert "open cash sessions" in response.json()["message"]
+    with SessionLocal() as session:
+        assert session.scalar(select(Branch.is_active).where(Branch.id == branch_id)) is True
+        assert (
+            session.scalar(select(CashSession.id).where(CashSession.branch_id == branch_id))
+            is not None
+        )

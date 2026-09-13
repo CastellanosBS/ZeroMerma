@@ -1,3 +1,4 @@
+import { AdminActionButton } from "../../components/AdminActionButton";
 import { AdminEmptyState } from "../../components/AdminEmptyState";
 import type {
   AdminPurchaseBackendContract,
@@ -124,7 +125,10 @@ export function AdminPurchasesTable({
     <section className="flex min-h-0 min-w-0 flex-col overflow-hidden rounded-[20px] border border-[var(--ui-color-border)] bg-white">
       <div className="flex min-w-0 shrink-0 items-center justify-between gap-3 border-b border-[var(--ui-color-border)] px-3 py-2.5">
         <div className="min-w-0">
-          <h3 className="truncate text-base font-semibold text-slate-950" title="Compras y entradas">
+          <h3
+            className="truncate text-base font-semibold text-slate-950"
+            title="Compras y entradas"
+          >
             Compras y entradas
           </h3>
           <p className="truncate text-xs text-slate-500">
@@ -138,14 +142,18 @@ export function AdminPurchasesTable({
 
       <div className="min-h-0 min-w-0 flex-1 overflow-y-auto p-2.5">
         {isLoading ? (
-          <AdminEmptyState description="Consultando compras y entradas del backend." title="Cargando compras" />
+          <AdminEmptyState
+            description="Consultando compras y entradas del backend."
+            title="Cargando compras"
+          />
         ) : errorMessage ? (
           <AdminEmptyState description={errorMessage} title="No se pudieron cargar compras" />
         ) : purchases.length > 0 ? (
           <div className="grid min-w-0 gap-1.5">
             {purchases.map((item) => {
               const isSelected = item.id === selectedPurchaseId;
-              const warningLabel = item.warnings.length > 0 ? `${item.warnings.length} alertas` : "Sin alertas";
+              const warningLabel =
+                item.warnings.length > 0 ? `${item.warnings.length} alertas` : "Sin alertas";
 
               return (
                 <article
@@ -227,42 +235,52 @@ export function AdminPurchasesTable({
 
                   <div className="flex min-w-0 flex-col gap-1.5 xl:items-end">
                     <div className="flex min-w-0 flex-wrap gap-1.5 xl:justify-end">
-                      <StatusChip tone={statusTone(item.status)}>{formatStatus(item.status)}</StatusChip>
+                      <StatusChip tone={statusTone(item.status)}>
+                        {formatStatus(item.status)}
+                      </StatusChip>
                       <StatusChip tone={warningTone(item.warningState)}>{warningLabel}</StatusChip>
-                      {item.hasDiscrepancy ? <StatusChip tone="critical">Discrepancia</StatusChip> : null}
+                      {item.hasDiscrepancy ? (
+                        <StatusChip tone="critical">Discrepancia</StatusChip>
+                      ) : null}
                     </div>
                     <div className="flex min-w-0 flex-wrap gap-1.5 text-xs xl:justify-end">
                       {item.status === "DRAFT" ? (
-                        <button
+                        <AdminActionButton
+                          capability="purchases.confirm"
+                          branchIds={[item.branchId]}
                           className="rounded-full border border-[var(--ui-color-border)] bg-white px-2 py-1 font-semibold text-slate-600 transition hover:bg-slate-50 focus:outline-none focus:ring-4 focus:ring-[var(--ui-color-ring)] disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-400"
                           disabled={isSubmitting}
                           type="button"
                           onClick={() => onConfirm(item)}
                         >
                           Confirmar
-                        </button>
+                        </AdminActionButton>
                       ) : null}
                       {item.status === "DRAFT" ||
                       item.status === "ORDERED" ||
                       item.status === "PARTIALLY_RECEIVED" ? (
-                        <button
+                        <AdminActionButton
+                          capability="purchases.receive"
+                          branchIds={[item.branchId]}
                           className="rounded-full border border-[var(--ui-color-border)] bg-white px-2 py-1 font-semibold text-slate-600 transition hover:bg-slate-50 focus:outline-none focus:ring-4 focus:ring-[var(--ui-color-ring)] disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-400"
                           disabled={isSubmitting}
                           type="button"
                           onClick={() => onReceive(item)}
                         >
                           Recibir
-                        </button>
+                        </AdminActionButton>
                       ) : null}
                       {item.status === "DRAFT" || item.status === "ORDERED" ? (
-                        <button
+                        <AdminActionButton
+                          capability="purchases.cancel"
+                          branchIds={[item.branchId]}
                           className="rounded-full border border-[var(--ui-color-border)] bg-white px-2 py-1 font-semibold text-slate-600 transition hover:bg-slate-50 focus:outline-none focus:ring-4 focus:ring-[var(--ui-color-ring)] disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-400"
                           disabled={isSubmitting}
                           type="button"
                           onClick={() => onCancel(item)}
                         >
                           Cancelar
-                        </button>
+                        </AdminActionButton>
                       ) : null}
                       <button
                         className="rounded-full border border-[var(--ui-color-border)] bg-white px-2 py-1 font-semibold text-slate-600 transition hover:bg-slate-50 focus:outline-none focus:ring-4 focus:ring-[var(--ui-color-ring)]"
@@ -291,8 +309,8 @@ export function AdminPurchasesTable({
               title="Sin compras registradas"
             />
             <p className="rounded-[16px] border border-[var(--ui-color-border)] bg-slate-50 px-3 py-2 text-xs leading-5 text-slate-600">
-              Contrato activo: {backendContract.listEndpoint}. Las entradas aparecen cuando se guardan documentos de
-              compra o recepciones directas en el backend.
+              Contrato activo: {backendContract.listEndpoint}. Las entradas aparecen cuando se
+              guardan documentos de compra o recepciones directas en el backend.
             </p>
           </div>
         )}

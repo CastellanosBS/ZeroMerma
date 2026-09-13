@@ -1,3 +1,4 @@
+import { withCapabilities } from "../../../test-support/authorization";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import type { ReactElement } from "react";
 import { renderToString } from "react-dom/server";
@@ -72,7 +73,9 @@ const wasteRecord: AdminWasteListItem = {
   status: "COMMITTED",
   uom: "PCS",
   warningState: "warning",
-  warnings: [{ code: "high_impact", message: "Merma marcada como alto impacto.", severity: "warning" }],
+  warnings: [
+    { code: "high_impact", message: "Merma marcada como alto impacto.", severity: "warning" },
+  ],
 };
 
 const wasteDetail: AdminWasteDetail = {
@@ -169,11 +172,13 @@ const wasteDetail: AdminWasteDetail = {
       status: "OUT",
     },
   ],
-  warnings: [{ code: "high_impact", message: "Merma marcada como alto impacto.", severity: "warning" }],
+  warnings: [
+    { code: "high_impact", message: "Merma marcada como alto impacto.", severity: "warning" },
+  ],
 };
 
 function render(element: ReactElement) {
-  return renderToString(element);
+  return renderToString(withCapabilities(element, ["waste.manage"]));
 }
 
 describe("admin waste UI components", () => {
@@ -188,12 +193,19 @@ describe("admin waste UI components", () => {
 
     expect(html).toContain("Merma");
     expect(html).toContain("Nueva merma");
-    expect(html).toContain("Selecciona una merma para revisar producto, motivo, evidencia e impacto en inventario.");
+    expect(html).toContain(
+      "Selecciona una merma para revisar producto, motivo, evidencia e impacto en inventario.",
+    );
   });
 
   it("renders operational filters", () => {
     const html = render(
-      <AdminWasteFilters filters={filters} isBackendConnected={true} options={filterOptions} onChange={() => undefined} />,
+      <AdminWasteFilters
+        filters={filters}
+        isBackendConnected={true}
+        options={filterOptions}
+        onChange={() => undefined}
+      />,
     );
 
     expect(html).toContain("Buscar");

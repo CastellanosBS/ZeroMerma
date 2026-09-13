@@ -1,3 +1,4 @@
+import { AdminActionButton } from "../../components/AdminActionButton";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { useMemo, useState } from "react";
 
@@ -160,7 +161,10 @@ export function AdminAuditPage() {
     },
     onSuccess: (payload) => {
       downloadJson(`auditoria-${new Date().toISOString().slice(0, 10)}.json`, payload);
-      setFeedback({ tone: "success", message: `${payload.total} eventos preparados para exportar.` });
+      setFeedback({
+        tone: "success",
+        message: `${payload.total} eventos preparados para exportar.`,
+      });
     },
   });
 
@@ -212,14 +216,15 @@ export function AdminAuditPage() {
           >
             Actualizar
           </button>
-          <button
+          <AdminActionButton
+            capability="audit.export"
             className="rounded-2xl border border-[var(--ui-color-border)] bg-white px-3 py-2 text-sm font-semibold text-slate-700 transition hover:border-[var(--ui-color-info)] disabled:cursor-not-allowed disabled:opacity-40"
             disabled={!auditList.backendContract.exportSupported || exportMutation.isPending}
             type="button"
             onClick={() => exportMutation.mutate()}
           >
             Exportar
-          </button>
+          </AdminActionButton>
         </div>
 
         {feedback ? (

@@ -12,7 +12,9 @@ from sqlalchemy.orm import Session
 
 from zeromerma_api.modules.audit.application.service import AuditRecorder
 from zeromerma_api.modules.branches.infrastructure.models import Branch
+from zeromerma_api.modules.identity.application.actions import restrict_actions
 from zeromerma_api.modules.identity.application.schemas import AuthenticatedUser
+from zeromerma_api.modules.identity.application.visibility import operational_user_predicate
 from zeromerma_api.modules.identity.infrastructure.models import User
 from zeromerma_api.modules.outbox.application.service import OutboxWriter
 from zeromerma_api.modules.quality.application.cleaning_schemas import (
@@ -287,7 +289,7 @@ class AdminCleaningLogService:
         *,
         cleaning_log_id: uuid.UUID,
     ) -> AdminCleaningLogDetailView:
-        return self._to_detail(self._get_row(session, cleaning_log_id))
+        return self._to_detail(session, self._get_row(session, cleaning_log_id))
 
     def create_log(
         self,
@@ -408,6 +410,7 @@ class AdminCleaningLogService:
             raise CleaningLogValidationError("Cleaning log could not be saved.") from error
 
         return self._to_detail(
+            session,
             _CleaningRow(
                 branch=branch,
                 checklist_items=self._get_checklist(session, log.id),
@@ -415,7 +418,7 @@ class AdminCleaningLogService:
                 log=log,
                 responsible_user=responsible_user,
                 template=template,
-            )
+            ),
         )
 
     def complete_log(
@@ -495,7 +498,7 @@ class AdminCleaningLogService:
             )
 
         session.commit()
-        return self._to_detail(self._get_row(session, cleaning_log_id))
+        return self._to_detail(session, self._get_row(session, cleaning_log_id))
 
     def cancel_log(
         self,
@@ -529,7 +532,7 @@ class AdminCleaningLogService:
             branch=row.branch,
         )
         session.commit()
-        return self._to_detail(self._get_row(session, cleaning_log_id))
+        return self._to_detail(session, self._get_row(session, cleaning_log_id))
 
     def _fetch_rows(self, session: Session) -> list[_CleaningRow]:
         logs = (
@@ -594,13 +597,13 @@ class AdminCleaningLogService:
             warnings=self._warnings(row),
         )
 
-    def _to_detail(self, row: _CleaningRow) -> AdminCleaningLogDetailView:
+    def _to_detail(self, session: Session, row: _CleaningRow) -> AdminCleaningLogDetailView:
         checklist = [self._checklist_view(item) for item in row.checklist_items]
         incomplete_required = sum(
             1 for item in row.checklist_items if item.is_required and not item.is_completed
         )
         return AdminCleaningLogDetailView(
-            available_actions=self._available_actions(row),
+            available_actions=self._available_actions(session, row),
             checklist=checklist,
             evidence=AdminCleaningEvidenceView(
                 evidence_note=row.log.evidence_note,
@@ -666,7 +669,9 @@ class AdminCleaningLogService:
         rows: list[_CleaningRow],
     ) -> AdminCleaningFilterOptionsView:
         branches = session.execute(select(Branch).order_by(Branch.name.asc())).scalars().all()
-        users = session.execute(select(User).order_by(User.full_name.asc())).scalars().all()
+        users = session.scalars(
+            select(User).where(operational_user_predicate(session)).order_by(User.full_name.asc())
+        ).all()
         templates = (
             session.execute(
                 select(CleaningTemplate)
@@ -976,22 +981,36 @@ class AdminCleaningLogService:
             )
         return warnings
 
-    def _available_actions(self, row: _CleaningRow) -> AdminCleaningAvailableActionsView:
+    def _available_actions(
+        self, session: Session, row: _CleaningRow
+    ) -> AdminCleaningAvailableActionsView:
         is_final = row.log.status in FINAL_STATUSES
-        return AdminCleaningAvailableActionsView(
-            can_add_evidence=row.log.status in OPEN_STATUSES,
-            can_cancel=row.log.status in OPEN_STATUSES,
-            can_complete=row.log.status in OPEN_STATUSES or self._is_overdue(row.log),
-            can_create_incident=True,
-            can_edit=row.log.status in OPEN_STATUSES,
-            can_export=False,
-            can_print=False,
-            note=(
-                "Incidencias, adjuntos de archivo y exportacion requieren "
-                "contratos backend dedicados."
-                if not is_final
-                else "Bitacora cerrada; el checklist es de solo lectura."
+        return restrict_actions(
+            session,
+            AdminCleaningAvailableActionsView(
+                can_add_evidence=row.log.status in OPEN_STATUSES,
+                can_cancel=row.log.status in OPEN_STATUSES,
+                can_complete=row.log.status in OPEN_STATUSES or self._is_overdue(row.log),
+                can_create_incident=True,
+                can_edit=row.log.status in OPEN_STATUSES,
+                can_export=False,
+                can_print=False,
+                note=(
+                    "Incidencias, adjuntos de archivo y exportacion requieren "
+                    "contratos backend dedicados."
+                    if not is_final
+                    else "Bitacora cerrada; el checklist es de solo lectura."
+                ),
             ),
+            {
+                "can_add_evidence": "quality_hygiene.manage",
+                "can_cancel": "quality_hygiene.manage",
+                "can_complete": "quality_hygiene.manage",
+                "can_create_incident": "quality_hygiene.manage",
+                "can_edit": "quality_hygiene.manage",
+            },
+            branch_ids=(row.log.branch_id,),
+            global_only=False,
         )
 
     def _related_documents(self, row: _CleaningRow) -> list[AdminCleaningRelatedDocumentView]:

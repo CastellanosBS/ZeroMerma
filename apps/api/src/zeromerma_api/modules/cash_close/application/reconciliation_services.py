@@ -59,6 +59,7 @@ from zeromerma_api.modules.cash_close.infrastructure.models import (
     CashSessionClose,
     FinancialReconciliation,
 )
+from zeromerma_api.modules.identity.application.actions import restrict_actions
 from zeromerma_api.modules.identity.application.schemas import AuthenticatedUser
 from zeromerma_api.modules.identity.infrastructure.models import User
 from zeromerma_api.modules.outbox.application.service import OutboxWriter
@@ -917,17 +918,23 @@ class AdminReconciliationService:
             FINANCIAL_RECONCILIATION_STATUS_IN_REVIEW,
         }
         return AdminReconciliationDetailView(
-            available_actions=AdminReconciliationAvailableActionsView(
-                can_attach_evidence=False,
-                can_export_report=False,
-                can_open_source=True,
-                can_resolve=can_resolve,
-                can_save_notes=can_resolve,
-                can_void=False,
-                note=(
-                    "La evidencia se registra como nota; los adjuntos de archivo "
-                    "aun no tienen contrato."
+            available_actions=restrict_actions(
+                session,
+                AdminReconciliationAvailableActionsView(
+                    can_attach_evidence=False,
+                    can_export_report=False,
+                    can_open_source=True,
+                    can_resolve=can_resolve,
+                    can_save_notes=can_resolve,
+                    can_void=False,
+                    note=(
+                        "La evidencia se registra como nota; los adjuntos de archivo "
+                        "aun no tienen contrato."
+                    ),
                 ),
+                {"can_resolve": "cash_finance.manage", "can_save_notes": "cash_finance.manage"},
+                branch_ids=(type_cast(uuid.UUID, row["branch_id"]),),
+                global_only=False,
             ),
             backend_contract=_backend_contract(),
             difference_breakdown=AdminReconciliationDifferenceBreakdownView(

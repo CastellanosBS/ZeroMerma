@@ -67,7 +67,9 @@ function formatMoney(value: string, currencyCode = "MXN") {
   if (!Number.isFinite(numericValue)) {
     return `${value} ${currencyCode}`;
   }
-  return new Intl.NumberFormat("es-MX", { currency: currencyCode, style: "currency" }).format(numericValue);
+  return new Intl.NumberFormat("es-MX", { currency: currencyCode, style: "currency" }).format(
+    numericValue,
+  );
 }
 
 function AdminOrdersMetricStrip({
@@ -79,8 +81,16 @@ function AdminOrdersMetricStrip({
 }) {
   const loadingValue = isLoading ? "Cargando" : null;
   const items = [
-    { label: "Activos", title: "Pedidos activos", value: loadingValue ?? String(metrics.activeOrders) },
-    { label: "Listos", title: "Listos para entrega", value: loadingValue ?? String(metrics.readyOrders) },
+    {
+      label: "Activos",
+      title: "Pedidos activos",
+      value: loadingValue ?? String(metrics.activeOrders),
+    },
+    {
+      label: "Listos",
+      title: "Listos para entrega",
+      value: loadingValue ?? String(metrics.readyOrders),
+    },
     { label: "Hoy", title: "Entregas de hoy", value: loadingValue ?? String(metrics.dueToday) },
     {
       label: "Anticipos",
@@ -92,12 +102,18 @@ function AdminOrdersMetricStrip({
       title: "Saldo pendiente",
       value: loadingValue ?? formatMoney(metrics.outstandingBalanceAmount),
     },
-    { label: "Cancelados", title: "Cancelados", value: loadingValue ?? String(metrics.canceledOrders) },
+    {
+      label: "Cancelados",
+      title: "Cancelados",
+      value: loadingValue ?? String(metrics.canceledOrders),
+    },
   ];
 
   return (
     <section className="flex min-w-0 flex-wrap items-center gap-2 rounded-[18px] border border-[var(--ui-color-border)] bg-white px-3 py-2 text-xs text-slate-600">
-      <span className="shrink-0 font-semibold uppercase tracking-[0.12em] text-slate-500">Resumen</span>
+      <span className="shrink-0 font-semibold uppercase tracking-[0.12em] text-slate-500">
+        Resumen
+      </span>
       {items.map((item) => (
         <span
           className="inline-flex min-w-0 max-w-full items-center gap-1.5 rounded-full border border-[var(--ui-color-border)] bg-slate-50 px-2.5 py-1"
@@ -119,7 +135,9 @@ export function AdminOrdersPage() {
   const queryClient = useQueryClient();
   const [filters, setFilters] = useState<AdminOrderListFilters>(initialFilters);
   const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null);
-  const [feedback, setFeedback] = useState<{ tone: "success" | "error"; message: string } | null>(null);
+  const [feedback, setFeedback] = useState<{ tone: "success" | "error"; message: string } | null>(
+    null,
+  );
 
   const ordersQuery = useQuery({
     enabled: Boolean(accessToken),
@@ -165,7 +183,10 @@ export function AdminOrdersPage() {
   });
 
   const listErrorMessage = ordersQuery.isError
-    ? toBackofficeErrorMessage(ordersQuery.error, "No se pudieron cargar los pedidos. Intenta nuevamente.")
+    ? toBackofficeErrorMessage(
+        ordersQuery.error,
+        "No se pudieron cargar los pedidos. Intenta nuevamente.",
+      )
     : null;
   const detailErrorMessage = detailQuery.isError
     ? toBackofficeErrorMessage(detailQuery.error, "No se pudo cargar el detalle del pedido.")
@@ -205,6 +226,7 @@ export function AdminOrdersPage() {
   return (
     <section className="flex min-h-0 min-w-0 flex-col overflow-hidden rounded-[28px] border border-[var(--ui-color-border)] bg-white shadow-[var(--ui-shadow-subtle)] lg:h-full">
       <AdminPageHeader
+        actionCapability="orders.manage"
         actionDisabled
         actionLabel="Nuevo pedido"
         description="Gestiona pedidos de cliente, anticipos, saldos pendientes, fechas de entrega y estados operativos."

@@ -1,3 +1,4 @@
+import { AdminActionButton } from "../../components/AdminActionButton";
 import { AdminEmptyState } from "../../components/AdminEmptyState";
 import type { AdminProductClass, AdminProductClassBackendContract } from "../types";
 
@@ -134,10 +135,7 @@ export function AdminClassesTable({
             title="Cargando clases"
           />
         ) : errorMessage ? (
-          <AdminEmptyState
-            description={errorMessage}
-            title="No se pudieron cargar las clases"
-          />
+          <AdminEmptyState description={errorMessage} title="No se pudieron cargar las clases" />
         ) : classes.length > 0 ? (
           <div className="grid min-w-0 gap-1.5">
             {classes.map((item) => {
@@ -223,44 +221,56 @@ export function AdminClassesTable({
 
                   <div className="flex min-w-0 flex-col gap-1.5 lg:items-end">
                     <div className="flex min-w-0 flex-wrap gap-1.5 lg:justify-end">
-                      <StatusChip tone={item.status === "active" && item.isSellable ? "success" : "neutral"}>
+                      <StatusChip
+                        tone={item.status === "active" && item.isSellable ? "success" : "neutral"}
+                      >
                         {formatStatus(item)}
                       </StatusChip>
-                      <StatusChip tone={readinessTone}>{formatReadiness(item.readiness)}</StatusChip>
+                      <StatusChip tone={readinessTone}>
+                        {formatReadiness(item.readiness)}
+                      </StatusChip>
                     </div>
                     <div className="flex min-w-0 flex-wrap gap-1.5 text-xs lg:justify-end">
-                      <button
+                      <AdminActionButton
+                        globalOnly
+                        capability="catalog.manage"
                         className="rounded-full border border-[var(--ui-color-border)] bg-white px-2 py-1 font-semibold text-slate-600 transition hover:bg-slate-50 focus:outline-none focus:ring-4 focus:ring-[var(--ui-color-ring)] disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-400"
                         disabled={isUpdating}
                         type="button"
                         onClick={() => onEditClass(item)}
                       >
                         Editar
-                      </button>
-                      <button
+                      </AdminActionButton>
+                      <AdminActionButton
+                        globalOnly
+                        capability="catalog.manage"
                         className="rounded-full border border-[var(--ui-color-border)] bg-white px-2 py-1 font-semibold text-slate-600 transition hover:bg-slate-50 focus:outline-none focus:ring-4 focus:ring-[var(--ui-color-ring)] disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-400"
                         disabled={isUpdating}
                         type="button"
                         onClick={() => onMoveClass(item, "up")}
                       >
                         Subir
-                      </button>
-                      <button
+                      </AdminActionButton>
+                      <AdminActionButton
+                        globalOnly
+                        capability="catalog.manage"
                         className="rounded-full border border-[var(--ui-color-border)] bg-white px-2 py-1 font-semibold text-slate-600 transition hover:bg-slate-50 focus:outline-none focus:ring-4 focus:ring-[var(--ui-color-ring)] disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-400"
                         disabled={isUpdating}
                         type="button"
                         onClick={() => onMoveClass(item, "down")}
                       >
                         Bajar
-                      </button>
-                      <button
+                      </AdminActionButton>
+                      <AdminActionButton
+                        globalOnly
+                        capability="catalog.manage"
                         className="rounded-full border border-[var(--ui-color-border)] bg-white px-2 py-1 font-semibold text-[var(--ui-color-info)] transition hover:bg-[var(--ui-color-surface-tint)] focus:outline-none focus:ring-4 focus:ring-[var(--ui-color-ring)] disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-400"
                         disabled={isUpdating}
                         type="button"
                         onClick={() => onToggleStatus(item)}
                       >
                         {item.status === "active" ? "Desactivar" : "Activar"}
-                      </button>
+                      </AdminActionButton>
                     </div>
                   </div>
                 </article>

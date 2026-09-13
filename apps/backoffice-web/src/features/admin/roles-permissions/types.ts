@@ -1,3 +1,5 @@
+import type { components } from "@zeromerma/api-client";
+
 export type AdminRoleStatus = "active" | "inactive";
 export type AdminRoleSurface = "POS" | "BACKOFFICE";
 export type AdminRoleWarningState = "ready" | "warning" | "blocked";
@@ -110,6 +112,8 @@ export interface AdminPermissionGroup {
 }
 
 export interface AdminRoleAssignedUser {
+  scopeType: components["schemas"]["AdminRoleAssignedUserView"]["scope_type"];
+  branchIds: string[];
   assignedAt: string;
   branchSummary: string;
   email: string;
@@ -181,4 +185,3 @@ export interface AdminRoleUpdatePayload {
   permissionCodes?: string[];
   surfaces?: AdminRoleSurface[];
 }
-

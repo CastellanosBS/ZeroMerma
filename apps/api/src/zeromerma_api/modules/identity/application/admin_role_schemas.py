@@ -6,6 +6,7 @@ from uuid import UUID
 
 from pydantic import BaseModel, Field, field_validator, model_validator
 
+from zeromerma_api.modules.identity.application.admin_schemas import AdminAssignmentScopeRequest
 from zeromerma_api.modules.identity.application.schemas import IdentitySurface
 from zeromerma_api.modules.identity.domain.constants import IDENTITY_ALLOWED_SURFACES
 
@@ -24,7 +25,7 @@ class AdminRoleBackendContractView(BaseModel):
     assign_user_endpoint: str = "POST /v1/admin/roles/{id}/users/{user_id}"
     remove_user_endpoint: str = "POST /v1/admin/roles/{id}/users/{user_id}/remove"
     duplicate_supported: bool = False
-    scoped_roles_supported: bool = False
+    scoped_roles_supported: bool = True
     destructive_delete_supported: bool = False
 
 
@@ -133,9 +134,9 @@ class AdminPermissionGroupView(BaseModel):
 
 
 class AdminRoleScopeView(BaseModel):
-    is_supported: bool = False
-    scope_summary: str = "Sin restricciones de alcance configuradas."
-    missing_contract_note: str = "Branch-scoped roles are not available yet."
+    is_supported: bool = True
+    scope_summary: str = "Explicit scope is configured per user role assignment."
+    missing_contract_note: str = ""
 
 
 class AdminRoleAssignedUserView(BaseModel):
@@ -146,6 +147,8 @@ class AdminRoleAssignedUserView(BaseModel):
     branch_summary: str
     surfaces: list[IdentitySurface]
     assigned_at: datetime
+    scope_type: Literal["GLOBAL", "BRANCH_SET"]
+    branch_ids: list[UUID]
 
 
 class AdminRoleAuditEventView(BaseModel):
@@ -281,6 +284,5 @@ class AdminRoleStatusChangeRequest(BaseModel):
     confirmed_high_risk_change: bool = False
 
 
-class AdminRoleUserAssignmentRequest(BaseModel):
-    user_id: UUID
-
+class AdminRoleUserAssignmentRequest(AdminAssignmentScopeRequest):
+    pass

@@ -1,6 +1,12 @@
 import { ApiError, requestApiJson, type components } from "@zeromerma/api-client";
 
 import { appEnv } from "../env";
+import {
+  backofficeAuthorizationQueryKey,
+  clearAdministrativeQueries,
+  queryClient,
+} from "./query-client";
+import { useBackofficeAuthStore } from "../features/auth/backoffice-auth-store";
 
 export { ApiError };
 
@@ -22,13 +28,25 @@ export async function requestJson<TResponse>({
   method = "GET",
   path,
 }: RequestJsonOptions): Promise<TResponse> {
-  return requestApiJson<TResponse>({
-    accessToken,
-    baseUrl: appEnv.VITE_API_BASE_URL,
-    body,
-    method,
-    path,
-  });
+  try {
+    return await requestApiJson<TResponse>({
+      accessToken,
+      baseUrl: appEnv.VITE_API_BASE_URL,
+      body,
+      method,
+      path,
+    });
+  } catch (error) {
+    if (accessToken && error instanceof ApiError) {
+      if (error.statusCode === 401) useBackofficeAuthStore.getState().clearSession();
+      if (error.statusCode === 403 && path.split("?")[0] !== "/v1/auth/me") {
+        void clearAdministrativeQueries(queryClient).then(() =>
+          queryClient.invalidateQueries({ queryKey: backofficeAuthorizationQueryKey }),
+        );
+      }
+    }
+    throw error;
+  }
 }
 
 export async function fetchApiHealth(): Promise<HealthResponse> {
@@ -46,7 +64,7 @@ export function loginBackofficeUser(payload: LoginRequest): Promise<LoginRespons
 export function getCurrentBackofficeUser(accessToken: string): Promise<AuthenticatedUser> {
   return requestJson<AuthenticatedUser>({
     accessToken,
-    path: "/v1/auth/me",
+    path: "/v1/auth/me?surface=BACKOFFICE",
   });
 }
 

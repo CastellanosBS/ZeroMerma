@@ -3,7 +3,15 @@ from __future__ import annotations
 import uuid
 from datetime import UTC, datetime
 
-from sqlalchemy import Boolean, DateTime, ForeignKey, String, Text, UniqueConstraint
+from sqlalchemy import (
+    Boolean,
+    CheckConstraint,
+    DateTime,
+    ForeignKey,
+    String,
+    Text,
+    UniqueConstraint,
+)
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -165,10 +173,26 @@ class RolePermission(Base):
     )
 
 
+class UserRoleAssignmentBranchScope(Base):
+    __tablename__ = "user_role_assignment_branch_scopes"
+
+    assignment_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("user_role_assignments.id", ondelete="CASCADE"),
+        primary_key=True,
+    )
+    branch_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("branches.id", ondelete="RESTRICT"),
+        primary_key=True,
+    )
+
+
 class UserRoleAssignment(Base):
     __tablename__ = "user_role_assignments"
     __table_args__ = (
         UniqueConstraint("user_id", "role_id", name="uq_user_role_assignments_user_role"),
+        CheckConstraint("scope_type IN ('GLOBAL', 'BRANCH_SET')", name="ck_role_assignment_scope"),
     )
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
@@ -183,6 +207,7 @@ class UserRoleAssignment(Base):
         nullable=False,
     )
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    scope_type: Mapped[str] = mapped_column(String(20), nullable=False)
     assigned_by_user_id: Mapped[uuid.UUID | None] = mapped_column(
         UUID(as_uuid=True),
         ForeignKey("users.id", ondelete="SET NULL"),

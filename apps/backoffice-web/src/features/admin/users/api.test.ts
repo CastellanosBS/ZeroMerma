@@ -1,6 +1,13 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { createAdminUser, fetchAdminUserDetail, fetchAdminUsers, lockAdminUser } from "./api";
+import {
+  assignAdminUserRole,
+  removeAdminUserRole,
+  createAdminUser,
+  fetchAdminUserDetail,
+  fetchAdminUsers,
+  lockAdminUser,
+} from "./api";
 import type { AdminUserListFilters } from "./types";
 
 const filters: AdminUserListFilters = {
@@ -195,9 +202,9 @@ describe("admin users API boundary", () => {
   });
 
   it("loads detail and maps security/account fields", async () => {
-    const fetchSpy = vi.spyOn(globalThis, "fetch").mockImplementation(() =>
-      mockJsonResponse(apiDetail),
-    );
+    const fetchSpy = vi
+      .spyOn(globalThis, "fetch")
+      .mockImplementation(() => mockJsonResponse(apiDetail));
 
     const detail = await fetchAdminUserDetail("token-1", "user-1");
 
@@ -211,9 +218,9 @@ describe("admin users API boundary", () => {
   });
 
   it("submits user create and lock requests through backend endpoints", async () => {
-    const fetchSpy = vi.spyOn(globalThis, "fetch").mockImplementation(() =>
-      mockJsonResponse(apiDetail, 201),
-    );
+    const fetchSpy = vi
+      .spyOn(globalThis, "fetch")
+      .mockImplementation(() => mockJsonResponse(apiDetail, 201));
 
     await createAdminUser("token-1", {
       allowedSurfaces: ["BACKOFFICE"],
@@ -223,7 +230,6 @@ describe("admin users API boundary", () => {
       fullName: "New Admin",
       notes: null,
       phone: null,
-      roleIds: [],
       sendInvitation: false,
       temporaryPassword: "TempUser123!",
     });
@@ -235,6 +241,7 @@ describe("admin users API boundary", () => {
         method: "POST",
       }),
     );
+    expect(JSON.parse(String(fetchSpy.mock.calls[0]?.[1]?.body))).not.toHaveProperty("role_ids");
 
     await lockAdminUser("token-1", "user-1", { reason: "Security review" });
     expect(fetchSpy).toHaveBeenLastCalledWith(
@@ -243,6 +250,27 @@ describe("admin users API boundary", () => {
         body: JSON.stringify({ reason: "Security review" }),
         method: "POST",
       }),
+    );
+  });
+
+  it("sends explicit assignment scope and uses the canonical revocation route", async () => {
+    const fetchSpy = vi
+      .spyOn(globalThis, "fetch")
+      .mockImplementation(() => mockJsonResponse(apiDetail));
+    const payload = {
+      role_id: "role-1",
+      scope_type: "BRANCH_SET" as const,
+      branch_ids: ["branch-1"],
+    };
+    await assignAdminUserRole("token-1", "user-1", payload);
+    expect(fetchSpy).toHaveBeenLastCalledWith(
+      expect.stringContaining("/v1/admin/users/user-1/roles"),
+      expect.objectContaining({ method: "POST", body: JSON.stringify(payload) }),
+    );
+    await removeAdminUserRole("token-1", "user-1", "role-1");
+    expect(fetchSpy).toHaveBeenLastCalledWith(
+      expect.stringContaining("/v1/admin/users/user-1/roles/role-1/remove"),
+      expect.objectContaining({ method: "POST", body: undefined }),
     );
   });
 });

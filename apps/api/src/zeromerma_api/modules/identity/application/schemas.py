@@ -5,12 +5,21 @@ from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
+from zeromerma_api.modules.identity.application.permissions import PermissionCode
 from zeromerma_api.modules.identity.domain.constants import (
     IDENTITY_ALLOWED_SURFACES,
     IDENTITY_SURFACE_POS,
 )
 
 IdentitySurface = Literal["POS", "BACKOFFICE"]
+CapabilityCode = PermissionCode
+ScopeType = Literal["GLOBAL", "BRANCH_SET"]
+
+
+class EffectiveGrant(BaseModel):
+    capability: PermissionCode
+    scope_type: ScopeType
+    branch_ids: list[UUID]
 
 
 def _default_surfaces() -> list[IdentitySurface]:
@@ -26,6 +35,10 @@ class AuthenticatedUser(BaseModel):
     allowed_surfaces: list[IdentitySurface] = Field(default_factory=_default_surfaces)
     default_surface: IdentitySurface = Field(default=IDENTITY_SURFACE_POS)
     is_active: bool
+    effective_grants: list[EffectiveGrant] = Field(default_factory=list)
+    authorization_version: str = ""
+    authorization_surface: IdentitySurface | None = None
+    is_superadministrator: bool = False
 
     @field_validator("allowed_surfaces", mode="before")
     @classmethod

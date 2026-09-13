@@ -1,3 +1,4 @@
+import { AdminActionButton } from "../../components/AdminActionButton";
 import { useMemo, useState } from "react";
 
 import type {
@@ -164,7 +165,11 @@ export function AdminRoleWorkflowPanel({
         </label>
         <label className="grid gap-1 text-xs font-semibold text-slate-600">
           Nombre
-          <input className={fieldClass()} value={name} onChange={(event) => setName(event.target.value)} />
+          <input
+            className={fieldClass()}
+            value={name}
+            onChange={(event) => setName(event.target.value)}
+          />
         </label>
         <label className="grid gap-1 text-xs font-semibold text-slate-600">
           Descripcion
@@ -266,16 +271,17 @@ export function AdminRoleWorkflowPanel({
         >
           Cancelar
         </button>
-        <button
+        <AdminActionButton
+          capability="roles.manage"
+          globalOnly
           className="rounded-2xl bg-[var(--ui-color-primary)] px-4 py-2 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:bg-slate-300 disabled:text-slate-600"
           disabled={isSubmitting}
           type="button"
           onClick={handleSubmit}
         >
           {isSubmitting ? "Guardando" : isEdit ? "Guardar cambios" : "Crear rol"}
-        </button>
+        </AdminActionButton>
       </div>
     </section>
   );
 }
-

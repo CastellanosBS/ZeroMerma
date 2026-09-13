@@ -1,3 +1,4 @@
+import { AdminActionButton } from "../../components/AdminActionButton";
 import type { ReactNode } from "react";
 
 import { AdminEmptyState } from "../../components/AdminEmptyState";
@@ -164,7 +165,10 @@ export function AdminIncidentDetailPanel({
             <Fact label="Origen" value={sourceTypeLabel(detail.overview.sourceType)} />
             <Fact label="Severidad" value={detail.overview.severity} />
             <Fact label="Estado" value={statusLabel(detail.overview.status)} />
-            <Fact label="Responsable" value={detail.overview.responsibleUserName ?? "Sin responsable"} />
+            <Fact
+              label="Responsable"
+              value={detail.overview.responsibleUserName ?? "Sin responsable"}
+            />
             <Fact label="Reportada por" value={detail.overview.reportedByUserName} />
             <Fact label="Creada" value={formatDateTime(detail.overview.createdAt)} />
             <Fact label="Vence" value={formatDateTime(detail.overview.dueAt)} />
@@ -182,7 +186,10 @@ export function AdminIncidentDetailPanel({
             <Fact label="Equipo" value={detail.locationScope.equipmentName ?? "Sin equipo"} />
             <Fact label="Proceso" value={detail.locationScope.processName ?? "Sin proceso"} />
             <Fact label="Produccion" value={detail.locationScope.productionReference ?? "N/A"} />
-            <Fact label="Producto / inventario" value={detail.locationScope.productReference ?? "N/A"} />
+            <Fact
+              label="Producto / inventario"
+              value={detail.locationScope.productReference ?? "N/A"}
+            />
           </div>
         </Section>
 
@@ -231,11 +238,20 @@ export function AdminIncidentDetailPanel({
             </p>
             <div className="grid gap-2 sm:grid-cols-2">
               <Fact label="Progreso" value={statusLabel(detail.correctiveAction.currentProgress)} />
-              <Fact label="Responsable" value={detail.correctiveAction.responsibleUserName ?? "Sin responsable"} />
+              <Fact
+                label="Responsable"
+                value={detail.correctiveAction.responsibleUserName ?? "Sin responsable"}
+              />
               <Fact label="Vence" value={formatDateTime(detail.correctiveAction.dueAt)} />
               <Fact label="Completada" value={formatDateTime(detail.correctiveAction.resolvedAt)} />
-              <Fact label="Resultado" value={detail.correctiveAction.resolutionResult ?? "Pendiente"} />
-              <Fact label="Resolucion" value={detail.correctiveAction.resolutionNote ?? "Pendiente"} />
+              <Fact
+                label="Resultado"
+                value={detail.correctiveAction.resolutionResult ?? "Pendiente"}
+              />
+              <Fact
+                label="Resolucion"
+                value={detail.correctiveAction.resolutionNote ?? "Pendiente"}
+              />
             </div>
           </div>
         </Section>
@@ -334,38 +350,46 @@ export function AdminIncidentDetailPanel({
             >
               Copiar folio
             </button>
-            <button
+            <AdminActionButton
+              capability="quality_hygiene.manage"
+              branchIds={[detail.overview.branchId]}
               className="rounded-full border border-[var(--ui-color-border)] bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 disabled:cursor-not-allowed disabled:opacity-40"
               disabled={!detail.availableActions.canAddFollowUp}
               type="button"
               onClick={() => onAddFollowUp(detail.overview)}
             >
               Agregar seguimiento
-            </button>
-            <button
+            </AdminActionButton>
+            <AdminActionButton
+              capability="quality_hygiene.manage"
+              branchIds={[detail.overview.branchId]}
               className="rounded-full border border-[var(--ui-color-border)] bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 disabled:cursor-not-allowed disabled:opacity-40"
               disabled={!detail.availableActions.canMarkInProgress}
               type="button"
               onClick={() => onMarkInProgress(detail.overview)}
             >
               Marcar en seguimiento
-            </button>
-            <button
+            </AdminActionButton>
+            <AdminActionButton
+              capability="quality_hygiene.manage"
+              branchIds={[detail.overview.branchId]}
               className="rounded-full border border-[var(--ui-color-border)] bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 disabled:cursor-not-allowed disabled:opacity-40"
               disabled={!detail.availableActions.canResolve}
               type="button"
               onClick={() => onResolve(detail.overview)}
             >
               Resolver
-            </button>
-            <button
+            </AdminActionButton>
+            <AdminActionButton
+              capability="quality_hygiene.manage"
+              branchIds={[detail.overview.branchId]}
               className="rounded-full border border-[var(--ui-color-border)] bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 disabled:cursor-not-allowed disabled:opacity-40"
               disabled={!detail.availableActions.canReopen}
               type="button"
               onClick={() => onReopen(detail.overview)}
             >
               Reabrir
-            </button>
+            </AdminActionButton>
           </div>
           {detail.availableActions.note ? (
             <p className="mt-2 text-xs text-slate-500">{detail.availableActions.note}</p>

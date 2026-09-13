@@ -70,9 +70,21 @@ function AdminDiscountMetricStrip({
   const loadingValue = isLoading ? "Cargando" : null;
   const items = [
     { label: "Total", title: "Total de descuentos", value: loadingValue ?? metrics.totalDiscounts },
-    { label: "Activos", title: "Descuentos activos", value: loadingValue ?? metrics.activeDiscounts },
-    { label: "Proximos", title: "Descuentos proximos", value: loadingValue ?? metrics.upcomingDiscounts },
-    { label: "Expirados", title: "Descuentos expirados", value: loadingValue ?? metrics.expiredDiscounts },
+    {
+      label: "Activos",
+      title: "Descuentos activos",
+      value: loadingValue ?? metrics.activeDiscounts,
+    },
+    {
+      label: "Proximos",
+      title: "Descuentos proximos",
+      value: loadingValue ?? metrics.upcomingDiscounts,
+    },
+    {
+      label: "Expirados",
+      title: "Descuentos expirados",
+      value: loadingValue ?? metrics.expiredDiscounts,
+    },
     { label: "Producto", title: "Alcance producto", value: loadingValue ?? metrics.productScoped },
     { label: "Clase", title: "Alcance clase", value: loadingValue ?? metrics.classScoped },
     { label: "Revisar", title: "Con advertencias", value: loadingValue ?? metrics.withWarnings },
@@ -80,7 +92,9 @@ function AdminDiscountMetricStrip({
 
   return (
     <section className="flex min-w-0 flex-wrap items-center gap-2 rounded-[18px] border border-[var(--ui-color-border)] bg-white px-3 py-2 text-xs text-slate-600">
-      <span className="shrink-0 font-semibold uppercase tracking-[0.12em] text-slate-500">Resumen</span>
+      <span className="shrink-0 font-semibold uppercase tracking-[0.12em] text-slate-500">
+        Resumen
+      </span>
       {items.map((item) => (
         <span
           className="inline-flex min-w-0 max-w-full items-center gap-1.5 rounded-full border border-[var(--ui-color-border)] bg-slate-50 px-2.5 py-1"
@@ -100,10 +114,12 @@ export function AdminDiscountsPage() {
   const queryClient = useQueryClient();
   const [filters, setFilters] = useState<AdminDiscountListFilters>(initialFilters);
   const [selectedDiscountId, setSelectedDiscountId] = useState<string | null>(null);
-  const [formMode, setFormMode] = useState<{ type: "create" } | { type: "edit"; item: AdminDiscount } | null>(
+  const [formMode, setFormMode] = useState<
+    { type: "create" } | { type: "edit"; item: AdminDiscount } | null
+  >(null);
+  const [feedback, setFeedback] = useState<{ tone: "success" | "error"; message: string } | null>(
     null,
   );
-  const [feedback, setFeedback] = useState<{ tone: "success" | "error"; message: string } | null>(null);
 
   const discountsQuery = useQuery({
     enabled: Boolean(accessToken),
@@ -126,7 +142,8 @@ export function AdminDiscountsPage() {
   });
 
   const createMutation = useMutation({
-    mutationFn: (payload: AdminDiscountSavePayload) => createAdminDiscount(accessToken ?? "", payload),
+    mutationFn: (payload: AdminDiscountSavePayload) =>
+      createAdminDiscount(accessToken ?? "", payload),
     onError: (error) => {
       setFeedback({
         tone: "error",
@@ -142,8 +159,13 @@ export function AdminDiscountsPage() {
   });
 
   const updateMutation = useMutation({
-    mutationFn: ({ discountId, payload }: { discountId: string; payload: AdminDiscountSavePayload }) =>
-      updateAdminDiscount(accessToken ?? "", discountId, payload),
+    mutationFn: ({
+      discountId,
+      payload,
+    }: {
+      discountId: string;
+      payload: AdminDiscountSavePayload;
+    }) => updateAdminDiscount(accessToken ?? "", discountId, payload),
     onError: (error) => {
       setFeedback({
         tone: "error",
@@ -179,14 +201,23 @@ export function AdminDiscountsPage() {
 
   const detailDiscount = discountDetailQuery.data ?? selectedDiscountPreview;
   const listErrorMessage = discountsQuery.isError
-    ? toBackofficeErrorMessage(discountsQuery.error, "No se pudieron cargar los descuentos. Intenta nuevamente.")
+    ? toBackofficeErrorMessage(
+        discountsQuery.error,
+        "No se pudieron cargar los descuentos. Intenta nuevamente.",
+      )
     : null;
   const detailErrorMessage = discountDetailQuery.isError
-    ? toBackofficeErrorMessage(discountDetailQuery.error, "No se pudo cargar el detalle del descuento.")
+    ? toBackofficeErrorMessage(
+        discountDetailQuery.error,
+        "No se pudo cargar el detalle del descuento.",
+      )
     : null;
   const formErrorMessage =
     createMutation.isError || updateMutation.isError
-      ? toBackofficeErrorMessage(createMutation.error ?? updateMutation.error, "No se pudo guardar el descuento.")
+      ? toBackofficeErrorMessage(
+          createMutation.error ?? updateMutation.error,
+          "No se pudo guardar el descuento.",
+        )
       : null;
   const pageStatusLabel = discountsQuery.isLoading
     ? "Validando API"
@@ -247,6 +278,8 @@ export function AdminDiscountsPage() {
   return (
     <section className="flex min-h-0 min-w-0 flex-col overflow-hidden rounded-[28px] border border-[var(--ui-color-border)] bg-white shadow-[var(--ui-shadow-subtle)] lg:h-full">
       <AdminPageHeader
+        actionGlobalOnly
+        actionCapability="discounts.manage"
         actionLabel="Nuevo descuento"
         description="Gobierna reglas comerciales de descuento sin modificar precios base ni ventas historicas."
         meta={[pageStatusLabel]}
@@ -265,7 +298,10 @@ export function AdminDiscountsPage() {
           onChange={patchFilters}
         />
 
-        <AdminDiscountMetricStrip metrics={discountList.metrics} isLoading={discountsQuery.isLoading} />
+        <AdminDiscountMetricStrip
+          metrics={discountList.metrics}
+          isLoading={discountsQuery.isLoading}
+        />
 
         {feedback ? (
           <p

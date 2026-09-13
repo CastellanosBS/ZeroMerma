@@ -1,3 +1,6 @@
+import { AdminActionButton } from "../../components/AdminActionButton";
+import { hasEffectiveCapability, type PermissionCode } from "../../../auth/authorization";
+import { useBackofficeAuthorization } from "../../../auth/authorization-context";
 import { useMemo, useState } from "react";
 import type { FormEvent } from "react";
 
@@ -46,19 +49,27 @@ function getDescription(mode: WorkflowMode, production?: AdminProductionDetail |
     return "Crea un lote persistido antes de iniciar o afectar inventario.";
   }
   if (mode === "edit") {
-    return production ? `${production.overview.folio} - solo disponible en borrador.` : "Solo disponible en borrador.";
+    return production
+      ? `${production.overview.folio} - solo disponible en borrador.`
+      : "Solo disponible en borrador.";
   }
   if (mode === "start") {
-    return production ? `${production.overview.folio} validara insumos antes de iniciar.` : "Valida insumos antes de iniciar.";
+    return production
+      ? `${production.overview.folio} validara insumos antes de iniciar.`
+      : "Valida insumos antes de iniciar.";
   }
   if (mode === "complete") {
-    return production ? `${production.overview.folio} consumira insumos y generara salida terminada.` : "Cierre auditable.";
+    return production
+      ? `${production.overview.folio} consumira insumos y generara salida terminada.`
+      : "Cierre auditable.";
   }
-  return production ? `${production.overview.folio} quedara cancelada si backend lo permite.` : "Cancelacion controlada.";
+  return production
+    ? `${production.overview.folio} quedara cancelada si backend lo permite.`
+    : "Cancelacion controlada.";
 }
 
 export function AdminProductionWorkflowPanel({
-  branchOptions,
+  branchOptions: allBranchOptions,
   errorMessage,
   isSubmitting = false,
   mode,
@@ -72,23 +83,47 @@ export function AdminProductionWorkflowPanel({
   production,
   recipeOptions,
 }: AdminProductionWorkflowPanelProps) {
-  const [actualOutputQty, setActualOutputQty] = useState(production?.overview.plannedOutputQty ?? "");
-  const [branchId, setBranchId] = useState(production?.overview.branchId || branchOptions[0]?.id || "");
+  const actor = useBackofficeAuthorization();
+  const actionCapability: PermissionCode =
+    mode === "cancel"
+      ? "production.cancel"
+      : mode === "start" || mode === "complete"
+        ? "production.execute"
+        : "production.manage";
+  const branchOptions = useMemo(
+    () =>
+      allBranchOptions.filter((option) =>
+        hasEffectiveCapability(actor, actionCapability, [option.id]),
+      ),
+    [actor, actionCapability, allBranchOptions],
+  );
+  const [actualOutputQty, setActualOutputQty] = useState(
+    production?.overview.plannedOutputQty ?? "",
+  );
+  const [branchId, setBranchId] = useState(
+    production?.overview.branchId || branchOptions[0]?.id || "",
+  );
   const [localError, setLocalError] = useState<string | null>(null);
   const [notes, setNotes] = useState(production?.overview.notes ?? "");
   const [plannedAt, setPlannedAt] = useState(production?.overview.plannedAt?.slice(0, 16) ?? "");
-  const [plannedOutputQty, setPlannedOutputQty] = useState(production?.overview.plannedOutputQty ?? "");
-  const [productId, setProductId] = useState(production?.productRecipe.productId || productOptions[0]?.id || "");
+  const [plannedOutputQty, setPlannedOutputQty] = useState(
+    production?.overview.plannedOutputQty ?? "",
+  );
+  const [productId, setProductId] = useState(
+    production?.productRecipe.productId || productOptions[0]?.id || "",
+  );
   const [reason, setReason] = useState("");
   const [recipeId, setRecipeId] = useState(production?.productRecipe.recipeId || "");
   const [varianceReason, setVarianceReason] = useState(production?.overview.varianceReason ?? "");
 
   const selectedBranchLabel = useMemo(
-    () => branchOptions.find((option) => option.id === branchId)?.label ?? "Sucursal no seleccionada",
+    () =>
+      branchOptions.find((option) => option.id === branchId)?.label ?? "Sucursal no seleccionada",
     [branchOptions, branchId],
   );
   const selectedProductLabel = useMemo(
-    () => productOptions.find((option) => option.id === productId)?.label ?? "Producto no seleccionado",
+    () =>
+      productOptions.find((option) => option.id === productId)?.label ?? "Producto no seleccionado",
     [productOptions, productId],
   );
 
@@ -124,6 +159,7 @@ export function AdminProductionWorkflowPanel({
 
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (!hasEffectiveCapability(actor, actionCapability, [branchId])) return;
     setLocalError(null);
 
     if (mode === "create" || mode === "edit") {
@@ -166,6 +202,11 @@ export function AdminProductionWorkflowPanel({
   }
 
   function handleCreateAndStart() {
+    if (
+      !hasEffectiveCapability(actor, "production.manage", [branchId]) ||
+      !hasEffectiveCapability(actor, "production.execute", [branchId])
+    )
+      return;
     setLocalError(null);
     if (!validateDraft()) {
       return;
@@ -184,7 +225,10 @@ export function AdminProductionWorkflowPanel({
   }
 
   return (
-    <form className="grid min-w-0 gap-3 rounded-[20px] border border-[var(--ui-color-border)] bg-white p-3" onSubmit={handleSubmit}>
+    <form
+      className="grid min-w-0 gap-3 rounded-[20px] border border-[var(--ui-color-border)] bg-white p-3"
+      onSubmit={handleSubmit}
+    >
       <div className="flex min-w-0 items-start justify-between gap-3">
         <div className="min-w-0">
           <h3 className="truncate text-base font-semibold text-slate-950">{getTitle(mode)}</h3>
@@ -218,7 +262,9 @@ export function AdminProductionWorkflowPanel({
               value={branchId}
               onChange={(event) => setBranchId(event.target.value)}
             >
-              {branchOptions.length === 0 ? <option value="">Sucursales pendientes de API</option> : null}
+              {branchOptions.length === 0 ? (
+                <option value="">Sucursales pendientes de API</option>
+              ) : null}
               {branchOptions.map((option) => (
                 <option key={option.id} title={option.label} value={option.id}>
                   {option.label}
@@ -235,7 +281,9 @@ export function AdminProductionWorkflowPanel({
               value={productId}
               onChange={(event) => setProductId(event.target.value)}
             >
-              {productOptions.length === 0 ? <option value="">Productos pendientes de API</option> : null}
+              {productOptions.length === 0 ? (
+                <option value="">Productos pendientes de API</option>
+              ) : null}
               {productOptions.map((option) => (
                 <option key={option.id} title={option.label} value={option.id}>
                   {option.label}
@@ -316,12 +364,19 @@ export function AdminProductionWorkflowPanel({
           </span>
           <div className="grid gap-1.5 md:grid-cols-2 xl:grid-cols-3">
             {production.plannedInputs.map((line) => (
-              <div className="rounded-[14px] border border-[var(--ui-color-border)] bg-white px-3 py-2 text-xs" key={line.inputProductId}>
-                <span className="block truncate font-semibold text-slate-950" title={line.inputProductName}>
+              <div
+                className="rounded-[14px] border border-[var(--ui-color-border)] bg-white px-3 py-2 text-xs"
+                key={line.inputProductId}
+              >
+                <span
+                  className="block truncate font-semibold text-slate-950"
+                  title={line.inputProductName}
+                >
                   {line.inputProductName}
                 </span>
                 <span className="block truncate text-slate-500">
-                  Req. {line.requiredQty} / Disp. {line.availableQty ?? "N/D"} / Falt. {line.shortageQty ?? "0.000"}
+                  Req. {line.requiredQty} / Disp. {line.availableQty ?? "N/D"} / Falt.{" "}
+                  {line.shortageQty ?? "0.000"}
                 </span>
               </div>
             ))}
@@ -356,7 +411,8 @@ export function AdminProductionWorkflowPanel({
       ) : null}
 
       <p className="rounded-[16px] border border-[var(--ui-color-border)] bg-slate-50 px-3 py-2 text-xs leading-5 text-slate-600">
-        Produccion consume insumos y genera producto terminado solo cuando el backend confirma el cierre del lote.
+        Produccion consume insumos y genera producto terminado solo cuando el backend confirma el
+        cierre del lote.
       </p>
 
       <div className="flex min-w-0 flex-wrap justify-end gap-2 border-t border-[var(--ui-color-border)] pt-3">
@@ -368,16 +424,21 @@ export function AdminProductionWorkflowPanel({
           Cerrar
         </button>
         {mode === "create" ? (
-          <button
+          <AdminActionButton
+            capability="production.manage"
+            additionalCapabilities={["production.execute"]}
+            branchIds={[branchId]}
             className="rounded-2xl border border-[var(--ui-color-border)] bg-white px-4 py-2 text-sm font-semibold text-[var(--ui-color-info)] transition hover:bg-[var(--ui-color-surface-tint)] focus:outline-none focus:ring-4 focus:ring-[var(--ui-color-ring)] disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-400"
             disabled={isSubmitting}
             type="button"
             onClick={handleCreateAndStart}
           >
             Guardar e iniciar
-          </button>
+          </AdminActionButton>
         ) : null}
-        <button
+        <AdminActionButton
+          capability={actionCapability}
+          branchIds={[branchId]}
           className="rounded-2xl bg-[var(--ui-color-primary)] px-4 py-2 text-sm font-semibold text-white transition hover:bg-[var(--ui-color-primary-strong)] focus:outline-none focus:ring-4 focus:ring-[var(--ui-color-ring)] disabled:cursor-not-allowed disabled:bg-slate-300 disabled:text-slate-600"
           disabled={isSubmitting}
           type="submit"
@@ -393,7 +454,7 @@ export function AdminProductionWorkflowPanel({
                   : mode === "complete"
                     ? "Completar produccion"
                     : "Cancelar produccion"}
-        </button>
+        </AdminActionButton>
       </div>
     </form>
   );

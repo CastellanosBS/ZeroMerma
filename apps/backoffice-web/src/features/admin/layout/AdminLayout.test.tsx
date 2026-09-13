@@ -1,3 +1,4 @@
+import { withCapabilities } from "../../../test-support/authorization";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import type { ReactElement, ReactNode } from "react";
 import { renderToString } from "react-dom/server";
@@ -29,7 +30,7 @@ vi.mock("@tanstack/react-router", () => ({
 }));
 
 function render(element: ReactElement) {
-  return renderToString(element);
+  return renderToString(withCapabilities(element, ["audit.view"]));
 }
 
 function renderLayout() {

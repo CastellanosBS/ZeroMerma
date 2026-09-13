@@ -1,3 +1,6 @@
+import { AdminActionButton } from "../../components/AdminActionButton";
+import { hasEffectiveCapability, type PermissionCode } from "../../../auth/authorization";
+import { useBackofficeAuthorization } from "../../../auth/authorization-context";
 import { useMemo, useState } from "react";
 import type { FormEvent } from "react";
 
@@ -61,15 +64,23 @@ function getDescription(mode: WorkflowMode, transfer?: AdminTransferDetail | nul
     return "Crea un documento persistido antes de afectar inventario.";
   }
   if (mode === "edit") {
-    return transfer ? `${transfer.overview.folio} - solo disponible en borrador.` : "Solo disponible en borrador.";
+    return transfer
+      ? `${transfer.overview.folio} - solo disponible en borrador.`
+      : "Solo disponible en borrador.";
   }
   if (mode === "dispatch") {
-    return transfer ? `${transfer.overview.folio} saldra de la sucursal origen.` : "Confirma salida de origen.";
+    return transfer
+      ? `${transfer.overview.folio} saldra de la sucursal origen.`
+      : "Confirma salida de origen.";
   }
   if (mode === "receive") {
-    return transfer ? `${transfer.overview.folio} se recibe en destino.` : "Captura cantidades recibidas.";
+    return transfer
+      ? `${transfer.overview.folio} se recibe en destino.`
+      : "Captura cantidades recibidas.";
   }
-  return transfer ? `${transfer.overview.folio} quedara cancelada si backend lo permite.` : "Cancelacion controlada.";
+  return transfer
+    ? `${transfer.overview.folio} quedara cancelada si backend lo permite.`
+    : "Cancelacion controlada.";
 }
 
 function buildInitialDraftLines(transfer?: AdminTransferDetail | null): DraftLineState[] {
@@ -94,7 +105,7 @@ function toDraftPayload(lines: DraftLineState[]): AdminTransferLinePayload[] {
 }
 
 export function AdminTransferWorkflowPanel({
-  branchOptions,
+  branchOptions: allBranchOptions,
   errorMessage,
   isSubmitting = false,
   mode,
@@ -107,13 +118,31 @@ export function AdminTransferWorkflowPanel({
   productOptions,
   transfer,
 }: AdminTransferWorkflowPanelProps) {
+  const actor = useBackofficeAuthorization();
+  const actionCapability: PermissionCode =
+    mode === "cancel"
+      ? "transfers.cancel"
+      : mode === "dispatch" || mode === "receive"
+        ? "transfers.execute"
+        : "transfers.manage";
+  const branchOptions = useMemo(
+    () =>
+      allBranchOptions.filter((option) =>
+        hasEffectiveCapability(actor, actionCapability, [option.id]),
+      ),
+    [actor, actionCapability, allBranchOptions],
+  );
   const [destinationBranchId, setDestinationBranchId] = useState(
     transfer?.destination.branchId || branchOptions[1]?.id || branchOptions[0]?.id || "",
   );
-  const [draftLines, setDraftLines] = useState<DraftLineState[]>(() => buildInitialDraftLines(transfer));
+  const [draftLines, setDraftLines] = useState<DraftLineState[]>(() =>
+    buildInitialDraftLines(transfer),
+  );
   const [localError, setLocalError] = useState<string | null>(null);
   const [notes, setNotes] = useState(transfer?.overview.notes ?? "");
-  const [originBranchId, setOriginBranchId] = useState(transfer?.origin.branchId || branchOptions[0]?.id || "");
+  const [originBranchId, setOriginBranchId] = useState(
+    transfer?.origin.branchId || branchOptions[0]?.id || "",
+  );
   const [receiveLines, setReceiveLines] = useState<ReceiveLineState[]>(() =>
     (transfer?.lines ?? []).map((line) => ({
       notes: "",
@@ -125,20 +154,28 @@ export function AdminTransferWorkflowPanel({
   const [reason, setReason] = useState("");
 
   const selectedOriginLabel = useMemo(
-    () => branchOptions.find((option) => option.id === originBranchId)?.label ?? "Origen no seleccionado",
+    () =>
+      branchOptions.find((option) => option.id === originBranchId)?.label ??
+      "Origen no seleccionado",
     [branchOptions, originBranchId],
   );
   const selectedDestinationLabel = useMemo(
-    () => branchOptions.find((option) => option.id === destinationBranchId)?.label ?? "Destino no seleccionado",
+    () =>
+      branchOptions.find((option) => option.id === destinationBranchId)?.label ??
+      "Destino no seleccionado",
     [branchOptions, destinationBranchId],
   );
 
   function updateDraftLine(id: string, patch: Partial<DraftLineState>) {
-    setDraftLines((current) => current.map((line) => (line.id === id ? { ...line, ...patch } : line)));
+    setDraftLines((current) =>
+      current.map((line) => (line.id === id ? { ...line, ...patch } : line)),
+    );
   }
 
   function removeDraftLine(id: string) {
-    setDraftLines((current) => (current.length > 1 ? current.filter((line) => line.id !== id) : current));
+    setDraftLines((current) =>
+      current.length > 1 ? current.filter((line) => line.id !== id) : current,
+    );
   }
 
   function addDraftLine() {
@@ -150,7 +187,9 @@ export function AdminTransferWorkflowPanel({
 
   function updateReceiveLine(shipmentLineId: string, patch: Partial<ReceiveLineState>) {
     setReceiveLines((current) =>
-      current.map((line) => (line.shipmentLineId === shipmentLineId ? { ...line, ...patch } : line)),
+      current.map((line) =>
+        line.shipmentLineId === shipmentLineId ? { ...line, ...patch } : line,
+      ),
     );
   }
 
@@ -167,7 +206,10 @@ export function AdminTransferWorkflowPanel({
       setLocalError("Origen y destino no pueden ser la misma sucursal.");
       return false;
     }
-    if (draftLines.length === 0 || draftLines.some((line) => !line.productId || !line.quantity || Number(line.quantity) <= 0)) {
+    if (
+      draftLines.length === 0 ||
+      draftLines.some((line) => !line.productId || !line.quantity || Number(line.quantity) <= 0)
+    ) {
       setLocalError("Agrega al menos una linea con producto y cantidad mayor que cero.");
       return false;
     }
@@ -180,12 +222,21 @@ export function AdminTransferWorkflowPanel({
       return false;
     }
     for (const receiveLine of receiveLines) {
-      const sourceLine = transfer.lines.find((line) => line.shipmentLineId === receiveLine.shipmentLineId);
-      if (!sourceLine || receiveLine.receivedQuantity === "" || Number(receiveLine.receivedQuantity) < 0) {
+      const sourceLine = transfer.lines.find(
+        (line) => line.shipmentLineId === receiveLine.shipmentLineId,
+      );
+      if (
+        !sourceLine ||
+        receiveLine.receivedQuantity === "" ||
+        Number(receiveLine.receivedQuantity) < 0
+      ) {
         setLocalError("Las cantidades recibidas deben ser cero o mayores.");
         return false;
       }
-      if (Number(receiveLine.receivedQuantity) !== Number(sourceLine.sentQuantity) && !receiveLine.varianceReason.trim()) {
+      if (
+        Number(receiveLine.receivedQuantity) !== Number(sourceLine.sentQuantity) &&
+        !receiveLine.varianceReason.trim()
+      ) {
         setLocalError("Captura una razon para cada discrepancia entre enviado y recibido.");
         return false;
       }
@@ -195,6 +246,8 @@ export function AdminTransferWorkflowPanel({
 
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (!hasEffectiveCapability(actor, actionCapability, [originBranchId, destinationBranchId]))
+      return;
     setLocalError(null);
 
     if (mode === "create" || mode === "edit") {
@@ -248,6 +301,11 @@ export function AdminTransferWorkflowPanel({
   }
 
   function handleCreateAndDispatch() {
+    if (
+      !hasEffectiveCapability(actor, "transfers.manage", [originBranchId, destinationBranchId]) ||
+      !hasEffectiveCapability(actor, "transfers.execute", [originBranchId, destinationBranchId])
+    )
+      return;
     setLocalError(null);
     if (!validateDraft()) {
       return;
@@ -264,7 +322,10 @@ export function AdminTransferWorkflowPanel({
   }
 
   return (
-    <form className="grid min-w-0 gap-3 rounded-[20px] border border-[var(--ui-color-border)] bg-white p-3" onSubmit={handleSubmit}>
+    <form
+      className="grid min-w-0 gap-3 rounded-[20px] border border-[var(--ui-color-border)] bg-white p-3"
+      onSubmit={handleSubmit}
+    >
       <div className="flex min-w-0 items-start justify-between gap-3">
         <div className="min-w-0">
           <h3 className="truncate text-base font-semibold text-slate-950">{getTitle(mode)}</h3>
@@ -299,7 +360,9 @@ export function AdminTransferWorkflowPanel({
                 value={originBranchId}
                 onChange={(event) => setOriginBranchId(event.target.value)}
               >
-                {branchOptions.length === 0 ? <option value="">Sucursales pendientes de API</option> : null}
+                {branchOptions.length === 0 ? (
+                  <option value="">Sucursales pendientes de API</option>
+                ) : null}
                 {branchOptions.map((option) => (
                   <option key={option.id} title={option.label} value={option.id}>
                     {option.label}
@@ -316,7 +379,9 @@ export function AdminTransferWorkflowPanel({
                 value={destinationBranchId}
                 onChange={(event) => setDestinationBranchId(event.target.value)}
               >
-                {branchOptions.length === 0 ? <option value="">Sucursales pendientes de API</option> : null}
+                {branchOptions.length === 0 ? (
+                  <option value="">Sucursales pendientes de API</option>
+                ) : null}
                 {branchOptions.map((option) => (
                   <option key={option.id} title={option.label} value={option.id}>
                     {option.label}
@@ -328,7 +393,9 @@ export function AdminTransferWorkflowPanel({
 
           <div className="grid gap-2 rounded-[18px] border border-[var(--ui-color-border)] bg-slate-50 p-2.5">
             <div className="flex items-center justify-between gap-2">
-              <span className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">Lineas</span>
+              <span className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">
+                Lineas
+              </span>
               <button
                 className="rounded-full border border-[var(--ui-color-border)] bg-white px-3 py-1 text-xs font-semibold text-[var(--ui-color-info)] transition hover:bg-[var(--ui-color-surface-tint)] focus:outline-none focus:ring-4 focus:ring-[var(--ui-color-ring)]"
                 type="button"
@@ -338,14 +405,19 @@ export function AdminTransferWorkflowPanel({
               </button>
             </div>
             {draftLines.map((line, index) => (
-              <div className="grid min-w-0 gap-2 rounded-[16px] border border-[var(--ui-color-border)] bg-white p-2 md:grid-cols-[minmax(12rem,1fr)_7rem_minmax(10rem,0.85fr)_auto]" key={line.id}>
+              <div
+                className="grid min-w-0 gap-2 rounded-[16px] border border-[var(--ui-color-border)] bg-white p-2 md:grid-cols-[minmax(12rem,1fr)_7rem_minmax(10rem,0.85fr)_auto]"
+                key={line.id}
+              >
                 <label className="grid min-w-0 gap-1 text-xs font-semibold uppercase tracking-[0.1em] text-slate-500">
                   Producto {index + 1}
                   <select
                     className={`${inputClassName} truncate`}
                     disabled={productOptions.length === 0}
                     value={line.productId}
-                    onChange={(event) => updateDraftLine(line.id, { productId: event.target.value })}
+                    onChange={(event) =>
+                      updateDraftLine(line.id, { productId: event.target.value })
+                    }
                   >
                     <option value="">Selecciona producto</option>
                     {productOptions.map((option) => (
@@ -395,15 +467,26 @@ export function AdminTransferWorkflowPanel({
 
       {mode === "receive" && transfer ? (
         <div className="grid gap-2 rounded-[18px] border border-[var(--ui-color-border)] bg-slate-50 p-2.5">
-          <span className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">Recepcion</span>
+          <span className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">
+            Recepcion
+          </span>
           {transfer.lines.map((line) => {
-            const receiveLine = receiveLines.find((item) => item.shipmentLineId === line.shipmentLineId);
-            const hasDifference = Number(receiveLine?.receivedQuantity ?? "0") !== Number(line.sentQuantity);
+            const receiveLine = receiveLines.find(
+              (item) => item.shipmentLineId === line.shipmentLineId,
+            );
+            const hasDifference =
+              Number(receiveLine?.receivedQuantity ?? "0") !== Number(line.sentQuantity);
 
             return (
-              <div className="grid min-w-0 gap-2 rounded-[16px] border border-[var(--ui-color-border)] bg-white p-2 lg:grid-cols-[minmax(12rem,1fr)_7rem_minmax(11rem,0.9fr)_minmax(10rem,0.8fr)]" key={line.shipmentLineId}>
+              <div
+                className="grid min-w-0 gap-2 rounded-[16px] border border-[var(--ui-color-border)] bg-white p-2 lg:grid-cols-[minmax(12rem,1fr)_7rem_minmax(11rem,0.9fr)_minmax(10rem,0.8fr)]"
+                key={line.shipmentLineId}
+              >
                 <div className="min-w-0">
-                  <p className="truncate text-sm font-semibold text-slate-950" title={line.productName}>
+                  <p
+                    className="truncate text-sm font-semibold text-slate-950"
+                    title={line.productName}
+                  >
                     {line.productName}
                   </p>
                   <p className="truncate font-mono text-xs text-slate-500" title={line.productCode}>
@@ -418,7 +501,11 @@ export function AdminTransferWorkflowPanel({
                     step="0.001"
                     type="number"
                     value={receiveLine?.receivedQuantity ?? ""}
-                    onChange={(event) => updateReceiveLine(line.shipmentLineId, { receivedQuantity: event.target.value })}
+                    onChange={(event) =>
+                      updateReceiveLine(line.shipmentLineId, {
+                        receivedQuantity: event.target.value,
+                      })
+                    }
                   />
                 </label>
                 <label className="grid min-w-0 gap-1 text-xs font-semibold uppercase tracking-[0.1em] text-slate-500">
@@ -429,7 +516,9 @@ export function AdminTransferWorkflowPanel({
                     maxLength={180}
                     placeholder={hasDifference ? "Obligatoria" : "Sin diferencia"}
                     value={receiveLine?.varianceReason ?? ""}
-                    onChange={(event) => updateReceiveLine(line.shipmentLineId, { varianceReason: event.target.value })}
+                    onChange={(event) =>
+                      updateReceiveLine(line.shipmentLineId, { varianceReason: event.target.value })
+                    }
                   />
                 </label>
                 <label className="grid min-w-0 gap-1 text-xs font-semibold uppercase tracking-[0.1em] text-slate-500">
@@ -439,7 +528,9 @@ export function AdminTransferWorkflowPanel({
                     maxLength={180}
                     placeholder="Opcional"
                     value={receiveLine?.notes ?? ""}
-                    onChange={(event) => updateReceiveLine(line.shipmentLineId, { notes: event.target.value })}
+                    onChange={(event) =>
+                      updateReceiveLine(line.shipmentLineId, { notes: event.target.value })
+                    }
                   />
                 </label>
               </div>
@@ -475,7 +566,8 @@ export function AdminTransferWorkflowPanel({
       ) : null}
 
       <p className="rounded-[16px] border border-[var(--ui-color-border)] bg-slate-50 px-3 py-2 text-xs leading-5 text-slate-600">
-        Las transferencias son documentos auditados. El inventario se afecta solo al enviar o recibir mediante backend.
+        Las transferencias son documentos auditados. El inventario se afecta solo al enviar o
+        recibir mediante backend.
       </p>
 
       <div className="flex min-w-0 flex-wrap justify-end gap-2 border-t border-[var(--ui-color-border)] pt-3">
@@ -487,16 +579,21 @@ export function AdminTransferWorkflowPanel({
           Cerrar
         </button>
         {mode === "create" ? (
-          <button
+          <AdminActionButton
+            capability="transfers.manage"
+            additionalCapabilities={["transfers.execute"]}
+            branchIds={[originBranchId, destinationBranchId]}
             className="rounded-2xl border border-[var(--ui-color-border)] bg-white px-4 py-2 text-sm font-semibold text-[var(--ui-color-info)] transition hover:bg-[var(--ui-color-surface-tint)] focus:outline-none focus:ring-4 focus:ring-[var(--ui-color-ring)] disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-400"
             disabled={isSubmitting}
             type="button"
             onClick={handleCreateAndDispatch}
           >
             Guardar y enviar
-          </button>
+          </AdminActionButton>
         ) : null}
-        <button
+        <AdminActionButton
+          capability={actionCapability}
+          branchIds={[originBranchId, destinationBranchId]}
           className="rounded-2xl bg-[var(--ui-color-primary)] px-4 py-2 text-sm font-semibold text-white transition hover:bg-[var(--ui-color-primary-strong)] focus:outline-none focus:ring-4 focus:ring-[var(--ui-color-ring)] disabled:cursor-not-allowed disabled:bg-slate-300 disabled:text-slate-600"
           disabled={isSubmitting}
           type="submit"
@@ -512,7 +609,7 @@ export function AdminTransferWorkflowPanel({
                   : mode === "dispatch"
                     ? "Confirmar envio"
                     : "Cancelar transferencia"}
-        </button>
+        </AdminActionButton>
       </div>
     </form>
   );

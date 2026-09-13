@@ -8,14 +8,22 @@ from datetime import UTC, date, datetime, time
 from decimal import ROUND_HALF_UP, Decimal
 from typing import Any
 
+from fastapi import HTTPException
 from sqlalchemy import and_, func, or_, select
 from sqlalchemy.orm import Session, aliased
 
+from zeromerma_api.db.access_scope import (
+    authorization_scope,
+    require_session_capabilities,
+    scoped_session_capabilities,
+    session_allows_capabilities,
+)
 from zeromerma_api.modules.audit.application.service import AuditRecorder
 from zeromerma_api.modules.branches.infrastructure.models import Branch, Workstation
 from zeromerma_api.modules.cash_close.infrastructure.models import CashSessionClose
 from zeromerma_api.modules.catalog.infrastructure.models import Product
-from zeromerma_api.modules.identity.application.schemas import AuthenticatedUser
+from zeromerma_api.modules.identity.application.privileged_access import user_scope_predicate
+from zeromerma_api.modules.identity.application.schemas import AuthenticatedUser, CapabilityCode
 from zeromerma_api.modules.identity.domain.constants import (
     IDENTITY_SURFACE_BACKOFFICE,
     IDENTITY_SURFACE_POS,
@@ -119,7 +127,7 @@ class _ReportDefinition:
     supported_exports: tuple[str, ...]
     status: str
     is_sensitive: bool
-    required_permissions: tuple[str, ...]
+    required_permissions: tuple[CapabilityCode, ...]
     preview_kind: str
     unavailable_reason: str | None = None
 
@@ -145,7 +153,14 @@ class AdminReportService:
         sensitivity: str | None,
         source_module: str | None,
     ) -> AdminReportDefinitionsResponse:
-        definitions = list(_REPORT_DEFINITIONS)
+        context = authorization_scope(session)
+        if context is None:
+            raise HTTPException(status_code=403, detail="An authorization context is required.")
+        definitions = [
+            definition
+            for definition in _REPORT_DEFINITIONS
+            if session_allows_capabilities(session, definition.required_permissions)
+        ]
         filtered = self._apply_catalog_filters(
             definitions,
             search=search,
@@ -155,8 +170,12 @@ class AdminReportService:
             sensitivity=sensitivity,
             source_module=source_module,
         )
+        views = []
+        for definition in filtered:
+            with scoped_session_capabilities(session, definition.required_permissions):
+                views.append(self._to_definition_view(session, definition))
         return AdminReportDefinitionsResponse(
-            definitions=[self._to_definition_view(session, definition) for definition in filtered],
+            definitions=views,
             filter_options=self._catalog_filter_options(definitions),
             metrics=self._catalog_metrics(definitions),
             total=len(filtered),
@@ -170,6 +189,7 @@ class AdminReportService:
         filters: dict[str, Any],
     ) -> AdminReportPreviewResponse:
         definition = self._get_definition(report_code)
+        require_session_capabilities(session, definition.required_permissions)
         if definition.status != REPORT_STATUS_AVAILABLE:
             raise ReportUnavailableError(
                 definition.unavailable_reason or "This report requires additional backend support.",
@@ -945,8 +965,19 @@ class AdminReportService:
         branch_id = _uuid_filter(filters, "branch_id")
         user_status = _optional_filter(filters, "user_status")
         app_access = _optional_filter(filters, "app_access")
+        context = authorization_scope(session)
+        if context is None:
+            raise HTTPException(status_code=403, detail="An authorization context is required.")
         users = (
-            session.execute(select(User).order_by(User.full_name.asc(), User.email.asc()))
+            session.execute(
+                select(User)
+                .where(
+                    user_scope_predicate(
+                        context.user, "users.view", allowed_branch_ids=context.branch_ids
+                    )
+                )
+                .order_by(User.full_name.asc(), User.email.asc())
+            )
             .scalars()
             .all()
         )
@@ -1390,7 +1421,7 @@ _REPORT_DEFINITIONS = (
         supported_exports=(REPORT_EXPORT_JSON,),
         status=REPORT_STATUS_AVAILABLE,
         is_sensitive=True,
-        required_permissions=("inventory.adjust",),
+        required_permissions=("inventory.view",),
         preview_kind="table",
     ),
     _ReportDefinition(
@@ -1405,7 +1436,7 @@ _REPORT_DEFINITIONS = (
         supported_exports=(REPORT_EXPORT_JSON,),
         status=REPORT_STATUS_AVAILABLE,
         is_sensitive=True,
-        required_permissions=("multibranch_operations.manage",),
+        required_permissions=("waste.view",),
         preview_kind="summary_table",
     ),
     _ReportDefinition(
@@ -1418,7 +1449,7 @@ _REPORT_DEFINITIONS = (
         supported_exports=(REPORT_EXPORT_JSON,),
         status=REPORT_STATUS_AVAILABLE,
         is_sensitive=False,
-        required_permissions=("multibranch_operations.manage",),
+        required_permissions=("transfers.view",),
         preview_kind="table",
     ),
     _ReportDefinition(
@@ -1431,7 +1462,7 @@ _REPORT_DEFINITIONS = (
         supported_exports=(REPORT_EXPORT_JSON,),
         status=REPORT_STATUS_AVAILABLE,
         is_sensitive=False,
-        required_permissions=("quality_hygiene.manage",),
+        required_permissions=("quality_hygiene.view",),
         preview_kind="summary_table",
     ),
     _ReportDefinition(
@@ -1444,7 +1475,7 @@ _REPORT_DEFINITIONS = (
         supported_exports=(REPORT_EXPORT_JSON,),
         status=REPORT_STATUS_AVAILABLE,
         is_sensitive=True,
-        required_permissions=("users.manage",),
+        required_permissions=("users.view",),
         preview_kind="table",
     ),
     _ReportDefinition(
@@ -1457,7 +1488,7 @@ _REPORT_DEFINITIONS = (
         supported_exports=(),
         status=REPORT_STATUS_REQUIRES_BACKEND,
         is_sensitive=True,
-        required_permissions=("purchases_supply.manage",),
+        required_permissions=("purchases.view",),
         preview_kind="table",
         unavailable_reason=(
             "Este reporte requiere agregados de compras por proveedor antes de generarse."
@@ -1473,7 +1504,7 @@ _REPORT_DEFINITIONS = (
         supported_exports=(),
         status=REPORT_STATUS_REQUIRES_BACKEND,
         is_sensitive=True,
-        required_permissions=("catalog_products.manage",),
+        required_permissions=("catalog.view",),
         preview_kind="table",
         unavailable_reason="Este reporte requiere reglas canonicas de salud de catalogo.",
     ),

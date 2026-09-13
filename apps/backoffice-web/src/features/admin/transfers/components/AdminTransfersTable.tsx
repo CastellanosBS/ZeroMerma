@@ -1,3 +1,4 @@
+import { AdminActionButton } from "../../components/AdminActionButton";
 import { AdminEmptyState } from "../../components/AdminEmptyState";
 import type {
   AdminTransferBackendContract,
@@ -116,7 +117,10 @@ export function AdminTransfersTable({
     <section className="flex min-h-0 min-w-0 flex-col overflow-hidden rounded-[20px] border border-[var(--ui-color-border)] bg-white">
       <div className="flex min-w-0 shrink-0 items-center justify-between gap-3 border-b border-[var(--ui-color-border)] px-3 py-2.5">
         <div className="min-w-0">
-          <h3 className="truncate text-base font-semibold text-slate-950" title="Transferencias multisucursal">
+          <h3
+            className="truncate text-base font-semibold text-slate-950"
+            title="Transferencias multisucursal"
+          >
             Transferencias multisucursal
           </h3>
           <p className="truncate text-xs text-slate-500">
@@ -130,14 +134,18 @@ export function AdminTransfersTable({
 
       <div className="min-h-0 min-w-0 flex-1 overflow-y-auto p-2.5">
         {isLoading ? (
-          <AdminEmptyState description="Consultando transferencias reales del backend." title="Cargando transferencias" />
+          <AdminEmptyState
+            description="Consultando transferencias reales del backend."
+            title="Cargando transferencias"
+          />
         ) : errorMessage ? (
           <AdminEmptyState description={errorMessage} title="No se pudo cargar transferencias" />
         ) : transfers.length > 0 ? (
           <div className="grid min-w-0 gap-1.5">
             {transfers.map((item) => {
               const isSelected = item.id === selectedTransferId;
-              const warningLabel = item.warnings.length > 0 ? `${item.warnings.length} alertas` : "Sin alertas";
+              const warningLabel =
+                item.warnings.length > 0 ? `${item.warnings.length} alertas` : "Sin alertas";
 
               return (
                 <article
@@ -155,8 +163,12 @@ export function AdminTransfersTable({
                     type="button"
                     onClick={() => onSelectTransfer(item)}
                   >
-                    <span className="block truncate font-mono text-sm font-semibold text-slate-950">{item.folio}</span>
-                    <span className="mt-0.5 block truncate text-xs text-slate-500">{formatDate(item.createdAt)}</span>
+                    <span className="block truncate font-mono text-sm font-semibold text-slate-950">
+                      {item.folio}
+                    </span>
+                    <span className="mt-0.5 block truncate text-xs text-slate-500">
+                      {formatDate(item.createdAt)}
+                    </span>
                   </button>
 
                   <button
@@ -168,7 +180,9 @@ export function AdminTransfersTable({
                     <span className="block truncate text-sm font-semibold text-slate-900">
                       {item.originBranchName}
                     </span>
-                    <span className="mt-0.5 block truncate text-xs text-slate-500">Origen {item.originBranchCode}</span>
+                    <span className="mt-0.5 block truncate text-xs text-slate-500">
+                      Origen {item.originBranchCode}
+                    </span>
                   </button>
 
                   <button
@@ -215,8 +229,12 @@ export function AdminTransfersTable({
 
                   <div className="flex min-w-0 flex-col gap-1.5 xl:items-end">
                     <div className="flex min-w-0 flex-wrap gap-1.5 xl:justify-end">
-                      <StatusChip tone={statusTone(item.status)}>{formatStatus(item.status)}</StatusChip>
-                      {item.hasDiscrepancy ? <StatusChip tone="critical">Con discrepancia</StatusChip> : null}
+                      <StatusChip tone={statusTone(item.status)}>
+                        {formatStatus(item.status)}
+                      </StatusChip>
+                      {item.hasDiscrepancy ? (
+                        <StatusChip tone="critical">Con discrepancia</StatusChip>
+                      ) : null}
                       <StatusChip tone={warningTone(item.warningState)}>{warningLabel}</StatusChip>
                     </div>
                     <div className="flex min-w-0 flex-wrap gap-1.5 text-xs xl:justify-end">
@@ -235,34 +253,40 @@ export function AdminTransfersTable({
                         Destino
                       </button>
                       {item.status === "DRAFT" ? (
-                        <button
+                        <AdminActionButton
+                          capability="transfers.execute"
+                          branchIds={[item.originBranchId, item.destinationBranchId]}
                           className="rounded-full border border-[var(--ui-color-border)] bg-white px-2 py-1 font-semibold text-[var(--ui-color-info)] transition hover:bg-[var(--ui-color-surface-tint)] focus:outline-none focus:ring-4 focus:ring-[var(--ui-color-ring)] disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-400"
                           disabled={isSubmitting}
                           type="button"
                           onClick={() => onDispatch(item)}
                         >
                           Enviar
-                        </button>
+                        </AdminActionButton>
                       ) : null}
                       {item.status === "IN_TRANSIT" ? (
-                        <button
+                        <AdminActionButton
+                          capability="transfers.execute"
+                          branchIds={[item.originBranchId, item.destinationBranchId]}
                           className="rounded-full border border-[var(--ui-color-border)] bg-white px-2 py-1 font-semibold text-[var(--ui-color-info)] transition hover:bg-[var(--ui-color-surface-tint)] focus:outline-none focus:ring-4 focus:ring-[var(--ui-color-ring)] disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-400"
                           disabled={isSubmitting}
                           type="button"
                           onClick={() => onReceive(item)}
                         >
                           Recibir
-                        </button>
+                        </AdminActionButton>
                       ) : null}
                       {item.status === "DRAFT" ? (
-                        <button
+                        <AdminActionButton
+                          capability="transfers.cancel"
+                          branchIds={[item.originBranchId, item.destinationBranchId]}
                           className="rounded-full border border-[var(--ui-color-border)] bg-white px-2 py-1 font-semibold text-slate-600 transition hover:bg-slate-50 focus:outline-none focus:ring-4 focus:ring-[var(--ui-color-ring)] disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-400"
                           disabled={isSubmitting}
                           type="button"
                           onClick={() => onCancel(item)}
                         >
                           Cancelar
-                        </button>
+                        </AdminActionButton>
                       ) : null}
                     </div>
                   </div>
@@ -277,8 +301,8 @@ export function AdminTransfersTable({
               title="Sin transferencias"
             />
             <p className="rounded-[16px] border border-[var(--ui-color-border)] bg-slate-50 px-3 py-2 text-xs leading-5 text-slate-600">
-              Contrato activo: {backendContract.listEndpoint}. Las transferencias aparecen cuando existen documentos
-              persistidos en backend.
+              Contrato activo: {backendContract.listEndpoint}. Las transferencias aparecen cuando
+              existen documentos persistidos en backend.
             </p>
           </div>
         )}

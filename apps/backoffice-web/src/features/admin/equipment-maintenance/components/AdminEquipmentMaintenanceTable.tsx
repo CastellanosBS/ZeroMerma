@@ -1,3 +1,4 @@
+import { AdminActionButton } from "../../components/AdminActionButton";
 import { formatEquipmentMoney } from "../api";
 import { AdminEmptyState } from "../../components/AdminEmptyState";
 import type { AdminEquipmentListItem } from "../types";
@@ -98,9 +99,7 @@ export function AdminEquipmentMaintenanceTable({
     <section className="flex min-h-0 min-w-0 flex-col overflow-hidden rounded-[20px] border border-[var(--ui-color-border)] bg-white">
       <div className="flex min-w-0 shrink-0 items-center justify-between gap-3 border-b border-[var(--ui-color-border)] px-3 py-2.5">
         <div className="min-w-0">
-          <h3 className="truncate text-base font-semibold text-slate-950">
-            Equipos registrados
-          </h3>
+          <h3 className="truncate text-base font-semibold text-slate-950">Equipos registrados</h3>
           <p className="truncate text-xs text-slate-500">
             Codigo, sucursal, zona, estado operativo, mantenimiento, riesgo e incidencias.
           </p>
@@ -207,13 +206,15 @@ export function AdminEquipmentMaintenanceTable({
                       >
                         Ver
                       </button>
-                      <button
+                      <AdminActionButton
+                        capability="quality_hygiene.manage"
+                        branchIds={[item.branchId]}
                         className="rounded-full border border-[var(--ui-color-border)] bg-white px-2 py-1 text-xs font-semibold text-slate-700 transition hover:border-[var(--ui-color-info)]"
                         type="button"
                         onClick={() => onCreateMaintenance(item)}
                       >
                         Mantto.
-                      </button>
+                      </AdminActionButton>
                       <button
                         className="rounded-full border border-[var(--ui-color-border)] bg-white px-2 py-1 text-xs font-semibold text-slate-700 transition hover:border-[var(--ui-color-info)]"
                         type="button"

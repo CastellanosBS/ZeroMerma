@@ -1,3 +1,4 @@
+import { AdminActionButton } from "../../components/AdminActionButton";
 import { AdminEmptyState } from "../../components/AdminEmptyState";
 import type { AdminPriceBackendContract, AdminPriceHealth, AdminPriceRow } from "../types";
 
@@ -90,7 +91,10 @@ export function AdminPricesTable({
     <section className="flex min-h-0 min-w-0 flex-col overflow-hidden rounded-[20px] border border-[var(--ui-color-border)] bg-white">
       <div className="flex min-w-0 shrink-0 items-center justify-between gap-3 border-b border-[var(--ui-color-border)] px-3 py-2.5">
         <div className="min-w-0">
-          <h3 className="truncate text-base font-semibold text-slate-950" title="Precios comerciales">
+          <h3
+            className="truncate text-base font-semibold text-slate-950"
+            title="Precios comerciales"
+          >
             Precios comerciales
           </h3>
           <p className="truncate text-xs text-slate-500">
@@ -104,7 +108,10 @@ export function AdminPricesTable({
 
       <div className="min-h-0 min-w-0 flex-1 overflow-y-auto p-2.5">
         {isLoading ? (
-          <AdminEmptyState description="Consultando precios efectivos desde catalogo." title="Cargando precios" />
+          <AdminEmptyState
+            description="Consultando precios efectivos desde catalogo."
+            title="Cargando precios"
+          />
         ) : errorMessage ? (
           <AdminEmptyState description={errorMessage} title="No se pudieron cargar los precios" />
         ) : prices.length > 0 ? (
@@ -165,7 +172,9 @@ export function AdminPricesTable({
                     <span className="block truncate text-sm font-semibold text-slate-950">
                       {formatMoney(item.currentPrice, item.currencyCode)}
                     </span>
-                    <span className="mt-0.5 block truncate text-xs text-slate-500">{item.currencyCode}</span>
+                    <span className="mt-0.5 block truncate text-xs text-slate-500">
+                      {item.currencyCode}
+                    </span>
                   </button>
 
                   <button
@@ -177,7 +186,9 @@ export function AdminPricesTable({
                     <span className="block truncate text-sm font-semibold text-slate-950">
                       {formatMoney(item.standardCost, item.currencyCode)}
                     </span>
-                    <span className="mt-0.5 block truncate text-xs text-slate-500">Margen {formatMargin(item)}</span>
+                    <span className="mt-0.5 block truncate text-xs text-slate-500">
+                      Margen {formatMargin(item)}
+                    </span>
                   </button>
 
                   <div className="flex min-w-0 flex-col gap-1.5 lg:items-end">
@@ -192,13 +203,15 @@ export function AdminPricesTable({
                         {item.status === "active" ? "Activo" : "Inactivo"}
                       </span>
                     </div>
-                    <button
+                    <AdminActionButton
+                      globalOnly
+                      capability="pricing.manage"
                       className="rounded-full border border-[var(--ui-color-border)] bg-white px-2 py-1 text-xs font-semibold text-[var(--ui-color-info)] transition hover:bg-[var(--ui-color-surface-tint)] focus:outline-none focus:ring-4 focus:ring-[var(--ui-color-ring)]"
                       type="button"
                       onClick={() => onEditPrice(item)}
                     >
                       Editar precio
-                    </button>
+                    </AdminActionButton>
                   </div>
                 </article>
               );

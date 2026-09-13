@@ -14,9 +14,11 @@ from zeromerma_api.modules.identity.application.admin_role_schemas import (
     AdminRolesListResponse,
     AdminRoleStatusChangeRequest,
     AdminRoleUpdateRequest,
+    AdminRoleUserAssignmentRequest,
 )
 from zeromerma_api.modules.identity.application.admin_role_services import AdminRoleService
 from zeromerma_api.modules.identity.application.admin_schemas import (
+    AdminAssignmentScopeRequest,
     AdminUserBranchAssignmentCommand,
     AdminUserCreateRequest,
     AdminUserDetailView,
@@ -27,8 +29,16 @@ from zeromerma_api.modules.identity.application.admin_schemas import (
     AdminUserUpdateRequest,
 )
 from zeromerma_api.modules.identity.application.admin_services import AdminUserService
+from zeromerma_api.modules.identity.application.authorization import resolve_authorization
+from zeromerma_api.modules.identity.application.privileged_access import PrivilegedAccessService
+from zeromerma_api.modules.identity.application.privileged_schemas import (
+    PrivilegedChangeConfirmationRequest,
+    PrivilegedChangeCreateRequest,
+    PrivilegedChangeView,
+)
 from zeromerma_api.modules.identity.application.schemas import (
     AuthenticatedUser,
+    IdentitySurface,
     LoginRequest,
     LoginResponse,
 )
@@ -102,8 +112,15 @@ def login(
 
 
 @router.get("/me", response_model=AuthenticatedUser)
-def me(current_user: Annotated[AuthenticatedUser, Depends(get_current_user)]) -> AuthenticatedUser:
-    return current_user
+def me(
+    current_user: Annotated[AuthenticatedUser, Depends(get_current_user)],
+    session: Annotated[Session, Depends(get_session)],
+    surface: IdentitySurface | None = None,
+) -> AuthenticatedUser:
+    chosen = surface or current_user.default_surface
+    if chosen not in current_user.allowed_surfaces:
+        raise HTTPException(status_code=403, detail="The requested surface is not allowed.")
+    return resolve_authorization(session, current_user, surface=chosen)
 
 
 @admin_router.get("", response_model=AdminUsersListResponse)
@@ -124,6 +141,7 @@ def list_admin_users(
     try:
         return AdminUserService().list_users(
             session,
+            current_user=current_user,
             search=search,
             status_filter=status_filter,
             app_access=app_access,
@@ -335,19 +353,16 @@ def assign_admin_user_role(
 ) -> AdminUserDetailView:
     _require_backoffice_user(current_user)
     try:
-        role_id = UUID(payload.role_id)
         return AdminUserService().assign_role(
             session,
             current_user=current_user,
             user_id=user_id,
-            role_id=role_id,
+            role_id=payload.role_id,
+            command=AdminAssignmentScopeRequest(
+                scope_type=payload.scope_type, branch_ids=payload.branch_ids
+            ),
             request_id=request.headers.get("X-Request-ID"),
         )
-    except ValueError as error:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Role id must be a valid UUID.",
-        ) from error
     except UserAdminError as error:
         raise _to_admin_http_exception(error) from error
 
@@ -392,6 +407,7 @@ def list_admin_roles(
     try:
         return AdminRoleService().list_roles(
             session,
+            current_user=current_user,
             search=search,
             status_filter=status_filter,
             app_surface=app_surface,
@@ -413,7 +429,82 @@ def list_admin_role_permissions(
     session: Annotated[Session, Depends(get_session)],
 ) -> AdminPermissionsResponse:
     _require_backoffice_user(current_user)
-    return AdminRoleService().list_permissions(session)
+    return AdminRoleService().list_permissions(session, current_user=current_user)
+
+
+@roles_admin_router.post(
+    "/privileged-changes", response_model=PrivilegedChangeView, status_code=201
+)
+def propose_privileged_change(
+    payload: PrivilegedChangeCreateRequest,
+    request: Request,
+    current_user: Annotated[AuthenticatedUser, Depends(get_current_user)],
+    session: Annotated[Session, Depends(get_session)],
+) -> PrivilegedChangeView:
+    _require_backoffice_user(current_user)
+    return PrivilegedAccessService().propose(
+        session,
+        current_user=current_user,
+        command=payload,
+        request_id=request.headers.get("X-Request-ID"),
+    )
+
+
+@roles_admin_router.get("/privileged-changes/{change_id}", response_model=PrivilegedChangeView)
+def get_privileged_change(
+    change_id: UUID,
+    current_user: Annotated[AuthenticatedUser, Depends(get_current_user)],
+    session: Annotated[Session, Depends(get_session)],
+) -> PrivilegedChangeView:
+    _require_backoffice_user(current_user)
+    return PrivilegedAccessService().get_change(
+        session, current_user=current_user, change_id=change_id
+    )
+
+
+@roles_admin_router.post(
+    "/privileged-changes/{change_id}/approve", response_model=PrivilegedChangeView
+)
+def approve_privileged_change(
+    change_id: UUID,
+    payload: PrivilegedChangeConfirmationRequest,
+    request: Request,
+    current_user: Annotated[AuthenticatedUser, Depends(get_current_user)],
+    session: Annotated[Session, Depends(get_session)],
+) -> PrivilegedChangeView:
+    _require_backoffice_user(current_user)
+    return PrivilegedAccessService().approve(
+        session,
+        current_user=current_user,
+        change_id=change_id,
+        payload_sha256=payload.payload_sha256,
+        request_id=request.headers.get("X-Request-ID"),
+    )
+
+
+@roles_admin_router.post(
+    "/privileged-changes/{change_id}/execute", response_model=PrivilegedChangeView
+)
+def execute_privileged_change(
+    change_id: UUID,
+    payload: PrivilegedChangeConfirmationRequest,
+    request: Request,
+    current_user: Annotated[AuthenticatedUser, Depends(get_current_user)],
+    session: Annotated[Session, Depends(get_session)],
+) -> PrivilegedChangeView:
+    _require_backoffice_user(current_user)
+    try:
+        return PrivilegedAccessService().execute(
+            session,
+            current_user=current_user,
+            change_id=change_id,
+            payload_sha256=payload.payload_sha256,
+            request_id=request.headers.get("X-Request-ID"),
+        )
+    except UserAdminError as error:
+        raise _to_admin_http_exception(error) from error
+    except RoleAdminError as error:
+        raise _to_role_admin_http_exception(error) from error
 
 
 @roles_admin_router.get("/{role_id}", response_model=AdminRoleDetailView)
@@ -424,7 +515,9 @@ def get_admin_role_detail(
 ) -> AdminRoleDetailView:
     _require_backoffice_user(current_user)
     try:
-        return AdminRoleService().get_role_detail(session, role_id=role_id)
+        return AdminRoleService().get_role_detail(
+            session, role_id=role_id, current_user=current_user
+        )
     except RoleAdminError as error:
         raise _to_role_admin_http_exception(error) from error
 
@@ -498,6 +591,7 @@ def change_admin_role_status(
 def assign_admin_role_to_user(
     role_id: UUID,
     user_id: UUID,
+    payload: AdminRoleUserAssignmentRequest,
     request: Request,
     current_user: Annotated[AuthenticatedUser, Depends(get_current_user)],
     session: Annotated[Session, Depends(get_session)],
@@ -509,6 +603,7 @@ def assign_admin_role_to_user(
             current_user=current_user,
             role_id=role_id,
             user_id=user_id,
+            command=payload,
             request_id=request.headers.get("X-Request-ID"),
         )
     except RoleAdminError as error:

@@ -91,18 +91,44 @@ function AdminPurchaseMetricStrip({
 }) {
   const loadingValue = isLoading ? "Cargando" : null;
   const items = [
-    { label: "Compras", title: "Compras del periodo", value: loadingValue ?? metrics.totalDocuments },
+    {
+      label: "Compras",
+      title: "Compras del periodo",
+      value: loadingValue ?? metrics.totalDocuments,
+    },
     { label: "Monto", title: "Monto comprado", value: loadingValue ?? metrics.totalAmount },
-    { label: "Pendientes", title: "Pendientes de recepcion", value: loadingValue ?? metrics.pendingReceipt },
-    { label: "Parciales", title: "Recibidas parcialmente", value: loadingValue ?? metrics.partiallyReceived },
-    { label: "Confirmadas", title: "Entradas confirmadas", value: loadingValue ?? metrics.confirmedEntries },
-    { label: "Discrepancias", title: "Con discrepancias", value: loadingValue ?? metrics.withDiscrepancies },
-    { label: "Proveedores", title: "Proveedores activos usados", value: loadingValue ?? metrics.activeSuppliersUsed },
+    {
+      label: "Pendientes",
+      title: "Pendientes de recepcion",
+      value: loadingValue ?? metrics.pendingReceipt,
+    },
+    {
+      label: "Parciales",
+      title: "Recibidas parcialmente",
+      value: loadingValue ?? metrics.partiallyReceived,
+    },
+    {
+      label: "Confirmadas",
+      title: "Entradas confirmadas",
+      value: loadingValue ?? metrics.confirmedEntries,
+    },
+    {
+      label: "Discrepancias",
+      title: "Con discrepancias",
+      value: loadingValue ?? metrics.withDiscrepancies,
+    },
+    {
+      label: "Proveedores",
+      title: "Proveedores activos usados",
+      value: loadingValue ?? metrics.activeSuppliersUsed,
+    },
   ];
 
   return (
     <section className="flex min-w-0 flex-wrap items-center gap-2 rounded-[18px] border border-[var(--ui-color-border)] bg-white px-3 py-2 text-xs text-slate-600">
-      <span className="shrink-0 font-semibold uppercase tracking-[0.12em] text-slate-500">Resumen</span>
+      <span className="shrink-0 font-semibold uppercase tracking-[0.12em] text-slate-500">
+        Resumen
+      </span>
       {items.map((item) => (
         <span
           className="inline-flex min-w-0 max-w-full items-center gap-1.5 rounded-full border border-[var(--ui-color-border)] bg-slate-50 px-2.5 py-1"
@@ -127,7 +153,9 @@ export function AdminPurchasesPage() {
   const [filters, setFilters] = useState<AdminPurchaseListFilters>(getInitialFilters);
   const [selectedPurchaseId, setSelectedPurchaseId] = useState<string | null>(null);
   const [workflowMode, setWorkflowMode] = useState<WorkflowMode | null>(null);
-  const [feedback, setFeedback] = useState<{ tone: "success" | "error"; message: string } | null>(null);
+  const [feedback, setFeedback] = useState<{ tone: "success" | "error"; message: string } | null>(
+    null,
+  );
 
   const purchasesQuery = useQuery({
     enabled: Boolean(accessToken),
@@ -152,7 +180,10 @@ export function AdminPurchasesPage() {
   const createPurchaseMutation = useMutation({
     mutationFn: (payload: AdminPurchasePayload) => createAdminPurchase(accessToken ?? "", payload),
     onError: (error) => {
-      setFeedback({ tone: "error", message: toBackofficeErrorMessage(error, "No se pudo guardar la compra.") });
+      setFeedback({
+        tone: "error",
+        message: toBackofficeErrorMessage(error, "No se pudo guardar la compra."),
+      });
     },
     onSuccess: (detail) => {
       setFeedback({ tone: "success", message: "Compra guardada correctamente." });
@@ -163,9 +194,13 @@ export function AdminPurchasesPage() {
   });
 
   const directEntryMutation = useMutation({
-    mutationFn: (payload: AdminDirectEntryPayload) => createAdminDirectEntry(accessToken ?? "", payload),
+    mutationFn: (payload: AdminDirectEntryPayload) =>
+      createAdminDirectEntry(accessToken ?? "", payload),
     onError: (error) => {
-      setFeedback({ tone: "error", message: toBackofficeErrorMessage(error, "No se pudo confirmar la entrada.") });
+      setFeedback({
+        tone: "error",
+        message: toBackofficeErrorMessage(error, "No se pudo confirmar la entrada."),
+      });
     },
     onSuccess: (detail) => {
       setFeedback({ tone: "success", message: "Entrada directa confirmada." });
@@ -176,10 +211,18 @@ export function AdminPurchasesPage() {
   });
 
   const receiveMutation = useMutation({
-    mutationFn: ({ payload, purchaseId }: { payload: AdminPurchaseReceiptPayload; purchaseId: string }) =>
-      receiveAdminPurchase(accessToken ?? "", purchaseId, payload),
+    mutationFn: ({
+      payload,
+      purchaseId,
+    }: {
+      payload: AdminPurchaseReceiptPayload;
+      purchaseId: string;
+    }) => receiveAdminPurchase(accessToken ?? "", purchaseId, payload),
     onError: (error) => {
-      setFeedback({ tone: "error", message: toBackofficeErrorMessage(error, "No se pudo confirmar la recepcion.") });
+      setFeedback({
+        tone: "error",
+        message: toBackofficeErrorMessage(error, "No se pudo confirmar la recepcion."),
+      });
     },
     onSuccess: (detail) => {
       setFeedback({ tone: "success", message: "Recepcion confirmada e inventario actualizado." });
@@ -192,7 +235,10 @@ export function AdminPurchasesPage() {
   const confirmMutation = useMutation({
     mutationFn: (purchaseId: string) => confirmAdminPurchase(accessToken ?? "", purchaseId),
     onError: (error) => {
-      setFeedback({ tone: "error", message: toBackofficeErrorMessage(error, "No se pudo confirmar la compra.") });
+      setFeedback({
+        tone: "error",
+        message: toBackofficeErrorMessage(error, "No se pudo confirmar la compra."),
+      });
     },
     onSuccess: (detail) => {
       setFeedback({ tone: "success", message: "Compra confirmada." });
@@ -202,10 +248,18 @@ export function AdminPurchasesPage() {
   });
 
   const cancelMutation = useMutation({
-    mutationFn: ({ payload, purchaseId }: { payload: AdminPurchaseCancelPayload; purchaseId: string }) =>
-      cancelAdminPurchase(accessToken ?? "", purchaseId, payload),
+    mutationFn: ({
+      payload,
+      purchaseId,
+    }: {
+      payload: AdminPurchaseCancelPayload;
+      purchaseId: string;
+    }) => cancelAdminPurchase(accessToken ?? "", purchaseId, payload),
     onError: (error) => {
-      setFeedback({ tone: "error", message: toBackofficeErrorMessage(error, "No se pudo cancelar la compra.") });
+      setFeedback({
+        tone: "error",
+        message: toBackofficeErrorMessage(error, "No se pudo cancelar la compra."),
+      });
     },
     onSuccess: (detail) => {
       setFeedback({ tone: "success", message: "Compra cancelada." });
@@ -246,7 +300,10 @@ export function AdminPurchasesPage() {
     setWorkflowMode(null);
   }
 
-  function handleOpenWorkflow(mode: WorkflowMode, purchase?: AdminPurchaseDetail | AdminPurchaseListItem | null) {
+  function handleOpenWorkflow(
+    mode: WorkflowMode,
+    purchase?: AdminPurchaseDetail | AdminPurchaseListItem | null,
+  ) {
     setFeedback(null);
     if (purchase) {
       setSelectedPurchaseId(getPurchaseId(purchase));
@@ -293,6 +350,7 @@ export function AdminPurchasesPage() {
   return (
     <section className="flex min-h-0 min-w-0 flex-col overflow-hidden rounded-[28px] border border-[var(--ui-color-border)] bg-white shadow-[var(--ui-shadow-subtle)] lg:h-full">
       <AdminPageHeader
+        actionCapability="purchases.manage"
         actionLabel="Nueva compra"
         description="Registra compras a proveedores, entradas de mercancia, recepciones parciales e impacto en inventario."
         meta={[pageStatusLabel, "Recepcion auditable"]}
@@ -324,7 +382,10 @@ export function AdminPurchasesPage() {
           options={purchaseList.filterOptions}
           onChange={patchFilters}
         />
-        <AdminPurchaseMetricStrip isLoading={purchasesQuery.isLoading} metrics={purchaseList.metrics} />
+        <AdminPurchaseMetricStrip
+          isLoading={purchasesQuery.isLoading}
+          metrics={purchaseList.metrics}
+        />
 
         {feedback && workflowMode === null ? (
           <p

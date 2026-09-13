@@ -6,8 +6,6 @@ from fastapi.testclient import TestClient
 from sqlalchemy import select
 
 from zeromerma_api.bootstrap.seed_local import (
-    SEED_ADMIN_EMAIL,
-    SEED_ADMIN_PASSWORD,
     SEED_PRODUCT_CLASS_PAN_DULCE_CODE,
     SEED_PRODUCT_COCA_355_CODE,
     SEED_USER_EMAIL,
@@ -17,6 +15,7 @@ from zeromerma_api.bootstrap.seed_local import (
 from zeromerma_api.db.session import SessionLocal
 from zeromerma_api.modules.audit.infrastructure.models import AuditLog
 from zeromerma_api.modules.catalog.infrastructure.models import Product, ProductClass
+from zeromerma_api.testing.authorization import owner_headers
 
 
 def _login(client: TestClient, *, email: str, password: str) -> str:
@@ -26,10 +25,7 @@ def _login(client: TestClient, *, email: str, password: str) -> str:
 
 
 def _admin_headers(client: TestClient) -> dict[str, str]:
-    return {
-        "Authorization": "Bearer "
-        + _login(client, email=SEED_ADMIN_EMAIL, password=SEED_ADMIN_PASSWORD)
-    }
+    return owner_headers()
 
 
 def _cashier_headers(client: TestClient) -> dict[str, str]:
@@ -211,4 +207,4 @@ def test_admin_sales_tickets_require_backoffice_surface(client: TestClient) -> N
     response = client.get("/v1/admin/sales/tickets", headers=_cashier_headers(client))
 
     assert response.status_code == 403
-    assert response.json()["message"] == "Backoffice access is required."
+    assert response.json()["message"] == "This application surface is not authorized."

@@ -67,20 +67,38 @@ function AdminBranchesMetricStrip({
   const loadingValue = isLoading ? "Cargando" : null;
   const items = [
     { label: "Total", title: "Sucursales totales", value: loadingValue ?? metrics.totalBranches },
-    { label: "Activas", title: "Sucursales activas", value: loadingValue ?? metrics.activeBranches },
-    { label: "Inactivas", title: "Sucursales inactivas", value: loadingValue ?? metrics.inactiveBranches },
-    { label: "Con estaciones", title: "Sucursales con estaciones", value: loadingValue ?? metrics.withWorkstations },
+    {
+      label: "Activas",
+      title: "Sucursales activas",
+      value: loadingValue ?? metrics.activeBranches,
+    },
+    {
+      label: "Inactivas",
+      title: "Sucursales inactivas",
+      value: loadingValue ?? metrics.inactiveBranches,
+    },
+    {
+      label: "Con estaciones",
+      title: "Sucursales con estaciones",
+      value: loadingValue ?? metrics.withWorkstations,
+    },
     {
       label: "Sin estacion",
       title: "Sucursales sin estacion activa",
       value: loadingValue ?? metrics.withoutActiveWorkstation,
     },
-    { label: "Revisar", title: "Sucursales con advertencias", value: loadingValue ?? metrics.withWarnings },
+    {
+      label: "Revisar",
+      title: "Sucursales con advertencias",
+      value: loadingValue ?? metrics.withWarnings,
+    },
   ];
 
   return (
     <section className="flex min-w-0 flex-wrap items-center gap-2 rounded-[18px] border border-[var(--ui-color-border)] bg-white px-3 py-2 text-xs text-slate-600">
-      <span className="shrink-0 font-semibold uppercase tracking-[0.12em] text-slate-500">Resumen</span>
+      <span className="shrink-0 font-semibold uppercase tracking-[0.12em] text-slate-500">
+        Resumen
+      </span>
       {items.map((item) => (
         <span
           className="inline-flex min-w-0 max-w-full items-center gap-1.5 rounded-full border border-[var(--ui-color-border)] bg-slate-50 px-2.5 py-1"
@@ -95,7 +113,9 @@ function AdminBranchesMetricStrip({
   );
 }
 
-function toUpdatePayload(payload: AdminBranchCreatePayload | AdminBranchUpdatePayload): AdminBranchUpdatePayload {
+function toUpdatePayload(
+  payload: AdminBranchCreatePayload | AdminBranchUpdatePayload,
+): AdminBranchUpdatePayload {
   return {
     addressLine: payload.addressLine ?? null,
     brandId: payload.brandId ?? null,
@@ -141,10 +161,16 @@ export function AdminBranchesPage() {
   const accessToken = useBackofficeAuthStore((state) => state.accessToken);
   const queryClient = useQueryClient();
   const [filters, setFilters] = useState<AdminBranchListFilters>(initialFilters);
-  const [formMode, setFormMode] = useState<"create" | { type: "edit"; detail: AdminBranchDetail } | null>(null);
+  const [formMode, setFormMode] = useState<
+    "create" | { type: "edit"; detail: AdminBranchDetail } | null
+  >(null);
   const [pendingEditBranchId, setPendingEditBranchId] = useState<string | null>(null);
-  const [selectedBranchId, setSelectedBranchId] = useState<string | null>(getInitialSelectedBranchId);
-  const [feedback, setFeedback] = useState<{ tone: "success" | "error"; message: string } | null>(null);
+  const [selectedBranchId, setSelectedBranchId] = useState<string | null>(
+    getInitialSelectedBranchId,
+  );
+  const [feedback, setFeedback] = useState<{ tone: "success" | "error"; message: string } | null>(
+    null,
+  );
 
   const branchesQuery = useQuery({
     enabled: Boolean(accessToken),
@@ -167,7 +193,8 @@ export function AdminBranchesPage() {
   });
 
   const createBranchMutation = useMutation({
-    mutationFn: (payload: AdminBranchCreatePayload) => createAdminBranch(accessToken ?? "", payload),
+    mutationFn: (payload: AdminBranchCreatePayload) =>
+      createAdminBranch(accessToken ?? "", payload),
     onError: (error) => {
       setFeedback({
         tone: "error",
@@ -209,14 +236,23 @@ export function AdminBranchesPage() {
 
   const detailBranch = branchDetailQuery.data ?? null;
   const listErrorMessage = branchesQuery.isError
-    ? toBackofficeErrorMessage(branchesQuery.error, "No se pudieron cargar las sucursales. Intenta nuevamente.")
+    ? toBackofficeErrorMessage(
+        branchesQuery.error,
+        "No se pudieron cargar las sucursales. Intenta nuevamente.",
+      )
     : null;
   const detailErrorMessage = branchDetailQuery.isError
-    ? toBackofficeErrorMessage(branchDetailQuery.error, "No se pudo cargar el detalle de la sucursal.")
+    ? toBackofficeErrorMessage(
+        branchDetailQuery.error,
+        "No se pudo cargar el detalle de la sucursal.",
+      )
     : null;
   const formErrorMessage =
     createBranchMutation.isError || updateBranchMutation.isError
-      ? toBackofficeErrorMessage(createBranchMutation.error ?? updateBranchMutation.error, "No se pudo guardar.")
+      ? toBackofficeErrorMessage(
+          createBranchMutation.error ?? updateBranchMutation.error,
+          "No se pudo guardar.",
+        )
       : null;
   const pageStatusLabel = branchesQuery.isLoading
     ? "Validando API"
@@ -311,6 +347,8 @@ export function AdminBranchesPage() {
   return (
     <section className="flex min-h-0 min-w-0 flex-col overflow-hidden rounded-[28px] border border-[var(--ui-color-border)] bg-white shadow-[var(--ui-shadow-subtle)] lg:h-full">
       <AdminPageHeader
+        actionCapability="branches.manage"
+        actionGlobalOnly
         actionLabel="Nueva sucursal"
         description="Administra las sucursales, su estado operativo, marca, estaciones asociadas y preparacion multisucursal."
         meta={[pageStatusLabel]}
@@ -329,7 +367,10 @@ export function AdminBranchesPage() {
           onChange={patchFilters}
         />
 
-        <AdminBranchesMetricStrip metrics={branchList.metrics} isLoading={branchesQuery.isLoading} />
+        <AdminBranchesMetricStrip
+          metrics={branchList.metrics}
+          isLoading={branchesQuery.isLoading}
+        />
 
         {feedback ? (
           <p
@@ -359,18 +400,18 @@ export function AdminBranchesPage() {
           }}
         >
           {formMode ? (
-          <AdminBranchFormPanel
-            branchDetail={formMode === "create" ? null : formMode.detail}
-            brandOptions={branchList.filterOptions.brands}
-            errorMessage={formErrorMessage}
-            isSubmitting={isSaving}
-            key={formMode === "create" ? "create" : formMode.detail.overview.id}
-            onClose={() => {
-              setFormMode(null);
-              setPendingEditBranchId(null);
-            }}
-            onSubmit={handleSubmitBranch}
-          />
+            <AdminBranchFormPanel
+              branchDetail={formMode === "create" ? null : formMode.detail}
+              brandOptions={branchList.filterOptions.brands}
+              errorMessage={formErrorMessage}
+              isSubmitting={isSaving}
+              key={formMode === "create" ? "create" : formMode.detail.overview.id}
+              onClose={() => {
+                setFormMode(null);
+                setPendingEditBranchId(null);
+              }}
+              onSubmit={handleSubmitBranch}
+            />
           ) : null}
         </AdminEntityDrawer>
 

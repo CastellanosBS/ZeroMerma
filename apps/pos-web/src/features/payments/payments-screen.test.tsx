@@ -90,6 +90,9 @@ const bootstrapResponse = {
   local_timestamp: "2026-04-22T18:00:00Z",
   payment_registration_allowed: true,
   user: {
+    authorization_surface: "POS" as const,
+    authorization_version: "test-authorization-v1",
+    is_superadministrator: false,
     default_surface: "POS",
     email: "cashier@zeromerma.local",
     full_name: "Main Branch Cashier",

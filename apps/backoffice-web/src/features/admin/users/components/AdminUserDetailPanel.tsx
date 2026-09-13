@@ -1,3 +1,4 @@
+import { AdminActionButton } from "../../components/AdminActionButton";
 import type { ReactNode } from "react";
 
 import { AdminEmptyState } from "../../components/AdminEmptyState";
@@ -166,7 +167,10 @@ export function AdminUserDetailPanel({
               label="Restablecer contrasena"
               value={detail.accountStatus.passwordResetRequired ? "Requerido" : "No requerido"}
             />
-            <Fact label="Intentos fallidos" value={detail.accountStatus.failedLoginCount ?? "No soportado"} />
+            <Fact
+              label="Intentos fallidos"
+              value={detail.accountStatus.failedLoginCount ?? "No soportado"}
+            />
             <Fact
               label="Sesiones activas"
               value={
@@ -203,7 +207,11 @@ export function AdminUserDetailPanel({
                       {assignment.branchName} ({assignment.branchCode})
                     </span>
                     <span className="shrink-0 rounded-full border border-[var(--ui-color-border)] bg-white px-2 py-1 text-xs font-semibold text-slate-600">
-                      {assignment.isDefault ? "Predeterminada" : assignment.isActive ? "Activa" : "Inactiva"}
+                      {assignment.isDefault
+                        ? "Predeterminada"
+                        : assignment.isActive
+                          ? "Activa"
+                          : "Inactiva"}
                     </span>
                   </div>
                   <p className="mt-1 truncate text-xs text-slate-500">
@@ -223,7 +231,15 @@ export function AdminUserDetailPanel({
           {detail.roleAssignments.items.length > 0 ? (
             <div className="grid gap-2">
               {detail.roleAssignments.items.map((role) => (
-                <Fact key={role.roleId} label={role.roleName} value={role.scope ?? "Sin alcance"} />
+                <Fact
+                  key={role.roleId}
+                  label={role.roleName}
+                  value={
+                    role.scopeType === "GLOBAL"
+                      ? "Global explícito"
+                      : `${role.branchIds.length} sucursales`
+                  }
+                />
               ))}
             </div>
           ) : (
@@ -235,38 +251,42 @@ export function AdminUserDetailPanel({
 
         <Section title="Acciones de seguridad">
           <div className="flex flex-wrap gap-2">
-            <button
+            <AdminActionButton
+              capability="users.manage"
               className="rounded-full border border-[var(--ui-color-border)] bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 disabled:cursor-not-allowed disabled:opacity-40"
               disabled={!detail.securityActions.canLock}
               type="button"
               onClick={() => onLock(detail.overview)}
             >
               Bloquear
-            </button>
-            <button
+            </AdminActionButton>
+            <AdminActionButton
+              capability="users.manage"
               className="rounded-full border border-[var(--ui-color-border)] bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 disabled:cursor-not-allowed disabled:opacity-40"
               disabled={!detail.securityActions.canUnlock}
               type="button"
               onClick={() => onUnlock(detail.overview)}
             >
               Desbloquear
-            </button>
-            <button
+            </AdminActionButton>
+            <AdminActionButton
+              capability="users.manage"
               className="rounded-full border border-[var(--ui-color-border)] bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 disabled:cursor-not-allowed disabled:opacity-40"
               disabled={!detail.securityActions.canDeactivate}
               type="button"
               onClick={() => onDeactivate(detail.overview)}
             >
               Desactivar
-            </button>
-            <button
+            </AdminActionButton>
+            <AdminActionButton
+              capability="users.manage"
               className="rounded-full border border-[var(--ui-color-border)] bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 disabled:cursor-not-allowed disabled:opacity-40"
               disabled={!detail.securityActions.canActivate}
               type="button"
               onClick={() => onActivate(detail.overview)}
             >
               Activar
-            </button>
+            </AdminActionButton>
           </div>
           <p className="mt-2 text-xs text-slate-500">
             Restablecimiento, invitaciones y revocacion de sesiones no estan soportados por el
@@ -318,13 +338,15 @@ export function AdminUserDetailPanel({
 
         <Section title="Acciones disponibles">
           <div className="flex flex-wrap gap-2">
-            <button
+            <AdminActionButton
+              capability="users.manage"
               className="rounded-full border border-[var(--ui-color-border)] bg-white px-3 py-1.5 text-xs font-semibold text-slate-700"
               type="button"
+              disabled={!detail.availableActions.canEditProfile}
               onClick={() => onEdit(detail.overview)}
             >
               Editar
-            </button>
+            </AdminActionButton>
             <button
               className="rounded-full border border-[var(--ui-color-border)] bg-white px-3 py-1.5 text-xs font-semibold text-slate-700"
               type="button"

@@ -81,10 +81,26 @@ function AdminProductsMetricStrip({
   metrics: AdminProductListResponse["metrics"];
 }) {
   const items = [
-    { label: "Activos", title: "Productos activos", value: metricValue(metrics.activeProducts, isLoading) },
-    { label: "Directos", title: "PRODUCT_DIRECT", value: metricValue(metrics.productDirect, isLoading) },
-    { label: "Por clase", title: "CLASS_CAPTURE", value: metricValue(metrics.classCapture, isLoading) },
-    { label: "Atencion", title: "Requieren atencion", value: metricValue(metrics.requireAttention, isLoading) },
+    {
+      label: "Activos",
+      title: "Productos activos",
+      value: metricValue(metrics.activeProducts, isLoading),
+    },
+    {
+      label: "Directos",
+      title: "PRODUCT_DIRECT",
+      value: metricValue(metrics.productDirect, isLoading),
+    },
+    {
+      label: "Por clase",
+      title: "CLASS_CAPTURE",
+      value: metricValue(metrics.classCapture, isLoading),
+    },
+    {
+      label: "Atencion",
+      title: "Requieren atencion",
+      value: metricValue(metrics.requireAttention, isLoading),
+    },
     {
       label: "Disponibilidad",
       title: "Disponibilidad por sucursal",
@@ -94,7 +110,9 @@ function AdminProductsMetricStrip({
 
   return (
     <section className="flex min-w-0 flex-wrap items-center gap-2 rounded-[18px] border border-[var(--ui-color-border)] bg-white px-3 py-2 text-xs text-slate-600">
-      <span className="shrink-0 font-semibold uppercase tracking-[0.12em] text-slate-500">Resumen</span>
+      <span className="shrink-0 font-semibold uppercase tracking-[0.12em] text-slate-500">
+        Resumen
+      </span>
       {items.map((item) => (
         <span
           className="inline-flex min-w-0 max-w-full items-center gap-1.5 rounded-full border border-[var(--ui-color-border)] bg-slate-50 px-2.5 py-1"
@@ -115,7 +133,9 @@ export function AdminProductsPage() {
   const [filters, setFilters] = useState<AdminProductListFilters>(getInitialFilters);
   const [isCreating, setIsCreating] = useState(false);
   const [selectedProductId, setSelectedProductId] = useState<string | null>(null);
-  const [feedback, setFeedback] = useState<{ tone: "success" | "error"; message: string } | null>(null);
+  const [feedback, setFeedback] = useState<{ tone: "success" | "error"; message: string } | null>(
+    null,
+  );
 
   const productsQuery = useQuery({
     enabled: Boolean(accessToken),
@@ -138,7 +158,8 @@ export function AdminProductsPage() {
   });
 
   const createProductMutation = useMutation({
-    mutationFn: (payload: AdminProductCreatePayload) => createAdminProduct(accessToken ?? "", payload),
+    mutationFn: (payload: AdminProductCreatePayload) =>
+      createAdminProduct(accessToken ?? "", payload),
     onError: (error) => {
       setFeedback({
         tone: "error",
@@ -155,10 +176,16 @@ export function AdminProductsPage() {
 
   const detailProduct = productDetailQuery.data ?? selectedProductPreview;
   const listErrorMessage = productsQuery.isError
-    ? toBackofficeErrorMessage(productsQuery.error, "No se pudieron cargar los productos. Intenta nuevamente.")
+    ? toBackofficeErrorMessage(
+        productsQuery.error,
+        "No se pudieron cargar los productos. Intenta nuevamente.",
+      )
     : null;
   const detailErrorMessage = productDetailQuery.isError
-    ? toBackofficeErrorMessage(productDetailQuery.error, "No se pudo cargar el detalle del producto.")
+    ? toBackofficeErrorMessage(
+        productDetailQuery.error,
+        "No se pudo cargar el detalle del producto.",
+      )
     : null;
   const createErrorMessage = createProductMutation.isError
     ? toBackofficeErrorMessage(createProductMutation.error, "No se pudo crear el producto.")
@@ -198,6 +225,8 @@ export function AdminProductsPage() {
   return (
     <section className="flex min-h-0 min-w-0 flex-col overflow-hidden rounded-[28px] border border-[var(--ui-color-border)] bg-white shadow-[var(--ui-shadow-subtle)] lg:h-full">
       <AdminPageHeader
+        actionGlobalOnly
+        actionCapability="catalog.manage"
         actionLabel="Nuevo producto"
         description="Catalogo maestro de productos vendibles y operativos."
         meta={[pageStatusLabel]}
@@ -216,7 +245,10 @@ export function AdminProductsPage() {
           onChange={patchFilters}
         />
 
-        <AdminProductsMetricStrip metrics={productList.metrics} isLoading={productsQuery.isLoading} />
+        <AdminProductsMetricStrip
+          metrics={productList.metrics}
+          isLoading={productsQuery.isLoading}
+        />
 
         {feedback ? (
           <p

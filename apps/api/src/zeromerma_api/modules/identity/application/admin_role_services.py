@@ -5,8 +5,9 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import Any
 
+from fastapi import HTTPException
 from pydantic import TypeAdapter
-from sqlalchemy import func, select
+from sqlalchemy import func, select, true
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
@@ -37,8 +38,31 @@ from zeromerma_api.modules.identity.application.admin_role_schemas import (
     AdminRoleUpdateRequest,
     AdminRoleWarningView,
 )
-from zeromerma_api.modules.identity.application.permissions import SENSITIVE_PERMISSION_CODES
-from zeromerma_api.modules.identity.application.schemas import AuthenticatedUser, IdentitySurface
+from zeromerma_api.modules.identity.application.admin_schemas import AdminAssignmentScopeRequest
+from zeromerma_api.modules.identity.application.authorization import (
+    require_branches,
+    require_capability,
+)
+from zeromerma_api.modules.identity.application.permissions import (
+    PERMISSION_CODES,
+    SENSITIVE_PERMISSION_CODES,
+    SUPERADMIN_ROLE_CODE,
+)
+from zeromerma_api.modules.identity.application.privileged_access import (
+    assignment_branch_ids,
+    authorize_privileged_change,
+    can_access_user,
+    ensure_superadmin_remains,
+    lock_privileged_lifecycle,
+    refresh_actor,
+    set_role_assignment,
+    user_scope_predicate,
+)
+from zeromerma_api.modules.identity.application.schemas import (
+    AuthenticatedUser,
+    IdentitySurface,
+    ScopeType,
+)
 from zeromerma_api.modules.identity.domain.constants import (
     IDENTITY_ALLOWED_SURFACES,
     IDENTITY_SURFACE_BACKOFFICE,
@@ -59,6 +83,7 @@ from zeromerma_api.modules.identity.infrastructure.models import (
 )
 from zeromerma_api.modules.outbox.application.service import OutboxWriter
 
+_SCOPE_TYPE_ADAPTER: TypeAdapter[ScopeType] = TypeAdapter(ScopeType)
 _LIST_IDENTITY_SURFACE_ADAPTER: TypeAdapter[list[IdentitySurface]] = TypeAdapter(
     list[IdentitySurface]
 )
@@ -96,6 +121,7 @@ class AdminRoleService:
         self,
         session: Session,
         *,
+        current_user: AuthenticatedUser,
         search: str | None,
         status_filter: str | None,
         app_surface: str | None,
@@ -107,8 +133,10 @@ class AdminRoleService:
         page: int,
         page_size: int,
     ) -> AdminRolesListResponse:
+        current_user = refresh_actor(session, current_user)
+        require_capability(current_user, "roles.view")
         contexts = [
-            self._get_context(session, role.id)
+            self._get_context(session, role.id, current_user=current_user)
             for role in session.execute(select(Role).order_by(Role.name.asc())).scalars().all()
         ]
 
@@ -185,7 +213,11 @@ class AdminRoleService:
             total=total,
         )
 
-    def list_permissions(self, session: Session) -> AdminPermissionsResponse:
+    def list_permissions(
+        self, session: Session, *, current_user: AuthenticatedUser
+    ) -> AdminPermissionsResponse:
+        current_user = refresh_actor(session, current_user)
+        require_capability(current_user, "roles.view")
         permissions = self._fetch_all_permissions(session)
         return AdminPermissionsResponse(
             groups=self._permission_groups(permissions, enabled_codes=set()),
@@ -199,8 +231,15 @@ class AdminRoleService:
         session: Session,
         *,
         role_id: uuid.UUID,
+        current_user: AuthenticatedUser,
     ) -> AdminRoleDetailView:
-        return self._to_detail(session, self._get_context(session, role_id))
+        current_user = refresh_actor(session, current_user)
+        require_capability(current_user, "roles.view")
+        return self._to_detail(
+            session,
+            self._get_context(session, role_id, current_user=current_user),
+            current_user=current_user,
+        )
 
     def create_role(
         self,
@@ -210,6 +249,14 @@ class AdminRoleService:
         command: AdminRoleCreateRequest,
         request_id: str | None,
     ) -> AdminRoleDetailView:
+        lock_privileged_lifecycle(session)
+        current_user = refresh_actor(session, current_user)
+        require_branches(current_user, "roles.manage", [], global_only=True)
+        if command.code == SUPERADMIN_ROLE_CODE:
+            raise HTTPException(
+                status_code=403,
+                detail="The Superadministrator role is reserved for owner provisioning.",
+            )
         self._ensure_unique_code(session, command.code)
         surfaces = self._normalize_surfaces(command.surfaces)
         permissions = self._get_permissions_by_codes(session, command.permission_codes)
@@ -242,12 +289,15 @@ class AdminRoleService:
                 request_id=request_id,
                 metadata=self._role_metadata(role, permissions),
             )
+            ensure_superadmin_remains(session)
             session.commit()
         except IntegrityError as error:
             session.rollback()
             raise RoleValidationError("Role code must be unique.") from error
 
-        return self.get_role_detail(session, role_id=role.id)
+        return self._to_detail(
+            session, self._get_context(session, role.id), current_user=current_user
+        )
 
     def update_role(
         self,
@@ -257,12 +307,39 @@ class AdminRoleService:
         role_id: uuid.UUID,
         command: AdminRoleUpdateRequest,
         request_id: str | None,
+        approval_id: uuid.UUID | None = None,
     ) -> AdminRoleDetailView:
+        current_user = authorize_privileged_change(
+            session,
+            current_user=current_user,
+            operation="ROLE_UPDATE",
+            target_role_id=role_id,
+            payload=command.model_dump(mode="json", exclude_unset=True),
+            approval_id=approval_id,
+            request_id=request_id,
+        )
+        require_branches(current_user, "roles.manage", [], global_only=True)
         context = self._get_context(session, role_id)
         role = context.role
-        if role.is_system:
+        if role.is_system and role.code != SUPERADMIN_ROLE_CODE:
             raise RoleConflictError("System roles are read-only.")
 
+        own_assignment = session.scalar(
+            select(UserRoleAssignment.id).where(
+                UserRoleAssignment.user_id == current_user.id, UserRoleAssignment.role_id == role_id
+            )
+        )
+        if own_assignment is not None and (
+            (
+                command.permission_codes is not None
+                and not set(command.permission_codes) <= {item.code for item in context.permissions}
+            )
+            or (command.surfaces is not None and not set(command.surfaces) <= set(role.surfaces))
+            or (command.is_active is True and not role.is_active)
+        ):
+            raise HTTPException(
+                status_code=403, detail="Self-elevation through a role change is forbidden."
+            )
         previous_metadata = self._role_metadata(role, context.permissions)
         surfaces = self._normalize_surfaces(role.surfaces)
         permissions = context.permissions
@@ -327,8 +404,11 @@ class AdminRoleService:
                 "current": self._role_metadata(role, permissions),
             },
         )
+        ensure_superadmin_remains(session)
         session.commit()
-        return self.get_role_detail(session, role_id=role.id)
+        return self._to_detail(
+            session, self._get_context(session, role.id), current_user=current_user
+        )
 
     def change_status(
         self,
@@ -338,10 +418,21 @@ class AdminRoleService:
         role_id: uuid.UUID,
         command: AdminRoleStatusChangeRequest,
         request_id: str | None,
+        approval_id: uuid.UUID | None = None,
     ) -> AdminRoleDetailView:
+        current_user = authorize_privileged_change(
+            session,
+            current_user=current_user,
+            operation="ROLE_STATUS",
+            target_role_id=role_id,
+            payload=command.model_dump(mode="json", exclude_unset=True),
+            approval_id=approval_id,
+            request_id=request_id,
+        )
+        require_branches(current_user, "roles.manage", [], global_only=True)
         context = self._get_context(session, role_id)
         role = context.role
-        if role.is_system:
+        if role.is_system and role.code != SUPERADMIN_ROLE_CODE:
             raise RoleConflictError("System roles are read-only.")
         if (
             not command.is_active
@@ -356,6 +447,15 @@ class AdminRoleService:
         ):
             raise RoleConflictError("Cannot deactivate the last role with role management.")
 
+        own_assignment = session.scalar(
+            select(UserRoleAssignment.id).where(
+                UserRoleAssignment.user_id == current_user.id, UserRoleAssignment.role_id == role_id
+            )
+        )
+        if own_assignment is not None and command.is_active and not role.is_active:
+            raise HTTPException(
+                status_code=403, detail="Self-elevation through role activation is forbidden."
+            )
         previous_status = _role_status(role)
         role.is_active = command.is_active
         session.flush()
@@ -372,8 +472,11 @@ class AdminRoleService:
                 "new_status": _role_status(role),
             },
         )
+        ensure_superadmin_remains(session)
         session.commit()
-        return self.get_role_detail(session, role_id=role.id)
+        return self._to_detail(
+            session, self._get_context(session, role.id), current_user=current_user
+        )
 
     def assign_role_to_user(
         self,
@@ -382,30 +485,27 @@ class AdminRoleService:
         current_user: AuthenticatedUser,
         role_id: uuid.UUID,
         user_id: uuid.UUID,
+        command: AdminAssignmentScopeRequest,
         request_id: str | None,
+        approval_id: uuid.UUID | None = None,
     ) -> AdminRoleDetailView:
+        current_user = authorize_privileged_change(
+            session,
+            current_user=current_user,
+            operation="ROLE_ASSIGNMENT",
+            target_user_id=user_id,
+            target_role_id=role_id,
+            payload=command.model_dump(mode="json", exclude_unset=True),
+            approval_id=approval_id,
+            request_id=request_id,
+        )
         role = self._get_role(session, role_id)
         if not role.is_active:
             raise RoleValidationError("Inactive roles cannot be assigned.")
         user = self._get_user(session, user_id)
-        assignment = session.execute(
-            select(UserRoleAssignment).where(
-                UserRoleAssignment.user_id == user.id,
-                UserRoleAssignment.role_id == role.id,
-            )
-        ).scalar_one_or_none()
-        if assignment is None:
-            assignment = UserRoleAssignment(
-                user_id=user.id,
-                role_id=role.id,
-                is_active=True,
-                assigned_by_user_id=current_user.id,
-            )
-            session.add(assignment)
-        else:
-            assignment.is_active = True
-            assignment.assigned_by_user_id = current_user.id
-        session.flush()
+        assignment_metadata = set_role_assignment(
+            session, actor=current_user, user_id=user_id, role_id=role_id, scope=command
+        )
         self._record_assignment_change(
             session,
             current_user=current_user,
@@ -413,9 +513,13 @@ class AdminRoleService:
             user=user,
             action=AUDIT_ACTION_ADMIN_ROLE_USER_ASSIGNED,
             request_id=request_id,
+            assignment_metadata=assignment_metadata,
         )
+        ensure_superadmin_remains(session)
         session.commit()
-        return self.get_role_detail(session, role_id=role.id)
+        return self._to_detail(
+            session, self._get_context(session, role.id), current_user=current_user
+        )
 
     def remove_role_from_user(
         self,
@@ -425,23 +529,23 @@ class AdminRoleService:
         role_id: uuid.UUID,
         user_id: uuid.UUID,
         request_id: str | None,
+        approval_id: uuid.UUID | None = None,
     ) -> AdminRoleDetailView:
+        current_user = authorize_privileged_change(
+            session,
+            current_user=current_user,
+            operation="ROLE_REMOVAL",
+            target_user_id=user_id,
+            target_role_id=role_id,
+            payload={},
+            approval_id=approval_id,
+            request_id=request_id,
+        )
         role = self._get_role(session, role_id)
         user = self._get_user(session, user_id)
-        assignment = session.execute(
-            select(UserRoleAssignment).where(
-                UserRoleAssignment.user_id == user.id,
-                UserRoleAssignment.role_id == role.id,
-                UserRoleAssignment.is_active.is_(True),
-            )
-        ).scalar_one_or_none()
-        if assignment is None:
-            raise RoleNotFoundError("User role assignment was not found.")
-        if user.is_active and self._active_role_count_for_user(session, user.id) <= 1:
-            raise RoleConflictError("Cannot remove the last active role from an active user.")
-
-        assignment.is_active = False
-        session.flush()
+        assignment_metadata = set_role_assignment(
+            session, actor=current_user, user_id=user_id, role_id=role_id, scope=None
+        )
         self._record_assignment_change(
             session,
             current_user=current_user,
@@ -449,9 +553,13 @@ class AdminRoleService:
             user=user,
             action=AUDIT_ACTION_ADMIN_ROLE_USER_REMOVED,
             request_id=request_id,
+            assignment_metadata=assignment_metadata,
         )
+        ensure_superadmin_remains(session)
         session.commit()
-        return self.get_role_detail(session, role_id=role.id)
+        return self._to_detail(
+            session, self._get_context(session, role.id), current_user=current_user
+        )
 
     def _to_list_item(self, context: _RoleContext) -> AdminRoleListItemView:
         warnings = self._build_warnings(context)
@@ -474,7 +582,9 @@ class AdminRoleService:
             updated_at=context.role.updated_at,
         )
 
-    def _to_detail(self, session: Session, context: _RoleContext) -> AdminRoleDetailView:
+    def _to_detail(
+        self, session: Session, context: _RoleContext, *, current_user: AuthenticatedUser
+    ) -> AdminRoleDetailView:
         warnings = self._build_warnings(context)
         enabled_codes = {permission.code for permission in context.permissions}
         sensitive_permissions = [
@@ -482,7 +592,19 @@ class AdminRoleService:
             for permission in context.permissions
             if permission.is_sensitive
         ]
-        can_edit = not context.role.is_system
+        grants = {grant.capability: grant for grant in current_user.effective_grants}
+        role_grant = grants.get("roles.manage")
+        can_edit = (
+            role_grant is not None
+            and role_grant.scope_type == "GLOBAL"
+            and (not context.role.is_system or context.role.code == SUPERADMIN_ROLE_CODE)
+        )
+        can_assign = "role_assignments.manage" in grants
+        visible_users = [
+            (assignment, user)
+            for assignment, user in context.assigned_users
+            if can_access_user(session, current_user, "users.view", user.id)
+        ]
         return AdminRoleDetailView(
             overview=AdminRoleOverviewView(
                 id=context.role.id,
@@ -522,14 +644,16 @@ class AdminRoleService:
             ),
             sensitive_permissions=sensitive_permissions,
             scopes=AdminRoleScopeView(scope_summary=self._scope_summary()),
-            assigned_users=self._assigned_user_views(session, context.assigned_users),
-            audit_history=self._fetch_audit_history(session, context.role.id),
+            assigned_users=self._assigned_user_views(session, visible_users),
+            audit_history=self._fetch_audit_history(session, context.role.id)
+            if grants.get("audit.view") is not None and grants["audit.view"].scope_type == "GLOBAL"
+            else [],
             available_actions=AdminRoleAvailableActionsView(
                 can_edit=can_edit,
                 can_activate=can_edit and not context.role.is_active,
                 can_deactivate=can_edit and context.role.is_active,
-                can_assign_users=can_edit and context.role.is_active,
-                can_remove_users=can_edit,
+                can_assign_users=can_assign and context.role.is_active,
+                can_remove_users=can_assign,
             ),
             warnings=warnings,
         )
@@ -721,6 +845,8 @@ class AdminRoleService:
                         self._normalize_surfaces(user.allowed_surfaces)
                     ),
                     assigned_at=assignment.created_at,
+                    scope_type=_SCOPE_TYPE_ADAPTER.validate_python(assignment.scope_type),
+                    branch_ids=assignment_branch_ids(session, assignment.id),
                 )
             )
         return views
@@ -754,12 +880,14 @@ class AdminRoleService:
             for record in records
         ]
 
-    def _get_context(self, session: Session, role_id: uuid.UUID) -> _RoleContext:
+    def _get_context(
+        self, session: Session, role_id: uuid.UUID, *, current_user: AuthenticatedUser | None = None
+    ) -> _RoleContext:
         role = self._get_role(session, role_id)
         return _RoleContext(
             role=role,
             permissions=self._fetch_role_permissions(session, role.id),
-            assigned_users=self._fetch_assigned_users(session, role.id),
+            assigned_users=self._fetch_assigned_users(session, role.id, current_user=current_user),
         )
 
     def _get_role(self, session: Session, role_id: uuid.UUID) -> Role:
@@ -801,11 +929,18 @@ class AdminRoleService:
         self,
         session: Session,
         role_id: uuid.UUID,
+        *,
+        current_user: AuthenticatedUser | None = None,
     ) -> list[tuple[UserRoleAssignment, User]]:
         return list(
             session.execute(
                 select(UserRoleAssignment, User)
                 .join(User, User.id == UserRoleAssignment.user_id)
+                .where(
+                    user_scope_predicate(current_user, "roles.view")
+                    if current_user is not None
+                    else true()
+                )
                 .where(
                     UserRoleAssignment.role_id == role_id,
                     UserRoleAssignment.is_active.is_(True),
@@ -824,10 +959,16 @@ class AdminRoleService:
         normalized_codes = list(
             dict.fromkeys(code.strip().lower() for code in codes if code.strip())
         )
+        if set(normalized_codes) - set(PERMISSION_CODES):
+            raise RoleValidationError("Only canonical active capability codes can be assigned.")
         if not normalized_codes:
             raise RoleValidationError("At least one permission is required.")
         permissions = (
-            session.execute(select(Permission).where(Permission.code.in_(normalized_codes)))
+            session.execute(
+                select(Permission).where(
+                    Permission.code.in_(normalized_codes), Permission.is_active.is_(True)
+                )
+            )
             .scalars()
             .all()
         )
@@ -932,7 +1073,7 @@ class AdminRoleService:
         return normalized in surfaces
 
     def _scope_summary(self) -> str:
-        return "Sin restricciones de alcance configuradas."
+        return "Explicit GLOBAL or BRANCH_SET scope on each role assignment."
 
     def _record_change(
         self,
@@ -973,8 +1114,10 @@ class AdminRoleService:
         user: User,
         action: str,
         request_id: str | None,
+        assignment_metadata: dict[str, Any],
     ) -> None:
         metadata = {
+            **assignment_metadata,
             "role_id": str(role.id),
             "role_code": role.code,
             "user_id": str(user.id),

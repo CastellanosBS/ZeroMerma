@@ -7,6 +7,8 @@ import { AdminEntityDrawer } from "../../components/AdminEntityDrawer";
 import { AdminPageHeader } from "../../components/AdminPageHeader";
 import {
   addAdminUserBranchAssignment,
+  assignAdminUserRole,
+  removeAdminUserRole,
   adminUserBackendContract,
   changeAdminUserStatus,
   createAdminUser,
@@ -20,6 +22,7 @@ import { AdminUserDetailPanel } from "../components/AdminUserDetailPanel";
 import { AdminUsersFilters } from "../components/AdminUsersFilters";
 import { AdminUsersTable } from "../components/AdminUsersTable";
 import { AdminUserWorkflowPanel } from "../components/AdminUserWorkflowPanel";
+import { AdminUserRoleAssignmentPanel } from "../components/AdminUserRoleAssignmentPanel";
 import type {
   AdminUserCreatePayload,
   AdminUserFilterOptions,
@@ -27,6 +30,7 @@ import type {
   AdminUserListItem,
   AdminUserListResponse,
   AdminUserUpdatePayload,
+  AdminUserRoleAssignmentPayload,
 } from "../types";
 
 const initialFilters: AdminUserListFilters = {
@@ -138,6 +142,20 @@ export function AdminUsersPage() {
     retry: false,
   });
 
+  const assignmentMutation = useMutation({
+    mutationFn: (payload: AdminUserRoleAssignmentPayload) =>
+      assignAdminUserRole(accessToken ?? "", selectedUserId!, payload),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ["admin", "users"] });
+    },
+  });
+  const removeAssignmentMutation = useMutation({
+    mutationFn: (roleId: string) => removeAdminUserRole(accessToken ?? "", selectedUserId!, roleId),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ["admin", "users"] });
+    },
+  });
+
   const createMutation = useMutation({
     mutationFn: (payload: AdminUserCreatePayload) => createAdminUser(accessToken ?? "", payload),
     onError: (error) => {
@@ -181,7 +199,10 @@ export function AdminUsersPage() {
       });
     },
     onSuccess: async (detail) => {
-      setFeedback({ tone: "success", message: `Estado actualizado para ${detail.overview.email}.` });
+      setFeedback({
+        tone: "success",
+        message: `Estado actualizado para ${detail.overview.email}.`,
+      });
       setSelectedUserId(detail.overview.id);
       await queryClient.invalidateQueries({ queryKey: ["admin", "users"] });
     },
@@ -247,12 +268,13 @@ export function AdminUsersPage() {
   const detailErrorMessage = detailQuery.isError
     ? toBackofficeErrorMessage(detailQuery.error, "No se pudo cargar el detalle del usuario.")
     : null;
-  const workflowErrorMessage = createMutation.isError || updateMutation.isError || branchMutation.isError
-    ? toBackofficeErrorMessage(
-        createMutation.error ?? updateMutation.error ?? branchMutation.error,
-        "No se pudo guardar el usuario.",
-      )
-    : null;
+  const workflowErrorMessage =
+    createMutation.isError || updateMutation.isError || branchMutation.isError
+      ? toBackofficeErrorMessage(
+          createMutation.error ?? updateMutation.error ?? branchMutation.error,
+          "No se pudo guardar el usuario.",
+        )
+      : null;
   const pageStatusLabel = usersQuery.isLoading
     ? "Validando API"
     : userList.isBackendConnected
@@ -282,6 +304,7 @@ export function AdminUsersPage() {
   return (
     <section className="flex min-h-0 min-w-0 flex-col overflow-hidden rounded-[28px] border border-[var(--ui-color-border)] bg-white shadow-[var(--ui-shadow-subtle)] lg:h-full">
       <AdminPageHeader
+        actionCapability="users.manage"
         actionLabel="Nuevo usuario"
         description="Administra usuarios, acceso a POS y Backoffice, sucursales asignadas, roles y estado de cuenta."
         meta={[pageStatusLabel]}
@@ -325,22 +348,23 @@ export function AdminUsersPage() {
           title={workflowMode === "edit" ? "Editar usuario" : "Nuevo usuario"}
           onClose={() => setWorkflowMode(null)}
         >
-          {workflowMode ? (
-          <AdminUserWorkflowPanel
-            detail={detailQuery.data ?? null}
-            errorMessage={workflowErrorMessage}
-            isSubmitting={
-              createMutation.isPending || updateMutation.isPending || branchMutation.isPending
-            }
-            mode={workflowMode}
-            options={userList.filterOptions}
-            onAddBranch={(userId, branchId, isDefault) =>
-              branchMutation.mutate({ branchId, isDefault, userId })
-            }
-            onCancel={() => setWorkflowMode(null)}
-            onCreate={(payload) => createMutation.mutate(payload)}
-            onUpdate={(userId, payload) => updateMutation.mutate({ payload, userId })}
-          />
+          {workflowMode &&
+          (workflowMode === "create" || detailQuery.data?.availableActions.canEditProfile) ? (
+            <AdminUserWorkflowPanel
+              detail={detailQuery.data ?? null}
+              errorMessage={workflowErrorMessage}
+              isSubmitting={
+                createMutation.isPending || updateMutation.isPending || branchMutation.isPending
+              }
+              mode={workflowMode}
+              options={userList.filterOptions}
+              onAddBranch={(userId, branchId, isDefault) =>
+                branchMutation.mutate({ branchId, isDefault, userId })
+              }
+              onCancel={() => setWorkflowMode(null)}
+              onCreate={(payload) => createMutation.mutate(payload)}
+              onUpdate={(userId, payload) => updateMutation.mutate({ payload, userId })}
+            />
           ) : null}
         </AdminEntityDrawer>
 
@@ -371,23 +395,45 @@ export function AdminUsersPage() {
             onSelectUser={handleSelectUser}
           />
 
-          <AdminUserDetailPanel
-            detail={detailQuery.data ?? null}
-            errorMessage={detailErrorMessage}
-            isLoading={
-              detailQuery.isLoading
-              || statusMutation.isPending
-              || lockMutation.isPending
-              || unlockMutation.isPending
-            }
-            selectedUser={selectedUser}
-            onActivate={(item) => statusMutation.mutate({ isActive: true, userId: item.id })}
-            onCopyEmail={handleCopyEmail}
-            onDeactivate={(item) => statusMutation.mutate({ isActive: false, userId: item.id })}
-            onEdit={handleEdit}
-            onLock={(item) => lockMutation.mutate({ reason: "Bloqueado desde Backoffice.", userId: item.id })}
-            onUnlock={(item) => unlockMutation.mutate(item.id)}
-          />
+          <div className="grid min-h-0 gap-3 overflow-auto">
+            {detailQuery.data ? (
+              <AdminUserRoleAssignmentPanel
+                key={detailQuery.data.overview.id}
+                detail={detailQuery.data}
+                roles={userList.filterOptions.roles}
+                pending={assignmentMutation.isPending || removeAssignmentMutation.isPending}
+                errorMessage={
+                  assignmentMutation.isError || removeAssignmentMutation.isError
+                    ? toBackofficeErrorMessage(
+                        assignmentMutation.error ?? removeAssignmentMutation.error,
+                        "No fue posible actualizar la asignación.",
+                      )
+                    : null
+                }
+                onSave={(payload) => assignmentMutation.mutate(payload)}
+                onRemove={(roleId) => removeAssignmentMutation.mutate(roleId)}
+              />
+            ) : null}
+            <AdminUserDetailPanel
+              detail={detailQuery.data ?? null}
+              errorMessage={detailErrorMessage}
+              isLoading={
+                detailQuery.isLoading ||
+                statusMutation.isPending ||
+                lockMutation.isPending ||
+                unlockMutation.isPending
+              }
+              selectedUser={selectedUser}
+              onActivate={(item) => statusMutation.mutate({ isActive: true, userId: item.id })}
+              onCopyEmail={handleCopyEmail}
+              onDeactivate={(item) => statusMutation.mutate({ isActive: false, userId: item.id })}
+              onEdit={handleEdit}
+              onLock={(item) =>
+                lockMutation.mutate({ reason: "Bloqueado desde Backoffice.", userId: item.id })
+              }
+              onUnlock={(item) => unlockMutation.mutate(item.id)}
+            />
+          </div>
         </div>
       </div>
     </section>

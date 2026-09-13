@@ -65,7 +65,9 @@ function formatMoney(value: string, currencyCode = "MXN") {
   if (!Number.isFinite(numericValue)) {
     return `${value} ${currencyCode}`;
   }
-  return new Intl.NumberFormat("es-MX", { currency: currencyCode, style: "currency" }).format(numericValue);
+  return new Intl.NumberFormat("es-MX", { currency: currencyCode, style: "currency" }).format(
+    numericValue,
+  );
 }
 
 function AdminSalesTicketsMetricStrip({
@@ -88,14 +90,28 @@ function AdminSalesTicketsMetricStrip({
       title: "Ticket promedio",
       value: loadingValue ?? formatMoney(metrics.averageTicketAmount),
     },
-    { label: "Efectivo", title: "Cobro en efectivo", value: loadingValue ?? formatMoney(metrics.cashAmount) },
-    { label: "Tarjeta", title: "Cobro con tarjeta", value: loadingValue ?? formatMoney(metrics.cardAmount) },
-    { label: "Devoluciones", title: "Tickets con devoluciones", value: loadingValue ?? metrics.ticketsWithReturns },
+    {
+      label: "Efectivo",
+      title: "Cobro en efectivo",
+      value: loadingValue ?? formatMoney(metrics.cashAmount),
+    },
+    {
+      label: "Tarjeta",
+      title: "Cobro con tarjeta",
+      value: loadingValue ?? formatMoney(metrics.cardAmount),
+    },
+    {
+      label: "Devoluciones",
+      title: "Tickets con devoluciones",
+      value: loadingValue ?? metrics.ticketsWithReturns,
+    },
   ];
 
   return (
     <section className="flex min-w-0 flex-wrap items-center gap-2 rounded-[18px] border border-[var(--ui-color-border)] bg-white px-3 py-2 text-xs text-slate-600">
-      <span className="shrink-0 font-semibold uppercase tracking-[0.12em] text-slate-500">Resumen</span>
+      <span className="shrink-0 font-semibold uppercase tracking-[0.12em] text-slate-500">
+        Resumen
+      </span>
       {items.map((item) => (
         <span
           className="inline-flex min-w-0 max-w-full items-center gap-1.5 rounded-full border border-[var(--ui-color-border)] bg-slate-50 px-2.5 py-1"
@@ -114,7 +130,9 @@ export function AdminSalesTicketsPage() {
   const accessToken = useBackofficeAuthStore((state) => state.accessToken);
   const [filters, setFilters] = useState<AdminSalesTicketListFilters>(initialFilters);
   const [selectedTicketId, setSelectedTicketId] = useState<string | null>(null);
-  const [feedback, setFeedback] = useState<{ tone: "success" | "error"; message: string } | null>(null);
+  const [feedback, setFeedback] = useState<{ tone: "success" | "error"; message: string } | null>(
+    null,
+  );
 
   const ticketsQuery = useQuery({
     enabled: Boolean(accessToken),
@@ -137,7 +155,10 @@ export function AdminSalesTicketsPage() {
   });
 
   const listErrorMessage = ticketsQuery.isError
-    ? toBackofficeErrorMessage(ticketsQuery.error, "No se pudieron cargar las ventas. Intenta nuevamente.")
+    ? toBackofficeErrorMessage(
+        ticketsQuery.error,
+        "No se pudieron cargar las ventas. Intenta nuevamente.",
+      )
     : null;
   const detailErrorMessage = detailQuery.isError
     ? toBackofficeErrorMessage(detailQuery.error, "No se pudo cargar el detalle del ticket.")
@@ -174,6 +195,7 @@ export function AdminSalesTicketsPage() {
   return (
     <section className="flex min-h-0 min-w-0 flex-col overflow-hidden rounded-[28px] border border-[var(--ui-color-border)] bg-white shadow-[var(--ui-shadow-subtle)] lg:h-full">
       <AdminPageHeader
+        actionCapability="sales_tickets.view"
         actionLabel="Actualizar"
         description="Consulta ventas confirmadas, pagos, tickets emitidos y contexto operativo de caja."
         meta={[pageStatusLabel]}
@@ -189,7 +211,10 @@ export function AdminSalesTicketsPage() {
           onChange={patchFilters}
         />
 
-        <AdminSalesTicketsMetricStrip metrics={ticketList.metrics} isLoading={ticketsQuery.isLoading} />
+        <AdminSalesTicketsMetricStrip
+          metrics={ticketList.metrics}
+          isLoading={ticketsQuery.isLoading}
+        />
 
         {feedback ? (
           <p

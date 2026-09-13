@@ -88,21 +88,39 @@ function AdminTransferMetricStrip({
 }) {
   const loadingValue = isLoading ? "Cargando" : null;
   const items = [
-    { label: "Periodo", title: "Transferencias del periodo", value: loadingValue ?? metrics.totalTransfers },
-    { label: "En transito", title: "Transferencias en transito", value: loadingValue ?? metrics.inTransitTransfers },
+    {
+      label: "Periodo",
+      title: "Transferencias del periodo",
+      value: loadingValue ?? metrics.totalTransfers,
+    },
+    {
+      label: "En transito",
+      title: "Transferencias en transito",
+      value: loadingValue ?? metrics.inTransitTransfers,
+    },
     {
       label: "Pend. recepcion",
       title: "Pendientes de recepcion",
       value: loadingValue ?? metrics.pendingReceiptTransfers,
     },
-    { label: "Discrepancias", title: "Con discrepancias", value: loadingValue ?? metrics.withDiscrepancies },
+    {
+      label: "Discrepancias",
+      title: "Con discrepancias",
+      value: loadingValue ?? metrics.withDiscrepancies,
+    },
     { label: "Recibidas", title: "Recibidas", value: loadingValue ?? metrics.receivedTransfers },
-    { label: "Unid. transito", title: "Unidades en transito", value: loadingValue ?? metrics.unitsInTransit },
+    {
+      label: "Unid. transito",
+      title: "Unidades en transito",
+      value: loadingValue ?? metrics.unitsInTransit,
+    },
   ];
 
   return (
     <section className="flex min-w-0 flex-wrap items-center gap-2 rounded-[18px] border border-[var(--ui-color-border)] bg-white px-3 py-2 text-xs text-slate-600">
-      <span className="shrink-0 font-semibold uppercase tracking-[0.12em] text-slate-500">Resumen</span>
+      <span className="shrink-0 font-semibold uppercase tracking-[0.12em] text-slate-500">
+        Resumen
+      </span>
       {items.map((item) => (
         <span
           className="inline-flex min-w-0 max-w-full items-center gap-1.5 rounded-full border border-[var(--ui-color-border)] bg-slate-50 px-2.5 py-1"
@@ -124,7 +142,9 @@ export function AdminTransfersPage() {
   const [selectedTransferId, setSelectedTransferId] = useState<string | null>(null);
   const [workflowMode, setWorkflowMode] = useState<WorkflowMode | null>(null);
   const [workflowTransferId, setWorkflowTransferId] = useState<string | null>(null);
-  const [feedback, setFeedback] = useState<{ tone: "success" | "error"; message: string } | null>(null);
+  const [feedback, setFeedback] = useState<{ tone: "success" | "error"; message: string } | null>(
+    null,
+  );
 
   const transfersQuery = useQuery({
     enabled: Boolean(accessToken),
@@ -154,7 +174,13 @@ export function AdminTransfersPage() {
   });
 
   const createMutation = useMutation({
-    mutationFn: async ({ dispatchNow, payload }: { dispatchNow: boolean; payload: AdminTransferCreatePayload }) => {
+    mutationFn: async ({
+      dispatchNow,
+      payload,
+    }: {
+      dispatchNow: boolean;
+      payload: AdminTransferCreatePayload;
+    }) => {
       const created = await createAdminTransfer(accessToken ?? "", payload);
       if (!dispatchNow) {
         return created;
@@ -177,8 +203,13 @@ export function AdminTransfersPage() {
   });
 
   const updateMutation = useMutation({
-    mutationFn: ({ payload, transferId }: { payload: AdminTransferUpdatePayload; transferId: string }) =>
-      updateAdminTransfer(accessToken ?? "", transferId, payload),
+    mutationFn: ({
+      payload,
+      transferId,
+    }: {
+      payload: AdminTransferUpdatePayload;
+      transferId: string;
+    }) => updateAdminTransfer(accessToken ?? "", transferId, payload),
     onError: (error) => {
       setFeedback({
         tone: "error",
@@ -213,8 +244,13 @@ export function AdminTransfersPage() {
   });
 
   const receiveMutation = useMutation({
-    mutationFn: ({ payload, transferId }: { payload: AdminTransferReceivePayload; transferId: string }) =>
-      receiveAdminTransfer(accessToken ?? "", transferId, payload),
+    mutationFn: ({
+      payload,
+      transferId,
+    }: {
+      payload: AdminTransferReceivePayload;
+      transferId: string;
+    }) => receiveAdminTransfer(accessToken ?? "", transferId, payload),
     onError: (error) => {
       setFeedback({
         tone: "error",
@@ -256,15 +292,27 @@ export function AdminTransfersPage() {
     cancelMutation.isPending;
 
   const detailTransfer = transferDetailQuery.data ?? null;
-  const workflowTransfer = workflowTransferQuery.data ?? (workflowTransferId === selectedTransferId ? detailTransfer : null);
+  const workflowTransfer =
+    workflowTransferQuery.data ??
+    (workflowTransferId === selectedTransferId ? detailTransfer : null);
   const listErrorMessage = transfersQuery.isError
-    ? toBackofficeErrorMessage(transfersQuery.error, "No se pudo cargar transferencias. Intenta nuevamente.")
+    ? toBackofficeErrorMessage(
+        transfersQuery.error,
+        "No se pudo cargar transferencias. Intenta nuevamente.",
+      )
     : null;
   const detailErrorMessage = transferDetailQuery.isError
-    ? toBackofficeErrorMessage(transferDetailQuery.error, "No se pudo cargar el detalle de transferencia.")
+    ? toBackofficeErrorMessage(
+        transferDetailQuery.error,
+        "No se pudo cargar el detalle de transferencia.",
+      )
     : null;
   const workflowErrorMessage =
-    createMutation.isError || updateMutation.isError || dispatchMutation.isError || receiveMutation.isError || cancelMutation.isError
+    createMutation.isError ||
+    updateMutation.isError ||
+    dispatchMutation.isError ||
+    receiveMutation.isError ||
+    cancelMutation.isError
       ? feedback?.tone === "error"
         ? feedback.message
         : "No se pudo completar la operacion."
@@ -365,6 +413,7 @@ export function AdminTransfersPage() {
   return (
     <section className="flex min-h-0 min-w-0 flex-col overflow-hidden rounded-[28px] border border-[var(--ui-color-border)] bg-white shadow-[var(--ui-shadow-subtle)] lg:h-full">
       <AdminPageHeader
+        actionCapability="transfers.manage"
         actionLabel="Nueva transferencia"
         description="Gestiona movimientos de inventario entre sucursales, envios, recepciones y discrepancias."
         meta={[pageStatusLabel, "Inventario auditable"]}
@@ -380,7 +429,10 @@ export function AdminTransfersPage() {
           onChange={patchFilters}
         />
 
-        <AdminTransferMetricStrip isLoading={transfersQuery.isLoading} metrics={transferList.metrics} />
+        <AdminTransferMetricStrip
+          isLoading={transfersQuery.isLoading}
+          metrics={transferList.metrics}
+        />
 
         {feedback ? (
           <p

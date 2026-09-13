@@ -159,6 +159,8 @@ function mapDetailFromApi(response: ApiDetail): AdminRoleDetail {
     assignedUsers: response.assigned_users.map((item) => ({
       assignedAt: item.assigned_at,
       branchSummary: item.branch_summary,
+      scopeType: item.scope_type,
+      branchIds: item.branch_ids,
       email: item.email,
       fullName: item.full_name,
       status: item.status,
@@ -192,7 +194,8 @@ function mapDetailFromApi(response: ApiDetail): AdminRoleDetail {
         is_system: response.overview.is_system,
         name: response.overview.name,
         permission_count: response.permission_matrix.reduce(
-          (count, group) => count + group.permissions.filter((permission) => permission.is_enabled).length,
+          (count, group) =>
+            count + group.permissions.filter((permission) => permission.is_enabled).length,
           0,
         ),
         scope_summary: response.scopes.scope_summary,
@@ -328,19 +331,6 @@ export async function changeAdminRoleStatus(
     body,
     method: "POST",
     path: `/v1/admin/roles/${roleId}/status`,
-  });
-  return mapDetailFromApi(response);
-}
-
-export async function assignAdminRoleToUser(
-  accessToken: string,
-  roleId: string,
-  userId: string,
-): Promise<AdminRoleDetail> {
-  const response = await requestJson<ApiDetail>({
-    accessToken,
-    method: "POST",
-    path: `/v1/admin/roles/${roleId}/users/${userId}`,
   });
   return mapDetailFromApi(response);
 }

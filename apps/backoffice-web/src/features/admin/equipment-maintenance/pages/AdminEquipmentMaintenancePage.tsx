@@ -207,7 +207,10 @@ export function AdminEquipmentMaintenancePage() {
       });
     },
     onSuccess: async (detail) => {
-      setFeedback({ tone: "success", message: `Mantenimiento de ${detail.overview.code} cerrado.` });
+      setFeedback({
+        tone: "success",
+        message: `Mantenimiento de ${detail.overview.code} cerrado.`,
+      });
       setSelectedEquipmentId(detail.overview.id);
       setWorkflowMode(null);
       setSelectedMaintenance(null);
@@ -224,7 +227,10 @@ export function AdminEquipmentMaintenancePage() {
       });
     },
     onSuccess: async (detail) => {
-      setFeedback({ tone: "success", message: `Mantenimiento de ${detail.overview.code} iniciado.` });
+      setFeedback({
+        tone: "success",
+        message: `Mantenimiento de ${detail.overview.code} iniciado.`,
+      });
       setSelectedEquipmentId(detail.overview.id);
       await queryClient.invalidateQueries({ queryKey: ["admin", "equipment-maintenance"] });
     },
@@ -336,6 +342,7 @@ export function AdminEquipmentMaintenancePage() {
   return (
     <section className="flex min-h-0 min-w-0 flex-col overflow-hidden rounded-[28px] border border-[var(--ui-color-border)] bg-white shadow-[var(--ui-shadow-subtle)] lg:h-full">
       <AdminPageHeader
+        actionCapability="quality_hygiene.manage"
         actionLabel="Nuevo equipo"
         description="Administra equipos, servicios preventivos, fallas, reparaciones, evidencias, costos y estado operativo por sucursal."
         meta={[pageStatusLabel]}
@@ -354,7 +361,10 @@ export function AdminEquipmentMaintenancePage() {
           onChange={patchFilters}
         />
 
-        <EquipmentMetricStrip isLoading={equipmentQuery.isLoading} metrics={equipmentList.metrics} />
+        <EquipmentMetricStrip
+          isLoading={equipmentQuery.isLoading}
+          metrics={equipmentList.metrics}
+        />
 
         <div className="flex min-w-0 flex-wrap gap-2">
           <button
@@ -431,7 +441,9 @@ export function AdminEquipmentMaintenancePage() {
             detail={detailQuery.data ?? null}
             errorMessage={detailErrorMessage}
             isLoading={
-              detailQuery.isLoading || startMaintenanceMutation.isPending || statusMutation.isPending
+              detailQuery.isLoading ||
+              startMaintenanceMutation.isPending ||
+              statusMutation.isPending
             }
             selectedEquipment={selectedEquipment}
             onCompleteMaintenance={handleCompleteMaintenance}

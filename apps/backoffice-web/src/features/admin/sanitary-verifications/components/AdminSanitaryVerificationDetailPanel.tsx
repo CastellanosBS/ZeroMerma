@@ -1,10 +1,8 @@
+import { AdminActionButton } from "../../components/AdminActionButton";
 import type { ReactNode } from "react";
 
 import { AdminEmptyState } from "../../components/AdminEmptyState";
-import type {
-  AdminSanitaryVerificationDetail,
-  AdminSanitaryVerificationListItem,
-} from "../types";
+import type { AdminSanitaryVerificationDetail, AdminSanitaryVerificationListItem } from "../types";
 
 function formatDateTime(value: string | null | undefined): string {
   if (!value) {
@@ -323,22 +321,26 @@ export function AdminSanitaryVerificationDetailPanel({
             >
               Copiar folio
             </button>
-            <button
+            <AdminActionButton
+              capability="quality_hygiene.manage"
+              branchIds={[detail.overview.branchId]}
               className="rounded-full border border-[var(--ui-color-border)] bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 disabled:cursor-not-allowed disabled:opacity-40"
               disabled={!detail.availableActions.canStart}
               type="button"
               onClick={() => onStart(detail.overview)}
             >
               Iniciar
-            </button>
-            <button
+            </AdminActionButton>
+            <AdminActionButton
+              capability="quality_hygiene.manage"
+              branchIds={[detail.overview.branchId]}
               className="rounded-full border border-[var(--ui-color-border)] bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 disabled:cursor-not-allowed disabled:opacity-40"
               disabled={!detail.availableActions.canComplete}
               type="button"
               onClick={() => onExecute(detail.overview)}
             >
               Ejecutar checklist
-            </button>
+            </AdminActionButton>
             <button
               className="rounded-full border border-[var(--ui-color-border)] bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 disabled:cursor-not-allowed disabled:opacity-40"
               disabled={!detail.availableActions.canCreateIncident}

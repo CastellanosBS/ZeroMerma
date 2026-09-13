@@ -1,7 +1,12 @@
 import type { ReactNode } from "react";
+import { hasEffectiveCapability, type PermissionCode } from "../../auth/authorization";
+import { useBackofficeAuthorization } from "../../auth/authorization-context";
 
 export interface AdminRowActionItem {
   destructive?: boolean;
+  capability?: PermissionCode;
+  branchIds?: readonly string[];
+  globalOnly?: boolean;
   disabled?: boolean;
   label: string;
   onSelect: () => void;
@@ -13,6 +18,7 @@ interface AdminRowActionsMenuProps {
 }
 
 export function AdminRowActionsMenu({ actions, label = "Acciones" }: AdminRowActionsMenuProps) {
+  const user = useBackofficeAuthorization();
   return (
     <details className="relative inline-block text-left">
       <summary
@@ -31,7 +37,16 @@ export function AdminRowActionsMenu({ actions, label = "Acciones" }: AdminRowAct
                 ? "text-[var(--ui-color-danger)] hover:bg-[var(--ui-color-danger-soft)]"
                 : "text-slate-700 hover:bg-slate-50",
             ].join(" ")}
-            disabled={action.disabled}
+            disabled={
+              action.disabled ||
+              (action.capability !== undefined &&
+                !hasEffectiveCapability(
+                  user,
+                  action.capability,
+                  action.branchIds,
+                  action.globalOnly,
+                ))
+            }
             key={action.label}
             type="button"
             onClick={(event) => {

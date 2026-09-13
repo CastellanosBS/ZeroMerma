@@ -1,3 +1,4 @@
+import { AdminActionButton } from "../../components/AdminActionButton";
 import { AdminEmptyState } from "../../components/AdminEmptyState";
 import type { AdminReconciliationListItem } from "../types";
 
@@ -250,14 +251,16 @@ export function AdminReconciliationTable({
                     >
                       Ver
                     </button>
-                    <button
+                    <AdminActionButton
+                      capability="cash_finance.manage"
+                      branchIds={[item.branchId]}
                       className="rounded-full border border-[var(--ui-color-border)] bg-white px-2.5 py-1 text-xs font-semibold text-slate-700 transition hover:border-[var(--ui-color-info)] hover:text-[var(--ui-color-info)] focus:outline-none focus:ring-4 focus:ring-[var(--ui-color-ring)] disabled:cursor-not-allowed disabled:opacity-40"
                       disabled={item.status === "RECONCILED"}
                       type="button"
                       onClick={() => onResolve(item)}
                     >
                       Resolver
-                    </button>
+                    </AdminActionButton>
                     <button
                       className="rounded-full border border-[var(--ui-color-border)] bg-white px-2.5 py-1 text-xs font-semibold text-slate-700 transition hover:border-[var(--ui-color-info)] hover:text-[var(--ui-color-info)] focus:outline-none focus:ring-4 focus:ring-[var(--ui-color-ring)]"
                       type="button"

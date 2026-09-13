@@ -1,3 +1,4 @@
+import { AdminActionButton } from "../../components/AdminActionButton";
 import { AdminEmptyState } from "../../components/AdminEmptyState";
 import type { AdminRoleListItem } from "../types";
 
@@ -148,9 +149,7 @@ export function AdminRolesPermissionsTable({
                         item.isHighPrivilege ? badgeClass("high") : badgeClass("ready")
                       }`}
                     >
-                      <span className="truncate">
-                        {item.isHighPrivilege ? "Alto" : "Normal"}
-                      </span>
+                      <span className="truncate">{item.isHighPrivilege ? "Alto" : "Normal"}</span>
                     </span>
                     <span className="truncate text-xs text-slate-600">
                       {formatDateTime(item.updatedAt)}
@@ -162,7 +161,9 @@ export function AdminRolesPermissionsTable({
                       title={item.warnings.map((warning) => warning.message).join(" | ")}
                     >
                       <span className="truncate">
-                        {item.warnings.length > 0 ? `${item.warnings.length} alertas` : "Sin alertas"}
+                        {item.warnings.length > 0
+                          ? `${item.warnings.length} alertas`
+                          : "Sin alertas"}
                       </span>
                     </span>
                     <div className="flex min-w-0 items-center justify-end gap-1">
@@ -173,14 +174,16 @@ export function AdminRolesPermissionsTable({
                       >
                         Ver
                       </button>
-                      <button
+                      <AdminActionButton
+                        capability="roles.manage"
+                        globalOnly
                         className="rounded-full border border-[var(--ui-color-border)] bg-white px-2 py-1 text-xs font-semibold text-slate-700 transition hover:border-[var(--ui-color-info)] disabled:opacity-40"
                         disabled={item.isSystem}
                         type="button"
                         onClick={() => onEdit(item)}
                       >
                         Editar
-                      </button>
+                      </AdminActionButton>
                       <button
                         className="rounded-full border border-[var(--ui-color-border)] bg-white px-2 py-1 text-xs font-semibold text-slate-700 transition hover:border-[var(--ui-color-info)]"
                         type="button"
@@ -228,4 +231,3 @@ export function AdminRolesPermissionsTable({
     </section>
   );
 }
-

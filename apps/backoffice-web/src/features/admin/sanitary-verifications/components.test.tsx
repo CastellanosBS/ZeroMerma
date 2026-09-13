@@ -1,3 +1,4 @@
+import { withCapabilities } from "../../../test-support/authorization";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import type { ReactElement } from "react";
 import { renderToString } from "react-dom/server";
@@ -184,7 +185,9 @@ const detail: AdminSanitaryVerificationDetail = {
     score: 1,
     thresholdPercent: 80,
   },
-  warnings: [{ code: "failed", message: "La verificacion tiene puntos fallidos.", severity: "critical" }],
+  warnings: [
+    { code: "failed", message: "La verificacion tiene puntos fallidos.", severity: "critical" },
+  ],
 };
 
 const template: AdminSanitaryTemplate = {
@@ -213,7 +216,7 @@ const template: AdminSanitaryTemplate = {
 };
 
 function render(element: ReactElement) {
-  return renderToString(element);
+  return renderToString(withCapabilities(element, ["quality_hygiene.manage"]));
 }
 
 describe("admin sanitary verification UI components", () => {

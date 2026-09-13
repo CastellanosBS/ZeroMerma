@@ -37,6 +37,7 @@ from zeromerma_api.modules.configuration.infrastructure.models import (
     SystemSetting,
     SystemSettingHistory,
 )
+from zeromerma_api.modules.identity.application.actions import action_allowed
 from zeromerma_api.modules.identity.application.schemas import AuthenticatedUser
 from zeromerma_api.modules.identity.infrastructure.models import User
 
@@ -108,7 +109,7 @@ class AdminSettingService:
             [setting.updated_by_user_id for setting in overrides.values()],
         )
         items = [
-            self._to_list_item(definition, overrides.get(definition.key), updated_by)
+            self._to_list_item(session, definition, overrides.get(definition.key), updated_by)
             for definition in _SETTING_DEFINITIONS
         ]
         filtered = self._apply_filters(
@@ -142,7 +143,7 @@ class AdminSettingService:
         value_view = self._to_value_view(definition, override, updated_by)
         warnings = self._warnings(definition, value_view)
         return AdminSettingDetailView(
-            available_actions=self._available_actions(definition, override),
+            available_actions=self._available_actions(session, definition, override),
             definition=self._definition_view(definition),
             history=self._history(session, definition),
             validation=AdminSettingValidationView(
@@ -287,6 +288,7 @@ class AdminSettingService:
 
     def _to_list_item(
         self,
+        session: Session,
         definition: _SettingDefinition,
         override: SystemSetting | None,
         updated_by: dict[uuid.UUID, User],
@@ -294,7 +296,7 @@ class AdminSettingService:
         value = self._to_value_view(definition, override, updated_by)
         warnings = self._warnings(definition, value)
         return AdminSettingListItemView(
-            available_actions=self._available_actions(definition, override),
+            available_actions=self._available_actions(session, definition, override),
             definition=self._definition_view(definition),
             value=value,
             warnings=warnings,
@@ -442,11 +444,14 @@ class AdminSettingService:
 
     def _available_actions(
         self,
+        session: Session,
         definition: _SettingDefinition,
         override: SystemSetting | None,
     ) -> list[str]:
         actions = ["view", "copy_key", "view_history"]
-        if not definition.is_readonly:
+        if not definition.is_readonly and action_allowed(
+            session, "config.manage", global_only=True
+        ):
             actions.append("edit")
             if override is not None:
                 actions.append("reset")

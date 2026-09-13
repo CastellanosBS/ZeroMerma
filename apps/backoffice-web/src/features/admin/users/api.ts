@@ -13,6 +13,7 @@ import type {
   AdminUserLockPayload,
   AdminUserStatusPayload,
   AdminUserUpdatePayload,
+  AdminUserRoleAssignmentPayload,
 } from "./types";
 
 type ApiBackendContract = components["schemas"]["AdminUserBackendContractView"];
@@ -155,8 +156,7 @@ function mapDetailFromApi(response: ApiDetail): AdminUserDetail {
       activeSessionsSupported: response.operational_context.active_sessions_supported,
       lastWorkstationUsed: response.operational_context.last_workstation_used ?? null,
       openCashSessionsCount: response.operational_context.open_cash_sessions_count,
-      recentBackofficeActivityCount:
-        response.operational_context.recent_backoffice_activity_count,
+      recentBackofficeActivityCount: response.operational_context.recent_backoffice_activity_count,
       recentPosActivityCount: response.operational_context.recent_pos_activity_count,
       recentlyOperatedBranches: response.operational_context.recently_operated_branches,
     },
@@ -194,7 +194,8 @@ function mapDetailFromApi(response: ApiDetail): AdminUserDetail {
         roleDescription: item.role_description ?? null,
         roleId: item.role_id,
         roleName: item.role_name,
-        scope: item.scope ?? null,
+        scopeType: item.scope_type,
+        branchIds: item.branch_ids,
       })),
       missingContractNote: response.role_assignments.missing_contract_note,
     },
@@ -259,7 +260,6 @@ function mapCreatePayload(payload: AdminUserCreatePayload): ApiCreate {
     full_name: payload.fullName,
     notes: payload.notes,
     phone: payload.phone,
-    role_ids: payload.roleIds,
     send_invitation: payload.sendInvitation,
     temporary_password: payload.temporaryPassword,
   };
@@ -405,4 +405,33 @@ export async function deactivateAdminUserBranchAssignment(
     path: `/v1/admin/users/${userId}/branch-assignments/${branchId}/deactivate`,
   });
   return mapDetailFromApi(response);
+}
+
+export async function assignAdminUserRole(
+  accessToken: string,
+  userId: string,
+  payload: AdminUserRoleAssignmentPayload,
+): Promise<AdminUserDetail> {
+  return mapDetailFromApi(
+    await requestJson<ApiDetail>({
+      accessToken,
+      path: `/v1/admin/users/${userId}/roles`,
+      method: "POST",
+      body: payload,
+    }),
+  );
+}
+
+export async function removeAdminUserRole(
+  accessToken: string,
+  userId: string,
+  roleId: string,
+): Promise<AdminUserDetail> {
+  return mapDetailFromApi(
+    await requestJson<ApiDetail>({
+      accessToken,
+      path: `/v1/admin/users/${userId}/roles/${roleId}/remove`,
+      method: "POST",
+    }),
+  );
 }

@@ -4,8 +4,6 @@ from fastapi.testclient import TestClient
 from sqlalchemy import select
 
 from zeromerma_api.bootstrap.seed_local import (
-    SEED_ADMIN_EMAIL,
-    SEED_ADMIN_PASSWORD,
     SEED_USER_EMAIL,
     SEED_USER_PASSWORD,
 )
@@ -15,6 +13,7 @@ from zeromerma_api.modules.configuration.infrastructure.models import (
     SystemSetting,
     SystemSettingHistory,
 )
+from zeromerma_api.testing.authorization import owner_headers
 
 
 def _login(client: TestClient, *, email: str, password: str) -> str:
@@ -24,8 +23,7 @@ def _login(client: TestClient, *, email: str, password: str) -> str:
 
 
 def _admin_headers(client: TestClient) -> dict[str, str]:
-    token = _login(client, email=SEED_ADMIN_EMAIL, password=SEED_ADMIN_PASSWORD)
-    return {"Authorization": f"Bearer {token}"}
+    return owner_headers()
 
 
 def _cashier_headers(client: TestClient) -> dict[str, str]:

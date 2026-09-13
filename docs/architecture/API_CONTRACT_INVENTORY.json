@@ -1,6 +1,6 @@
 {
   "application_baseline_commit": "c020649885869cbf7e2987c39e9d14a16d5c3e89",
-  "operation_count": 223,
+  "operation_count": 227,
   "operations": [
     {
       "consumer_contract_state": "CLIENT_GENERATED_USED",
@@ -11613,6 +11613,218 @@
       ]
     },
     {
+      "consumer_contract_state": "NOT_CONSUMED",
+      "contract_gap": [],
+      "datetime_fields": [],
+      "decimal_fields": [],
+      "declared_error_responses": [
+        "400",
+        "401",
+        "403",
+        "404",
+        "409",
+        "422",
+        "500"
+      ],
+      "enum_fields": [],
+      "expected_growth": "NOT_APPLICABLE",
+      "filter_class": [],
+      "frontend_consumers": [],
+      "generated_client_symbol": "propose_privileged_change_v1_admin_roles_privileged_changes_post",
+      "id_fields": [],
+      "method": "POST",
+      "nullable_fields": [],
+      "operation_id": "propose_privileged_change_v1_admin_roles_privileged_changes_post",
+      "operation_id_source": "FASTAPI_STABLE_GENERATED",
+      "operation_key": "API:POST:/v1/admin/roles/privileged-changes",
+      "pagination_class": "NOT_APPLICABLE",
+      "path": "/v1/admin/roles/privileged-changes",
+      "request_schema": {
+        "body_schema": {
+          "$ref": "#/components/schemas/PrivilegedChangeCreateRequest"
+        },
+        "parameters": []
+      },
+      "stable_order": "NOT_APPLICABLE",
+      "success_response_schema": [
+        {
+          "schema": {
+            "$ref": "#/components/schemas/PrivilegedChangeView"
+          },
+          "status": "201"
+        }
+      ]
+    },
+    {
+      "consumer_contract_state": "NOT_CONSUMED",
+      "contract_gap": [],
+      "datetime_fields": [],
+      "decimal_fields": [],
+      "declared_error_responses": [
+        "400",
+        "401",
+        "403",
+        "404",
+        "409",
+        "422",
+        "500"
+      ],
+      "enum_fields": [],
+      "expected_growth": "NOT_APPLICABLE",
+      "filter_class": [],
+      "frontend_consumers": [],
+      "generated_client_symbol": "get_privileged_change_v1_admin_roles_privileged_changes__change_id__get",
+      "id_fields": [
+        "$.request.parameters[0].schema"
+      ],
+      "method": "GET",
+      "nullable_fields": [],
+      "operation_id": "get_privileged_change_v1_admin_roles_privileged_changes__change_id__get",
+      "operation_id_source": "FASTAPI_STABLE_GENERATED",
+      "operation_key": "API:GET:/v1/admin/roles/privileged-changes/{change_id}",
+      "pagination_class": "NOT_APPLICABLE",
+      "path": "/v1/admin/roles/privileged-changes/{change_id}",
+      "request_schema": {
+        "body_schema": null,
+        "parameters": [
+          {
+            "in": "path",
+            "name": "change_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Change Id",
+              "type": "string",
+              "x-zeromerma-id-representation": "JSON_STRING"
+            }
+          }
+        ]
+      },
+      "stable_order": "NOT_APPLICABLE",
+      "success_response_schema": [
+        {
+          "schema": {
+            "$ref": "#/components/schemas/PrivilegedChangeView"
+          },
+          "status": "200"
+        }
+      ]
+    },
+    {
+      "consumer_contract_state": "NOT_CONSUMED",
+      "contract_gap": [],
+      "datetime_fields": [],
+      "decimal_fields": [],
+      "declared_error_responses": [
+        "400",
+        "401",
+        "403",
+        "404",
+        "409",
+        "422",
+        "500"
+      ],
+      "enum_fields": [],
+      "expected_growth": "NOT_APPLICABLE",
+      "filter_class": [],
+      "frontend_consumers": [],
+      "generated_client_symbol": "approve_privileged_change_v1_admin_roles_privileged_changes__change_id__approve_post",
+      "id_fields": [
+        "$.request.parameters[0].schema"
+      ],
+      "method": "POST",
+      "nullable_fields": [],
+      "operation_id": "approve_privileged_change_v1_admin_roles_privileged_changes__change_id__approve_post",
+      "operation_id_source": "FASTAPI_STABLE_GENERATED",
+      "operation_key": "API:POST:/v1/admin/roles/privileged-changes/{change_id}/approve",
+      "pagination_class": "NOT_APPLICABLE",
+      "path": "/v1/admin/roles/privileged-changes/{change_id}/approve",
+      "request_schema": {
+        "body_schema": {
+          "$ref": "#/components/schemas/PrivilegedChangeConfirmationRequest"
+        },
+        "parameters": [
+          {
+            "in": "path",
+            "name": "change_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Change Id",
+              "type": "string",
+              "x-zeromerma-id-representation": "JSON_STRING"
+            }
+          }
+        ]
+      },
+      "stable_order": "NOT_APPLICABLE",
+      "success_response_schema": [
+        {
+          "schema": {
+            "$ref": "#/components/schemas/PrivilegedChangeView"
+          },
+          "status": "200"
+        }
+      ]
+    },
+    {
+      "consumer_contract_state": "NOT_CONSUMED",
+      "contract_gap": [],
+      "datetime_fields": [],
+      "decimal_fields": [],
+      "declared_error_responses": [
+        "400",
+        "401",
+        "403",
+        "404",
+        "409",
+        "422",
+        "500"
+      ],
+      "enum_fields": [],
+      "expected_growth": "NOT_APPLICABLE",
+      "filter_class": [],
+      "frontend_consumers": [],
+      "generated_client_symbol": "execute_privileged_change_v1_admin_roles_privileged_changes__change_id__execute_post",
+      "id_fields": [
+        "$.request.parameters[0].schema"
+      ],
+      "method": "POST",
+      "nullable_fields": [],
+      "operation_id": "execute_privileged_change_v1_admin_roles_privileged_changes__change_id__execute_post",
+      "operation_id_source": "FASTAPI_STABLE_GENERATED",
+      "operation_key": "API:POST:/v1/admin/roles/privileged-changes/{change_id}/execute",
+      "pagination_class": "NOT_APPLICABLE",
+      "path": "/v1/admin/roles/privileged-changes/{change_id}/execute",
+      "request_schema": {
+        "body_schema": {
+          "$ref": "#/components/schemas/PrivilegedChangeConfirmationRequest"
+        },
+        "parameters": [
+          {
+            "in": "path",
+            "name": "change_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Change Id",
+              "type": "string",
+              "x-zeromerma-id-representation": "JSON_STRING"
+            }
+          }
+        ]
+      },
+      "stable_order": "NOT_APPLICABLE",
+      "success_response_schema": [
+        {
+          "schema": {
+            "$ref": "#/components/schemas/PrivilegedChangeView"
+          },
+          "status": "200"
+        }
+      ]
+    },
+    {
       "consumer_contract_state": "CLIENT_GENERATED_USED",
       "contract_gap": [],
       "datetime_fields": [],
@@ -11818,7 +12030,9 @@
       "pagination_class": "NOT_APPLICABLE",
       "path": "/v1/admin/roles/{role_id}/users/{user_id}",
       "request_schema": {
-        "body_schema": null,
+        "body_schema": {
+          "$ref": "#/components/schemas/AdminRoleUserAssignmentRequest"
+        },
         "parameters": [
           {
             "in": "path",
@@ -15514,7 +15728,7 @@
       ]
     },
     {
-      "consumer_contract_state": "NOT_CONSUMED",
+      "consumer_contract_state": "CLIENT_GENERATED_USED",
       "contract_gap": [],
       "datetime_fields": [],
       "decimal_fields": [],
@@ -15530,7 +15744,10 @@
       "enum_fields": [],
       "expected_growth": "NOT_APPLICABLE",
       "filter_class": [],
-      "frontend_consumers": [],
+      "frontend_consumers": [
+        "apps/backoffice-web/src/features/admin/users/api.ts",
+        "apps/backoffice-web/src/features/admin/users/components/AdminUserRoleAssignmentPanel.tsx"
+      ],
       "generated_client_symbol": "assign_admin_user_role_v1_admin_users__user_id__roles_post",
       "id_fields": [
         "$.request.parameters[0].schema"
@@ -15571,7 +15788,7 @@
       ]
     },
     {
-      "consumer_contract_state": "NOT_CONSUMED",
+      "consumer_contract_state": "CLIENT_GENERATED_USED",
       "contract_gap": [],
       "datetime_fields": [],
       "decimal_fields": [],
@@ -15587,7 +15804,10 @@
       "enum_fields": [],
       "expected_growth": "NOT_APPLICABLE",
       "filter_class": [],
-      "frontend_consumers": [],
+      "frontend_consumers": [
+        "apps/backoffice-web/src/features/admin/users/api.ts",
+        "apps/backoffice-web/src/features/admin/users/components/AdminUserRoleAssignmentPanel.tsx"
+      ],
       "generated_client_symbol": "remove_admin_user_role_v1_admin_users__user_id__roles__role_id__remove_post",
       "id_fields": [
         "$.request.parameters[0].schema",
@@ -16681,7 +16901,9 @@
         "422",
         "500"
       ],
-      "enum_fields": [],
+      "enum_fields": [
+        "$.request.parameters[0].schema.anyOf[0]"
+      ],
       "expected_growth": "NOT_APPLICABLE",
       "filter_class": [],
       "frontend_consumers": [
@@ -16691,7 +16913,9 @@
       "generated_client_symbol": "me_v1_auth_me_get",
       "id_fields": [],
       "method": "GET",
-      "nullable_fields": [],
+      "nullable_fields": [
+        "$.request.parameters[0].schema"
+      ],
       "operation_id": "me_v1_auth_me_get",
       "operation_id_source": "FASTAPI_STABLE_GENERATED",
       "operation_key": "API:GET:/v1/auth/me",
@@ -16699,7 +16923,28 @@
       "path": "/v1/auth/me",
       "request_schema": {
         "body_schema": null,
-        "parameters": []
+        "parameters": [
+          {
+            "in": "query",
+            "name": "surface",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "POS",
+                    "BACKOFFICE"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Surface"
+            }
+          }
+        ]
       },
       "stable_order": "NOT_APPLICABLE",
       "success_response_schema": [

@@ -128,9 +128,7 @@ export function AdminIncidentsPage() {
   const queryClient = useQueryClient();
   const [filters, setFilters] = useState<AdminIncidentListFilters>(initialFilters);
   const [selectedIncidentId, setSelectedIncidentId] = useState<string | null>(null);
-  const [workflowMode, setWorkflowMode] = useState<"create" | "followUp" | "resolve" | null>(
-    null,
-  );
+  const [workflowMode, setWorkflowMode] = useState<"create" | "followUp" | "resolve" | null>(null);
   const [feedback, setFeedback] = useState<{ tone: "success" | "error"; message: string } | null>(
     null,
   );
@@ -156,7 +154,8 @@ export function AdminIncidentsPage() {
   });
 
   const createMutation = useMutation({
-    mutationFn: (payload: AdminIncidentCreatePayload) => createAdminIncident(accessToken ?? "", payload),
+    mutationFn: (payload: AdminIncidentCreatePayload) =>
+      createAdminIncident(accessToken ?? "", payload),
     onError: (error) => {
       setFeedback({
         tone: "error",
@@ -338,6 +337,7 @@ export function AdminIncidentsPage() {
   return (
     <section className="flex min-h-0 min-w-0 flex-col overflow-hidden rounded-[28px] border border-[var(--ui-color-border)] bg-white shadow-[var(--ui-shadow-subtle)] lg:h-full">
       <AdminPageHeader
+        actionCapability="quality_hygiene.manage"
         actionLabel="Nueva incidencia"
         description="Registra, clasifica y da seguimiento a problemas operativos, sanitarios, de limpieza, equipo, produccion o inventario."
         meta={[pageStatusLabel]}

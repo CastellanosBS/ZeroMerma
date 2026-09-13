@@ -17,6 +17,7 @@ from zeromerma_api.modules.catalog.domain.constants import (
     CATALOG_PRODUCT_KIND_RAW_MATERIAL,
 )
 from zeromerma_api.modules.catalog.infrastructure.models import Product, ProductClass
+from zeromerma_api.modules.identity.application.actions import restrict_actions
 from zeromerma_api.modules.identity.application.schemas import AuthenticatedUser
 from zeromerma_api.modules.outbox.application.service import OutboxWriter
 from zeromerma_api.modules.suppliers.application.admin_schemas import (
@@ -202,7 +203,7 @@ class AdminSupplierService:
     def get_supplier_detail(
         self, session: Session, *, supplier_id: uuid.UUID
     ) -> AdminSupplierDetailView:
-        return self._to_detail(self._get_row(session, supplier_id))
+        return self._to_detail(session, self._get_row(session, supplier_id))
 
     def create_supplier(
         self,
@@ -583,10 +584,22 @@ class AdminSupplierService:
             warnings=warnings,
         )
 
-    def _to_detail(self, row: _SupplierRow) -> AdminSupplierDetailView:
+    def _to_detail(self, session: Session, row: _SupplierRow) -> AdminSupplierDetailView:
         warnings = self._build_warnings(row)
         return AdminSupplierDetailView(
-            available_actions=AdminSupplierAvailableActionsView(),
+            available_actions=restrict_actions(
+                session,
+                AdminSupplierAvailableActionsView(),
+                {
+                    "can_add_contact": "suppliers.manage",
+                    "can_add_product": "suppliers.manage",
+                    "can_block": "suppliers.manage",
+                    "can_deactivate": "suppliers.manage",
+                    "can_edit": "suppliers.manage",
+                },
+                branch_ids=(),
+                global_only=True,
+            ),
             branch_applicability=[
                 AdminSupplierBranchApplicabilityView(
                     branch_code=branch.code,

@@ -259,6 +259,7 @@ export function AdminCleaningLogsPage() {
   return (
     <section className="flex min-h-0 min-w-0 flex-col overflow-hidden rounded-[28px] border border-[var(--ui-color-border)] bg-white shadow-[var(--ui-shadow-subtle)] lg:h-full">
       <AdminPageHeader
+        actionCapability="quality_hygiene.manage"
         actionLabel="Nueva bitacora"
         description="Registra y consulta actividades de limpieza por sucursal, zona, turno, responsable, checklist y evidencia."
         meta={[pageStatusLabel]}

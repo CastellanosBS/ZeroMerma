@@ -12,6 +12,6 @@ export function loginOperator(payload: LoginRequest): Promise<LoginResponse> {
 export function getCurrentOperator(accessToken: string): Promise<AuthenticatedUser> {
   return requestJson<AuthenticatedUser>({
     accessToken,
-    path: "/v1/auth/me",
+    path: "/v1/auth/me?surface=POS",
   });
 }

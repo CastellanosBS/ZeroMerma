@@ -1,3 +1,4 @@
+import { withCapabilities } from "../../../test-support/authorization";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import type { ReactElement } from "react";
 import { renderToString } from "react-dom/server";
@@ -112,7 +113,9 @@ const preview: AdminReportPreview = {
 };
 
 function render(element: ReactElement) {
-  return renderToString(element);
+  return renderToString(
+    withCapabilities(element, ["reports.view", "reports.export", "sales_tickets.view"]),
+  );
 }
 
 describe("admin reports UI components", () => {

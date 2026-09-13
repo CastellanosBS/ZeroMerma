@@ -49,7 +49,7 @@ from zeromerma_api.testing.database_safety import (
 REPO_ROOT = Path(__file__).resolve().parents[3]
 VERSIONS_DIR = REPO_ROOT / "apps" / "api" / "alembic" / "versions"
 ALEMBIC_INI = REPO_ROOT / "apps" / "api" / "alembic.ini"
-CANONICAL_HEAD = "20260520_0039_system_settings"
+CANONICAL_HEAD = "20260912_0040_authorization"
 EXPECTED_POSTGRES_MAJOR = 16
 TEST_CONTAINER_VARIABLE = "ZEROMERMA_TEST_CONTAINER_NAME"
 
@@ -830,6 +830,43 @@ KNOWN_DB_ONLY_CHECKS: frozenset[CheckConstraintFingerprint] = frozenset(
 )
 KNOWN_MODEL_CHECKS: frozenset[ModelCheckFingerprint] = frozenset(
     {
+        ModelCheckFingerprint(
+            "public",
+            "user_role_assignments",
+            "ck_user_role_assignments_ck_role_assignment_scope",
+            "ck_user_role_assignments_ck_role_assignment_scope",
+            "ck_user_role_assignments_ck_role_assignment_scope",
+            "scope_type IN ('GLOBAL', 'BRANCH_SET')",
+            "scope_type::text = ANY (ARRAY['GLOBAL'::character varying, "
+            "'BRANCH_SET'::character varying]::text[])",
+        ),
+        ModelCheckFingerprint(
+            "public",
+            "identity_privilege_state",
+            "ck_identity_privilege_state_ck_identity_privilege_state_singleton",
+            "ck_identity_privilege_state_ck_identity_privilege_state_b455",
+            "ck_identity_privilege_state_ck_identity_privilege_state_b455",
+            "id = 1",
+            "id = 1",
+        ),
+        ModelCheckFingerprint(
+            "public",
+            "identity_privileged_changes",
+            "ck_identity_privileged_changes_ck_identity_privileged_changes_distinct_approver",
+            "ck_identity_privileged_changes_ck_identity_privileged_c_e650",
+            "ck_identity_privileged_changes_ck_identity_privileged_c_e650",
+            "approver_user_id IS NULL OR approver_user_id <> initiator_user_id",
+            "approver_user_id IS NULL OR approver_user_id <> initiator_user_id",
+        ),
+        ModelCheckFingerprint(
+            "public",
+            "identity_privileged_changes",
+            "ck_identity_privileged_changes_ck_identity_privileged_changes_expiry",
+            "ck_identity_privileged_changes_ck_identity_privileged_c_5a44",
+            "ck_identity_privileged_changes_ck_identity_privileged_c_5a44",
+            "expires_at > created_at",
+            "expires_at > created_at",
+        ),
         ModelCheckFingerprint(
             "public",
             "branch_counter_snapshot_lines",
@@ -3121,6 +3158,7 @@ MODEL_MODULES = (
     "zeromerma_api.modules.corrections.infrastructure.models",
     "zeromerma_api.modules.discounts.infrastructure.models",
     "zeromerma_api.modules.identity.infrastructure.models",
+    "zeromerma_api.modules.identity.infrastructure.privileged_models",
     "zeromerma_api.modules.inventory.infrastructure.models",
     "zeromerma_api.modules.operations.infrastructure.models",
     "zeromerma_api.modules.orders.infrastructure.models",
@@ -4733,7 +4771,7 @@ def test_drift_classifier_accepts_only_exact_known_fingerprints() -> None:
     assert len(KNOWN_DB_ONLY_INDEXES) == 75
     assert len(KNOWN_DB_ONLY_DEFAULTS) == 51
     assert len(KNOWN_DB_ONLY_CHECKS) == 6
-    assert len(KNOWN_MODEL_CHECKS) == 181
+    assert len(KNOWN_MODEL_CHECKS) == 185
     assert (
         sum(item.expected_database_name != item.database_name for item in KNOWN_MODEL_CHECKS) == 87
     )
@@ -4910,14 +4948,163 @@ def test_unknown_schema_mutations_fail_closed() -> None:
                 )
 
 
+def test_authorization_transition_preserves_evidence_without_implicit_global() -> None:
+    with _root_runtime() as (root_config, root_engine):
+        with _temporary_database(root_engine, root_config, "authorization") as (config, engine):
+            _upgrade(engine, config, "20260520_0039_system_settings")
+            now = datetime.now(UTC)
+            admin_role, cashier_role = uuid.uuid4(), uuid.uuid4()
+            broad_permission, pos_permission = uuid.uuid4(), uuid.uuid4()
+            admin_assignment, cashier_assignment, unscoped_assignment = (
+                uuid.uuid4(),
+                uuid.uuid4(),
+                uuid.uuid4(),
+            )
+            with engine.begin() as connection:
+                assert_authorized_destructive_connection(connection, config)
+                identity = _insert_identity(connection, "scope-migration")
+                unscoped = _insert_identity(connection, "scope-migration-unassigned")
+                connection.execute(
+                    text("""
+                    UPDATE user_branch_assignments SET is_active=false WHERE user_id=:user_id
+                """),
+                    {"user_id": unscoped["user"]},
+                )
+                for role_id, code in [(admin_role, "admin"), (cashier_role, "cashier")]:
+                    _insert_row(
+                        connection,
+                        "roles",
+                        {
+                            "id": role_id,
+                            "code": code,
+                            "name": code,
+                            "surfaces": '["POS","BACKOFFICE"]',
+                            "is_active": True,
+                            "is_system": True,
+                            "created_at": now,
+                            "updated_at": now,
+                        },
+                    )
+                for permission_id, code in [
+                    (broad_permission, "catalog_products.manage"),
+                    (pos_permission, "pos.operate"),
+                ]:
+                    _insert_row(
+                        connection,
+                        "permissions",
+                        {
+                            "id": permission_id,
+                            "code": code,
+                            "label": code,
+                            "module": "test",
+                            "module_label": "Test",
+                            "action": "manage",
+                            "created_at": now,
+                            "updated_at": now,
+                            "surfaces": '["POS","BACKOFFICE"]',
+                        },
+                    )
+                for role_id, permission_id in [
+                    (admin_role, broad_permission),
+                    (cashier_role, pos_permission),
+                ]:
+                    _insert_row(
+                        connection,
+                        "role_permissions",
+                        {
+                            "id": uuid.uuid4(),
+                            "role_id": role_id,
+                            "permission_id": permission_id,
+                            "created_at": now,
+                        },
+                    )
+                for assignment_id, role_id, user_id in [
+                    (admin_assignment, admin_role, identity["user"]),
+                    (cashier_assignment, cashier_role, identity["user"]),
+                    (unscoped_assignment, cashier_role, unscoped["user"]),
+                ]:
+                    _insert_row(
+                        connection,
+                        "user_role_assignments",
+                        {
+                            "id": assignment_id,
+                            "role_id": role_id,
+                            "user_id": user_id,
+                            "is_active": True,
+                            "created_at": now,
+                            "updated_at": now,
+                        },
+                    )
+            _upgrade(engine, config, "head")
+            with engine.connect() as connection:
+                assignments = connection.execute(
+                    text("""
+                    SELECT id, scope_type FROM user_role_assignments ORDER BY id
+                """)
+                ).all()
+                assert {row.id for row in assignments} == {admin_assignment, cashier_assignment}
+                assert all(row.scope_type == "BRANCH_SET" for row in assignments)
+                assert (
+                    connection.scalar(
+                        text("""
+                    SELECT count(*) FROM user_role_assignment_branch_scopes WHERE branch_id=:id
+                """),
+                        {"id": identity["branch"]},
+                    )
+                    == 2
+                )
+                assert (
+                    connection.scalar(
+                        text("SELECT is_active FROM roles WHERE id=:id"), {"id": admin_role}
+                    )
+                    is False
+                )
+                assert (
+                    connection.scalar(
+                        text("SELECT is_active FROM roles WHERE id=:id"), {"id": cashier_role}
+                    )
+                    is True
+                )
+                assert connection.scalar(text("SELECT count(*) FROM permissions")) == 55
+                assert connection.scalar(text("SELECT count(*) FROM role_permissions")) == 1
+                assert connection.scalar(text("SELECT count(*) FROM cash_sessions")) == 2
+                assert connection.scalar(text("SELECT count(*) FROM users")) == 2
+                evidence = connection.execute(
+                    text("""
+                    SELECT action, metadata FROM audit_log ORDER BY action
+                """)
+                ).all()
+                assert len(evidence) == 2
+                assert all(row.metadata["requires_review"] for row in evidence)
+                assert any(
+                    row.metadata.get("assignment", {}).get("id") == str(unscoped_assignment)
+                    for row in evidence
+                )
+                assert connection.scalar(text("SELECT count(*) FROM outbox_events")) == 2
+                assert (
+                    connection.scalar(
+                        text("""
+                    SELECT initial_owner_user_id FROM identity_privilege_state WHERE id=1
+                """)
+                    )
+                    is None
+                )
+                assert (
+                    connection.scalar(
+                        text("SELECT count(*) FROM roles WHERE code='explicit_superadmin'")
+                    )
+                    == 0
+                )
+
+
 def test_static_graph() -> None:
     inventory = _revision_inventory()
     graph = _graph(inventory)
     for row in inventory:
         _emit("REVISION", row)
     _emit("GRAPH", graph)
-    assert graph["revision_count"] == 39
-    assert graph["unique_revision_count"] == 39
+    assert graph["revision_count"] == 40
+    assert graph["unique_revision_count"] == 40
     assert graph["duplicate_revisions"] == []
     assert graph["roots"] == ["0001_foundation_schema"]
     assert graph["heads"] == [CANONICAL_HEAD]
@@ -4926,7 +5113,7 @@ def test_static_graph() -> None:
     assert graph["unreachable"] == []
     assert graph["branches"] == {}
     assert graph["merge_revisions"] == []
-    assert len(_topological_revisions(inventory)) == 39
+    assert len(_topological_revisions(inventory)) == 40
 
 
 def test_fresh_schema_drift_and_seed() -> None:

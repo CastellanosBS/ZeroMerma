@@ -66,16 +66,38 @@ function AdminRecipeCostMetricStrip({
 }) {
   const loadingValue = isLoading ? "Cargando" : null;
   const items = [
-    { label: "Con receta", title: "Productos con receta activa", value: loadingValue ?? metrics.withActiveRecipe },
-    { label: "Sin receta", title: "Productos sin receta activa", value: loadingValue ?? metrics.withoutRecipe },
-    { label: "Revisar", title: "Recetas con advertencias", value: loadingValue ?? metrics.withWarnings },
-    { label: "Varianza", title: "Productos con varianza alta", value: loadingValue ?? metrics.highVariance },
-    { label: "Actualizadas", title: "Recetas actualizadas", value: loadingValue ?? metrics.recentlyUpdated },
+    {
+      label: "Con receta",
+      title: "Productos con receta activa",
+      value: loadingValue ?? metrics.withActiveRecipe,
+    },
+    {
+      label: "Sin receta",
+      title: "Productos sin receta activa",
+      value: loadingValue ?? metrics.withoutRecipe,
+    },
+    {
+      label: "Revisar",
+      title: "Recetas con advertencias",
+      value: loadingValue ?? metrics.withWarnings,
+    },
+    {
+      label: "Varianza",
+      title: "Productos con varianza alta",
+      value: loadingValue ?? metrics.highVariance,
+    },
+    {
+      label: "Actualizadas",
+      title: "Recetas actualizadas",
+      value: loadingValue ?? metrics.recentlyUpdated,
+    },
   ];
 
   return (
     <section className="flex min-w-0 flex-wrap items-center gap-2 rounded-[18px] border border-[var(--ui-color-border)] bg-white px-3 py-2 text-xs text-slate-600">
-      <span className="shrink-0 font-semibold uppercase tracking-[0.12em] text-slate-500">Resumen</span>
+      <span className="shrink-0 font-semibold uppercase tracking-[0.12em] text-slate-500">
+        Resumen
+      </span>
       {items.map((item) => (
         <span
           className="inline-flex min-w-0 max-w-full items-center gap-1.5 rounded-full border border-[var(--ui-color-border)] bg-slate-50 px-2.5 py-1"
@@ -96,7 +118,9 @@ export function AdminRecipeCostsPage() {
   const [filters, setFilters] = useState<AdminRecipeCostListFilters>(initialFilters);
   const [selectedProductId, setSelectedProductId] = useState<string | null>(null);
   const [formProduct, setFormProduct] = useState<AdminRecipeCostProduct | null>(null);
-  const [feedback, setFeedback] = useState<{ tone: "success" | "error"; message: string } | null>(null);
+  const [feedback, setFeedback] = useState<{ tone: "success" | "error"; message: string } | null>(
+    null,
+  );
 
   const listQuery = useQuery({
     enabled: Boolean(accessToken),
@@ -119,7 +143,8 @@ export function AdminRecipeCostsPage() {
   });
 
   const createMutation = useMutation({
-    mutationFn: (payload: AdminRecipeCreatePayload) => createAdminRecipe(accessToken ?? "", payload),
+    mutationFn: (payload: AdminRecipeCreatePayload) =>
+      createAdminRecipe(accessToken ?? "", payload),
     onError: (error) => {
       setFeedback({
         tone: "error",
@@ -161,7 +186,8 @@ export function AdminRecipeCostsPage() {
   });
 
   const detail: AdminRecipeCostDetail | null =
-    detailQuery.data ?? (selectedPreview ? { product: selectedPreview, activeRecipe: null, recipeVersions: [] } : null);
+    detailQuery.data ??
+    (selectedPreview ? { product: selectedPreview, activeRecipe: null, recipeVersions: [] } : null);
   const listErrorMessage = listQuery.isError
     ? toBackofficeErrorMessage(listQuery.error, "No se pudieron cargar recetas y costos.")
     : null;
@@ -194,6 +220,8 @@ export function AdminRecipeCostsPage() {
   return (
     <section className="flex min-h-0 min-w-0 flex-col overflow-hidden rounded-[28px] border border-[var(--ui-color-border)] bg-white shadow-[var(--ui-shadow-subtle)] lg:h-full">
       <AdminPageHeader
+        actionGlobalOnly
+        actionCapability="recipes.manage"
         actionLabel="Nueva receta"
         description="Gobierna recetas tecnicas, rendimiento, insumos y costo teorico por producto terminado."
         meta={[pageStatusLabel]}
@@ -212,7 +240,10 @@ export function AdminRecipeCostsPage() {
           onChange={patchFilters}
         />
 
-        <AdminRecipeCostMetricStrip metrics={recipeCostList.metrics} isLoading={listQuery.isLoading} />
+        <AdminRecipeCostMetricStrip
+          metrics={recipeCostList.metrics}
+          isLoading={listQuery.isLoading}
+        />
 
         {feedback ? (
           <p

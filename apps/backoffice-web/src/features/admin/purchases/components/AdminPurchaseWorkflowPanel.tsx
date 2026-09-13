@@ -1,3 +1,6 @@
+import { AdminActionButton } from "../../components/AdminActionButton";
+import { hasEffectiveCapability, type PermissionCode } from "../../../auth/authorization";
+import { useBackofficeAuthorization } from "../../../auth/authorization-context";
 import { useMemo, useState } from "react";
 
 import type {
@@ -68,6 +71,13 @@ export function AdminPurchaseWorkflowPanel({
   options,
   purchase,
 }: AdminPurchaseWorkflowPanelProps) {
+  const actor = useBackofficeAuthorization();
+  const actionCapability: PermissionCode =
+    mode === "cancel"
+      ? "purchases.cancel"
+      : mode === "receive"
+        ? "purchases.receive"
+        : "purchases.manage";
   const [branchId, setBranchId] = useState(purchase?.overview.branchId ?? "");
   const [supplierId, setSupplierId] = useState(purchase?.overview.supplierId ?? "");
   const [externalDocumentType, setExternalDocumentType] = useState("REMISSION");
@@ -108,12 +118,18 @@ export function AdminPurchaseWorkflowPanel({
     if (mode !== "receive" || !purchase) {
       return false;
     }
-    const pendingByLine = new Map(purchase.lines.map((line) => [line.purchaseLineId, line.pendingQuantity]));
-    return receiptLines.some((line) => line.receivedQuantity !== pendingByLine.get(line.purchaseLineId));
+    const pendingByLine = new Map(
+      purchase.lines.map((line) => [line.purchaseLineId, line.pendingQuantity]),
+    );
+    return receiptLines.some(
+      (line) => line.receivedQuantity !== pendingByLine.get(line.purchaseLineId),
+    );
   }, [mode, purchase, receiptLines]);
 
   function patchLine(index: number, patch: Partial<EditableLine>) {
-    setLines((current) => current.map((line, lineIndex) => (lineIndex === index ? { ...line, ...patch } : line)));
+    setLines((current) =>
+      current.map((line, lineIndex) => (lineIndex === index ? { ...line, ...patch } : line)),
+    );
   }
 
   function patchReceiptLine(index: number, patch: Partial<ReceiptLineState>) {
@@ -147,6 +163,13 @@ export function AdminPurchaseWorkflowPanel({
   }
 
   function handleSubmit() {
+    if (!hasEffectiveCapability(actor, actionCapability, [branchId])) return;
+    if (
+      mode === "purchase" &&
+      confirmNow &&
+      !hasEffectiveCapability(actor, "purchases.confirm", [branchId])
+    )
+      return;
     setFormError(null);
     if (mode === "cancel") {
       if (!cancelReason.trim()) {
@@ -169,11 +192,17 @@ export function AdminPurchaseWorkflowPanel({
       if (
         hasDiscrepancy &&
         receiptLines.some((line) => {
-          const sourceLine = purchase.lines.find((purchaseLine) => purchaseLine.purchaseLineId === line.purchaseLineId);
-          return sourceLine?.pendingQuantity !== line.receivedQuantity && !line.discrepancyReason.trim();
+          const sourceLine = purchase.lines.find(
+            (purchaseLine) => purchaseLine.purchaseLineId === line.purchaseLineId,
+          );
+          return (
+            sourceLine?.pendingQuantity !== line.receivedQuantity && !line.discrepancyReason.trim()
+          );
         })
       ) {
-        setFormError("La razon de discrepancia es obligatoria cuando recibido y esperado difieren.");
+        setFormError(
+          "La razon de discrepancia es obligatoria cuando recibido y esperado difieren.",
+        );
         return;
       }
       onSubmitReceipt({
@@ -280,13 +309,20 @@ export function AdminPurchaseWorkflowPanel({
                     className="grid gap-2 rounded-[16px] border border-[var(--ui-color-border)] bg-slate-50 p-3"
                     key={line.purchaseLineId}
                   >
-                    <p className="truncate text-sm font-semibold text-slate-950" title={sourceLine?.productName}>
+                    <p
+                      className="truncate text-sm font-semibold text-slate-950"
+                      title={sourceLine?.productName}
+                    >
                       {sourceLine?.productName}
                     </p>
                     <div className="grid gap-2 md:grid-cols-3">
                       <label className="grid gap-1 text-xs font-semibold uppercase tracking-[0.1em] text-slate-500">
                         Pendiente
-                        <input className={inputClassName} disabled value={sourceLine?.pendingQuantity ?? "0"} />
+                        <input
+                          className={inputClassName}
+                          disabled
+                          value={sourceLine?.pendingQuantity ?? "0"}
+                        />
                       </label>
                       <label className="grid gap-1 text-xs font-semibold uppercase tracking-[0.1em] text-slate-500">
                         Recibido
@@ -296,7 +332,9 @@ export function AdminPurchaseWorkflowPanel({
                           step="0.001"
                           type="number"
                           value={line.receivedQuantity}
-                          onChange={(event) => patchReceiptLine(index, { receivedQuantity: event.target.value })}
+                          onChange={(event) =>
+                            patchReceiptLine(index, { receivedQuantity: event.target.value })
+                          }
                         />
                       </label>
                       <label className="grid gap-1 text-xs font-semibold uppercase tracking-[0.1em] text-slate-500">
@@ -307,7 +345,9 @@ export function AdminPurchaseWorkflowPanel({
                           step="0.0001"
                           type="number"
                           value={line.unitCost}
-                          onChange={(event) => patchReceiptLine(index, { unitCost: event.target.value })}
+                          onChange={(event) =>
+                            patchReceiptLine(index, { unitCost: event.target.value })
+                          }
                         />
                       </label>
                     </div>
@@ -317,7 +357,9 @@ export function AdminPurchaseWorkflowPanel({
                         className={inputClassName}
                         placeholder="Obligatoria si recibido difiere de pendiente"
                         value={line.discrepancyReason}
-                        onChange={(event) => patchReceiptLine(index, { discrepancyReason: event.target.value })}
+                        onChange={(event) =>
+                          patchReceiptLine(index, { discrepancyReason: event.target.value })
+                        }
                       />
                     </label>
                   </div>
@@ -334,7 +376,11 @@ export function AdminPurchaseWorkflowPanel({
             <div className="grid gap-2 md:grid-cols-2">
               <label className="grid gap-1 text-xs font-semibold uppercase tracking-[0.1em] text-slate-500">
                 Proveedor
-                <select className={inputClassName} value={supplierId} onChange={(event) => setSupplierId(event.target.value)}>
+                <select
+                  className={inputClassName}
+                  value={supplierId}
+                  onChange={(event) => setSupplierId(event.target.value)}
+                >
                   <option value="">Selecciona proveedor</option>
                   {options.suppliers.map((option) => (
                     <option key={option.id} value={option.id}>
@@ -345,7 +391,11 @@ export function AdminPurchaseWorkflowPanel({
               </label>
               <label className="grid gap-1 text-xs font-semibold uppercase tracking-[0.1em] text-slate-500">
                 Sucursal receptora
-                <select className={inputClassName} value={branchId} onChange={(event) => setBranchId(event.target.value)}>
+                <select
+                  className={inputClassName}
+                  value={branchId}
+                  onChange={(event) => setBranchId(event.target.value)}
+                >
                   <option value="">Selecciona sucursal</option>
                   {options.branches.map((option) => (
                     <option key={option.id} value={option.id}>
@@ -383,14 +433,21 @@ export function AdminPurchaseWorkflowPanel({
 
             {mode === "purchase" ? (
               <label className="flex items-center gap-2 rounded-[16px] border border-[var(--ui-color-border)] bg-slate-50 px-3 py-2 text-sm font-semibold text-slate-700">
-                <input checked={confirmNow} type="checkbox" onChange={(event) => setConfirmNow(event.target.checked)} />
+                <input
+                  checked={confirmNow}
+                  type="checkbox"
+                  onChange={(event) => setConfirmNow(event.target.checked)}
+                />
                 Confirmar compra al guardar
               </label>
             ) : null}
 
             <div className="grid gap-2">
               {lines.map((line, index) => (
-                <div className="grid gap-2 rounded-[16px] border border-[var(--ui-color-border)] bg-slate-50 p-3" key={index}>
+                <div
+                  className="grid gap-2 rounded-[16px] border border-[var(--ui-color-border)] bg-slate-50 p-3"
+                  key={index}
+                >
                   <label className="grid gap-1 text-xs font-semibold uppercase tracking-[0.1em] text-slate-500">
                     Producto
                     <select
@@ -442,7 +499,9 @@ export function AdminPurchaseWorkflowPanel({
                     <button
                       className="justify-self-start rounded-full border border-[var(--ui-color-border)] bg-white px-3 py-1 text-xs font-semibold text-slate-600"
                       type="button"
-                      onClick={() => setLines((current) => current.filter((_, lineIndex) => lineIndex !== index))}
+                      onClick={() =>
+                        setLines((current) => current.filter((_, lineIndex) => lineIndex !== index))
+                      }
                     >
                       Quitar linea
                     </button>
@@ -480,14 +539,17 @@ export function AdminPurchaseWorkflowPanel({
         >
           Cancelar
         </button>
-        <button
+        <AdminActionButton
+          capability={actionCapability}
+          branchIds={[branchId]}
+          additionalCapabilities={mode === "purchase" && confirmNow ? ["purchases.confirm"] : []}
           className="rounded-full bg-[var(--ui-color-info)] px-3 py-1.5 text-sm font-semibold text-white transition hover:brightness-95 focus:outline-none focus:ring-4 focus:ring-[var(--ui-color-ring)] disabled:cursor-not-allowed disabled:bg-slate-300"
           disabled={isSubmitting}
           type="button"
           onClick={handleSubmit}
         >
           {isSubmitting ? "Guardando" : primaryLabel}
-        </button>
+        </AdminActionButton>
       </div>
     </aside>
   );

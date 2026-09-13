@@ -5,7 +5,6 @@ import { toBackofficeErrorMessage } from "../../../../lib/api";
 import { useBackofficeAuthStore } from "../../../auth/backoffice-auth-store";
 import { AdminPageHeader } from "../../components/AdminPageHeader";
 import {
-  assignAdminRoleToUser,
   adminRoleBackendContract,
   changeAdminRoleStatus,
   createAdminRole,
@@ -28,8 +27,6 @@ import type {
   AdminRoleListResponse,
   AdminRoleUpdatePayload,
 } from "../types";
-import { adminUserBackendContract, fetchAdminUsers } from "../../users/api";
-import type { AdminUserListResponse } from "../../users/types";
 
 const initialFilters: AdminRoleListFilters = {
   appSurface: "all",
@@ -78,33 +75,6 @@ const emptyRoleList: AdminRoleListResponse = {
 const emptyPermissions: AdminPermissionsResponse = {
   groups: [],
   sensitivePermissionCodes: [],
-};
-
-const emptyUserList: AdminUserListResponse = {
-  backendContract: adminUserBackendContract,
-  filterOptions: {
-    appAccess: [],
-    branches: [],
-    lastLoginStates: [],
-    roles: [],
-    statuses: [],
-    warningStates: [],
-  },
-  isBackendConnected: false,
-  items: [],
-  metrics: {
-    activeUsers: "0",
-    backofficeUsers: "0",
-    inactiveUsers: "0",
-    lockedUsers: "0",
-    pendingUsers: "0",
-    posUsers: "0",
-    totalUsers: "0",
-    withoutBranch: "0",
-  },
-  page: 1,
-  pageSize: 100,
-  total: 0,
 };
 
 function RoleMetricStrip({
@@ -170,27 +140,8 @@ export function AdminRolesPermissionsPage() {
     retry: false,
   });
 
-  const usersQuery = useQuery({
-    enabled: Boolean(accessToken),
-    queryFn: () =>
-      fetchAdminUsers(accessToken ?? "", {
-        appAccess: "all",
-        branchId: "all",
-        lastLoginState: "all",
-        page: 1,
-        pageSize: 100,
-        roleId: "all",
-        search: "",
-        status: "all",
-        warningState: "all",
-      }),
-    queryKey: ["admin", "roles", "users-for-assignment"],
-    retry: false,
-  });
-
   const roleList = rolesQuery.data ?? emptyRoleList;
   const permissions = permissionsQuery.data ?? emptyPermissions;
-  const userList = usersQuery.data ?? emptyUserList;
   const selectedRole = useMemo(
     () => roleList.items.find((item) => item.id === selectedRoleId) ?? null,
     [roleList.items, selectedRoleId],
@@ -259,22 +210,6 @@ export function AdminRolesPermissionsPage() {
     },
   });
 
-  const assignUserMutation = useMutation({
-    mutationFn: ({ roleId, userId }: { roleId: string; userId: string }) =>
-      assignAdminRoleToUser(accessToken ?? "", roleId, userId),
-    onError: (error) => {
-      setFeedback({
-        tone: "error",
-        message: toBackofficeErrorMessage(error, "No se pudo asignar el usuario al rol."),
-      });
-    },
-    onSuccess: async (detail) => {
-      setFeedback({ tone: "success", message: `Usuario asignado a ${detail.overview.name}.` });
-      await queryClient.invalidateQueries({ queryKey: ["admin", "roles"] });
-      await queryClient.invalidateQueries({ queryKey: ["admin", "users"] });
-    },
-  });
-
   const removeUserMutation = useMutation({
     mutationFn: ({ roleId, userId }: { roleId: string; userId: string }) =>
       removeAdminRoleFromUser(accessToken ?? "", roleId, userId),
@@ -297,12 +232,13 @@ export function AdminRolesPermissionsPage() {
   const detailErrorMessage = detailQuery.isError
     ? toBackofficeErrorMessage(detailQuery.error, "No se pudo cargar el detalle del rol.")
     : null;
-  const workflowErrorMessage = createMutation.isError || updateMutation.isError
-    ? toBackofficeErrorMessage(
-        createMutation.error ?? updateMutation.error,
-        "No se pudo guardar el rol.",
-      )
-    : null;
+  const workflowErrorMessage =
+    createMutation.isError || updateMutation.isError
+      ? toBackofficeErrorMessage(
+          createMutation.error ?? updateMutation.error,
+          "No se pudo guardar el rol.",
+        )
+      : null;
   const pageStatusLabel = rolesQuery.isLoading
     ? "Validando API"
     : roleList.isBackendConnected
@@ -332,6 +268,8 @@ export function AdminRolesPermissionsPage() {
   return (
     <section className="flex min-h-0 min-w-0 flex-col overflow-hidden rounded-[28px] border border-[var(--ui-color-border)] bg-white shadow-[var(--ui-shadow-subtle)] lg:h-full">
       <AdminPageHeader
+        actionCapability="roles.manage"
+        actionGlobalOnly
         actionLabel="Nuevo rol"
         description="Define roles, permisos por modulo, acceso a POS y Backoffice, alcance operativo y usuarios asignados."
         meta={[pageStatusLabel]}
@@ -414,10 +352,7 @@ export function AdminRolesPermissionsPage() {
             detail={detailQuery.data ?? null}
             errorMessage={detailErrorMessage}
             isLoading={
-              detailQuery.isLoading
-              || statusMutation.isPending
-              || assignUserMutation.isPending
-              || removeUserMutation.isPending
+              detailQuery.isLoading || statusMutation.isPending || removeUserMutation.isPending
             }
             selectedRole={selectedRole}
             onActivate={(item) =>
@@ -427,7 +362,6 @@ export function AdminRolesPermissionsPage() {
                 roleId: item.id,
               })
             }
-            onAssignUser={(roleId, userId) => assignUserMutation.mutate({ roleId, userId })}
             onCopyRole={handleCopyRole}
             onDeactivate={(item) =>
               statusMutation.mutate({
@@ -438,7 +372,6 @@ export function AdminRolesPermissionsPage() {
             }
             onEdit={handleEdit}
             onRemoveUser={(roleId, userId) => removeUserMutation.mutate({ roleId, userId })}
-            users={userList.items}
           />
         </div>
       </div>

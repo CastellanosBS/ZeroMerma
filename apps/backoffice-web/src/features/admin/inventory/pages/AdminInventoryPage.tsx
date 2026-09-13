@@ -81,10 +81,26 @@ function AdminInventoryMetricStrip({
 }) {
   const loadingValue = isLoading ? "Cargando" : null;
   const items = [
-    { label: "Con existencia", title: "Productos con existencia", value: loadingValue ?? metrics.productsWithStock },
-    { label: "Stock negativo", title: "Registros con stock negativo", value: loadingValue ?? metrics.negativeStock },
-    { label: "Sin movimiento", title: "Registros sin movimiento reciente", value: loadingValue ?? metrics.staleStock },
-    { label: "Registros", title: "Registros de inventario", value: loadingValue ?? metrics.totalRecords },
+    {
+      label: "Con existencia",
+      title: "Productos con existencia",
+      value: loadingValue ?? metrics.productsWithStock,
+    },
+    {
+      label: "Stock negativo",
+      title: "Registros con stock negativo",
+      value: loadingValue ?? metrics.negativeStock,
+    },
+    {
+      label: "Sin movimiento",
+      title: "Registros sin movimiento reciente",
+      value: loadingValue ?? metrics.staleStock,
+    },
+    {
+      label: "Registros",
+      title: "Registros de inventario",
+      value: loadingValue ?? metrics.totalRecords,
+    },
     {
       label: "Valor estimado",
       title: "Valor estimado por costo estandar disponible",
@@ -94,7 +110,9 @@ function AdminInventoryMetricStrip({
 
   return (
     <section className="flex min-w-0 flex-wrap items-center gap-2 rounded-[18px] border border-[var(--ui-color-border)] bg-white px-3 py-2 text-xs text-slate-600">
-      <span className="shrink-0 font-semibold uppercase tracking-[0.12em] text-slate-500">Resumen</span>
+      <span className="shrink-0 font-semibold uppercase tracking-[0.12em] text-slate-500">
+        Resumen
+      </span>
       {items.map((item) => (
         <span
           className="inline-flex min-w-0 max-w-full items-center gap-1.5 rounded-full border border-[var(--ui-color-border)] bg-slate-50 px-2.5 py-1"
@@ -118,9 +136,13 @@ export function AdminInventoryPage() {
   const queryClient = useQueryClient();
   const [filters, setFilters] = useState<AdminInventoryListFilters>(getInitialFilters);
   const [selectedBalanceId, setSelectedBalanceId] = useState<string | null>(null);
-  const [adjustmentSource, setAdjustmentSource] = useState<AdminInventoryDetail | AdminInventoryListItem | null>(null);
+  const [adjustmentSource, setAdjustmentSource] = useState<
+    AdminInventoryDetail | AdminInventoryListItem | null
+  >(null);
   const [isAdjustmentOpen, setIsAdjustmentOpen] = useState(false);
-  const [feedback, setFeedback] = useState<{ tone: "success" | "error"; message: string } | null>(null);
+  const [feedback, setFeedback] = useState<{ tone: "success" | "error"; message: string } | null>(
+    null,
+  );
 
   const inventoryQuery = useQuery({
     enabled: Boolean(accessToken),
@@ -162,10 +184,16 @@ export function AdminInventoryPage() {
 
   const detailInventory = inventoryDetailQuery.data ?? null;
   const listErrorMessage = inventoryQuery.isError
-    ? toBackofficeErrorMessage(inventoryQuery.error, "No se pudo cargar inventario. Intenta nuevamente.")
+    ? toBackofficeErrorMessage(
+        inventoryQuery.error,
+        "No se pudo cargar inventario. Intenta nuevamente.",
+      )
     : null;
   const detailErrorMessage = inventoryDetailQuery.isError
-    ? toBackofficeErrorMessage(inventoryDetailQuery.error, "No se pudo cargar el detalle de inventario.")
+    ? toBackofficeErrorMessage(
+        inventoryDetailQuery.error,
+        "No se pudo cargar el detalle de inventario.",
+      )
     : null;
   const adjustmentErrorMessage = adjustmentMutation.isError
     ? toBackofficeErrorMessage(adjustmentMutation.error, "No se pudo guardar el ajuste.")
@@ -222,6 +250,7 @@ export function AdminInventoryPage() {
   return (
     <section className="flex min-h-0 min-w-0 flex-col overflow-hidden rounded-[28px] border border-[var(--ui-color-border)] bg-white shadow-[var(--ui-shadow-subtle)] lg:h-full">
       <AdminPageHeader
+        actionCapability="inventory.adjust"
         actionLabel="Nuevo ajuste"
         description="Consulta existencias por sucursal, producto y ubicacion; revisa movimientos, alertas y ajustes auditados."
         meta={[pageStatusLabel, "Conteos pendientes de contrato"]}
@@ -237,7 +266,10 @@ export function AdminInventoryPage() {
           onChange={patchFilters}
         />
 
-        <AdminInventoryMetricStrip metrics={inventoryList.metrics} isLoading={inventoryQuery.isLoading} />
+        <AdminInventoryMetricStrip
+          metrics={inventoryList.metrics}
+          isLoading={inventoryQuery.isLoading}
+        />
 
         {feedback ? (
           <p

@@ -1,3 +1,4 @@
+import { AdminActionButton } from "../../components/AdminActionButton";
 import type { ReactNode } from "react";
 
 import type {
@@ -32,10 +33,16 @@ function formatDate(value: string | null | undefined): string {
 function InfoRow({ label, value }: { label: string; value?: string | number | null }) {
   return (
     <div className="grid min-w-0 grid-cols-[7.5rem_minmax(0,1fr)] gap-2 text-xs">
-      <span className="truncate font-semibold uppercase tracking-[0.08em] text-slate-500" title={label}>
+      <span
+        className="truncate font-semibold uppercase tracking-[0.08em] text-slate-500"
+        title={label}
+      >
         {label}
       </span>
-      <span className="min-w-0 truncate font-medium text-slate-900" title={String(value ?? "No disponible")}>
+      <span
+        className="min-w-0 truncate font-medium text-slate-900"
+        title={String(value ?? "No disponible")}
+      >
         {value ?? "No disponible"}
       </span>
     </div>
@@ -45,7 +52,10 @@ function InfoRow({ label, value }: { label: string; value?: string | number | nu
 function Section({ children, title }: { children: ReactNode; title: string }) {
   return (
     <div className="rounded-[18px] border border-[var(--ui-color-border)] bg-white p-3">
-      <h4 className="mb-2 truncate text-xs font-semibold uppercase tracking-[0.12em] text-slate-500" title={title}>
+      <h4
+        className="mb-2 truncate text-xs font-semibold uppercase tracking-[0.12em] text-slate-500"
+        title={title}
+      >
         {title}
       </h4>
       {children}
@@ -62,7 +72,10 @@ function WarningItem({ warning }: { warning: AdminProductionWarning }) {
         : "border-[var(--ui-color-border)] bg-slate-50 text-slate-600";
 
   return (
-    <li className={`rounded-[14px] border px-3 py-2 text-xs leading-5 ${toneClass}`} title={warning.message}>
+    <li
+      className={`rounded-[14px] border px-3 py-2 text-xs leading-5 ${toneClass}`}
+      title={warning.message}
+    >
       <span className="font-semibold">{warning.code}</span>: {warning.message}
     </li>
   );
@@ -80,15 +93,23 @@ function MovementRow({ movement }: { movement: AdminProductionInventoryMovement 
         <span className="truncate font-semibold text-slate-950" title={movement.movementType}>
           {movement.movementType}
         </span>
-        <span className={`shrink-0 rounded-full border px-2 py-0.5 font-semibold ${directionClass}`}>
+        <span
+          className={`shrink-0 rounded-full border px-2 py-0.5 font-semibold ${directionClass}`}
+        >
           {movement.direction}
         </span>
       </div>
       <div className="grid min-w-0 grid-cols-[minmax(0,1fr)_5rem] gap-2">
-        <span className="truncate text-slate-500" title={`${movement.locationCode} - ${movement.sourceDocumentType ?? ""}`}>
+        <span
+          className="truncate text-slate-500"
+          title={`${movement.locationCode} - ${movement.sourceDocumentType ?? ""}`}
+        >
           {movement.locationCode}
         </span>
-        <span className="truncate text-right font-semibold text-slate-900" title={movement.quantity}>
+        <span
+          className="truncate text-right font-semibold text-slate-900"
+          title={movement.quantity}
+        >
           {movement.quantity}
         </span>
       </div>
@@ -139,7 +160,10 @@ export function AdminProductionDetailPanel({
         <div className="flex min-h-0 flex-1 items-center p-3">
           <div className="rounded-[18px] border border-dashed border-[var(--ui-color-border)] bg-slate-50 p-4 text-sm leading-6 text-slate-600">
             <p className="font-semibold text-slate-950">Sin produccion seleccionada</p>
-            <p>Selecciona una produccion para revisar receta, insumos, avance e impacto en inventario.</p>
+            <p>
+              Selecciona una produccion para revisar receta, insumos, avance e impacto en
+              inventario.
+            </p>
           </div>
         </div>
       </aside>
@@ -152,8 +176,9 @@ export function AdminProductionDetailPanel({
   const branchId = productionDetail?.overview.branchId ?? productionPreview?.branchId ?? "";
   const productId = productionDetail?.productRecipe.productId ?? productionPreview?.productId ?? "";
   const hasVariance =
-    Boolean(productionDetail?.overview.varianceQty && productionDetail.overview.varianceQty !== "0.000") ||
-    Boolean(productionPreview?.varianceQty && productionPreview.varianceQty !== "0.000");
+    Boolean(
+      productionDetail?.overview.varianceQty && productionDetail.overview.varianceQty !== "0.000",
+    ) || Boolean(productionPreview?.varianceQty && productionPreview.varianceQty !== "0.000");
 
   return (
     <aside className="flex min-h-0 min-w-0 flex-col overflow-hidden rounded-[20px] border border-[var(--ui-color-border)] bg-white">
@@ -192,12 +217,42 @@ export function AdminProductionDetailPanel({
         <Section title="Resumen">
           <div className="grid gap-1.5">
             <InfoRow label="Estado" value={formatStatus(status)} />
-            <InfoRow label="Sucursal" value={productionDetail?.overview.branchName ?? productionPreview?.branchName} />
-            <InfoRow label="Planeado" value={productionDetail?.overview.plannedOutputQty ?? productionPreview?.plannedOutputQty} />
-            <InfoRow label="Producido" value={productionDetail?.overview.actualOutputQty ?? productionPreview?.actualOutputQty ?? "Pendiente"} />
-            <InfoRow label="Inicio" value={formatDate(productionDetail?.overview.startedAt ?? productionPreview?.startedAt)} />
-            <InfoRow label="Cierre" value={formatDate(productionDetail?.overview.completedAt ?? productionPreview?.completedAt)} />
-            <InfoRow label="Operador" value={productionDetail?.overview.createdByUserName ?? productionPreview?.operatorName} />
+            <InfoRow
+              label="Sucursal"
+              value={productionDetail?.overview.branchName ?? productionPreview?.branchName}
+            />
+            <InfoRow
+              label="Planeado"
+              value={
+                productionDetail?.overview.plannedOutputQty ?? productionPreview?.plannedOutputQty
+              }
+            />
+            <InfoRow
+              label="Producido"
+              value={
+                productionDetail?.overview.actualOutputQty ??
+                productionPreview?.actualOutputQty ??
+                "Pendiente"
+              }
+            />
+            <InfoRow
+              label="Inicio"
+              value={formatDate(
+                productionDetail?.overview.startedAt ?? productionPreview?.startedAt,
+              )}
+            />
+            <InfoRow
+              label="Cierre"
+              value={formatDate(
+                productionDetail?.overview.completedAt ?? productionPreview?.completedAt,
+              )}
+            />
+            <InfoRow
+              label="Operador"
+              value={
+                productionDetail?.overview.createdByUserName ?? productionPreview?.operatorName
+              }
+            />
           </div>
         </Section>
 
@@ -211,10 +266,26 @@ export function AdminProductionDetailPanel({
                   : `${productionPreview?.productName} (${productionPreview?.productCode})`
               }
             />
-            <InfoRow label="Tipo" value={productionDetail?.productRecipe.productKind ?? "FINISHED_GOOD"} />
-            <InfoRow label="Unidad" value={productionDetail?.productRecipe.productUnitOfMeasure ?? "No disponible"} />
-            <InfoRow label="Receta" value={productionDetail?.productRecipe.recipeName ?? productionPreview?.recipeName} />
-            <InfoRow label="Rendimiento" value={productionDetail ? `${productionDetail.productRecipe.recipeYieldQty} ${productionDetail.productRecipe.recipeYieldUom}` : null} />
+            <InfoRow
+              label="Tipo"
+              value={productionDetail?.productRecipe.productKind ?? "FINISHED_GOOD"}
+            />
+            <InfoRow
+              label="Unidad"
+              value={productionDetail?.productRecipe.productUnitOfMeasure ?? "No disponible"}
+            />
+            <InfoRow
+              label="Receta"
+              value={productionDetail?.productRecipe.recipeName ?? productionPreview?.recipeName}
+            />
+            <InfoRow
+              label="Rendimiento"
+              value={
+                productionDetail
+                  ? `${productionDetail.productRecipe.recipeYieldQty} ${productionDetail.productRecipe.recipeYieldUom}`
+                  : null
+              }
+            />
           </div>
         </Section>
 
@@ -229,10 +300,15 @@ export function AdminProductionDetailPanel({
                       key={line.inputProductId}
                     >
                       <div className="flex min-w-0 items-center justify-between gap-2">
-                        <span className="truncate font-semibold text-slate-950" title={line.inputProductName}>
+                        <span
+                          className="truncate font-semibold text-slate-950"
+                          title={line.inputProductName}
+                        >
                           {line.inputProductName}
                         </span>
-                        <span className="shrink-0 font-mono text-slate-500">{line.inputProductCode}</span>
+                        <span className="shrink-0 font-mono text-slate-500">
+                          {line.inputProductCode}
+                        </span>
                       </div>
                       <div className="grid min-w-0 grid-cols-3 gap-2 text-slate-600">
                         <span className="truncate">Req. {line.requiredQty}</span>
@@ -248,7 +324,9 @@ export function AdminProductionDetailPanel({
                   ))}
                 </ul>
               ) : (
-                <p className="text-sm leading-6 text-slate-600">Esta produccion no tiene insumos planeados.</p>
+                <p className="text-sm leading-6 text-slate-600">
+                  Esta produccion no tiene insumos planeados.
+                </p>
               )}
             </Section>
 
@@ -260,11 +338,15 @@ export function AdminProductionDetailPanel({
                       className="rounded-[14px] border border-[var(--ui-color-border)] bg-slate-50 px-3 py-2 text-xs"
                       key={line.inputProductId}
                     >
-                      <span className="block truncate font-semibold text-slate-950" title={line.inputProductName}>
+                      <span
+                        className="block truncate font-semibold text-slate-950"
+                        title={line.inputProductName}
+                      >
                         {line.inputProductName}
                       </span>
                       <span className="block truncate text-slate-500">
-                        Esperado {line.expectedQty} - Consumido {line.consumedQty ?? "Pendiente"} {line.uom}
+                        Esperado {line.expectedQty} - Consumido {line.consumedQty ?? "Pendiente"}{" "}
+                        {line.uom}
                       </span>
                     </li>
                   ))}
@@ -278,11 +360,26 @@ export function AdminProductionDetailPanel({
 
             <Section title="Salida / rendimiento">
               <div className="grid gap-1.5">
-                <InfoRow label="Planeado" value={`${productionDetail.outputYield.plannedOutputQty} ${productionDetail.outputYield.uom}`} />
-                <InfoRow label="Real" value={productionDetail.outputYield.actualOutputQty ?? "Pendiente"} />
-                <InfoRow label="Variacion" value={productionDetail.outputYield.varianceQty ?? "Pendiente"} />
-                <InfoRow label="Porcentaje" value={productionDetail.outputYield.variancePercent ?? "Pendiente"} />
-                <InfoRow label="Razon" value={productionDetail.outputYield.varianceReason ?? "No registrada"} />
+                <InfoRow
+                  label="Planeado"
+                  value={`${productionDetail.outputYield.plannedOutputQty} ${productionDetail.outputYield.uom}`}
+                />
+                <InfoRow
+                  label="Real"
+                  value={productionDetail.outputYield.actualOutputQty ?? "Pendiente"}
+                />
+                <InfoRow
+                  label="Variacion"
+                  value={productionDetail.outputYield.varianceQty ?? "Pendiente"}
+                />
+                <InfoRow
+                  label="Porcentaje"
+                  value={productionDetail.outputYield.variancePercent ?? "Pendiente"}
+                />
+                <InfoRow
+                  label="Razon"
+                  value={productionDetail.outputYield.varianceReason ?? "No registrada"}
+                />
               </div>
             </Section>
 
@@ -304,7 +401,8 @@ export function AdminProductionDetailPanel({
                   </ul>
                 ) : (
                   <p className="text-sm leading-6 text-slate-600">
-                    El backend integra inventario; aun no hay movimientos porque el lote no se ha completado.
+                    El backend integra inventario; aun no hay movimientos porque el lote no se ha
+                    completado.
                   </p>
                 )
               ) : (
@@ -322,17 +420,25 @@ export function AdminProductionDetailPanel({
                       className="rounded-[14px] border border-[var(--ui-color-border)] bg-slate-50 px-3 py-2 text-xs"
                       key={`${document.documentType}-${document.documentId}`}
                     >
-                      <span className="block truncate font-semibold text-slate-950" title={document.folio}>
+                      <span
+                        className="block truncate font-semibold text-slate-950"
+                        title={document.folio}
+                      >
                         {document.folio}
                       </span>
-                      <span className="block truncate text-slate-500" title={`${document.documentType} - ${document.status}`}>
+                      <span
+                        className="block truncate text-slate-500"
+                        title={`${document.documentType} - ${document.status}`}
+                      >
                         {document.documentType} - {document.status}
                       </span>
                     </li>
                   ))}
                 </ul>
               ) : (
-                <p className="text-sm leading-6 text-slate-600">Esta produccion no tiene documentos relacionados.</p>
+                <p className="text-sm leading-6 text-slate-600">
+                  Esta produccion no tiene documentos relacionados.
+                </p>
               )}
             </Section>
           </>
@@ -346,51 +452,61 @@ export function AdminProductionDetailPanel({
               ))}
             </ul>
           ) : (
-            <p className="text-sm leading-6 text-slate-600">No hay faltantes de insumos para esta produccion.</p>
+            <p className="text-sm leading-6 text-slate-600">
+              No hay faltantes de insumos para esta produccion.
+            </p>
           )}
         </Section>
       </div>
 
       <div className="flex shrink-0 flex-wrap gap-2 border-t border-[var(--ui-color-border)] p-3 text-xs">
         {productionDetail?.availableActions.canStart ? (
-          <button
+          <AdminActionButton
+            capability="production.execute"
+            branchIds={[branchId]}
             className="rounded-full border border-[var(--ui-color-border)] bg-white px-3 py-1.5 font-semibold text-[var(--ui-color-info)] transition hover:bg-[var(--ui-color-surface-tint)] focus:outline-none focus:ring-4 focus:ring-[var(--ui-color-ring)] disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-400"
             disabled={isSubmitting}
             type="button"
             onClick={() => onStart(productionDetail)}
           >
             Iniciar
-          </button>
+          </AdminActionButton>
         ) : null}
         {productionDetail?.availableActions.canEdit ? (
-          <button
+          <AdminActionButton
+            capability="production.manage"
+            branchIds={[branchId]}
             className="rounded-full border border-[var(--ui-color-border)] bg-white px-3 py-1.5 font-semibold text-slate-700 transition hover:bg-slate-50 focus:outline-none focus:ring-4 focus:ring-[var(--ui-color-ring)] disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-400"
             disabled={isSubmitting}
             type="button"
             onClick={() => onEdit(productionDetail)}
           >
             Editar
-          </button>
+          </AdminActionButton>
         ) : null}
         {productionDetail?.availableActions.canComplete ? (
-          <button
+          <AdminActionButton
+            capability="production.execute"
+            branchIds={[branchId]}
             className="rounded-full border border-[var(--ui-color-border)] bg-white px-3 py-1.5 font-semibold text-[var(--ui-color-info)] transition hover:bg-[var(--ui-color-surface-tint)] focus:outline-none focus:ring-4 focus:ring-[var(--ui-color-ring)] disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-400"
             disabled={isSubmitting}
             type="button"
             onClick={() => onComplete(productionDetail)}
           >
             Completar
-          </button>
+          </AdminActionButton>
         ) : null}
         {productionDetail?.availableActions.canCancel ? (
-          <button
+          <AdminActionButton
+            capability="production.cancel"
+            branchIds={[branchId]}
             className="rounded-full border border-[var(--ui-color-border)] bg-white px-3 py-1.5 font-semibold text-slate-700 transition hover:bg-slate-50 focus:outline-none focus:ring-4 focus:ring-[var(--ui-color-ring)] disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-400"
             disabled={isSubmitting}
             type="button"
             onClick={() => onCancel(productionDetail)}
           >
             Cancelar
-          </button>
+          </AdminActionButton>
         ) : null}
         <button
           className="rounded-full border border-[var(--ui-color-border)] bg-white px-3 py-1.5 font-semibold text-slate-700 transition hover:bg-slate-50 focus:outline-none focus:ring-4 focus:ring-[var(--ui-color-ring)]"
@@ -417,7 +533,9 @@ export function AdminProductionDetailPanel({
           <button
             className="rounded-full border border-[var(--ui-color-border)] bg-white px-3 py-1.5 font-semibold text-slate-700 transition hover:bg-slate-50 focus:outline-none focus:ring-4 focus:ring-[var(--ui-color-ring)]"
             type="button"
-            onClick={() => onOpenInventory(productionDetail.plannedInputs[0].inputProductId, branchId)}
+            onClick={() =>
+              onOpenInventory(productionDetail.plannedInputs[0].inputProductId, branchId)
+            }
           >
             Ver insumo
           </button>

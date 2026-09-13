@@ -1,3 +1,4 @@
+import { AdminActionButton } from "../../components/AdminActionButton";
 import { AdminEmptyState } from "../../components/AdminEmptyState";
 import type { AdminCleaningLogDetail, AdminCleaningLogListItem } from "../types";
 
@@ -269,14 +270,16 @@ export function AdminCleaningLogDetailPanel({
             >
               Copiar folio
             </button>
-            <button
+            <AdminActionButton
+              capability="quality_hygiene.manage"
+              branchIds={[detail.overview.branchId]}
               className="rounded-full border border-[var(--ui-color-border)] bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 disabled:cursor-not-allowed disabled:opacity-40"
               disabled={!detail.availableActions.canComplete}
               type="button"
               onClick={() => onRegisterCompletion(detail.overview)}
             >
               Registrar completion
-            </button>
+            </AdminActionButton>
             <button
               className="rounded-full border border-[var(--ui-color-border)] bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 disabled:cursor-not-allowed disabled:opacity-40"
               disabled={!detail.availableActions.canCreateIncident}

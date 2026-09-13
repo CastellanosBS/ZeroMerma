@@ -19,6 +19,9 @@ from zeromerma_api.modules.configuration.infrastructure import models as configu
 from zeromerma_api.modules.corrections.infrastructure import models as corrections_models
 from zeromerma_api.modules.discounts.infrastructure import models as discounts_models
 from zeromerma_api.modules.identity.infrastructure import models as identity_models
+from zeromerma_api.modules.identity.infrastructure import (
+    privileged_models as identity_privileged_models,
+)
 from zeromerma_api.modules.inventory.infrastructure import models as inventory_models
 from zeromerma_api.modules.operations.infrastructure import models as operations_models
 from zeromerma_api.modules.orders.infrastructure import models as orders_models
@@ -63,6 +66,7 @@ _ = (
     corrections_models,
     discounts_models,
     identity_models,
+    identity_privileged_models,
     inventory_models,
     operations_models,
     orders_models,

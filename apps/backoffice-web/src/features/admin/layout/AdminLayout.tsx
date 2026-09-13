@@ -1,14 +1,17 @@
-import { useQuery } from "@tanstack/react-query";
 import { Link, Outlet, useRouterState } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 
-import { getCurrentBackofficeUser } from "../../../lib/api";
 import { useBackofficeAuthStore } from "../../auth/backoffice-auth-store";
+import { useBackofficeAuthorization } from "../../auth/authorization-context";
+import { AdminAccessDenied } from "../../auth/AdminAccessDenied";
+import { canReadAdminModule, adminReadCapabilities } from "../navigation/adminCapabilities";
+import { adminModules } from "../adminModules";
+import { isAdminModuleVisibleInCurrentRelease } from "../releaseVisibility";
 import { AdminNavigationIcon } from "../navigation/AdminNavigationIcon";
 import {
   type AdminNavigationItem,
   type AdminNavigationSection,
-  adminNavigationSections,
+  getAuthorizedAdminNavigation,
   getAdminNavigationItem,
 } from "../navigation/adminNavigation";
 import {
@@ -100,23 +103,22 @@ function CollapsedSidebarSection({
 export function AdminLayout() {
   const pathname = useRouterState({ select: (state) => state.location.pathname });
   const activeItem = getAdminNavigationItem(pathname);
-  const accessToken = useBackofficeAuthStore((state) => state.accessToken);
+  const currentUser = useBackofficeAuthorization();
+  const navigationSections = getAuthorizedAdminNavigation(currentUser);
+  const activeCapability = adminReadCapabilities[activeItem.key];
+  const activeGrant = currentUser?.effective_grants?.find(
+    (grant) => grant.capability === activeCapability,
+  );
+  const routeModule = adminModules.find(
+    (module) => pathname === module.path || pathname.startsWith(`${module.path}/`),
+  );
+  const canOpenRoute =
+    !routeModule ||
+    !isAdminModuleVisibleInCurrentRelease(routeModule.key) ||
+    canReadAdminModule(currentUser, routeModule.key);
   const clearSession = useBackofficeAuthStore((state) => state.clearSession);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(getInitialAdminSidebarCollapsed);
   const [openSections, setOpenSections] = useState<Set<string>>(() => new Set());
-  const currentUserQuery = useQuery({
-    enabled: Boolean(accessToken),
-    queryFn: () => getCurrentBackofficeUser(accessToken ?? ""),
-    queryKey: ["backoffice-auth", "me", accessToken],
-    retry: false,
-  });
-
-  useEffect(() => {
-    if (currentUserQuery.isError) {
-      clearSession();
-    }
-  }, [clearSession, currentUserQuery.isError]);
-
   useEffect(() => {
     persistAdminSidebarCollapsed(isSidebarCollapsed);
   }, [isSidebarCollapsed]);
@@ -135,7 +137,6 @@ export function AdminLayout() {
     setOpenSections((current) => (current.has(sectionTitle) ? new Set() : new Set([sectionTitle])));
   }
 
-  // TODO: Enforce granular admin permissions once the backend exposes module/action/scope grants.
   return (
     <div className="min-h-screen min-w-0 bg-slate-50 text-slate-950">
       <header className="sticky top-0 z-30 border-b border-[var(--ui-color-border)] bg-white/95 shadow-[var(--ui-shadow-subtle)] backdrop-blur">
@@ -173,12 +174,14 @@ export function AdminLayout() {
           <div className="flex min-w-0 flex-wrap items-center justify-end gap-2 text-sm">
             <span
               className="max-w-[16rem] truncate rounded-full border border-[var(--ui-color-border)] bg-white px-3 py-2 font-medium text-slate-700"
-              title={currentUserQuery.data?.full_name ?? "Usuario administrativo"}
+              title={currentUser?.full_name ?? "Usuario administrativo"}
             >
-              {currentUserQuery.data?.full_name ?? "Usuario administrativo"}
+              {currentUser?.full_name ?? "Usuario administrativo"}
             </span>
             <span className="rounded-full border border-[var(--ui-color-financial-border)] bg-[var(--ui-color-financial-soft)] px-3 py-2 font-medium text-[var(--ui-color-warning)]">
-              Entorno local
+              {activeGrant?.scope_type === "GLOBAL"
+                ? "Todas las sucursales"
+                : `${activeGrant?.branch_ids.length ?? 0} sucursales autorizadas`}
             </span>
             <button
               className="rounded-full border border-[var(--ui-color-border)] bg-white px-3 py-2 font-semibold text-slate-700 transition hover:bg-slate-50 focus:outline-none focus:ring-4 focus:ring-[var(--ui-color-ring)]"
@@ -225,7 +228,7 @@ export function AdminLayout() {
             className="h-[calc(100%-4.55rem)] space-y-2 overflow-y-auto overflow-x-visible p-2"
           >
             {isSidebarCollapsed
-              ? adminNavigationSections.map((section) => (
+              ? navigationSections.map((section) => (
                   <CollapsedSidebarSection
                     key={section.title}
                     onOpenSection={openCollapsedSection}
@@ -233,7 +236,7 @@ export function AdminLayout() {
                     section={section}
                   />
                 ))
-              : adminNavigationSections.map((section) => {
+              : navigationSections.map((section) => {
                   const isOpen = openSections.has(section.title);
                   const isActive = isNavigationSectionActive(pathname, section);
 
@@ -290,7 +293,7 @@ export function AdminLayout() {
         </aside>
 
         <main className="min-h-0 min-w-0 lg:overflow-hidden">
-          <Outlet />
+          {canOpenRoute ? <Outlet /> : <AdminAccessDenied />}
         </main>
       </div>
     </div>

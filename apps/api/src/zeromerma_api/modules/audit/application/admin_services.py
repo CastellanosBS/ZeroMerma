@@ -10,6 +10,7 @@ from typing import Any
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from zeromerma_api.db.access_scope import authorization_scope
 from zeromerma_api.modules.audit.application.admin_schemas import (
     AdminAuditActorContextView,
     AdminAuditAvailableActionsView,
@@ -31,6 +32,8 @@ from zeromerma_api.modules.audit.application.admin_schemas import (
 from zeromerma_api.modules.audit.domain.exceptions import AuditEventNotFoundError
 from zeromerma_api.modules.audit.infrastructure.models import AuditLog
 from zeromerma_api.modules.branches.infrastructure.models import Branch
+from zeromerma_api.modules.identity.application.actions import restrict_actions
+from zeromerma_api.modules.identity.application.privileged_access import can_access_user
 from zeromerma_api.modules.identity.infrastructure.models import (
     Role,
     User,
@@ -220,21 +223,28 @@ class AdminAuditService:
         )
         request_context = self._build_request_context(record)
         related_documents = self._build_related_documents(context)
+        actor_context = self._build_actor_context(session, context)
 
         return AdminAuditEventDetailView(
             overview=overview,
-            actor_context=self._build_actor_context(session, context),
+            actor_context=actor_context,
             entity_context=self._build_entity_context(context),
             change_summary=self._build_change_summary(record.metadata_ or {}),
             request_context=request_context,
             related_documents=related_documents,
             timeline_related_events=self._build_timeline(session, context),
-            available_actions=AdminAuditAvailableActionsView(
-                can_copy_correlation_id=bool(
-                    request_context and request_context.correlation_id,
+            available_actions=restrict_actions(
+                session,
+                AdminAuditAvailableActionsView(
+                    can_copy_correlation_id=bool(
+                        request_context and request_context.correlation_id,
+                    ),
+                    can_open_related_document=bool(related_documents),
+                    can_open_user=actor_context.can_open_user,
                 ),
-                can_open_related_document=bool(related_documents),
-                can_open_user=context.actor is not None,
+                {"can_export_event": "audit.export", "can_open_user": "users.view"},
+                branch_ids=(record.branch_id,) if record.branch_id else (),
+                global_only=False,
             ),
         )
 
@@ -560,6 +570,15 @@ class AdminAuditService:
             return AdminAuditActorContextView(
                 full_name=self._actor_name(context),
                 can_open_user=False,
+            )
+
+        authorization = authorization_scope(session)
+        if authorization is None or not can_access_user(
+            session, authorization.user, "users.view", actor.id
+        ):
+            # Event attribution is visible; current identity administration is separately scoped.
+            return AdminAuditActorContextView(
+                user_id=actor.id, full_name=actor.full_name, email=actor.email, can_open_user=False
             )
 
         roles = (

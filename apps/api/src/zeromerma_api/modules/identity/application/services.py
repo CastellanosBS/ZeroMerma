@@ -5,6 +5,7 @@ from datetime import UTC, datetime
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from zeromerma_api.modules.identity.application.authorization import resolve_authorization
 from zeromerma_api.modules.identity.application.schemas import AuthenticatedUser
 from zeromerma_api.modules.identity.application.security import PasswordHasher, TokenService
 from zeromerma_api.modules.identity.domain.exceptions import (
@@ -47,9 +48,11 @@ class AuthService:
         user.last_login_at = datetime.now(tz=UTC)
         session.flush()
 
-        return self._token_service.issue_access_token(
-            user.id
-        ), AuthenticatedUser.model_validate(user)
+        return self._token_service.issue_access_token(user.id), resolve_authorization(
+            session,
+            user,
+            surface=AuthenticatedUser.model_validate(user).default_surface,
+        )
 
     def get_authenticated_user(self, session: Session, token: str) -> AuthenticatedUser:
         user_id = self._token_service.read_user_id(token)
@@ -57,4 +60,4 @@ class AuthService:
         if user is None or not user.is_active or user.is_locked:
             raise AuthenticationError("Authenticated user is no longer active.")
 
-        return AuthenticatedUser.model_validate(user)
+        return resolve_authorization(session, user)

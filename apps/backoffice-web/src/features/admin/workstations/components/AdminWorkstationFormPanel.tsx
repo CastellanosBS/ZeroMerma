@@ -1,3 +1,4 @@
+import { AdminActionButton } from "../../components/AdminActionButton";
 import { useMemo, useState } from "react";
 import type { FormEvent } from "react";
 
@@ -39,7 +40,8 @@ export function AdminWorkstationFormPanel({
 
   const title = isEdit ? "Editar estacion" : "Nueva estacion";
   const selectedBranchLabel = useMemo(
-    () => branchOptions.find((option) => option.id === branchId)?.label ?? "Sucursal no seleccionada",
+    () =>
+      branchOptions.find((option) => option.id === branchId)?.label ?? "Sucursal no seleccionada",
     [branchId, branchOptions],
   );
 
@@ -98,8 +100,14 @@ export function AdminWorkstationFormPanel({
       <div className="grid min-w-0 gap-2 lg:grid-cols-[minmax(12rem,1fr)_minmax(9rem,0.7fr)_minmax(14rem,1.1fr)_auto]">
         <label className="grid min-w-0 gap-1 text-xs font-semibold uppercase tracking-[0.1em] text-slate-500">
           Sucursal
-          <select className={inputClassName} value={branchId} onChange={(event) => setBranchId(event.target.value)}>
-            {branchOptions.length === 0 ? <option value="">Sucursales pendientes de API</option> : null}
+          <select
+            className={inputClassName}
+            value={branchId}
+            onChange={(event) => setBranchId(event.target.value)}
+          >
+            {branchOptions.length === 0 ? (
+              <option value="">Sucursales pendientes de API</option>
+            ) : null}
             {branchOptions.map((option) => (
               <option key={option.id} title={option.label} value={option.id}>
                 {option.label}
@@ -126,14 +134,18 @@ export function AdminWorkstationFormPanel({
           />
         </label>
         <label className="flex min-w-0 items-center gap-2 rounded-2xl border border-[var(--ui-color-border)] bg-slate-50 px-3 py-2 text-sm font-semibold text-slate-700">
-          <input checked={isActive} type="checkbox" onChange={(event) => setIsActive(event.target.checked)} />
+          <input
+            checked={isActive}
+            type="checkbox"
+            onChange={(event) => setIsActive(event.target.checked)}
+          />
           Activa
         </label>
       </div>
 
       <p className="rounded-[16px] border border-[var(--ui-color-border)] bg-slate-50 px-3 py-2 text-xs leading-5 text-slate-600">
-        El codigo se usa para que POS resuelva sucursal y estacion. Si cambias un codigo existente, verifica la
-        configuracion del dispositivo POS correspondiente.
+        El codigo se usa para que POS resuelva sucursal y estacion. Si cambias un codigo existente,
+        verifica la configuracion del dispositivo POS correspondiente.
       </p>
 
       <div className="flex min-w-0 flex-wrap justify-end gap-2 border-t border-[var(--ui-color-border)] pt-3">
@@ -144,13 +156,15 @@ export function AdminWorkstationFormPanel({
         >
           Cancelar
         </button>
-        <button
+        <AdminActionButton
+          capability="workstations.manage"
+          branchIds={[branchId]}
           className="rounded-2xl bg-[var(--ui-color-primary)] px-4 py-2 text-sm font-semibold text-white transition hover:bg-[var(--ui-color-primary-strong)] focus:outline-none focus:ring-4 focus:ring-[var(--ui-color-ring)] disabled:cursor-not-allowed disabled:bg-slate-300 disabled:text-slate-600"
           disabled={isSubmitting}
           type="submit"
         >
           {isSubmitting ? "Guardando" : "Guardar estacion"}
-        </button>
+        </AdminActionButton>
       </div>
     </form>
   );

@@ -7,8 +7,6 @@ from fastapi.testclient import TestClient
 from sqlalchemy import select
 
 from zeromerma_api.bootstrap.seed_local import (
-    SEED_ADMIN_EMAIL,
-    SEED_ADMIN_PASSWORD,
     SEED_PRODUCT_COCA_355_CODE,
     SEED_USER_EMAIL,
     SEED_USER_PASSWORD,
@@ -22,6 +20,7 @@ from zeromerma_api.modules.cash_close.infrastructure.models import (
 )
 from zeromerma_api.modules.catalog.infrastructure.models import Product
 from zeromerma_api.modules.outbox.infrastructure.models import OutboxEvent
+from zeromerma_api.testing.authorization import owner_headers
 
 
 def _login(client: TestClient, *, email: str, password: str) -> str:
@@ -31,8 +30,7 @@ def _login(client: TestClient, *, email: str, password: str) -> str:
 
 
 def _admin_headers(client: TestClient) -> dict[str, str]:
-    token = _login(client, email=SEED_ADMIN_EMAIL, password=SEED_ADMIN_PASSWORD)
-    return {"Authorization": f"Bearer {token}"}
+    return owner_headers()
 
 
 def _cashier_headers(client: TestClient) -> dict[str, str]:
@@ -303,7 +301,7 @@ def test_admin_reconciliation_requires_reason_notes_and_backoffice_surface(
         headers=_cashier_headers(client),
     )
     assert cashier_response.status_code == 403
-    assert cashier_response.json()["message"] == "Backoffice access is required."
+    assert cashier_response.json()["message"] == "This application surface is not authorized."
 
     other_without_note_response = client.post(
         "/v1/admin/reconciliation",

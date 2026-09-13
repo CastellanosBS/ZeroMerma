@@ -12,6 +12,7 @@ from sqlalchemy.orm import Session
 
 from zeromerma_api.modules.audit.application.service import AuditRecorder
 from zeromerma_api.modules.branches.infrastructure.models import Branch
+from zeromerma_api.modules.identity.application.actions import restrict_actions
 from zeromerma_api.modules.identity.application.schemas import AuthenticatedUser
 from zeromerma_api.modules.identity.infrastructure.models import User
 from zeromerma_api.modules.outbox.application.service import OutboxWriter
@@ -603,7 +604,7 @@ class AdminIncidentService:
         list_item = self._to_list_item(session, row)
         incident = row.incident
         return AdminIncidentDetailView(
-            available_actions=self._available_actions(incident),
+            available_actions=self._available_actions(session, incident),
             corrective_action=AdminIncidentCorrectiveActionView(
                 corrective_action=incident.corrective_action,
                 current_progress=incident.status,
@@ -931,28 +932,48 @@ class AdminIncidentService:
             )
         return sorted(items, key=lambda item: item.occurred_at)
 
-    def _available_actions(self, incident: QualityIncident) -> AdminIncidentAvailableActionsView:
+    def _available_actions(
+        self, session: Session, incident: QualityIncident
+    ) -> AdminIncidentAvailableActionsView:
         is_final = incident.status in FINAL_STATUSES
         is_resolved_or_closed = incident.status in {
             INCIDENT_STATUS_RESOLVED,
             INCIDENT_STATUS_CLOSED,
         }
-        return AdminIncidentAvailableActionsView(
-            can_add_evidence=not is_final,
-            can_add_follow_up=not is_final,
-            can_assign=not is_final,
-            can_cancel=incident.status not in FINAL_STATUSES,
-            can_create_corrective_action=not is_final,
-            can_create_maintenance=incident.incident_type == "EQUIPMENT_FAILURE" and not is_final,
-            can_export=False,
-            can_mark_in_progress=not is_final,
-            can_print=False,
-            can_reopen=is_resolved_or_closed,
-            can_resolve=incident.status not in FINAL_STATUSES,
-            note=(
-                "Adjuntos de archivo, exportacion y creacion directa de mantenimiento requieren "
-                "contratos backend dedicados; los documentos origen permanecen inmutables."
+        return restrict_actions(
+            session,
+            AdminIncidentAvailableActionsView(
+                can_add_evidence=not is_final,
+                can_add_follow_up=not is_final,
+                can_assign=not is_final,
+                can_cancel=incident.status not in FINAL_STATUSES,
+                can_create_corrective_action=not is_final,
+                can_create_maintenance=incident.incident_type == "EQUIPMENT_FAILURE"
+                and not is_final,
+                can_export=False,
+                can_mark_in_progress=not is_final,
+                can_print=False,
+                can_reopen=is_resolved_or_closed,
+                can_resolve=incident.status not in FINAL_STATUSES,
+                note=(
+                    "Adjuntos de archivo, exportacion y creacion directa de mantenimiento "
+                    "requieren "
+                    "contratos backend dedicados; los documentos origen permanecen inmutables."
+                ),
             ),
+            {
+                "can_add_evidence": "quality_hygiene.manage",
+                "can_add_follow_up": "quality_hygiene.manage",
+                "can_assign": "quality_hygiene.manage",
+                "can_cancel": "quality_hygiene.manage",
+                "can_create_corrective_action": "quality_hygiene.manage",
+                "can_create_maintenance": "quality_hygiene.manage",
+                "can_mark_in_progress": "quality_hygiene.manage",
+                "can_reopen": "quality_hygiene.manage",
+                "can_resolve": "quality_hygiene.manage",
+            },
+            branch_ids=(incident.branch_id,),
+            global_only=False,
         )
 
     def _follow_up_view(

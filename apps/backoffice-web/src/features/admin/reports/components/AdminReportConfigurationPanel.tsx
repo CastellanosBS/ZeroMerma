@@ -1,5 +1,8 @@
+import { hasEffectiveCapability } from "../../../auth/authorization";
+import { useBackofficeAuthorization } from "../../../auth/authorization-context";
 import { AdminEmptyState } from "../../components/AdminEmptyState";
 import type { AdminReportDefinition } from "../types";
+import { AdminActionButton } from "../../components/AdminActionButton";
 
 interface AdminReportConfigurationPanelProps {
   exportPending?: boolean;
@@ -22,11 +25,13 @@ function badgeClass(value: string): string {
 }
 
 function formatStatus(value: string): string {
-  return {
-    available: "Disponible",
-    coming_soon: "Proximamente",
-    requires_backend: "Requiere backend",
-  }[value] ?? value;
+  return (
+    {
+      available: "Disponible",
+      coming_soon: "Proximamente",
+      requires_backend: "Requiere backend",
+    }[value] ?? value
+  );
 }
 
 export function AdminReportConfigurationPanel({
@@ -38,6 +43,7 @@ export function AdminReportConfigurationPanel({
   onGenerate,
   report,
 }: AdminReportConfigurationPanelProps) {
+  const actor = useBackofficeAuthorization();
   if (!report) {
     return (
       <section className="flex min-h-0 min-w-0 flex-col overflow-hidden rounded-[20px] border border-[var(--ui-color-border)] bg-white p-3">
@@ -49,7 +55,12 @@ export function AdminReportConfigurationPanel({
     );
   }
 
-  const canGenerate = report.status === "available";
+  const branchIds = filters.branch_id && filters.branch_id !== "all" ? [filters.branch_id] : [];
+  const hasSourceCapabilities = report.requiredPermissions.every((code) => {
+    const grant = actor?.effective_grants?.find((item) => item.capability === code);
+    return Boolean(grant && hasEffectiveCapability(actor, grant.capability, branchIds));
+  });
+  const canGenerate = report.status === "available" && hasSourceCapabilities;
   const canExport = canGenerate && report.supportedExports.includes("json");
 
   return (
@@ -60,11 +71,15 @@ export function AdminReportConfigurationPanel({
           <p className="text-xs text-slate-500">{report.description}</p>
         </div>
         <div className="flex shrink-0 flex-wrap gap-1.5">
-          <span className={`rounded-full border px-2 py-1 text-xs font-semibold ${badgeClass(report.status)}`}>
+          <span
+            className={`rounded-full border px-2 py-1 text-xs font-semibold ${badgeClass(report.status)}`}
+          >
             {formatStatus(report.status)}
           </span>
           {report.isSensitive ? (
-            <span className={`rounded-full border px-2 py-1 text-xs font-semibold ${badgeClass("sensitive")}`}>
+            <span
+              className={`rounded-full border px-2 py-1 text-xs font-semibold ${badgeClass("sensitive")}`}
+            >
               Sensible
             </span>
           ) : null}
@@ -73,8 +88,7 @@ export function AdminReportConfigurationPanel({
 
       <div className="grid gap-2 rounded-[18px] border border-[var(--ui-color-border)] bg-slate-50/80 p-3 text-xs text-slate-600">
         <p>
-          <span className="font-semibold text-slate-700">Categoria:</span>{" "}
-          {report.categoryLabel}
+          <span className="font-semibold text-slate-700">Categoria:</span> {report.categoryLabel}
         </p>
         <p>
           <span className="font-semibold text-slate-700">Modulos fuente:</span>{" "}
@@ -87,8 +101,8 @@ export function AdminReportConfigurationPanel({
             : "Sin permiso especifico"}
         </p>
         <p>
-          <span className="font-semibold text-slate-700">Historial:</span>{" "}
-          No hay ejecuciones recientes para este reporte.
+          <span className="font-semibold text-slate-700">Historial:</span> No hay ejecuciones
+          recientes para este reporte.
         </p>
       </div>
 
@@ -143,15 +157,19 @@ export function AdminReportConfigurationPanel({
       ) : null}
 
       <div className="flex min-w-0 flex-wrap justify-end gap-2">
-        <button
+        <AdminActionButton
+          capability="reports.view"
+          branchIds={branchIds}
           className="rounded-2xl border border-[var(--ui-color-border)] bg-white px-3 py-2 text-sm font-semibold text-slate-700 transition hover:border-[var(--ui-color-info)] disabled:cursor-not-allowed disabled:opacity-40"
           disabled={!canGenerate || generationPending}
           type="button"
           onClick={onGenerate}
         >
           Generar vista previa
-        </button>
-        <button
+        </AdminActionButton>
+        <AdminActionButton
+          capability="reports.export"
+          branchIds={branchIds}
           className="rounded-2xl border border-[var(--ui-color-border)] bg-white px-3 py-2 text-sm font-semibold text-slate-700 transition hover:border-[var(--ui-color-info)] disabled:cursor-not-allowed disabled:opacity-40"
           disabled={!canExport || exportPending}
           type="button"
@@ -159,7 +177,7 @@ export function AdminReportConfigurationPanel({
           title={!canExport ? "La exportacion no esta disponible para este reporte." : undefined}
         >
           Exportar JSON
-        </button>
+        </AdminActionButton>
       </div>
     </section>
   );

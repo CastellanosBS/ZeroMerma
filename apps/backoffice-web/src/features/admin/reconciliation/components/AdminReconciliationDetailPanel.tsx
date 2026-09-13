@@ -1,3 +1,4 @@
+import { AdminActionButton } from "../../components/AdminActionButton";
 import { AdminEmptyState } from "../../components/AdminEmptyState";
 import type {
   AdminReconciliationDetail,
@@ -378,14 +379,16 @@ export function AdminReconciliationDetailPanel({
         >
           Copiar folio
         </button>
-        <button
+        <AdminActionButton
+          capability="cash_finance.manage"
+          branchIds={[detail.overview.branchId]}
           className="h-10 rounded-2xl border border-[var(--ui-color-border)] bg-white px-3 text-sm font-semibold text-slate-700 transition hover:border-[var(--ui-color-info)] hover:text-[var(--ui-color-info)] focus:outline-none focus:ring-4 focus:ring-[var(--ui-color-ring)] disabled:cursor-not-allowed disabled:opacity-40"
           disabled={!detail.availableActions.canResolve}
           type="button"
           onClick={() => onResolve(detail.overview)}
         >
           Resolver
-        </button>
+        </AdminActionButton>
         <button
           className="h-10 rounded-2xl border border-[var(--ui-color-border)] bg-white px-3 text-sm font-semibold text-slate-500 disabled:cursor-not-allowed disabled:opacity-50"
           disabled

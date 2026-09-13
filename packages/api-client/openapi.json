@@ -24164,6 +24164,15 @@
             "type": "string",
             "x-zeromerma-instant-format": "ISO8601_DATETIME"
           },
+          "branch_ids": {
+            "items": {
+              "format": "uuid",
+              "type": "string",
+              "x-zeromerma-id-representation": "JSON_STRING"
+            },
+            "title": "Branch Ids",
+            "type": "array"
+          },
           "branch_summary": {
             "title": "Branch Summary",
             "type": "string"
@@ -24174,6 +24183,14 @@
           },
           "full_name": {
             "title": "Full Name",
+            "type": "string"
+          },
+          "scope_type": {
+            "enum": [
+              "GLOBAL",
+              "BRANCH_SET"
+            ],
+            "title": "Scope Type",
             "type": "string"
           },
           "status": {
@@ -24205,7 +24222,9 @@
           "status",
           "branch_summary",
           "surfaces",
-          "assigned_at"
+          "assigned_at",
+          "scope_type",
+          "branch_ids"
         ],
         "title": "AdminRoleAssignedUserView",
         "type": "object"
@@ -24347,7 +24366,7 @@
             "type": "string"
           },
           "scoped_roles_supported": {
-            "default": false,
+            "default": true,
             "title": "Scoped Roles Supported",
             "type": "boolean"
           },
@@ -24830,17 +24849,17 @@
       "AdminRoleScopeView": {
         "properties": {
           "is_supported": {
-            "default": false,
+            "default": true,
             "title": "Is Supported",
             "type": "boolean"
           },
           "missing_contract_note": {
-            "default": "Branch-scoped roles are not available yet.",
+            "default": "",
             "title": "Missing Contract Note",
             "type": "string"
           },
           "scope_summary": {
-            "default": "Sin restricciones de alcance configuradas.",
+            "default": "Explicit scope is configured per user role assignment.",
             "title": "Scope Summary",
             "type": "string"
           }
@@ -24942,6 +24961,34 @@
           }
         },
         "title": "AdminRoleUpdateRequest",
+        "type": "object"
+      },
+      "AdminRoleUserAssignmentRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "branch_ids": {
+            "items": {
+              "format": "uuid",
+              "type": "string",
+              "x-zeromerma-id-representation": "JSON_STRING"
+            },
+            "title": "Branch Ids",
+            "type": "array"
+          },
+          "scope_type": {
+            "enum": [
+              "GLOBAL",
+              "BRANCH_SET"
+            ],
+            "title": "Scope Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "scope_type",
+          "branch_ids"
+        ],
+        "title": "AdminRoleUserAssignmentRequest",
         "type": "object"
       },
       "AdminRoleWarningView": {
@@ -31591,6 +31638,7 @@
         "type": "object"
       },
       "AdminUserCreateRequest": {
+        "additionalProperties": false,
         "properties": {
           "allowed_surfaces": {
             "items": {
@@ -31660,13 +31708,6 @@
               }
             ],
             "title": "Phone"
-          },
-          "role_ids": {
-            "items": {
-              "type": "string"
-            },
-            "title": "Role Ids",
-            "type": "array"
           },
           "send_invitation": {
             "default": false,
@@ -32227,15 +32268,35 @@
         "type": "object"
       },
       "AdminUserRoleAssignmentRequest": {
+        "additionalProperties": false,
         "properties": {
+          "branch_ids": {
+            "items": {
+              "format": "uuid",
+              "type": "string",
+              "x-zeromerma-id-representation": "JSON_STRING"
+            },
+            "title": "Branch Ids",
+            "type": "array"
+          },
           "role_id": {
-            "maxLength": 120,
-            "minLength": 1,
+            "format": "uuid",
             "title": "Role Id",
+            "type": "string",
+            "x-zeromerma-id-representation": "JSON_STRING"
+          },
+          "scope_type": {
+            "enum": [
+              "GLOBAL",
+              "BRANCH_SET"
+            ],
+            "title": "Scope Type",
             "type": "string"
           }
         },
         "required": [
+          "scope_type",
+          "branch_ids",
           "role_id"
         ],
         "title": "AdminUserRoleAssignmentRequest",
@@ -32256,6 +32317,15 @@
             ],
             "title": "Assigned At"
           },
+          "branch_ids": {
+            "items": {
+              "format": "uuid",
+              "type": "string",
+              "x-zeromerma-id-representation": "JSON_STRING"
+            },
+            "title": "Branch Ids",
+            "type": "array"
+          },
           "role_description": {
             "anyOf": [
               {
@@ -32275,21 +32345,20 @@
             "title": "Role Name",
             "type": "string"
           },
-          "scope": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
+          "scope_type": {
+            "enum": [
+              "GLOBAL",
+              "BRANCH_SET"
             ],
-            "title": "Scope"
+            "title": "Scope Type",
+            "type": "string"
           }
         },
         "required": [
           "role_id",
-          "role_name"
+          "role_name",
+          "scope_type",
+          "branch_ids"
         ],
         "title": "AdminUserRoleAssignmentView",
         "type": "object"
@@ -34877,6 +34946,26 @@
             "title": "Allowed Surfaces",
             "type": "array"
           },
+          "authorization_surface": {
+            "anyOf": [
+              {
+                "enum": [
+                  "POS",
+                  "BACKOFFICE"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Authorization Surface"
+          },
+          "authorization_version": {
+            "default": "",
+            "title": "Authorization Version",
+            "type": "string"
+          },
           "default_surface": {
             "default": "POS",
             "enum": [
@@ -34885,6 +34974,13 @@
             ],
             "title": "Default Surface",
             "type": "string"
+          },
+          "effective_grants": {
+            "items": {
+              "$ref": "#/components/schemas/EffectiveGrant"
+            },
+            "title": "Effective Grants",
+            "type": "array"
           },
           "email": {
             "maxLength": 320,
@@ -34904,6 +35000,11 @@
           },
           "is_active": {
             "title": "Is Active",
+            "type": "boolean"
+          },
+          "is_superadministrator": {
+            "default": false,
+            "title": "Is Superadministrator",
             "type": "boolean"
           }
         },
@@ -38951,6 +39052,95 @@
         "title": "DiscountsListResponse",
         "type": "object"
       },
+      "EffectiveGrant": {
+        "properties": {
+          "branch_ids": {
+            "items": {
+              "format": "uuid",
+              "type": "string",
+              "x-zeromerma-id-representation": "JSON_STRING"
+            },
+            "title": "Branch Ids",
+            "type": "array"
+          },
+          "capability": {
+            "enum": [
+              "pos.operate",
+              "sales_tickets.view",
+              "sales_tickets.reprint",
+              "orders.view",
+              "orders.manage",
+              "orders.cancel",
+              "returns_corrections.view",
+              "returns_corrections.manage",
+              "catalog.view",
+              "catalog.manage",
+              "catalog.availability.manage",
+              "pricing.view",
+              "pricing.manage",
+              "recipes.view",
+              "recipes.manage",
+              "discounts.view",
+              "discounts.manage",
+              "inventory.view",
+              "inventory.adjust",
+              "branches.view",
+              "branches.manage",
+              "workstations.view",
+              "workstations.manage",
+              "transfers.view",
+              "transfers.manage",
+              "transfers.execute",
+              "transfers.cancel",
+              "production.view",
+              "production.manage",
+              "production.execute",
+              "production.cancel",
+              "waste.view",
+              "waste.manage",
+              "suppliers.view",
+              "suppliers.manage",
+              "purchases.view",
+              "purchases.manage",
+              "purchases.confirm",
+              "purchases.receive",
+              "purchases.cancel",
+              "cash_finance.view",
+              "cash_finance.manage",
+              "quality_hygiene.view",
+              "quality_hygiene.manage",
+              "users.view",
+              "users.manage",
+              "roles.view",
+              "roles.manage",
+              "role_assignments.manage",
+              "audit.view",
+              "audit.export",
+              "reports.view",
+              "reports.export",
+              "config.view",
+              "config.manage"
+            ],
+            "title": "Capability",
+            "type": "string"
+          },
+          "scope_type": {
+            "enum": [
+              "GLOBAL",
+              "BRANCH_SET"
+            ],
+            "title": "Scope Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "capability",
+          "scope_type",
+          "branch_ids"
+        ],
+        "title": "EffectiveGrant",
+        "type": "object"
+      },
       "HealthResponse": {
         "properties": {
           "environment": {
@@ -41685,6 +41875,234 @@
           "products"
         ],
         "title": "PosClassProductsResponse",
+        "type": "object"
+      },
+      "PrivilegedChangeConfirmationRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "payload_sha256": {
+            "pattern": "^[a-f0-9]{64}$",
+            "title": "Payload Sha256",
+            "type": "string"
+          }
+        },
+        "required": [
+          "payload_sha256"
+        ],
+        "title": "PrivilegedChangeConfirmationRequest",
+        "type": "object"
+      },
+      "PrivilegedChangeCreateRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "expires_in_minutes": {
+            "default": 15,
+            "maximum": 60.0,
+            "minimum": 1.0,
+            "title": "Expires In Minutes",
+            "type": "integer"
+          },
+          "operation": {
+            "enum": [
+              "USER_UPDATE",
+              "USER_STATUS",
+              "USER_LOCK",
+              "USER_UNLOCK",
+              "USER_BRANCH_ASSIGNMENT",
+              "USER_BRANCH_REMOVAL",
+              "USER_BRANCH_DEFAULT",
+              "ROLE_ASSIGNMENT",
+              "ROLE_REMOVAL",
+              "ROLE_UPDATE",
+              "ROLE_STATUS"
+            ],
+            "title": "Operation",
+            "type": "string"
+          },
+          "payload": {
+            "additionalProperties": true,
+            "title": "Payload",
+            "type": "object"
+          },
+          "reason": {
+            "maxLength": 1000,
+            "minLength": 8,
+            "title": "Reason",
+            "type": "string"
+          },
+          "target_role_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string",
+                "x-zeromerma-id-representation": "JSON_STRING"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Target Role Id"
+          },
+          "target_user_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string",
+                "x-zeromerma-id-representation": "JSON_STRING"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Target User Id"
+          }
+        },
+        "required": [
+          "operation",
+          "payload",
+          "reason"
+        ],
+        "title": "PrivilegedChangeCreateRequest",
+        "type": "object"
+      },
+      "PrivilegedChangeView": {
+        "properties": {
+          "approved_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string",
+                "x-zeromerma-instant-format": "ISO8601_DATETIME"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Approved At"
+          },
+          "approver_user_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string",
+                "x-zeromerma-id-representation": "JSON_STRING"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Approver User Id"
+          },
+          "consumed_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string",
+                "x-zeromerma-instant-format": "ISO8601_DATETIME"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Consumed At"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string",
+            "x-zeromerma-instant-format": "ISO8601_DATETIME"
+          },
+          "expires_at": {
+            "format": "date-time",
+            "title": "Expires At",
+            "type": "string",
+            "x-zeromerma-instant-format": "ISO8601_DATETIME"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string",
+            "x-zeromerma-id-representation": "JSON_STRING"
+          },
+          "initiator_user_id": {
+            "format": "uuid",
+            "title": "Initiator User Id",
+            "type": "string",
+            "x-zeromerma-id-representation": "JSON_STRING"
+          },
+          "operation": {
+            "enum": [
+              "USER_UPDATE",
+              "USER_STATUS",
+              "USER_LOCK",
+              "USER_UNLOCK",
+              "USER_BRANCH_ASSIGNMENT",
+              "USER_BRANCH_REMOVAL",
+              "USER_BRANCH_DEFAULT",
+              "ROLE_ASSIGNMENT",
+              "ROLE_REMOVAL",
+              "ROLE_UPDATE",
+              "ROLE_STATUS"
+            ],
+            "title": "Operation",
+            "type": "string"
+          },
+          "payload": {
+            "additionalProperties": true,
+            "title": "Payload",
+            "type": "object"
+          },
+          "payload_sha256": {
+            "title": "Payload Sha256",
+            "type": "string"
+          },
+          "reason": {
+            "title": "Reason",
+            "type": "string"
+          },
+          "target_role_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string",
+                "x-zeromerma-id-representation": "JSON_STRING"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Target Role Id"
+          },
+          "target_user_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string",
+                "x-zeromerma-id-representation": "JSON_STRING"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Target User Id"
+          }
+        },
+        "required": [
+          "id",
+          "operation",
+          "target_user_id",
+          "target_role_id",
+          "payload",
+          "payload_sha256",
+          "reason",
+          "initiator_user_id",
+          "approver_user_id",
+          "created_at",
+          "expires_at",
+          "approved_at",
+          "consumed_at"
+        ],
+        "title": "PrivilegedChangeView",
         "type": "object"
       },
       "ReturnCommitLineRequest": {
@@ -44982,6 +45400,10 @@
         "tags": [
           "admin-audit"
         ],
+        "x-authorization-policy": "explicit-deny-by-default",
+        "x-required-capabilities": [
+          "audit.view"
+        ],
         "x-zeromerma-operation-id-policy": "FASTAPI_STABLE_GENERATED"
       }
     },
@@ -45374,6 +45796,10 @@
         "tags": [
           "admin-audit"
         ],
+        "x-authorization-policy": "explicit-deny-by-default",
+        "x-required-capabilities": [
+          "audit.export"
+        ],
         "x-zeromerma-operation-id-policy": "FASTAPI_STABLE_GENERATED"
       }
     },
@@ -45483,6 +45909,10 @@
         "summary": "Get Admin Audit Event Detail",
         "tags": [
           "admin-audit"
+        ],
+        "x-authorization-policy": "explicit-deny-by-default",
+        "x-required-capabilities": [
+          "audit.view"
         ],
         "x-zeromerma-operation-id-policy": "FASTAPI_STABLE_GENERATED"
       }
@@ -45692,6 +46122,10 @@
         "tags": [
           "admin-branches"
         ],
+        "x-authorization-policy": "explicit-deny-by-default",
+        "x-required-capabilities": [
+          "branches.view"
+        ],
         "x-zeromerma-operation-id-policy": "FASTAPI_STABLE_GENERATED"
       },
       "post": {
@@ -45796,6 +46230,10 @@
         "summary": "Create Admin Branch",
         "tags": [
           "admin-branches"
+        ],
+        "x-authorization-policy": "explicit-deny-by-default",
+        "x-required-capabilities": [
+          "branches.manage"
         ],
         "x-zeromerma-operation-id-policy": "FASTAPI_STABLE_GENERATED"
       }
@@ -45906,6 +46344,10 @@
         "summary": "Get Admin Branch Detail",
         "tags": [
           "admin-branches"
+        ],
+        "x-authorization-policy": "explicit-deny-by-default",
+        "x-required-capabilities": [
+          "branches.view"
         ],
         "x-zeromerma-operation-id-policy": "FASTAPI_STABLE_GENERATED"
       },
@@ -46024,6 +46466,10 @@
         "summary": "Update Admin Branch",
         "tags": [
           "admin-branches"
+        ],
+        "x-authorization-policy": "explicit-deny-by-default",
+        "x-required-capabilities": [
+          "branches.manage"
         ],
         "x-zeromerma-operation-id-policy": "FASTAPI_STABLE_GENERATED"
       }
@@ -46337,6 +46783,10 @@
         "tags": [
           "admin-cash-cuts"
         ],
+        "x-authorization-policy": "explicit-deny-by-default",
+        "x-required-capabilities": [
+          "cash_finance.view"
+        ],
         "x-zeromerma-operation-id-policy": "FASTAPI_STABLE_GENERATED"
       }
     },
@@ -46446,6 +46896,10 @@
         "summary": "Get Admin Cash Cut Detail",
         "tags": [
           "admin-cash-cuts"
+        ],
+        "x-authorization-policy": "explicit-deny-by-default",
+        "x-required-capabilities": [
+          "cash_finance.view"
         ],
         "x-zeromerma-operation-id-policy": "FASTAPI_STABLE_GENERATED"
       }
@@ -46805,6 +47259,10 @@
         "tags": [
           "admin-cash-flow"
         ],
+        "x-authorization-policy": "explicit-deny-by-default",
+        "x-required-capabilities": [
+          "cash_finance.view"
+        ],
         "x-zeromerma-operation-id-policy": "FASTAPI_STABLE_GENERATED"
       }
     },
@@ -46912,6 +47370,10 @@
         "summary": "Get Admin Cash Flow Movement Detail",
         "tags": [
           "admin-cash-flow"
+        ],
+        "x-authorization-policy": "explicit-deny-by-default",
+        "x-required-capabilities": [
+          "cash_finance.view"
         ],
         "x-zeromerma-operation-id-policy": "FASTAPI_STABLE_GENERATED"
       }
@@ -47290,6 +47752,10 @@
         "tags": [
           "admin-cleaning-logs"
         ],
+        "x-authorization-policy": "explicit-deny-by-default",
+        "x-required-capabilities": [
+          "quality_hygiene.view"
+        ],
         "x-zeromerma-operation-id-policy": "FASTAPI_STABLE_GENERATED"
       },
       "post": {
@@ -47413,6 +47879,10 @@
         "tags": [
           "admin-cleaning-logs"
         ],
+        "x-authorization-policy": "explicit-deny-by-default",
+        "x-required-capabilities": [
+          "quality_hygiene.manage"
+        ],
         "x-zeromerma-operation-id-policy": "FASTAPI_STABLE_GENERATED"
       }
     },
@@ -47513,6 +47983,10 @@
         "summary": "List Admin Cleaning Templates",
         "tags": [
           "admin-cleaning-logs"
+        ],
+        "x-authorization-policy": "explicit-deny-by-default",
+        "x-required-capabilities": [
+          "quality_hygiene.view"
         ],
         "x-zeromerma-operation-id-policy": "FASTAPI_STABLE_GENERATED"
       }
@@ -47623,6 +48097,10 @@
         "summary": "Get Admin Cleaning Log Detail",
         "tags": [
           "admin-cleaning-logs"
+        ],
+        "x-authorization-policy": "explicit-deny-by-default",
+        "x-required-capabilities": [
+          "quality_hygiene.view"
         ],
         "x-zeromerma-operation-id-policy": "FASTAPI_STABLE_GENERATED"
       }
@@ -47760,6 +48238,10 @@
         "tags": [
           "admin-cleaning-logs"
         ],
+        "x-authorization-policy": "explicit-deny-by-default",
+        "x-required-capabilities": [
+          "quality_hygiene.manage"
+        ],
         "x-zeromerma-operation-id-policy": "FASTAPI_STABLE_GENERATED"
       }
     },
@@ -47895,6 +48377,10 @@
         "summary": "Complete Admin Cleaning Log",
         "tags": [
           "admin-cleaning-logs"
+        ],
+        "x-authorization-policy": "explicit-deny-by-default",
+        "x-required-capabilities": [
+          "quality_hygiene.manage"
         ],
         "x-zeromerma-operation-id-policy": "FASTAPI_STABLE_GENERATED"
       }
@@ -48156,6 +48642,10 @@
         "tags": [
           "admin-discounts"
         ],
+        "x-authorization-policy": "explicit-deny-by-default",
+        "x-required-capabilities": [
+          "discounts.view"
+        ],
         "x-zeromerma-operation-id-policy": "FASTAPI_STABLE_GENERATED"
       },
       "post": {
@@ -48260,6 +48750,10 @@
         "summary": "Create Admin Discount",
         "tags": [
           "admin-discounts"
+        ],
+        "x-authorization-policy": "explicit-deny-by-default",
+        "x-required-capabilities": [
+          "discounts.manage"
         ],
         "x-zeromerma-operation-id-policy": "FASTAPI_STABLE_GENERATED"
       }
@@ -48370,6 +48864,10 @@
         "summary": "Get Admin Discount Detail",
         "tags": [
           "admin-discounts"
+        ],
+        "x-authorization-policy": "explicit-deny-by-default",
+        "x-required-capabilities": [
+          "discounts.view"
         ],
         "x-zeromerma-operation-id-policy": "FASTAPI_STABLE_GENERATED"
       },
@@ -48488,6 +48986,10 @@
         "summary": "Update Admin Discount",
         "tags": [
           "admin-discounts"
+        ],
+        "x-authorization-policy": "explicit-deny-by-default",
+        "x-required-capabilities": [
+          "discounts.manage"
         ],
         "x-zeromerma-operation-id-policy": "FASTAPI_STABLE_GENERATED"
       }
@@ -48608,6 +49110,10 @@
         "summary": "Duplicate Admin Discount",
         "tags": [
           "admin-discounts"
+        ],
+        "x-authorization-policy": "explicit-deny-by-default",
+        "x-required-capabilities": [
+          "discounts.manage"
         ],
         "x-zeromerma-operation-id-policy": "FASTAPI_STABLE_GENERATED"
       }
@@ -48985,6 +49491,10 @@
         "tags": [
           "admin-equipment-maintenance"
         ],
+        "x-authorization-policy": "explicit-deny-by-default",
+        "x-required-capabilities": [
+          "quality_hygiene.view"
+        ],
         "x-zeromerma-operation-id-policy": "FASTAPI_STABLE_GENERATED"
       },
       "post": {
@@ -49108,6 +49618,10 @@
         "tags": [
           "admin-equipment-maintenance"
         ],
+        "x-authorization-policy": "explicit-deny-by-default",
+        "x-required-capabilities": [
+          "quality_hygiene.manage"
+        ],
         "x-zeromerma-operation-id-policy": "FASTAPI_STABLE_GENERATED"
       }
     },
@@ -49217,6 +49731,10 @@
         "summary": "Get Admin Equipment Detail",
         "tags": [
           "admin-equipment-maintenance"
+        ],
+        "x-authorization-policy": "explicit-deny-by-default",
+        "x-required-capabilities": [
+          "quality_hygiene.view"
         ],
         "x-zeromerma-operation-id-policy": "FASTAPI_STABLE_GENERATED"
       },
@@ -49351,6 +49869,10 @@
         "summary": "Update Admin Equipment",
         "tags": [
           "admin-equipment-maintenance"
+        ],
+        "x-authorization-policy": "explicit-deny-by-default",
+        "x-required-capabilities": [
+          "quality_hygiene.manage"
         ],
         "x-zeromerma-operation-id-policy": "FASTAPI_STABLE_GENERATED"
       }
@@ -49488,6 +50010,10 @@
         "tags": [
           "admin-equipment-maintenance"
         ],
+        "x-authorization-policy": "explicit-deny-by-default",
+        "x-required-capabilities": [
+          "quality_hygiene.manage"
+        ],
         "x-zeromerma-operation-id-policy": "FASTAPI_STABLE_GENERATED"
       }
     },
@@ -49612,6 +50138,10 @@
         "summary": "Create Admin Equipment Maintenance",
         "tags": [
           "admin-equipment-maintenance"
+        ],
+        "x-authorization-policy": "explicit-deny-by-default",
+        "x-required-capabilities": [
+          "quality_hygiene.manage"
         ],
         "x-zeromerma-operation-id-policy": "FASTAPI_STABLE_GENERATED"
       }
@@ -49749,6 +50279,10 @@
         "tags": [
           "admin-equipment-maintenance"
         ],
+        "x-authorization-policy": "explicit-deny-by-default",
+        "x-required-capabilities": [
+          "quality_hygiene.manage"
+        ],
         "x-zeromerma-operation-id-policy": "FASTAPI_STABLE_GENERATED"
       }
     },
@@ -49885,6 +50419,10 @@
         "tags": [
           "admin-equipment-maintenance"
         ],
+        "x-authorization-policy": "explicit-deny-by-default",
+        "x-required-capabilities": [
+          "quality_hygiene.manage"
+        ],
         "x-zeromerma-operation-id-policy": "FASTAPI_STABLE_GENERATED"
       }
     },
@@ -50010,6 +50548,10 @@
         "summary": "Start Admin Equipment Maintenance",
         "tags": [
           "admin-equipment-maintenance"
+        ],
+        "x-authorization-policy": "explicit-deny-by-default",
+        "x-required-capabilities": [
+          "quality_hygiene.manage"
         ],
         "x-zeromerma-operation-id-policy": "FASTAPI_STABLE_GENERATED"
       }
@@ -50388,6 +50930,10 @@
         "tags": [
           "admin-incidents"
         ],
+        "x-authorization-policy": "explicit-deny-by-default",
+        "x-required-capabilities": [
+          "quality_hygiene.view"
+        ],
         "x-zeromerma-operation-id-policy": "FASTAPI_STABLE_GENERATED"
       },
       "post": {
@@ -50511,6 +51057,10 @@
         "tags": [
           "admin-incidents"
         ],
+        "x-authorization-policy": "explicit-deny-by-default",
+        "x-required-capabilities": [
+          "quality_hygiene.manage"
+        ],
         "x-zeromerma-operation-id-policy": "FASTAPI_STABLE_GENERATED"
       }
     },
@@ -50620,6 +51170,10 @@
         "summary": "Get Admin Incident Detail",
         "tags": [
           "admin-incidents"
+        ],
+        "x-authorization-policy": "explicit-deny-by-default",
+        "x-required-capabilities": [
+          "quality_hygiene.view"
         ],
         "x-zeromerma-operation-id-policy": "FASTAPI_STABLE_GENERATED"
       },
@@ -50754,6 +51308,10 @@
         "summary": "Update Admin Incident",
         "tags": [
           "admin-incidents"
+        ],
+        "x-authorization-policy": "explicit-deny-by-default",
+        "x-required-capabilities": [
+          "quality_hygiene.manage"
         ],
         "x-zeromerma-operation-id-policy": "FASTAPI_STABLE_GENERATED"
       }
@@ -50891,6 +51449,10 @@
         "tags": [
           "admin-incidents"
         ],
+        "x-authorization-policy": "explicit-deny-by-default",
+        "x-required-capabilities": [
+          "quality_hygiene.manage"
+        ],
         "x-zeromerma-operation-id-policy": "FASTAPI_STABLE_GENERATED"
       }
     },
@@ -51026,6 +51588,10 @@
         "summary": "Reopen Admin Incident",
         "tags": [
           "admin-incidents"
+        ],
+        "x-authorization-policy": "explicit-deny-by-default",
+        "x-required-capabilities": [
+          "quality_hygiene.manage"
         ],
         "x-zeromerma-operation-id-policy": "FASTAPI_STABLE_GENERATED"
       }
@@ -51163,6 +51729,10 @@
         "tags": [
           "admin-incidents"
         ],
+        "x-authorization-policy": "explicit-deny-by-default",
+        "x-required-capabilities": [
+          "quality_hygiene.manage"
+        ],
         "x-zeromerma-operation-id-policy": "FASTAPI_STABLE_GENERATED"
       }
     },
@@ -51298,6 +51868,10 @@
         "summary": "Change Admin Incident Status",
         "tags": [
           "admin-incidents"
+        ],
+        "x-authorization-policy": "explicit-deny-by-default",
+        "x-required-capabilities": [
+          "quality_hygiene.manage"
         ],
         "x-zeromerma-operation-id-policy": "FASTAPI_STABLE_GENERATED"
       }
@@ -51641,6 +52215,10 @@
         "tags": [
           "admin-inputs-supplies"
         ],
+        "x-authorization-policy": "explicit-deny-by-default",
+        "x-required-capabilities": [
+          "catalog.view"
+        ],
         "x-zeromerma-operation-id-policy": "FASTAPI_STABLE_GENERATED"
       },
       "post": {
@@ -51745,6 +52323,10 @@
         "summary": "Create Admin Input Supply",
         "tags": [
           "admin-inputs-supplies"
+        ],
+        "x-authorization-policy": "explicit-deny-by-default",
+        "x-required-capabilities": [
+          "catalog.manage"
         ],
         "x-zeromerma-operation-id-policy": "FASTAPI_STABLE_GENERATED"
       }
@@ -51855,6 +52437,10 @@
         "summary": "Get Admin Input Supply Detail",
         "tags": [
           "admin-inputs-supplies"
+        ],
+        "x-authorization-policy": "explicit-deny-by-default",
+        "x-required-capabilities": [
+          "catalog.view"
         ],
         "x-zeromerma-operation-id-policy": "FASTAPI_STABLE_GENERATED"
       },
@@ -51973,6 +52559,10 @@
         "summary": "Update Admin Input Supply",
         "tags": [
           "admin-inputs-supplies"
+        ],
+        "x-authorization-policy": "explicit-deny-by-default",
+        "x-required-capabilities": [
+          "catalog.manage"
         ],
         "x-zeromerma-operation-id-policy": "FASTAPI_STABLE_GENERATED"
       }
@@ -52094,6 +52684,10 @@
         "tags": [
           "admin-inputs-supplies"
         ],
+        "x-authorization-policy": "explicit-deny-by-default",
+        "x-required-capabilities": [
+          "catalog.manage"
+        ],
         "x-zeromerma-operation-id-policy": "FASTAPI_STABLE_GENERATED"
       }
     },
@@ -52213,6 +52807,10 @@
         "summary": "Upsert Admin Input Supply Supplier",
         "tags": [
           "admin-inputs-supplies"
+        ],
+        "x-authorization-policy": "explicit-deny-by-default",
+        "x-required-capabilities": [
+          "catalog.manage"
         ],
         "x-zeromerma-operation-id-policy": "FASTAPI_STABLE_GENERATED"
       }
@@ -52344,6 +52942,10 @@
         "summary": "Update Admin Input Supply Supplier",
         "tags": [
           "admin-inputs-supplies"
+        ],
+        "x-authorization-policy": "explicit-deny-by-default",
+        "x-required-capabilities": [
+          "catalog.manage"
         ],
         "x-zeromerma-operation-id-policy": "FASTAPI_STABLE_GENERATED"
       }
@@ -52588,6 +53190,10 @@
         "tags": [
           "admin-inventory"
         ],
+        "x-authorization-policy": "explicit-deny-by-default",
+        "x-required-capabilities": [
+          "inventory.view"
+        ],
         "x-zeromerma-operation-id-policy": "FASTAPI_STABLE_GENERATED"
       }
     },
@@ -52694,6 +53300,10 @@
         "summary": "Create Admin Inventory Adjustment",
         "tags": [
           "admin-inventory"
+        ],
+        "x-authorization-policy": "explicit-deny-by-default",
+        "x-required-capabilities": [
+          "inventory.adjust"
         ],
         "x-zeromerma-operation-id-policy": "FASTAPI_STABLE_GENERATED"
       }
@@ -52804,6 +53414,10 @@
         "summary": "Get Admin Inventory Detail",
         "tags": [
           "admin-inventory"
+        ],
+        "x-authorization-policy": "explicit-deny-by-default",
+        "x-required-capabilities": [
+          "inventory.view"
         ],
         "x-zeromerma-operation-id-policy": "FASTAPI_STABLE_GENERATED"
       }
@@ -52937,6 +53551,10 @@
         "summary": "List Admin Inventory Movements",
         "tags": [
           "admin-inventory"
+        ],
+        "x-authorization-policy": "explicit-deny-by-default",
+        "x-required-capabilities": [
+          "inventory.view"
         ],
         "x-zeromerma-operation-id-policy": "FASTAPI_STABLE_GENERATED"
       }
@@ -53201,6 +53819,10 @@
         "tags": [
           "admin-orders"
         ],
+        "x-authorization-policy": "explicit-deny-by-default",
+        "x-required-capabilities": [
+          "orders.view"
+        ],
         "x-zeromerma-operation-id-policy": "FASTAPI_STABLE_GENERATED"
       }
     },
@@ -53310,6 +53932,10 @@
         "summary": "Get Admin Order Detail",
         "tags": [
           "admin-orders"
+        ],
+        "x-authorization-policy": "explicit-deny-by-default",
+        "x-required-capabilities": [
+          "orders.view"
         ],
         "x-zeromerma-operation-id-policy": "FASTAPI_STABLE_GENERATED"
       }
@@ -53431,6 +54057,10 @@
         "tags": [
           "admin-orders"
         ],
+        "x-authorization-policy": "explicit-deny-by-default",
+        "x-required-capabilities": [
+          "orders.cancel"
+        ],
         "x-zeromerma-operation-id-policy": "FASTAPI_STABLE_GENERATED"
       }
     },
@@ -53551,6 +54181,10 @@
         "tags": [
           "admin-orders"
         ],
+        "x-authorization-policy": "explicit-deny-by-default",
+        "x-required-capabilities": [
+          "orders.manage"
+        ],
         "x-zeromerma-operation-id-policy": "FASTAPI_STABLE_GENERATED"
       }
     },
@@ -53670,6 +54304,10 @@
         "summary": "Mark Admin Order Ready",
         "tags": [
           "admin-orders"
+        ],
+        "x-authorization-policy": "explicit-deny-by-default",
+        "x-required-capabilities": [
+          "orders.manage"
         ],
         "x-zeromerma-operation-id-policy": "FASTAPI_STABLE_GENERATED"
       }
@@ -53950,6 +54588,10 @@
         "tags": [
           "admin-prices"
         ],
+        "x-authorization-policy": "explicit-deny-by-default",
+        "x-required-capabilities": [
+          "pricing.view"
+        ],
         "x-zeromerma-operation-id-policy": "FASTAPI_STABLE_GENERATED"
       }
     },
@@ -54068,6 +54710,10 @@
         "summary": "Get Admin Price Detail",
         "tags": [
           "admin-prices"
+        ],
+        "x-authorization-policy": "explicit-deny-by-default",
+        "x-required-capabilities": [
+          "pricing.view"
         ],
         "x-zeromerma-operation-id-policy": "FASTAPI_STABLE_GENERATED"
       },
@@ -54195,6 +54841,10 @@
         "summary": "Update Admin Price",
         "tags": [
           "admin-prices"
+        ],
+        "x-authorization-policy": "explicit-deny-by-default",
+        "x-required-capabilities": [
+          "pricing.manage"
         ],
         "x-zeromerma-operation-id-policy": "FASTAPI_STABLE_GENERATED"
       }
@@ -54404,6 +55054,10 @@
         "tags": [
           "admin-product-classes"
         ],
+        "x-authorization-policy": "explicit-deny-by-default",
+        "x-required-capabilities": [
+          "catalog.view"
+        ],
         "x-zeromerma-operation-id-policy": "FASTAPI_STABLE_GENERATED"
       },
       "post": {
@@ -54508,6 +55162,10 @@
         "summary": "Create Admin Product Class",
         "tags": [
           "admin-product-classes"
+        ],
+        "x-authorization-policy": "explicit-deny-by-default",
+        "x-required-capabilities": [
+          "catalog.manage"
         ],
         "x-zeromerma-operation-id-policy": "FASTAPI_STABLE_GENERATED"
       }
@@ -54618,6 +55276,10 @@
         "summary": "Get Admin Product Class Detail",
         "tags": [
           "admin-product-classes"
+        ],
+        "x-authorization-policy": "explicit-deny-by-default",
+        "x-required-capabilities": [
+          "catalog.view"
         ],
         "x-zeromerma-operation-id-policy": "FASTAPI_STABLE_GENERATED"
       },
@@ -54736,6 +55398,10 @@
         "summary": "Update Admin Product Class",
         "tags": [
           "admin-product-classes"
+        ],
+        "x-authorization-policy": "explicit-deny-by-default",
+        "x-required-capabilities": [
+          "catalog.manage"
         ],
         "x-zeromerma-operation-id-policy": "FASTAPI_STABLE_GENERATED"
       }
@@ -55028,6 +55694,10 @@
         "tags": [
           "admin-production"
         ],
+        "x-authorization-policy": "explicit-deny-by-default",
+        "x-required-capabilities": [
+          "production.view"
+        ],
         "x-zeromerma-operation-id-policy": "FASTAPI_STABLE_GENERATED"
       },
       "post": {
@@ -55151,6 +55821,10 @@
         "tags": [
           "admin-production"
         ],
+        "x-authorization-policy": "explicit-deny-by-default",
+        "x-required-capabilities": [
+          "production.manage"
+        ],
         "x-zeromerma-operation-id-policy": "FASTAPI_STABLE_GENERATED"
       }
     },
@@ -55260,6 +55934,10 @@
         "summary": "Get Admin Production Detail",
         "tags": [
           "admin-production"
+        ],
+        "x-authorization-policy": "explicit-deny-by-default",
+        "x-required-capabilities": [
+          "production.view"
         ],
         "x-zeromerma-operation-id-policy": "FASTAPI_STABLE_GENERATED"
       },
@@ -55394,6 +56072,10 @@
         "summary": "Update Admin Production",
         "tags": [
           "admin-production"
+        ],
+        "x-authorization-policy": "explicit-deny-by-default",
+        "x-required-capabilities": [
+          "production.manage"
         ],
         "x-zeromerma-operation-id-policy": "FASTAPI_STABLE_GENERATED"
       }
@@ -55531,6 +56213,10 @@
         "tags": [
           "admin-production"
         ],
+        "x-authorization-policy": "explicit-deny-by-default",
+        "x-required-capabilities": [
+          "production.cancel"
+        ],
         "x-zeromerma-operation-id-policy": "FASTAPI_STABLE_GENERATED"
       }
     },
@@ -55667,6 +56353,10 @@
         "tags": [
           "admin-production"
         ],
+        "x-authorization-policy": "explicit-deny-by-default",
+        "x-required-capabilities": [
+          "production.execute"
+        ],
         "x-zeromerma-operation-id-policy": "FASTAPI_STABLE_GENERATED"
       }
     },
@@ -55802,6 +56492,10 @@
         "summary": "Start Admin Production",
         "tags": [
           "admin-production"
+        ],
+        "x-authorization-policy": "explicit-deny-by-default",
+        "x-required-capabilities": [
+          "production.execute"
         ],
         "x-zeromerma-operation-id-policy": "FASTAPI_STABLE_GENERATED"
       }
@@ -56047,6 +56741,10 @@
         "tags": [
           "admin-products"
         ],
+        "x-authorization-policy": "explicit-deny-by-default",
+        "x-required-capabilities": [
+          "catalog.view"
+        ],
         "x-zeromerma-operation-id-policy": "FASTAPI_STABLE_GENERATED"
       },
       "post": {
@@ -56151,6 +56849,10 @@
         "summary": "Create Admin Product",
         "tags": [
           "admin-products"
+        ],
+        "x-authorization-policy": "explicit-deny-by-default",
+        "x-required-capabilities": [
+          "catalog.manage"
         ],
         "x-zeromerma-operation-id-policy": "FASTAPI_STABLE_GENERATED"
       }
@@ -56261,6 +56963,10 @@
         "summary": "Get Admin Product Detail",
         "tags": [
           "admin-products"
+        ],
+        "x-authorization-policy": "explicit-deny-by-default",
+        "x-required-capabilities": [
+          "catalog.view"
         ],
         "x-zeromerma-operation-id-policy": "FASTAPI_STABLE_GENERATED"
       },
@@ -56379,6 +57085,10 @@
         "summary": "Update Admin Product",
         "tags": [
           "admin-products"
+        ],
+        "x-authorization-policy": "explicit-deny-by-default",
+        "x-required-capabilities": [
+          "catalog.manage"
         ],
         "x-zeromerma-operation-id-policy": "FASTAPI_STABLE_GENERATED"
       }
@@ -56499,6 +57209,10 @@
         "summary": "Configure Admin Product Availability",
         "tags": [
           "admin-products"
+        ],
+        "x-authorization-policy": "explicit-deny-by-default",
+        "x-required-capabilities": [
+          "catalog.availability.manage"
         ],
         "x-zeromerma-operation-id-policy": "FASTAPI_STABLE_GENERATED"
       }
@@ -56856,6 +57570,10 @@
         "tags": [
           "admin-purchases"
         ],
+        "x-authorization-policy": "explicit-deny-by-default",
+        "x-required-capabilities": [
+          "purchases.view"
+        ],
         "x-zeromerma-operation-id-policy": "FASTAPI_STABLE_GENERATED"
       },
       "post": {
@@ -56978,6 +57696,10 @@
         "summary": "Create Admin Purchase",
         "tags": [
           "admin-purchases"
+        ],
+        "x-authorization-policy": "explicit-deny-by-default",
+        "x-required-capabilities": [
+          "purchases.manage"
         ],
         "x-zeromerma-operation-id-policy": "FASTAPI_STABLE_GENERATED"
       }
@@ -57104,6 +57826,10 @@
         "tags": [
           "admin-purchases"
         ],
+        "x-authorization-policy": "explicit-deny-by-default",
+        "x-required-capabilities": [
+          "purchases.manage"
+        ],
         "x-zeromerma-operation-id-policy": "FASTAPI_STABLE_GENERATED"
       }
     },
@@ -57213,6 +57939,10 @@
         "summary": "Get Admin Purchase Detail",
         "tags": [
           "admin-purchases"
+        ],
+        "x-authorization-policy": "explicit-deny-by-default",
+        "x-required-capabilities": [
+          "purchases.view"
         ],
         "x-zeromerma-operation-id-policy": "FASTAPI_STABLE_GENERATED"
       },
@@ -57347,6 +58077,10 @@
         "summary": "Update Admin Purchase",
         "tags": [
           "admin-purchases"
+        ],
+        "x-authorization-policy": "explicit-deny-by-default",
+        "x-required-capabilities": [
+          "purchases.manage"
         ],
         "x-zeromerma-operation-id-policy": "FASTAPI_STABLE_GENERATED"
       }
@@ -57484,6 +58218,10 @@
         "tags": [
           "admin-purchases"
         ],
+        "x-authorization-policy": "explicit-deny-by-default",
+        "x-required-capabilities": [
+          "purchases.cancel"
+        ],
         "x-zeromerma-operation-id-policy": "FASTAPI_STABLE_GENERATED"
       }
     },
@@ -57609,6 +58347,10 @@
         "summary": "Confirm Admin Purchase",
         "tags": [
           "admin-purchases"
+        ],
+        "x-authorization-policy": "explicit-deny-by-default",
+        "x-required-capabilities": [
+          "purchases.confirm"
         ],
         "x-zeromerma-operation-id-policy": "FASTAPI_STABLE_GENERATED"
       }
@@ -57745,6 +58487,10 @@
         "summary": "Receive Admin Purchase",
         "tags": [
           "admin-purchases"
+        ],
+        "x-authorization-policy": "explicit-deny-by-default",
+        "x-required-capabilities": [
+          "purchases.receive"
         ],
         "x-zeromerma-operation-id-policy": "FASTAPI_STABLE_GENERATED"
       }
@@ -57938,6 +58684,10 @@
         "tags": [
           "admin-recipes-costs"
         ],
+        "x-authorization-policy": "explicit-deny-by-default",
+        "x-required-capabilities": [
+          "recipes.view"
+        ],
         "x-zeromerma-operation-id-policy": "FASTAPI_STABLE_GENERATED"
       }
     },
@@ -58048,6 +58798,10 @@
         "tags": [
           "admin-recipes-costs"
         ],
+        "x-authorization-policy": "explicit-deny-by-default",
+        "x-required-capabilities": [
+          "recipes.view"
+        ],
         "x-zeromerma-operation-id-policy": "FASTAPI_STABLE_GENERATED"
       }
     },
@@ -58154,6 +58908,10 @@
         "summary": "Create Admin Recipe",
         "tags": [
           "admin-recipes-costs"
+        ],
+        "x-authorization-policy": "explicit-deny-by-default",
+        "x-required-capabilities": [
+          "recipes.manage"
         ],
         "x-zeromerma-operation-id-policy": "FASTAPI_STABLE_GENERATED"
       }
@@ -58265,6 +59023,10 @@
         "tags": [
           "admin-recipes-costs"
         ],
+        "x-authorization-policy": "explicit-deny-by-default",
+        "x-required-capabilities": [
+          "recipes.manage"
+        ],
         "x-zeromerma-operation-id-policy": "FASTAPI_STABLE_GENERATED"
       }
     },
@@ -58374,6 +59136,11 @@
         "summary": "Apply Admin Recipe Standard Cost",
         "tags": [
           "admin-recipes-costs"
+        ],
+        "x-authorization-policy": "explicit-deny-by-default",
+        "x-required-capabilities": [
+          "pricing.manage",
+          "recipes.manage"
         ],
         "x-zeromerma-operation-id-policy": "FASTAPI_STABLE_GENERATED"
       }
@@ -58494,6 +59261,10 @@
         "summary": "Duplicate Admin Recipe",
         "tags": [
           "admin-recipes-costs"
+        ],
+        "x-authorization-policy": "explicit-deny-by-default",
+        "x-required-capabilities": [
+          "recipes.manage"
         ],
         "x-zeromerma-operation-id-policy": "FASTAPI_STABLE_GENERATED"
       }
@@ -58853,6 +59624,10 @@
         "tags": [
           "admin-reconciliation"
         ],
+        "x-authorization-policy": "explicit-deny-by-default",
+        "x-required-capabilities": [
+          "cash_finance.view"
+        ],
         "x-zeromerma-operation-id-policy": "FASTAPI_STABLE_GENERATED"
       },
       "post": {
@@ -58975,6 +59750,10 @@
         "summary": "Create Admin Reconciliation",
         "tags": [
           "admin-reconciliation"
+        ],
+        "x-authorization-policy": "explicit-deny-by-default",
+        "x-required-capabilities": [
+          "cash_finance.manage"
         ],
         "x-zeromerma-operation-id-policy": "FASTAPI_STABLE_GENERATED"
       }
@@ -59277,6 +60056,10 @@
         "tags": [
           "admin-reconciliation"
         ],
+        "x-authorization-policy": "explicit-deny-by-default",
+        "x-required-capabilities": [
+          "cash_finance.view"
+        ],
         "x-zeromerma-operation-id-policy": "FASTAPI_STABLE_GENERATED"
       }
     },
@@ -59386,6 +60169,10 @@
         "summary": "Get Admin Reconciliation Detail",
         "tags": [
           "admin-reconciliation"
+        ],
+        "x-authorization-policy": "explicit-deny-by-default",
+        "x-required-capabilities": [
+          "cash_finance.view"
         ],
         "x-zeromerma-operation-id-policy": "FASTAPI_STABLE_GENERATED"
       }
@@ -59522,6 +60309,10 @@
         "summary": "Resolve Admin Reconciliation",
         "tags": [
           "admin-reconciliation"
+        ],
+        "x-authorization-policy": "explicit-deny-by-default",
+        "x-required-capabilities": [
+          "cash_finance.manage"
         ],
         "x-zeromerma-operation-id-policy": "FASTAPI_STABLE_GENERATED"
       }
@@ -59724,6 +60515,10 @@
         "tags": [
           "admin-reports"
         ],
+        "x-authorization-policy": "explicit-deny-by-default",
+        "x-required-capabilities": [
+          "reports.view"
+        ],
         "x-zeromerma-operation-id-policy": "FASTAPI_STABLE_GENERATED"
       }
     },
@@ -59858,6 +60653,10 @@
         "tags": [
           "admin-reports"
         ],
+        "x-authorization-policy": "explicit-deny-by-default",
+        "x-required-capabilities": [
+          "reports.export"
+        ],
         "x-zeromerma-operation-id-policy": "FASTAPI_STABLE_GENERATED"
       }
     },
@@ -59975,6 +60774,10 @@
         "summary": "Preview Admin Report",
         "tags": [
           "admin-reports"
+        ],
+        "x-authorization-policy": "explicit-deny-by-default",
+        "x-required-capabilities": [
+          "reports.view"
         ],
         "x-zeromerma-operation-id-policy": "FASTAPI_STABLE_GENERATED"
       }
@@ -60272,6 +61075,10 @@
         "tags": [
           "admin-returns-corrections"
         ],
+        "x-authorization-policy": "explicit-deny-by-default",
+        "x-required-capabilities": [
+          "returns_corrections.view"
+        ],
         "x-zeromerma-operation-id-policy": "FASTAPI_STABLE_GENERATED"
       }
     },
@@ -60381,6 +61188,10 @@
         "summary": "Get Admin Correction Detail",
         "tags": [
           "admin-returns-corrections"
+        ],
+        "x-authorization-policy": "explicit-deny-by-default",
+        "x-required-capabilities": [
+          "returns_corrections.view"
         ],
         "x-zeromerma-operation-id-policy": "FASTAPI_STABLE_GENERATED"
       }
@@ -60661,6 +61472,10 @@
         "tags": [
           "admin-returns-corrections"
         ],
+        "x-authorization-policy": "explicit-deny-by-default",
+        "x-required-capabilities": [
+          "returns_corrections.view"
+        ],
         "x-zeromerma-operation-id-policy": "FASTAPI_STABLE_GENERATED"
       }
     },
@@ -60770,6 +61585,10 @@
         "summary": "Get Admin Return Detail",
         "tags": [
           "admin-returns-corrections"
+        ],
+        "x-authorization-policy": "explicit-deny-by-default",
+        "x-required-capabilities": [
+          "returns_corrections.view"
         ],
         "x-zeromerma-operation-id-policy": "FASTAPI_STABLE_GENERATED"
       }
@@ -61029,6 +61848,10 @@
         "tags": [
           "admin-roles"
         ],
+        "x-authorization-policy": "explicit-deny-by-default",
+        "x-required-capabilities": [
+          "roles.view"
+        ],
         "x-zeromerma-operation-id-policy": "FASTAPI_STABLE_GENERATED"
       },
       "post": {
@@ -61134,6 +61957,10 @@
         "tags": [
           "admin-roles"
         ],
+        "x-authorization-policy": "explicit-deny-by-default",
+        "x-required-capabilities": [
+          "roles.manage"
+        ],
         "x-zeromerma-operation-id-policy": "FASTAPI_STABLE_GENERATED"
       }
     },
@@ -61231,6 +62058,475 @@
         "tags": [
           "admin-roles"
         ],
+        "x-authorization-policy": "explicit-deny-by-default",
+        "x-required-capabilities": [
+          "roles.view"
+        ],
+        "x-zeromerma-operation-id-policy": "FASTAPI_STABLE_GENERATED"
+      }
+    },
+    "/v1/admin/roles/privileged-changes": {
+      "post": {
+        "operationId": "propose_privileged_change_v1_admin_roles_privileged_changes_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PrivilegedChangeCreateRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PrivilegedChangeView"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Authentication Required"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Internal Server Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Propose Privileged Change",
+        "tags": [
+          "admin-roles"
+        ],
+        "x-authorization-policy": "explicit-deny-by-default",
+        "x-required-capabilities": [],
+        "x-zeromerma-operation-id-policy": "FASTAPI_STABLE_GENERATED"
+      }
+    },
+    "/v1/admin/roles/privileged-changes/{change_id}": {
+      "get": {
+        "operationId": "get_privileged_change_v1_admin_roles_privileged_changes__change_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "change_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Change Id",
+              "type": "string",
+              "x-zeromerma-id-representation": "JSON_STRING"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PrivilegedChangeView"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Authentication Required"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Internal Server Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Get Privileged Change",
+        "tags": [
+          "admin-roles"
+        ],
+        "x-authorization-policy": "explicit-deny-by-default",
+        "x-required-capabilities": [],
+        "x-zeromerma-operation-id-policy": "FASTAPI_STABLE_GENERATED"
+      }
+    },
+    "/v1/admin/roles/privileged-changes/{change_id}/approve": {
+      "post": {
+        "operationId": "approve_privileged_change_v1_admin_roles_privileged_changes__change_id__approve_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "change_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Change Id",
+              "type": "string",
+              "x-zeromerma-id-representation": "JSON_STRING"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PrivilegedChangeConfirmationRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PrivilegedChangeView"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Authentication Required"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Internal Server Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Approve Privileged Change",
+        "tags": [
+          "admin-roles"
+        ],
+        "x-authorization-policy": "explicit-deny-by-default",
+        "x-required-capabilities": [],
+        "x-zeromerma-operation-id-policy": "FASTAPI_STABLE_GENERATED"
+      }
+    },
+    "/v1/admin/roles/privileged-changes/{change_id}/execute": {
+      "post": {
+        "operationId": "execute_privileged_change_v1_admin_roles_privileged_changes__change_id__execute_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "change_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Change Id",
+              "type": "string",
+              "x-zeromerma-id-representation": "JSON_STRING"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PrivilegedChangeConfirmationRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PrivilegedChangeView"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Authentication Required"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Internal Server Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Execute Privileged Change",
+        "tags": [
+          "admin-roles"
+        ],
+        "x-authorization-policy": "explicit-deny-by-default",
+        "x-required-capabilities": [],
         "x-zeromerma-operation-id-policy": "FASTAPI_STABLE_GENERATED"
       }
     },
@@ -61340,6 +62636,10 @@
         "summary": "Get Admin Role Detail",
         "tags": [
           "admin-roles"
+        ],
+        "x-authorization-policy": "explicit-deny-by-default",
+        "x-required-capabilities": [
+          "roles.view"
         ],
         "x-zeromerma-operation-id-policy": "FASTAPI_STABLE_GENERATED"
       },
@@ -61458,6 +62758,10 @@
         "summary": "Update Admin Role",
         "tags": [
           "admin-roles"
+        ],
+        "x-authorization-policy": "explicit-deny-by-default",
+        "x-required-capabilities": [
+          "roles.manage"
         ],
         "x-zeromerma-operation-id-policy": "FASTAPI_STABLE_GENERATED"
       }
@@ -61579,6 +62883,10 @@
         "tags": [
           "admin-roles"
         ],
+        "x-authorization-policy": "explicit-deny-by-default",
+        "x-required-capabilities": [
+          "roles.manage"
+        ],
         "x-zeromerma-operation-id-policy": "FASTAPI_STABLE_GENERATED"
       }
     },
@@ -61609,6 +62917,16 @@
             }
           }
         ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AdminRoleUserAssignmentRequest"
+              }
+            }
+          },
+          "required": true
+        },
         "responses": {
           "200": {
             "content": {
@@ -61699,6 +63017,10 @@
         "summary": "Assign Admin Role To User",
         "tags": [
           "admin-roles"
+        ],
+        "x-authorization-policy": "explicit-deny-by-default",
+        "x-required-capabilities": [
+          "role_assignments.manage"
         ],
         "x-zeromerma-operation-id-policy": "FASTAPI_STABLE_GENERATED"
       }
@@ -61820,6 +63142,10 @@
         "summary": "Remove Admin Role From User",
         "tags": [
           "admin-roles"
+        ],
+        "x-authorization-policy": "explicit-deny-by-default",
+        "x-required-capabilities": [
+          "role_assignments.manage"
         ],
         "x-zeromerma-operation-id-policy": "FASTAPI_STABLE_GENERATED"
       }
@@ -62128,6 +63454,10 @@
         "tags": [
           "admin-sales-tickets"
         ],
+        "x-authorization-policy": "explicit-deny-by-default",
+        "x-required-capabilities": [
+          "sales_tickets.view"
+        ],
         "x-zeromerma-operation-id-policy": "FASTAPI_STABLE_GENERATED"
       }
     },
@@ -62238,6 +63568,10 @@
         "tags": [
           "admin-sales-tickets"
         ],
+        "x-authorization-policy": "explicit-deny-by-default",
+        "x-required-capabilities": [
+          "sales_tickets.view"
+        ],
         "x-zeromerma-operation-id-policy": "FASTAPI_STABLE_GENERATED"
       }
     },
@@ -62347,6 +63681,10 @@
         "summary": "Reprint Admin Sales Ticket",
         "tags": [
           "admin-sales-tickets"
+        ],
+        "x-authorization-policy": "explicit-deny-by-default",
+        "x-required-capabilities": [
+          "sales_tickets.reprint"
         ],
         "x-zeromerma-operation-id-policy": "FASTAPI_STABLE_GENERATED"
       }
@@ -62742,6 +64080,10 @@
         "tags": [
           "admin-sanitary-verifications"
         ],
+        "x-authorization-policy": "explicit-deny-by-default",
+        "x-required-capabilities": [
+          "quality_hygiene.view"
+        ],
         "x-zeromerma-operation-id-policy": "FASTAPI_STABLE_GENERATED"
       },
       "post": {
@@ -62865,6 +64207,10 @@
         "tags": [
           "admin-sanitary-verifications"
         ],
+        "x-authorization-policy": "explicit-deny-by-default",
+        "x-required-capabilities": [
+          "quality_hygiene.manage"
+        ],
         "x-zeromerma-operation-id-policy": "FASTAPI_STABLE_GENERATED"
       }
     },
@@ -62965,6 +64311,10 @@
         "summary": "List Admin Sanitary Templates",
         "tags": [
           "admin-sanitary-verifications"
+        ],
+        "x-authorization-policy": "explicit-deny-by-default",
+        "x-required-capabilities": [
+          "quality_hygiene.view"
         ],
         "x-zeromerma-operation-id-policy": "FASTAPI_STABLE_GENERATED"
       }
@@ -63075,6 +64425,10 @@
         "summary": "Get Admin Sanitary Verification Detail",
         "tags": [
           "admin-sanitary-verifications"
+        ],
+        "x-authorization-policy": "explicit-deny-by-default",
+        "x-required-capabilities": [
+          "quality_hygiene.view"
         ],
         "x-zeromerma-operation-id-policy": "FASTAPI_STABLE_GENERATED"
       }
@@ -63212,6 +64566,10 @@
         "tags": [
           "admin-sanitary-verifications"
         ],
+        "x-authorization-policy": "explicit-deny-by-default",
+        "x-required-capabilities": [
+          "quality_hygiene.manage"
+        ],
         "x-zeromerma-operation-id-policy": "FASTAPI_STABLE_GENERATED"
       }
     },
@@ -63348,6 +64706,10 @@
         "tags": [
           "admin-sanitary-verifications"
         ],
+        "x-authorization-policy": "explicit-deny-by-default",
+        "x-required-capabilities": [
+          "quality_hygiene.manage"
+        ],
         "x-zeromerma-operation-id-policy": "FASTAPI_STABLE_GENERATED"
       }
     },
@@ -63473,6 +64835,10 @@
         "summary": "Start Admin Sanitary Verification",
         "tags": [
           "admin-sanitary-verifications"
+        ],
+        "x-authorization-policy": "explicit-deny-by-default",
+        "x-required-capabilities": [
+          "quality_hygiene.manage"
         ],
         "x-zeromerma-operation-id-policy": "FASTAPI_STABLE_GENERATED"
       }
@@ -63692,6 +65058,10 @@
         "tags": [
           "admin-settings"
         ],
+        "x-authorization-policy": "explicit-deny-by-default",
+        "x-required-capabilities": [
+          "config.view"
+        ],
         "x-zeromerma-operation-id-policy": "FASTAPI_STABLE_GENERATED"
       }
     },
@@ -63799,6 +65169,10 @@
         "summary": "Get Admin Setting Detail",
         "tags": [
           "admin-settings"
+        ],
+        "x-authorization-policy": "explicit-deny-by-default",
+        "x-required-capabilities": [
+          "config.view"
         ],
         "x-zeromerma-operation-id-policy": "FASTAPI_STABLE_GENERATED"
       },
@@ -63915,6 +65289,10 @@
         "summary": "Update Admin Setting",
         "tags": [
           "admin-settings"
+        ],
+        "x-authorization-policy": "explicit-deny-by-default",
+        "x-required-capabilities": [
+          "config.manage"
         ],
         "x-zeromerma-operation-id-policy": "FASTAPI_STABLE_GENERATED"
       }
@@ -64033,6 +65411,10 @@
         "summary": "Reset Admin Setting",
         "tags": [
           "admin-settings"
+        ],
+        "x-authorization-policy": "explicit-deny-by-default",
+        "x-required-capabilities": [
+          "config.manage"
         ],
         "x-zeromerma-operation-id-policy": "FASTAPI_STABLE_GENERATED"
       }
@@ -64258,6 +65640,10 @@
         "tags": [
           "admin-suppliers"
         ],
+        "x-authorization-policy": "explicit-deny-by-default",
+        "x-required-capabilities": [
+          "suppliers.view"
+        ],
         "x-zeromerma-operation-id-policy": "FASTAPI_STABLE_GENERATED"
       },
       "post": {
@@ -64381,6 +65767,10 @@
         "tags": [
           "admin-suppliers"
         ],
+        "x-authorization-policy": "explicit-deny-by-default",
+        "x-required-capabilities": [
+          "suppliers.manage"
+        ],
         "x-zeromerma-operation-id-policy": "FASTAPI_STABLE_GENERATED"
       }
     },
@@ -64490,6 +65880,10 @@
         "summary": "Get Admin Supplier Detail",
         "tags": [
           "admin-suppliers"
+        ],
+        "x-authorization-policy": "explicit-deny-by-default",
+        "x-required-capabilities": [
+          "suppliers.view"
         ],
         "x-zeromerma-operation-id-policy": "FASTAPI_STABLE_GENERATED"
       },
@@ -64624,6 +66018,10 @@
         "summary": "Update Admin Supplier",
         "tags": [
           "admin-suppliers"
+        ],
+        "x-authorization-policy": "explicit-deny-by-default",
+        "x-required-capabilities": [
+          "suppliers.manage"
         ],
         "x-zeromerma-operation-id-policy": "FASTAPI_STABLE_GENERATED"
       }
@@ -64761,6 +66159,10 @@
         "tags": [
           "admin-suppliers"
         ],
+        "x-authorization-policy": "explicit-deny-by-default",
+        "x-required-capabilities": [
+          "suppliers.manage"
+        ],
         "x-zeromerma-operation-id-policy": "FASTAPI_STABLE_GENERATED"
       }
     },
@@ -64896,6 +66298,10 @@
         "summary": "Create Admin Supplier Contact",
         "tags": [
           "admin-suppliers"
+        ],
+        "x-authorization-policy": "explicit-deny-by-default",
+        "x-required-capabilities": [
+          "suppliers.manage"
         ],
         "x-zeromerma-operation-id-policy": "FASTAPI_STABLE_GENERATED"
       }
@@ -65044,6 +66450,10 @@
         "tags": [
           "admin-suppliers"
         ],
+        "x-authorization-policy": "explicit-deny-by-default",
+        "x-required-capabilities": [
+          "suppliers.manage"
+        ],
         "x-zeromerma-operation-id-policy": "FASTAPI_STABLE_GENERATED"
       }
     },
@@ -65179,6 +66589,10 @@
         "summary": "Upsert Admin Supplier Product",
         "tags": [
           "admin-suppliers"
+        ],
+        "x-authorization-policy": "explicit-deny-by-default",
+        "x-required-capabilities": [
+          "suppliers.manage"
         ],
         "x-zeromerma-operation-id-policy": "FASTAPI_STABLE_GENERATED"
       }
@@ -65327,6 +66741,10 @@
         "tags": [
           "admin-suppliers"
         ],
+        "x-authorization-policy": "explicit-deny-by-default",
+        "x-required-capabilities": [
+          "suppliers.manage"
+        ],
         "x-zeromerma-operation-id-policy": "FASTAPI_STABLE_GENERATED"
       }
     },
@@ -65462,6 +66880,10 @@
         "summary": "Change Admin Supplier Status",
         "tags": [
           "admin-suppliers"
+        ],
+        "x-authorization-policy": "explicit-deny-by-default",
+        "x-required-capabilities": [
+          "suppliers.manage"
         ],
         "x-zeromerma-operation-id-policy": "FASTAPI_STABLE_GENERATED"
       }
@@ -65742,6 +67164,10 @@
         "tags": [
           "admin-transfers"
         ],
+        "x-authorization-policy": "explicit-deny-by-default",
+        "x-required-capabilities": [
+          "transfers.view"
+        ],
         "x-zeromerma-operation-id-policy": "FASTAPI_STABLE_GENERATED"
       },
       "post": {
@@ -65846,6 +67272,10 @@
         "summary": "Create Admin Transfer",
         "tags": [
           "admin-transfers"
+        ],
+        "x-authorization-policy": "explicit-deny-by-default",
+        "x-required-capabilities": [
+          "transfers.manage"
         ],
         "x-zeromerma-operation-id-policy": "FASTAPI_STABLE_GENERATED"
       }
@@ -65956,6 +67386,10 @@
         "summary": "Get Admin Transfer Detail",
         "tags": [
           "admin-transfers"
+        ],
+        "x-authorization-policy": "explicit-deny-by-default",
+        "x-required-capabilities": [
+          "transfers.view"
         ],
         "x-zeromerma-operation-id-policy": "FASTAPI_STABLE_GENERATED"
       },
@@ -66074,6 +67508,10 @@
         "summary": "Update Admin Transfer",
         "tags": [
           "admin-transfers"
+        ],
+        "x-authorization-policy": "explicit-deny-by-default",
+        "x-required-capabilities": [
+          "transfers.manage"
         ],
         "x-zeromerma-operation-id-policy": "FASTAPI_STABLE_GENERATED"
       }
@@ -66195,6 +67633,10 @@
         "tags": [
           "admin-transfers"
         ],
+        "x-authorization-policy": "explicit-deny-by-default",
+        "x-required-capabilities": [
+          "transfers.cancel"
+        ],
         "x-zeromerma-operation-id-policy": "FASTAPI_STABLE_GENERATED"
       }
     },
@@ -66315,6 +67757,10 @@
         "tags": [
           "admin-transfers"
         ],
+        "x-authorization-policy": "explicit-deny-by-default",
+        "x-required-capabilities": [
+          "transfers.execute"
+        ],
         "x-zeromerma-operation-id-policy": "FASTAPI_STABLE_GENERATED"
       }
     },
@@ -66434,6 +67880,10 @@
         "summary": "Receive Admin Transfer",
         "tags": [
           "admin-transfers"
+        ],
+        "x-authorization-policy": "explicit-deny-by-default",
+        "x-required-capabilities": [
+          "transfers.execute"
         ],
         "x-zeromerma-operation-id-policy": "FASTAPI_STABLE_GENERATED"
       }
@@ -66677,6 +68127,10 @@
         "tags": [
           "admin-users"
         ],
+        "x-authorization-policy": "explicit-deny-by-default",
+        "x-required-capabilities": [
+          "users.view"
+        ],
         "x-zeromerma-operation-id-policy": "FASTAPI_STABLE_GENERATED"
       },
       "post": {
@@ -66781,6 +68235,10 @@
         "summary": "Create Admin User",
         "tags": [
           "admin-users"
+        ],
+        "x-authorization-policy": "explicit-deny-by-default",
+        "x-required-capabilities": [
+          "users.manage"
         ],
         "x-zeromerma-operation-id-policy": "FASTAPI_STABLE_GENERATED"
       }
@@ -66891,6 +68349,10 @@
         "summary": "Get Admin User Detail",
         "tags": [
           "admin-users"
+        ],
+        "x-authorization-policy": "explicit-deny-by-default",
+        "x-required-capabilities": [
+          "users.view"
         ],
         "x-zeromerma-operation-id-policy": "FASTAPI_STABLE_GENERATED"
       },
@@ -67009,6 +68471,10 @@
         "summary": "Update Admin User",
         "tags": [
           "admin-users"
+        ],
+        "x-authorization-policy": "explicit-deny-by-default",
+        "x-required-capabilities": [
+          "users.manage"
         ],
         "x-zeromerma-operation-id-policy": "FASTAPI_STABLE_GENERATED"
       }
@@ -67129,6 +68595,10 @@
         "summary": "Add Admin User Branch Assignment",
         "tags": [
           "admin-users"
+        ],
+        "x-authorization-policy": "explicit-deny-by-default",
+        "x-required-capabilities": [
+          "role_assignments.manage"
         ],
         "x-zeromerma-operation-id-policy": "FASTAPI_STABLE_GENERATED"
       }
@@ -67251,6 +68721,10 @@
         "tags": [
           "admin-users"
         ],
+        "x-authorization-policy": "explicit-deny-by-default",
+        "x-required-capabilities": [
+          "role_assignments.manage"
+        ],
         "x-zeromerma-operation-id-policy": "FASTAPI_STABLE_GENERATED"
       }
     },
@@ -67372,6 +68846,10 @@
         "tags": [
           "admin-users"
         ],
+        "x-authorization-policy": "explicit-deny-by-default",
+        "x-required-capabilities": [
+          "role_assignments.manage"
+        ],
         "x-zeromerma-operation-id-policy": "FASTAPI_STABLE_GENERATED"
       }
     },
@@ -67492,6 +68970,10 @@
         "tags": [
           "admin-users"
         ],
+        "x-authorization-policy": "explicit-deny-by-default",
+        "x-required-capabilities": [
+          "users.manage"
+        ],
         "x-zeromerma-operation-id-policy": "FASTAPI_STABLE_GENERATED"
       }
     },
@@ -67611,6 +69093,10 @@
         "summary": "Assign Admin User Role",
         "tags": [
           "admin-users"
+        ],
+        "x-authorization-policy": "explicit-deny-by-default",
+        "x-required-capabilities": [
+          "role_assignments.manage"
         ],
         "x-zeromerma-operation-id-policy": "FASTAPI_STABLE_GENERATED"
       }
@@ -67733,6 +69219,10 @@
         "tags": [
           "admin-users"
         ],
+        "x-authorization-policy": "explicit-deny-by-default",
+        "x-required-capabilities": [
+          "role_assignments.manage"
+        ],
         "x-zeromerma-operation-id-policy": "FASTAPI_STABLE_GENERATED"
       }
     },
@@ -67853,6 +69343,10 @@
         "tags": [
           "admin-users"
         ],
+        "x-authorization-policy": "explicit-deny-by-default",
+        "x-required-capabilities": [
+          "users.manage"
+        ],
         "x-zeromerma-operation-id-policy": "FASTAPI_STABLE_GENERATED"
       }
     },
@@ -67962,6 +69456,10 @@
         "summary": "Unlock Admin User",
         "tags": [
           "admin-users"
+        ],
+        "x-authorization-policy": "explicit-deny-by-default",
+        "x-required-capabilities": [
+          "users.manage"
         ],
         "x-zeromerma-operation-id-policy": "FASTAPI_STABLE_GENERATED"
       }
@@ -68321,6 +69819,10 @@
         "tags": [
           "admin-waste"
         ],
+        "x-authorization-policy": "explicit-deny-by-default",
+        "x-required-capabilities": [
+          "waste.view"
+        ],
         "x-zeromerma-operation-id-policy": "FASTAPI_STABLE_GENERATED"
       },
       "post": {
@@ -68444,6 +69946,10 @@
         "tags": [
           "admin-waste"
         ],
+        "x-authorization-policy": "explicit-deny-by-default",
+        "x-required-capabilities": [
+          "waste.manage"
+        ],
         "x-zeromerma-operation-id-policy": "FASTAPI_STABLE_GENERATED"
       }
     },
@@ -68544,6 +70050,10 @@
         "summary": "List Admin Waste Reasons",
         "tags": [
           "admin-waste"
+        ],
+        "x-authorization-policy": "explicit-deny-by-default",
+        "x-required-capabilities": [
+          "waste.view"
         ],
         "x-zeromerma-operation-id-policy": "FASTAPI_STABLE_GENERATED"
       }
@@ -68654,6 +70164,10 @@
         "summary": "Get Admin Waste Detail",
         "tags": [
           "admin-waste"
+        ],
+        "x-authorization-policy": "explicit-deny-by-default",
+        "x-required-capabilities": [
+          "waste.view"
         ],
         "x-zeromerma-operation-id-policy": "FASTAPI_STABLE_GENERATED"
       }
@@ -68880,6 +70394,10 @@
         "tags": [
           "admin-workstations"
         ],
+        "x-authorization-policy": "explicit-deny-by-default",
+        "x-required-capabilities": [
+          "workstations.view"
+        ],
         "x-zeromerma-operation-id-policy": "FASTAPI_STABLE_GENERATED"
       },
       "post": {
@@ -68984,6 +70502,10 @@
         "summary": "Create Admin Workstation",
         "tags": [
           "admin-workstations"
+        ],
+        "x-authorization-policy": "explicit-deny-by-default",
+        "x-required-capabilities": [
+          "workstations.manage"
         ],
         "x-zeromerma-operation-id-policy": "FASTAPI_STABLE_GENERATED"
       }
@@ -69094,6 +70616,10 @@
         "summary": "Get Admin Workstation Detail",
         "tags": [
           "admin-workstations"
+        ],
+        "x-authorization-policy": "explicit-deny-by-default",
+        "x-required-capabilities": [
+          "workstations.view"
         ],
         "x-zeromerma-operation-id-policy": "FASTAPI_STABLE_GENERATED"
       },
@@ -69213,6 +70739,10 @@
         "tags": [
           "admin-workstations"
         ],
+        "x-authorization-policy": "explicit-deny-by-default",
+        "x-required-capabilities": [
+          "workstations.manage"
+        ],
         "x-zeromerma-operation-id-policy": "FASTAPI_STABLE_GENERATED"
       }
     },
@@ -69321,6 +70851,28 @@
     "/v1/auth/me": {
       "get": {
         "operationId": "me_v1_auth_me_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "surface",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "POS",
+                    "BACKOFFICE"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Surface"
+            }
+          }
+        ],
         "responses": {
           "200": {
             "content": {
@@ -69521,6 +71073,10 @@
         "tags": [
           "cash-close"
         ],
+        "x-authorization-policy": "explicit-deny-by-default",
+        "x-required-capabilities": [
+          "pos.operate"
+        ],
         "x-zeromerma-operation-id-policy": "FASTAPI_STABLE_GENERATED"
       }
     },
@@ -69628,6 +71184,10 @@
         "tags": [
           "cash-close"
         ],
+        "x-authorization-policy": "explicit-deny-by-default",
+        "x-required-capabilities": [
+          "pos.operate"
+        ],
         "x-zeromerma-operation-id-policy": "FASTAPI_STABLE_GENERATED"
       }
     },
@@ -69734,6 +71294,10 @@
         "summary": "Preview Cash Close",
         "tags": [
           "cash-close"
+        ],
+        "x-authorization-policy": "explicit-deny-by-default",
+        "x-required-capabilities": [
+          "pos.operate"
         ],
         "x-zeromerma-operation-id-policy": "FASTAPI_STABLE_GENERATED"
       }
@@ -69844,6 +71408,10 @@
         "tags": [
           "cash-close"
         ],
+        "x-authorization-policy": "explicit-deny-by-default",
+        "x-required-capabilities": [
+          "pos.operate"
+        ],
         "x-zeromerma-operation-id-policy": "FASTAPI_STABLE_GENERATED"
       }
     },
@@ -69952,6 +71520,10 @@
         "summary": "Get Cash Close Summary",
         "tags": [
           "cash-close"
+        ],
+        "x-authorization-policy": "explicit-deny-by-default",
+        "x-required-capabilities": [
+          "pos.operate"
         ],
         "x-zeromerma-operation-id-policy": "FASTAPI_STABLE_GENERATED"
       }
@@ -70062,6 +71634,10 @@
         "summary": "Get Cash Close Detail",
         "tags": [
           "cash-close"
+        ],
+        "x-authorization-policy": "explicit-deny-by-default",
+        "x-required-capabilities": [
+          "pos.operate"
         ],
         "x-zeromerma-operation-id-policy": "FASTAPI_STABLE_GENERATED"
       }
@@ -70180,6 +71756,10 @@
         "tags": [
           "cash-sessions"
         ],
+        "x-authorization-policy": "explicit-deny-by-default",
+        "x-required-capabilities": [
+          "pos.operate"
+        ],
         "x-zeromerma-operation-id-policy": "FASTAPI_STABLE_GENERATED"
       }
     },
@@ -70286,6 +71866,10 @@
         "summary": "Open Cash Session",
         "tags": [
           "cash-sessions"
+        ],
+        "x-authorization-policy": "explicit-deny-by-default",
+        "x-required-capabilities": [
+          "pos.operate"
         ],
         "x-zeromerma-operation-id-policy": "FASTAPI_STABLE_GENERATED"
       }
@@ -70396,6 +71980,10 @@
         "tags": [
           "corrections"
         ],
+        "x-authorization-policy": "explicit-deny-by-default",
+        "x-required-capabilities": [
+          "pos.operate"
+        ],
         "x-zeromerma-operation-id-policy": "FASTAPI_STABLE_GENERATED"
       }
     },
@@ -70502,6 +72090,10 @@
         "summary": "Commit Correction",
         "tags": [
           "corrections"
+        ],
+        "x-authorization-policy": "explicit-deny-by-default",
+        "x-required-capabilities": [
+          "returns_corrections.manage"
         ],
         "x-zeromerma-operation-id-policy": "FASTAPI_STABLE_GENERATED"
       }
@@ -70698,6 +72290,10 @@
         "tags": [
           "corrections"
         ],
+        "x-authorization-policy": "explicit-deny-by-default",
+        "x-required-capabilities": [
+          "pos.operate"
+        ],
         "x-zeromerma-operation-id-policy": "FASTAPI_STABLE_GENERATED"
       }
     },
@@ -70817,6 +72413,10 @@
         "summary": "Get Correction Document Detail",
         "tags": [
           "corrections"
+        ],
+        "x-authorization-policy": "explicit-deny-by-default",
+        "x-required-capabilities": [
+          "pos.operate"
         ],
         "x-zeromerma-operation-id-policy": "FASTAPI_STABLE_GENERATED"
       }
@@ -70943,6 +72543,10 @@
         "summary": "Search Correction Products",
         "tags": [
           "corrections"
+        ],
+        "x-authorization-policy": "explicit-deny-by-default",
+        "x-required-capabilities": [
+          "pos.operate"
         ],
         "x-zeromerma-operation-id-policy": "FASTAPI_STABLE_GENERATED"
       }
@@ -71087,6 +72691,10 @@
         "tags": [
           "corrections"
         ],
+        "x-authorization-policy": "explicit-deny-by-default",
+        "x-required-capabilities": [
+          "pos.operate"
+        ],
         "x-zeromerma-operation-id-policy": "FASTAPI_STABLE_GENERATED"
       }
     },
@@ -71206,6 +72814,10 @@
         "summary": "Get Correction Target Detail",
         "tags": [
           "corrections"
+        ],
+        "x-authorization-policy": "explicit-deny-by-default",
+        "x-required-capabilities": [
+          "pos.operate"
         ],
         "x-zeromerma-operation-id-policy": "FASTAPI_STABLE_GENERATED"
       }
@@ -71402,6 +73014,10 @@
         "tags": [
           "discounts"
         ],
+        "x-authorization-policy": "explicit-deny-by-default",
+        "x-required-capabilities": [
+          "pos.operate"
+        ],
         "x-zeromerma-operation-id-policy": "FASTAPI_STABLE_GENERATED"
       },
       "post": {
@@ -71506,6 +73122,10 @@
         "summary": "Create Discount",
         "tags": [
           "discounts"
+        ],
+        "x-authorization-policy": "explicit-deny-by-default",
+        "x-required-capabilities": [
+          "discounts.manage"
         ],
         "x-zeromerma-operation-id-policy": "FASTAPI_STABLE_GENERATED"
       }
@@ -71615,6 +73235,10 @@
         "summary": "Get Discounts Bootstrap",
         "tags": [
           "discounts"
+        ],
+        "x-authorization-policy": "explicit-deny-by-default",
+        "x-required-capabilities": [
+          "pos.operate"
         ],
         "x-zeromerma-operation-id-policy": "FASTAPI_STABLE_GENERATED"
       }
@@ -71736,6 +73360,10 @@
         "tags": [
           "discounts"
         ],
+        "x-authorization-policy": "explicit-deny-by-default",
+        "x-required-capabilities": [
+          "pos.operate"
+        ],
         "x-zeromerma-operation-id-policy": "FASTAPI_STABLE_GENERATED"
       }
     },
@@ -71844,6 +73472,10 @@
         "summary": "Get Operations Bootstrap",
         "tags": [
           "operations"
+        ],
+        "x-authorization-policy": "explicit-deny-by-default",
+        "x-required-capabilities": [
+          "pos.operate"
         ],
         "x-zeromerma-operation-id-policy": "FASTAPI_STABLE_GENERATED"
       }
@@ -71980,6 +73612,10 @@
         "summary": "Get Operations Catalog",
         "tags": [
           "operations"
+        ],
+        "x-authorization-policy": "explicit-deny-by-default",
+        "x-required-capabilities": [
+          "pos.operate"
         ],
         "x-zeromerma-operation-id-policy": "FASTAPI_STABLE_GENERATED"
       }
@@ -72128,6 +73764,10 @@
         "tags": [
           "operations"
         ],
+        "x-authorization-policy": "explicit-deny-by-default",
+        "x-required-capabilities": [
+          "pos.operate"
+        ],
         "x-zeromerma-operation-id-policy": "FASTAPI_STABLE_GENERATED"
       }
     },
@@ -72234,6 +73874,10 @@
         "summary": "Commit Counter Transfer",
         "tags": [
           "operations"
+        ],
+        "x-authorization-policy": "explicit-deny-by-default",
+        "x-required-capabilities": [
+          "pos.operate"
         ],
         "x-zeromerma-operation-id-policy": "FASTAPI_STABLE_GENERATED"
       }
@@ -72458,6 +74102,10 @@
         "tags": [
           "operations"
         ],
+        "x-authorization-policy": "explicit-deny-by-default",
+        "x-required-capabilities": [
+          "pos.operate"
+        ],
         "x-zeromerma-operation-id-policy": "FASTAPI_STABLE_GENERATED"
       }
     },
@@ -72564,6 +74212,10 @@
         "summary": "Commit Waste Record",
         "tags": [
           "operations"
+        ],
+        "x-authorization-policy": "explicit-deny-by-default",
+        "x-required-capabilities": [
+          "pos.operate"
         ],
         "x-zeromerma-operation-id-policy": "FASTAPI_STABLE_GENERATED"
       }
@@ -72684,6 +74336,10 @@
         "summary": "Get Operation Document",
         "tags": [
           "operations"
+        ],
+        "x-authorization-policy": "explicit-deny-by-default",
+        "x-required-capabilities": [
+          "pos.operate"
         ],
         "x-zeromerma-operation-id-policy": "FASTAPI_STABLE_GENERATED"
       }
@@ -72864,6 +74520,10 @@
         "tags": [
           "orders"
         ],
+        "x-authorization-policy": "explicit-deny-by-default",
+        "x-required-capabilities": [
+          "orders.view"
+        ],
         "x-zeromerma-operation-id-policy": "FASTAPI_STABLE_GENERATED"
       },
       "post": {
@@ -72968,6 +74628,10 @@
         "summary": "Create Order",
         "tags": [
           "orders"
+        ],
+        "x-authorization-policy": "explicit-deny-by-default",
+        "x-required-capabilities": [
+          "orders.manage"
         ],
         "x-zeromerma-operation-id-policy": "FASTAPI_STABLE_GENERATED"
       }
@@ -73077,6 +74741,10 @@
         "summary": "Get Orders Bootstrap",
         "tags": [
           "orders"
+        ],
+        "x-authorization-policy": "explicit-deny-by-default",
+        "x-required-capabilities": [
+          "orders.view"
         ],
         "x-zeromerma-operation-id-policy": "FASTAPI_STABLE_GENERATED"
       }
@@ -73203,6 +74871,10 @@
         "summary": "Get Orders Catalog",
         "tags": [
           "orders"
+        ],
+        "x-authorization-policy": "explicit-deny-by-default",
+        "x-required-capabilities": [
+          "orders.view"
         ],
         "x-zeromerma-operation-id-policy": "FASTAPI_STABLE_GENERATED"
       }
@@ -73341,6 +75013,10 @@
         "tags": [
           "orders"
         ],
+        "x-authorization-policy": "explicit-deny-by-default",
+        "x-required-capabilities": [
+          "orders.view"
+        ],
         "x-zeromerma-operation-id-policy": "FASTAPI_STABLE_GENERATED"
       }
     },
@@ -73460,6 +75136,10 @@
         "summary": "Get Order Detail",
         "tags": [
           "orders"
+        ],
+        "x-authorization-policy": "explicit-deny-by-default",
+        "x-required-capabilities": [
+          "orders.view"
         ],
         "x-zeromerma-operation-id-policy": "FASTAPI_STABLE_GENERATED"
       }
@@ -73581,6 +75261,10 @@
         "tags": [
           "orders"
         ],
+        "x-authorization-policy": "explicit-deny-by-default",
+        "x-required-capabilities": [
+          "orders.cancel"
+        ],
         "x-zeromerma-operation-id-policy": "FASTAPI_STABLE_GENERATED"
       }
     },
@@ -73701,6 +75385,10 @@
         "tags": [
           "orders"
         ],
+        "x-authorization-policy": "explicit-deny-by-default",
+        "x-required-capabilities": [
+          "orders.manage"
+        ],
         "x-zeromerma-operation-id-policy": "FASTAPI_STABLE_GENERATED"
       }
     },
@@ -73820,6 +75508,10 @@
         "summary": "Mark Order Ready",
         "tags": [
           "orders"
+        ],
+        "x-authorization-policy": "explicit-deny-by-default",
+        "x-required-capabilities": [
+          "orders.manage"
         ],
         "x-zeromerma-operation-id-policy": "FASTAPI_STABLE_GENERATED"
       }
@@ -74016,6 +75708,10 @@
         "tags": [
           "payments"
         ],
+        "x-authorization-policy": "explicit-deny-by-default",
+        "x-required-capabilities": [
+          "pos.operate"
+        ],
         "x-zeromerma-operation-id-policy": "FASTAPI_STABLE_GENERATED"
       },
       "post": {
@@ -74120,6 +75816,10 @@
         "summary": "Create Payment",
         "tags": [
           "payments"
+        ],
+        "x-authorization-policy": "explicit-deny-by-default",
+        "x-required-capabilities": [
+          "pos.operate"
         ],
         "x-zeromerma-operation-id-policy": "FASTAPI_STABLE_GENERATED"
       }
@@ -74229,6 +75929,10 @@
         "summary": "Get Payments Bootstrap",
         "tags": [
           "payments"
+        ],
+        "x-authorization-policy": "explicit-deny-by-default",
+        "x-required-capabilities": [
+          "pos.operate"
         ],
         "x-zeromerma-operation-id-policy": "FASTAPI_STABLE_GENERATED"
       }
@@ -74350,6 +76054,10 @@
         "tags": [
           "payments"
         ],
+        "x-authorization-policy": "explicit-deny-by-default",
+        "x-required-capabilities": [
+          "pos.operate"
+        ],
         "x-zeromerma-operation-id-policy": "FASTAPI_STABLE_GENERATED"
       }
     },
@@ -74458,6 +76166,10 @@
         "summary": "Bootstrap",
         "tags": [
           "pos"
+        ],
+        "x-authorization-policy": "explicit-deny-by-default",
+        "x-required-capabilities": [
+          "pos.operate"
         ],
         "x-zeromerma-operation-id-policy": "FASTAPI_STABLE_GENERATED"
       }
@@ -74584,6 +76296,10 @@
         "summary": "Get Pos Catalog",
         "tags": [
           "pos"
+        ],
+        "x-authorization-policy": "explicit-deny-by-default",
+        "x-required-capabilities": [
+          "pos.operate"
         ],
         "x-zeromerma-operation-id-policy": "FASTAPI_STABLE_GENERATED"
       }
@@ -74722,6 +76438,10 @@
         "tags": [
           "pos"
         ],
+        "x-authorization-policy": "explicit-deny-by-default",
+        "x-required-capabilities": [
+          "pos.operate"
+        ],
         "x-zeromerma-operation-id-policy": "FASTAPI_STABLE_GENERATED"
       }
     },
@@ -74830,6 +76550,10 @@
         "summary": "Get Returns Bootstrap",
         "tags": [
           "returns"
+        ],
+        "x-authorization-policy": "explicit-deny-by-default",
+        "x-required-capabilities": [
+          "pos.operate"
         ],
         "x-zeromerma-operation-id-policy": "FASTAPI_STABLE_GENERATED"
       }
@@ -74968,6 +76692,10 @@
         "tags": [
           "returns"
         ],
+        "x-authorization-policy": "explicit-deny-by-default",
+        "x-required-capabilities": [
+          "pos.operate"
+        ],
         "x-zeromerma-operation-id-policy": "FASTAPI_STABLE_GENERATED"
       }
     },
@@ -75074,6 +76802,10 @@
         "summary": "Commit Sale Return",
         "tags": [
           "returns"
+        ],
+        "x-authorization-policy": "explicit-deny-by-default",
+        "x-required-capabilities": [
+          "returns_corrections.manage"
         ],
         "x-zeromerma-operation-id-policy": "FASTAPI_STABLE_GENERATED"
       }
@@ -75289,6 +77021,10 @@
         "tags": [
           "returns"
         ],
+        "x-authorization-policy": "explicit-deny-by-default",
+        "x-required-capabilities": [
+          "pos.operate"
+        ],
         "x-zeromerma-operation-id-policy": "FASTAPI_STABLE_GENERATED"
       }
     },
@@ -75408,6 +77144,10 @@
         "summary": "Get Return Sale Detail",
         "tags": [
           "returns"
+        ],
+        "x-authorization-policy": "explicit-deny-by-default",
+        "x-required-capabilities": [
+          "pos.operate"
         ],
         "x-zeromerma-operation-id-policy": "FASTAPI_STABLE_GENERATED"
       }
@@ -75588,6 +77328,10 @@
         "tags": [
           "returns"
         ],
+        "x-authorization-policy": "explicit-deny-by-default",
+        "x-required-capabilities": [
+          "pos.operate"
+        ],
         "x-zeromerma-operation-id-policy": "FASTAPI_STABLE_GENERATED"
       }
     },
@@ -75708,6 +77452,10 @@
         "tags": [
           "returns"
         ],
+        "x-authorization-policy": "explicit-deny-by-default",
+        "x-required-capabilities": [
+          "pos.operate"
+        ],
         "x-zeromerma-operation-id-policy": "FASTAPI_STABLE_GENERATED"
       }
     },
@@ -75814,6 +77562,10 @@
         "summary": "Confirm Sale",
         "tags": [
           "sales"
+        ],
+        "x-authorization-policy": "explicit-deny-by-default",
+        "x-required-capabilities": [
+          "pos.operate"
         ],
         "x-zeromerma-operation-id-policy": "FASTAPI_STABLE_GENERATED"
       }
@@ -75924,6 +77676,10 @@
         "summary": "Get Sale",
         "tags": [
           "sales"
+        ],
+        "x-authorization-policy": "explicit-deny-by-default",
+        "x-required-capabilities": [
+          "pos.operate"
         ],
         "x-zeromerma-operation-id-policy": "FASTAPI_STABLE_GENERATED"
       }
@@ -76068,6 +77824,10 @@
         "tags": [
           "tickets"
         ],
+        "x-authorization-policy": "explicit-deny-by-default",
+        "x-required-capabilities": [
+          "sales_tickets.view"
+        ],
         "x-zeromerma-operation-id-policy": "FASTAPI_STABLE_GENERATED"
       }
     },
@@ -76176,6 +77936,10 @@
         "summary": "Get Tickets Bootstrap",
         "tags": [
           "tickets"
+        ],
+        "x-authorization-policy": "explicit-deny-by-default",
+        "x-required-capabilities": [
+          "sales_tickets.view"
         ],
         "x-zeromerma-operation-id-policy": "FASTAPI_STABLE_GENERATED"
       }
@@ -76297,6 +78061,10 @@
         "tags": [
           "tickets"
         ],
+        "x-authorization-policy": "explicit-deny-by-default",
+        "x-required-capabilities": [
+          "sales_tickets.view"
+        ],
         "x-zeromerma-operation-id-policy": "FASTAPI_STABLE_GENERATED"
       }
     },
@@ -76417,6 +78185,10 @@
         "tags": [
           "tickets"
         ],
+        "x-authorization-policy": "explicit-deny-by-default",
+        "x-required-capabilities": [
+          "sales_tickets.reprint"
+        ],
         "x-zeromerma-operation-id-policy": "FASTAPI_STABLE_GENERATED"
       }
     },
@@ -76523,6 +78295,10 @@
         "summary": "Commit Transfer Dispatch",
         "tags": [
           "transfers"
+        ],
+        "x-authorization-policy": "explicit-deny-by-default",
+        "x-required-capabilities": [
+          "transfers.execute"
         ],
         "x-zeromerma-operation-id-policy": "FASTAPI_STABLE_GENERATED"
       }
@@ -76701,6 +78477,10 @@
         "tags": [
           "transfers"
         ],
+        "x-authorization-policy": "explicit-deny-by-default",
+        "x-required-capabilities": [
+          "transfers.view"
+        ],
         "x-zeromerma-operation-id-policy": "FASTAPI_STABLE_GENERATED"
       }
     },
@@ -76809,6 +78589,10 @@
         "summary": "Get Pending Inbound Transfers",
         "tags": [
           "transfers"
+        ],
+        "x-authorization-policy": "explicit-deny-by-default",
+        "x-required-capabilities": [
+          "transfers.view"
         ],
         "x-zeromerma-operation-id-policy": "FASTAPI_STABLE_GENERATED"
       }
@@ -76971,6 +78755,10 @@
         "tags": [
           "transfers"
         ],
+        "x-authorization-policy": "explicit-deny-by-default",
+        "x-required-capabilities": [
+          "transfers.view"
+        ],
         "x-zeromerma-operation-id-policy": "FASTAPI_STABLE_GENERATED"
       }
     },
@@ -77091,6 +78879,10 @@
         "tags": [
           "transfers"
         ],
+        "x-authorization-policy": "explicit-deny-by-default",
+        "x-required-capabilities": [
+          "transfers.view"
+        ],
         "x-zeromerma-operation-id-policy": "FASTAPI_STABLE_GENERATED"
       }
     },
@@ -77210,6 +79002,10 @@
         "summary": "Receive Transfer",
         "tags": [
           "transfers"
+        ],
+        "x-authorization-policy": "explicit-deny-by-default",
+        "x-required-capabilities": [
+          "transfers.execute"
         ],
         "x-zeromerma-operation-id-policy": "FASTAPI_STABLE_GENERATED"
       }

@@ -1,3 +1,4 @@
+import { AdminActionButton } from "../../components/AdminActionButton";
 import { useEffect, useMemo, useState } from "react";
 
 import type {
@@ -22,8 +23,14 @@ interface AdminSupplierFormPanelProps {
 
 function selectedIdsFromDetail(initialSupplier?: AdminSupplierDetail | null) {
   return {
-    branchIds: initialSupplier?.branchApplicability.filter((branch) => branch.isActive).map((branch) => branch.branchId) ?? [],
-    productIds: initialSupplier?.productAssociations.filter((product) => product.isActive).map((product) => product.productId) ?? [],
+    branchIds:
+      initialSupplier?.branchApplicability
+        .filter((branch) => branch.isActive)
+        .map((branch) => branch.branchId) ?? [],
+    productIds:
+      initialSupplier?.productAssociations
+        .filter((product) => product.isActive)
+        .map((product) => product.productId) ?? [],
   };
 }
 
@@ -42,19 +49,33 @@ export function AdminSupplierFormPanel({
   const [branchIds, setBranchIds] = useState<string[]>(selectedIds.branchIds);
   const [category, setCategory] = useState(initialSupplier?.overview.category ?? "OTHER");
   const [code, setCode] = useState(initialSupplier?.overview.code ?? "");
-  const [commercialName, setCommercialName] = useState(initialSupplier?.overview.commercialName ?? "");
+  const [commercialName, setCommercialName] = useState(
+    initialSupplier?.overview.commercialName ?? "",
+  );
   const [contactEmail, setContactEmail] = useState(initialSupplier?.contacts[0]?.email ?? "");
   const [contactName, setContactName] = useState(initialSupplier?.contacts[0]?.name ?? "");
   const [contactPhone, setContactPhone] = useState(initialSupplier?.contacts[0]?.phone ?? "");
-  const [creditDays, setCreditDays] = useState(String(initialSupplier?.commercialTerms.creditDays ?? 0));
-  const [fiscalEmail, setFiscalEmail] = useState(initialSupplier?.fiscalLegal.paymentFiscalEmail ?? "");
-  const [leadTimeDays, setLeadTimeDays] = useState(String(initialSupplier?.commercialTerms.leadTimeDays ?? 0));
+  const [creditDays, setCreditDays] = useState(
+    String(initialSupplier?.commercialTerms.creditDays ?? 0),
+  );
+  const [fiscalEmail, setFiscalEmail] = useState(
+    initialSupplier?.fiscalLegal.paymentFiscalEmail ?? "",
+  );
+  const [leadTimeDays, setLeadTimeDays] = useState(
+    String(initialSupplier?.commercialTerms.leadTimeDays ?? 0),
+  );
   const [legalName, setLegalName] = useState(initialSupplier?.overview.legalName ?? "");
-  const [minimumOrderAmount, setMinimumOrderAmount] = useState(initialSupplier?.commercialTerms.minimumOrderAmount ?? "");
+  const [minimumOrderAmount, setMinimumOrderAmount] = useState(
+    initialSupplier?.commercialTerms.minimumOrderAmount ?? "",
+  );
   const [notes, setNotes] = useState(initialSupplier?.fiscalLegal.notes ?? "");
-  const [paymentTermsType, setPaymentTermsType] = useState(initialSupplier?.commercialTerms.paymentTermsType ?? "CASH");
+  const [paymentTermsType, setPaymentTermsType] = useState(
+    initialSupplier?.commercialTerms.paymentTermsType ?? "CASH",
+  );
   const [productIds, setProductIds] = useState<string[]>(selectedIds.productIds);
-  const [status, setStatus] = useState<AdminSupplierStatus>(initialSupplier?.overview.status ?? "ACTIVE");
+  const [status, setStatus] = useState<AdminSupplierStatus>(
+    initialSupplier?.overview.status ?? "ACTIVE",
+  );
   const [taxId, setTaxId] = useState(initialSupplier?.overview.taxId ?? "");
   const [validationMessage, setValidationMessage] = useState<string | null>(null);
 
@@ -80,7 +101,9 @@ export function AdminSupplierFormPanel({
   }, [initialSupplier]);
 
   function toggleSelection(value: string, current: string[], setter: (next: string[]) => void) {
-    setter(current.includes(value) ? current.filter((item) => item !== value) : [...current, value]);
+    setter(
+      current.includes(value) ? current.filter((item) => item !== value) : [...current, value],
+    );
   }
 
   function handleSubmit() {
@@ -157,35 +180,74 @@ export function AdminSupplierFormPanel({
           <p className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">
             {initialSupplier ? "Editar proveedor" : "Nuevo proveedor"}
           </p>
-          <h2 className="text-lg font-semibold text-slate-950">Datos maestros y preparacion de compras</h2>
-          <p className="text-sm text-slate-600">Los cambios se persisten en backend y quedan auditados.</p>
+          <h2 className="text-lg font-semibold text-slate-950">
+            Datos maestros y preparacion de compras
+          </h2>
+          <p className="text-sm text-slate-600">
+            Los cambios se persisten en backend y quedan auditados.
+          </p>
         </div>
-        <button className="rounded-full border border-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-700" type="button" onClick={onClose}>
+        <button
+          className="rounded-full border border-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-700"
+          type="button"
+          onClick={onClose}
+        >
           Cerrar
         </button>
       </div>
 
       <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-6">
         <label className="flex flex-col gap-1 xl:col-span-2">
-          <span className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">Razon social</span>
-          <input className="rounded-xl border border-slate-200 px-3 py-2 text-sm" value={legalName} onChange={(event) => setLegalName(event.target.value)} />
+          <span className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">
+            Razon social
+          </span>
+          <input
+            className="rounded-xl border border-slate-200 px-3 py-2 text-sm"
+            value={legalName}
+            onChange={(event) => setLegalName(event.target.value)}
+          />
         </label>
         <label className="flex flex-col gap-1">
-          <span className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">Codigo</span>
-          <input className="rounded-xl border border-slate-200 px-3 py-2 text-sm" placeholder="Autogenerado si queda vacio" value={code} onChange={(event) => setCode(event.target.value)} />
+          <span className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">
+            Codigo
+          </span>
+          <input
+            className="rounded-xl border border-slate-200 px-3 py-2 text-sm"
+            placeholder="Autogenerado si queda vacio"
+            value={code}
+            onChange={(event) => setCode(event.target.value)}
+          />
         </label>
         <label className="flex flex-col gap-1 xl:col-span-2">
-          <span className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">Nombre comercial</span>
-          <input className="rounded-xl border border-slate-200 px-3 py-2 text-sm" value={commercialName} onChange={(event) => setCommercialName(event.target.value)} />
+          <span className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">
+            Nombre comercial
+          </span>
+          <input
+            className="rounded-xl border border-slate-200 px-3 py-2 text-sm"
+            value={commercialName}
+            onChange={(event) => setCommercialName(event.target.value)}
+          />
         </label>
         <label className="flex flex-col gap-1">
-          <span className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">RFC / Tax ID</span>
-          <input className="rounded-xl border border-slate-200 px-3 py-2 text-sm" value={taxId} onChange={(event) => setTaxId(event.target.value)} />
+          <span className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">
+            RFC / Tax ID
+          </span>
+          <input
+            className="rounded-xl border border-slate-200 px-3 py-2 text-sm"
+            value={taxId}
+            onChange={(event) => setTaxId(event.target.value)}
+          />
         </label>
 
         <label className="flex flex-col gap-1">
-          <span className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">Categoria</span>
-          <select className="rounded-xl border border-slate-200 px-3 py-2 text-sm" value={category} onChange={(event) => setCategory(event.target.value)}>
+          <span className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">
+            Categoria
+          </span>
+          <select
+            className="rounded-xl border border-slate-200 px-3 py-2 text-sm"
+            value={category}
+            onChange={(event) => setCategory(event.target.value)}
+          >
             {categoryOptions.map((option) => (
               <option key={option.id} value={option.id}>
                 {option.label}
@@ -194,8 +256,14 @@ export function AdminSupplierFormPanel({
           </select>
         </label>
         <label className="flex flex-col gap-1">
-          <span className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">Estado</span>
-          <select className="rounded-xl border border-slate-200 px-3 py-2 text-sm" value={status} onChange={(event) => setStatus(event.target.value as AdminSupplierStatus)}>
+          <span className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">
+            Estado
+          </span>
+          <select
+            className="rounded-xl border border-slate-200 px-3 py-2 text-sm"
+            value={status}
+            onChange={(event) => setStatus(event.target.value as AdminSupplierStatus)}
+          >
             {statusOptions.map((option) => (
               <option key={option.id} value={option.id}>
                 {option.label}
@@ -204,21 +272,45 @@ export function AdminSupplierFormPanel({
           </select>
         </label>
         <label className="flex flex-col gap-1 xl:col-span-2">
-          <span className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">Contacto principal</span>
-          <input className="rounded-xl border border-slate-200 px-3 py-2 text-sm" value={contactName} onChange={(event) => setContactName(event.target.value)} />
+          <span className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">
+            Contacto principal
+          </span>
+          <input
+            className="rounded-xl border border-slate-200 px-3 py-2 text-sm"
+            value={contactName}
+            onChange={(event) => setContactName(event.target.value)}
+          />
         </label>
         <label className="flex flex-col gap-1">
-          <span className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">Telefono</span>
-          <input className="rounded-xl border border-slate-200 px-3 py-2 text-sm" value={contactPhone} onChange={(event) => setContactPhone(event.target.value)} />
+          <span className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">
+            Telefono
+          </span>
+          <input
+            className="rounded-xl border border-slate-200 px-3 py-2 text-sm"
+            value={contactPhone}
+            onChange={(event) => setContactPhone(event.target.value)}
+          />
         </label>
         <label className="flex flex-col gap-1">
-          <span className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">Email</span>
-          <input className="rounded-xl border border-slate-200 px-3 py-2 text-sm" value={contactEmail} onChange={(event) => setContactEmail(event.target.value)} />
+          <span className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">
+            Email
+          </span>
+          <input
+            className="rounded-xl border border-slate-200 px-3 py-2 text-sm"
+            value={contactEmail}
+            onChange={(event) => setContactEmail(event.target.value)}
+          />
         </label>
 
         <label className="flex flex-col gap-1">
-          <span className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">Terminos</span>
-          <select className="rounded-xl border border-slate-200 px-3 py-2 text-sm" value={paymentTermsType} onChange={(event) => setPaymentTermsType(event.target.value)}>
+          <span className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">
+            Terminos
+          </span>
+          <select
+            className="rounded-xl border border-slate-200 px-3 py-2 text-sm"
+            value={paymentTermsType}
+            onChange={(event) => setPaymentTermsType(event.target.value)}
+          >
             <option value="CASH">Contado</option>
             <option value="CREDIT">Credito</option>
             <option value="TRANSFER">Transferencia</option>
@@ -226,28 +318,65 @@ export function AdminSupplierFormPanel({
           </select>
         </label>
         <label className="flex flex-col gap-1">
-          <span className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">Dias credito</span>
-          <input className="rounded-xl border border-slate-200 px-3 py-2 text-sm" min="0" type="number" value={creditDays} onChange={(event) => setCreditDays(event.target.value)} />
+          <span className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">
+            Dias credito
+          </span>
+          <input
+            className="rounded-xl border border-slate-200 px-3 py-2 text-sm"
+            min="0"
+            type="number"
+            value={creditDays}
+            onChange={(event) => setCreditDays(event.target.value)}
+          />
         </label>
         <label className="flex flex-col gap-1">
-          <span className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">Lead time</span>
-          <input className="rounded-xl border border-slate-200 px-3 py-2 text-sm" min="0" type="number" value={leadTimeDays} onChange={(event) => setLeadTimeDays(event.target.value)} />
+          <span className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">
+            Lead time
+          </span>
+          <input
+            className="rounded-xl border border-slate-200 px-3 py-2 text-sm"
+            min="0"
+            type="number"
+            value={leadTimeDays}
+            onChange={(event) => setLeadTimeDays(event.target.value)}
+          />
         </label>
         <label className="flex flex-col gap-1">
-          <span className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">Pedido minimo</span>
-          <input className="rounded-xl border border-slate-200 px-3 py-2 text-sm" min="0" step="0.01" type="number" value={minimumOrderAmount} onChange={(event) => setMinimumOrderAmount(event.target.value)} />
+          <span className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">
+            Pedido minimo
+          </span>
+          <input
+            className="rounded-xl border border-slate-200 px-3 py-2 text-sm"
+            min="0"
+            step="0.01"
+            type="number"
+            value={minimumOrderAmount}
+            onChange={(event) => setMinimumOrderAmount(event.target.value)}
+          />
         </label>
         <label className="flex flex-col gap-1 xl:col-span-2">
-          <span className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">Email fiscal</span>
-          <input className="rounded-xl border border-slate-200 px-3 py-2 text-sm" value={fiscalEmail} onChange={(event) => setFiscalEmail(event.target.value)} />
+          <span className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">
+            Email fiscal
+          </span>
+          <input
+            className="rounded-xl border border-slate-200 px-3 py-2 text-sm"
+            value={fiscalEmail}
+            onChange={(event) => setFiscalEmail(event.target.value)}
+          />
         </label>
 
         <fieldset className="rounded-xl border border-slate-200 p-3 xl:col-span-3">
-          <legend className="px-1 text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">Productos surtidos</legend>
+          <legend className="px-1 text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">
+            Productos surtidos
+          </legend>
           <div className="grid gap-2 sm:grid-cols-2">
             {productOptions.map((option) => (
               <label className="flex items-center gap-2 text-sm text-slate-700" key={option.id}>
-                <input checked={productIds.includes(option.id)} type="checkbox" onChange={() => toggleSelection(option.id, productIds, setProductIds)} />
+                <input
+                  checked={productIds.includes(option.id)}
+                  type="checkbox"
+                  onChange={() => toggleSelection(option.id, productIds, setProductIds)}
+                />
                 <span>{option.label}</span>
               </label>
             ))}
@@ -255,11 +384,17 @@ export function AdminSupplierFormPanel({
         </fieldset>
 
         <fieldset className="rounded-xl border border-slate-200 p-3 xl:col-span-3">
-          <legend className="px-1 text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">Sucursales aplicables</legend>
+          <legend className="px-1 text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">
+            Sucursales aplicables
+          </legend>
           <div className="grid gap-2 sm:grid-cols-2">
             {branchOptions.map((option) => (
               <label className="flex items-center gap-2 text-sm text-slate-700" key={option.id}>
-                <input checked={branchIds.includes(option.id)} type="checkbox" onChange={() => toggleSelection(option.id, branchIds, setBranchIds)} />
+                <input
+                  checked={branchIds.includes(option.id)}
+                  type="checkbox"
+                  onChange={() => toggleSelection(option.id, branchIds, setBranchIds)}
+                />
                 <span>{option.label}</span>
               </label>
             ))}
@@ -267,8 +402,14 @@ export function AdminSupplierFormPanel({
         </fieldset>
 
         <label className="flex flex-col gap-1 xl:col-span-6">
-          <span className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">Notas</span>
-          <input className="rounded-xl border border-slate-200 px-3 py-2 text-sm" value={notes} onChange={(event) => setNotes(event.target.value)} />
+          <span className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">
+            Notas
+          </span>
+          <input
+            className="rounded-xl border border-slate-200 px-3 py-2 text-sm"
+            value={notes}
+            onChange={(event) => setNotes(event.target.value)}
+          />
         </label>
       </div>
 
@@ -279,12 +420,24 @@ export function AdminSupplierFormPanel({
       ) : null}
 
       <div className="mt-4 flex justify-end gap-2">
-        <button className="rounded-xl border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700" disabled={isSubmitting} type="button" onClick={onClose}>
+        <button
+          className="rounded-xl border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700"
+          disabled={isSubmitting}
+          type="button"
+          onClick={onClose}
+        >
           Cancelar
         </button>
-        <button className="rounded-xl bg-[var(--ui-color-primary)] px-4 py-2 text-sm font-semibold text-white disabled:opacity-60" disabled={isSubmitting} type="button" onClick={handleSubmit}>
+        <AdminActionButton
+          capability="suppliers.manage"
+          globalOnly
+          className="rounded-xl bg-[var(--ui-color-primary)] px-4 py-2 text-sm font-semibold text-white disabled:opacity-60"
+          disabled={isSubmitting}
+          type="button"
+          onClick={handleSubmit}
+        >
           Guardar proveedor
-        </button>
+        </AdminActionButton>
       </div>
     </section>
   );

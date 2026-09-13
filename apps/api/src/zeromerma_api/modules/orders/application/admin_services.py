@@ -13,6 +13,7 @@ from sqlalchemy.sql.selectable import Subquery
 
 from zeromerma_api.modules.audit.application.service import AuditRecorder
 from zeromerma_api.modules.branches.infrastructure.models import Branch, Workstation
+from zeromerma_api.modules.identity.application.actions import restrict_actions
 from zeromerma_api.modules.identity.infrastructure.models import User
 from zeromerma_api.modules.orders.application.admin_schemas import (
     AdminOrderAvailableActionsView,
@@ -666,7 +667,7 @@ def _build_order_detail(session: Session, order: CustomerOrder) -> AdminOrderDet
         remaining_balance_amount=_quantize_money(order.remaining_balance_amount),
     )
     return AdminOrderDetailView(
-        available_actions=_build_available_actions(order, refund_amount=refund_amount),
+        available_actions=_build_available_actions(session, order, refund_amount=refund_amount),
         backend_contract=_backend_contract(),
         customer=AdminOrderCustomerView(
             name=order.customer_name,
@@ -746,6 +747,7 @@ def _build_order_detail(session: Session, order: CustomerOrder) -> AdminOrderDet
 
 
 def _build_available_actions(
+    session: Session,
     order: CustomerOrder,
     *,
     refund_amount: Decimal,
@@ -760,18 +762,28 @@ def _build_available_actions(
         financial_note = "El saldo pendiente debe cobrarse desde una caja abierta."
     elif refund_amount > ZERO_MONEY:
         financial_note = "El reembolso del anticipo debe procesarse desde una caja abierta."
-    return AdminOrderAvailableActionsView(
-        can_mark_ready=order.status == ORDER_STATUS_PENDING,
-        can_deliver=can_deliver_without_payment,
-        can_cancel=(
-            order.status in {ORDER_STATUS_PENDING, ORDER_STATUS_READY}
-            and refund_amount == ZERO_MONEY
+    return restrict_actions(
+        session,
+        AdminOrderAvailableActionsView(
+            can_mark_ready=order.status == ORDER_STATUS_PENDING,
+            can_deliver=can_deliver_without_payment,
+            can_cancel=(
+                order.status in {ORDER_STATUS_PENDING, ORDER_STATUS_READY}
+                and refund_amount == ZERO_MONEY
+            ),
+            can_capture_balance=False,
+            can_create_from_backoffice=False,
+            requires_settlement_on_delivery=order.status == ORDER_STATUS_READY and has_balance_due,
+            requires_cash_session_for_financial_action=requires_financial_action,
+            financial_action_note=financial_note,
         ),
-        can_capture_balance=False,
-        can_create_from_backoffice=False,
-        requires_settlement_on_delivery=order.status == ORDER_STATUS_READY and has_balance_due,
-        requires_cash_session_for_financial_action=requires_financial_action,
-        financial_action_note=financial_note,
+        {
+            "can_mark_ready": "orders.manage",
+            "can_deliver": "orders.manage",
+            "can_cancel": "orders.cancel",
+        },
+        branch_ids=(order.branch_id,),
+        global_only=False,
     )
 
 

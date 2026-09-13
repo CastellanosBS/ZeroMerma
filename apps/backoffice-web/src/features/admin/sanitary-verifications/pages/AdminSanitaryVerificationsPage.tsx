@@ -289,6 +289,7 @@ export function AdminSanitaryVerificationsPage() {
   return (
     <section className="flex min-h-0 min-w-0 flex-col overflow-hidden rounded-[28px] border border-[var(--ui-color-border)] bg-white shadow-[var(--ui-shadow-subtle)] lg:h-full">
       <AdminPageHeader
+        actionCapability="quality_hygiene.manage"
         actionLabel="Nueva verificacion"
         description="Evalua el cumplimiento sanitario por sucursal, zona, equipo, proceso, checklist, evidencia y nivel de riesgo."
         meta={[pageStatusLabel]}

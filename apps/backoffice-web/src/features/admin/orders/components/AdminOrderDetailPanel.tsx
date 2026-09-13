@@ -1,3 +1,4 @@
+import { AdminActionButton } from "../../components/AdminActionButton";
 import { AdminEmptyState } from "../../components/AdminEmptyState";
 import type { AdminOrderDetail, AdminOrderListItem } from "../types";
 
@@ -9,7 +10,9 @@ function formatMoney(value: string | null | undefined, currencyCode = "MXN"): st
   if (!Number.isFinite(numericValue)) {
     return `${value} ${currencyCode}`;
   }
-  return new Intl.NumberFormat("es-MX", { currency: currencyCode, style: "currency" }).format(numericValue);
+  return new Intl.NumberFormat("es-MX", { currency: currencyCode, style: "currency" }).format(
+    numericValue,
+  );
 }
 
 function formatDateTime(value: string | null | undefined): string {
@@ -75,7 +78,9 @@ export function AdminOrderDetailPanel({
     return (
       <aside className="flex min-h-0 min-w-0 flex-col overflow-hidden rounded-[20px] border border-[var(--ui-color-border)] bg-white">
         <div className="border-b border-[var(--ui-color-border)] px-4 py-3">
-          <p className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">Detalle</p>
+          <p className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">
+            Detalle
+          </p>
           <h3 className="mt-1 text-lg font-semibold text-slate-950">Sin pedido seleccionado</h3>
         </div>
         <div className="min-h-0 flex-1 p-4">
@@ -92,11 +97,18 @@ export function AdminOrderDetailPanel({
     return (
       <aside className="flex min-h-0 min-w-0 flex-col overflow-hidden rounded-[20px] border border-[var(--ui-color-border)] bg-white">
         <div className="border-b border-[var(--ui-color-border)] px-4 py-3">
-          <p className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">Detalle</p>
-          <h3 className="mt-1 truncate text-lg font-semibold text-slate-950">{selectedOrder.folio}</h3>
+          <p className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">
+            Detalle
+          </p>
+          <h3 className="mt-1 truncate text-lg font-semibold text-slate-950">
+            {selectedOrder.folio}
+          </h3>
         </div>
         <div className="min-h-0 flex-1 p-4">
-          <AdminEmptyState description="Consultando productos, pagos y timeline." title="Cargando pedido" />
+          <AdminEmptyState
+            description="Consultando productos, pagos y timeline."
+            title="Cargando pedido"
+          />
         </div>
       </aside>
     );
@@ -106,8 +118,12 @@ export function AdminOrderDetailPanel({
     return (
       <aside className="flex min-h-0 min-w-0 flex-col overflow-hidden rounded-[20px] border border-[var(--ui-color-border)] bg-white">
         <div className="border-b border-[var(--ui-color-border)] px-4 py-3">
-          <p className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">Detalle</p>
-          <h3 className="mt-1 truncate text-lg font-semibold text-slate-950">{selectedOrder.folio}</h3>
+          <p className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">
+            Detalle
+          </p>
+          <h3 className="mt-1 truncate text-lg font-semibold text-slate-950">
+            {selectedOrder.folio}
+          </h3>
         </div>
         <div className="min-h-0 flex-1 p-4">
           <AdminEmptyState
@@ -126,8 +142,13 @@ export function AdminOrderDetailPanel({
       <div className="shrink-0 border-b border-[var(--ui-color-border)] px-4 py-3">
         <div className="flex min-w-0 items-start justify-between gap-3">
           <div className="min-w-0">
-            <p className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">Pedido</p>
-            <h3 className="mt-1 truncate text-lg font-semibold text-slate-950" title={detail.overview.folio}>
+            <p className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">
+              Pedido
+            </p>
+            <h3
+              className="mt-1 truncate text-lg font-semibold text-slate-950"
+              title={detail.overview.folio}
+            >
               {detail.overview.folio}
             </h3>
           </div>
@@ -140,16 +161,27 @@ export function AdminOrderDetailPanel({
       <div className="min-h-0 flex-1 overflow-y-auto p-3">
         <section className="rounded-[18px] border border-[var(--ui-color-border)] bg-slate-50/80 p-3">
           <div className="flex items-center justify-between gap-3">
-            <span className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">Resumen</span>
+            <span className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">
+              Resumen
+            </span>
             <strong className="text-xl font-semibold text-slate-950">
               {formatMoney(detail.overview.remainingBalanceAmount, currencyCode)}
             </strong>
           </div>
           <div className="mt-3 grid gap-1.5">
             <FieldRow label="Entrega" value={formatDateTime(detail.overview.requestedForAt)} />
-            <FieldRow label="Total" value={formatMoney(detail.overview.totalAmount, currencyCode)} />
-            <FieldRow label="Anticipo" value={formatMoney(detail.overview.advanceAmount, currencyCode)} />
-            <FieldRow label="Saldo" value={formatMoney(detail.overview.remainingBalanceAmount, currencyCode)} />
+            <FieldRow
+              label="Total"
+              value={formatMoney(detail.overview.totalAmount, currencyCode)}
+            />
+            <FieldRow
+              label="Anticipo"
+              value={formatMoney(detail.overview.advanceAmount, currencyCode)}
+            />
+            <FieldRow
+              label="Saldo"
+              value={formatMoney(detail.overview.remainingBalanceAmount, currencyCode)}
+            />
             <FieldRow
               label="Reembolso"
               value={formatMoney(detail.overview.cancellationRefundAmount, currencyCode)}
@@ -163,7 +195,9 @@ export function AdminOrderDetailPanel({
         </section>
 
         <section className="mt-3 rounded-[18px] border border-[var(--ui-color-border)] bg-white p-3">
-          <p className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">Cliente</p>
+          <p className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">
+            Cliente
+          </p>
           <div className="mt-3 grid gap-1.5">
             <FieldRow label="Nombre" value={detail.customer.name} />
             <FieldRow label="Telefono" value={detail.customer.phone ?? "Sin telefono"} />
@@ -172,21 +206,31 @@ export function AdminOrderDetailPanel({
         </section>
 
         <section className="mt-3 rounded-[18px] border border-[var(--ui-color-border)] bg-white p-3">
-          <p className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">Contexto operativo</p>
+          <p className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">
+            Contexto operativo
+          </p>
           <div className="mt-3 grid gap-1.5">
             <FieldRow label="Sucursal" value={detail.overview.branchName} />
             <FieldRow
               label="Caja"
               value={`${detail.operationalContext.workstationName ?? "N/A"} (${detail.operationalContext.workstationCode ?? "N/A"})`}
             />
-            <FieldRow label="Creado por" value={detail.operationalContext.createdByUserFullName ?? "N/A"} />
-            <FieldRow label="Turno" value={detail.operationalContext.activeCashSessionId ?? "N/A"} />
+            <FieldRow
+              label="Creado por"
+              value={detail.operationalContext.createdByUserFullName ?? "N/A"}
+            />
+            <FieldRow
+              label="Turno"
+              value={detail.operationalContext.activeCashSessionId ?? "N/A"}
+            />
           </div>
         </section>
 
         <section className="mt-3 rounded-[18px] border border-[var(--ui-color-border)] bg-white p-3">
           <div className="flex items-center justify-between gap-2">
-            <p className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">Productos</p>
+            <p className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">
+              Productos
+            </p>
             <span className="rounded-full border border-[var(--ui-color-border)] bg-white px-2.5 py-1 text-xs font-semibold text-slate-600">
               {detail.lines.length} lineas
             </span>
@@ -229,8 +273,12 @@ export function AdminOrderDetailPanel({
                   <span className="text-right font-semibold text-slate-950">
                     {formatMoney(payment.amount, payment.currencyCode)}
                   </span>
-                  <span className="truncate text-xs text-slate-500">{payment.recordedByUserFullName}</span>
-                  <span className="text-right text-xs text-slate-500">{formatDateTime(payment.recordedAtUtc)}</span>
+                  <span className="truncate text-xs text-slate-500">
+                    {payment.recordedByUserFullName}
+                  </span>
+                  <span className="text-right text-xs text-slate-500">
+                    {formatDateTime(payment.recordedAtUtc)}
+                  </span>
                 </div>
               ))
             ) : (
@@ -242,30 +290,48 @@ export function AdminOrderDetailPanel({
         </section>
 
         <section className="mt-3 rounded-[18px] border border-[var(--ui-color-border)] bg-white p-3">
-          <p className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">Timeline</p>
+          <p className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">
+            Timeline
+          </p>
           <div className="mt-3 grid gap-1.5">
             {detail.timeline.map((event) => (
-              <div className="rounded-[14px] border border-[var(--ui-color-border)] bg-slate-50 px-3 py-2 text-sm" key={event.key}>
+              <div
+                className="rounded-[14px] border border-[var(--ui-color-border)] bg-slate-50 px-3 py-2 text-sm"
+                key={event.key}
+              >
                 <div className="flex min-w-0 items-center justify-between gap-2">
                   <span className="truncate font-semibold text-slate-950">{event.label}</span>
-                  <span className="shrink-0 text-xs text-slate-500">{formatDateTime(event.occurredAt)}</span>
+                  <span className="shrink-0 text-xs text-slate-500">
+                    {formatDateTime(event.occurredAt)}
+                  </span>
                 </div>
-                {event.description ? <p className="mt-1 truncate text-xs text-slate-500">{event.description}</p> : null}
+                {event.description ? (
+                  <p className="mt-1 truncate text-xs text-slate-500">{event.description}</p>
+                ) : null}
               </div>
             ))}
           </div>
         </section>
 
         <section className="mt-3 rounded-[18px] border border-[var(--ui-color-border)] bg-white p-3">
-          <p className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">Documentos relacionados</p>
+          <p className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">
+            Documentos relacionados
+          </p>
           <div className="mt-3">
             {detail.relatedDocuments.length > 0 ? (
               <div className="grid gap-1.5">
                 {detail.relatedDocuments.map((document) => (
-                  <div className="rounded-[14px] border border-[var(--ui-color-border)] bg-slate-50 px-3 py-2 text-sm" key={document.id}>
+                  <div
+                    className="rounded-[14px] border border-[var(--ui-color-border)] bg-slate-50 px-3 py-2 text-sm"
+                    key={document.id}
+                  >
                     <div className="flex min-w-0 items-center justify-between gap-2">
-                      <span className="truncate font-semibold text-slate-950">{document.folio}</span>
-                      <span className="shrink-0 text-xs font-semibold text-slate-500">{document.status}</span>
+                      <span className="truncate font-semibold text-slate-950">
+                        {document.folio}
+                      </span>
+                      <span className="shrink-0 text-xs font-semibold text-slate-500">
+                        {document.status}
+                      </span>
                     </div>
                   </div>
                 ))}
@@ -280,30 +346,36 @@ export function AdminOrderDetailPanel({
       </div>
 
       <div className="grid shrink-0 grid-cols-3 gap-2 border-t border-[var(--ui-color-border)] p-3">
-        <button
+        <AdminActionButton
+          capability="orders.manage"
+          branchIds={[detail.overview.branchId]}
           className="h-10 rounded-2xl border border-[var(--ui-color-border)] bg-white px-3 text-xs font-semibold text-slate-700 transition hover:border-[var(--ui-color-info)] hover:text-[var(--ui-color-info)] focus:outline-none focus:ring-4 focus:ring-[var(--ui-color-ring)] disabled:cursor-not-allowed disabled:opacity-45"
           disabled={!detail.availableActions.canMarkReady}
           type="button"
           onClick={() => onMarkReady(detail)}
         >
           Marcar listo
-        </button>
-        <button
+        </AdminActionButton>
+        <AdminActionButton
+          capability="orders.manage"
+          branchIds={[detail.overview.branchId]}
           className="h-10 rounded-2xl bg-[var(--ui-color-primary)] px-3 text-xs font-semibold text-white transition hover:bg-[var(--ui-color-primary-strong)] focus:outline-none focus:ring-4 focus:ring-[var(--ui-color-ring)] disabled:cursor-not-allowed disabled:bg-slate-300 disabled:text-slate-600"
           disabled={!detail.availableActions.canDeliver}
           type="button"
           onClick={() => onDeliver(detail)}
         >
           Entregar
-        </button>
-        <button
+        </AdminActionButton>
+        <AdminActionButton
+          capability="orders.cancel"
+          branchIds={[detail.overview.branchId]}
           className="h-10 rounded-2xl border border-rose-200 bg-white px-3 text-xs font-semibold text-[var(--ui-color-danger)] transition hover:bg-[var(--ui-color-danger-soft)] focus:outline-none focus:ring-4 focus:ring-[var(--ui-color-ring)] disabled:cursor-not-allowed disabled:opacity-45"
           disabled={!detail.availableActions.canCancel}
           type="button"
           onClick={() => onCancel(detail)}
         >
           Cancelar
-        </button>
+        </AdminActionButton>
       </div>
     </aside>
   );

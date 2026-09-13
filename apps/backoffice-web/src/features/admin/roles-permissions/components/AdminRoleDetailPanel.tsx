@@ -1,7 +1,7 @@
-import { useState, type ReactNode } from "react";
+import { AdminActionButton } from "../../components/AdminActionButton";
+import type { ReactNode } from "react";
 
 import { AdminEmptyState } from "../../components/AdminEmptyState";
-import type { AdminUserListItem } from "../../users/types";
 import type { AdminRoleDetail, AdminRoleListItem } from "../types";
 
 function formatDateTime(value: string | null | undefined): string {
@@ -58,13 +58,11 @@ interface AdminRoleDetailPanelProps {
   errorMessage?: string | null;
   isLoading?: boolean;
   onActivate: (item: AdminRoleListItem) => void;
-  onAssignUser: (roleId: string, userId: string) => void;
   onCopyRole: (item: AdminRoleListItem | string) => void;
   onDeactivate: (item: AdminRoleListItem) => void;
   onEdit: (item: AdminRoleListItem) => void;
   onRemoveUser: (roleId: string, userId: string) => void;
   selectedRole: AdminRoleListItem | null;
-  users: AdminUserListItem[];
 }
 
 export function AdminRoleDetailPanel({
@@ -72,16 +70,12 @@ export function AdminRoleDetailPanel({
   errorMessage,
   isLoading = false,
   onActivate,
-  onAssignUser,
   onCopyRole,
   onDeactivate,
   onEdit,
   onRemoveUser,
   selectedRole,
-  users,
 }: AdminRoleDetailPanelProps) {
-  const [userToAssign, setUserToAssign] = useState("");
-
   if (!selectedRole) {
     return (
       <AdminEmptyState
@@ -155,7 +149,10 @@ export function AdminRoleDetailPanel({
 
         <Section title="Superficies de acceso">
           <div className="grid gap-2 sm:grid-cols-2">
-            <Fact label="POS" value={detail.accessSurfaces.posEnabled ? "Habilitado" : "Sin acceso"} />
+            <Fact
+              label="POS"
+              value={detail.accessSurfaces.posEnabled ? "Habilitado" : "Sin acceso"}
+            />
             <Fact
               label="Backoffice"
               value={detail.accessSurfaces.backofficeEnabled ? "Habilitado" : "Sin acceso"}
@@ -171,7 +168,9 @@ export function AdminRoleDetailPanel({
           ) ? (
             <div className="grid gap-2">
               {detail.permissionMatrix.map((group) => {
-                const enabledPermissions = group.permissions.filter((permission) => permission.isEnabled);
+                const enabledPermissions = group.permissions.filter(
+                  (permission) => permission.isEnabled,
+                );
                 if (enabledPermissions.length === 0) {
                   return null;
                 }
@@ -237,52 +236,26 @@ export function AdminRoleDetailPanel({
         </Section>
 
         <Section title="Usuarios asignados">
-          {detail.availableActions.canAssignUsers ? (
-            <div className="mb-2 flex min-w-0 flex-wrap gap-2">
-              <select
-                className="h-9 min-w-0 rounded-2xl border border-[var(--ui-color-border)] bg-white px-3 text-sm font-semibold text-slate-700"
-                value={userToAssign}
-                onChange={(event) => setUserToAssign(event.target.value)}
-              >
-                <option value="">Seleccionar usuario</option>
-                {users
-                  .filter(
-                    (user) =>
-                      !detail.assignedUsers.some((assigned) => assigned.userId === user.id),
-                  )
-                  .map((user) => (
-                    <option key={user.id} value={user.id}>
-                      {user.fullName} · {user.email}
-                    </option>
-                  ))}
-              </select>
-              <button
-                className="rounded-full border border-[var(--ui-color-border)] bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 disabled:cursor-not-allowed disabled:opacity-40"
-                disabled={!userToAssign}
-                type="button"
-                onClick={() => {
-                  onAssignUser(detail.overview.id, userToAssign);
-                  setUserToAssign("");
-                }}
-              >
-                Asignar usuario
-              </button>
-            </div>
-          ) : null}
+          <p className="mb-2 text-sm text-slate-600">
+            Administra las asignaciones y su alcance explícito en Usuarios.
+          </p>
           {detail.assignedUsers.length > 0 ? (
             <div className="grid gap-2">
               {detail.assignedUsers.map((user) => (
                 <div className="rounded-[14px] bg-slate-50 px-3 py-2" key={user.userId}>
                   <div className="flex min-w-0 items-start justify-between gap-2">
                     <p className="truncate text-sm font-semibold text-slate-950">{user.fullName}</p>
-                    <button
+                    <AdminActionButton
+                      capability="role_assignments.manage"
+                      branchIds={user.branchIds}
+                      globalOnly={user.scopeType === "GLOBAL"}
                       className="shrink-0 rounded-full border border-[var(--ui-color-border)] bg-white px-2 py-1 text-xs font-semibold text-slate-700 disabled:cursor-not-allowed disabled:opacity-40"
                       disabled={!detail.availableActions.canRemoveUsers}
                       type="button"
                       onClick={() => onRemoveUser(detail.overview.id, user.userId)}
                     >
                       Quitar
-                    </button>
+                    </AdminActionButton>
                   </div>
                   <p className="truncate text-xs text-slate-500">
                     {user.email} · {user.status} · {surfaceLabel(user.surfaces)}
@@ -319,30 +292,36 @@ export function AdminRoleDetailPanel({
 
         <Section title="Acciones disponibles">
           <div className="flex flex-wrap gap-2">
-            <button
+            <AdminActionButton
+              capability="roles.manage"
+              globalOnly
               className="rounded-full border border-[var(--ui-color-border)] bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 disabled:cursor-not-allowed disabled:opacity-40"
               disabled={!detail.availableActions.canEdit}
               type="button"
               onClick={() => onEdit(detail.overview)}
             >
               Editar
-            </button>
-            <button
+            </AdminActionButton>
+            <AdminActionButton
+              capability="roles.manage"
+              globalOnly
               className="rounded-full border border-[var(--ui-color-border)] bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 disabled:cursor-not-allowed disabled:opacity-40"
               disabled={!detail.availableActions.canDeactivate}
               type="button"
               onClick={() => onDeactivate(detail.overview)}
             >
               Desactivar
-            </button>
-            <button
+            </AdminActionButton>
+            <AdminActionButton
+              capability="roles.manage"
+              globalOnly
               className="rounded-full border border-[var(--ui-color-border)] bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 disabled:cursor-not-allowed disabled:opacity-40"
               disabled={!detail.availableActions.canActivate}
               type="button"
               onClick={() => onActivate(detail.overview)}
             >
               Activar
-            </button>
+            </AdminActionButton>
             <button
               className="rounded-full border border-[var(--ui-color-border)] bg-white px-3 py-1.5 text-xs font-semibold text-slate-700"
               type="button"

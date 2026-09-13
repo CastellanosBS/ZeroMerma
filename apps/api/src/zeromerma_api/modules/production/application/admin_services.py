@@ -13,6 +13,7 @@ from zeromerma_api.modules.audit.application.service import AuditRecorder
 from zeromerma_api.modules.branches.infrastructure.models import Branch
 from zeromerma_api.modules.catalog.domain.constants import CATALOG_PRODUCT_KIND_FINISHED_GOOD
 from zeromerma_api.modules.catalog.infrastructure.models import Product, Recipe, RecipeInput
+from zeromerma_api.modules.identity.application.actions import restrict_actions
 from zeromerma_api.modules.identity.application.schemas import AuthenticatedUser
 from zeromerma_api.modules.identity.infrastructure.models import User
 from zeromerma_api.modules.inventory.domain.constants import (
@@ -571,13 +572,25 @@ class AdminProductionService:
                 )
                 for input_line, input_product in self._input_rows_with_products(session, input_rows)
             ],
-            available_actions=AdminProductionAvailableActionsView(
-                can_cancel=row.batch.status
-                in {PRODUCTION_STATUS_DRAFT, PRODUCTION_STATUS_IN_PROGRESS},
-                can_complete=row.batch.status == PRODUCTION_STATUS_IN_PROGRESS,
-                can_edit=row.batch.status == PRODUCTION_STATUS_DRAFT,
-                can_start=row.batch.status == PRODUCTION_STATUS_DRAFT,
-                can_view_movements=True,
+            available_actions=restrict_actions(
+                session,
+                AdminProductionAvailableActionsView(
+                    can_cancel=row.batch.status
+                    in {PRODUCTION_STATUS_DRAFT, PRODUCTION_STATUS_IN_PROGRESS},
+                    can_complete=row.batch.status == PRODUCTION_STATUS_IN_PROGRESS,
+                    can_edit=row.batch.status == PRODUCTION_STATUS_DRAFT,
+                    can_start=row.batch.status == PRODUCTION_STATUS_DRAFT,
+                    can_view_movements=True,
+                ),
+                {
+                    "can_cancel": "production.cancel",
+                    "can_complete": "production.execute",
+                    "can_edit": "production.manage",
+                    "can_start": "production.execute",
+                    "can_view_movements": "inventory.view",
+                },
+                branch_ids=(row.branch.id,),
+                global_only=False,
             ),
             inventory_impact=self._inventory_impact(session, row.batch.id),
             output_yield=AdminProductionOutputYieldView(

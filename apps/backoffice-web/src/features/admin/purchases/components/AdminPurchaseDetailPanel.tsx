@@ -1,3 +1,4 @@
+import { AdminActionButton } from "../../components/AdminActionButton";
 import type { ReactNode } from "react";
 
 import type {
@@ -43,10 +44,16 @@ function formatMovementType(value: string): string {
 function InfoRow({ label, value }: { label: string; value?: string | number | null }) {
   return (
     <div className="grid min-w-0 grid-cols-[7.75rem_minmax(0,1fr)] gap-2 text-xs">
-      <span className="truncate font-semibold uppercase tracking-[0.08em] text-slate-500" title={label}>
+      <span
+        className="truncate font-semibold uppercase tracking-[0.08em] text-slate-500"
+        title={label}
+      >
         {label}
       </span>
-      <span className="min-w-0 truncate font-medium text-slate-900" title={String(value ?? "No disponible")}>
+      <span
+        className="min-w-0 truncate font-medium text-slate-900"
+        title={String(value ?? "No disponible")}
+      >
         {value ?? "No disponible"}
       </span>
     </div>
@@ -56,7 +63,10 @@ function InfoRow({ label, value }: { label: string; value?: string | number | nu
 function Section({ children, title }: { children: ReactNode; title: string }) {
   return (
     <div className="rounded-[18px] border border-[var(--ui-color-border)] bg-white p-3">
-      <h4 className="mb-2 truncate text-xs font-semibold uppercase tracking-[0.12em] text-slate-500" title={title}>
+      <h4
+        className="mb-2 truncate text-xs font-semibold uppercase tracking-[0.12em] text-slate-500"
+        title={title}
+      >
         {title}
       </h4>
       {children}
@@ -73,7 +83,10 @@ function WarningItem({ warning }: { warning: AdminPurchaseWarning }) {
         : "border-[var(--ui-color-border)] bg-slate-50 text-slate-600";
 
   return (
-    <li className={`rounded-[14px] border px-3 py-2 text-xs leading-5 ${toneClass}`} title={warning.message}>
+    <li
+      className={`rounded-[14px] border px-3 py-2 text-xs leading-5 ${toneClass}`}
+      title={warning.message}
+    >
       <span className="font-semibold">{warning.code}</span>: {warning.message}
     </li>
   );
@@ -113,7 +126,10 @@ export function AdminPurchaseDetailPanel({
         <div className="flex min-h-0 flex-1 items-center p-3">
           <div className="rounded-[18px] border border-dashed border-[var(--ui-color-border)] bg-slate-50 p-4 text-sm leading-6 text-slate-600">
             <p className="font-semibold text-slate-950">Sin compra seleccionada</p>
-            <p>Selecciona una compra para revisar proveedor, productos, recepcion e impacto en inventario.</p>
+            <p>
+              Selecciona una compra para revisar proveedor, productos, recepcion e impacto en
+              inventario.
+            </p>
           </div>
         </div>
       </aside>
@@ -123,8 +139,10 @@ export function AdminPurchaseDetailPanel({
   const folio = purchaseDetail?.overview.folio ?? purchasePreview?.folio ?? "";
   const status = purchaseDetail?.overview.status ?? purchasePreview?.status ?? "DRAFT";
   const type = purchaseDetail?.overview.documentType ?? purchasePreview?.documentType ?? "PURCHASE";
-  const supplierName = purchaseDetail?.supplierContext.supplierName ?? purchasePreview?.supplierName ?? "";
-  const branchName = purchaseDetail?.receivingBranch.branchName ?? purchasePreview?.branchName ?? "";
+  const supplierName =
+    purchaseDetail?.supplierContext.supplierName ?? purchasePreview?.supplierName ?? "";
+  const branchName =
+    purchaseDetail?.receivingBranch.branchName ?? purchasePreview?.branchName ?? "";
 
   return (
     <aside className="flex min-h-0 min-w-0 flex-col overflow-hidden rounded-[20px] border border-[var(--ui-color-border)] bg-white">
@@ -158,10 +176,24 @@ export function AdminPurchaseDetailPanel({
           <div className="grid gap-1.5">
             <InfoRow label="Tipo" value={formatType(type)} />
             <InfoRow label="Estado" value={formatStatus(status)} />
-            <InfoRow label="Documento" value={purchaseDetail?.overview.externalDocumentNumber ?? "Sin externo"} />
-            <InfoRow label="Fecha" value={formatDate(purchaseDetail?.overview.documentDate ?? purchasePreview?.documentDate)} />
-            <InfoRow label="Monto" value={purchaseDetail?.overview.totalAmount ?? purchasePreview?.totalAmount} />
-            <InfoRow label="Operador" value={purchaseDetail?.overview.createdByUserName ?? purchasePreview?.operatorName} />
+            <InfoRow
+              label="Documento"
+              value={purchaseDetail?.overview.externalDocumentNumber ?? "Sin externo"}
+            />
+            <InfoRow
+              label="Fecha"
+              value={formatDate(
+                purchaseDetail?.overview.documentDate ?? purchasePreview?.documentDate,
+              )}
+            />
+            <InfoRow
+              label="Monto"
+              value={purchaseDetail?.overview.totalAmount ?? purchasePreview?.totalAmount}
+            />
+            <InfoRow
+              label="Operador"
+              value={purchaseDetail?.overview.createdByUserName ?? purchasePreview?.operatorName}
+            />
           </div>
         </Section>
 
@@ -173,8 +205,14 @@ export function AdminPurchaseDetailPanel({
                 <InfoRow label="Comercial" value={purchaseDetail.supplierContext.commercialName} />
                 <InfoRow label="Estado" value={purchaseDetail.supplierContext.status} />
                 <InfoRow label="Contacto" value={purchaseDetail.supplierContext.primaryContact} />
-                <InfoRow label="Terminos" value={purchaseDetail.supplierContext.paymentTermsSummary} />
-                <InfoRow label="Lead time" value={`${purchaseDetail.supplierContext.leadTimeDays} dias`} />
+                <InfoRow
+                  label="Terminos"
+                  value={purchaseDetail.supplierContext.paymentTermsSummary}
+                />
+                <InfoRow
+                  label="Lead time"
+                  value={`${purchaseDetail.supplierContext.leadTimeDays} dias`}
+                />
               </div>
             </Section>
 
@@ -199,7 +237,10 @@ export function AdminPurchaseDetailPanel({
                   >
                     <div className="flex min-w-0 items-start justify-between gap-2">
                       <div className="min-w-0">
-                        <p className="truncate font-semibold text-slate-950" title={line.productName}>
+                        <p
+                          className="truncate font-semibold text-slate-950"
+                          title={line.productName}
+                        >
                           {line.productName}
                         </p>
                         <p className="truncate font-mono text-slate-500" title={line.productCode}>
@@ -211,13 +252,19 @@ export function AdminPurchaseDetailPanel({
                       </span>
                     </div>
                     <div className="grid min-w-0 grid-cols-2 gap-1.5 md:grid-cols-4">
-                      <InfoRow label="Ordenado" value={`${line.orderedQuantity} ${line.unitOfMeasure}`} />
+                      <InfoRow
+                        label="Ordenado"
+                        value={`${line.orderedQuantity} ${line.unitOfMeasure}`}
+                      />
                       <InfoRow label="Recibido" value={line.receivedQuantity} />
                       <InfoRow label="Pendiente" value={line.pendingQuantity} />
                       <InfoRow label="Costo" value={line.unitCost} />
                     </div>
                     {line.discrepancyReason ? (
-                      <p className="truncate text-[var(--ui-color-danger)]" title={line.discrepancyReason}>
+                      <p
+                        className="truncate text-[var(--ui-color-danger)]"
+                        title={line.discrepancyReason}
+                      >
                         {line.discrepancyReason}
                       </p>
                     ) : null}
@@ -233,7 +280,9 @@ export function AdminPurchaseDetailPanel({
                 <InfoRow label="Pendiente" value={purchaseDetail.receipt.pendingQuantity} />
                 <InfoRow
                   label="Discrepancia"
-                  value={purchaseDetail.receipt.hasDiscrepancy ? "Con diferencias" : "Sin discrepancias"}
+                  value={
+                    purchaseDetail.receipt.hasDiscrepancy ? "Con diferencias" : "Sin discrepancias"
+                  }
                 />
               </div>
             </Section>
@@ -242,8 +291,14 @@ export function AdminPurchaseDetailPanel({
               <div className="grid gap-1.5">
                 <InfoRow label="Subtotal" value={purchaseDetail.costSummary.subtotal} />
                 <InfoRow label="Recibido" value={purchaseDetail.costSummary.receivedTotal} />
-                <InfoRow label="Impuestos" value={purchaseDetail.costSummary.taxes ?? "No conectado"} />
-                <InfoRow label="Total" value={`${purchaseDetail.costSummary.total} ${purchaseDetail.costSummary.currency}`} />
+                <InfoRow
+                  label="Impuestos"
+                  value={purchaseDetail.costSummary.taxes ?? "No conectado"}
+                />
+                <InfoRow
+                  label="Total"
+                  value={`${purchaseDetail.costSummary.total} ${purchaseDetail.costSummary.currency}`}
+                />
               </div>
             </Section>
 
@@ -264,14 +319,16 @@ export function AdminPurchaseDetailPanel({
                         </span>
                       </div>
                       <p className="truncate text-slate-500" title={movement.locationCode}>
-                        {movement.direction} - {movement.locationCode} - saldo {movement.balanceAfter ?? "N/D"}
+                        {movement.direction} - {movement.locationCode} - saldo{" "}
+                        {movement.balanceAfter ?? "N/D"}
                       </p>
                     </li>
                   ))}
                 </ul>
               ) : (
                 <p className="rounded-[14px] border border-[var(--ui-color-border)] bg-slate-50 px-3 py-2 text-xs leading-5 text-slate-600">
-                  {purchaseDetail.inventoryImpact.notes ?? "No hay movimientos de inventario vinculados."}
+                  {purchaseDetail.inventoryImpact.notes ??
+                    "No hay movimientos de inventario vinculados."}
                 </p>
               )}
             </Section>
@@ -284,7 +341,9 @@ export function AdminPurchaseDetailPanel({
                       className="flex min-w-0 justify-between gap-2 rounded-[14px] border border-[var(--ui-color-border)] bg-slate-50 px-3 py-2"
                       key={`${document.documentType}-${document.documentId}`}
                     >
-                      <span className="truncate font-semibold text-slate-950">{document.documentType}</span>
+                      <span className="truncate font-semibold text-slate-950">
+                        {document.documentType}
+                      </span>
                       <span className="truncate text-slate-500">{document.folio}</span>
                     </li>
                   ))}
@@ -316,31 +375,37 @@ export function AdminPurchaseDetailPanel({
       {purchaseDetail ? (
         <div className="flex shrink-0 flex-wrap gap-2 border-t border-[var(--ui-color-border)] px-3 py-2 text-xs">
           {purchaseDetail.availableActions.canConfirm ? (
-            <button
+            <AdminActionButton
+              capability="purchases.confirm"
+              branchIds={[purchaseDetail.receivingBranch.branchId]}
               className="rounded-full border border-[var(--ui-color-border)] bg-white px-3 py-1 font-semibold text-slate-700 transition hover:bg-slate-50 focus:outline-none focus:ring-4 focus:ring-[var(--ui-color-ring)]"
               type="button"
               onClick={() => onConfirm(purchaseDetail)}
             >
               Confirmar compra
-            </button>
+            </AdminActionButton>
           ) : null}
           {purchaseDetail.availableActions.canReceive ? (
-            <button
+            <AdminActionButton
+              capability="purchases.receive"
+              branchIds={[purchaseDetail.receivingBranch.branchId]}
               className="rounded-full bg-[var(--ui-color-info)] px-3 py-1 font-semibold text-white transition hover:brightness-95 focus:outline-none focus:ring-4 focus:ring-[var(--ui-color-ring)]"
               type="button"
               onClick={() => onReceive(purchaseDetail)}
             >
               Recibir
-            </button>
+            </AdminActionButton>
           ) : null}
           {purchaseDetail.availableActions.canCancel ? (
-            <button
+            <AdminActionButton
+              capability="purchases.cancel"
+              branchIds={[purchaseDetail.receivingBranch.branchId]}
               className="rounded-full border border-rose-200 bg-white px-3 py-1 font-semibold text-[var(--ui-color-danger)] transition hover:bg-[var(--ui-color-danger-soft)] focus:outline-none focus:ring-4 focus:ring-[var(--ui-color-ring)]"
               type="button"
               onClick={() => onCancel(purchaseDetail)}
             >
               Cancelar
-            </button>
+            </AdminActionButton>
           ) : null}
           <button
             className="rounded-full border border-[var(--ui-color-border)] bg-white px-3 py-1 font-semibold text-slate-700 transition hover:bg-slate-50 focus:outline-none focus:ring-4 focus:ring-[var(--ui-color-ring)]"

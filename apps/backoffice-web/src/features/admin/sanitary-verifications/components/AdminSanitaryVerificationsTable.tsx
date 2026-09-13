@@ -1,3 +1,4 @@
+import { AdminActionButton } from "../../components/AdminActionButton";
 import { AdminEmptyState } from "../../components/AdminEmptyState";
 import type { AdminSanitaryVerificationListItem } from "../types";
 
@@ -205,7 +206,9 @@ export function AdminSanitaryVerificationsTable({
                       >
                         Ver
                       </button>
-                      <button
+                      <AdminActionButton
+                        capability="quality_hygiene.manage"
+                        branchIds={[item.branchId]}
                         className="rounded-full border border-[var(--ui-color-border)] bg-white px-2 py-1 text-xs font-semibold text-slate-700 transition hover:border-[var(--ui-color-info)] disabled:cursor-not-allowed disabled:opacity-40"
                         disabled={
                           item.status === "COMPLETED" ||
@@ -216,7 +219,7 @@ export function AdminSanitaryVerificationsTable({
                         onClick={() => onExecute(item)}
                       >
                         Ejecutar
-                      </button>
+                      </AdminActionButton>
                       <button
                         className="rounded-full border border-[var(--ui-color-border)] bg-white px-2 py-1 text-xs font-semibold text-slate-700 transition hover:border-[var(--ui-color-info)]"
                         type="button"

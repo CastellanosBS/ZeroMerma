@@ -2,11 +2,13 @@ from __future__ import annotations
 
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal
+from zoneinfo import ZoneInfo
 
 from fastapi.testclient import TestClient
 from sqlalchemy import select
 
 from zeromerma_api.bootstrap.seed_local import (
+    SEED_BRANCH_TIMEZONE,
     SEED_PRODUCT_BOLILLO_STD_CODE,
     SEED_PRODUCT_CAFE_AMERICANO_CODE,
     SEED_PRODUCT_CLASS_BEBIDAS_CODE,
@@ -188,7 +190,12 @@ def test_create_order_lists_and_details_with_advance_payment_audit_and_outbox(
     assert list_payload["orders"][0]["id"] == payload["id"]
     assert Decimal(str(list_payload["orders"][0]["remaining_balance_amount"])) == Decimal("14.00")
 
-    requested_date = str(payload["requested_for_at"])[:10]
+    requested_date = (
+        datetime.fromisoformat(payload["requested_for_at"])
+        .astimezone(ZoneInfo(SEED_BRANCH_TIMEZONE))
+        .date()
+        .isoformat()
+    )
     folio_list_response = client.get(
         "/v1/orders",
         params={

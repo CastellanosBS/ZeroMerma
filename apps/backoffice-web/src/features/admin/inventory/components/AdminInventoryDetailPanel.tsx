@@ -1,3 +1,4 @@
+import { AdminActionButton } from "../../components/AdminActionButton";
 import type { ReactNode } from "react";
 
 import type {
@@ -54,10 +55,16 @@ function formatMovementType(value: string): string {
 function InfoRow({ label, value }: { label: string; value?: string | number | null }) {
   return (
     <div className="grid min-w-0 grid-cols-[7.25rem_minmax(0,1fr)] gap-2 text-xs">
-      <span className="truncate font-semibold uppercase tracking-[0.08em] text-slate-500" title={label}>
+      <span
+        className="truncate font-semibold uppercase tracking-[0.08em] text-slate-500"
+        title={label}
+      >
         {label}
       </span>
-      <span className="min-w-0 truncate font-medium text-slate-900" title={String(value ?? "No disponible")}>
+      <span
+        className="min-w-0 truncate font-medium text-slate-900"
+        title={String(value ?? "No disponible")}
+      >
         {value ?? "No disponible"}
       </span>
     </div>
@@ -67,7 +74,10 @@ function InfoRow({ label, value }: { label: string; value?: string | number | nu
 function Section({ children, title }: { children: ReactNode; title: string }) {
   return (
     <div className="rounded-[18px] border border-[var(--ui-color-border)] bg-white p-3">
-      <h4 className="mb-2 truncate text-xs font-semibold uppercase tracking-[0.12em] text-slate-500" title={title}>
+      <h4
+        className="mb-2 truncate text-xs font-semibold uppercase tracking-[0.12em] text-slate-500"
+        title={title}
+      >
         {title}
       </h4>
       {children}
@@ -84,7 +94,10 @@ function WarningItem({ warning }: { warning: AdminInventoryWarning }) {
         : "border-[var(--ui-color-border)] bg-slate-50 text-slate-600";
 
   return (
-    <li className={`rounded-[14px] border px-3 py-2 text-xs leading-5 ${toneClass}`} title={warning.message}>
+    <li
+      className={`rounded-[14px] border px-3 py-2 text-xs leading-5 ${toneClass}`}
+      title={warning.message}
+    >
       <span className="font-semibold">{warning.code}</span>: {warning.message}
     </li>
   );
@@ -99,10 +112,15 @@ function MovementRow({ movement }: { movement: AdminInventoryMovement }) {
   return (
     <li className="grid min-w-0 gap-2 rounded-[14px] border border-[var(--ui-color-border)] bg-slate-50 px-3 py-2 text-xs">
       <div className="flex min-w-0 items-center justify-between gap-2">
-        <span className="truncate font-semibold text-slate-950" title={formatMovementType(movement.movementType)}>
+        <span
+          className="truncate font-semibold text-slate-950"
+          title={formatMovementType(movement.movementType)}
+        >
           {formatMovementType(movement.movementType)}
         </span>
-        <span className={`shrink-0 rounded-full border px-2 py-0.5 font-semibold ${directionClass}`}>
+        <span
+          className={`shrink-0 rounded-full border px-2 py-0.5 font-semibold ${directionClass}`}
+        >
           {movement.direction}
         </span>
       </div>
@@ -110,7 +128,10 @@ function MovementRow({ movement }: { movement: AdminInventoryMovement }) {
         <span className="truncate text-slate-500" title={formatDate(movement.occurredAt)}>
           {formatDate(movement.occurredAt)}
         </span>
-        <span className="truncate text-right font-semibold text-slate-900" title={movement.quantity}>
+        <span
+          className="truncate text-right font-semibold text-slate-900"
+          title={movement.quantity}
+        >
           {movement.quantity}
         </span>
       </div>
@@ -163,8 +184,10 @@ export function AdminInventoryDetailPanel({
   const productCode = inventoryDetail?.product.code ?? inventoryPreview?.productCode ?? "";
   const productId = inventoryDetail?.product.id ?? inventoryPreview?.productId ?? "";
   const branchId = inventoryDetail?.branchLocation.branchId ?? inventoryPreview?.branchId ?? "";
-  const branchName = inventoryDetail?.branchLocation.branchName ?? inventoryPreview?.branchName ?? "";
-  const locationName = inventoryDetail?.branchLocation.locationName ?? inventoryPreview?.locationName ?? "";
+  const branchName =
+    inventoryDetail?.branchLocation.branchName ?? inventoryPreview?.branchName ?? "";
+  const locationName =
+    inventoryDetail?.branchLocation.locationName ?? inventoryPreview?.locationName ?? "";
   const stockState = inventoryDetail?.stockState ?? inventoryPreview?.stockState ?? "out_of_stock";
   const warnings = inventoryDetail?.warnings ?? inventoryPreview?.warnings ?? [];
 
@@ -203,7 +226,9 @@ export function AdminInventoryDetailPanel({
             <InfoRow
               label="Existencia"
               value={`${inventoryDetail?.stockBreakdown.quantityOnHand ?? inventoryPreview?.quantityOnHand ?? "0"} ${
-                inventoryDetail?.stockBreakdown.unitOfMeasure ?? inventoryPreview?.unitOfMeasure ?? ""
+                inventoryDetail?.stockBreakdown.unitOfMeasure ??
+                inventoryPreview?.unitOfMeasure ??
+                ""
               }`}
             />
             <InfoRow label="Ult. mov." value={formatDate(inventoryPreview?.lastMovementAt)} />
@@ -214,21 +239,37 @@ export function AdminInventoryDetailPanel({
           <>
             <Section title="Producto">
               <div className="grid gap-1.5">
-                <InfoRow label="Tipo" value={formatProductKind(inventoryDetail.product.productKind)} />
+                <InfoRow
+                  label="Tipo"
+                  value={formatProductKind(inventoryDetail.product.productKind)}
+                />
                 <InfoRow label="Clase" value={inventoryDetail.product.className} />
-                <InfoRow label="Estado" value={inventoryDetail.product.isActive ? "Activo" : "Inactivo"} />
-                <InfoRow label="Costo est." value={inventoryDetail.product.standardCost ?? "No disponible"} />
+                <InfoRow
+                  label="Estado"
+                  value={inventoryDetail.product.isActive ? "Activo" : "Inactivo"}
+                />
+                <InfoRow
+                  label="Costo est."
+                  value={inventoryDetail.product.standardCost ?? "No disponible"}
+                />
               </div>
             </Section>
 
             <Section title="Sucursal / ubicacion">
               <div className="grid gap-1.5">
                 <InfoRow label="Sucursal" value={inventoryDetail.branchLocation.branchName} />
-                <InfoRow label="Estado" value={inventoryDetail.branchLocation.branchIsActive ? "Activa" : "Inactiva"} />
+                <InfoRow
+                  label="Estado"
+                  value={inventoryDetail.branchLocation.branchIsActive ? "Activa" : "Inactiva"}
+                />
                 <InfoRow label="Ubicacion" value={inventoryDetail.branchLocation.locationName} />
                 <InfoRow
                   label="Modelo ubic."
-                  value={inventoryDetail.branchLocation.locationModelSupported ? "Soportado" : "Nivel sucursal"}
+                  value={
+                    inventoryDetail.branchLocation.locationModelSupported
+                      ? "Soportado"
+                      : "Nivel sucursal"
+                  }
                 />
               </div>
             </Section>
@@ -236,19 +277,43 @@ export function AdminInventoryDetailPanel({
             <Section title="Desglose de stock">
               <div className="grid gap-1.5">
                 <InfoRow label="En mano" value={inventoryDetail.stockBreakdown.quantityOnHand} />
-                <InfoRow label="Reservado" value={inventoryDetail.stockBreakdown.reservedQuantity ?? "No conectado"} />
-                <InfoRow label="Transito" value={inventoryDetail.stockBreakdown.inTransitQuantity ?? "No conectado"} />
-                <InfoRow label="Disponible" value={inventoryDetail.stockBreakdown.availableQuantity ?? "No disponible"} />
-                <InfoRow label="Valor est." value={inventoryDetail.stockBreakdown.estimatedValue ?? "No disponible"} />
+                <InfoRow
+                  label="Reservado"
+                  value={inventoryDetail.stockBreakdown.reservedQuantity ?? "No conectado"}
+                />
+                <InfoRow
+                  label="Transito"
+                  value={inventoryDetail.stockBreakdown.inTransitQuantity ?? "No conectado"}
+                />
+                <InfoRow
+                  label="Disponible"
+                  value={inventoryDetail.stockBreakdown.availableQuantity ?? "No disponible"}
+                />
+                <InfoRow
+                  label="Valor est."
+                  value={inventoryDetail.stockBreakdown.estimatedValue ?? "No disponible"}
+                />
               </div>
             </Section>
 
             <Section title="Resumen de movimientos">
               <div className="grid gap-1.5">
-                <InfoRow label="Ultimo" value={formatDate(inventoryDetail.movementSummary.lastMovementAt)} />
-                <InfoRow label="Entrada" value={formatDate(inventoryDetail.movementSummary.lastInboundAt)} />
-                <InfoRow label="Salida" value={formatDate(inventoryDetail.movementSummary.lastOutboundAt)} />
-                <InfoRow label="Ajuste" value={formatDate(inventoryDetail.movementSummary.lastAdjustmentAt)} />
+                <InfoRow
+                  label="Ultimo"
+                  value={formatDate(inventoryDetail.movementSummary.lastMovementAt)}
+                />
+                <InfoRow
+                  label="Entrada"
+                  value={formatDate(inventoryDetail.movementSummary.lastInboundAt)}
+                />
+                <InfoRow
+                  label="Salida"
+                  value={formatDate(inventoryDetail.movementSummary.lastOutboundAt)}
+                />
+                <InfoRow
+                  label="Ajuste"
+                  value={formatDate(inventoryDetail.movementSummary.lastAdjustmentAt)}
+                />
               </div>
             </Section>
 
@@ -276,19 +341,23 @@ export function AdminInventoryDetailPanel({
               ))}
             </ul>
           ) : (
-            <p className="text-sm leading-6 text-slate-600">No hay advertencias de inventario para este registro.</p>
+            <p className="text-sm leading-6 text-slate-600">
+              No hay advertencias de inventario para este registro.
+            </p>
           )}
         </Section>
       </div>
 
       <div className="flex shrink-0 flex-wrap gap-2 border-t border-[var(--ui-color-border)] p-3 text-xs">
-        <button
+        <AdminActionButton
+          capability="inventory.adjust"
+          branchIds={[branchId]}
           className="rounded-full border border-[var(--ui-color-border)] bg-white px-3 py-1.5 font-semibold text-[var(--ui-color-info)] transition hover:bg-[var(--ui-color-surface-tint)] focus:outline-none focus:ring-4 focus:ring-[var(--ui-color-ring)]"
           type="button"
           onClick={() => onAdjust(inventoryDetail ?? inventoryPreview!)}
         >
           Nuevo ajuste
-        </button>
+        </AdminActionButton>
         <button
           className="rounded-full border border-[var(--ui-color-border)] bg-white px-3 py-1.5 font-semibold text-slate-700 transition hover:bg-slate-50 focus:outline-none focus:ring-4 focus:ring-[var(--ui-color-ring)]"
           type="button"

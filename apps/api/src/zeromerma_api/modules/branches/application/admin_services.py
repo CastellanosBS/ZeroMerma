@@ -65,6 +65,7 @@ from zeromerma_api.modules.cash.domain.constants import (
     CASH_SESSION_STATUS_OPEN,
 )
 from zeromerma_api.modules.cash.infrastructure.models import CashSession
+from zeromerma_api.modules.identity.application.actions import restrict_actions
 from zeromerma_api.modules.identity.application.schemas import AuthenticatedUser
 from zeromerma_api.modules.identity.infrastructure.models import User, UserBranchAssignment
 from zeromerma_api.modules.outbox.application.service import OutboxWriter
@@ -181,6 +182,7 @@ class AdminBranchService:
         self._ensure_unique_code(session, code)
 
         branch = Branch(
+            id=uuid.uuid4(),
             brand_id=brand.id,
             code=code,
             name=command.name.strip(),
@@ -224,6 +226,8 @@ class AdminBranchService:
         command: AdminBranchUpdateRequest,
         request_id: str | None,
     ) -> AdminBranchDetailView:
+        # Serialize status changes before reading open-session preconditions.
+        session.scalar(select(Branch.id).where(Branch.id == branch_id).with_for_update())
         row = self._get_row(session, branch_id)
         branch = row.branch
         brand = row.brand
@@ -387,9 +391,21 @@ class AdminBranchService:
         readiness = self._readiness(row, warnings)
 
         return AdminBranchDetailView(
-            available_actions=AdminBranchAvailableActionsView(
-                can_activate=not row.branch.is_active,
-                can_deactivate=row.branch.is_active,
+            available_actions=restrict_actions(
+                session,
+                AdminBranchAvailableActionsView(
+                    can_activate=not row.branch.is_active,
+                    can_deactivate=row.branch.is_active,
+                ),
+                {
+                    "can_edit": "branches.manage",
+                    "can_activate": "branches.manage",
+                    "can_deactivate": "branches.manage",
+                    "can_open_workstations": "workstations.view",
+                    "can_open_users": "users.view",
+                },
+                branch_ids=(row.branch.id,),
+                global_only=False,
             ),
             location_contact=AdminBranchLocationContactView(
                 address_line=row.branch.address_line,
@@ -971,10 +987,22 @@ class AdminWorkstationService:
                 assigned_user_count=len(access_users),
                 users=access_users,
             ),
-            available_actions=AdminWorkstationAvailableActionsView(
-                can_activate=not row.workstation.is_active,
-                can_deactivate=row.workstation.is_active and row.active_session is None,
-                can_open_cash_session=row.active_session is not None,
+            available_actions=restrict_actions(
+                session,
+                AdminWorkstationAvailableActionsView(
+                    can_activate=not row.workstation.is_active,
+                    can_deactivate=row.workstation.is_active and row.active_session is None,
+                    can_open_cash_session=row.active_session is not None,
+                ),
+                {
+                    "can_edit": "workstations.manage",
+                    "can_activate": "workstations.manage",
+                    "can_deactivate": "workstations.manage",
+                    "can_open_branch": "branches.view",
+                    "can_open_cash_session": "cash_finance.view",
+                },
+                branch_ids=(row.branch.id,),
+                global_only=False,
             ),
             branch_relationship=AdminWorkstationBranchRelationshipView(
                 branch_code=row.branch.code,

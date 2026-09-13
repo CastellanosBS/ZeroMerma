@@ -60,6 +60,7 @@ from zeromerma_api.modules.discounts.infrastructure.models import (
     OperationalDiscount,
     OperationalDiscountCategory,
 )
+from zeromerma_api.modules.identity.application.actions import restrict_actions
 from zeromerma_api.modules.identity.infrastructure.models import User
 from zeromerma_api.modules.operations.infrastructure.models import OperationDocument
 from zeromerma_api.modules.payments.infrastructure.models import (
@@ -296,15 +297,25 @@ class AdminCashCutService:
         )
 
         return AdminCashCutDetailView(
-            available_actions=AdminCashCutAvailableActionsView(
-                can_export_report=False,
-                can_print_report=False,
-                can_remote_close=False,
-                remote_close_note=(
-                    "El cierre debe realizarse desde el POS."
-                    if status in {CASH_CUT_STATUS_OPEN, CASH_CUT_STATUS_PENDING_CLOSE}
-                    else None
+            available_actions=restrict_actions(
+                session,
+                AdminCashCutAvailableActionsView(
+                    can_export_report=False,
+                    can_print_report=False,
+                    can_remote_close=False,
+                    remote_close_note=(
+                        "El cierre debe realizarse desde el POS."
+                        if status in {CASH_CUT_STATUS_OPEN, CASH_CUT_STATUS_PENDING_CLOSE}
+                        else None
+                    ),
                 ),
+                {
+                    "can_open_tickets": "sales_tickets.view",
+                    "can_open_returns": "returns_corrections.view",
+                    "can_open_operational_payments": "cash_finance.view",
+                },
+                branch_ids=(type_cast(uuid.UUID, row["branch_id"]),),
+                global_only=False,
             ),
             audit_timeline=self._build_timeline(
                 row=row,

@@ -95,19 +95,19 @@ class TransferQueryService:
             user_id=current_user.id,
             workstation_code=workstation_code,
         )
-        source_branch = Branch.__table__.alias("source_branch")
-        destination_branch = Branch.__table__.alias("destination_branch")
+        source_branch = aliased(Branch, name="source_branch")
+        destination_branch = aliased(Branch, name="destination_branch")
 
         records = (
             session.execute(
                 select(
                     OperationDocument.id,
                     OperationDocument.source_branch_id,
-                    source_branch.c.code.label("source_branch_code"),
-                    source_branch.c.name.label("source_branch_name"),
+                    source_branch.code.label("source_branch_code"),
+                    source_branch.name.label("source_branch_name"),
                     OperationDocument.destination_branch_id,
-                    destination_branch.c.code.label("destination_branch_code"),
-                    destination_branch.c.name.label("destination_branch_name"),
+                    destination_branch.code.label("destination_branch_code"),
+                    destination_branch.name.label("destination_branch_name"),
                     OperationDocument.workstation_id,
                     Workstation.code.label("workstation_code"),
                     Workstation.name.label("workstation_name"),
@@ -120,10 +120,10 @@ class TransferQueryService:
                     ),
                 )
                 .select_from(OperationDocument)
-                .join(source_branch, source_branch.c.id == OperationDocument.source_branch_id)
+                .join(source_branch, source_branch.id == OperationDocument.source_branch_id)
                 .join(
                     destination_branch,
-                    destination_branch.c.id == OperationDocument.destination_branch_id,
+                    destination_branch.id == OperationDocument.destination_branch_id,
                 )
                 .join(Workstation, Workstation.id == OperationDocument.workstation_id)
                 .join(
@@ -139,11 +139,11 @@ class TransferQueryService:
                 .group_by(
                     OperationDocument.id,
                     OperationDocument.source_branch_id,
-                    source_branch.c.code,
-                    source_branch.c.name,
+                    source_branch.code,
+                    source_branch.name,
                     OperationDocument.destination_branch_id,
-                    destination_branch.c.code,
-                    destination_branch.c.name,
+                    destination_branch.code,
+                    destination_branch.name,
                     OperationDocument.workstation_id,
                     Workstation.code,
                     Workstation.name,

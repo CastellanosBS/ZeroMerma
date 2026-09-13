@@ -328,6 +328,7 @@ export function AdminReconciliationPage() {
   return (
     <section className="flex min-h-0 min-w-0 flex-col overflow-hidden rounded-[28px] border border-[var(--ui-color-border)] bg-white shadow-[var(--ui-shadow-subtle)] lg:h-full">
       <AdminPageHeader
+        actionCapability="cash_finance.manage"
         actionLabel="Nueva conciliacion"
         description="Revisa diferencias de caja y medios de pago, documenta causas y resuelve discrepancias con trazabilidad."
         meta={[pageStatusLabel]}

@@ -14,6 +14,7 @@ from sqlalchemy.orm import Session
 
 from zeromerma_api.modules.audit.application.service import AuditRecorder
 from zeromerma_api.modules.branches.infrastructure.models import Branch
+from zeromerma_api.modules.identity.application.actions import restrict_actions
 from zeromerma_api.modules.identity.application.schemas import AuthenticatedUser
 from zeromerma_api.modules.identity.infrastructure.models import User
 from zeromerma_api.modules.outbox.application.service import OutboxWriter
@@ -831,7 +832,7 @@ class AdminEquipmentMaintenanceService:
         )
         current_open = self._current_open_record(row)
         return AdminEquipmentDetailView(
-            available_actions=self._available_actions(row),
+            available_actions=self._available_actions(session, row),
             cost_context=AdminEquipmentCostContextView(
                 last_service_cost=last_completed.cost if last_completed else None,
                 period_cost=list_item.period_cost,
@@ -1176,31 +1177,48 @@ class AdminEquipmentMaintenanceService:
                 )
         return references
 
-    def _available_actions(self, row: _EquipmentRow) -> AdminEquipmentAvailableActionsView:
+    def _available_actions(
+        self, session: Session, row: _EquipmentRow
+    ) -> AdminEquipmentAvailableActionsView:
         current_open = self._current_open_record(row)
         is_editable = row.equipment.operational_status not in {
             EQUIPMENT_STATUS_RETIRED,
             EQUIPMENT_STATUS_INACTIVE,
         }
-        return AdminEquipmentAvailableActionsView(
-            can_cancel_maintenance=bool(current_open),
-            can_complete_maintenance=bool(current_open),
-            can_create_corrective=is_editable,
-            can_create_preventive=is_editable,
-            can_edit_equipment=is_editable,
-            can_export=False,
-            can_mark_operational=row.equipment.operational_status
-            in {EQUIPMENT_STATUS_OUT_OF_SERVICE, EQUIPMENT_STATUS_UNDER_MAINTENANCE},
-            can_mark_out_of_service=row.equipment.operational_status
-            == EQUIPMENT_STATUS_OPERATIONAL,
-            can_print=False,
-            can_start_maintenance=bool(
-                current_open and current_open.status != MAINTENANCE_STATUS_IN_PROGRESS
+        return restrict_actions(
+            session,
+            AdminEquipmentAvailableActionsView(
+                can_cancel_maintenance=bool(current_open),
+                can_complete_maintenance=bool(current_open),
+                can_create_corrective=is_editable,
+                can_create_preventive=is_editable,
+                can_edit_equipment=is_editable,
+                can_export=False,
+                can_mark_operational=row.equipment.operational_status
+                in {EQUIPMENT_STATUS_OUT_OF_SERVICE, EQUIPMENT_STATUS_UNDER_MAINTENANCE},
+                can_mark_out_of_service=row.equipment.operational_status
+                == EQUIPMENT_STATUS_OPERATIONAL,
+                can_print=False,
+                can_start_maintenance=bool(
+                    current_open and current_open.status != MAINTENANCE_STATUS_IN_PROGRESS
+                ),
+                note=(
+                    "Incidencias, adjuntos de archivo y exportacion requieren contratos backend "
+                    "dedicados."
+                ),
             ),
-            note=(
-                "Incidencias, adjuntos de archivo y exportacion requieren contratos backend "
-                "dedicados."
-            ),
+            {
+                "can_cancel_maintenance": "quality_hygiene.manage",
+                "can_complete_maintenance": "quality_hygiene.manage",
+                "can_create_corrective": "quality_hygiene.manage",
+                "can_create_preventive": "quality_hygiene.manage",
+                "can_edit_equipment": "quality_hygiene.manage",
+                "can_mark_operational": "quality_hygiene.manage",
+                "can_mark_out_of_service": "quality_hygiene.manage",
+                "can_start_maintenance": "quality_hygiene.manage",
+            },
+            branch_ids=(row.equipment.branch_id,),
+            global_only=False,
         )
 
     def _warnings(self, row: _EquipmentRow) -> list[AdminEquipmentWarningView]:

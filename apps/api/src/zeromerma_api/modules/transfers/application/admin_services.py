@@ -13,6 +13,7 @@ from sqlalchemy.orm import Session, aliased
 from zeromerma_api.modules.audit.application.service import AuditRecorder
 from zeromerma_api.modules.branches.infrastructure.models import Branch, Workstation
 from zeromerma_api.modules.catalog.infrastructure.models import Product, ProductClass
+from zeromerma_api.modules.identity.application.actions import restrict_actions
 from zeromerma_api.modules.identity.application.schemas import AuthenticatedUser
 from zeromerma_api.modules.identity.infrastructure.models import User
 from zeromerma_api.modules.inventory.domain.constants import (
@@ -1073,13 +1074,25 @@ class AdminTransferService:
             else "received"
         )
         return AdminTransferDetailView(
-            available_actions=AdminTransferAvailableActionsView(
-                can_cancel=row.shipment.status == OPERATION_DOCUMENT_STATUS_DRAFT,
-                can_dispatch=row.shipment.status == OPERATION_DOCUMENT_STATUS_DRAFT
-                and len(shipment_lines) > 0,
-                can_edit=row.shipment.status == OPERATION_DOCUMENT_STATUS_DRAFT,
-                can_receive=row.shipment.status == OPERATION_DOCUMENT_STATUS_IN_TRANSIT,
-                can_view_movements=True,
+            available_actions=restrict_actions(
+                session,
+                AdminTransferAvailableActionsView(
+                    can_cancel=row.shipment.status == OPERATION_DOCUMENT_STATUS_DRAFT,
+                    can_dispatch=row.shipment.status == OPERATION_DOCUMENT_STATUS_DRAFT
+                    and len(shipment_lines) > 0,
+                    can_edit=row.shipment.status == OPERATION_DOCUMENT_STATUS_DRAFT,
+                    can_receive=row.shipment.status == OPERATION_DOCUMENT_STATUS_IN_TRANSIT,
+                    can_view_movements=True,
+                ),
+                {
+                    "can_cancel": "transfers.cancel",
+                    "can_dispatch": "transfers.execute",
+                    "can_edit": "transfers.manage",
+                    "can_receive": "transfers.execute",
+                    "can_view_movements": "inventory.view",
+                },
+                branch_ids=(row.origin_branch.id, row.destination_branch.id),
+                global_only=False,
             ),
             destination=self._to_branch_view(row.destination_branch),
             inventory_impact=self._inventory_impact(session, row),

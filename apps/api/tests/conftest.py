@@ -46,6 +46,10 @@ TEST_ENGINE, SessionLocal, seed_local_data, create_app = TEST_RUNTIME
 
 TRUNCATE_SQL = """
 TRUNCATE TABLE
+  identity_recovery_credentials,
+  identity_privileged_changes,
+  identity_privilege_state,
+  user_role_assignment_branch_scopes,
   system_setting_history,
   system_settings,
   quality_incident_follow_ups,

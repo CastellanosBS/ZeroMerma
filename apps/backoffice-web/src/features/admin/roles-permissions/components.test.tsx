@@ -1,3 +1,4 @@
+import { withCapabilities } from "../../../test-support/authorization";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import type { ReactElement } from "react";
 import { renderToString } from "react-dom/server";
@@ -87,6 +88,8 @@ const detail: AdminRoleDetail = {
   },
   assignedUsers: [
     {
+      scopeType: "GLOBAL",
+      branchIds: [],
       assignedAt: "2026-05-22T10:00:00Z",
       branchSummary: "Main Branch",
       email: "admin@zeromerma.local",
@@ -127,7 +130,7 @@ const detail: AdminRoleDetail = {
 };
 
 function render(element: ReactElement) {
-  return renderToString(element);
+  return renderToString(withCapabilities(element, ["roles.manage"]));
 }
 
 describe("admin roles and permissions UI components", () => {
@@ -199,9 +202,7 @@ describe("admin roles and permissions UI components", () => {
       <AdminRoleDetailPanel
         detail={detail}
         selectedRole={role}
-        users={[]}
         onActivate={() => undefined}
-        onAssignUser={() => undefined}
         onCopyRole={() => undefined}
         onDeactivate={() => undefined}
         onEdit={() => undefined}

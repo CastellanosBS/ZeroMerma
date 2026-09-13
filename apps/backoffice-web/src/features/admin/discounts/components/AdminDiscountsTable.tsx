@@ -1,3 +1,4 @@
+import { AdminActionButton } from "../../components/AdminActionButton";
 import { AdminEmptyState } from "../../components/AdminEmptyState";
 import type { AdminDiscount, AdminDiscountBackendContract, AdminDiscountHealth } from "../types";
 
@@ -9,7 +10,9 @@ function formatMoney(value: string | null | undefined, currencyCode: string): st
   if (!Number.isFinite(numericValue)) {
     return `${value} ${currencyCode}`;
   }
-  return new Intl.NumberFormat("es-MX", { currency: currencyCode, style: "currency" }).format(numericValue);
+  return new Intl.NumberFormat("es-MX", { currency: currencyCode, style: "currency" }).format(
+    numericValue,
+  );
 }
 
 function formatDiscountValue(item: AdminDiscount): string {
@@ -100,7 +103,10 @@ export function AdminDiscountsTable({
     <section className="flex min-h-0 min-w-0 flex-col overflow-hidden rounded-[20px] border border-[var(--ui-color-border)] bg-white">
       <div className="flex min-w-0 shrink-0 items-center justify-between gap-3 border-b border-[var(--ui-color-border)] px-3 py-2.5">
         <div className="min-w-0">
-          <h3 className="truncate text-base font-semibold text-slate-950" title="Descuentos comerciales">
+          <h3
+            className="truncate text-base font-semibold text-slate-950"
+            title="Descuentos comerciales"
+          >
             Descuentos comerciales
           </h3>
           <p className="truncate text-xs text-slate-500">
@@ -114,9 +120,15 @@ export function AdminDiscountsTable({
 
       <div className="min-h-0 min-w-0 flex-1 overflow-y-auto p-2.5">
         {isLoading ? (
-          <AdminEmptyState description="Consultando definiciones comerciales desde backend." title="Cargando descuentos" />
+          <AdminEmptyState
+            description="Consultando definiciones comerciales desde backend."
+            title="Cargando descuentos"
+          />
         ) : errorMessage ? (
-          <AdminEmptyState description={errorMessage} title="No se pudieron cargar los descuentos" />
+          <AdminEmptyState
+            description={errorMessage}
+            title="No se pudieron cargar los descuentos"
+          />
         ) : discounts.length > 0 ? (
           <div className="grid min-w-0 gap-1.5">
             {discounts.map((item) => {
@@ -137,9 +149,12 @@ export function AdminDiscountsTable({
                     type="button"
                     onClick={() => onSelectDiscount(item)}
                   >
-                    <span className="block truncate text-sm font-semibold text-slate-950">{item.name}</span>
+                    <span className="block truncate text-sm font-semibold text-slate-950">
+                      {item.name}
+                    </span>
                     <span className="mt-0.5 block truncate text-xs text-slate-500">
-                      {item.code ?? "Sin codigo"} - {item.discountType === "PERCENTAGE" ? "Porcentaje" : "Monto fijo"}
+                      {item.code ?? "Sin codigo"} -{" "}
+                      {item.discountType === "PERCENTAGE" ? "Porcentaje" : "Monto fijo"}
                     </span>
                   </button>
 
@@ -149,7 +164,9 @@ export function AdminDiscountsTable({
                     type="button"
                     onClick={() => onSelectDiscount(item)}
                   >
-                    <span className="block truncate text-sm font-semibold text-slate-800">{formatScope(item)}</span>
+                    <span className="block truncate text-sm font-semibold text-slate-800">
+                      {formatScope(item)}
+                    </span>
                     <span className="mt-0.5 block truncate text-xs text-slate-500">
                       {item.targetName ?? item.brandName ?? "Sin objetivo especifico"}
                     </span>
@@ -161,7 +178,9 @@ export function AdminDiscountsTable({
                     type="button"
                     onClick={() => onSelectDiscount(item)}
                   >
-                    <span className="block truncate text-sm font-semibold text-slate-950">{formatDiscountValue(item)}</span>
+                    <span className="block truncate text-sm font-semibold text-slate-950">
+                      {formatDiscountValue(item)}
+                    </span>
                     <span className="mt-0.5 block truncate text-xs text-slate-500">
                       Resultado {formatMoney(item.previewPrice, item.currencyCode)}
                     </span>
@@ -174,9 +193,15 @@ export function AdminDiscountsTable({
                     onClick={() => onSelectDiscount(item)}
                   >
                     <span className="block truncate text-sm font-semibold text-slate-950">
-                      {item.status === "ACTIVE" ? "Activo" : item.status === "INACTIVE" ? "Inactivo" : "Archivado"}
+                      {item.status === "ACTIVE"
+                        ? "Activo"
+                        : item.status === "INACTIVE"
+                          ? "Inactivo"
+                          : "Archivado"}
                     </span>
-                    <span className="mt-0.5 block truncate text-xs text-slate-500">{validityLabel(item)}</span>
+                    <span className="mt-0.5 block truncate text-xs text-slate-500">
+                      {validityLabel(item)}
+                    </span>
                   </button>
 
                   <div className="flex min-w-0 flex-col gap-1.5 lg:items-end">
@@ -192,29 +217,35 @@ export function AdminDiscountsTable({
                       </span>
                     </div>
                     <div className="flex min-w-0 flex-wrap gap-1.5 lg:justify-end">
-                      <button
+                      <AdminActionButton
+                        globalOnly
+                        capability="discounts.manage"
                         className="rounded-full border border-[var(--ui-color-border)] bg-white px-2 py-1 text-xs font-semibold text-[var(--ui-color-info)] transition hover:bg-[var(--ui-color-surface-tint)] focus:outline-none focus:ring-4 focus:ring-[var(--ui-color-ring)]"
                         type="button"
                         onClick={() => onEditDiscount(item)}
                       >
                         Editar
-                      </button>
-                      <button
+                      </AdminActionButton>
+                      <AdminActionButton
+                        globalOnly
+                        capability="discounts.manage"
                         className="rounded-full border border-[var(--ui-color-border)] bg-white px-2 py-1 text-xs font-semibold text-slate-700 transition hover:bg-slate-50 focus:outline-none focus:ring-4 focus:ring-[var(--ui-color-ring)] disabled:cursor-not-allowed disabled:bg-slate-100"
                         disabled={isUpdating}
                         type="button"
                         onClick={() => onToggleStatus(item)}
                       >
                         {item.status === "ACTIVE" ? "Desactivar" : "Activar"}
-                      </button>
-                      <button
+                      </AdminActionButton>
+                      <AdminActionButton
+                        globalOnly
+                        capability="discounts.manage"
                         className="rounded-full border border-[var(--ui-color-border)] bg-white px-2 py-1 text-xs font-semibold text-slate-700 transition hover:bg-slate-50 focus:outline-none focus:ring-4 focus:ring-[var(--ui-color-ring)] disabled:cursor-not-allowed disabled:bg-slate-100"
                         disabled={isUpdating}
                         type="button"
                         onClick={() => onDuplicateDiscount(item)}
                       >
                         Duplicar
-                      </button>
+                      </AdminActionButton>
                     </div>
                   </div>
                 </article>

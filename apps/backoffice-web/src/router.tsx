@@ -44,6 +44,7 @@ import { AdminWastePage } from "./features/admin/waste/pages/AdminWastePage";
 import { AdminWorkstationsPage } from "./features/admin/workstations/pages/AdminWorkstationsPage";
 import { BackofficeLoginPage } from "./features/auth/BackofficeLoginPage";
 import { ProtectedAdminRoute } from "./features/auth/ProtectedAdminRoute";
+import { AuthorizedAdminHome } from "./features/auth/AdminAccessDenied";
 import { HealthDemoPage } from "./routes/health-demo";
 import { HomePage } from "./routes/home";
 
@@ -55,7 +56,7 @@ export function getBackofficeDevelopmentRouteRedirect(
   pathname: "/" | "/health",
   isDevelopment: boolean,
 ) {
-  return isDevelopment ? null : "/login" as const;
+  return isDevelopment ? null : ("/login" as const);
 }
 
 function DevelopmentHomeRoute() {
@@ -107,7 +108,7 @@ const adminRoute = createRoute({
 const adminIndexRoute = createRoute({
   getParentRoute: () => adminRoute,
   path: "/",
-  component: () => <Navigate to={DEFAULT_ADMIN_RELEASE_PATH as never} />,
+  component: AuthorizedAdminHome,
 });
 
 const adminModuleRoutes = adminModules.map((module) => {
@@ -115,10 +116,9 @@ const adminModuleRoutes = adminModules.map((module) => {
   return createRoute({
     getParentRoute: () => adminRoute,
     path: module.routeSlug,
-    component:
-      releaseRedirect
-        ? () => <Navigate to={releaseRedirect as never} />
-        : module.key === "cleaningLogs"
+    component: releaseRedirect
+      ? AuthorizedAdminHome
+      : module.key === "cleaningLogs"
         ? AdminCleaningLogsPage
         : module.key === "sanitaryChecks"
           ? AdminSanitaryVerificationsPage
@@ -177,7 +177,9 @@ const adminModuleRoutes = adminModules.map((module) => {
                                                               : module.key === "settings"
                                                                 ? AdminSettingsPage
                                                                 : () => (
-                                                                    <AdminModulePage moduleKey={module.key} />
+                                                                    <AdminModulePage
+                                                                      moduleKey={module.key}
+                                                                    />
                                                                   ),
   });
 });

@@ -1,3 +1,4 @@
+import { AdminActionButton } from "../../components/AdminActionButton";
 import type { FormEvent } from "react";
 import { useEffect, useState } from "react";
 
@@ -236,7 +237,9 @@ export function AdminReconciliationWorkflowPanel({
           >
             Cancelar
           </button>
-          <button
+          <AdminActionButton
+            capability="cash_finance.manage"
+            branchIds={[]}
             className="h-10 rounded-2xl border border-[var(--ui-color-primary)] bg-[var(--ui-color-primary)] px-4 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50"
             disabled={isSubmitting}
             type="submit"
@@ -246,7 +249,7 @@ export function AdminReconciliationWorkflowPanel({
               : mode === "create"
                 ? "Confirmar conciliacion"
                 : "Marcar como conciliada"}
-          </button>
+          </AdminActionButton>
         </div>
       </form>
     </section>

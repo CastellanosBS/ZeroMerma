@@ -63,6 +63,9 @@ const bootstrap = {
   },
   local_timestamp: "2026-04-13T10:00:00Z",
   user: {
+    authorization_surface: "POS" as const,
+    authorization_version: "test-authorization-v1",
+    is_superadministrator: false,
     default_surface: "POS" as const,
     email: "cashier@zeromerma.local",
     full_name: "Main Branch Cashier",

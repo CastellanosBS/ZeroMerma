@@ -1,3 +1,4 @@
+import { AdminActionButton } from "../../components/AdminActionButton";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useMemo, useState } from "react";
 
@@ -85,20 +86,42 @@ function AdminSupplierMetricStrip({
 }) {
   const loadingValue = isLoading ? "Cargando" : null;
   const items = [
-    { label: "Totales", title: "Proveedores totales", value: loadingValue ?? metrics.totalSuppliers },
+    {
+      label: "Totales",
+      title: "Proveedores totales",
+      value: loadingValue ?? metrics.totalSuppliers,
+    },
     { label: "Activos", title: "Activos", value: loadingValue ?? metrics.activeSuppliers },
     { label: "Inactivos", title: "Inactivos", value: loadingValue ?? metrics.inactiveSuppliers },
-    { label: "Advertencias", title: "Con advertencias", value: loadingValue ?? metrics.suppliersWithWarnings },
-    { label: "Sin productos", title: "Sin productos asociados", value: loadingValue ?? metrics.suppliersWithoutProducts },
-    { label: "Compras recientes", title: "Con compras recientes", value: loadingValue ?? metrics.suppliersWithRecentActivity },
+    {
+      label: "Advertencias",
+      title: "Con advertencias",
+      value: loadingValue ?? metrics.suppliersWithWarnings,
+    },
+    {
+      label: "Sin productos",
+      title: "Sin productos asociados",
+      value: loadingValue ?? metrics.suppliersWithoutProducts,
+    },
+    {
+      label: "Compras recientes",
+      title: "Con compras recientes",
+      value: loadingValue ?? metrics.suppliersWithRecentActivity,
+    },
     { label: "Bloqueados", title: "Bloqueados", value: loadingValue ?? metrics.blockedSuppliers },
   ];
 
   return (
     <section className="flex min-w-0 flex-wrap items-center gap-2 rounded-[18px] border border-[var(--ui-color-border)] bg-white px-3 py-2 text-xs text-slate-600">
-      <span className="shrink-0 font-semibold uppercase tracking-[0.12em] text-slate-500">Resumen</span>
+      <span className="shrink-0 font-semibold uppercase tracking-[0.12em] text-slate-500">
+        Resumen
+      </span>
       {items.map((item) => (
-        <span className="inline-flex min-w-0 max-w-full items-center gap-1.5 rounded-full border border-[var(--ui-color-border)] bg-slate-50 px-2.5 py-1" key={item.label} title={`${item.title}: ${item.value}`}>
+        <span
+          className="inline-flex min-w-0 max-w-full items-center gap-1.5 rounded-full border border-[var(--ui-color-border)] bg-slate-50 px-2.5 py-1"
+          key={item.label}
+          title={`${item.title}: ${item.value}`}
+        >
           <span className="truncate text-slate-500">{item.label}</span>
           <span className="truncate font-semibold text-slate-950">{item.value}</span>
         </span>
@@ -114,7 +137,9 @@ export function AdminSuppliersPage() {
   const [selectedSupplierId, setSelectedSupplierId] = useState<string | null>(null);
   const [editingSupplier, setEditingSupplier] = useState<AdminSupplierDetail | null>(null);
   const [isFormOpen, setIsFormOpen] = useState(false);
-  const [feedback, setFeedback] = useState<{ tone: "success" | "error"; message: string } | null>(null);
+  const [feedback, setFeedback] = useState<{ tone: "success" | "error"; message: string } | null>(
+    null,
+  );
 
   const suppliersQuery = useQuery({
     enabled: Boolean(accessToken),
@@ -139,7 +164,10 @@ export function AdminSuppliersPage() {
   const createMutation = useMutation({
     mutationFn: (payload: AdminSupplierPayload) => createAdminSupplier(accessToken ?? "", payload),
     onError: (error) => {
-      setFeedback({ tone: "error", message: toBackofficeErrorMessage(error, "No se pudo guardar el proveedor.") });
+      setFeedback({
+        tone: "error",
+        message: toBackofficeErrorMessage(error, "No se pudo guardar el proveedor."),
+      });
     },
     onSuccess: (detail) => {
       setFeedback({ tone: "success", message: "Proveedor guardado correctamente." });
@@ -154,7 +182,10 @@ export function AdminSuppliersPage() {
     mutationFn: ({ payload, supplierId }: { payload: AdminSupplierPayload; supplierId: string }) =>
       updateAdminSupplier(accessToken ?? "", supplierId, payload),
     onError: (error) => {
-      setFeedback({ tone: "error", message: toBackofficeErrorMessage(error, "No se pudo actualizar el proveedor.") });
+      setFeedback({
+        tone: "error",
+        message: toBackofficeErrorMessage(error, "No se pudo actualizar el proveedor."),
+      });
     },
     onSuccess: (detail) => {
       setFeedback({ tone: "success", message: "Proveedor actualizado correctamente." });
@@ -169,7 +200,10 @@ export function AdminSuppliersPage() {
     mutationFn: ({ status, supplierId }: { status: AdminSupplierStatus; supplierId: string }) =>
       changeAdminSupplierStatus(accessToken ?? "", supplierId, { notes: null, status }),
     onError: (error) => {
-      setFeedback({ tone: "error", message: toBackofficeErrorMessage(error, "No se pudo cambiar el estado del proveedor.") });
+      setFeedback({
+        tone: "error",
+        message: toBackofficeErrorMessage(error, "No se pudo cambiar el estado del proveedor."),
+      });
     },
     onSuccess: (detail) => {
       setFeedback({ tone: "success", message: "Estado del proveedor actualizado." });
@@ -182,11 +216,17 @@ export function AdminSuppliersPage() {
     ? toBackofficeErrorMessage(suppliersQuery.error, "No se pudieron cargar proveedores.")
     : null;
   const detailErrorMessage = supplierDetailQuery.isError
-    ? toBackofficeErrorMessage(supplierDetailQuery.error, "No se pudo cargar el detalle de proveedor.")
+    ? toBackofficeErrorMessage(
+        supplierDetailQuery.error,
+        "No se pudo cargar el detalle de proveedor.",
+      )
     : null;
   const formErrorMessage =
-    (createMutation.isError || updateMutation.isError) && feedback?.tone === "error" ? feedback.message : null;
-  const isSubmitting = createMutation.isPending || updateMutation.isPending || statusMutation.isPending;
+    (createMutation.isError || updateMutation.isError) && feedback?.tone === "error"
+      ? feedback.message
+      : null;
+  const isSubmitting =
+    createMutation.isPending || updateMutation.isPending || statusMutation.isPending;
   const pageStatusLabel = suppliersQuery.isLoading
     ? "Validando API"
     : supplierList.isBackendConnected
@@ -241,6 +281,8 @@ export function AdminSuppliersPage() {
   return (
     <section className="flex min-h-0 min-w-0 flex-col overflow-hidden rounded-[28px] border border-[var(--ui-color-border)] bg-white shadow-[var(--ui-shadow-subtle)] lg:h-full">
       <AdminPageHeader
+        actionGlobalOnly
+        actionCapability="suppliers.manage"
         actionLabel="Nuevo proveedor"
         description="Administra proveedores, contactos, condiciones comerciales, productos surtidos y estado operativo."
         meta={[pageStatusLabel, "Cambios auditables"]}
@@ -253,8 +295,16 @@ export function AdminSuppliersPage() {
       />
 
       <div className="flex min-h-0 min-w-0 flex-1 flex-col gap-2.5 overflow-hidden p-3">
-        <AdminSuppliersFilters filters={filters} isBackendConnected={supplierList.isBackendConnected} options={supplierList.filterOptions} onChange={patchFilters} />
-        <AdminSupplierMetricStrip isLoading={suppliersQuery.isLoading} metrics={supplierList.metrics} />
+        <AdminSuppliersFilters
+          filters={filters}
+          isBackendConnected={supplierList.isBackendConnected}
+          options={supplierList.filterOptions}
+          onChange={patchFilters}
+        />
+        <AdminSupplierMetricStrip
+          isLoading={suppliersQuery.isLoading}
+          metrics={supplierList.metrics}
+        />
 
         {feedback ? (
           <p
@@ -310,9 +360,15 @@ export function AdminSuppliersPage() {
           />
           <div className="flex min-h-0 flex-col gap-2.5 overflow-hidden">
             {supplierDetailQuery.data ? (
-              <button className="rounded-[16px] border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700" type="button" onClick={handleEditCurrent}>
+              <AdminActionButton
+                capability="suppliers.manage"
+                globalOnly
+                className="rounded-[16px] border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700"
+                type="button"
+                onClick={handleEditCurrent}
+              >
                 Editar proveedor
-              </button>
+              </AdminActionButton>
             ) : null}
             <AdminSupplierDetailPanel
               errorMessage={detailErrorMessage}

@@ -19,7 +19,9 @@ from zeromerma_api.modules.catalog.domain.constants import (
     CATALOG_PRODUCT_KIND_RAW_MATERIAL,
 )
 from zeromerma_api.modules.catalog.infrastructure.models import Product
+from zeromerma_api.modules.identity.application.actions import restrict_actions
 from zeromerma_api.modules.identity.application.schemas import AuthenticatedUser
+from zeromerma_api.modules.identity.application.visibility import operational_user_predicate
 from zeromerma_api.modules.identity.infrastructure.models import User
 from zeromerma_api.modules.inventory.domain.constants import (
     INVENTORY_LOCATION_BACKROOM,
@@ -804,18 +806,31 @@ class AdminPurchaseService:
         receipt_lines = self._receipt_lines_for_document(session, row.document.id)
         movements = self._inventory_movements(session, row.receipts)
         return AdminPurchaseDetailView(
-            available_actions=AdminPurchaseAvailableActionsView(
-                can_cancel=row.document.status in {PURCHASE_STATUS_DRAFT, PURCHASE_STATUS_ORDERED}
-                and not row.receipts,
-                can_confirm=row.document.status == PURCHASE_STATUS_DRAFT,
-                can_edit=row.document.status == PURCHASE_STATUS_DRAFT,
-                can_receive=row.document.status
-                in {
-                    PURCHASE_STATUS_DRAFT,
-                    PURCHASE_STATUS_ORDERED,
-                    PURCHASE_STATUS_PARTIALLY_RECEIVED,
+            available_actions=restrict_actions(
+                session,
+                AdminPurchaseAvailableActionsView(
+                    can_cancel=row.document.status
+                    in {PURCHASE_STATUS_DRAFT, PURCHASE_STATUS_ORDERED}
+                    and not row.receipts,
+                    can_confirm=row.document.status == PURCHASE_STATUS_DRAFT,
+                    can_edit=row.document.status == PURCHASE_STATUS_DRAFT,
+                    can_receive=row.document.status
+                    in {
+                        PURCHASE_STATUS_DRAFT,
+                        PURCHASE_STATUS_ORDERED,
+                        PURCHASE_STATUS_PARTIALLY_RECEIVED,
+                    },
+                    can_view_movements=True,
+                ),
+                {
+                    "can_cancel": "purchases.cancel",
+                    "can_confirm": "purchases.confirm",
+                    "can_edit": "purchases.manage",
+                    "can_receive": "purchases.receive",
+                    "can_view_movements": "inventory.view",
                 },
-                can_view_movements=True,
+                branch_ids=(row.branch.id,),
+                global_only=False,
             ),
             cost_summary=AdminPurchaseCostSummaryView(
                 currency=row.supplier.default_currency,
@@ -978,7 +993,11 @@ class AdminPurchaseService:
             .all()
         )
         operators = (
-            session.execute(select(User).order_by(User.full_name.asc(), User.email.asc()))
+            session.execute(
+                select(User)
+                .where(operational_user_predicate(session))
+                .order_by(User.full_name.asc(), User.email.asc())
+            )
             .scalars()
             .all()
         )

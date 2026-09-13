@@ -59,6 +59,7 @@ from zeromerma_api.modules.catalog.infrastructure.models import (
     Recipe,
     RecipeInput,
 )
+from zeromerma_api.modules.identity.application.actions import restrict_actions
 from zeromerma_api.modules.identity.application.schemas import AuthenticatedUser
 from zeromerma_api.modules.inventory.infrastructure.models import (
     InventoryBalance,
@@ -182,7 +183,7 @@ class AdminInputSupplyService:
         *,
         product_id: uuid.UUID,
     ) -> AdminInputSupplyDetailView:
-        return self._to_detail(self._get_context(session, product_id))
+        return self._to_detail(session, self._get_context(session, product_id))
 
     def create_item(
         self,
@@ -615,7 +616,9 @@ class AdminInputSupplyService:
             warnings=warnings,
         )
 
-    def _to_detail(self, context: _InputSupplyContext) -> AdminInputSupplyDetailView:
+    def _to_detail(
+        self, session: Session, context: _InputSupplyContext
+    ) -> AdminInputSupplyDetailView:
         warnings = self._build_warnings(context)
         stock_state = self._stock_state(context)
         total_stock = self._total_stock(context)
@@ -633,7 +636,25 @@ class AdminInputSupplyService:
             None,
         )
         return AdminInputSupplyDetailView(
-            available_actions=AdminInputSupplyAvailableActionsView(),
+            available_actions=restrict_actions(
+                session,
+                restrict_actions(
+                    session,
+                    AdminInputSupplyAvailableActionsView(),
+                    {
+                        "can_add_supplier": "catalog.manage",
+                        "can_deactivate": "catalog.manage",
+                        "can_edit": "catalog.manage",
+                    },
+                    branch_ids=(),
+                    global_only=True,
+                ),
+                {
+                    "can_open_inventory": "inventory.view",
+                    "can_open_product": "catalog.view",
+                    "can_open_recipes": "recipes.view",
+                },
+            ),
             classification=AdminInputSupplyClassificationView(
                 kind=context.product.product_kind,  # type: ignore[arg-type]
                 notes=context.product.procurement_notes,

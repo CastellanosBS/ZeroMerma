@@ -1,3 +1,4 @@
+import { AdminActionButton } from "../../components/AdminActionButton";
 import type { ReactNode } from "react";
 
 import { AdminEmptyState } from "../../components/AdminEmptyState";
@@ -39,7 +40,7 @@ function statusLabel(value: string | null | undefined): string {
     SCHEDULED: "Programado",
     UNDER_MAINTENANCE: "En mantenimiento",
   };
-  return value ? labels[value] ?? value : "No disponible";
+  return value ? (labels[value] ?? value) : "No disponible";
 }
 
 function Section({ children, title }: { children: ReactNode; title: string }) {
@@ -182,7 +183,10 @@ export function AdminEquipmentMaintenanceDetailPanel({
             />
             <Fact label="Area" value={detail.locationContext.areaName ?? "Sin area"} />
             <Fact label="Tipo area" value={detail.locationContext.areaType} />
-            <Fact label="Critico operacion" value={detail.locationContext.isCritical ? "Si" : "No"} />
+            <Fact
+              label="Critico operacion"
+              value={detail.locationContext.isCritical ? "Si" : "No"}
+            />
             <Fact
               label="Inocuidad"
               value={detail.locationContext.foodSafetyCritical ? "Critico" : "No critico"}
@@ -228,10 +232,7 @@ export function AdminEquipmentMaintenanceDetailPanel({
               label="Proximo mantenimiento"
               value={formatDateTime(detail.currentMaintenanceStatus.nextScheduledMaintenanceAt)}
             />
-            <Fact
-              label="Vencido"
-              value={detail.currentMaintenanceStatus.overdue ? "Si" : "No"}
-            />
+            <Fact label="Vencido" value={detail.currentMaintenanceStatus.overdue ? "Si" : "No"} />
             <Fact
               label="Incidencia actual"
               value={detail.currentMaintenanceStatus.currentLinkedIncident ?? "N/A"}
@@ -340,46 +341,56 @@ export function AdminEquipmentMaintenanceDetailPanel({
             >
               Copiar codigo
             </button>
-            <button
+            <AdminActionButton
+              capability="quality_hygiene.manage"
+              branchIds={[detail.overview.branchId]}
               className="rounded-full border border-[var(--ui-color-border)] bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 disabled:cursor-not-allowed disabled:opacity-40"
               disabled={!detail.availableActions.canCreatePreventive}
               type="button"
               onClick={() => onCreateMaintenance(detail.overview)}
             >
               Crear mantenimiento
-            </button>
-            <button
+            </AdminActionButton>
+            <AdminActionButton
+              capability="quality_hygiene.manage"
+              branchIds={[detail.overview.branchId]}
               className="rounded-full border border-[var(--ui-color-border)] bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 disabled:cursor-not-allowed disabled:opacity-40"
               disabled={!openRecord || !detail.availableActions.canStartMaintenance}
               type="button"
               onClick={() => openRecord && onStartMaintenance(openRecord)}
             >
               Iniciar mantenimiento
-            </button>
-            <button
+            </AdminActionButton>
+            <AdminActionButton
+              capability="quality_hygiene.manage"
+              branchIds={[detail.overview.branchId]}
               className="rounded-full border border-[var(--ui-color-border)] bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 disabled:cursor-not-allowed disabled:opacity-40"
               disabled={!openRecord || !detail.availableActions.canCompleteMaintenance}
               type="button"
               onClick={() => openRecord && onCompleteMaintenance(openRecord)}
             >
               Completar mantenimiento
-            </button>
-            <button
+            </AdminActionButton>
+            <AdminActionButton
+              capability="quality_hygiene.manage"
+              branchIds={[detail.overview.branchId]}
               className="rounded-full border border-[var(--ui-color-border)] bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 disabled:cursor-not-allowed disabled:opacity-40"
               disabled={!detail.availableActions.canMarkOutOfService}
               type="button"
               onClick={() => onMarkOutOfService(detail.overview)}
             >
               Fuera de servicio
-            </button>
-            <button
+            </AdminActionButton>
+            <AdminActionButton
+              capability="quality_hygiene.manage"
+              branchIds={[detail.overview.branchId]}
               className="rounded-full border border-[var(--ui-color-border)] bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 disabled:cursor-not-allowed disabled:opacity-40"
               disabled={!detail.availableActions.canMarkOperational}
               type="button"
               onClick={() => onMarkOperational(detail.overview)}
             >
               Marcar operativo
-            </button>
+            </AdminActionButton>
           </div>
           {detail.availableActions.note ? (
             <p className="mt-2 text-xs text-slate-500">{detail.availableActions.note}</p>

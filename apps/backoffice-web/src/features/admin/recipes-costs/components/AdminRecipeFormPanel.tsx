@@ -1,3 +1,4 @@
+import { AdminActionButton } from "../../components/AdminActionButton";
 import type { FormEvent, ReactNode } from "react";
 import { useMemo, useState } from "react";
 
@@ -131,11 +132,15 @@ export function AdminRecipeFormPanel({
           <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
             Definicion tecnica
           </p>
-          <h3 className="mt-1 truncate text-base font-semibold text-slate-950" title={product?.productName ?? "Nueva receta"}>
+          <h3
+            className="mt-1 truncate text-base font-semibold text-slate-950"
+            title={product?.productName ?? "Nueva receta"}
+          >
             Nueva receta{product ? ` - ${product.productName}` : ""}
           </h3>
           <p className="mt-1 max-w-4xl text-sm leading-5 text-slate-600">
-            Define rendimiento e insumos RAW_MATERIAL. El costo se calcula en backend con costo estandar de insumos.
+            Define rendimiento e insumos RAW_MATERIAL. El costo se calcula en backend con costo
+            estandar de insumos.
           </p>
         </div>
         <button
@@ -191,12 +196,19 @@ export function AdminRecipeFormPanel({
 
       <section className="mt-4 rounded-[18px] border border-[var(--ui-color-border)] bg-white p-3">
         <div className="flex min-w-0 flex-wrap items-center justify-between gap-2">
-          <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">Insumos</p>
+          <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
+            Insumos
+          </p>
           <button
             className="rounded-full border border-[var(--ui-color-border)] bg-white px-3 py-1 text-xs font-semibold text-[var(--ui-color-info)] disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-400"
             disabled={rawMaterialOptions.length === 0}
             type="button"
-            onClick={() => setInputs((current) => [...current, { inputProductId: rawMaterialOptions[0]?.id ?? "", quantity: "" }])}
+            onClick={() =>
+              setInputs((current) => [
+                ...current,
+                { inputProductId: rawMaterialOptions[0]?.id ?? "", quantity: "" },
+              ])
+            }
           >
             Agregar insumo
           </button>
@@ -209,7 +221,10 @@ export function AdminRecipeFormPanel({
         ) : (
           <div className="mt-2 grid gap-2">
             {inputs.map((input, index) => (
-              <div className="grid min-w-0 gap-2 md:grid-cols-[minmax(0,1fr)_8rem_auto]" key={index}>
+              <div
+                className="grid min-w-0 gap-2 md:grid-cols-[minmax(0,1fr)_8rem_auto]"
+                key={index}
+              >
                 <select
                   className={inputClassName}
                   value={input.inputProductId}
@@ -231,7 +246,9 @@ export function AdminRecipeFormPanel({
                 <button
                   className="h-10 rounded-2xl border border-[var(--ui-color-border)] bg-white px-3 text-sm font-semibold text-slate-600"
                   type="button"
-                  onClick={() => setInputs((current) => current.filter((_, inputIndex) => inputIndex !== index))}
+                  onClick={() =>
+                    setInputs((current) => current.filter((_, inputIndex) => inputIndex !== index))
+                  }
                 >
                   Quitar
                 </button>
@@ -249,15 +266,18 @@ export function AdminRecipeFormPanel({
 
       <div className="mt-4 flex min-w-0 flex-wrap items-center justify-between gap-3 border-t border-[var(--ui-color-border)] pt-3">
         <p className="min-w-0 text-sm leading-5 text-slate-600">
-          No se modifica el costo estandar del producto al guardar; esa accion es explicita desde el detalle.
+          No se modifica el costo estandar del producto al guardar; esa accion es explicita desde el
+          detalle.
         </p>
-        <button
+        <AdminActionButton
+          capability="recipes.manage"
+          globalOnly
           className="shrink-0 rounded-2xl bg-[var(--ui-color-info)] px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:brightness-95 focus:outline-none focus:ring-4 focus:ring-[var(--ui-color-ring)] disabled:cursor-not-allowed disabled:bg-slate-300 disabled:text-slate-600"
           disabled={!canSubmit}
           type="submit"
         >
           {isSubmitting ? "Guardando..." : "Guardar receta"}
-        </button>
+        </AdminActionButton>
       </div>
     </form>
   );

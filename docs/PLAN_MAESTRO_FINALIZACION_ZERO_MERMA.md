@@ -30,6 +30,40 @@ no certifica los gates Development Complete, Feature Complete o Production Ready
 El siguiente bloque por dependencia es ZM-FIN-015–022, autorización y alcance por
 sucursal; el resto del plan conserva sus criterios de aceptación.
 
+### 0.2 Registro de ejecución — bloque ZM-FIN-015–022
+
+El bloque del 2026-09-12 implementa las decisiones aprobadas DEC-03, DEC-04 y DEC-19
+en `codex/zm-fin-015-022-authorization`. El catálogo contiene 55 capacidades explícitas;
+el acceso a Backoffice por sí solo no autoriza operaciones. Las asignaciones declaran
+`GLOBAL` o `BRANCH_SET`, con cardinalidad validada por PostgreSQL. La migración
+`20260912_0040_authorization` conserva evidencia de asignaciones anteriores y no
+convierte al administrador demo en Superadministrador.
+
+| Tarea | Implementación y evidencia ejecutable |
+|---|---|
+| ZM-FIN-015 | Catálogo canónico, resolución determinista por superficie, grants y versión de autorización en `/me`; cobertura de políticas por método/ruta. |
+| ZM-FIN-016 | Separación de usuarios, roles y asignaciones; rechazo de autoelevación; propietario explícito, protección de última autoridad, aprobación durable entre dos cuentas y recuperación local de un solo uso. |
+| ZM-FIN-017 | Capacidades separadas para configuración, auditoría y reportes; permisos de definición obligatorios y alcance intersectado antes de consultar o exportar. |
+| ZM-FIN-018 | Autorización de operaciones económicas, inventario, compras, producción y transferencias, con auditoría y trazas causales. |
+| ZM-FIN-019 | Políticas explícitas para todas las rutas; denegación por defecto, prueba de cobertura y gates de rutas, menús y acciones en Backoffice. |
+| ZM-FIN-020 | Scopes normalizados, unión por capacidad e intersección con membresías activas; invalidación del contexto y caché web ante revocación. |
+| ZM-FIN-021 | Filtrado de consultas, aliases, agregados, conteos, detalles, selectores y exportaciones antes de devolver datos. |
+| ZM-FIN-022 | Validación de sucursales y relaciones al persistir, dos extremos de transferencias, caja/estación/turno y contexto causal en audit/outbox. |
+
+La [arquitectura de autorización](architecture/authorization.md) describe las reglas;
+el [procedimiento operativo y registro de validación](implementation/authorization-validation.md)
+contiene los comandos de provisión, recuperación y aprobación, las pruebas ejecutadas
+y sus límites. La aceptación del bloque requiere las ocho etapas verdes de Foundation
+para el commit entregado. La provisión de una cuenta productiva se ejecutará en el
+entorno explícitamente configurado, con las credenciales privadas de su propietario.
+
+Las cuatro operaciones de aprobación están disponibles en la API; la pantalla dedicada
+para revisarlas permanece dentro de la finalización posterior del módulo de usuarios
+y roles. El worker actual conserva el contexto de outbox y sólo observa eventos; sus
+handlers ejecutores pertenecen a su fase posterior. Este registro no declara Security
+Ready, Feature Complete ni Production Ready. La siguiente tarea por dependencia es
+**ZM-FIN-023**, traspaso seguro de sesión POS–Backoffice.
+
 ## 1. Resumen ejecutivo
 
 ZeroMerma posee una base adecuada para evolucionar sin reescritura: monolito modular, FastAPI/SQLAlchemy/PostgreSQL, POS y Backoffice separados, OpenAPI generado, precisión decimal, auditoría y outbox transaccionales. La auditoría activa demostró que una parte importante de ventas, pagos, pedidos, documentos y administración es real. También demostró defectos sistémicos: el POS no alimenta el inventario canónico; el pago de pedido no entra en caja/corte; el worker no procesa eventos; la trazabilidad de identidad/origen es incorrecta; y varias superficies administrativas son simuladas o incompletas.

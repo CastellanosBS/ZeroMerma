@@ -1,3 +1,4 @@
+import { AdminActionButton } from "../../components/AdminActionButton";
 import { AdminEmptyState } from "../../components/AdminEmptyState";
 import type {
   AdminWorkstationBackendContract,
@@ -111,16 +112,28 @@ export function AdminWorkstationsTable({
 
       <div className="min-h-0 min-w-0 flex-1 overflow-y-auto p-2.5">
         {isLoading ? (
-          <AdminEmptyState description="Consultando estaciones y contexto de caja." title="Cargando estaciones" />
+          <AdminEmptyState
+            description="Consultando estaciones y contexto de caja."
+            title="Cargando estaciones"
+          />
         ) : errorMessage ? (
-          <AdminEmptyState description={errorMessage} title="No se pudieron cargar las estaciones" />
+          <AdminEmptyState
+            description={errorMessage}
+            title="No se pudieron cargar las estaciones"
+          />
         ) : workstations.length > 0 ? (
           <div className="grid min-w-0 gap-1.5">
             {workstations.map((item) => {
               const isSelected = item.id === selectedWorkstationId;
               const readinessTone =
-                item.readiness === "ready" ? "success" : item.readiness === "blocked" ? "critical" : "warning";
-              const criticalWarning = item.warnings.some((warning) => warning.severity === "critical");
+                item.readiness === "ready"
+                  ? "success"
+                  : item.readiness === "blocked"
+                    ? "critical"
+                    : "warning";
+              const criticalWarning = item.warnings.some(
+                (warning) => warning.severity === "critical",
+              );
 
               return (
                 <article
@@ -138,8 +151,12 @@ export function AdminWorkstationsTable({
                     type="button"
                     onClick={() => onSelectWorkstation(item)}
                   >
-                    <span className="block truncate text-sm font-semibold text-slate-950">{item.name}</span>
-                    <span className="mt-0.5 block truncate font-mono text-xs text-slate-500">{item.code}</span>
+                    <span className="block truncate text-sm font-semibold text-slate-950">
+                      {item.name}
+                    </span>
+                    <span className="mt-0.5 block truncate font-mono text-xs text-slate-500">
+                      {item.code}
+                    </span>
                   </button>
 
                   <button
@@ -148,8 +165,12 @@ export function AdminWorkstationsTable({
                     type="button"
                     onClick={() => onSelectWorkstation(item)}
                   >
-                    <span className="block truncate text-sm font-semibold text-slate-800">{item.branchName}</span>
-                    <span className="mt-0.5 block truncate text-xs text-slate-500">{item.branchCode}</span>
+                    <span className="block truncate text-sm font-semibold text-slate-800">
+                      {item.branchName}
+                    </span>
+                    <span className="mt-0.5 block truncate text-xs text-slate-500">
+                      {item.branchCode}
+                    </span>
                   </button>
 
                   <button
@@ -175,7 +196,9 @@ export function AdminWorkstationsTable({
                     <span className="block truncate text-sm font-semibold text-slate-950">
                       {formatDate(item.lastClosedAt)}
                     </span>
-                    <span className="mt-0.5 block truncate text-xs text-slate-500">Ultimo cierre</span>
+                    <span className="mt-0.5 block truncate text-xs text-slate-500">
+                      Ultimo cierre
+                    </span>
                   </button>
 
                   <div className="flex min-w-0 flex-col gap-1.5 xl:items-end">
@@ -183,7 +206,9 @@ export function AdminWorkstationsTable({
                       <StatusChip tone={item.status === "active" ? "success" : "neutral"}>
                         {formatStatus(item.status)}
                       </StatusChip>
-                      <StatusChip tone={readinessTone}>{formatReadiness(item.readiness)}</StatusChip>
+                      <StatusChip tone={readinessTone}>
+                        {formatReadiness(item.readiness)}
+                      </StatusChip>
                       {item.warnings.length > 0 ? (
                         <StatusChip tone={criticalWarning ? "critical" : "warning"}>
                           {`${item.warnings.length} alertas`}
@@ -191,14 +216,16 @@ export function AdminWorkstationsTable({
                       ) : null}
                     </div>
                     <div className="flex min-w-0 flex-wrap gap-1.5 text-xs xl:justify-end">
-                      <button
+                      <AdminActionButton
+                        capability="workstations.manage"
+                        branchIds={[item.branchId]}
                         className="rounded-full border border-[var(--ui-color-border)] bg-white px-2 py-1 font-semibold text-slate-600 transition hover:bg-slate-50 focus:outline-none focus:ring-4 focus:ring-[var(--ui-color-ring)] disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-400"
                         disabled={isUpdating}
                         type="button"
                         onClick={() => onEditWorkstation(item)}
                       >
                         Editar
-                      </button>
+                      </AdminActionButton>
                       <button
                         className="rounded-full border border-[var(--ui-color-border)] bg-white px-2 py-1 font-semibold text-slate-600 transition hover:bg-slate-50 focus:outline-none focus:ring-4 focus:ring-[var(--ui-color-ring)]"
                         type="button"
@@ -213,9 +240,13 @@ export function AdminWorkstationsTable({
                       >
                         Sucursal
                       </button>
-                      <button
+                      <AdminActionButton
+                        capability="workstations.manage"
+                        branchIds={[item.branchId]}
                         className="rounded-full border border-[var(--ui-color-border)] bg-white px-2 py-1 font-semibold text-[var(--ui-color-info)] transition hover:bg-[var(--ui-color-surface-tint)] focus:outline-none focus:ring-4 focus:ring-[var(--ui-color-ring)] disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-400"
-                        disabled={isUpdating || (item.status === "active" && item.hasActiveCashSession)}
+                        disabled={
+                          isUpdating || (item.status === "active" && item.hasActiveCashSession)
+                        }
                         title={
                           item.status === "active" && item.hasActiveCashSession
                             ? "Cierra la caja antes de desactivar esta estacion."
@@ -225,7 +256,7 @@ export function AdminWorkstationsTable({
                         onClick={() => onToggleStatus(item)}
                       >
                         {item.status === "active" ? "Desactivar" : "Activar"}
-                      </button>
+                      </AdminActionButton>
                     </div>
                   </div>
                 </article>

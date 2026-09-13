@@ -1,3 +1,4 @@
+import { AdminActionButton } from "../../components/AdminActionButton";
 import { AdminEmptyState } from "../../components/AdminEmptyState";
 import type { AdminOrderListItem } from "../types";
 
@@ -6,7 +7,9 @@ function formatMoney(value: string, currencyCode: string): string {
   if (!Number.isFinite(numericValue)) {
     return `${value} ${currencyCode}`;
   }
-  return new Intl.NumberFormat("es-MX", { currency: currencyCode, style: "currency" }).format(numericValue);
+  return new Intl.NumberFormat("es-MX", { currency: currencyCode, style: "currency" }).format(
+    numericValue,
+  );
 }
 
 function formatDateTime(value: string | null): string {
@@ -90,7 +93,10 @@ export function AdminOrdersTable({
     <section className="flex min-h-0 min-w-0 flex-col overflow-hidden rounded-[20px] border border-[var(--ui-color-border)] bg-white">
       <div className="flex min-w-0 shrink-0 items-center justify-between gap-3 border-b border-[var(--ui-color-border)] px-3 py-2.5">
         <div className="min-w-0">
-          <h3 className="truncate text-base font-semibold text-slate-950" title="Pedidos registrados">
+          <h3
+            className="truncate text-base font-semibold text-slate-950"
+            title="Pedidos registrados"
+          >
             Pedidos registrados
           </h3>
           <p className="truncate text-xs text-slate-500">
@@ -104,7 +110,10 @@ export function AdminOrdersTable({
 
       <div className="min-h-0 min-w-0 flex-1 overflow-y-auto p-2.5">
         {isLoading ? (
-          <AdminEmptyState description="Consultando pedidos reales del backend." title="Cargando pedidos" />
+          <AdminEmptyState
+            description="Consultando pedidos reales del backend."
+            title="Cargando pedidos"
+          />
         ) : errorMessage ? (
           <AdminEmptyState description={errorMessage} title="No se pudieron cargar los pedidos" />
         ) : orders.length > 0 ? (
@@ -112,9 +121,11 @@ export function AdminOrdersTable({
             {orders.map((item) => {
               const isSelected = item.id === selectedOrderId;
               const canMarkReady = item.status === "PENDING";
-              const canDeliver = item.status === "READY" && Number(item.remainingBalanceAmount) === 0;
+              const canDeliver =
+                item.status === "READY" && Number(item.remainingBalanceAmount) === 0;
               const canCancel =
-                (item.status === "PENDING" || item.status === "READY") && !item.cancellationRefundEligible;
+                (item.status === "PENDING" || item.status === "READY") &&
+                !item.cancellationRefundEligible;
               return (
                 <article
                   className={[
@@ -131,8 +142,12 @@ export function AdminOrdersTable({
                     type="button"
                     onClick={() => onSelectOrder(item)}
                   >
-                    <span className="block truncate text-sm font-semibold text-slate-950">{item.folio}</span>
-                    <span className="mt-0.5 block truncate text-xs text-slate-500">{item.lineCount} lineas</span>
+                    <span className="block truncate text-sm font-semibold text-slate-950">
+                      {item.folio}
+                    </span>
+                    <span className="mt-0.5 block truncate text-xs text-slate-500">
+                      {item.lineCount} lineas
+                    </span>
                   </button>
 
                   <button
@@ -141,7 +156,9 @@ export function AdminOrdersTable({
                     type="button"
                     onClick={() => onSelectOrder(item)}
                   >
-                    <span className="block truncate text-sm font-semibold text-slate-950">{item.customerName}</span>
+                    <span className="block truncate text-sm font-semibold text-slate-950">
+                      {item.customerName}
+                    </span>
                     <span className="mt-0.5 block truncate text-xs text-slate-500">
                       {item.customerPhone ?? "Sin telefono"}
                     </span>
@@ -156,7 +173,9 @@ export function AdminOrdersTable({
                     <span className="block truncate text-sm font-semibold text-[var(--ui-color-primary)]">
                       {formatDateTime(item.requestedForAt)}
                     </span>
-                    <span className="mt-0.5 block truncate text-xs text-slate-500">{item.branchName}</span>
+                    <span className="mt-0.5 block truncate text-xs text-slate-500">
+                      {item.branchName}
+                    </span>
                   </button>
 
                   <button
@@ -170,7 +189,9 @@ export function AdminOrdersTable({
                     >
                       <span className="truncate">{formatStatus(item.status)}</span>
                     </span>
-                    <span className="mt-1 block truncate text-xs text-slate-500">{formatPaymentState(item.paymentState)}</span>
+                    <span className="mt-1 block truncate text-xs text-slate-500">
+                      {formatPaymentState(item.paymentState)}
+                    </span>
                   </button>
 
                   <button
@@ -203,8 +224,12 @@ export function AdminOrdersTable({
                     type="button"
                     onClick={() => onSelectOrder(item)}
                   >
-                    <span className="block truncate text-sm font-semibold text-slate-950">{item.workstationName}</span>
-                    <span className="mt-0.5 block truncate text-xs text-slate-500">{item.createdByUserFullName}</span>
+                    <span className="block truncate text-sm font-semibold text-slate-950">
+                      {item.workstationName}
+                    </span>
+                    <span className="mt-0.5 block truncate text-xs text-slate-500">
+                      {item.createdByUserFullName}
+                    </span>
                   </button>
 
                   <div className="flex shrink-0 items-center justify-end gap-1.5">
@@ -216,31 +241,37 @@ export function AdminOrdersTable({
                       Ver
                     </button>
                     {canMarkReady ? (
-                      <button
+                      <AdminActionButton
+                        capability="orders.manage"
+                        branchIds={[item.branchId]}
                         className="rounded-full border border-sky-200 bg-[var(--ui-color-info-soft)] px-2.5 py-1 text-xs font-semibold text-[var(--ui-color-info)] transition hover:border-sky-300 focus:outline-none focus:ring-4 focus:ring-[var(--ui-color-ring)]"
                         type="button"
                         onClick={() => onMarkReady(item)}
                       >
                         Listo
-                      </button>
+                      </AdminActionButton>
                     ) : null}
                     {canDeliver ? (
-                      <button
+                      <AdminActionButton
+                        capability="orders.manage"
+                        branchIds={[item.branchId]}
                         className="rounded-full border border-emerald-200 bg-[var(--ui-color-success-soft)] px-2.5 py-1 text-xs font-semibold text-[var(--ui-color-success)] transition hover:border-emerald-300 focus:outline-none focus:ring-4 focus:ring-[var(--ui-color-ring)]"
                         type="button"
                         onClick={() => onDeliver(item)}
                       >
                         Entregar
-                      </button>
+                      </AdminActionButton>
                     ) : null}
                     {canCancel ? (
-                      <button
+                      <AdminActionButton
+                        capability="orders.cancel"
+                        branchIds={[item.branchId]}
                         className="rounded-full border border-rose-200 bg-white px-2.5 py-1 text-xs font-semibold text-[var(--ui-color-danger)] transition hover:bg-[var(--ui-color-danger-soft)] focus:outline-none focus:ring-4 focus:ring-[var(--ui-color-ring)]"
                         type="button"
                         onClick={() => onCancel(item)}
                       >
                         Cancelar
-                      </button>
+                      </AdminActionButton>
                     ) : null}
                   </div>
                 </article>

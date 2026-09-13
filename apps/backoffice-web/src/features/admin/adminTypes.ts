@@ -19,17 +19,6 @@ export interface AdminScope {
   userId?: string | null;
 }
 
-export interface BranchFilter {
-  id: string;
-  label: string;
-  access: PermissionScope;
-}
-
-export interface BrandFilter {
-  id: string;
-  label: "El Mejor Pan" | "Merenna" | string;
-}
-
 export type PermissionAction =
   | "view"
   | "create"
@@ -39,27 +28,6 @@ export type PermissionAction =
   | "approve"
   | "export"
   | "configure";
-
-export type PermissionScope =
-  | "all_branches"
-  | "assigned_branches"
-  | "own_branch"
-  | "own_records";
-
-export interface AdminPermission {
-  action: PermissionAction;
-  moduleKey: AdminModuleKey;
-  scope: PermissionScope;
-}
-
-export type AdminRoleKey =
-  | "super_admin"
-  | "general_admin"
-  | "branch_manager"
-  | "operations_supervisor"
-  | "cashier"
-  | "production"
-  | "auditor";
 
 export interface AdminMetricDefinition {
   description?: string;

@@ -1,3 +1,4 @@
+import { withCapabilities } from "../../../test-support/authorization";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import type { ReactElement } from "react";
 import { renderToString } from "react-dom/server";
@@ -185,7 +186,7 @@ const detail: AdminEquipmentDetail = {
 };
 
 function render(element: ReactElement) {
-  return renderToString(element);
+  return renderToString(withCapabilities(element, ["quality_hygiene.manage"]));
 }
 
 describe("admin equipment maintenance UI components", () => {

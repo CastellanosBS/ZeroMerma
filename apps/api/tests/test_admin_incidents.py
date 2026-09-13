@@ -21,6 +21,7 @@ from zeromerma_api.modules.quality.infrastructure.models import (
     QualityIncident,
     SanitaryVerification,
 )
+from zeromerma_api.testing.authorization import owner_headers
 
 
 def _login_admin(client: TestClient) -> str:
@@ -42,7 +43,7 @@ def _login_cashier(client: TestClient) -> str:
 
 
 def _admin_headers(client: TestClient) -> dict[str, str]:
-    return {"Authorization": f"Bearer {_login_admin(client)}"}
+    return owner_headers()
 
 
 def _get_branch_id() -> str:

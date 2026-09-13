@@ -89,17 +89,31 @@ function AdminWasteMetricStrip({
   const loadingValue = isLoading ? "Cargando" : null;
   const items = [
     { label: "Periodo", title: "Mermas del periodo", value: loadingValue ?? metrics.totalRecords },
-    { label: "Unidades", title: "Unidades dadas de baja", value: loadingValue ?? metrics.totalQuantity },
+    {
+      label: "Unidades",
+      title: "Unidades dadas de baja",
+      value: loadingValue ?? metrics.totalQuantity,
+    },
     { label: "Valor est.", title: "Valor estimado", value: loadingValue ?? metrics.estimatedValue },
     { label: "Caducidad", title: "Por caducidad", value: loadingValue ?? metrics.expiredRecords },
-    { label: "Dano/cont.", title: "Por dano o contaminacion", value: loadingValue ?? metrics.contaminatedOrDamaged },
-    { label: "Alto impacto", title: "Alto impacto", value: loadingValue ?? metrics.highImpactRecords },
+    {
+      label: "Dano/cont.",
+      title: "Por dano o contaminacion",
+      value: loadingValue ?? metrics.contaminatedOrDamaged,
+    },
+    {
+      label: "Alto impacto",
+      title: "Alto impacto",
+      value: loadingValue ?? metrics.highImpactRecords,
+    },
     { label: "Evidencia", title: "Con evidencia", value: loadingValue ?? metrics.evidenceRecords },
   ];
 
   return (
     <section className="flex min-w-0 flex-wrap items-center gap-2 rounded-[18px] border border-[var(--ui-color-border)] bg-white px-3 py-2 text-xs text-slate-600">
-      <span className="shrink-0 font-semibold uppercase tracking-[0.12em] text-slate-500">Resumen</span>
+      <span className="shrink-0 font-semibold uppercase tracking-[0.12em] text-slate-500">
+        Resumen
+      </span>
       {items.map((item) => (
         <span
           className="inline-flex min-w-0 max-w-full items-center gap-1.5 rounded-full border border-[var(--ui-color-border)] bg-slate-50 px-2.5 py-1"
@@ -120,7 +134,9 @@ export function AdminWastePage() {
   const [filters, setFilters] = useState<AdminWasteListFilters>(getInitialFilters);
   const [selectedWasteId, setSelectedWasteId] = useState<string | null>(null);
   const [isCreateOpen, setIsCreateOpen] = useState(false);
-  const [feedback, setFeedback] = useState<{ tone: "success" | "error"; message: string } | null>(null);
+  const [feedback, setFeedback] = useState<{ tone: "success" | "error"; message: string } | null>(
+    null,
+  );
 
   const wasteQuery = useQuery({
     enabled: Boolean(accessToken),
@@ -217,6 +233,7 @@ export function AdminWastePage() {
   return (
     <section className="flex min-h-0 min-w-0 flex-col overflow-hidden rounded-[28px] border border-[var(--ui-color-border)] bg-white shadow-[var(--ui-shadow-subtle)] lg:h-full">
       <AdminPageHeader
+        actionCapability="waste.manage"
         actionLabel="Nueva merma"
         description="Registra, consulta y audita perdidas de inventario por sucursal, producto, motivo e impacto operativo."
         meta={[pageStatusLabel, "Movimiento auditable"]}

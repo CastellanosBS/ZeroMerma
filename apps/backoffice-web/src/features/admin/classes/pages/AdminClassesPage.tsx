@@ -68,13 +68,23 @@ function AdminClassesMetricStrip({
     { label: "Activas", title: "Clases activas", value: loadingValue ?? metrics.activeClasses },
     { label: "Por clase", title: "CLASS_CAPTURE", value: loadingValue ?? metrics.classCapture },
     { label: "Directas", title: "PRODUCT_DIRECT", value: loadingValue ?? metrics.productDirect },
-    { label: "Sin productos", title: "Clases sin productos", value: loadingValue ?? metrics.withoutProducts },
-    { label: "Revisar", title: "Clases con advertencias", value: loadingValue ?? metrics.withWarnings },
+    {
+      label: "Sin productos",
+      title: "Clases sin productos",
+      value: loadingValue ?? metrics.withoutProducts,
+    },
+    {
+      label: "Revisar",
+      title: "Clases con advertencias",
+      value: loadingValue ?? metrics.withWarnings,
+    },
   ];
 
   return (
     <section className="flex min-w-0 flex-wrap items-center gap-2 rounded-[18px] border border-[var(--ui-color-border)] bg-white px-3 py-2 text-xs text-slate-600">
-      <span className="shrink-0 font-semibold uppercase tracking-[0.12em] text-slate-500">Resumen</span>
+      <span className="shrink-0 font-semibold uppercase tracking-[0.12em] text-slate-500">
+        Resumen
+      </span>
       {items.map((item) => (
         <span
           className="inline-flex min-w-0 max-w-full items-center gap-1.5 rounded-full border border-[var(--ui-color-border)] bg-slate-50 px-2.5 py-1"
@@ -93,11 +103,13 @@ export function AdminClassesPage() {
   const accessToken = useBackofficeAuthStore((state) => state.accessToken);
   const queryClient = useQueryClient();
   const [filters, setFilters] = useState<AdminProductClassListFilters>(initialFilters);
-  const [formMode, setFormMode] = useState<{ type: "create" } | { type: "edit"; item: AdminProductClass } | null>(
+  const [formMode, setFormMode] = useState<
+    { type: "create" } | { type: "edit"; item: AdminProductClass } | null
+  >(null);
+  const [selectedClassId, setSelectedClassId] = useState<string | null>(null);
+  const [feedback, setFeedback] = useState<{ tone: "success" | "error"; message: string } | null>(
     null,
   );
-  const [selectedClassId, setSelectedClassId] = useState<string | null>(null);
-  const [feedback, setFeedback] = useState<{ tone: "success" | "error"; message: string } | null>(null);
 
   const classesQuery = useQuery({
     enabled: Boolean(accessToken),
@@ -120,7 +132,8 @@ export function AdminClassesPage() {
   });
 
   const createClassMutation = useMutation({
-    mutationFn: (payload: AdminProductClassCreatePayload) => createAdminProductClass(accessToken ?? "", payload),
+    mutationFn: (payload: AdminProductClassCreatePayload) =>
+      createAdminProductClass(accessToken ?? "", payload),
     onError: (error) => {
       setFeedback({
         tone: "error",
@@ -136,8 +149,13 @@ export function AdminClassesPage() {
   });
 
   const updateClassMutation = useMutation({
-    mutationFn: ({ classId, payload }: { classId: string; payload: AdminProductClassUpdatePayload }) =>
-      updateAdminProductClass(accessToken ?? "", classId, payload),
+    mutationFn: ({
+      classId,
+      payload,
+    }: {
+      classId: string;
+      payload: AdminProductClassUpdatePayload;
+    }) => updateAdminProductClass(accessToken ?? "", classId, payload),
     onError: (error) => {
       setFeedback({
         tone: "error",
@@ -154,7 +172,10 @@ export function AdminClassesPage() {
 
   const detailClass = classDetailQuery.data ?? selectedClassPreview;
   const listErrorMessage = classesQuery.isError
-    ? toBackofficeErrorMessage(classesQuery.error, "No se pudieron cargar las clases. Intenta nuevamente.")
+    ? toBackofficeErrorMessage(
+        classesQuery.error,
+        "No se pudieron cargar las clases. Intenta nuevamente.",
+      )
     : null;
   const detailErrorMessage = classDetailQuery.isError
     ? toBackofficeErrorMessage(classDetailQuery.error, "No se pudo cargar el detalle de la clase.")
@@ -248,6 +269,8 @@ export function AdminClassesPage() {
   return (
     <section className="flex min-h-0 min-w-0 flex-col overflow-hidden rounded-[28px] border border-[var(--ui-color-border)] bg-white shadow-[var(--ui-shadow-subtle)] lg:h-full">
       <AdminPageHeader
+        actionGlobalOnly
+        actionCapability="catalog.manage"
         actionLabel="Nueva clase"
         description="Gobierna categorias operativas, modo de captura POS, precio de clase y orden visual."
         meta={[pageStatusLabel]}

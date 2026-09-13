@@ -1,5 +1,9 @@
 import { useMemo, useState } from "react";
 
+import { useBackofficeAuthorization } from "../../../auth/authorization-context";
+import { hasEffectiveCapability } from "../../../auth/authorization";
+import { AdminActionButton } from "../../components/AdminActionButton";
+
 import type {
   AdminUserCreatePayload,
   AdminUserDetail,
@@ -45,6 +49,12 @@ export function AdminUserWorkflowPanel({
   onUpdate,
 }: AdminUserWorkflowPanelProps) {
   const isEdit = mode === "edit" && detail !== null;
+  const actor = useBackofficeAuthorization();
+  const assignableBranches = options.branches.filter((branch) =>
+    hasEffectiveCapability(actor, "role_assignments.manage", [branch.id]),
+  );
+  const canEditAppAccess = !isEdit || Boolean(detail?.availableActions.canEditAppAccess);
+  const canEditBranches = !isEdit || Boolean(detail?.availableActions.canEditBranchAssignments);
   const initialSurfaces = detail?.appAccess.allowedSurfaces ?? ["BACKOFFICE"];
   const [fullName, setFullName] = useState(detail?.profile.fullName ?? "");
   const [email, setEmail] = useState(detail?.profile.email ?? "");
@@ -63,10 +73,7 @@ export function AdminUserWorkflowPanel({
       .filter((assignment) => assignment.isActive)
       .map((assignment) => assignment.branchId) ?? [],
   );
-  const [selectedRoleIds, setSelectedRoleIds] = useState<string[]>(
-    detail?.roleAssignments.items.map((role) => role.roleId) ?? [],
-  );
-  const [branchToAdd, setBranchToAdd] = useState(options.branches[0]?.id ?? "");
+  const [branchToAdd, setBranchToAdd] = useState(assignableBranches[0]?.id ?? "");
   const [makeDefaultBranch, setMakeDefaultBranch] = useState(false);
   const [validationMessage, setValidationMessage] = useState<string | null>(null);
 
@@ -85,15 +92,14 @@ export function AdminUserWorkflowPanel({
     );
   }
 
-  function toggleRole(roleId: string) {
-    setSelectedRoleIds((current) =>
-      current.includes(roleId)
-        ? current.filter((item) => item !== roleId)
-        : [...current, roleId],
-    );
-  }
-
   function validateForm(): boolean {
+    if (
+      !isEdit &&
+      selectedBranchIds.some((id) => !assignableBranches.some((branch) => branch.id === id))
+    ) {
+      setValidationMessage("No tienes permiso para asignar esas sucursales.");
+      return false;
+    }
     if (!fullName.trim()) {
       setValidationMessage("El nombre completo es obligatorio.");
       return false;
@@ -149,14 +155,18 @@ export function AdminUserWorkflowPanel({
       fullName: fullName.trim(),
       notes: notes.trim() || null,
       phone: phone.trim() || null,
-      roleIds: selectedRoleIds,
       sendInvitation: false,
       temporaryPassword: temporaryPassword,
     });
   }
 
   function handleAddBranch() {
-    if (!detail || !branchToAdd) {
+    if (
+      !detail ||
+      !branchToAdd ||
+      !canEditBranches ||
+      !assignableBranches.some((branch) => branch.id === branchToAdd)
+    ) {
       return;
     }
     onAddBranch(detail.overview.id, branchToAdd, makeDefaultBranch);
@@ -184,19 +194,35 @@ export function AdminUserWorkflowPanel({
       <div className="grid gap-2 md:grid-cols-2">
         <label className="grid gap-1 text-xs font-semibold text-slate-600">
           Nombre completo
-          <input className={fieldClass()} value={fullName} onChange={(event) => setFullName(event.target.value)} />
+          <input
+            className={fieldClass()}
+            value={fullName}
+            onChange={(event) => setFullName(event.target.value)}
+          />
         </label>
         <label className="grid gap-1 text-xs font-semibold text-slate-600">
           Correo
-          <input className={fieldClass()} value={email} onChange={(event) => setEmail(event.target.value)} />
+          <input
+            className={fieldClass()}
+            value={email}
+            onChange={(event) => setEmail(event.target.value)}
+          />
         </label>
         <label className="grid gap-1 text-xs font-semibold text-slate-600">
           Telefono
-          <input className={fieldClass()} value={phone} onChange={(event) => setPhone(event.target.value)} />
+          <input
+            className={fieldClass()}
+            value={phone}
+            onChange={(event) => setPhone(event.target.value)}
+          />
         </label>
         <label className="grid gap-1 text-xs font-semibold text-slate-600">
           Notas
-          <input className={fieldClass()} value={notes} onChange={(event) => setNotes(event.target.value)} />
+          <input
+            className={fieldClass()}
+            value={notes}
+            onChange={(event) => setNotes(event.target.value)}
+          />
         </label>
         {!isEdit ? (
           <label className="grid gap-1 text-xs font-semibold text-slate-600 md:col-span-2">
@@ -218,6 +244,7 @@ export function AdminUserWorkflowPanel({
         <div className="flex flex-wrap gap-3">
           <label className="inline-flex items-center gap-2 text-sm font-semibold text-slate-700">
             <input
+              disabled={!canEditAppAccess}
               checked={posEnabled}
               type="checkbox"
               onChange={(event) => setPosEnabled(event.target.checked)}
@@ -226,6 +253,7 @@ export function AdminUserWorkflowPanel({
           </label>
           <label className="inline-flex items-center gap-2 text-sm font-semibold text-slate-700">
             <input
+              disabled={!canEditAppAccess}
               checked={backofficeEnabled}
               type="checkbox"
               onChange={(event) => setBackofficeEnabled(event.target.checked)}
@@ -234,7 +262,7 @@ export function AdminUserWorkflowPanel({
           </label>
           <select
             className={fieldClass()}
-            disabled={!requiresDefaultSurface}
+            disabled={!requiresDefaultSurface || !canEditAppAccess}
             value={defaultSurface}
             onChange={(event) => setDefaultSurface(event.target.value as AdminUserSurface)}
           >
@@ -248,9 +276,13 @@ export function AdminUserWorkflowPanel({
         <span className="text-xs font-semibold uppercase tracking-[0.08em] text-slate-500">
           Sucursales
         </span>
-        {!isEdit ? (
+        {!canEditBranches || assignableBranches.length === 0 ? (
+          <p className="text-sm text-slate-600">
+            La asignación de sucursales requiere autorización adicional.
+          </p>
+        ) : !isEdit ? (
           <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
-            {options.branches.map((branch) => (
+            {assignableBranches.map((branch) => (
               <label
                 className="inline-flex min-w-0 items-center gap-2 rounded-[14px] border border-[var(--ui-color-border)] bg-white px-3 py-2 text-sm font-semibold text-slate-700"
                 key={branch.id}
@@ -271,7 +303,7 @@ export function AdminUserWorkflowPanel({
               value={branchToAdd}
               onChange={(event) => setBranchToAdd(event.target.value)}
             >
-              {options.branches.map((branch) => (
+              {assignableBranches.map((branch) => (
                 <option key={branch.id} value={branch.id}>
                   {branch.label}
                 </option>
@@ -285,51 +317,23 @@ export function AdminUserWorkflowPanel({
               />
               Predeterminada
             </label>
-            <button
+            <AdminActionButton
+              capability="role_assignments.manage"
+              branchIds={[branchToAdd]}
               className="rounded-2xl border border-[var(--ui-color-border)] bg-white px-3 text-sm font-semibold text-slate-700"
               disabled={!branchToAdd || isSubmitting}
               type="button"
               onClick={handleAddBranch}
             >
               Agregar sucursal
-            </button>
+            </AdminActionButton>
           </div>
         )}
       </div>
 
-      <div className="grid gap-2 rounded-[16px] bg-slate-50 p-3">
-        <span className="text-xs font-semibold uppercase tracking-[0.08em] text-slate-500">
-          Roles
-        </span>
-        {options.roles.length > 0 ? (
-          <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
-            {options.roles.map((role) => (
-              <label
-                className="inline-flex min-w-0 items-center gap-2 rounded-[14px] border border-[var(--ui-color-border)] bg-white px-3 py-2 text-sm font-semibold text-slate-700"
-                key={role.id}
-              >
-                <input
-                  checked={selectedRoleIds.includes(role.id)}
-                  disabled={isEdit}
-                  type="checkbox"
-                  onChange={() => toggleRole(role.id)}
-                />
-                <span className="truncate">{role.label}</span>
-              </label>
-            ))}
-          </div>
-        ) : (
-          <p className="rounded-[14px] border border-dashed border-[var(--ui-color-border)] px-3 py-3 text-sm text-slate-600">
-            Este usuario no tiene roles asignados.
-          </p>
-        )}
-        {isEdit ? (
-          <p className="text-xs text-slate-500">
-            Las altas y bajas de roles se gestionan desde Roles y permisos para conservar contexto
-            del cambio.
-          </p>
-        ) : null}
-      </div>
+      <p className="text-sm text-slate-600">
+        Los roles y su alcance se administran por separado después de crear la cuenta.
+      </p>
 
       {validationMessage || errorMessage ? (
         <p className="rounded-[16px] border border-rose-200 bg-[var(--ui-color-danger-soft)] px-3 py-2 text-sm font-semibold text-[var(--ui-color-danger)]">
@@ -345,14 +349,15 @@ export function AdminUserWorkflowPanel({
         >
           Cancelar
         </button>
-        <button
+        <AdminActionButton
+          capability="users.manage"
           className="rounded-2xl bg-[var(--ui-color-primary)] px-4 py-2 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:bg-slate-300 disabled:text-slate-600"
-          disabled={isSubmitting}
+          disabled={isSubmitting || (isEdit && !detail.availableActions.canEditProfile)}
           type="button"
           onClick={handleSubmit}
         >
           {isSubmitting ? "Guardando" : isEdit ? "Guardar cambios" : "Crear usuario"}
-        </button>
+        </AdminActionButton>
       </div>
     </section>
   );

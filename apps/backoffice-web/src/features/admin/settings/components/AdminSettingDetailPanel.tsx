@@ -1,3 +1,4 @@
+import { AdminActionButton } from "../../components/AdminActionButton";
 import type { ReactNode } from "react";
 
 import { AdminEmptyState } from "../../components/AdminEmptyState";
@@ -278,22 +279,24 @@ export function AdminSettingDetailPanel({
               >
                 Copiar clave
               </button>
-              <button
+              <AdminActionButton
+                capability="config.manage"
                 className="rounded-2xl border border-[var(--ui-color-border)] bg-white px-3 py-2 text-sm font-semibold text-slate-700 transition hover:border-[var(--ui-color-info)] disabled:cursor-not-allowed disabled:opacity-40"
                 disabled={!resetEnabled || resetPending}
                 type="button"
                 onClick={onReset}
               >
                 Restablecer
-              </button>
-              <button
+              </AdminActionButton>
+              <AdminActionButton
+                capability="config.manage"
                 className="rounded-2xl border border-[var(--ui-color-info)] bg-[var(--ui-color-info)] px-3 py-2 text-sm font-semibold text-white transition disabled:cursor-not-allowed disabled:opacity-40"
                 disabled={saveDisabled}
                 type="button"
                 onClick={onSave}
               >
                 Guardar cambio
-              </button>
+              </AdminActionButton>
             </div>
           </div>
         </Section>
@@ -339,8 +342,7 @@ export function AdminSettingDetailPanel({
                     {item.newValueMasked}
                   </p>
                   <p className="mt-1 text-xs">
-                    {formatDateTime(item.changedAt)} - {item.changedBy ?? "Sistema"} -{" "}
-                    {item.scope}
+                    {formatDateTime(item.changedAt)} - {item.changedBy ?? "Sistema"} - {item.scope}
                   </p>
                   <p className="mt-1 text-xs">{item.note ?? "Sin nota"}</p>
                 </div>
