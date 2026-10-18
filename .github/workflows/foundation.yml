@@ -50,23 +50,30 @@ jobs:
         run: corepack pnpm --filter @zeromerma/pos-web exec playwright install --with-deps chromium
       - name: Run canonical stage
         shell: pwsh
-        run: ./scripts/dev/check-foundation.ps1 -Stage ${{ matrix.stage }}
+        run: |
+          . ./scripts/powershell/ZeroMerma.ValidationArtifacts.ps1
+          $exitCode = Invoke-ZeroMermaProtectedValidationProcess -FilePath (Get-Command pwsh).Source -ArgumentList @(
+            '-NoProfile', '-NonInteractive', '-File', './scripts/dev/check-foundation.ps1', '-Stage', '${{ matrix.stage }}'
+          ) -CaptureDirectory "$PWD/.tmp/validation-console"
+          exit $exitCode
       - name: Reject generated or accidental source changes
         shell: pwsh
         run: |
           $changes = @(git status --porcelain)
           if ($changes.Count -ne 0) { throw "Validation changed source files: $($changes -join ', ')" }
-      - name: Upload validation evidence
+      - name: Prepare sanitized validation evidence
+        id: publish_evidence
         if: always()
+        shell: pwsh
+        run: |
+          . ./scripts/powershell/ZeroMerma.ValidationArtifacts.ps1
+          Protect-ZeroMermaValidationArtifacts -SourceDirectory "$PWD/.tmp/validation" -DestinationDirectory "$PWD/.tmp/validation-published"
+      - name: Upload sanitized validation evidence
+        if: always() && steps.publish_evidence.outcome == 'success'
         uses: actions/upload-artifact@v4
         with:
           name: foundation-${{ matrix.stage }}-${{ github.run_id }}-${{ github.run_attempt }}
-          path: |
-            .tmp/validation/
-            !.tmp/validation/**/tls/**
-            !.tmp/validation/**/*.key.pem
-            apps/*/playwright-report/
-            apps/*/test-results/
+          path: .tmp/validation-published/
           include-hidden-files: true
           if-no-files-found: warn
           retention-days: 14

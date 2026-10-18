@@ -13,6 +13,7 @@ interface BackofficeAuthState {
   setSession: (response: SessionResponse) => void;
   updateSession: (session: AuthSessionView) => void;
   markLocked: () => void;
+  requireVerification: () => void;
   requirePasswordChange: () => void;
   clearSession: () => void;
 }
@@ -43,6 +44,11 @@ export const useBackofficeAuthStore = create<BackofficeAuthState>()((set, get) =
       generation: previous.generation + (previous.csrfToken !== response.csrf_token || previous.phase !== phase ? 1 : 0) });
   },
   updateSession: (session) => set({ session }),
+  requireVerification: () => {
+    void queryClient.cancelQueries();
+    queryClient.clear();
+    set({ phase: "restoring", isAuthenticated: false, generation: get().generation + 1 });
+  },
   markLocked: () => {
     void queryClient.cancelQueries();
     queryClient.clear();

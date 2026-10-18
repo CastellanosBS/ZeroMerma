@@ -182,6 +182,41 @@ def test_actual_application_cors_and_deployment_route_boundary(
         assert "access-control-allow-origin" not in rejected.headers
 
 
+@pytest.mark.parametrize("component", ["api", "worker"])
+@pytest.mark.parametrize("environment", ["staging", "production", "local", "test"])
+def test_checkout_dotenv_cannot_select_a_deployment_mode(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    component: str,
+    environment: str,
+) -> None:
+    module = import_module(f"zeromerma_{component}.core.config")
+    prefix = f"ZEROMERMA_{component.upper()}_"
+    values = {
+        "ENVIRONMENT": environment,
+        "DATABASE_URL": DATABASE_URL,
+        "CORS_ORIGINS": json.dumps([POS_ORIGIN, BACKOFFICE_ORIGIN]),
+        "SESSION_POS_ORIGINS": json.dumps([POS_ORIGIN]),
+        "SESSION_BACKOFFICE_ORIGINS": json.dumps([BACKOFFICE_ORIGIN]),
+        "ALLOWED_HOSTS": json.dumps(["api.example.test"]),
+    }
+    (tmp_path / ".env").write_text(
+        "\n".join(prefix + key + "=" + value for key, value in values.items()), encoding="utf-8"
+    )
+    monkeypatch.chdir(tmp_path)
+    module.get_settings.cache_clear()
+    try:
+        if environment in {"staging", "production"}:
+            with pytest.raises(
+                ValueError, match="Deployment mode must be selected through " + prefix
+            ):
+                module.get_settings()
+        else:
+            assert module.get_settings().environment == environment
+    finally:
+        module.get_settings.cache_clear()
+
+
 def test_deployment_import_refuses_before_engine_creation_and_redacts_validation() -> None:
     environment = {
         key: value

@@ -245,4 +245,7 @@ class _InjectedApiSettings(ApiSettings):
 def get_settings() -> ApiSettings:
     if os.environ.get("ZEROMERMA_API_ENVIRONMENT", "").strip().lower() in {"staging", "production"}:
         return _InjectedApiSettings()
-    return ApiSettings()
+    settings = ApiSettings()
+    if settings.environment in {"staging", "production"}:
+        raise ValueError("Deployment mode must be selected through ZEROMERMA_API_ENVIRONMENT.")
+    return settings

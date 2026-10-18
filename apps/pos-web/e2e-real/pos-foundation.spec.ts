@@ -69,6 +69,10 @@ test("real login, mandatory opening and persisted read state", async ({ page, ne
   await expect(page.getByRole("heading", { name: "Sesión bloqueada" })).toBeVisible();
   await page.reload();
   await expect(page.getByRole("heading", { name: "Sesión bloqueada" })).toBeVisible();
+  const otherTab = await page.context().newPage();
+  await otherTab.goto(`${environment.baseUrl}/pos`);
+  await expect(otherTab.getByRole("heading", { name: "Sesión bloqueada" })).toBeVisible();
+  await page.bringToFront();
   await page.getByLabel("Contraseña actual", { exact: true }).fill(environment.password);
   const unlock = page.waitForResponse(response => new URL(response.url()).pathname === "/v1/auth/reauthenticate");
   await page.getByRole("button", { name: "Desbloquear", exact: true }).click();
@@ -77,6 +81,18 @@ test("real login, mandatory opening and persisted read state", async ({ page, ne
   expect(unlocked.session.absolute_expires_at).toBe(original.session.absolute_expires_at);
   expect(unlocked.csrf_token === original.csrf_token).toBe(false);
   await expect(page.getByRole("heading", { name: "Punto de venta", exact: true })).toBeVisible();
+  const restoredOtherTab = otherTab.waitForResponse(response => new URL(response.url()).pathname === "/v1/auth/session");
+  await otherTab.bringToFront();
+  // Headless Chromium can keep both pages focused; deliver the focus notification explicitly.
+  await otherTab.evaluate(() => window.dispatchEvent(new Event("focus")));
+  const restored: SessionResponse = await (await restoredOtherTab).json();
+  expect(restored.session.id).toBe(unlocked.session.id);
+  expect(restored.csrf_token === unlocked.csrf_token).toBe(true);
+  expect(restored.session.last_activity_at).toBe(unlocked.session.last_activity_at);
+  expect(restored.session.idle_expires_at).toBe(unlocked.session.idle_expires_at);
+  await expect(otherTab.getByRole("heading", { name: "Punto de venta", exact: true })).toBeVisible();
+  await otherTab.close();
+  await page.bringToFront();
   const logout = page.waitForResponse(response => new URL(response.url()).pathname === "/v1/auth/logout");
   await page.getByRole("button", { name: "Cerrar sesion", exact: true }).click();
   expect((await logout).status()).toBe(204);

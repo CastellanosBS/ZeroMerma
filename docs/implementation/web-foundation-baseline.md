@@ -179,6 +179,27 @@ ports and records owned process IDs and logs. It does not install OS certificate
 The isolated browser runner validated the HTTPS Vite configuration; execution against
 the persistent development database remains a separate local operational check.
 
+The final review added eight focused session-boundary regressions. Expired content
+is now hidden and its query cache cleared before the status read; a failed network
+request leaves a visible verification retry. Locked tabs restore on focus, and a
+CSRF rejection restores the current cookie envelope without replaying the rejected
+mutation. Recovery itself uses only session reads and does not renew inactivity.
+The follow-up validation passed lint/typecheck, 23 focused unit tests (POS 15,
+Backoffice 8) and seven affected mocked browser tests (POS 6, Backoffice 1).
+The preceding 478-test entry records the earlier full Web run; it is not a claim
+that the full suite was repeated after these eight additions.
+
+Real POS integration was repeated successfully with two tabs sharing the actual
+cookie: **2/2 tests pass** in
+`.tmp/validation/web/c40b2a6a779242919142e03586137c4d/`. After one tab unlocks and
+rotates cookie/CSRF, the other restores its envelope and keeps the same activity
+timestamp and idle deadline. Headless Chromium's focus notification is delivered
+explicitly because activating its page does not consistently emit a window-focus
+event; API calls and cookies remain real and unintercepted. Focused command logs
+are `.tmp/session-boundary-pos-tests.log`, `.tmp/session-boundary-bo-tests.log`,
+`.tmp/session-boundary-mocked.log`, `.tmp/session-boundary-bo-mocked.log` and
+`.tmp/session-boundary-real-pos.log`.
+
 ## Remaining scope
 
 The foundation smoke does not approve Development Complete or Feature Complete. Real

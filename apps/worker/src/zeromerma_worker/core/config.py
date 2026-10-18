@@ -96,4 +96,7 @@ def get_settings() -> WorkerSettings:
         "production",
     }:
         return _InjectedWorkerSettings()
-    return WorkerSettings()
+    settings = WorkerSettings()
+    if settings.environment in {"staging", "production"}:
+        raise ValueError("Deployment mode must be selected through ZEROMERMA_WORKER_ENVIRONMENT.")
+    return settings

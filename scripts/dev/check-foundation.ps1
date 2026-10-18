@@ -7,6 +7,7 @@ param(
 Set-StrictMode -Version 3.0
 $ErrorActionPreference = "Stop"
 . (Join-Path $PSScriptRoot "..\powershell\ZeroMerma.Tools.ps1")
+. (Join-Path $PSScriptRoot "..\powershell\ZeroMerma.ValidationArtifacts.ps1")
 $root = Get-ZeroMermaRepoRoot
 $runId = [Guid]::NewGuid().ToString("N")
 $evidenceDirectory = Join-Path $root ".tmp/validation/foundation/$runId"
@@ -68,7 +69,7 @@ try {
           & (Join-Path $PSScriptRoot "run-web-integration.ps1") -Surface All
         }
         "Negative" {
-          Invoke-ZeroMermaUv run --frozen pytest scripts/dev/tests/test_foundation_gates.py "--junitxml=$evidenceDirectory/negative-gates.xml"
+          Invoke-ZeroMermaUv run --frozen pytest scripts/dev/tests/test_foundation_gates.py scripts/dev/tests/test_validation_artifacts.py "--junitxml=$evidenceDirectory/negative-gates.xml"
         }
       }
       $passed = $true
@@ -91,6 +92,8 @@ try {
         $result.artifact_sha256[$artifact] = (Get-FileHash -LiteralPath $artifact -Algorithm SHA256).Hash.ToLowerInvariant()
       }
       $result | ConvertTo-Json | Set-Content -LiteralPath (Join-Path $evidenceDirectory "$currentStage.json")
+      Protect-ZeroMermaValidationArtifacts -SourceDirectory $evidenceDirectory `
+        -DestinationDirectory (Join-Path $root ".tmp/validation-published/foundation/$runId")
     }
   }
   Write-Host "Foundation validation passed. Evidence: $evidenceDirectory"

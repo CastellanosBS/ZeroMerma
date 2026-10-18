@@ -10,7 +10,9 @@ No live database, installed certificate trust or real secret is changed by this 
 `ZEROMERMA_API_ENVIRONMENT` and `ZEROMERMA_WORKER_ENVIRONMENT` accept only `local`,
 `test`, `staging` and `production`. Staging and production use the same strict
 configuration checks. Runtime factories ignore repository `.env` files in those
-two environments. Missing or sample database credentials prevent startup before
+two environments, which must be selected explicitly through the corresponding
+process environment variable. A checkout `.env` cannot select staging or production;
+local/test `.env` configuration remains available. Missing or sample database credentials prevent startup before
 engine creation. The database must use `postgresql+psycopg`, an explicit host,
 database and login, and a generated password of at least 24 characters. API and
 worker should have distinct least-privilege database accounts; migration and
@@ -155,6 +157,27 @@ compressed archives, container layers, external provider consoles or arbitrary
 unknown secret formats. Extract and explicitly inspect release artifacts before
 the later deployment gate. The current development run has no supplied production
 secret inventory and does not claim access to production secrets or images.
+
+Foundation publication uses `ZeroMerma.ValidationArtifacts.ps1` after transcript
+closure. It copies recognized text evidence into `.tmp/validation-published`,
+redacting session cookies, CSRF/reset credentials, keyed passwords, DSNs and private
+key blocks. JSON is parsed and reserialized; JUnit XML is parsed with external
+entities disabled, then redacted without changing failure counts or exit results.
+TLS directories, PEM files, archives, images, traces and raw HTML reports are not
+published by this boundary. Raw local files remain separate for controlled diagnosis.
+
+CI uploads only that sanitized tree after the publication step succeeds. An earlier
+failure or interrupted cleanup does not authorize uploading raw evidence; if
+publication cannot run or parse its inputs, there is no raw fallback. The canonical
+CI stage also runs in a child PowerShell process whose stdout/stderr are captured
+concurrently in private files outside either artifact tree. Only the complete
+sanitized output is emitted after the process finishes, preserving its original
+exit code; interruption does not emit the raw capture. Capture files are removed
+on normal completion. This boundary does not cover earlier dependency-install
+steps, direct local invocations or unknown unlabelled secret formats. Tests and
+logging must still avoid printing credential material. A real failing pytest
+subprocess verifies that console output, its log and JUnit preserve a 404 failure
+and exit code 1 while the supplied cookie, CSRF, reset and password values are absent.
 
 Unit tests cover explicit configuration allow/deny cases, audience origin
 separation, hosts, trusted proxy metadata, HTTPS, safe error headers, credential

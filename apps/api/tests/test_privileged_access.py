@@ -17,6 +17,7 @@ from zeromerma_api.modules.identity.application.privileged_access import (
     PrivilegedAccessService,
     active_superadmin_ids,
 )
+from zeromerma_api.modules.identity.application.security import secret_hash
 from zeromerma_api.modules.identity.infrastructure.models import (
     Permission,
     Role,
@@ -27,6 +28,7 @@ from zeromerma_api.modules.identity.infrastructure.models import (
     UserRoleAssignmentBranchScope,
 )
 from zeromerma_api.modules.identity.infrastructure.privileged_models import IdentityPrivilegedChange
+from zeromerma_api.modules.identity.infrastructure.session_models import AuthSession
 from zeromerma_api.modules.outbox.infrastructure.models import OutboxEvent
 from zeromerma_api.testing.sessions import fixture_session_headers
 
@@ -37,6 +39,40 @@ def _headers(user: User) -> dict[str, str]:
     session = object_session(user)
     assert session is not None
     return fixture_session_headers(session, user)
+
+
+def _new_session_headers(user_id: uuid.UUID) -> dict[str, str]:
+    with SessionLocal() as session:
+        user = session.get(User, user_id)
+        assert user is not None
+        headers = _headers(user)
+        session.commit()
+        return headers
+
+
+def _assert_session_revoked(client: TestClient, headers: dict[str, str]) -> None:
+    response = client.get("/v1/auth/me", headers=headers)
+    assert response.status_code == 401 and response.json()["code"] == "SESSION_REVOKED"
+    with SessionLocal() as session:
+        record = session.scalars(
+            select(AuthSession).where(
+                AuthSession.credential_hash == secret_hash(headers["Cookie"].split("=", 1)[1])
+            )
+        ).one()
+        assert record.status == "REVOKED" and record.revocation_reason == "AUTHORIZATION_CHANGED"
+        assert record.revoked_at is not None
+        audit = session.scalars(
+            select(AuditLog).where(
+                AuditLog.resource_id == str(record.id), AuditLog.action == "session.revoked"
+            )
+        ).one()
+        event = session.scalars(
+            select(OutboxEvent).where(
+                OutboxEvent.aggregate_id == str(record.id),
+                OutboxEvent.event_name == "session.revoked",
+            )
+        ).one()
+        assert audit.metadata_["reason"] == event.payload["reason"] == "AUTHORIZATION_CHANGED"
 
 
 def _new_user(email: str, *, surfaces: list[str] | None = None) -> User:
@@ -124,6 +160,20 @@ def _trace_counts() -> tuple[int, int]:
         )
 
 
+def _business_trace_counts(actions: tuple[str, ...]) -> tuple[int, int]:
+    with SessionLocal() as session:
+        return (
+            session.scalar(select(func.count(AuditLog.id)).where(AuditLog.action.in_(actions)))
+            or 0,
+            session.scalar(
+                select(func.count(OutboxEvent.id)).where(
+                    OutboxEvent.event_name.in_(tuple(f"{action}.v1" for action in actions))
+                )
+            )
+            or 0,
+        )
+
+
 def test_dual_approval_binds_payload_requires_distinct_actor_and_is_single_use(
     client: TestClient,
 ) -> None:
@@ -160,7 +210,8 @@ def test_dual_approval_binds_payload_requires_distinct_actor_and_is_single_use(
     )
     assert bad_hash.status_code == 409
     _approve(client, change, second)
-    before = _trace_counts()
+    actions = ("identity.privileged_change.consumed", "admin.user.updated")
+    before = _business_trace_counts(actions)
     response = client.post(
         f"{PREFIX}/{change['id']}/execute",
         headers=first,
@@ -170,7 +221,8 @@ def test_dual_approval_binds_payload_requires_distinct_actor_and_is_single_use(
     assert response.json()["consumed_at"] is not None
     assert response.json()["initiator_user_id"] == str(first_id)
     assert response.json()["approver_user_id"] == str(second_id)
-    assert _trace_counts() == (before[0] + 2, before[1] + 2)
+    assert _business_trace_counts(actions) == (before[0] + 2, before[1] + 2)
+    _assert_session_revoked(client, second)
     replay_counts = _trace_counts()
     replay = client.post(
         f"{PREFIX}/{change['id']}/execute",
@@ -283,18 +335,20 @@ def test_concurrent_cross_revocations_leave_one_active_superadministrator(
     _approve(client, remove_second, second)
     _approve(client, remove_first, first)
 
-    def execute(pair: tuple[dict[str, object], dict[str, str]]) -> int:
+    def execute(pair: tuple[dict[str, object], dict[str, str]]) -> tuple[int, str | None]:
         change, headers = pair
-        return client.post(
+        response = client.post(
             f"{PREFIX}/{change['id']}/execute",
             headers=headers,
             json={"payload_sha256": change["payload_sha256"]},
-        ).status_code
+        )
+        return response.status_code, response.json().get("code")
 
     with ThreadPoolExecutor(max_workers=2) as executor:
-        statuses = list(executor.map(execute, [(remove_second, first), (remove_first, second)]))
-    assert statuses.count(200) == 1, statuses
-    assert all(status in {200, 403, 409} for status in statuses), statuses
+        results = list(executor.map(execute, [(remove_second, first), (remove_first, second)]))
+    assert sorted(status for status, _ in results) == [200, 401], results
+    assert [code for status, code in results if status == 401] == ["SESSION_REVOKED"]
+    _assert_session_revoked(client, first if results[0][0] == 401 else second)
     with SessionLocal() as session:
         assert len(active_superadmin_ids(session)) == 1
         assert (
@@ -466,6 +520,8 @@ def test_users_manage_cannot_grant_roles_or_application_access(client: TestClien
         )
         target_id, role_id = target.id, role.id
         session.commit()
+    _assert_session_revoked(client, headers)
+    headers = _new_session_headers(actor_id)
     before = _trace_counts()
     response = client.patch(
         f"/v1/admin/users/{target_id}",
@@ -509,6 +565,8 @@ def test_global_identity_manager_cannot_add_own_role_authority_or_membership(
         session.add(RolePermission(role_id=role.id, permission_id=permission.id))
         role_id = role.id
         session.commit()
+    _assert_session_revoked(client, headers)
+    headers = _new_session_headers(actor_id)
     before = _trace_counts()
     response = client.patch(
         f"/v1/admin/roles/{role_id}",
@@ -569,7 +627,8 @@ def test_user_assignment_endpoints_persist_explicit_scope_and_revoke_authority(
         role_id = session.scalars(select(Role.id).where(Role.code == "scoped_identity_test")).one()
         target_id, target_headers = target.id, _headers(target)
         session.commit()
-    before = _trace_counts()
+    actions = ("admin.user.role_assignment_changed",)
+    before = _business_trace_counts(actions)
     response = client.post(
         f"/v1/admin/users/{target_id}/roles",
         headers=headers,
@@ -578,12 +637,16 @@ def test_user_assignment_endpoints_persist_explicit_scope_and_revoke_authority(
     assert response.status_code == 200, response.text
     item = response.json()["role_assignments"]["items"][0]
     assert item["scope_type"] == "BRANCH_SET" and item["branch_ids"] == [str(north)]
+    _assert_session_revoked(client, target_headers)
+    target_headers = _new_session_headers(target_id)
     assert client.get("/v1/admin/users", headers=target_headers).status_code == 200
     response = client.post(f"/v1/admin/users/{target_id}/roles/{role_id}/remove", headers=headers)
     assert response.status_code == 200, response.text
     assert response.json()["role_assignments"]["items"] == []
+    _assert_session_revoked(client, target_headers)
+    target_headers = _new_session_headers(target_id)
     assert client.get("/v1/admin/users", headers=target_headers).status_code == 403
-    assert _trace_counts() == (before[0] + 2, before[1] + 2)
+    assert _business_trace_counts(actions) == (before[0] + 2, before[1] + 2)
     with SessionLocal() as session:
         records = list(
             session.scalars(

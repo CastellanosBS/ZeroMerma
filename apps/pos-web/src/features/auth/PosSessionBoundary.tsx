@@ -12,8 +12,9 @@ export function PosSessionBoundary({ children }: PropsWithChildren) {
   const [newPassword, setNewPassword] = useState("");
   const [confirmation, setConfirmation] = useState("");
   const [notice, setNotice] = useState<string | null>(null);
-  const refresh = useCallback(async () => {
+  const refresh = useCallback(async (requireVerification = false) => {
     setError(null);
+    if (requireVerification) usePosAuthStore.getState().requireVerification();
     try { await restoreSession(); }
     catch (failure) {
       if (!(failure instanceof ApiError && failure.statusCode === 401)) {
@@ -23,7 +24,7 @@ export function PosSessionBoundary({ children }: PropsWithChildren) {
   }, []);
   useEffect(() => { void refresh(); }, [refresh]);
   useEffect(() => {
-    setPassword(""); setNewPassword(""); setConfirmation(""); setError(null);
+    setPassword(""); setNewPassword(""); setConfirmation("");
   }, [phase]);
   useEffect(() => {
     if (phase !== "ready") return;
@@ -33,11 +34,11 @@ export function PosSessionBoundary({ children }: PropsWithChildren) {
     if (!session || phase !== "ready") return;
     // A status read observes the server deadline; it never extends operator activity.
     const deadline = Math.min(Date.parse(session.idle_expires_at), Date.parse(session.absolute_expires_at));
-    const timer = window.setTimeout(() => void refresh(), Math.max(100, deadline - Date.now() + 100));
+    const timer = window.setTimeout(() => void refresh(true), Math.max(100, deadline - Date.now() + 100));
     return () => window.clearTimeout(timer);
   }, [phase, refresh, session]);
   useEffect(() => {
-    const onFocus = () => { if (usePosAuthStore.getState().phase === "ready") void refresh(); };
+    const onFocus = () => { if (usePosAuthStore.getState().phase !== "signedOut") void refresh(); };
     window.addEventListener("focus", onFocus);
     return () => window.removeEventListener("focus", onFocus);
   }, [refresh]);
@@ -69,7 +70,8 @@ export function PosSessionBoundary({ children }: PropsWithChildren) {
   if (phase === "restoring") {
     return <main className="grid min-h-screen place-content-center gap-4 p-6">
       <h1>Verificando sesión</h1>
-      {error ? <><p role="alert">{error}</p><button onClick={() => void refresh()}>Reintentar</button></> : <p>Espera un momento...</p>}
+      {error ? <p role="alert">{error}</p> : <p>Espera un momento...</p>}
+      <button onClick={() => void refresh()}>Reintentar</button>
     </main>;
   }
   if (phase === "locked" || phase === "passwordChange") {

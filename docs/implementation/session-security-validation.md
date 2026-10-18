@@ -21,7 +21,9 @@ The eight required stages are Preflight, Backend, Worker, Migrations, Contracts,
 Web, Browser and Negative. The harness creates isolated PostgreSQL databases,
 uses HTTPS for both real browser surfaces, and removes generated TLS private
 keys before publishing artifacts. It records commits, timestamps and artifact
-hashes under `.tmp/validation/`. The same stages run in Foundation CI.
+hashes under `.tmp/validation/`. CI captures and sanitizes stage console output
+while preserving its exit code, and uploads only sanitized text evidence from
+`.tmp/validation-published/`. The same stages run in Foundation CI.
 
 Targeted security checks are included in the complete backend suite:
 
@@ -55,15 +57,19 @@ The following local evidence was obtained on 2026-10-18:
 |---|---|---|
 | Pinned dependency installation | Passed, frozen lockfiles | Foundation `edf8a0c827b74aa4bf48109759dfd4b1` |
 | Worker | 26 unit and 4 PostgreSQL tests passed | Foundation `466d6cc86f5b42a6bfdaefdb13b58523` |
-| Negative gates | 10 passed | Foundation `abbea4117d7342ff817b4b2f4e074d21` |
+| Negative gates and evidence publication | 15 passed through the CI console wrapper; failing subprocess exit code and JUnit failure preserved, credentials removed | Foundation `a7c36889775c46de901e8cac1d8cfcc4` |
 | Web | 478 unit and 11 mocked browser tests passed; lint, types and builds passed | Foundation `c63cc7f0b725441eabf4dc4a2a7b22f8` |
 | Real HTTPS browsers | 2 POS and 6 Backoffice tests passed | Browser run `460a7d8fc26c4cccb8289e2af2e8ad03` |
 | Full migrations | 13 tests passed; 41 historical checkpoints, zero unknown drift, preservation and dump/restore passed | `.tmp/session-migrations-final.log` |
+| Contracts | 50 tests passed; 240 operations and 59 bounded collections, zero generated drift | Foundation `bb2ed8c016684671b370a2fa0c742cf1` |
 | Runtime security and secret tools | 60 tests and real PostgreSQL rotation passed | `.tmp/runtime-security-final.log`, `.tmp/runtime-secret-rotation.log` |
 | Session security | Lifecycle, concurrency, scope denial, privileged recovery, temporary-password lock/unlock and positive session administration passed | `.tmp/auth-session-lifecycle-final.xml`, `.tmp/auth-session-boundaries.log`, `.tmp/session-migration-boundaries.log`, `.tmp/session-admin-positive-final.log` |
+| Final runtime configuration review | 54 focused tests passed, including rejection of deployment mode selected only by checkout `.env` | `.tmp/runtime-security-review.log` |
+| Final browser session review | 23 focused unit tests (8 new regressions), 7 affected mocked browser tests and 2 real POS tests passed; cross-tab recovery does not extend activity | Browser run `c40b2a6a779242919142e03586137c4d` |
+| Privileged access regression | 5 affected tests passed; authority changes revoke sessions and preserve business audit/outbox assertions | `.tmp/session-privileged-regressions.log` |
 
-The integrated API regression and final contract gate are additionally required;
-their final status is supplied by Foundation for the delivered commit. The
+The integrated API regression is additionally required; its final status is
+supplied by Foundation for the delivered commit. The
 initial migration gate rejected the four new check expressions and partial-index
 reflection until exact reviewed fingerprints and negative mutation tests were
 added. No general drift exception was introduced. Contract inventory regeneration
