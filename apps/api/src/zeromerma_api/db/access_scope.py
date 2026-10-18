@@ -24,6 +24,11 @@ from sqlalchemy.sql.elements import ClauseElement, ColumnElement, TextClause
 from zeromerma_api.db.base import Base
 from zeromerma_api.modules.audit.infrastructure.models import AuditLog
 from zeromerma_api.modules.branches.infrastructure.models import Workstation
+from zeromerma_api.modules.idempotency.application.context import (
+    authorization_boundary_initialization,
+    metadata_statement_allowed,
+    record_mutation_allowed,
+)
 from zeromerma_api.modules.idempotency.infrastructure.models import IdempotencyRecord
 from zeromerma_api.modules.identity.application.authorization import (
     require_branches,
@@ -249,10 +254,6 @@ def _lock_boundary(session: Session, *, exclusive: bool) -> None:
         .with_for_update(read=True)
     )
     if session.scalar(statement) is None:
-        from zeromerma_api.modules.idempotency.application.context import (
-            authorization_boundary_initialization,
-        )
-
         with authorization_boundary_initialization(session):
             session.execute(insert(IdentityPrivilegeState).values(id=1).on_conflict_do_nothing())
         if session.scalar(statement) is None:
@@ -431,8 +432,6 @@ def _scope_statement(state: ORMExecuteState) -> None:
         return
     statement = state.statement
     tables = _statement_tables(statement)
-    from zeromerma_api.modules.idempotency.application.context import metadata_statement_allowed
-
     if metadata_statement_allowed(state.session, statement):
         return
     if tables.intersection(COMMAND_METADATA_TABLES):
@@ -651,8 +650,6 @@ def _validate_entity(
     table = _table(type(instance))
     name = table.name
     if name in COMMAND_METADATA_TABLES:
-        from zeromerma_api.modules.idempotency.application.context import record_mutation_allowed
-
         if not record_mutation_allowed(session, instance):
             raise _deny("Idempotency records require the canonical command boundary.")
         return
