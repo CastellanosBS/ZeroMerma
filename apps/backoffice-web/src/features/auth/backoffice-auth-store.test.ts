@@ -6,7 +6,7 @@ import { useBackofficeAuthStore as auth } from "./backoffice-auth-store";
 function response(id = "actor-1", version = "v1"): SessionResponse {
   return {
     csrf_token: `memory-csrf-${id}`,
-    session: { id, audience: "BACKOFFICE", status: "ACTIVE", created_at: "2026-10-18T00:00:00Z", last_activity_at: "2026-10-18T00:00:00Z", idle_expires_at: "2026-10-18T00:15:00Z", absolute_expires_at: "2026-10-18T08:00:00Z", workstation_id: null, cash_session_id: null, revoked_at: null, revocation_reason: null },
+    session: { id, audience: "BACKOFFICE", status: "ACTIVE", created_at: "2026-10-18T00:00:00Z", last_activity_at: "2026-10-18T00:00:00Z", idle_expires_at: "2026-10-18T00:30:00Z", absolute_expires_at: "2026-10-18T08:00:00Z", workstation_id: null, cash_session_id: null, revoked_at: null, revocation_reason: null },
     user: { id, email: "operator@example.invalid", full_name: "Operator", is_active: true, default_surface: "BACKOFFICE", allowed_surfaces: ["BACKOFFICE"], authorization_surface: "BACKOFFICE", authorization_version: version, is_superadministrator: false, effective_grants: [], password_reset_required: false },
   };
 }

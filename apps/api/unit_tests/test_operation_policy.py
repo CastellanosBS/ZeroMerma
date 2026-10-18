@@ -5,6 +5,7 @@ from fastapi import APIRouter, FastAPI, HTTPException
 from fastapi.routing import APIRoute
 
 from zeromerma_api.db.access_scope import (
+    COMMAND_METADATA_TABLES,
     DIRECT_SCOPE_COLUMNS,
     IDENTITY_METADATA_TABLES,
     PARENT_SCOPE_COLUMNS,
@@ -45,6 +46,7 @@ def test_every_route_and_persisted_family_has_an_explicit_policy() -> None:
         | set(PARENT_SCOPE_COLUMNS)
         | SHARED_TABLES
         | IDENTITY_METADATA_TABLES
+        | COMMAND_METADATA_TABLES
         | {"outbox_events"}
     )
     assert set(Base.metadata.tables) == classified

@@ -29,6 +29,23 @@ async function renderBoundary() {
 }
 
 describe("session verification UI", () => {
+  it("keeps the 30-minute server deadline and hides business data when it expires offline", async () => {
+    const response = mockSessionResponse();
+    expect(Date.parse(response.session.idle_expires_at) - Date.now()).toBe(1_800_000);
+    const fetchMock = vi.fn().mockResolvedValueOnce(new Response(JSON.stringify(response)))
+      .mockRejectedValueOnce(new Error("offline"));
+    vi.stubGlobal("fetch", fetchMock);
+    await renderBoundary();
+    await act(async () => { await vi.advanceTimersByTimeAsync(1_799_000); });
+    expect(container.textContent).toContain("Protected business data");
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    await act(async () => { await vi.advanceTimersByTimeAsync(1_101); });
+    expect(container.textContent).not.toContain("Protected business data");
+    expect(auth.getState()).toMatchObject({ phase: "restoring", isAuthenticated: false });
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(fetchMock.mock.calls.every(([url, options]) => String(url).endsWith("/v1/auth/session") && options.method === "GET")).toBe(true);
+  });
+
   it("hides expired business data offline and restores only through a successful status read", async () => {
     const response = mockSessionResponse();
     response.session.idle_expires_at = new Date(Date.now() + 1_000).toISOString();

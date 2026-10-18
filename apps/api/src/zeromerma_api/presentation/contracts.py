@@ -6,6 +6,8 @@ from typing import Any
 
 from fastapi import FastAPI
 
+from zeromerma_api.modules.idempotency.presentation.http import add_idempotency_contract
+
 CONTRACT_SCHEMA_VERSION = "1.0.0"
 DECIMAL_PATTERN = r"^(?!^[-+.]*$)[+-]?0*\d*\.?\d*$"
 _DECIMAL_PATTERN_PREFIX = r"^(?!^[-+.]*$)[+-]?0*"
@@ -50,6 +52,7 @@ def normalize_contract_schema(schema: dict[str, Any]) -> dict[str, Any]:
     normalized = deepcopy(schema)
     normalized["x-zeromerma-contract-schema-version"] = CONTRACT_SCHEMA_VERSION
     normalized["x-zeromerma-source"] = "FASTAPI_PYDANTIC"
+    add_idempotency_contract(normalized)
     for path_item in normalized.get("paths", {}).values():
         for method, operation in path_item.items():
             if method in _HTTP_METHODS and isinstance(operation, dict):

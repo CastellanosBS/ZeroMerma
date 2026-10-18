@@ -8,7 +8,7 @@ export function mockSessionResponse(): SessionResponse {
     session: {
       id: "00000000-0000-0000-0000-000000000001", audience: "POS", status: "ACTIVE",
       created_at: new Date(now).toISOString(), last_activity_at: new Date(now).toISOString(),
-      idle_expires_at: new Date(now + 300_000).toISOString(),
+      idle_expires_at: new Date(now + 1_800_000).toISOString(),
       absolute_expires_at: new Date(now + 43_200_000).toISOString(),
       workstation_id: "00000000-0000-0000-0000-000000000002", cash_session_id: null,
       revoked_at: null, revocation_reason: null,

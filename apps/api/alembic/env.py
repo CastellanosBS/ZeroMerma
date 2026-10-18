@@ -18,6 +18,7 @@ from zeromerma_api.modules.catalog.infrastructure import models as catalog_model
 from zeromerma_api.modules.configuration.infrastructure import models as configuration_models
 from zeromerma_api.modules.corrections.infrastructure import models as corrections_models
 from zeromerma_api.modules.discounts.infrastructure import models as discounts_models
+from zeromerma_api.modules.idempotency.infrastructure import models as idempotency_models
 from zeromerma_api.modules.identity.infrastructure import models as identity_models
 from zeromerma_api.modules.identity.infrastructure import (
     privileged_models as identity_privileged_models,
@@ -67,6 +68,7 @@ _ = (
     configuration_models,
     corrections_models,
     discounts_models,
+    idempotency_models,
     identity_models,
     identity_privileged_models,
     inventory_models,

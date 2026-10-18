@@ -17310,6 +17310,34 @@ export interface components {
             /** Version */
             version: string;
         };
+        /**
+         * Format: uuid
+         * @description One UUIDv7 per business intention, reused for every retry.
+         */
+        IdempotencyKey: string;
+        /**
+         * IdempotencyRejectionSnapshot
+         * @description Persist only stable error content; request correlation belongs to the current response.
+         */
+        IdempotencyRejectionSnapshot: {
+            /** Code */
+            code: string;
+            /**
+             * Details
+             * @default null
+             */
+            details: {
+                [key: string]: components["schemas"]["JsonValue"];
+            } | null;
+            /** Message */
+            message: string;
+        };
+        /**
+         * IdempotencyStatus
+         * @enum {string}
+         */
+        IdempotencyStatus: "PROCESSING" | "COMPLETED" | "REJECTED" | "UNKNOWN";
+        JsonValue: unknown;
         /** LoginRequest */
         LoginRequest: {
             /**
@@ -19333,9 +19361,15 @@ export interface components {
         };
     };
     responses: never;
-    parameters: never;
+    parameters: {
+        /** @description Reuse only for the same operation, actor, context and canonical payload. */
+        IdempotencyKey: components["schemas"]["IdempotencyKey"];
+    };
     requestBodies: never;
-    headers: never;
+    headers: {
+        /** @description True when the committed result was recovered without repeating effects. */
+        IdempotencyReplayed: boolean;
+    };
     pathItems: never;
 }
 export type $defs = Record<string, never>;

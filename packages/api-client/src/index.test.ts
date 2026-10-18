@@ -1,12 +1,33 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { ApiError, isApiErrorResponse, requestApiJson } from "./index";
+import type { components } from "./generated/schema";
 
 afterEach(() => {
   vi.unstubAllGlobals();
 });
 
 describe("api client package", () => {
+  it("preserves an intention key across explicit retries with independent request IDs", async () => {
+    const key: components["schemas"]["IdempotencyKey"] = "019a0000-0000-7000-8000-000000000001";
+    const fetchMock = vi.fn().mockImplementation(() => Promise.resolve(
+      new Response(JSON.stringify({ status: "ok" }), {
+        status: 200, headers: { "Content-Type": "application/json" },
+      }),
+    ));
+    vi.stubGlobal("fetch", fetchMock);
+    for (const requestId of ["request-one", "request-two"]) {
+      await requestApiJson({
+        surface: "POS", baseUrl: "https://api.test", path: "/command", method: "POST",
+        body: { amount: "12.30" }, csrfToken: "memory-csrf",
+        headers: { "Idempotency-Key": key, "X-Request-ID": requestId },
+      });
+    }
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    const headers = fetchMock.mock.calls.map(([, init]) => (init as RequestInit).headers as Headers);
+    expect(headers.map((value) => value.get("Idempotency-Key"))).toEqual([key, key]);
+    expect(headers.map((value) => value.get("X-Request-ID"))).toEqual(["request-one", "request-two"]);
+  });
   it("keeps generated contracts as the package boundary", () => {
     const payload = {
       code: "CONFLICT",

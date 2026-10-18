@@ -4,6 +4,7 @@ import json
 from concurrent.futures import ThreadPoolExecutor
 from datetime import UTC, datetime, timedelta
 from threading import Barrier
+from unittest.mock import patch
 from uuid import UUID
 
 import pytest
@@ -75,6 +76,96 @@ def _session_id(payload: dict[str, object]) -> UUID:
     row = payload["session"]
     assert isinstance(row, dict)
     return UUID(str(row["id"]))
+
+
+@pytest.mark.parametrize(("audience", "absolute_hours"), [("POS", 12), ("BACKOFFICE", 8)])
+def test_idle_policy_accepts_29_minutes_59_seconds_and_expires_at_30_minutes(
+    client: TestClient, audience: IdentitySurface, absolute_hours: int
+) -> None:
+    started_at = datetime.now(UTC)
+    with patch(
+        "zeromerma_api.modules.identity.application.session_services.datetime", wraps=datetime
+    ) as clock:
+        clock.now.return_value = started_at
+        headers, payload = _login(client, audience)
+        row = payload["session"]
+        assert isinstance(row, dict)
+        assert datetime.fromisoformat(row["created_at"]) == started_at
+        assert datetime.fromisoformat(row["last_activity_at"]) == started_at
+        assert datetime.fromisoformat(row["idle_expires_at"]) == started_at + timedelta(minutes=30)
+        assert datetime.fromisoformat(row["absolute_expires_at"]) == started_at + timedelta(
+            hours=absolute_hours
+        )
+
+        clock.now.return_value = started_at + timedelta(minutes=29, seconds=59)
+        assert client.get("/v1/auth/me", headers=headers).status_code == 200
+        restored = client.get("/v1/auth/session", headers=headers)
+        assert restored.status_code == 200, restored.text
+        assert restored.json()["session"]["idle_expires_at"] == row["idle_expires_at"]
+
+        clock.now.return_value = started_at + timedelta(minutes=30)
+        boundary = client.get("/v1/auth/me", headers=headers)
+        expected_status, expected_code = (
+            (423, "SESSION_LOCKED") if audience == "POS" else (401, "SESSION_EXPIRED")
+        )
+        assert boundary.status_code == expected_status, boundary.text
+        assert boundary.json()["code"] == expected_code
+        with SessionLocal() as session:
+            persisted = session.get(AuthSession, _session_id(payload))
+            assert persisted is not None
+            assert persisted.status == ("LOCKED" if audience == "POS" else "EXPIRED")
+            assert persisted.idle_expires_at == started_at + timedelta(minutes=30)
+            assert persisted.absolute_expires_at == started_at + timedelta(hours=absolute_hours)
+
+
+@pytest.mark.parametrize("audience", ["POS", "BACKOFFICE"])
+def test_activity_applies_current_idle_policy_without_rewriting_stored_deadlines_on_restore(
+    client: TestClient, audience: IdentitySurface
+) -> None:
+    started_at = datetime.now(UTC)
+    with patch(
+        "zeromerma_api.modules.identity.application.session_services.datetime", wraps=datetime
+    ) as clock:
+        clock.now.return_value = started_at
+        headers, payload = _login(client, audience)
+        with SessionLocal() as session:
+            row = session.get(AuthSession, _session_id(payload))
+            assert row is not None
+            original_absolute = row.absolute_expires_at
+            stored_deadline = started_at + timedelta(minutes=5 if audience == "POS" else 15)
+            row.idle_expires_at = stored_deadline
+            session.commit()
+
+        clock.now.return_value = started_at + timedelta(minutes=1)
+        restored = client.get("/v1/auth/session", headers=headers)
+        assert restored.status_code == 200, restored.text
+        assert (
+            datetime.fromisoformat(restored.json()["session"]["idle_expires_at"]) == stored_deadline
+        )
+        renewed = client.post("/v1/auth/activity", headers=headers)
+        assert renewed.status_code == 200, renewed.text
+        assert datetime.fromisoformat(renewed.json()["last_activity_at"]) == clock.now.return_value
+        assert datetime.fromisoformat(renewed.json()["idle_expires_at"]) == started_at + timedelta(
+            minutes=31
+        )
+        assert datetime.fromisoformat(renewed.json()["absolute_expires_at"]) == original_absolute
+
+        with SessionLocal() as session:
+            row = session.get(AuthSession, _session_id(payload))
+            assert row is not None
+            row.last_activity_at = original_absolute - timedelta(minutes=11)
+            row.idle_expires_at = original_absolute
+            session.commit()
+        clock.now.return_value = original_absolute - timedelta(minutes=10)
+        capped = client.post("/v1/auth/activity", headers=headers)
+        assert capped.status_code == 200, capped.text
+        assert datetime.fromisoformat(capped.json()["idle_expires_at"]) == original_absolute
+        assert datetime.fromisoformat(capped.json()["absolute_expires_at"]) == original_absolute
+
+        clock.now.return_value = original_absolute
+        expired = client.get("/v1/auth/session", headers=headers)
+        assert expired.status_code == 401, expired.text
+        assert expired.json()["code"] == "SESSION_EXPIRED"
 
 
 def test_cookie_login_persists_activity_without_persisting_or_auditing_secrets(
@@ -154,7 +245,7 @@ def test_pos_idle_locks_restore_without_touch_and_reauth_rotates_without_extendi
         row = session.get(AuthSession, row_id)
         assert row is not None
         original_absolute = row.absolute_expires_at
-        row.last_activity_at = datetime.now(UTC) - timedelta(minutes=6)
+        row.last_activity_at = datetime.now(UTC) - timedelta(minutes=31)
         row.idle_expires_at = datetime.now(UTC) - timedelta(minutes=1)
         session.commit()
     locked = client.get("/v1/auth/me", headers=headers)
@@ -167,6 +258,10 @@ def test_pos_idle_locks_restore_without_touch_and_reauth_rotates_without_extendi
     )
     client.cookies.clear()
     assert unlocked.status_code == 200, unlocked.text
+    renewed_session = unlocked.json()["session"]
+    assert datetime.fromisoformat(renewed_session["idle_expires_at"]) - datetime.fromisoformat(
+        renewed_session["last_activity_at"]
+    ) == timedelta(minutes=30)
     fresh = response_session_headers(unlocked, "POS")
     assert fresh["Cookie"] != headers["Cookie"] and fresh["X-CSRF-Token"] != headers["X-CSRF-Token"]
     assert client.get("/v1/auth/me", headers=headers).status_code == 401

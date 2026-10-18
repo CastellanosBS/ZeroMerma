@@ -7,6 +7,7 @@ from zeromerma_api import __version__
 from zeromerma_api.core.config import ApiSettings, get_settings
 from zeromerma_api.core.logging import configure_logging
 from zeromerma_api.core.security import install_security_boundary
+from zeromerma_api.modules.idempotency.presentation.http import install_idempotency_error_handler
 from zeromerma_api.presentation.api import api_router
 from zeromerma_api.presentation.contracts import install_contract_openapi
 from zeromerma_api.presentation.errors import error_responses, install_error_handlers
@@ -35,7 +36,14 @@ def create_app() -> FastAPI:
         allow_origins=allowed_origins,
         allow_credentials=True,
         allow_methods=["GET", "HEAD", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
-        allow_headers=["Content-Type", "X-CSRF-Token", "X-ZeroMerma-Surface", "X-Request-ID"],
+        allow_headers=[
+            "Content-Type",
+            "X-CSRF-Token",
+            "X-ZeroMerma-Surface",
+            "X-Request-ID",
+            "Idempotency-Key",
+        ],
+        expose_headers=["Idempotency-Replayed", "Retry-After"],
     )
 
     app.include_router(api_router)
@@ -46,6 +54,7 @@ def create_app() -> FastAPI:
             if not getattr(route, "path", "").startswith("/dev/")
         ]
     install_error_handlers(app)
+    install_idempotency_error_handler(app)
     install_security_boundary(app, settings)
     install_contract_openapi(app)
     return app

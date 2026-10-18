@@ -93,6 +93,36 @@ aprovisionamiento, respaldos y ensayos operativos de sus fases posteriores. Este
 registro no declara Security Ready ni Production Ready. La siguiente dependencia
 funcional es **ZM-FIN-028**, idempotencia de comandos.
 
+### 0.4 Registro de ejecución — ZM-FIN-028
+
+El bloque del 2026-10-18 implementa la fundación de idempotencia aprobada en
+DEC-07, en `codex/zm-fin-028-idempotency`. Su alcance es la infraestructura
+compartida y su validación aislada; la adopción en ventas empieza en ZM-FIN-029.
+El mismo cambio incluye la instrucción posterior del usuario de fijar en
+30 minutos la inactividad de POS y Backoffice, conservando las expiraciones
+absolutas y la separación de sesiones de DEC-05.
+
+La [arquitectura de idempotencia](architecture/idempotency.md) define la clave
+UUIDv7 global, fingerprint canónico y versionado, unidad transaccional, replay
+con autorización vigente y retención de identidad. La migración
+`20261018_0042_idempotency` protege la identidad y los resultados terminales,
+rechaza `PROCESSING` durable en el camino interno y permite purgar una respuesta
+vencida sólo conservando una referencia. El downgrade se rechaza si existen
+identidades; la recuperación debe preservar también sus efectos de negocio.
+
+El [registro de validación](implementation/idempotency-validation.md) contiene
+los comandos, resultados y límites de la validación local. La aceptación integrada
+exige las ocho etapas Foundation y **Foundation required** verdes para el SHA
+entregado; el enlace de esa ejecución inmutable acompaña el cierre del bloque.
+Las pruebas emplean PostgreSQL y navegadores aislados; este
+bloque no migra ni modifica la base local normal.
+
+Los comandos existentes no se declaran idempotentes por publicar el componente
+OpenAPI o crear la tabla. Su adopción corresponde a ZM-FIN-029–035; la revisión
+general de fronteras transaccionales y contexto causal continúa en 039–040.
+No se declaran Feature Complete ni Production Ready. La siguiente dependencia
+funcional al aceptar este bloque es **ZM-FIN-029**, confirmación de ventas.
+
 ## 1. Resumen ejecutivo
 
 ZeroMerma posee una base adecuada para evolucionar sin reescritura: monolito modular, FastAPI/SQLAlchemy/PostgreSQL, POS y Backoffice separados, OpenAPI generado, precisión decimal, auditoría y outbox transaccionales. La auditoría activa demostró que una parte importante de ventas, pagos, pedidos, documentos y administración es real. También demostró defectos sistémicos: el POS no alimenta el inventario canónico; el pago de pedido no entra en caja/corte; el worker no procesa eventos; la trazabilidad de identidad/origen es incorrecta; y varias superficies administrativas son simuladas o incompletas.

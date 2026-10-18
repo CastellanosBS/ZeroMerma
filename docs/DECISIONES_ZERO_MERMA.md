@@ -520,14 +520,14 @@ La topología concreta se resolverá posteriormente conforme a DEC-17.
 
 ### POS — idle y bloqueo
 
-- El timeout de inactividad POS será de 5 minutos.
+- El timeout de inactividad POS será de 30 minutos.
 - La duración absoluta máxima POS será de 12 horas.
 - El servidor será la autoridad del timeout.
 - Polling, refetch automático, health checks y timers no contarán como actividad del operador.
 - La actividad podrá transmitirse mediante heartbeat limitado y ligado a eventos reales de teclado, touch o pointer.
 - Las mutaciones iniciadas por el usuario contarán como actividad.
 - La actividad nunca extenderá la duración absoluta.
-- Tras 5 minutos de inactividad, la sesión pasará de `ACTIVE` a `LOCKED`.
+- Tras 30 minutos de inactividad, la sesión pasará de `ACTIVE` a `LOCKED`.
 - Mientras esté `LOCKED`, no se permitirán operaciones de negocio; sólo estado de sesión, reautenticación y logout.
 - El bloqueo no cerrará `CashSession` ni generará un cierre de turno.
 - Una reautenticación correcta conservará la misma `AuthSession`, la devolverá a `ACTIVE`, rotará el secreto de cookie y no reiniciará el límite absoluto.
@@ -547,12 +547,14 @@ Existirá como máximo una `AuthSession` POS `ACTIVE` o `LOCKED` por combinació
 
 ### Backoffice — sesiones múltiples
 
-- El timeout de inactividad Backoffice será de 15 minutos.
+- El timeout de inactividad Backoffice será de 30 minutos.
 - La duración absoluta máxima Backoffice será de 8 horas.
 - Se permitirán múltiples sesiones Backoffice simultáneas por usuario.
 - Cada sesión será visible al propio usuario, revocable individualmente e identificable mediante datos no secretos de creación, última actividad, expiración y estado.
 - Se requerirán operaciones conceptuales para listar sesiones propias, revocar una sesión propia, revocar todas excepto la actual y hacer logout de la sesión actual.
 - Administrar sesiones de otro usuario será autoridad derivada de `users.manage`, deberá respetar DEC-04 y no añadirá una capacidad nueva a DEC-03.
+
+La política de 30 minutos se aplicará al crear sesión, registrar actividad aceptada o reautenticar. No se extenderán masivamente los vencimientos persistidos: una restauración o consulta conservará el deadline existente. Los límites absolutos seguirán siendo 12 horas para POS y 8 horas para Backoffice.
 
 ### Revocación
 
@@ -640,7 +642,7 @@ Estos hallazgos son deuda de implementación futura y no implican cambios de có
 - **Tareas afectadas:** `ZM-FIN-003`, `ZM-FIN-008`, `ZM-FIN-015`, `ZM-FIN-016`, `ZM-FIN-017`, `ZM-FIN-018`, `ZM-FIN-019`, `ZM-FIN-020`, `ZM-FIN-021` y `ZM-FIN-022`; las tareas posteriores de cierre, idempotencia, infraestructura y seguridad deberán respetar DEC-05 conforme al Plan Maestro.
 - **Consecuencias:** migración coordinada de API, POS, Backoffice, OpenAPI y cliente generado; sesiones revocables; cookies seguras; CSRF; expiración por audiencia; vínculo de sesión POS con estación y caja; pruebas de concurrencia, revocación y aislamiento.
 - **Límite:** DEC-05 define la política y el modelo conceptual; no certifica que sesiones, cookies, CSRF, revocación, migraciones o contratos estén implementados o probados.
-- **Historial:** `PENDIENTE` desde 2026-08-26; `APROBADA` por el propietario el 2026-08-27.
+- **Historial:** `PENDIENTE` desde 2026-08-26; `APROBADA` por el propietario el 2026-08-27. El 2026-10-18, el propietario amplió la inactividad de POS y Backoffice a 30 minutos, conservando sus límites absolutos y sin extensión masiva de sesiones existentes.
 
 ## DEC-06 — Cierre
 

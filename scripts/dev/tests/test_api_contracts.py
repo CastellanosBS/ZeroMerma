@@ -71,6 +71,34 @@ def test_path_omission_is_detected() -> None:
     assert _openapi_drift(changed)
 
 
+def test_idempotency_foundation_exposes_reusable_backend_contract_without_claiming_adoption() -> (
+    None
+):
+    normalized = normalize_contract_schema(SCHEMA)
+    components = normalized["components"]
+    key = components["schemas"]["IdempotencyKey"]
+    assert key["format"] == "uuid" and key["x-zeromerma-uuid-version"] == 7
+    assert key["minLength"] == key["maxLength"] == 36
+    assert "7[0-9a-fA-F]{3}" in key["pattern"]
+    assert components["parameters"]["IdempotencyKey"] == {
+        "name": "Idempotency-Key",
+        "in": "header",
+        "required": True,
+        "description": "Reuse only for the same operation, actor, context and canonical payload.",
+        "schema": {"$ref": "#/components/schemas/IdempotencyKey"},
+    }
+    assert components["schemas"]["IdempotencyStatus"]["enum"] == [
+        "PROCESSING",
+        "COMPLETED",
+        "REJECTED",
+        "UNKNOWN",
+    ]
+    assert normalized["x-zeromerma-idempotency"]["request_id_is_idempotency_key"] is False
+    assert normalized["x-zeromerma-idempotency"]["adoption"] == "PER_OPERATION"
+    assert normalized["paths"] == SCHEMA["paths"]
+    assert "request_id" not in components["schemas"]["IdempotencyRejectionSnapshot"]["properties"]
+
+
 def test_schema_change_is_detected() -> None:
     changed = copy.deepcopy(SCHEMA)
     changed["components"]["schemas"]["HealthResponse"]["properties"]["status"]["maxLength"] = 1

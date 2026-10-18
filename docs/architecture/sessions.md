@@ -33,12 +33,17 @@ contracts and TypeScript types are generated from backend schemas.
 
 | Rule | POS | Backoffice |
 |---|---|---|
-| Idle timeout | 5 minutes, then LOCKED | 15 minutes, then EXPIRED |
+| Idle timeout | 30 minutes, then LOCKED | 30 minutes, then EXPIRED |
 | Absolute lifetime | 12 hours | 8 hours |
 | Concurrent sessions | One ACTIVE/LOCKED per user and workstation | Multiple |
 | Workstation | Required and validated | Absent |
 | Cash session | Linked when an owned cash session opens | Absent |
 | Reauthentication | Same session ID, rotated cookie/CSRF, unchanged absolute deadline | Full login after expiry |
+
+The 30-minute policy applies when login, accepted activity or reauthentication
+sets an idle deadline. Existing persisted deadlines are not extended in bulk;
+restoring or polling a session preserves its current deadline. Absolute limits
+remain unchanged.
 
 Polling and reload do not count as activity. Real keyboard, pointer and touch
 events use a throttled activity endpoint; authorized business mutations also

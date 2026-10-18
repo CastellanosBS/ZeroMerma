@@ -6,7 +6,7 @@ import { usePosAuthStore as auth } from "./auth-store";
 function response(id = "actor-1", version = "v1"): SessionResponse {
   return {
     csrf_token: `memory-csrf-${id}`,
-    session: { id, audience: "POS", status: "ACTIVE", created_at: "2026-10-18T00:00:00Z", last_activity_at: "2026-10-18T00:00:00Z", idle_expires_at: "2026-10-18T00:15:00Z", absolute_expires_at: "2026-10-18T08:00:00Z", workstation_id: null, cash_session_id: null, revoked_at: null, revocation_reason: null },
+    session: { id, audience: "POS", status: "ACTIVE", created_at: "2026-10-18T00:00:00Z", last_activity_at: "2026-10-18T00:00:00Z", idle_expires_at: "2026-10-18T00:30:00Z", absolute_expires_at: "2026-10-18T12:00:00Z", workstation_id: null, cash_session_id: null, revoked_at: null, revocation_reason: null },
     user: { id, email: "operator@example.invalid", full_name: "Operator", is_active: true, default_surface: "POS", allowed_surfaces: ["POS"], authorization_surface: "POS", authorization_version: version, is_superadministrator: false, effective_grants: [], password_reset_required: false },
   };
 }

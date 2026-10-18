@@ -49,7 +49,7 @@ COOKIE_NAMES: dict[IdentitySurface, str] = {
     "POS": "__Host-zm-pos-session",
     "BACKOFFICE": "__Host-zm-backoffice-session",
 }
-IDLE_MINUTES: dict[IdentitySurface, int] = {"POS": 5, "BACKOFFICE": 15}
+IDLE_MINUTES: dict[IdentitySurface, int] = {"POS": 30, "BACKOFFICE": 30}
 ABSOLUTE_HOURS: dict[IdentitySurface, int] = {"POS": 12, "BACKOFFICE": 8}
 AUTH_CONTEXT_KEY = "zeromerma_auth_session"
 _DUMMY_PASSWORD_HASH = "pbkdf2_sha256$600000$zeromerma-dummy-password$" + "0" * 64

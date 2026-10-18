@@ -1,0 +1,1 @@
+"""Idempotency protocol and failures."""
