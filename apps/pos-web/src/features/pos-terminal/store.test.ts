@@ -127,7 +127,10 @@ describe("pos terminal model", () => {
 
     expect(classSelectionState.controlState).toBe(CONTROL_STATE_PRODUCT_SELECTION);
 
-    const productSelectionState = selectProductForPending(classSelectionState, productDirectProduct);
+    const productSelectionState = selectProductForPending(
+      classSelectionState,
+      productDirectProduct,
+    );
     expect(productSelectionState.controlState).toBe(CONTROL_STATE_QUANTITY_CAPTURE);
 
     const withLineState = addPendingSelectionToCart({
@@ -138,10 +141,15 @@ describe("pos terminal model", () => {
       },
     });
 
-    const request = buildConfirmSaleRequest("POS-01", withLineState.cartLines, {
-      cashReceivedText: "20.00",
-      paymentMethodCode: CASH_PAYMENT_METHOD_CODE,
-    });
+    const request = buildConfirmSaleRequest(
+      "POS-01",
+      withLineState.cartLines,
+      {
+        cashReceivedText: "20.00",
+        paymentMethodCode: CASH_PAYMENT_METHOD_CODE,
+      },
+      "cash-session-1",
+    );
 
     expect(request.workstation_code).toBe("POS-01");
     expect(request.lines).toEqual([
@@ -166,10 +174,15 @@ describe("pos terminal model", () => {
   it("builds a card sale request without cash capture", () => {
     const withLineState = addClassLine("2");
 
-    const request = buildConfirmSaleRequest("POS-01", withLineState.cartLines, {
-      cashReceivedText: "",
-      paymentMethodCode: CARD_PAYMENT_METHOD_CODE,
-    });
+    const request = buildConfirmSaleRequest(
+      "POS-01",
+      withLineState.cartLines,
+      {
+        cashReceivedText: "",
+        paymentMethodCode: CARD_PAYMENT_METHOD_CODE,
+      },
+      "cash-session-1",
+    );
 
     expect(request.payments).toEqual([
       {
@@ -182,20 +195,25 @@ describe("pos terminal model", () => {
   it("builds a mixed sale request with explicit confirmed legs", () => {
     const withLineState = addClassLine("2");
 
-    const request = buildConfirmSaleRequest("POS-01", withLineState.cartLines, {
-      cashReceivedText: "",
-      mixedConfirmedLegs: [
-        {
-          amountText: "10.00",
-          methodCode: CASH_PAYMENT_METHOD_CODE,
-        },
-        {
-          amountText: "14.00",
-          methodCode: CARD_PAYMENT_METHOD_CODE,
-        },
-      ],
-      paymentMethodCode: MIXED_PAYMENT_METHOD_CODE,
-    });
+    const request = buildConfirmSaleRequest(
+      "POS-01",
+      withLineState.cartLines,
+      {
+        cashReceivedText: "",
+        mixedConfirmedLegs: [
+          {
+            amountText: "10.00",
+            methodCode: CASH_PAYMENT_METHOD_CODE,
+          },
+          {
+            amountText: "14.00",
+            methodCode: CARD_PAYMENT_METHOD_CODE,
+          },
+        ],
+        paymentMethodCode: MIXED_PAYMENT_METHOD_CODE,
+      },
+      "cash-session-1",
+    );
 
     expect(request.payments).toEqual([
       {
@@ -251,10 +269,7 @@ describe("pos terminal model", () => {
         },
       ],
     ]);
-    expect(getPosCheckoutSummaryMetricRows()).toEqual([
-      ["TOTAL", "RECEIVED"],
-      ["RESULT"],
-    ]);
+    expect(getPosCheckoutSummaryMetricRows()).toEqual([["TOTAL", "RECEIVED"], ["RESULT"]]);
     expect(isSplitPaymentMethodCode(MIXED_PAYMENT_METHOD_CODE)).toBe(true);
     expect(isSplitPaymentMethodCode(CARD_PAYMENT_METHOD_CODE)).toBe(false);
     expect(usesReceivedAmountInput(CASH_PAYMENT_METHOD_CODE)).toBe(true);

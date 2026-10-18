@@ -3,9 +3,11 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { act } from "react";
 import { createRoot } from "react-dom/client";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { webcrypto } from "node:crypto";
 
 import type {
+  CashSessionView,
   PosBootstrapResponse,
   PosCatalogClassView,
   SaleDetailView,
@@ -14,11 +16,14 @@ import { usePosAuthStore } from "../auth/auth-store";
 import { CLASS_CAPTURE_MODE } from "./model";
 import { PosCheckoutPanel } from "./pos-checkout-panel";
 import { usePosTerminalStore } from "./store";
+import { forgetSaleIntentionBodies } from "./sale-confirmation-intent";
 
-(globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean })
-  .IS_REACT_ACT_ENVIRONMENT = true;
+(
+  globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }
+).IS_REACT_ACT_ENVIRONMENT = true;
 
 const confirmPosSaleMock = vi.fn();
+const recoverSaleMock = vi.fn();
 const getTicketDetailMock = vi.fn();
 const showSuccessMock = vi.fn();
 const showWarningMock = vi.fn();
@@ -26,6 +31,7 @@ const writeTicketToPrintWindowMock = vi.fn();
 
 vi.mock("./pos-terminal-api", () => ({
   confirmPosSale: (...args: unknown[]) => confirmPosSaleMock(...args),
+  getSaleConfirmation: (...args: unknown[]) => recoverSaleMock(...args),
 }));
 
 vi.mock("../tickets/tickets-api", () => ({
@@ -90,10 +96,7 @@ function dispatchKey(target: EventTarget, key: string, options?: KeyboardEventIn
 }
 
 function setInputValue(input: HTMLInputElement, value: string) {
-  const valueSetter = Object.getOwnPropertyDescriptor(
-    HTMLInputElement.prototype,
-    "value",
-  )?.set;
+  const valueSetter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")?.set;
 
   act(() => {
     valueSetter?.call(input, value);
@@ -117,8 +120,12 @@ const bolilloClass: PosCatalogClassView = {
 const bootstrap = {
   workstation: {
     code: "POS-01",
+    id: "station-1",
   },
+  user: { id: "user-1" },
+  branch: { id: "branch-1" },
 } as PosBootstrapResponse;
+const cashSession = { id: "cash-1" } as CashSessionView;
 
 function createSaleDetail(overrides?: Partial<SaleDetailView>): SaleDetailView {
   return {
@@ -162,7 +169,25 @@ function seedTicket() {
 
 let mountedRoots: Array<() => void> = [];
 
+beforeEach(() => {
+  vi.stubGlobal("crypto", {
+    getRandomValues: webcrypto.getRandomValues.bind(webcrypto),
+    subtle: { digest: async () => new ArrayBuffer(32) },
+  });
+  Object.defineProperty(navigator, "locks", {
+    configurable: true,
+    value: {
+      request: async (
+        _name: string,
+        _options: unknown,
+        callback: (lock: object) => Promise<unknown>,
+      ) => callback({}),
+    },
+  });
+});
 afterEach(() => {
+  forgetSaleIntentionBodies();
+  vi.unstubAllGlobals();
   for (const unmount of mountedRoots) {
     unmount();
   }
@@ -170,6 +195,7 @@ afterEach(() => {
   document.body.innerHTML = "";
   localStorage.clear();
   confirmPosSaleMock.mockReset();
+  recoverSaleMock.mockReset();
   getTicketDetailMock.mockReset();
   showSuccessMock.mockReset();
   showWarningMock.mockReset();
@@ -182,13 +208,75 @@ afterEach(() => {
 });
 
 describe("PosCheckoutPanel", () => {
+  const retained = {
+    key: "019a4000-0000-7000-8000-000000000001",
+    userId: "user-1",
+    branchId: "branch-1",
+    workstationId: "station-1",
+    workstationCode: "POS-01",
+    cashSessionId: "old-cash",
+    payloadDigest: "a".repeat(64),
+    status: "UNKNOWN",
+  };
+
+  it("recovers an old intention with no open cash session and never posts a new sale", async () => {
+    localStorage.setItem("zeromerma-sale-intention:station-1", JSON.stringify(retained));
+    recoverSaleMock.mockResolvedValue(createSaleDetail());
+    const view = renderUi(<PosCheckoutPanel bootstrap={bootstrap} cashSession={null} />);
+    mountedRoots.push(view.unmount);
+    expect(view.container.textContent).toContain("Tras recargar");
+    await act(async () => {
+      Array.from(view.container.querySelectorAll("button"))
+        .find((button) => button.textContent === "Recuperar venta")!
+        .click();
+    });
+    expect(recoverSaleMock).toHaveBeenCalledWith(retained.key, "POS-01", "old-cash");
+    expect(confirmPosSaleMock).not.toHaveBeenCalled();
+    expect(showSuccessMock).toHaveBeenCalledWith("Venta registrada.");
+  });
+
+  it("clears the stale draft when another tab confirms, including a coalesced storage notification", async () => {
+    seedTicket();
+    const view = renderUi(<PosCheckoutPanel bootstrap={bootstrap} cashSession={cashSession} />);
+    mountedRoots.push(view.unmount);
+    await act(async () => {
+      localStorage.setItem(
+        "zeromerma-sale-intention:station-1",
+        JSON.stringify({ ...retained, status: "CONFIRMED" }),
+      );
+      window.dispatchEvent(
+        new StorageEvent("storage", { key: "zeromerma-sale-intention:station-1" }),
+      );
+    });
+    expect(usePosTerminalStore.getState().cartLines).toHaveLength(0);
+    dispatchKey(window, "Enter");
+    expect(confirmPosSaleMock).not.toHaveBeenCalled();
+  });
+
+  it("keeps the draft identity across checkout unmount and clears it after another tab confirms", () => {
+    seedTicket();
+    const first = renderUi(<PosCheckoutPanel bootstrap={bootstrap} cashSession={cashSession} />);
+    expect(usePosTerminalStore.getState().saleDraftIntentionKey).toBeNull();
+    first.unmount();
+    localStorage.setItem(
+      "zeromerma-sale-intention:station-1",
+      JSON.stringify({ ...retained, status: "CONFIRMED" }),
+    );
+    const second = renderUi(<PosCheckoutPanel bootstrap={bootstrap} cashSession={cashSession} />);
+    mountedRoots.push(second.unmount);
+    expect(usePosTerminalStore.getState().cartLines).toHaveLength(0);
+    expect(usePosTerminalStore.getState().saleDraftIntentionKey).toBe(retained.key);
+    dispatchKey(window, "Enter");
+    expect(confirmPosSaleMock).not.toHaveBeenCalled();
+  });
+
   it("keeps Recibe enabled and lets the cashier confirm without clicking Cobrar first", async () => {
     act(() => {
       usePosAuthStore.setState({ isAuthenticated: true, phase: "ready" });
       seedTicket();
     });
 
-    const view = renderUi(<PosCheckoutPanel bootstrap={bootstrap} />);
+    const view = renderUi(<PosCheckoutPanel bootstrap={bootstrap} cashSession={cashSession} />);
     mountedRoots.push(view.unmount);
 
     const input = view.container.querySelector(
@@ -226,7 +314,7 @@ describe("PosCheckoutPanel", () => {
       seedTicket();
     });
 
-    const view = renderUi(<PosCheckoutPanel bootstrap={bootstrap} />);
+    const view = renderUi(<PosCheckoutPanel bootstrap={bootstrap} cashSession={cashSession} />);
     mountedRoots.push(view.unmount);
 
     const paymentButton = Array.from(view.container.querySelectorAll("button")).find(
@@ -253,7 +341,7 @@ describe("PosCheckoutPanel", () => {
       seedTicket();
     });
 
-    const view = renderUi(<PosCheckoutPanel bootstrap={bootstrap} />);
+    const view = renderUi(<PosCheckoutPanel bootstrap={bootstrap} cashSession={cashSession} />);
     mountedRoots.push(view.unmount);
 
     act(() => {
@@ -289,7 +377,7 @@ describe("PosCheckoutPanel", () => {
       seedTicket();
     });
 
-    const view = renderUi(<PosCheckoutPanel bootstrap={bootstrap} />);
+    const view = renderUi(<PosCheckoutPanel bootstrap={bootstrap} cashSession={cashSession} />);
     mountedRoots.push(view.unmount);
 
     const row = view.container.querySelector('[role="row"]') as HTMLDivElement;
@@ -326,7 +414,7 @@ describe("PosCheckoutPanel", () => {
       seedTicket();
     });
 
-    const view = renderUi(<PosCheckoutPanel bootstrap={bootstrap} />);
+    const view = renderUi(<PosCheckoutPanel bootstrap={bootstrap} cashSession={cashSession} />);
     mountedRoots.push(view.unmount);
 
     act(() => {
@@ -374,7 +462,7 @@ describe("PosCheckoutPanel", () => {
       seedTicket();
     });
 
-    const view = renderUi(<PosCheckoutPanel bootstrap={bootstrap} />);
+    const view = renderUi(<PosCheckoutPanel bootstrap={bootstrap} cashSession={cashSession} />);
     mountedRoots.push(view.unmount);
 
     act(() => {
@@ -426,14 +514,19 @@ describe("PosCheckoutPanel", () => {
 
     dispatchKey(window, "Enter");
 
-    await act(async () => { await Promise.resolve(); await new Promise((resolve) => window.setTimeout(resolve, 0)); });
+    await act(async () => {
+      await Promise.resolve();
+      await new Promise((resolve) => window.setTimeout(resolve, 0));
+    });
 
     expect(confirmPosSaleMock).toHaveBeenCalledTimes(1);
     expect(getTicketDetailMock).toHaveBeenCalledTimes(1);
     expect(writeTicketToPrintWindowMock).toHaveBeenCalledTimes(1);
     expect(showSuccessMock).toHaveBeenCalledWith("Venta registrada.");
     expect(usePosTerminalStore.getState().cartLines).toHaveLength(0);
-    expect(view.container.textContent).toContain("El ticket esta vacio. Agrega productos desde el catalogo para empezar la venta.");
+    expect(view.container.textContent).toContain(
+      "El ticket esta vacio. Agrega productos desde el catalogo para empezar la venta.",
+    );
   });
 
   it("supports mixed payment legs until the remaining amount reaches zero", async () => {
@@ -452,7 +545,7 @@ describe("PosCheckoutPanel", () => {
       seedTicket();
     });
 
-    const view = renderUi(<PosCheckoutPanel bootstrap={bootstrap} />);
+    const view = renderUi(<PosCheckoutPanel bootstrap={bootstrap} cashSession={cashSession} />);
     mountedRoots.push(view.unmount);
 
     act(() => {
@@ -513,7 +606,7 @@ describe("PosCheckoutPanel", () => {
       seedTicket();
     });
 
-    const view = renderUi(<PosCheckoutPanel bootstrap={bootstrap} />);
+    const view = renderUi(<PosCheckoutPanel bootstrap={bootstrap} cashSession={cashSession} />);
     mountedRoots.push(view.unmount);
 
     act(() => {
@@ -557,7 +650,7 @@ describe("PosCheckoutPanel", () => {
       seedTicket();
     });
 
-    const view = renderUi(<PosCheckoutPanel bootstrap={bootstrap} />);
+    const view = renderUi(<PosCheckoutPanel bootstrap={bootstrap} cashSession={cashSession} />);
     mountedRoots.push(view.unmount);
 
     act(() => {
@@ -582,7 +675,7 @@ describe("PosCheckoutPanel", () => {
       await Promise.resolve();
     });
 
-    expect(view.container.textContent).toContain("No se pudo registrar la venta.");
+    expect(view.container.textContent).toContain("Resultado de venta pendiente");
     expect(usePosTerminalStore.getState().cartLines).toHaveLength(1);
     expect(view.container.textContent).toContain("Reintentar");
   });
@@ -597,7 +690,7 @@ describe("PosCheckoutPanel", () => {
       seedTicket();
     });
 
-    const view = renderUi(<PosCheckoutPanel bootstrap={bootstrap} />);
+    const view = renderUi(<PosCheckoutPanel bootstrap={bootstrap} cashSession={cashSession} />);
     mountedRoots.push(view.unmount);
 
     act(() => {

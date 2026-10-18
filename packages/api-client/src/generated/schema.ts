@@ -3305,6 +3305,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/sales/confirmations/{idempotency_key}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Recover Sale Confirmation */
+        get: operations["recover_sale_confirmation_v1_sales_confirmations__idempotency_key__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/sales/{sale_id}": {
         parameters: {
             query?: never;
@@ -16577,6 +16594,11 @@ export interface components {
         };
         /** ConfirmSaleRequest */
         ConfirmSaleRequest: {
+            /**
+             * Cash Session Id
+             * Format: uuid
+             */
+            cash_session_id: string;
             /** Lines */
             lines: components["schemas"]["ConfirmSaleLineRequest"][];
             /** Payments */
@@ -18736,6 +18758,65 @@ export interface components {
             scope: string;
             /** Workstation Code */
             workstation_code: string;
+        };
+        /** SaleConfirmationView */
+        SaleConfirmationView: {
+            /** Branch Code */
+            branch_code: string;
+            /**
+             * Branch Id
+             * Format: uuid
+             */
+            branch_id: string;
+            /** Branch Name */
+            branch_name: string;
+            /** Cash Movements */
+            cash_movements: components["schemas"]["CashMovementView"][];
+            /**
+             * Cash Session Id
+             * Format: uuid
+             */
+            cash_session_id: string;
+            /** Change Amount */
+            change_amount: string;
+            /**
+             * Confirmed At
+             * Format: date-time
+             */
+            confirmed_at: string;
+            /** Currency Code */
+            currency_code: string;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Lines */
+            lines: components["schemas"]["SaleLineView"][];
+            /**
+             * Operator Id
+             * Format: uuid
+             */
+            operator_id: string;
+            /** Paid Amount */
+            paid_amount: string;
+            /** Payments */
+            payments: components["schemas"]["SalePaymentView"][];
+            /** Status */
+            status: string;
+            /** Subtotal Amount */
+            subtotal_amount: string;
+            /** Total Amount */
+            total_amount: string;
+            /** Workstation Code */
+            workstation_code: string;
+            /**
+             * Workstation Id
+             * Format: uuid
+             */
+            workstation_id: string;
+            /** Workstation Name */
+            workstation_name: string;
         };
         /** SaleDetailView */
         SaleDetailView: {
@@ -43691,7 +43772,10 @@ export interface operations {
     confirm_sale_v1_sales_confirm_post: {
         parameters: {
             query?: never;
-            header?: never;
+            header: {
+                /** @description A globally unique UUIDv7 identifying this business intention. */
+                "Idempotency-Key": string;
+            };
             path?: never;
             cookie?: never;
         };
@@ -43704,10 +43788,118 @@ export interface operations {
             /** @description Successful Response */
             201: {
                 headers: {
+                    "Idempotency-Replayed": components["headers"]["IdempotencyReplayed"];
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["SaleDetailView"];
+                    "application/json": components["schemas"]["SaleConfirmationView"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorResponse"];
+                };
+            };
+            /** @description Authentication Required */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorResponse"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorResponse"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorResponse"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorResponse"];
+                };
+            };
+            /** @description Session Locked */
+            423: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorResponse"];
+                };
+            };
+            /** @description Login Rate Limited */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorResponse"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorResponse"];
+                };
+            };
+        };
+    };
+    recover_sale_confirmation_v1_sales_confirmations__idempotency_key__get: {
+        parameters: {
+            query: {
+                workstation_code: string;
+                cash_session_id: string;
+            };
+            header?: never;
+            path: {
+                idempotency_key: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    "Idempotency-Replayed": components["headers"]["IdempotencyReplayed"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SaleConfirmationView"];
                 };
             };
             /** @description Bad Request */

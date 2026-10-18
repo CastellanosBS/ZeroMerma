@@ -76,6 +76,17 @@ type ResponseObservation = {
 type PageObservation = {
   on(event: "response", listener: (response: ResponseObservation) => void): unknown;
 };
+type SaleFaultRoute = {
+  request(): { method(): string };
+  fetch(options: { maxRedirects: number }): Promise<{ status(): number; json(): Promise<unknown> }>;
+  abort(errorCode?: string): Promise<void>;
+};
+type SaleRouteRegistration = (
+  url: string,
+  handler: (route: SaleFaultRoute) => Promise<void>,
+  options: { times: number },
+) => Promise<void>;
+const saleFaultRegistrations = new WeakMap<object, SaleRouteRegistration>();
 type ContextObservation = {
   on(event: "page", listener: (page: PageObservation) => void): unknown;
 };
@@ -100,6 +111,8 @@ export function observeRealApi(
     }
   };
   const observePage = (currentPage: PageObservation) => {
+    const register = Reflect.get(currentPage, "route") as SaleRouteRegistration | undefined;
+    if (register) saleFaultRegistrations.set(currentPage, register.bind(currentPage));
     blockInterception(currentPage);
     currentPage.on("response", (response) => {
       const url = new URL(response.url());
@@ -117,6 +130,47 @@ export function observeRealApi(
   observePage(page);
   context.on("page", observePage);
   return evidence;
+}
+
+/** Lose only a real committed sale response. No fabricated response or arbitrary interception is exposed. */
+export async function dropNextSaleConfirmationResponse(
+  page: PageObservation,
+  apiUrl: string,
+  evidence: NetworkEvidence,
+) {
+  if (realEnvironment("pos").apiUrl !== apiUrl)
+    throw new Error("Sale faults require the isolated real POS API.");
+  const register = saleFaultRegistrations.get(page);
+  if (!register)
+    throw new Error(
+      "Real API observation must be installed before injecting a sale response loss.",
+    );
+  let resolveCommitted!: (value: unknown) => void;
+  let rejectCommitted!: (reason: unknown) => void;
+  const committed = new Promise<unknown>((resolve, reject) => {
+    resolveCommitted = resolve;
+    rejectCommitted = reject;
+  });
+  await register(
+    `${apiUrl}/v1/sales/confirm`,
+    async (route) => {
+      try {
+        if (route.request().method() !== "POST")
+          throw new Error("Only POST sale confirmation can lose a response.");
+        const response = await route.fetch({ maxRedirects: 0 });
+        if (response.status() !== 201)
+          throw new Error(`Expected a real committed sale, received ${response.status()}.`);
+        evidence.push({ method: "POST", path: "/v1/sales/confirm", status: 201 });
+        resolveCommitted(await response.json());
+      } catch (error) {
+        rejectCommitted(error);
+      } finally {
+        await route.abort("failed");
+      }
+    },
+    { times: 1 },
+  );
+  return { committed };
 }
 
 function sanitize(value: string): string {

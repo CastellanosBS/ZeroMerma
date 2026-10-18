@@ -1,5 +1,11 @@
 export type { components, operations, paths, webhooks } from "./generated/schema";
-export { removeLegacyAuthStorage, observeOperatorActivity, type AuthSessionView, type SessionResponse } from "./session";
+export { createIdempotencyKey } from "./uuid-v7";
+export {
+  removeLegacyAuthStorage,
+  observeOperatorActivity,
+  type AuthSessionView,
+  type SessionResponse,
+} from "./session";
 export {
   ApiError,
   isApiErrorResponse,

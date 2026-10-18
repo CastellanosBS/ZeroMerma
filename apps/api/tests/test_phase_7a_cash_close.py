@@ -21,6 +21,7 @@ from zeromerma_api.modules.cash.domain.constants import CASH_SESSION_STATUS_OPEN
 from zeromerma_api.modules.cash.infrastructure.models import CashSession
 from zeromerma_api.modules.cash_close.infrastructure.models import CashSessionClose
 from zeromerma_api.modules.catalog.infrastructure.models import Product, ProductClass
+from zeromerma_api.testing.idempotency import current_cash_session_id, new_idempotency_key
 from zeromerma_api.testing.sessions import login_headers
 
 
@@ -80,10 +81,17 @@ def _confirm_sale(
     lines: list[dict[str, str]],
     tendered_amount: str,
 ) -> None:
+    headers = _authorization_header(client)
+    cash_session_id = current_cash_session_id(
+        client, headers=headers, workstation_code=SEED_WORKSTATION_CODE
+    )
+    headers["Idempotency-Key"] = new_idempotency_key()
+
     response = client.post(
         "/v1/sales/confirm",
-        headers=_authorization_header(client),
+        headers=headers,
         json={
+            "cash_session_id": cash_session_id,
             "workstation_code": SEED_WORKSTATION_CODE,
             "lines": lines,
             "payments": [

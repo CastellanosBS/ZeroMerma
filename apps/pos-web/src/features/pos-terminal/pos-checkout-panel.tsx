@@ -1,13 +1,5 @@
 import { useMutation } from "@tanstack/react-query";
-import {
-  useCallback,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-  type ReactNode,
-  type Ref,
-} from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode, type Ref } from "react";
 
 import { PosInlineValidationMessage } from "../../components/pos-feedback";
 import {
@@ -28,7 +20,8 @@ import {
   TrashIcon,
 } from "../../components/pos-icons";
 import { Button } from "../../components/ui/button";
-import type { PosBootstrapResponse } from "../../lib/api-contracts";
+import type { CashSessionView, PosBootstrapResponse } from "../../lib/api-contracts";
+import { toOperationalErrorMessage } from "../../lib/http";
 import { openBrowserPrintWindow } from "../../lib/browser-print";
 import { formatCurrency } from "../../lib/formatters";
 import { isEditableTarget } from "../../lib/keyboard-shortcuts";
@@ -62,13 +55,16 @@ import {
   SALE_FLOW_QUANTITY_CAPTURE,
   useSaleFlowController,
 } from "./sale-flow-controller";
-import { confirmPosSale } from "./pos-terminal-api";
-import { usePosTerminalStore } from "./store";
 import {
-  posInputClass,
-  posOutlineButtonClass,
-  posPrimaryButtonClass,
-} from "../pos-theme/theme";
+  beginSaleConfirmation,
+  hasSaleIntentionBody,
+  isSaleIntentionPending,
+  recoverSaleConfirmation,
+  retrySaleConfirmation,
+} from "./sale-confirmation-intent";
+import { useSaleIntention } from "./use-sale-intention";
+import { usePosTerminalStore } from "./store";
+import { posInputClass, posOutlineButtonClass, posPrimaryButtonClass } from "../pos-theme/theme";
 
 function isSubmitKey(key: string): boolean {
   return key === "Enter" || key === "NumpadEnter";
@@ -361,13 +357,7 @@ function TicketRequestToggle({
   );
 }
 
-function MixedLegSummary({
-  amount,
-  label,
-}: {
-  amount: string;
-  label: string;
-}) {
+function MixedLegSummary({ amount, label }: { amount: string; label: string }) {
   return (
     <div className="flex items-center justify-between gap-3 rounded-lg border border-[var(--pos-shell-border)] bg-white px-3 py-2">
       <span className="text-sm font-medium text-slate-700">{label}</span>
@@ -378,11 +368,12 @@ function MixedLegSummary({
   );
 }
 
-
 export function PosCheckoutPanel({
   bootstrap,
+  cashSession,
 }: {
   bootstrap: PosBootstrapResponse;
+  cashSession: CashSessionView | null;
 }) {
   const showSuccess = useStatusMessageStore((state) => state.showSuccess);
   const showWarning = useStatusMessageStore((state) => state.showWarning);
@@ -395,6 +386,19 @@ export function PosCheckoutPanel({
   const [editingLineKey, setEditingLineKey] = useState<string | null>(null);
   const [editingQuantityText, setEditingQuantityText] = useState("");
   const [ticketInlineError, setTicketInlineError] = useState<string | null>(null);
+  const submitting = useRef(false);
+  const intention = useSaleIntention(bootstrap.workstation.id);
+  const previousIntention = useRef(intention.metadata);
+  const draftObservedKey = usePosTerminalStore((state) => state.saleDraftIntentionKey);
+  const observeSaleIntention = usePosTerminalStore((state) => state.observeSaleIntention);
+  const pendingIntention = isSaleIntentionPending(intention.metadata);
+  const context = {
+    userId: bootstrap.user.id,
+    branchId: bootstrap.branch.id,
+    workstationId: bootstrap.workstation.id,
+    workstationCode: bootstrap.workstation.code,
+    cashSessionId: cashSession?.id ?? "",
+  };
   const cartLines = usePosTerminalStore((state) => state.cartLines);
   const controlState = usePosTerminalStore((state) => state.controlState);
   const incrementLineQuantity = usePosTerminalStore((state) => state.incrementLineQuantity);
@@ -416,11 +420,40 @@ export function PosCheckoutPanel({
   const paymentControlRows = useMemo(() => getPosCheckoutPaymentControlRows(), []);
   const paymentControls = useMemo(() => paymentControlRows.flat(), [paymentControlRows]);
   const confirmSaleMutation = useMutation({
-    mutationFn: () =>
-      confirmPosSale(
-        buildConfirmSaleRequest(bootstrap.workstation.code, cartLines, saleFlow.buildPaymentDraft()),
-      ),
+    mutationFn: (action: "confirm" | "retry" | "recover") => {
+      const recoveryContext = {
+        ...context,
+        cashSessionId: intention.metadata?.cashSessionId ?? cashSession?.id ?? "",
+      };
+      if (action === "recover") return recoverSaleConfirmation(recoveryContext);
+      if (action === "retry") return retrySaleConfirmation(recoveryContext);
+      if (!cashSession) throw new Error("Abre una caja antes de registrar una venta nueva.");
+      return beginSaleConfirmation(
+        context,
+        buildConfirmSaleRequest(
+          bootstrap.workstation.code,
+          cartLines,
+          saleFlow.buildPaymentDraft(),
+          cashSession.id,
+        ),
+        draftObservedKey ?? null,
+      );
+    },
   });
+
+  useEffect(() => {
+    observeSaleIntention(intention.metadata);
+    const previous = previousIntention.current;
+    previousIntention.current = intention.metadata;
+    if (
+      intention.metadata?.status === "CONFIRMED" &&
+      (previous?.key !== intention.metadata.key || previous.status !== "CONFIRMED")
+    ) {
+      // Another tab must not turn its stale checkout into a new business intention.
+      clearCart();
+      saleFlow.resetAfterFinish();
+    }
+  }, [intention.metadata, clearCart, saleFlow, observeSaleIntention]);
 
   const isPaymentMode =
     saleFlow.state.mode === SALE_FLOW_PAYMENT_AMOUNT_CAPTURE ||
@@ -573,10 +606,7 @@ export function PosCheckoutPanel({
   }, [focusPrimaryPaymentInput, saleFlow.state.mode]);
 
   useEffect(() => {
-    if (
-      saleFlow.state.mode !== SALE_FLOW_AMOUNT_CONFIRMED &&
-      !isRecoverableConfirmed
-    ) {
+    if (saleFlow.state.mode !== SALE_FLOW_AMOUNT_CONFIRMED && !isRecoverableConfirmed) {
       return;
     }
 
@@ -735,80 +765,91 @@ export function PosCheckoutPanel({
     setPaymentInlineError(null);
   }, [focusPrimaryPaymentInput, saleFlow, totalAmountCents]);
 
-  const finalizeSale = useCallback(async () => {
-    if (
-      saleFlow.state.mode !== SALE_FLOW_AMOUNT_CONFIRMED &&
-      saleFlow.state.mode !== SALE_FLOW_RECOVERABLE_ERROR
-    ) {
-      return;
-    }
-
-    if (confirmSaleMutation.isPending) {
-      return;
-    }
-
-    confirmSaleMutation.reset();
-    setPaymentInlineError(null);
-    saleFlow.clearRecoverableError(SALE_FLOW_AMOUNT_CONFIRMED);
-    saleFlow.startProcessing();
-
-    let printWindow: Window | null = null;
-    if (saleFlow.state.ticketRequested) {
-      printWindow = openBrowserPrintWindow();
-    }
-
-    try {
-      const sale = await confirmSaleMutation.mutateAsync();
-      saleFlow.clearPrintFailure();
-      const shouldPrintTicket = saleFlow.state.ticketRequested;
-      const successMessage =
-        (parseMoneyToCents(String(sale.change_amount)) ?? 0) > 0
-          ? `Venta registrada. Cambio ${formatDisplayAmount(parseMoneyToCents(String(sale.change_amount)) ?? 0)}.`
-          : "Venta registrada.";
-
-      clearCart();
-      saleFlow.resetAfterFinish();
-
-      if (shouldPrintTicket) {
-        try {
-          await printTicketForSale(sale.id, printWindow);
-          showSuccess(successMessage);
-        } catch (error) {
-          printWindow?.close();
-          void error;
-          showWarning("Venta registrada, pero no se pudo imprimir.");
-        }
-      } else {
-        printWindow?.close();
-        showSuccess(successMessage);
+  const finalizeSale = useCallback(
+    async (action: "confirm" | "retry" | "recover" = "confirm") => {
+      if (
+        action === "confirm" &&
+        saleFlow.state.mode !== SALE_FLOW_AMOUNT_CONFIRMED &&
+        saleFlow.state.mode !== SALE_FLOW_RECOVERABLE_ERROR
+      ) {
+        return;
       }
-    } catch (error) {
-      printWindow?.close();
-      void error;
-      saleFlow.registerRecoverableError({
-        kind: "operation",
-        message: "No se pudo registrar la venta. Reintenta o vuelve al cobro.",
-        retryMode: SALE_FLOW_AMOUNT_CONFIRMED,
-      });
-    }
-  }, [
-    clearCart,
-    confirmSaleMutation,
-    printTicketForSale,
-    saleFlow,
-    showSuccess,
-    showWarning,
-  ]);
+
+      if (submitting.current || confirmSaleMutation.isPending || intention.error) {
+        return;
+      }
+      submitting.current = true;
+
+      confirmSaleMutation.reset();
+      setPaymentInlineError(null);
+      saleFlow.clearRecoverableError(SALE_FLOW_AMOUNT_CONFIRMED);
+      saleFlow.startProcessing();
+
+      let printWindow: Window | null = null;
+      if (action === "confirm" && saleFlow.state.ticketRequested) {
+        printWindow = openBrowserPrintWindow();
+      }
+
+      try {
+        const sale = await confirmSaleMutation.mutateAsync(action);
+        saleFlow.clearPrintFailure();
+        const shouldPrintTicket = action === "confirm" && saleFlow.state.ticketRequested;
+        const successMessage =
+          (parseMoneyToCents(String(sale.change_amount)) ?? 0) > 0
+            ? `Venta registrada. Cambio ${formatDisplayAmount(parseMoneyToCents(String(sale.change_amount)) ?? 0)}.`
+            : "Venta registrada.";
+
+        clearCart();
+        saleFlow.resetAfterFinish();
+
+        if (shouldPrintTicket) {
+          try {
+            await printTicketForSale(sale.id, printWindow);
+            showSuccess(successMessage);
+          } catch (error) {
+            printWindow?.close();
+            void error;
+            showWarning("Venta registrada, pero no se pudo imprimir.");
+          }
+        } else {
+          printWindow?.close();
+          showSuccess(successMessage);
+        }
+      } catch (error) {
+        printWindow?.close();
+        saleFlow.registerRecoverableError({
+          kind: "operation",
+          message: toOperationalErrorMessage(
+            error,
+            "No se pudo confirmar el resultado. Recupera la venta antes de cobrar otra vez.",
+          ),
+          retryMode: SALE_FLOW_AMOUNT_CONFIRMED,
+        });
+      } finally {
+        submitting.current = false;
+      }
+    },
+    [
+      clearCart,
+      confirmSaleMutation,
+      printTicketForSale,
+      saleFlow,
+      showSuccess,
+      showWarning,
+      intention.error,
+    ],
+  );
 
   useEffect(() => {
     function handleCheckoutKeyboard(event: KeyboardEvent) {
-      if (event.defaultPrevented) {
+      if (event.defaultPrevented || pendingIntention || intention.error) {
         return;
       }
 
       const activeTarget = event.target;
       const isKnownPaymentInput =
-        activeTarget === primaryAmountInputRef.current || activeTarget === mixedLegAmountInputRef.current;
+        activeTarget === primaryAmountInputRef.current ||
+        activeTarget === mixedLegAmountInputRef.current;
 
       if (isClearCartConfirming && event.key === "Escape") {
         event.preventDefault();
@@ -849,7 +890,11 @@ export function PosCheckoutPanel({
         }
       }
 
-      if (!isEditablePaymentState && saleFlow.state.mode !== SALE_FLOW_AMOUNT_CONFIRMED && !isRecoverableConfirmed) {
+      if (
+        !isEditablePaymentState &&
+        saleFlow.state.mode !== SALE_FLOW_AMOUNT_CONFIRMED &&
+        !isRecoverableConfirmed
+      ) {
         return;
       }
 
@@ -919,6 +964,8 @@ export function PosCheckoutPanel({
     isEditablePaymentState,
     isRecoverableConfirmed,
     isClearCartConfirming,
+    pendingIntention,
+    intention.error,
     removeLine,
     saleFlow,
     switchPaymentMethod,
@@ -928,11 +975,71 @@ export function PosCheckoutPanel({
     saleFlow.state.mode === SALE_FLOW_PROCESSING
       ? "Procesando..."
       : isEditablePaymentState
-          ? saleFlow.state.paymentMethodCode === MIXED_PAYMENT_METHOD_CODE &&
-              paymentComputation.remainingAmountCents > 0
-            ? "Confirmar tramo"
-            : "Cobrar"
-          : "Cobrar";
+        ? saleFlow.state.paymentMethodCode === MIXED_PAYMENT_METHOD_CODE &&
+          paymentComputation.remainingAmountCents > 0
+          ? "Confirmar tramo"
+          : "Cobrar"
+        : "Cobrar";
+
+  if (pendingIntention || intention.error) {
+    const metadata = intention.metadata;
+    const actorMatches =
+      metadata?.userId === context.userId && metadata.branchId === context.branchId;
+    return (
+      <section
+        className="grid content-start gap-4 rounded-xl border p-4"
+        aria-label="Recuperación de venta"
+      >
+        <h2 className="text-lg font-semibold">
+          {confirmSaleMutation.isPending ? "Procesando..." : "Resultado de venta pendiente"}
+        </h2>
+        <p>
+          No inicies otro cobro. La venta puede haberse registrado aunque no recibieras la
+          respuesta.
+        </p>
+        <p role="status">
+          {intention.error ??
+            (actorMatches
+              ? "Consulta el resultado con la referencia original."
+              : "Debe acceder el operador original para recuperar esta venta.")}
+        </p>
+        {metadata && <p className="break-all text-sm">Referencia: {metadata.key}</p>}
+        {metadata?.status === "CONFLICT" && (
+          <p>La referencia está en conflicto. Conserva esta referencia y solicita revisión.</p>
+        )}
+        {confirmSaleMutation.error && (
+          <p role="alert">
+            {toOperationalErrorMessage(
+              confirmSaleMutation.error,
+              "El resultado todavía no está disponible.",
+            )}
+          </p>
+        )}
+        <Button
+          disabled={!actorMatches || confirmSaleMutation.isPending || Boolean(intention.error)}
+          onClick={() => void finalizeSale("recover")}
+        >
+          Recuperar venta
+        </Button>
+        {metadata &&
+        actorMatches &&
+        metadata.status !== "CONFLICT" &&
+        hasSaleIntentionBody(metadata.key) ? (
+          <Button
+            disabled={confirmSaleMutation.isPending}
+            onClick={() => void finalizeSale("retry")}
+          >
+            Reintentar misma venta
+          </Button>
+        ) : (
+          <p>
+            Tras recargar, sólo se consulta el resultado. Si sigue pendiente, conserva la referencia
+            y solicita revisión; no vuelvas a capturar el cobro.
+          </p>
+        )}
+      </section>
+    );
+  }
 
   return (
     <div className="grid h-full min-h-0 grid-rows-[auto_minmax(0,1fr)_auto] gap-2 overflow-hidden rounded-xl border border-[var(--pos-shell-border)] bg-[var(--pos-shell-surface)] p-2.5 shadow-[var(--pos-subtle-shadow)]">
@@ -1197,7 +1304,9 @@ export function PosCheckoutPanel({
                           ? "primary"
                           : "default"
                       }
-                      onClick={() => saleFlow.setMixedCurrentLegMethodCode(CASH_PAYMENT_METHOD_CODE)}
+                      onClick={() =>
+                        saleFlow.setMixedCurrentLegMethodCode(CASH_PAYMENT_METHOD_CODE)
+                      }
                       type="button"
                     >
                       / Efectivo
@@ -1218,14 +1327,19 @@ export function PosCheckoutPanel({
                           ? "primary"
                           : "default"
                       }
-                      onClick={() => saleFlow.setMixedCurrentLegMethodCode(CARD_PAYMENT_METHOD_CODE)}
+                      onClick={() =>
+                        saleFlow.setMixedCurrentLegMethodCode(CARD_PAYMENT_METHOD_CODE)
+                      }
                       type="button"
                     >
                       * Tarjeta
                     </button>
                   </div>
 
-                  <PosPaymentInputCard icon={<SplitIcon className="h-5 w-5" />} label="Monto del tramo">
+                  <PosPaymentInputCard
+                    icon={<SplitIcon className="h-5 w-5" />}
+                    label="Monto del tramo"
+                  >
                     <input
                       aria-label="Monto del tramo"
                       className={cn(
@@ -1317,7 +1431,9 @@ export function PosCheckoutPanel({
                   )
                 }
                 label={
-                  saleFlow.state.paymentMethodCode === CARD_PAYMENT_METHOD_CODE ? "Tarjeta" : "Recibe"
+                  saleFlow.state.paymentMethodCode === CARD_PAYMENT_METHOD_CODE
+                    ? "Tarjeta"
+                    : "Recibe"
                 }
                 tone="input"
                 value={effectiveReceivedAmountText}
@@ -1334,17 +1450,13 @@ export function PosCheckoutPanel({
                 saleFlow.state.mode === SALE_FLOW_PROCESSING ? (
                   <ClockIcon className="h-5 w-5" />
                 ) : paymentComputation.previewRemainingAmountCents > 0 &&
-                    saleFlow.state.mode !== SALE_FLOW_AMOUNT_CONFIRMED ? (
-                    <MoneyIcon className="h-5 w-5" />
-                  ) : (
-                    <CheckCircleIcon className="h-5 w-5" />
-                  )
+                  saleFlow.state.mode !== SALE_FLOW_AMOUNT_CONFIRMED ? (
+                  <MoneyIcon className="h-5 w-5" />
+                ) : (
+                  <CheckCircleIcon className="h-5 w-5" />
+                )
               }
-              label={
-                effectiveResultLabel === "Falta"
-                  ? "Pendiente"
-                  : effectiveResultLabel
-              }
+              label={effectiveResultLabel === "Falta" ? "Pendiente" : effectiveResultLabel}
               tone={effectiveResultTone}
               value={effectiveResultValueText}
             />
@@ -1448,10 +1560,7 @@ export function PosCheckoutPanel({
                   return;
                 }
 
-                if (
-                  saleFlow.state.mode === SALE_FLOW_AMOUNT_CONFIRMED ||
-                  isRecoverableConfirmed
-                ) {
+                if (saleFlow.state.mode === SALE_FLOW_AMOUNT_CONFIRMED || isRecoverableConfirmed) {
                   void finalizeSale();
                   return;
                 }

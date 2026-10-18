@@ -21,6 +21,7 @@ from zeromerma_api.modules.cash.infrastructure.models import CashSession
 from zeromerma_api.modules.catalog.infrastructure.models import ProductClass
 from zeromerma_api.modules.identity.infrastructure.models import User
 from zeromerma_api.modules.sales.infrastructure.models import Sale
+from zeromerma_api.testing.idempotency import current_cash_session_id, new_idempotency_key
 from zeromerma_api.testing.sessions import login_headers
 
 DEV_AUDIT_TOKEN = "change-me-dev-audit-token"
@@ -55,13 +56,20 @@ def _get_product_class_id(code: str) -> str:
 
 
 def _confirm_sale(client: TestClient) -> str:
+    headers = {
+        **_authorization_header(client),
+        "X-Request-ID": "dev-audit-sale-confirmation",
+    }
+    cash_session_id = current_cash_session_id(
+        client, headers=headers, workstation_code=SEED_WORKSTATION_CODE
+    )
+    headers["Idempotency-Key"] = new_idempotency_key()
+
     response = client.post(
         "/v1/sales/confirm",
-        headers={
-            **_authorization_header(client),
-            "X-Request-ID": "dev-audit-sale-confirmation",
-        },
+        headers=headers,
         json={
+            "cash_session_id": cash_session_id,
             "workstation_code": SEED_WORKSTATION_CODE,
             "lines": [
                 {

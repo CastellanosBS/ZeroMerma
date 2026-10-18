@@ -16,6 +16,9 @@ import { InlineNotice, RightPanelBlock } from "./pos-module-primitives";
 import { TrainingModeBanner } from "./training-mode-banner";
 import { Button } from "./ui/button";
 import { PosCheckoutPanel } from "../features/pos-terminal/pos-checkout-panel";
+import { useSaleIntention } from "../features/pos-terminal/use-sale-intention";
+import { isSaleIntentionPending } from "../features/pos-terminal/sale-confirmation-intent";
+import { usePosTerminalStore } from "../features/pos-terminal/store";
 import { useCashCloseSummaryQuery } from "../features/cash-close/queries";
 import { useOrdersListQuery } from "../features/orders/queries";
 import {
@@ -24,10 +27,7 @@ import {
   type KeyboardShortcutDefinition,
   useModuleHotkeys,
 } from "../features/pos-shell/keyboard";
-import {
-  posModules,
-  resolveActivePosModule,
-} from "../features/pos-shell/modules";
+import { posModules, resolveActivePosModule } from "../features/pos-shell/modules";
 import { usePosShellStore } from "../features/pos-shell/shell-store";
 import { getPosBranchTheme, posOutlineButtonClass } from "../features/pos-theme/theme";
 import { usePendingInboundTransfersQuery } from "../features/transfers/queries";
@@ -174,7 +174,10 @@ function ShellInfoPill({
         <span className="truncate text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-500">
           {label}
         </span>
-        <span className="block truncate text-[13px] font-bold leading-5 text-slate-950" title={value}>
+        <span
+          className="block truncate text-[13px] font-bold leading-5 text-slate-950"
+          title={value}
+        >
           {value}
         </span>
       </span>
@@ -210,7 +213,9 @@ function CommandPalette({
     }
 
     return actions.filter((action) =>
-      `${action.label} ${action.description} ${action.tag ?? ""}`.toLowerCase().includes(normalizedQuery),
+      `${action.label} ${action.description} ${action.tag ?? ""}`
+        .toLowerCase()
+        .includes(normalizedQuery),
     );
   }, [actions, query]);
 
@@ -239,7 +244,13 @@ function CommandPalette({
             ref={inputRef}
             value={query}
           />
-          <Button className={cn("h-11 w-11 p-0", posOutlineButtonClass)} onClick={onClose} size="icon" type="button" variant="outline">
+          <Button
+            className={cn("h-11 w-11 p-0", posOutlineButtonClass)}
+            onClick={onClose}
+            size="icon"
+            type="button"
+            variant="outline"
+          >
             <XIcon className="h-4 w-4" />
           </Button>
         </div>
@@ -270,9 +281,7 @@ function CommandPalette({
                   <div className="flex items-center justify-between gap-3">
                     <p className="text-sm font-semibold text-slate-950">{action.label}</p>
                     {action.shortcut ? (
-                      <span className="pos-kbd-chip">
-                        {action.shortcut}
-                      </span>
+                      <span className="pos-kbd-chip">{action.shortcut}</span>
                     ) : null}
                   </div>
                   <p className="text-sm leading-5 text-slate-600">{action.description}</p>
@@ -327,7 +336,10 @@ function DefaultShellRightPanel({
         <div className="grid gap-2 sm:grid-cols-2">
           <ShellSummaryMetric label="Turno" value={hasCashSession ? "Activo" : "Pendiente"} />
           <ShellSummaryMetric label="Apertura" tone="financial" value={openingAmount} />
-          <ShellSummaryMetric label="Pedidos pendientes" value={getCountValue(pendingOrdersCount)} />
+          <ShellSummaryMetric
+            label="Pedidos pendientes"
+            value={getCountValue(pendingOrdersCount)}
+          />
           <ShellSummaryMetric
             label="Envios por recibir"
             value={getCountValue(pendingInboundTransfersCount)}
@@ -365,10 +377,19 @@ function DefaultShellRightPanel({
 }
 
 function getModulePathForResume(pathname: string): boolean {
-  return pathname !== "/" && pathname !== "/cash-session/open" && pathname !== "/login" && pathname !== "/health";
+  return (
+    pathname !== "/" &&
+    pathname !== "/cash-session/open" &&
+    pathname !== "/login" &&
+    pathname !== "/health"
+  );
 }
 
 function AppShellFrame({ bootstrap, cashSession, children, onSignOut, onLock }: AppShellProps) {
+  const saleIntention = useSaleIntention(bootstrap.workstation.id);
+  useEffect(() => {
+    usePosTerminalStore.getState().observeSaleIntention(saleIntention.metadata);
+  }, [saleIntention.metadata]);
   const navigate = useNavigate();
   const branchTheme = getPosBranchTheme(bootstrap);
   const pathname = useRouterState({
@@ -387,7 +408,8 @@ function AppShellFrame({ bootstrap, cashSession, children, onSignOut, onLock }: 
   const [isCompactShell, setIsCompactShell] = useState(false);
   const [isMediumShell, setIsMediumShell] = useState(false);
   const [isInlineRightPanel, setIsInlineRightPanel] = useState(true);
-  const [isSidebarKeyboardNavigationEnabled, setIsSidebarKeyboardNavigationEnabled] = useState(false);
+  const [isSidebarKeyboardNavigationEnabled, setIsSidebarKeyboardNavigationEnabled] =
+    useState(false);
   const [isSidebarDrawerOpen, setIsSidebarDrawerOpen] = useState(false);
   const [isRightPanelDrawerOpen, setIsRightPanelDrawerOpen] = useState(false);
   const [liveTimestamp, setLiveTimestamp] = useState(() => Date.now());
@@ -445,10 +467,7 @@ function AppShellFrame({ bootstrap, cashSession, children, onSignOut, onLock }: 
   const closeWarningsCount = cashCloseSummaryQuery.data?.warnings.length ?? null;
   const isInlineSidebar = !isCompactShell;
   const effectiveSidebarCollapsed = isInlineSidebar && (isSidebarCollapsed || isMediumShell);
-  const rightPanelContextValue = useMemo(
-    () => ({ setRightPanelContent }),
-    [setRightPanelContent],
-  );
+  const rightPanelContextValue = useMemo(() => ({ setRightPanelContent }), [setRightPanelContent]);
   const shellGridStyle = useMemo(
     () =>
       ({
@@ -502,7 +521,10 @@ function AppShellFrame({ bootstrap, cashSession, children, onSignOut, onLock }: 
         description: "Abrir o revisar el estado de la caja actual.",
         key: "cash-session",
         label: cashSession ? "Revisar caja abierta" : "Abrir caja",
-        onSelect: () => void navigate({ to: cashSession ? (lastOperationalPath ?? "/pos") : "/cash-session/open" }),
+        onSelect: () =>
+          void navigate({
+            to: cashSession ? (lastOperationalPath ?? "/pos") : "/cash-session/open",
+          }),
         tag: "Caja",
       },
       {
@@ -603,8 +625,16 @@ function AppShellFrame({ bootstrap, cashSession, children, onSignOut, onLock }: 
     />
   );
   const resolvedRightPanel =
-    rightPanelContent ??
-    (pathname === "/pos" && cashSession ? <PosCheckoutPanel bootstrap={bootstrap} /> : defaultRightPanel);
+    saleIntention.error || isSaleIntentionPending(saleIntention.metadata) ? (
+      <PosCheckoutPanel bootstrap={bootstrap} cashSession={cashSession} />
+    ) : (
+      (rightPanelContent ??
+      (pathname === "/pos" && cashSession ? (
+        <PosCheckoutPanel bootstrap={bootstrap} cashSession={cashSession} />
+      ) : (
+        defaultRightPanel
+      )))
+    );
   const sidebarNavigation = (
     <AppShellSidebar
       activeModuleKey={activeModule.key}
@@ -640,7 +670,13 @@ function AppShellFrame({ bootstrap, cashSession, children, onSignOut, onLock }: 
           <div className="flex min-w-0 flex-1 items-center gap-3">
             <Button
               aria-expanded={isCompactShell ? isSidebarDrawerOpen : !effectiveSidebarCollapsed}
-              aria-label={isCompactShell ? "Abrir navegacion" : effectiveSidebarCollapsed ? "Expandir barra lateral" : "Contraer barra lateral"}
+              aria-label={
+                isCompactShell
+                  ? "Abrir navegacion"
+                  : effectiveSidebarCollapsed
+                    ? "Expandir barra lateral"
+                    : "Contraer barra lateral"
+              }
               className={cn("h-10 px-3", posOutlineButtonClass)}
               onClick={() => {
                 if (isCompactShell) {
@@ -652,7 +688,13 @@ function AppShellFrame({ bootstrap, cashSession, children, onSignOut, onLock }: 
                 setIsSidebarKeyboardNavigationEnabled(false);
                 toggleSidebar();
               }}
-              title={isCompactShell ? "Abrir navegacion" : effectiveSidebarCollapsed ? "Expandir barra lateral" : "Contraer barra lateral"}
+              title={
+                isCompactShell
+                  ? "Abrir navegacion"
+                  : effectiveSidebarCollapsed
+                    ? "Expandir barra lateral"
+                    : "Contraer barra lateral"
+              }
               type="button"
               variant="outline"
             >
@@ -670,10 +712,16 @@ function AppShellFrame({ bootstrap, cashSession, children, onSignOut, onLock }: 
                 {branchTheme.brandMark}
               </div>
               <div className="grid min-w-0 gap-0.5">
-                <p className="truncate text-[17px] font-bold leading-5 text-slate-950" title={bootstrap.branch.name}>
+                <p
+                  className="truncate text-[17px] font-bold leading-5 text-slate-950"
+                  title={bootstrap.branch.name}
+                >
                   {bootstrap.branch.name}
                 </p>
-                <p className="truncate text-[12px] font-medium leading-4 text-slate-500" title={`${bootstrap.workstation.name} | ${bootstrap.workstation.code}`}>
+                <p
+                  className="truncate text-[12px] font-medium leading-4 text-slate-500"
+                  title={`${bootstrap.workstation.name} | ${bootstrap.workstation.code}`}
+                >
                   {bootstrap.workstation.name} | {bootstrap.workstation.code}
                 </p>
               </div>
@@ -736,7 +784,9 @@ function AppShellFrame({ bootstrap, cashSession, children, onSignOut, onLock }: 
               <SearchIcon className="h-4 w-4" />
             </Button>
 
-            <Button onClick={onLock} type="button" variant="outline">Bloquear</Button>
+            <Button onClick={onLock} type="button" variant="outline">
+              Bloquear
+            </Button>
             <Button
               aria-label="Cerrar sesion"
               className={cn(
@@ -774,10 +824,7 @@ function AppShellFrame({ bootstrap, cashSession, children, onSignOut, onLock }: 
             </main>
 
             {isInlineRightPanel ? (
-              <aside
-                className="min-h-0 min-w-0 overflow-hidden"
-                data-pos-shell-region="right"
-              >
+              <aside className="min-h-0 min-w-0 overflow-hidden" data-pos-shell-region="right">
                 {resolvedRightPanel}
               </aside>
             ) : null}

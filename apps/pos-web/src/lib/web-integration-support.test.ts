@@ -1,6 +1,10 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { observeRealApi, realEnvironment } from "../../../../scripts/dev/web-integration-support.mjs";
+import {
+  dropNextSaleConfirmationResponse,
+  observeRealApi,
+  realEnvironment,
+} from "../../../../scripts/dev/web-integration-support.mjs";
 
 afterEach(() => vi.unstubAllEnvs());
 
@@ -15,6 +19,42 @@ function isolatedEnvironment() {
 }
 
 describe("real browser integration safety", () => {
+  it.each([201, 409])(
+    "loses a response only after the real sale fetch and requires 201, received %i",
+    async (status) => {
+      isolatedEnvironment();
+      const route = {
+        request: () => ({ method: () => "POST" }),
+        fetch: vi.fn(async () => ({ status: () => status, json: async () => ({ id: "sale" }) })),
+        abort: vi.fn(async () => {}),
+      };
+      let handler: ((value: typeof route) => Promise<void>) | undefined;
+      const register = vi.fn(async (_url: string, callback: typeof handler) => {
+        handler = callback;
+      });
+      const page = { on: vi.fn(), route: register };
+      const network = observeRealApi({ on: vi.fn() }, page, "https://127.0.0.1:41201");
+      const fault = await dropNextSaleConfirmationResponse(
+        page,
+        "https://127.0.0.1:41201",
+        network,
+      );
+      const outcome =
+        status === 201
+          ? expect(fault.committed).resolves.toEqual({ id: "sale" })
+          : expect(fault.committed).rejects.toThrow("received 409");
+      await handler!(route);
+      await outcome;
+      expect(register.mock.calls[0]?.[0]).toBe("https://127.0.0.1:41201/v1/sales/confirm");
+      expect(route.fetch).toHaveBeenCalledWith({ maxRedirects: 0 });
+      expect(route.abort).toHaveBeenCalledWith("failed");
+      expect(network).toEqual(
+        status === 201 ? [{ method: "POST", path: "/v1/sales/confirm", status: 201 }] : [],
+      );
+      expect(() => page.route("", undefined)).toThrow("interception is forbidden");
+    },
+  );
+
   it("rejects direct invocation and remote or credential-bearing API origins", () => {
     vi.stubEnv("ZM_WEB_INTEGRATION_ISOLATED", "");
     expect(() => realEnvironment("pos")).toThrow("run-web-integration.ps1");

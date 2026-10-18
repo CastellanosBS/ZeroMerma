@@ -7,11 +7,13 @@ from datetime import UTC, datetime
 from decimal import ROUND_HALF_UP, Decimal
 
 from sqlalchemy import select
-from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, aliased
 
 from zeromerma_api.modules.audit.application.service import AuditRecorder
-from zeromerma_api.modules.branches.application.access import WorkstationAccessService
+from zeromerma_api.modules.branches.application.access import (
+    WorkstationAccessService,
+    WorkstationContext,
+)
 from zeromerma_api.modules.branches.infrastructure.models import Branch, Workstation
 from zeromerma_api.modules.cash.domain.constants import CASH_SESSION_STATUS_OPEN
 from zeromerma_api.modules.cash.infrastructure.models import CashSession
@@ -23,6 +25,7 @@ from zeromerma_api.modules.pricing.application.services import PricedSaleLine, S
 from zeromerma_api.modules.sales.application.schemas import (
     CashMovementView,
     ConfirmSaleRequest,
+    SaleConfirmationView,
     SaleDetailView,
     SaleLineView,
     SalePaymentView,
@@ -62,6 +65,18 @@ class PreparedSalePayment:
     change_amount: Decimal
 
 
+@dataclass(frozen=True)
+class PreparedSale:
+    context: WorkstationContext
+    cash_session_id: uuid.UUID
+    priced_lines: Sequence[PricedSaleLine]
+    payments: Sequence[PreparedSalePayment]
+    currency_code: str
+    subtotal_amount: Decimal
+    total_amount: Decimal
+    change_amount: Decimal
+
+
 class SaleQueryService:
     def get_sale_by_id(
         self,
@@ -70,33 +85,37 @@ class SaleQueryService:
         sale_id: uuid.UUID,
         user_id: uuid.UUID,
     ) -> SaleDetailView:
-        sale_record = session.execute(
-            select(
-                Sale.id,
-                Sale.status,
-                Sale.branch_id,
-                Branch.code.label("branch_code"),
-                Branch.name.label("branch_name"),
-                Sale.workstation_id,
-                Workstation.code.label("workstation_code"),
-                Workstation.name.label("workstation_name"),
-                Sale.cash_session_id,
-                Sale.operator_id,
-                User.email.label("operator_email"),
-                User.full_name.label("operator_full_name"),
-                Sale.currency_code,
-                Sale.subtotal_amount,
-                Sale.total_amount,
-                Sale.paid_amount,
-                Sale.change_amount,
-                Sale.confirmed_at,
+        sale_record = (
+            session.execute(
+                select(
+                    Sale.id,
+                    Sale.status,
+                    Sale.branch_id,
+                    Branch.code.label("branch_code"),
+                    Branch.name.label("branch_name"),
+                    Sale.workstation_id,
+                    Workstation.code.label("workstation_code"),
+                    Workstation.name.label("workstation_name"),
+                    Sale.cash_session_id,
+                    Sale.operator_id,
+                    User.email.label("operator_email"),
+                    User.full_name.label("operator_full_name"),
+                    Sale.currency_code,
+                    Sale.subtotal_amount,
+                    Sale.total_amount,
+                    Sale.paid_amount,
+                    Sale.change_amount,
+                    Sale.confirmed_at,
+                )
+                .select_from(Sale)
+                .join(Branch, Branch.id == Sale.branch_id)
+                .join(Workstation, Workstation.id == Sale.workstation_id)
+                .join(User, User.id == Sale.operator_id)
+                .where(Sale.id == sale_id)
             )
-            .select_from(Sale)
-            .join(Branch, Branch.id == Sale.branch_id)
-            .join(Workstation, Workstation.id == Sale.workstation_id)
-            .join(User, User.id == Sale.operator_id)
-            .where(Sale.id == sale_id)
-        ).mappings().one_or_none()
+            .mappings()
+            .one_or_none()
+        )
         if sale_record is None:
             raise SaleNotFoundError("Sale was not found.")
 
@@ -111,63 +130,77 @@ class SaleQueryService:
             raise SaleNotFoundError("Sale was not found.")
 
         direct_product_class = aliased(ProductClass)
-        line_records = session.execute(
-            select(
-                SaleLine.id,
-                SaleLine.sequence,
-                SaleLine.capture_mode,
-                SaleLine.product_class_id,
-                ProductClass.code.label("class_capture_code"),
-                ProductClass.name.label("class_capture_name"),
-                SaleLine.product_id,
-                Product.code.label("product_code"),
-                Product.name.label("product_name"),
-                direct_product_class.id.label("direct_product_class_id"),
-                direct_product_class.code.label("direct_product_class_code"),
-                direct_product_class.name.label("direct_product_class_name"),
-                SaleLine.catalog_code_snapshot,
-                SaleLine.catalog_name_snapshot,
-                SaleLine.quantity,
-                SaleLine.unit_price,
-                SaleLine.line_total_amount,
-                SaleLine.physical_attribution_status,
+        line_records = (
+            session.execute(
+                select(
+                    SaleLine.id,
+                    SaleLine.sequence,
+                    SaleLine.capture_mode,
+                    SaleLine.product_class_id,
+                    ProductClass.code.label("class_capture_code"),
+                    ProductClass.name.label("class_capture_name"),
+                    SaleLine.product_id,
+                    Product.code.label("product_code"),
+                    Product.name.label("product_name"),
+                    direct_product_class.id.label("direct_product_class_id"),
+                    direct_product_class.code.label("direct_product_class_code"),
+                    direct_product_class.name.label("direct_product_class_name"),
+                    SaleLine.catalog_code_snapshot,
+                    SaleLine.catalog_name_snapshot,
+                    SaleLine.quantity,
+                    SaleLine.unit_price,
+                    SaleLine.line_total_amount,
+                    SaleLine.physical_attribution_status,
+                )
+                .select_from(SaleLine)
+                .outerjoin(ProductClass, ProductClass.id == SaleLine.product_class_id)
+                .outerjoin(Product, Product.id == SaleLine.product_id)
+                .outerjoin(
+                    direct_product_class, direct_product_class.id == Product.product_class_id
+                )
+                .where(SaleLine.sale_id == sale_id)
+                .order_by(SaleLine.sequence.asc())
             )
-            .select_from(SaleLine)
-            .outerjoin(ProductClass, ProductClass.id == SaleLine.product_class_id)
-            .outerjoin(Product, Product.id == SaleLine.product_id)
-            .outerjoin(direct_product_class, direct_product_class.id == Product.product_class_id)
-            .where(SaleLine.sale_id == sale_id)
-            .order_by(SaleLine.sequence.asc())
-        ).mappings().all()
+            .mappings()
+            .all()
+        )
 
-        payment_records = session.execute(
-            select(
-                SalePayment.id,
-                SalePayment.sequence,
-                SalePayment.payment_method_code,
-                SalePayment.tendered_amount,
-                SalePayment.applied_amount,
-                SalePayment.change_amount,
-                SalePayment.currency_code,
-                SalePayment.received_at,
+        payment_records = (
+            session.execute(
+                select(
+                    SalePayment.id,
+                    SalePayment.sequence,
+                    SalePayment.payment_method_code,
+                    SalePayment.tendered_amount,
+                    SalePayment.applied_amount,
+                    SalePayment.change_amount,
+                    SalePayment.currency_code,
+                    SalePayment.received_at,
+                )
+                .where(SalePayment.sale_id == sale_id)
+                .order_by(SalePayment.sequence.asc())
             )
-            .where(SalePayment.sale_id == sale_id)
-            .order_by(SalePayment.sequence.asc())
-        ).mappings().all()
+            .mappings()
+            .all()
+        )
 
-        cash_movement_records = session.execute(
-            select(
-                CashMovement.id,
-                CashMovement.movement_type,
-                CashMovement.direction,
-                CashMovement.payment_method_code,
-                CashMovement.amount,
-                CashMovement.currency_code,
-                CashMovement.occurred_at,
+        cash_movement_records = (
+            session.execute(
+                select(
+                    CashMovement.id,
+                    CashMovement.movement_type,
+                    CashMovement.direction,
+                    CashMovement.payment_method_code,
+                    CashMovement.amount,
+                    CashMovement.currency_code,
+                    CashMovement.occurred_at,
+                )
+                .where(CashMovement.sale_id == sale_id)
+                .order_by(CashMovement.occurred_at.asc())
             )
-            .where(CashMovement.sale_id == sale_id)
-            .order_by(CashMovement.occurred_at.asc())
-        ).mappings().all()
+            .mappings()
+            .all()
+        )
 
         return SaleDetailView(
             id=sale_record["id"],
@@ -257,14 +290,13 @@ class SaleCommandService:
         self._outbox_writer = outbox_writer or OutboxWriter()
         self._query_service = query_service or SaleQueryService()
 
-    def confirm_sale(
+    def prepare_sale(
         self,
         session: Session,
         *,
         current_user: AuthenticatedUser,
         command: ConfirmSaleRequest,
-        request_id: str | None,
-    ) -> SaleDetailView:
+    ) -> PreparedSale:
         context = self._workstation_access.resolve_context(
             session,
             user_id=current_user.id,
@@ -272,6 +304,7 @@ class SaleCommandService:
         )
         cash_session = session.execute(
             select(CashSession).where(
+                CashSession.id == command.cash_session_id,
                 CashSession.workstation_id == context.workstation_id,
                 CashSession.user_id == current_user.id,
                 CashSession.status == CASH_SESSION_STATUS_OPEN,
@@ -296,13 +329,42 @@ class SaleCommandService:
         change_amount = _quantize_money(
             sum((payment.change_amount for payment in prepared_payments), Decimal("0.00"))
         )
+        return PreparedSale(
+            context=context,
+            cash_session_id=cash_session.id,
+            priced_lines=priced_lines,
+            payments=prepared_payments,
+            currency_code=sale_currency,
+            subtotal_amount=subtotal_amount,
+            total_amount=total_amount,
+            change_amount=change_amount,
+        )
+
+    def confirm_sale(
+        self,
+        session: Session,
+        *,
+        current_user: AuthenticatedUser,
+        prepared: PreparedSale,
+        request_id: str | None,
+        idempotency_key: uuid.UUID,
+        operation_id: uuid.UUID,
+    ) -> SaleConfirmationView:
+        """Write one prepared sale inside the caller-owned idempotent transaction."""
+        context = prepared.context
+        priced_lines = prepared.priced_lines
+        prepared_payments = prepared.payments
+        sale_currency = prepared.currency_code
+        subtotal_amount = prepared.subtotal_amount
+        total_amount = prepared.total_amount
+        change_amount = prepared.change_amount
         confirmed_at = datetime.now(tz=UTC)
         resolved_request_id = request_id or str(uuid.uuid4())
 
         sale = Sale(
             branch_id=context.branch_id,
             workstation_id=context.workstation_id,
-            cash_session_id=cash_session.id,
+            cash_session_id=prepared.cash_session_id,
             operator_id=current_user.id,
             status=SALE_STATUS_CONFIRMED,
             currency_code=sale_currency,
@@ -313,143 +375,147 @@ class SaleCommandService:
             confirmed_at=confirmed_at,
         )
 
-        try:
-            session.add(sale)
-            session.flush()
+        session.add(sale)
+        session.flush()
 
-            for sequence, priced_line in enumerate(priced_lines, start=1):
-                session.add(
-                    SaleLine(
-                        sale_id=sale.id,
-                        sequence=sequence,
-                        capture_mode=priced_line.capture_mode,
-                        product_class_id=priced_line.product_class_id,
-                        product_id=priced_line.product_id,
-                        catalog_code_snapshot=priced_line.catalog_code_snapshot,
-                        catalog_name_snapshot=priced_line.catalog_name_snapshot,
-                        quantity=priced_line.quantity,
-                        unit_price=priced_line.unit_price,
-                        line_total_amount=priced_line.line_total_amount,
-                        physical_attribution_status=priced_line.physical_attribution_status,
-                    )
+        for sequence, priced_line in enumerate(priced_lines, start=1):
+            session.add(
+                SaleLine(
+                    sale_id=sale.id,
+                    sequence=sequence,
+                    capture_mode=priced_line.capture_mode,
+                    product_class_id=priced_line.product_class_id,
+                    product_id=priced_line.product_id,
+                    catalog_code_snapshot=priced_line.catalog_code_snapshot,
+                    catalog_name_snapshot=priced_line.catalog_name_snapshot,
+                    quantity=priced_line.quantity,
+                    unit_price=priced_line.unit_price,
+                    line_total_amount=priced_line.line_total_amount,
+                    physical_attribution_status=priced_line.physical_attribution_status,
                 )
+            )
 
-            for sequence, payment in enumerate(prepared_payments, start=1):
+        for sequence, payment in enumerate(prepared_payments, start=1):
+            session.add(
+                SalePayment(
+                    sale_id=sale.id,
+                    sequence=sequence,
+                    payment_method_code=payment.payment_method_code,
+                    tendered_amount=payment.tendered_amount,
+                    applied_amount=payment.applied_amount,
+                    change_amount=payment.change_amount,
+                    currency_code=sale_currency,
+                    received_at=confirmed_at,
+                )
+            )
+
+            if payment.payment_method_code == SALE_PAYMENT_METHOD_CASH:
                 session.add(
-                    SalePayment(
+                    CashMovement(
                         sale_id=sale.id,
-                        sequence=sequence,
-                        payment_method_code=payment.payment_method_code,
-                        tendered_amount=payment.tendered_amount,
-                        applied_amount=payment.applied_amount,
-                        change_amount=payment.change_amount,
+                        cash_session_id=prepared.cash_session_id,
+                        branch_id=context.branch_id,
+                        workstation_id=context.workstation_id,
+                        operator_id=current_user.id,
+                        movement_type=CASH_MOVEMENT_TYPE_SALE_COLLECTION,
+                        direction=CASH_MOVEMENT_DIRECTION_IN,
+                        payment_method_code=SALE_PAYMENT_METHOD_CASH,
+                        amount=payment.applied_amount,
                         currency_code=sale_currency,
-                        received_at=confirmed_at,
+                        occurred_at=confirmed_at,
                     )
                 )
 
-                if payment.payment_method_code == SALE_PAYMENT_METHOD_CASH:
-                    session.add(
-                        CashMovement(
-                            sale_id=sale.id,
-                            cash_session_id=cash_session.id,
-                            branch_id=context.branch_id,
-                            workstation_id=context.workstation_id,
-                            operator_id=current_user.id,
-                            movement_type=CASH_MOVEMENT_TYPE_SALE_COLLECTION,
-                            direction=CASH_MOVEMENT_DIRECTION_IN,
-                            payment_method_code=SALE_PAYMENT_METHOD_CASH,
-                            amount=payment.applied_amount,
-                            currency_code=sale_currency,
-                            occurred_at=confirmed_at,
-                        )
-                    )
-
-            self._audit_recorder.record(
-                session,
-                actor_id=current_user.id,
-                action="sale.confirmed",
-                resource_type="sale",
-                resource_id=str(sale.id),
-                branch_id=context.branch_id,
-                request_id=resolved_request_id,
-                metadata={
-                    "branch_code": context.branch_code,
-                    "workstation_code": context.workstation_code,
-                    "cash_session_id": str(cash_session.id),
-                    "currency_code": sale_currency,
-                    "total_amount": str(total_amount),
-                    "paid_amount": str(total_amount),
-                    "change_amount": str(change_amount),
-                    "line_count": len(priced_lines),
-                    "payment_method_codes": [
-                        payment.payment_method_code for payment in prepared_payments
-                    ],
-                },
-            )
-            self._outbox_writer.append(
-                session,
-                aggregate_type="sale",
-                aggregate_id=str(sale.id),
-                event_name=OUTBOX_EVENT_SALE_CONFIRMED_V1,
-                payload={
-                    "sale_id": str(sale.id),
-                    "branch_id": str(context.branch_id),
-                    "branch_code": context.branch_code,
-                    "workstation_id": str(context.workstation_id),
-                    "workstation_code": context.workstation_code,
-                    "cash_session_id": str(cash_session.id),
-                    "operator_id": str(current_user.id),
-                    "operator_email": current_user.email,
-                    "currency_code": sale_currency,
-                    "subtotal_amount": str(subtotal_amount),
-                    "total_amount": str(total_amount),
-                    "paid_amount": str(total_amount),
-                    "change_amount": str(change_amount),
-                    "confirmed_at": confirmed_at.isoformat(),
-                    "lines": [
-                        {
-                            "capture_mode": line.capture_mode,
-                            "product_class_id": (
-                                str(line.product_class_id)
-                                if line.product_class_id is not None
-                                else None
-                            ),
-                            "product_id": (
-                                str(line.product_id) if line.product_id is not None else None
-                            ),
-                            "catalog_code_snapshot": line.catalog_code_snapshot,
-                            "catalog_name_snapshot": line.catalog_name_snapshot,
-                            "quantity": str(line.quantity),
-                            "unit_price": str(line.unit_price),
-                            "line_total_amount": str(line.line_total_amount),
-                            "physical_attribution_status": line.physical_attribution_status,
-                        }
-                        for line in priced_lines
-                    ],
-                    "payments": [
-                        {
-                            "payment_method_code": payment.payment_method_code,
-                            "tendered_amount": str(payment.tendered_amount),
-                            "applied_amount": str(payment.applied_amount),
-                            "change_amount": str(payment.change_amount),
-                        }
-                        for payment in prepared_payments
-                    ],
-                },
-                headers={"request_id": resolved_request_id},
-            )
-            session.commit()
-        except IntegrityError as error:
-            session.rollback()
-            raise SaleValidationError(
-                "Sale confirmation invariants were violated by a concurrent request."
-            ) from error
-
-        return self._query_service.get_sale_by_id(
+        self._audit_recorder.record(
+            session,
+            actor_id=current_user.id,
+            action="sale.confirmed",
+            resource_type="sale",
+            resource_id=str(sale.id),
+            branch_id=context.branch_id,
+            request_id=resolved_request_id,
+            metadata={
+                "branch_code": context.branch_code,
+                "idempotency_key": str(idempotency_key),
+                "operation_id": str(operation_id),
+                "operation_code": "sale.confirm",
+                "workstation_code": context.workstation_code,
+                "cash_session_id": str(prepared.cash_session_id),
+                "currency_code": sale_currency,
+                "total_amount": str(total_amount),
+                "paid_amount": str(total_amount),
+                "change_amount": str(change_amount),
+                "line_count": len(priced_lines),
+                "payment_method_codes": [
+                    payment.payment_method_code for payment in prepared_payments
+                ],
+            },
+        )
+        self._outbox_writer.append(
+            session,
+            aggregate_type="sale",
+            aggregate_id=str(sale.id),
+            event_name=OUTBOX_EVENT_SALE_CONFIRMED_V1,
+            payload={
+                "sale_id": str(sale.id),
+                "branch_id": str(context.branch_id),
+                "branch_code": context.branch_code,
+                "workstation_id": str(context.workstation_id),
+                "workstation_code": context.workstation_code,
+                "cash_session_id": str(prepared.cash_session_id),
+                "operator_id": str(current_user.id),
+                "operator_email": current_user.email,
+                "currency_code": sale_currency,
+                "subtotal_amount": str(subtotal_amount),
+                "total_amount": str(total_amount),
+                "paid_amount": str(total_amount),
+                "change_amount": str(change_amount),
+                "confirmed_at": confirmed_at.isoformat(),
+                "lines": [
+                    {
+                        "capture_mode": line.capture_mode,
+                        "product_class_id": (
+                            str(line.product_class_id)
+                            if line.product_class_id is not None
+                            else None
+                        ),
+                        "product_id": (
+                            str(line.product_id) if line.product_id is not None else None
+                        ),
+                        "catalog_code_snapshot": line.catalog_code_snapshot,
+                        "catalog_name_snapshot": line.catalog_name_snapshot,
+                        "quantity": str(line.quantity),
+                        "unit_price": str(line.unit_price),
+                        "line_total_amount": str(line.line_total_amount),
+                        "physical_attribution_status": line.physical_attribution_status,
+                    }
+                    for line in priced_lines
+                ],
+                "payments": [
+                    {
+                        "payment_method_code": payment.payment_method_code,
+                        "tendered_amount": str(payment.tendered_amount),
+                        "applied_amount": str(payment.applied_amount),
+                        "change_amount": str(payment.change_amount),
+                    }
+                    for payment in prepared_payments
+                ],
+            },
+            headers={
+                "request_id": resolved_request_id,
+                "idempotency_key": str(idempotency_key),
+                "operation_id": str(operation_id),
+                "operation_code": "sale.confirm",
+            },
+        )
+        session.flush()
+        detail = self._query_service.get_sale_by_id(
             session,
             sale_id=sale.id,
             user_id=current_user.id,
+        )
+        return SaleConfirmationView.model_validate(
+            detail.model_dump(exclude={"operator_email", "operator_full_name"})
         )
 
     def _price_lines(
@@ -512,9 +578,7 @@ def _prepare_sale_payments(
 
         tendered_amount = _quantize_money(payment.tendered_amount)
         if tendered_amount <= Decimal("0.00"):
-            raise SaleValidationError(
-                f"El monto de {payment_method_code} debe ser mayor que cero."
-            )
+            raise SaleValidationError(f"El monto de {payment_method_code} debe ser mayor que cero.")
 
         normalized_payments.append((payment_method_code, tendered_amount))
         seen_payment_methods.add(payment_method_code)
@@ -540,11 +604,7 @@ def _prepare_sale_payments(
         remaining_amount = _quantize_money(remaining_amount - tendered_amount)
 
     cash_payment = next(
-        (
-            payment
-            for payment in normalized_payments
-            if payment[0] == SALE_PAYMENT_METHOD_CASH
-        ),
+        (payment for payment in normalized_payments if payment[0] == SALE_PAYMENT_METHOD_CASH),
         None,
     )
     if cash_payment is not None:

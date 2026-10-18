@@ -1,4 +1,5 @@
 import { create } from "zustand";
+import type { SaleIntentionMetadata } from "./sale-confirmation-intent";
 
 import type {
   PosCatalogClassView,
@@ -30,6 +31,8 @@ import {
 } from "./model";
 
 interface PosTerminalStore {
+  saleDraftIntentionKey: string | null | undefined;
+  observeSaleIntention: (metadata: SaleIntentionMetadata | null) => void;
   addPendingLine: () => void;
   cartLines: PosCartLine[];
   clearCart: () => void;
@@ -60,22 +63,36 @@ const initialState = createInitialPosTerminalState();
 
 export const usePosTerminalStore = create<PosTerminalStore>()((set) => ({
   ...initialState,
+  saleDraftIntentionKey: undefined,
+  observeSaleIntention: (metadata) =>
+    set((state) => {
+      const key = metadata?.key ?? null;
+      if (
+        state.saleDraftIntentionKey === undefined ||
+        state.cartLines.length === 0 ||
+        metadata?.status === "REJECTED"
+      ) {
+        return state.saleDraftIntentionKey === key ? state : { saleDraftIntentionKey: key };
+      }
+      if (metadata?.status === "CONFIRMED" && state.saleDraftIntentionKey !== key) {
+        return { ...clearCart(state), saleDraftIntentionKey: key };
+      }
+      return state;
+    }),
   addPendingLine: () => set((state) => addPendingSelectionToCart(state)),
   clearCart: () => set((state) => clearCart(state)),
   clearQuantity: () => set((state) => clearPendingQuantity(state)),
-  decrementLineQuantity: (lineKey) =>
-    set((state) => decrementCartLineQuantity(state, lineKey)),
+  decrementLineQuantity: (lineKey) => set((state) => decrementCartLineQuantity(state, lineKey)),
   decrementPendingQuantity: () => set((state) => decrementPendingQuantity(state)),
   dismissLastCompletedSale: () => set((state) => dismissLastCompletedSale(state)),
   enterPaymentCapture: () => set((state) => enterPaymentCapture(state)),
   goBack: () => set((state) => goBackFromControlState(state)),
-  incrementLineQuantity: (lineKey) =>
-    set((state) => incrementCartLineQuantity(state, lineKey)),
+  incrementLineQuantity: (lineKey) => set((state) => incrementCartLineQuantity(state, lineKey)),
   incrementPendingQuantity: () => set((state) => incrementPendingQuantity(state)),
   markSaleCompleted: (sale) => set((state) => markSaleCompleted(state, sale)),
   removeLine: (lineKey) => set((state) => removeCartLine(state, lineKey)),
   repeatLastLine: () => set((state) => repeatLastCartLine(state)),
-  reset: () => set(createInitialPosTerminalState()),
+  reset: () => set({ ...createInitialPosTerminalState(), saleDraftIntentionKey: undefined }),
   selectClass: (productClass) => set((state) => beginSelectionFromClass(state, productClass)),
   selectProduct: (product) => set((state) => selectProductForPending(state, product)),
   setLineQuantity: (lineKey, quantityText) =>

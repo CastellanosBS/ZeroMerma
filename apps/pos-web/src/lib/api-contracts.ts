@@ -2,8 +2,7 @@ import type { components } from "@zeromerma/api-client";
 
 export type AuthenticatedUser = components["schemas"]["AuthenticatedUser"];
 export type AuditActorSummaryView = components["schemas"]["AuditActorSummaryView"];
-export type AuditNotificationSummaryView =
-  components["schemas"]["AuditNotificationSummaryView"];
+export type AuditNotificationSummaryView = components["schemas"]["AuditNotificationSummaryView"];
 export type AuditSummaryView = components["schemas"]["AuditSummaryView"];
 export type CashCloseAttributionLineView = components["schemas"]["CashCloseAttributionLineView"];
 export type CashCloseBaselineSnapshotSummaryView =
@@ -49,34 +48,24 @@ export type ConfirmSaleLineRequest = components["schemas"]["ConfirmSaleLineReque
 export type ConfirmSalePaymentRequest = components["schemas"]["ConfirmSalePaymentRequest"];
 export type ConfirmSaleRequest = components["schemas"]["ConfirmSaleRequest"];
 export type CounterTransferCommitRequest = components["schemas"]["CounterTransferCommitRequest"];
-export type AppliedCorrectionSummaryView =
-  components["schemas"]["AppliedCorrectionSummaryView"];
-export type CorrectionBootstrapResponse =
-  components["schemas"]["CorrectionBootstrapResponse"];
-export type CorrectionCommitLineRequest =
-  components["schemas"]["CorrectionCommitLineRequest"];
+export type AppliedCorrectionSummaryView = components["schemas"]["AppliedCorrectionSummaryView"];
+export type CorrectionBootstrapResponse = components["schemas"]["CorrectionBootstrapResponse"];
+export type CorrectionCommitLineRequest = components["schemas"]["CorrectionCommitLineRequest"];
 export type CorrectionCommitRequest = components["schemas"]["CorrectionCommitRequest"];
-export type CorrectionDocumentLineView =
-  components["schemas"]["CorrectionDocumentLineView"];
+export type CorrectionDocumentLineView = components["schemas"]["CorrectionDocumentLineView"];
 export type CorrectionDocumentView = components["schemas"]["CorrectionDocumentView"];
 export type CorrectionHistoryFilterOptionView =
   components["schemas"]["CorrectionHistoryFilterOptionView"];
-export type CorrectionsHistoryResponse =
-  components["schemas"]["CorrectionsHistoryResponse"];
-export type CorrectionHistoryListItemView =
-  components["schemas"]["CorrectionHistoryListItemView"];
-export type CorrectionHistoryScopeView =
-  components["schemas"]["CorrectionHistoryScopeView"];
-export type CorrectionProductOptionView =
-  components["schemas"]["CorrectionProductOptionView"];
+export type CorrectionsHistoryResponse = components["schemas"]["CorrectionsHistoryResponse"];
+export type CorrectionHistoryListItemView = components["schemas"]["CorrectionHistoryListItemView"];
+export type CorrectionHistoryScopeView = components["schemas"]["CorrectionHistoryScopeView"];
+export type CorrectionProductOptionView = components["schemas"]["CorrectionProductOptionView"];
 export type CorrectionReasonView = components["schemas"]["CorrectionReasonView"];
-export type CorrectionSearchDocumentView =
-  components["schemas"]["CorrectionSearchDocumentView"];
+export type CorrectionSearchDocumentView = components["schemas"]["CorrectionSearchDocumentView"];
 export type CorrectionSearchResponse = components["schemas"]["CorrectionSearchResponse"];
 export type CorrectionTargetDetailResponse =
   components["schemas"]["CorrectionTargetDetailResponse"];
-export type CorrectionsProductsResponse =
-  components["schemas"]["CorrectionsProductsResponse"];
+export type CorrectionsProductsResponse = components["schemas"]["CorrectionsProductsResponse"];
 export type CreateCustomerOrderAdvancePaymentRequest =
   components["schemas"]["CreateCustomerOrderAdvancePaymentRequest"];
 export type CreateCustomerOrderItemRequest =
@@ -102,8 +91,7 @@ export type OperationDocumentLineView = components["schemas"]["OperationDocument
 export type OperationDocumentView = components["schemas"]["OperationDocumentView"];
 export type OperationHistoryFilterOptionView =
   components["schemas"]["OperationHistoryFilterOptionView"];
-export type OperationHistoryListItemView =
-  components["schemas"]["OperationHistoryListItemView"];
+export type OperationHistoryListItemView = components["schemas"]["OperationHistoryListItemView"];
 export type OperationHistoryResponse = components["schemas"]["OperationHistoryResponse"];
 export type OperationHistoryScopeView = components["schemas"]["OperationHistoryScopeView"];
 export type OpenCashSessionRequest = components["schemas"]["OpenCashSessionRequest"];
@@ -115,10 +103,8 @@ export type OperationalDiscountFilterOptionView =
   components["schemas"]["OperationalDiscountFilterOptionView"];
 export type OperationalDiscountListItemView =
   components["schemas"]["OperationalDiscountListItemView"];
-export type OperationalDiscountMethodView =
-  components["schemas"]["OperationalDiscountMethodView"];
-export type OperationalDiscountScopeView =
-  components["schemas"]["OperationalDiscountScopeView"];
+export type OperationalDiscountMethodView = components["schemas"]["OperationalDiscountMethodView"];
+export type OperationalDiscountScopeView = components["schemas"]["OperationalDiscountScopeView"];
 export type OperationalPaymentCategoryView =
   components["schemas"]["OperationalPaymentCategoryView"];
 export type OperationalPaymentDetailResponse =
@@ -127,10 +113,8 @@ export type OperationalPaymentFilterOptionView =
   components["schemas"]["OperationalPaymentFilterOptionView"];
 export type OperationalPaymentListItemView =
   components["schemas"]["OperationalPaymentListItemView"];
-export type OperationalPaymentMethodView =
-  components["schemas"]["OperationalPaymentMethodView"];
-export type OperationalPaymentScopeView =
-  components["schemas"]["OperationalPaymentScopeView"];
+export type OperationalPaymentMethodView = components["schemas"]["OperationalPaymentMethodView"];
+export type OperationalPaymentScopeView = components["schemas"]["OperationalPaymentScopeView"];
 export type OrderActionRequest = components["schemas"]["OrderActionRequest"];
 export type OrderStatusCounterView = components["schemas"]["OrderStatusCounterView"];
 export type OperationsBootstrapResponse = components["schemas"]["OperationsBootstrapResponse"];
@@ -156,11 +140,11 @@ export type PosClassProductsResponse = components["schemas"]["PosClassProductsRe
 export type PaymentsBootstrapResponse = components["schemas"]["PaymentsBootstrapResponse"];
 export type PaymentsListResponse = components["schemas"]["PaymentsListResponse"];
 export type SaleDetailView = components["schemas"]["SaleDetailView"];
+export type SaleConfirmationView = components["schemas"]["SaleConfirmationView"];
 export type ReturnCommitLineRequest = components["schemas"]["ReturnCommitLineRequest"];
 export type ReturnCommitRequest = components["schemas"]["ReturnCommitRequest"];
 export type ReturnFilterOptionView = components["schemas"]["ReturnFilterOptionView"];
-export type ReturnHistoryListItemView =
-  components["schemas"]["ReturnHistoryListItemView"];
+export type ReturnHistoryListItemView = components["schemas"]["ReturnHistoryListItemView"];
 export type ReturnOriginalSaleDetailResponse =
   components["schemas"]["ReturnOriginalSaleDetailResponse"];
 export type ReturnProductOptionView = components["schemas"]["ReturnProductOptionView"];
@@ -168,12 +152,10 @@ export type ReturnSaleSearchItemView = components["schemas"]["ReturnSaleSearchIt
 export type ReturnScopeView = components["schemas"]["ReturnScopeView"];
 export type ReturnableSaleLineView = components["schemas"]["ReturnableSaleLineView"];
 export type ReturnsBootstrapResponse = components["schemas"]["ReturnsBootstrapResponse"];
-export type ReturnsClassProductsResponse =
-  components["schemas"]["ReturnsClassProductsResponse"];
+export type ReturnsClassProductsResponse = components["schemas"]["ReturnsClassProductsResponse"];
 export type ReturnsHistoryResponse = components["schemas"]["ReturnsHistoryResponse"];
 export type ReturnsSearchSalesResponse = components["schemas"]["ReturnsSearchSalesResponse"];
-export type SaleReturnCommittedLineView =
-  components["schemas"]["SaleReturnCommittedLineView"];
+export type SaleReturnCommittedLineView = components["schemas"]["SaleReturnCommittedLineView"];
 export type SaleReturnDetailResponse = components["schemas"]["SaleReturnDetailResponse"];
 export type CreateOperationalPaymentRequest =
   components["schemas"]["CreateOperationalPaymentRequest"];

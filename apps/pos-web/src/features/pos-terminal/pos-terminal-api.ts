@@ -2,7 +2,7 @@ import type {
   ConfirmSaleRequest,
   PosCatalogResponse,
   PosClassProductsResponse,
-  SaleDetailView,
+  SaleConfirmationView,
 } from "../../lib/api-contracts";
 import { requestJson } from "../../lib/http";
 
@@ -46,10 +46,22 @@ export function getPosClassProducts(
 
 export function confirmPosSale(
   payload: ConfirmSaleRequest,
-): Promise<SaleDetailView> {
-  return requestJson<SaleDetailView>({
+  idempotencyKey: string,
+): Promise<SaleConfirmationView> {
+  return requestJson<SaleConfirmationView>({
     body: payload,
+    headers: { "Idempotency-Key": idempotencyKey },
     method: "POST",
     path: "/v1/sales/confirm",
+  });
+}
+
+export function getSaleConfirmation(
+  key: string,
+  workstationCode: string,
+  cashSessionId: string,
+): Promise<SaleConfirmationView> {
+  return requestJson<SaleConfirmationView>({
+    path: `/v1/sales/confirmations/${encodeURIComponent(key)}${buildQueryString({ workstation_code: workstationCode, cash_session_id: cashSessionId })}`,
   });
 }

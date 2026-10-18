@@ -1,9 +1,10 @@
 # Transactional idempotency foundation
 
-ZM-FIN-028 implements the shared infrastructure governed by DEC-07. Adoption by
-sale confirmation starts in ZM-FIN-029; the existence of this foundation does not
-make existing business endpoints idempotent. POS and Backoffice remain separate,
-and PostgreSQL remains the authority for both the command and its result.
+ZM-FIN-028 implements the shared infrastructure governed by DEC-07. ZM-FIN-029
+adopts it for POS sale confirmation. Other business commands retain their own
+pending adoption tasks; the existence of the foundation does not make them
+idempotent. POS and Backoffice remain separate, and PostgreSQL remains the
+authority for both the command and its result.
 
 ## Identity and request contract
 
@@ -71,7 +72,63 @@ The HTTP adapter exposes `require_idempotency_key` and `idempotency_response`.
 It rejects duplicate headers, returns `Idempotency-Replayed` and `Cache-Control:
 no-store`, and reconstructs rejection envelopes with the current attempt's
 request ID. OpenAPI publishes reusable components and the
-`x-zeromerma-idempotency` convention without declaring adoption on existing routes.
+`x-zeromerma-idempotency` convention. Adoption is declared on each protected
+operation, rather than inferred from the presence of those shared components.
+
+## POS sale confirmation and recovery
+
+`POST /v1/sales/confirm` requires a UUIDv7 `Idempotency-Key` and an explicit
+`cash_session_id` alongside the workstation, ordered lines and payment legs.
+The cash session is part of the intention; reopening a workstation does not
+silently redirect an old retry to the new session. A new intention requires the
+authenticated operator's current open session and existing POS authorization.
+
+The successful response is HTTP 201 with `SaleConfirmationView`. The snapshot
+contains the sale, line, payment and cash-movement identities and amounts, but
+excludes `operator_email` and `operator_full_name`. Authenticated sale-detail
+queries retain those display fields. The ticket is a projection of the same sale
+ID; confirmation does not create a separate ticket identity. An authorized replay
+returns the original snapshot, without repricing or reconstructing it from mutable
+operator, branch or catalog labels.
+
+The executor owns the transaction. The sale action can flush but cannot commit
+independently. Sale, sale lines, sale payments, cash movements, `sale.confirmed`
+audit, the sale outbox event and the terminal idempotency result succeed or roll
+back together. Audit and outbox preserve the durable operation identity separately
+from the HTTP attempt's request ID. This adoption does not implement the pending
+canonical inventory ledger or the separate sale-versus-close locking task.
+
+The existing authentication boundary locks the user and authentication session.
+Concurrent HTTP requests for that same user can therefore serialize before sale
+admission. Coordinated HTTP retry tests prove one result and one effect; separate
+PostgreSQL command tests exercise same-key contention and independent-key progress
+without that HTTP authentication lock. This is not a claim of parallel HTTP
+throughput, and ZM-FIN-029 does not redesign authentication locking.
+
+After a lost response or page reload, the POS can use
+`GET /v1/sales/confirmations/{idempotency_key}` with `workstation_code` and
+`cash_session_id`. The read revalidates the actor, POS capability and context; a
+key is not a bearer credential. A completed result is returned from its safe
+snapshot even if the historical session has since closed. A missing or unresolved
+result is HTTP 409, not evidence that a new sale may safely be submitted with a new
+key. Recovery reads do not execute sale effects or reserve new identities.
+
+For one intention the POS keeps the same key through pending requests, temporary
+contention and network failures. A terminal result ends that intention; a new sale
+receives a new key. While its outcome is unknown, the operator must not bypass
+recovery by creating a replacement intention. A deterministic business rejection
+is distinct from transport failure and is displayed as a terminal rejection.
+
+The browser persists only the key, payload digest, outcome status and opaque
+user/branch/workstation/cash-session identifiers, plus the workstation code.
+The economic request body remains in memory. No sale payload, response snapshot,
+operator display details, cookie, CSRF token or credentials enter browser storage.
+Reload and another tab recover through the backend; they do not reconstruct or
+auto-submit a sale from browser storage. This is online recovery under DEC-15,
+not offline sale capture or a promise of offline availability.
+
+Executed adoption evidence and limitations are recorded in
+[the sale validation record](../implementation/sale-idempotency-validation.md).
 
 ## Transaction and replay boundary
 

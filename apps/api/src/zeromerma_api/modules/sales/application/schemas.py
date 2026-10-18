@@ -4,7 +4,7 @@ from datetime import datetime
 from decimal import Decimal
 from uuid import UUID
 
-from pydantic import BaseModel, Field, model_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from zeromerma_api.modules.catalog.domain.constants import (
     CATALOG_CAPTURE_MODE_CLASS_CAPTURE,
@@ -44,14 +44,22 @@ class ConfirmSalePaymentRequest(BaseModel):
     payment_method_code: str = Field(min_length=1, max_length=40)
     tendered_amount: Decimal = Field(ge=Decimal("0.00"), max_digits=12, decimal_places=2)
 
+    @field_validator("payment_method_code")
+    @classmethod
+    def normalize_payment_method(cls, value: str) -> str:
+        return value.strip().upper()
+
 
 class ConfirmSaleRequest(BaseModel):
     workstation_code: str = Field(min_length=1, max_length=64)
+    cash_session_id: UUID
     lines: list[ConfirmSaleLineRequest] = Field(min_length=1)
     payments: list[ConfirmSalePaymentRequest] = Field(min_length=1)
 
 
 class SaleLineView(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     id: UUID
     sequence: int
     capture_mode: str
@@ -70,6 +78,8 @@ class SaleLineView(BaseModel):
 
 
 class SalePaymentView(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     id: UUID
     sequence: int
     payment_method_code: str
@@ -81,6 +91,8 @@ class SalePaymentView(BaseModel):
 
 
 class CashMovementView(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     id: UUID
     movement_type: str
     direction: str
@@ -90,7 +102,9 @@ class CashMovementView(BaseModel):
     occurred_at: datetime
 
 
-class SaleDetailView(BaseModel):
+class SaleConfirmationView(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     id: UUID
     status: str
     branch_id: UUID
@@ -101,8 +115,6 @@ class SaleDetailView(BaseModel):
     workstation_name: str
     cash_session_id: UUID
     operator_id: UUID
-    operator_email: str
-    operator_full_name: str
     currency_code: str
     subtotal_amount: Decimal
     total_amount: Decimal
@@ -113,3 +125,7 @@ class SaleDetailView(BaseModel):
     payments: list[SalePaymentView]
     cash_movements: list[CashMovementView]
 
+
+class SaleDetailView(SaleConfirmationView):
+    operator_email: str
+    operator_full_name: str

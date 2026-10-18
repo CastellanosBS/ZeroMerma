@@ -123,6 +123,35 @@ general de fronteras transaccionales y contexto causal continúa en 039–040.
 No se declaran Feature Complete ni Production Ready. La siguiente dependencia
 funcional al aceptar este bloque es **ZM-FIN-029**, confirmación de ventas.
 
+### 0.5 Registro de ejecución — ZM-FIN-029
+
+El bloque del 2026-10-18 adopta la fundación aceptada de ZM-FIN-028 para
+confirmación de venta, en `codex/zm-fin-029-sale-idempotency`. El POST exige
+`Idempotency-Key` UUIDv7 y `cash_session_id` explícito. El resultado confirmado
+se conserva junto con venta, líneas, pagos, movimientos de caja, auditoría y
+outbox en la misma transacción; el replay no vuelve a ejecutar el negocio.
+
+La consulta de recuperación por clave revalida actor, contexto y permisos
+actuales, y devuelve el snapshot de confirmación sin email ni nombre completo
+del operador. El POS conserva únicamente metadata mínima de recuperación;
+el cuerpo económico permanece en memoria y no se introduce una cola offline.
+La venta y su ticket conservan la misma identidad de dominio.
+
+El [registro de validación de ventas](implementation/sale-idempotency-validation.md)
+separa pruebas PostgreSQL, contratos, regresión de consumidores y navegador real.
+La validación local aprobó 26 casos de adopción, 47 regresiones de consumidores,
+512 pruebas unitarias web, 11 recorridos simulados y 9 recorridos reales sobre
+HTTPS, API y PostgreSQL aislado. La evidencia cierra el defecto de replay de
+ventas GAP-0749 sin completar el resto del flujo POS. La aceptación integrada
+exige las ocho etapas Foundation y **Foundation required** verdes para el SHA
+entregado; el enlace inmutable y el SHA acompañan la entrega. La base local
+normal permanece fuera de los ensayos y no se añade una migración DB.
+
+Este bloque no completa el inventario de 049–050, la carrera venta/cierre de
+036, el flujo completo de 056 ni la adopción de los demás comandos 030–035.
+No declara Feature Complete ni Production Ready. La siguiente adopción del
+plan es **ZM-FIN-030**, pedidos y sus pagos.
+
 ## 1. Resumen ejecutivo
 
 ZeroMerma posee una base adecuada para evolucionar sin reescritura: monolito modular, FastAPI/SQLAlchemy/PostgreSQL, POS y Backoffice separados, OpenAPI generado, precisión decimal, auditoría y outbox transaccionales. La auditoría activa demostró que una parte importante de ventas, pagos, pedidos, documentos y administración es real. También demostró defectos sistémicos: el POS no alimenta el inventario canónico; el pago de pedido no entra en caja/corte; el worker no procesa eventos; la trazabilidad de identidad/origen es incorrecta; y varias superficies administrativas son simuladas o incompletas.

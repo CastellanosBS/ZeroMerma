@@ -23,6 +23,7 @@ from zeromerma_api.modules.audit.infrastructure.models import AuditLog
 from zeromerma_api.modules.catalog.infrastructure.models import Product, ProductClass
 from zeromerma_api.modules.outbox.infrastructure.models import OutboxEvent
 from zeromerma_api.modules.sales.infrastructure.models import CashMovement, Sale, SalePayment
+from zeromerma_api.testing.idempotency import current_cash_session_id, new_idempotency_key
 from zeromerma_api.testing.sessions import login_headers
 
 
@@ -120,10 +121,16 @@ def test_class_capture_sale_confirmation_writes_sale_payment_cash_movement_audit
         "X-Request-ID": "phase-2a-class-capture",
     }
 
+    cash_session_id = current_cash_session_id(
+        client, headers=headers, workstation_code=SEED_WORKSTATION_CODE
+    )
+    headers["Idempotency-Key"] = new_idempotency_key()
+
     response = client.post(
         "/v1/sales/confirm",
         headers=headers,
         json={
+            "cash_session_id": cash_session_id,
             "workstation_code": SEED_WORKSTATION_CODE,
             "lines": [
                 {
@@ -185,10 +192,17 @@ def test_product_direct_sale_confirmation_uses_product_reference_and_direct_assi
 ) -> None:
     _open_cash_session(client)
 
+    headers = _authorization_header(client)
+    cash_session_id = current_cash_session_id(
+        client, headers=headers, workstation_code=SEED_WORKSTATION_CODE
+    )
+    headers["Idempotency-Key"] = new_idempotency_key()
+
     response = client.post(
         "/v1/sales/confirm",
-        headers=_authorization_header(client),
+        headers=headers,
         json={
+            "cash_session_id": cash_session_id,
             "workstation_code": SEED_WORKSTATION_CODE,
             "lines": [
                 {
@@ -218,10 +232,17 @@ def test_mixed_sale_confirmation_supports_class_capture_and_product_direct_lines
 ) -> None:
     _open_cash_session(client)
 
+    headers = _authorization_header(client)
+    cash_session_id = current_cash_session_id(
+        client, headers=headers, workstation_code=SEED_WORKSTATION_CODE
+    )
+    headers["Idempotency-Key"] = new_idempotency_key()
+
     response = client.post(
         "/v1/sales/confirm",
-        headers=_authorization_header(client),
+        headers=headers,
         json={
+            "cash_session_id": cash_session_id,
             "workstation_code": SEED_WORKSTATION_CODE,
             "lines": [
                 {
@@ -259,10 +280,17 @@ def test_sale_confirmation_supports_card_payment_without_cash_movement(
 ) -> None:
     _open_cash_session(client)
 
+    headers = _authorization_header(client)
+    cash_session_id = current_cash_session_id(
+        client, headers=headers, workstation_code=SEED_WORKSTATION_CODE
+    )
+    headers["Idempotency-Key"] = new_idempotency_key()
+
     response = client.post(
         "/v1/sales/confirm",
-        headers=_authorization_header(client),
+        headers=headers,
         json={
+            "cash_session_id": cash_session_id,
             "workstation_code": SEED_WORKSTATION_CODE,
             "lines": [
                 {
@@ -306,10 +334,17 @@ def test_sale_confirmation_supports_mixed_cash_and_card_payment(
 ) -> None:
     _open_cash_session(client)
 
+    headers = _authorization_header(client)
+    cash_session_id = current_cash_session_id(
+        client, headers=headers, workstation_code=SEED_WORKSTATION_CODE
+    )
+    headers["Idempotency-Key"] = new_idempotency_key()
+
     response = client.post(
         "/v1/sales/confirm",
-        headers=_authorization_header(client),
+        headers=headers,
         json={
+            "cash_session_id": cash_session_id,
             "workstation_code": SEED_WORKSTATION_CODE,
             "lines": [
                 {
@@ -369,10 +404,17 @@ def test_sale_confirmation_rejects_removed_other_payment_method(
 ) -> None:
     _open_cash_session(client)
 
+    headers = _authorization_header(client)
+    cash_session_id = current_cash_session_id(
+        client, headers=headers, workstation_code=SEED_WORKSTATION_CODE
+    )
+    headers["Idempotency-Key"] = new_idempotency_key()
+
     response = client.post(
         "/v1/sales/confirm",
-        headers=_authorization_header(client),
+        headers=headers,
         json={
+            "cash_session_id": cash_session_id,
             "workstation_code": SEED_WORKSTATION_CODE,
             "lines": [
                 {
@@ -397,10 +439,17 @@ def test_sale_confirmation_rejects_removed_other_payment_method(
 def test_sale_confirmation_rejects_insufficient_cash(client: TestClient) -> None:
     _open_cash_session(client)
 
+    headers = _authorization_header(client)
+    cash_session_id = current_cash_session_id(
+        client, headers=headers, workstation_code=SEED_WORKSTATION_CODE
+    )
+    headers["Idempotency-Key"] = new_idempotency_key()
+
     response = client.post(
         "/v1/sales/confirm",
-        headers=_authorization_header(client),
+        headers=headers,
         json={
+            "cash_session_id": cash_session_id,
             "workstation_code": SEED_WORKSTATION_CODE,
             "lines": [
                 {
@@ -423,10 +472,15 @@ def test_sale_confirmation_rejects_insufficient_cash(client: TestClient) -> None
 
 
 def test_sale_confirmation_requires_open_cash_session(client: TestClient) -> None:
+    headers = _authorization_header(client)
+    cash_session_id = "10000000-0000-4000-8000-000000000001"
+    headers["Idempotency-Key"] = new_idempotency_key()
+
     response = client.post(
         "/v1/sales/confirm",
-        headers=_authorization_header(client),
+        headers=headers,
         json={
+            "cash_session_id": cash_session_id,
             "workstation_code": SEED_WORKSTATION_CODE,
             "lines": [
                 {

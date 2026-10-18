@@ -76,6 +76,56 @@ class IdempotencyExecutor:
             raise ValueError("The key contention timeout must be between 1 and 60000 milliseconds.")
         self.lock_timeout_ms = lock_timeout_ms
 
+    def recover(
+        self,
+        session: Session,
+        *,
+        key: UUID | str,
+        operation_code: str,
+        resolve_context: Callable[[Session, CommandContext | None], CommandContext],
+        authorize: Callable[[Session, CommandContext], None],
+        response_policy: ResponsePolicy,
+    ) -> IdempotencyResult:
+        """Recover an existing result without admitting a command or receiving its body."""
+        assert_clean_entry(session)
+        parsed_key = parse_idempotency_key(key)
+        validate_policy(response_policy)
+        owner = CommandExecution(session.get_transaction() or session.begin())
+        try:
+            with command_execution(session, owner):
+                record = _lookup(session, parsed_key)
+                if record is None:
+                    # A concurrent, uncommitted admission is indistinguishable from absence.
+                    raise IdempotencyResultUnknown()
+                owner.record = record
+                if record.operation_code != operation_code:
+                    raise IdempotencyKeyReused()
+                saved = _saved_context(record)
+                context = resolve_context(session, saved)
+                self._assert_transaction(session, owner)
+                if canonical_fingerprint(
+                    operation_code=operation_code,
+                    context=context,
+                    payload={},
+                    fingerprint_version=record.fingerprint_version,
+                ) != canonical_fingerprint(
+                    operation_code=operation_code,
+                    context=saved,
+                    payload={},
+                    fingerprint_version=record.fingerprint_version,
+                ):
+                    raise IdempotencyKeyReused()
+                authorize(session, saved)
+                self._assert_transaction(session, owner)
+                result = self._replay(session, record, response_policy)
+                self._assert_transaction(session, owner)
+                owner.finalizing = True
+                session.commit()
+                return result
+        except BaseException:
+            session.rollback()
+            raise
+
     def execute(
         self,
         session: Session,

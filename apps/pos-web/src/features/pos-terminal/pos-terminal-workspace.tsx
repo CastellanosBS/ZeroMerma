@@ -41,6 +41,9 @@ import { usePosCatalogQuery, usePosClassProductsQuery } from "./queries";
 import { usePosTerminalStore } from "./store";
 import { usePosHotkeys } from "./use-pos-hotkeys";
 import { posInputClass, posOutlineButtonClass, posPrimaryButtonClass } from "../pos-theme/theme";
+import { usePosAuthStore } from "../auth/auth-store";
+import { useSaleIntention } from "./use-sale-intention";
+import { isSaleIntentionPending } from "./sale-confirmation-intent";
 
 function useDebouncedValue(value: string, delayMs: number): string {
   const [debouncedValue, setDebouncedValue] = useState(value);
@@ -54,6 +57,20 @@ function useDebouncedValue(value: string, delayMs: number): string {
 }
 
 export function PosTerminalWorkspace() {
+  const workstationId = usePosAuthStore((state) => state.session?.workstation_id ?? "");
+  const intention = useSaleIntention(workstationId);
+  if (intention.error || isSaleIntentionPending(intention.metadata)) {
+    return (
+      <OperationalStatus
+        title="Venta pendiente de resolver"
+        description="Recupera el resultado en el panel de cobro antes de iniciar otra venta."
+      />
+    );
+  }
+  return <AvailablePosTerminalWorkspace />;
+}
+
+function AvailablePosTerminalWorkspace() {
   const quantityInputRef = useRef<HTMLInputElement>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
   const scannerInputRef = useRef<HTMLInputElement>(null);
@@ -244,12 +261,11 @@ export function PosTerminalWorkspace() {
     sortedProducts.length,
   ]);
 
-  const selectionKeyboardHint =
-    isSelectionDisabled
-      ? "Seleccion bloqueada mientras capturas el cobro."
-      : controlState === CONTROL_STATE_PRODUCT_SELECTION
-        ? "Enter: seleccionar · .+Enter: cobrar · Esc: volver"
-        : "Enter: seleccionar · .+Enter: cobrar · Esc: cancelar";
+  const selectionKeyboardHint = isSelectionDisabled
+    ? "Seleccion bloqueada mientras capturas el cobro."
+    : controlState === CONTROL_STATE_PRODUCT_SELECTION
+      ? "Enter: seleccionar · .+Enter: cobrar · Esc: volver"
+      : "Enter: seleccionar · .+Enter: cobrar · Esc: cancelar";
 
   useEffect(() => {
     if (pendingScannerCode === null || isSelectionLoading || selectionLoadError) {
@@ -525,225 +541,225 @@ export function PosTerminalWorkspace() {
           </div>
         ) : null}
 
-          {!isSelectionLoading &&
-          !selectionLoadError &&
-          (controlState === CONTROL_STATE_CLASS_SELECTION ||
-            controlState === CONTROL_STATE_PAYMENT_CAPTURE) ? (
-            sortedClasses.length > 0 ? (
-              <div className="grid gap-2.5">
-                <div className="flex flex-wrap items-center justify-between gap-2">
-                  <p className="text-xs font-medium text-slate-500">{selectionKeyboardHint}</p>
-                </div>
-                <div className="grid gap-2.5 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
-                  {sortedClasses.map((productClass, index) => {
-                    const itemProps = getClassItemProps(index);
-
-                    return (
-                      <CatalogSelectionCard
-                        buttonRef={itemProps.ref}
-                        code={productClass.code}
-                        isActive={classActiveIndex === index}
-                        isDisabled={isSelectionDisabled}
-                        key={productClass.id}
-                        name={productClass.name}
-                        onCardFocus={itemProps.onFocus}
-                        onCardKeyDown={itemProps.onKeyDown}
-                        onSelect={() => selectClass(productClass)}
-                        priceText={
-                          productClass.capture_mode_default === CLASS_CAPTURE_MODE
-                            ? productClass.class_capture_unit_price
-                            : null
-                        }
-                        shortcutLabel={getSelectionShortcutLabel(index)}
-                        tabIndex={itemProps.tabIndex}
-                        variant="pos"
-                      />
-                    );
-                  })}
-                </div>
+        {!isSelectionLoading &&
+        !selectionLoadError &&
+        (controlState === CONTROL_STATE_CLASS_SELECTION ||
+          controlState === CONTROL_STATE_PAYMENT_CAPTURE) ? (
+          sortedClasses.length > 0 ? (
+            <div className="grid gap-2.5">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <p className="text-xs font-medium text-slate-500">{selectionKeyboardHint}</p>
               </div>
-            ) : (
-              <div className="rounded-xl border border-dashed border-[var(--pos-shell-border)] bg-[var(--pos-shell-muted)] px-4 py-8 text-center text-sm text-slate-600">
-                No hay clases para la busqueda actual.
-              </div>
-            )
-          ) : null}
+              <div className="grid gap-2.5 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
+                {sortedClasses.map((productClass, index) => {
+                  const itemProps = getClassItemProps(index);
 
-          {!isSelectionLoading &&
-          !selectionLoadError &&
-          controlState === CONTROL_STATE_PRODUCT_SELECTION ? (
-            sortedProducts.length > 0 ? (
-              <div className="grid gap-2.5">
-                <div className="flex flex-wrap items-center justify-between gap-2">
-                  <div className="flex flex-wrap items-center gap-2 text-xs text-slate-500">
-                    <span className="font-medium text-slate-700">
-                      {pendingSelection?.productClass.name}
-                    </span>
-                  </div>
-                  <p className="text-xs font-medium text-slate-500">{selectionKeyboardHint}</p>
-                </div>
-                <div className="grid gap-2.5 sm:grid-cols-2 xl:grid-cols-3">
-                  {sortedProducts.map((product, index) => {
-                    const itemProps = getProductItemProps(index);
-
-                    return (
-                      <CatalogSelectionCard
-                        buttonRef={itemProps.ref}
-                        code={product.code}
-                        isActive={productActiveIndex === index}
-                        key={product.id}
-                        name={product.name}
-                        onCardFocus={itemProps.onFocus}
-                        onCardKeyDown={itemProps.onKeyDown}
-                        onSelect={() => selectProduct(product)}
-                        priceText={product.unit_price}
-                        shortcutLabel={getSelectionShortcutLabel(index)}
-                        tabIndex={itemProps.tabIndex}
-                        variant="pos"
-                      />
-                    );
-                  })}
-                </div>
-              </div>
-            ) : (
-              <div className="rounded-xl border border-dashed border-[var(--pos-shell-border)] bg-[var(--pos-shell-muted)] px-4 py-8 text-center text-sm text-slate-600">
-                No hay productos para esta busqueda.
-              </div>
-            )
-          ) : null}
-
-          {controlState === CONTROL_STATE_QUANTITY_CAPTURE && pendingSelection ? (
-            <div className="w-full max-w-5xl justify-self-center rounded-xl border border-[var(--pos-shell-border)] bg-white p-3 shadow-sm">
-              <div className="grid gap-3 lg:grid-cols-[12rem_minmax(0,1fr)]">
-                <CatalogVisual
-                  className="min-h-[11.5rem]"
-                  code={
-                    pendingSelection.captureMode === PRODUCT_DIRECT_MODE
-                      ? pendingSelection.product?.code ?? pendingSelection.productClass.code
-                      : pendingSelection.productClass.code
-                  }
-                  name={
-                    pendingSelection.captureMode === PRODUCT_DIRECT_MODE
-                      ? pendingSelection.product?.name ?? pendingSelection.productClass.name
-                      : pendingSelection.productClass.name
-                  }
-                />
-
-                <div className="grid gap-2.5">
-                  <div className="flex flex-wrap items-start justify-between gap-3">
-                    <div>
-                      <div className="flex flex-wrap items-center gap-2">
-                        <p className="text-base font-semibold text-slate-950">
-                          {pendingSelection.captureMode === PRODUCT_DIRECT_MODE
-                            ? pendingSelection.product?.name
-                            : pendingSelection.productClass.name}
-                        </p>
-                        {isQuantityPending ? (
-                          <span className="pos-chip" data-tone="warning">
-                            Pendiente
-                          </span>
-                        ) : null}
-                      </div>
-                      <p className="mt-1 text-sm text-slate-600">
-                        {pendingSelection.captureMode === PRODUCT_DIRECT_MODE
-                          ? pendingSelection.productClass.name
-                          : "Confirma la cantidad y agrega la linea al ticket."}
-                      </p>
-                    </div>
-                  </div>
-
-                  <div className="grid gap-2">
-                    <input
-                      aria-label="Cantidad"
-                      className={cn(
-                        "h-16 rounded-xl px-4 text-[2.25rem] font-semibold tracking-tight shadow-sm",
-                        posInputClass,
-                      )}
-                      inputMode="decimal"
-                      onChange={(event) => setQuantityText(event.target.value)}
-                      onKeyDown={(event) => {
-                        if (event.key === "Enter" || event.key === "NumpadEnter") {
-                          event.preventDefault();
-                          handleAddLine();
-                        }
-
-                        if (event.key === "Escape") {
-                          event.preventDefault();
-                          goBack();
-                        }
-
-                        if (event.key === "Delete") {
-                          event.preventDefault();
-                          clearQuantity();
-                          setSelectionError(null);
-                        }
-                      }}
-                      placeholder="0"
-                      ref={quantityInputRef}
-                      value={pendingSelection.quantityText}
+                  return (
+                    <CatalogSelectionCard
+                      buttonRef={itemProps.ref}
+                      code={productClass.code}
+                      isActive={classActiveIndex === index}
+                      isDisabled={isSelectionDisabled}
+                      key={productClass.id}
+                      name={productClass.name}
+                      onCardFocus={itemProps.onFocus}
+                      onCardKeyDown={itemProps.onKeyDown}
+                      onSelect={() => selectClass(productClass)}
+                      priceText={
+                        productClass.capture_mode_default === CLASS_CAPTURE_MODE
+                          ? productClass.class_capture_unit_price
+                          : null
+                      }
+                      shortcutLabel={getSelectionShortcutLabel(index)}
+                      tabIndex={itemProps.tabIndex}
+                      variant="pos"
                     />
-                    <div className="flex flex-wrap items-center gap-2">
-                      <div className="flex items-center gap-2">
-                        <Button
-                          className={cn("h-10 px-3", posOutlineButtonClass)}
-                          onClick={decrementPendingQuantity}
-                          type="button"
-                        >
-                          -1
-                        </Button>
-                        <Button
-                          className={cn("h-10 px-3", posOutlineButtonClass)}
-                          onClick={incrementPendingQuantity}
-                          type="button"
-                        >
-                          +1
-                        </Button>
-                      </div>
+                  );
+                })}
+              </div>
+            </div>
+          ) : (
+            <div className="rounded-xl border border-dashed border-[var(--pos-shell-border)] bg-[var(--pos-shell-muted)] px-4 py-8 text-center text-sm text-slate-600">
+              No hay clases para la busqueda actual.
+            </div>
+          )
+        ) : null}
 
-                      <div className="flex flex-wrap items-center gap-2">
-                        {quantityPresets.map((preset) => (
-                          <Button
-                            className={cn("h-10 min-w-12 px-3", posOutlineButtonClass)}
-                            key={preset}
-                            onClick={() => setQuantityText(preset)}
-                            type="button"
-                          >
-                            {preset}
-                          </Button>
-                        ))}
-                      </div>
+        {!isSelectionLoading &&
+        !selectionLoadError &&
+        controlState === CONTROL_STATE_PRODUCT_SELECTION ? (
+          sortedProducts.length > 0 ? (
+            <div className="grid gap-2.5">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div className="flex flex-wrap items-center gap-2 text-xs text-slate-500">
+                  <span className="font-medium text-slate-700">
+                    {pendingSelection?.productClass.name}
+                  </span>
+                </div>
+                <p className="text-xs font-medium text-slate-500">{selectionKeyboardHint}</p>
+              </div>
+              <div className="grid gap-2.5 sm:grid-cols-2 xl:grid-cols-3">
+                {sortedProducts.map((product, index) => {
+                  const itemProps = getProductItemProps(index);
+
+                  return (
+                    <CatalogSelectionCard
+                      buttonRef={itemProps.ref}
+                      code={product.code}
+                      isActive={productActiveIndex === index}
+                      key={product.id}
+                      name={product.name}
+                      onCardFocus={itemProps.onFocus}
+                      onCardKeyDown={itemProps.onKeyDown}
+                      onSelect={() => selectProduct(product)}
+                      priceText={product.unit_price}
+                      shortcutLabel={getSelectionShortcutLabel(index)}
+                      tabIndex={itemProps.tabIndex}
+                      variant="pos"
+                    />
+                  );
+                })}
+              </div>
+            </div>
+          ) : (
+            <div className="rounded-xl border border-dashed border-[var(--pos-shell-border)] bg-[var(--pos-shell-muted)] px-4 py-8 text-center text-sm text-slate-600">
+              No hay productos para esta busqueda.
+            </div>
+          )
+        ) : null}
+
+        {controlState === CONTROL_STATE_QUANTITY_CAPTURE && pendingSelection ? (
+          <div className="w-full max-w-5xl justify-self-center rounded-xl border border-[var(--pos-shell-border)] bg-white p-3 shadow-sm">
+            <div className="grid gap-3 lg:grid-cols-[12rem_minmax(0,1fr)]">
+              <CatalogVisual
+                className="min-h-[11.5rem]"
+                code={
+                  pendingSelection.captureMode === PRODUCT_DIRECT_MODE
+                    ? (pendingSelection.product?.code ?? pendingSelection.productClass.code)
+                    : pendingSelection.productClass.code
+                }
+                name={
+                  pendingSelection.captureMode === PRODUCT_DIRECT_MODE
+                    ? (pendingSelection.product?.name ?? pendingSelection.productClass.name)
+                    : pendingSelection.productClass.name
+                }
+              />
+
+              <div className="grid gap-2.5">
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <p className="text-base font-semibold text-slate-950">
+                        {pendingSelection.captureMode === PRODUCT_DIRECT_MODE
+                          ? pendingSelection.product?.name
+                          : pendingSelection.productClass.name}
+                      </p>
+                      {isQuantityPending ? (
+                        <span className="pos-chip" data-tone="warning">
+                          Pendiente
+                        </span>
+                      ) : null}
                     </div>
-                    <p className="text-xs font-medium text-slate-500">
-                      Enter: agregar · Esc: volver · Alt+1/2/3/6: rapido
+                    <p className="mt-1 text-sm text-slate-600">
+                      {pendingSelection.captureMode === PRODUCT_DIRECT_MODE
+                        ? pendingSelection.productClass.name
+                        : "Confirma la cantidad y agrega la linea al ticket."}
                     </p>
-                    <div className="flex flex-wrap items-center justify-end gap-3">
+                  </div>
+                </div>
+
+                <div className="grid gap-2">
+                  <input
+                    aria-label="Cantidad"
+                    className={cn(
+                      "h-16 rounded-xl px-4 text-[2.25rem] font-semibold tracking-tight shadow-sm",
+                      posInputClass,
+                    )}
+                    inputMode="decimal"
+                    onChange={(event) => setQuantityText(event.target.value)}
+                    onKeyDown={(event) => {
+                      if (event.key === "Enter" || event.key === "NumpadEnter") {
+                        event.preventDefault();
+                        handleAddLine();
+                      }
+
+                      if (event.key === "Escape") {
+                        event.preventDefault();
+                        goBack();
+                      }
+
+                      if (event.key === "Delete") {
+                        event.preventDefault();
+                        clearQuantity();
+                        setSelectionError(null);
+                      }
+                    }}
+                    placeholder="0"
+                    ref={quantityInputRef}
+                    value={pendingSelection.quantityText}
+                  />
+                  <div className="flex flex-wrap items-center gap-2">
+                    <div className="flex items-center gap-2">
                       <Button
-                        className={cn("h-10 px-4", posPrimaryButtonClass)}
-                        disabled={!isQuantityReady}
-                        onClick={handleAddLine}
+                        className={cn("h-10 px-3", posOutlineButtonClass)}
+                        onClick={decrementPendingQuantity}
                         type="button"
                       >
-                        {quantityActionLabel}
+                        -1
+                      </Button>
+                      <Button
+                        className={cn("h-10 px-3", posOutlineButtonClass)}
+                        onClick={incrementPendingQuantity}
+                        type="button"
+                      >
+                        +1
                       </Button>
                     </div>
-                    {selectionError ? (
-                      <div className="flex items-start justify-between gap-3 rounded-lg border border-[var(--ui-color-danger-soft)] bg-[var(--ui-color-danger-soft)] px-3 py-2 text-sm text-[var(--ui-color-danger)]">
-                        <p className="leading-6">{selectionError}</p>
-                        <button
-                          aria-label="Cerrar error"
-                          className="flex h-8 w-8 items-center justify-center rounded-full text-[var(--ui-color-danger)] transition hover:bg-[var(--ui-color-danger-soft)] hover:text-[var(--ui-color-danger)]"
-                          onClick={() => setSelectionError(null)}
+
+                    <div className="flex flex-wrap items-center gap-2">
+                      {quantityPresets.map((preset) => (
+                        <Button
+                          className={cn("h-10 min-w-12 px-3", posOutlineButtonClass)}
+                          key={preset}
+                          onClick={() => setQuantityText(preset)}
                           type="button"
                         >
-                          <XIcon className="h-4 w-4" />
-                        </button>
-                      </div>
-                    ) : null}
+                          {preset}
+                        </Button>
+                      ))}
+                    </div>
                   </div>
+                  <p className="text-xs font-medium text-slate-500">
+                    Enter: agregar · Esc: volver · Alt+1/2/3/6: rapido
+                  </p>
+                  <div className="flex flex-wrap items-center justify-end gap-3">
+                    <Button
+                      className={cn("h-10 px-4", posPrimaryButtonClass)}
+                      disabled={!isQuantityReady}
+                      onClick={handleAddLine}
+                      type="button"
+                    >
+                      {quantityActionLabel}
+                    </Button>
+                  </div>
+                  {selectionError ? (
+                    <div className="flex items-start justify-between gap-3 rounded-lg border border-[var(--ui-color-danger-soft)] bg-[var(--ui-color-danger-soft)] px-3 py-2 text-sm text-[var(--ui-color-danger)]">
+                      <p className="leading-6">{selectionError}</p>
+                      <button
+                        aria-label="Cerrar error"
+                        className="flex h-8 w-8 items-center justify-center rounded-full text-[var(--ui-color-danger)] transition hover:bg-[var(--ui-color-danger-soft)] hover:text-[var(--ui-color-danger)]"
+                        onClick={() => setSelectionError(null)}
+                        type="button"
+                      >
+                        <XIcon className="h-4 w-4" />
+                      </button>
+                    </div>
+                  ) : null}
                 </div>
               </div>
             </div>
-          ) : null}
+          </div>
+        ) : null}
       </CentralWorkspaceSheet>
 
       {cartLines.length > 0 ? (
@@ -751,7 +767,9 @@ export function PosTerminalWorkspace() {
           <div className="flex items-center justify-between gap-3">
             <div>
               <p className="text-sm font-medium text-slate-900">Ticket actual</p>
-              <p className="text-sm text-slate-600">{cartLines.length} lineas listas para cobrar.</p>
+              <p className="text-sm text-slate-600">
+                {cartLines.length} lineas listas para cobrar.
+              </p>
             </div>
             <span className="pos-chip" data-tone="primary">
               Cobro
@@ -762,5 +780,3 @@ export function PosTerminalWorkspace() {
     </div>
   );
 }
-
-

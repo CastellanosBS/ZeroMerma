@@ -109,15 +109,11 @@ export function getPrimaryPosPaymentMethodCodes(): PosPaymentMethodCode[] {
   return [...PRIMARY_POS_PAYMENT_METHOD_CODES];
 }
 
-export function isSplitPaymentMethodCode(
-  paymentMethodCode: PosPaymentMethodCode,
-): boolean {
+export function isSplitPaymentMethodCode(paymentMethodCode: PosPaymentMethodCode): boolean {
   return paymentMethodCode === MIXED_PAYMENT_METHOD_CODE;
 }
 
-export function usesReceivedAmountInput(
-  paymentMethodCode: PosPaymentMethodCode,
-): boolean {
+export function usesReceivedAmountInput(paymentMethodCode: PosPaymentMethodCode): boolean {
   return (
     paymentMethodCode === CASH_PAYMENT_METHOD_CODE ||
     paymentMethodCode === MIXED_PAYMENT_METHOD_CODE
@@ -341,8 +337,7 @@ export function beginEditingCartLine(
 
   const productClass: PosCatalogClassView = {
     capture_mode_default: line.captureMode,
-    class_capture_unit_price:
-      line.captureMode === CLASS_CAPTURE_MODE ? line.unitPriceText : null,
+    class_capture_unit_price: line.captureMode === CLASS_CAPTURE_MODE ? line.unitPriceText : null,
     code: line.productClassCode,
     currency_code: line.currencyCode,
     display_order: 0,
@@ -390,10 +385,7 @@ export function goBackFromControlState(state: PosTerminalSnapshot): PosTerminalS
     };
   }
 
-  if (
-    state.controlState === CONTROL_STATE_QUANTITY_CAPTURE &&
-    state.pendingSelection !== null
-  ) {
+  if (state.controlState === CONTROL_STATE_QUANTITY_CAPTURE && state.pendingSelection !== null) {
     if (state.pendingSelection.editingLine !== null) {
       return {
         ...state,
@@ -462,10 +454,7 @@ export function appendPendingQuantityCharacter(
     return state;
   }
 
-  return setPendingQuantityText(
-    state,
-    `${state.pendingSelection.quantityText}${character}`,
-  );
+  return setPendingQuantityText(state, `${state.pendingSelection.quantityText}${character}`);
 }
 
 export function backspacePendingQuantity(state: PosTerminalSnapshot): PosTerminalSnapshot {
@@ -473,10 +462,7 @@ export function backspacePendingQuantity(state: PosTerminalSnapshot): PosTermina
     return state;
   }
 
-  return setPendingQuantityText(
-    state,
-    state.pendingSelection.quantityText.slice(0, -1),
-  );
+  return setPendingQuantityText(state, state.pendingSelection.quantityText.slice(0, -1));
 }
 
 export function clearPendingQuantity(state: PosTerminalSnapshot): PosTerminalSnapshot {
@@ -489,10 +475,7 @@ export function incrementPendingQuantity(state: PosTerminalSnapshot): PosTermina
   }
 
   const currentQuantity = parseQuantityToMilliUnits(state.pendingSelection.quantityText) ?? 0;
-  return setPendingQuantityText(
-    state,
-    formatQuantityFromMilliUnits(currentQuantity + 1000),
-  );
+  return setPendingQuantityText(state, formatQuantityFromMilliUnits(currentQuantity + 1000));
 }
 
 export function decrementPendingQuantity(state: PosTerminalSnapshot): PosTerminalSnapshot {
@@ -505,10 +488,7 @@ export function decrementPendingQuantity(state: PosTerminalSnapshot): PosTermina
     return setPendingQuantityText(state, "");
   }
 
-  return setPendingQuantityText(
-    state,
-    formatQuantityFromMilliUnits(currentQuantity - 1000),
-  );
+  return setPendingQuantityText(state, formatQuantityFromMilliUnits(currentQuantity - 1000));
 }
 
 export function addPendingSelectionToCart(state: PosTerminalSnapshot): PosTerminalSnapshot {
@@ -546,9 +526,7 @@ export function incrementCartLineQuantity(
   return {
     ...state,
     cartLines: state.cartLines.map((line) =>
-      line.key === lineKey
-        ? updateCartLineQuantity(line, line.quantityMilliUnits + 1000)
-        : line,
+      line.key === lineKey ? updateCartLineQuantity(line, line.quantityMilliUnits + 1000) : line,
     ),
     lastCompletedSale: null,
   };
@@ -588,10 +566,7 @@ export function setCartLineQuantity(
   };
 }
 
-export function removeCartLine(
-  state: PosTerminalSnapshot,
-  lineKey: string,
-): PosTerminalSnapshot {
+export function removeCartLine(state: PosTerminalSnapshot, lineKey: string): PosTerminalSnapshot {
   const nextCartLines = state.cartLines.filter((line) => line.key !== lineKey);
 
   if (nextCartLines.length === 0) {
@@ -722,9 +697,8 @@ export function computePaymentComputation({
   const resolvedCashTenderedAmountCents =
     mixedLegTotals?.cashTenderedAmountCents ?? cashTenderedAmountCents;
   const nonCashTenderedAmountCents =
-    mixedLegTotals?.nonCashTenderedAmountCents ?? (parseMoneyToCents(mixedNonCashAmountText) ?? 0);
-  const capturedAmountCents =
-    resolvedCashTenderedAmountCents + nonCashTenderedAmountCents;
+    mixedLegTotals?.nonCashTenderedAmountCents ?? parseMoneyToCents(mixedNonCashAmountText) ?? 0;
+  const capturedAmountCents = resolvedCashTenderedAmountCents + nonCashTenderedAmountCents;
 
   return {
     capturedAmountCents,
@@ -740,6 +714,7 @@ export function buildConfirmSaleRequest(
   workstationCode: string,
   lines: PosCartLine[],
   paymentDraft: PosPaymentDraft,
+  cashSessionId: string,
 ): ConfirmSaleRequest {
   if (lines.length === 0) {
     throw new Error("Agrega al menos una linea antes de cobrar.");
@@ -786,9 +761,7 @@ export function buildConfirmSaleRequest(
         tendered_amount: formatMoneyFromCents(paymentComputation.cashTenderedAmountCents),
       },
     ];
-  } else if (
-    paymentDraft.paymentMethodCode === CARD_PAYMENT_METHOD_CODE
-  ) {
+  } else if (paymentDraft.paymentMethodCode === CARD_PAYMENT_METHOD_CODE) {
     payments = [
       {
         payment_method_code: paymentDraft.paymentMethodCode,
@@ -804,7 +777,9 @@ export function buildConfirmSaleRequest(
     const confirmedNonCashCents = mixedPaymentLegs.reduce(
       (sum, leg) =>
         sum +
-        (leg.methodCode === CARD_PAYMENT_METHOD_CODE ? parseMoneyToCents(leg.amountText) ?? 0 : 0),
+        (leg.methodCode === CARD_PAYMENT_METHOD_CODE
+          ? (parseMoneyToCents(leg.amountText) ?? 0)
+          : 0),
       0,
     );
 
@@ -837,16 +812,22 @@ export function buildConfirmSaleRequest(
     lines: requestLines,
     payments,
     workstation_code: workstationCode,
+    cash_session_id: cashSessionId,
   };
 }
 
-function buildCartLine(pendingSelection: PendingSelection, quantityMilliUnits: number): PosCartLine {
+function buildCartLine(
+  pendingSelection: PendingSelection,
+  quantityMilliUnits: number,
+): PosCartLine {
   const { productClass } = pendingSelection;
 
   if (pendingSelection.captureMode === CLASS_CAPTURE_MODE) {
     const unitPriceText = productClass.class_capture_unit_price;
     if (!unitPriceText) {
-      throw new Error(`La clase ${productClass.code} no tiene precio configurado para captura por clase.`);
+      throw new Error(
+        `La clase ${productClass.code} no tiene precio configurado para captura por clase.`,
+      );
     }
 
     return {
@@ -955,8 +936,7 @@ function parseFixedDecimalToUnits(value: string, decimalPlaces: number): number 
 
   const paddedDecimalPart = decimalPart.padEnd(decimalPlaces, "0");
   const integerUnits =
-    Number.parseInt(wholePart, 10) * 10 ** decimalPlaces +
-    Number.parseInt(paddedDecimalPart, 10);
+    Number.parseInt(wholePart, 10) * 10 ** decimalPlaces + Number.parseInt(paddedDecimalPart, 10);
 
   return integerUnits > 0 ? integerUnits : null;
 }

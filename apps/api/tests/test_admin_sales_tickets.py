@@ -16,6 +16,7 @@ from zeromerma_api.db.session import SessionLocal
 from zeromerma_api.modules.audit.infrastructure.models import AuditLog
 from zeromerma_api.modules.catalog.infrastructure.models import Product, ProductClass
 from zeromerma_api.testing.authorization import owner_headers
+from zeromerma_api.testing.idempotency import current_cash_session_id, new_idempotency_key
 from zeromerma_api.testing.sessions import login_headers
 
 
@@ -56,10 +57,17 @@ def _get_product_id(code: str) -> str:
 
 def _confirm_sale(client: TestClient, *, payment_method_code: str = "CASH") -> dict[str, object]:
     tendered_amount = "100.00" if payment_method_code == "CASH" else "42.00"
+    headers = _cashier_headers(client)
+    cash_session_id = current_cash_session_id(
+        client, headers=headers, workstation_code=SEED_WORKSTATION_CODE
+    )
+    headers["Idempotency-Key"] = new_idempotency_key()
+
     response = client.post(
         "/v1/sales/confirm",
-        headers=_cashier_headers(client),
+        headers=headers,
         json={
+            "cash_session_id": cash_session_id,
             "workstation_code": SEED_WORKSTATION_CODE,
             "lines": [
                 {
@@ -88,6 +96,11 @@ def _confirm_sale(client: TestClient, *, payment_method_code: str = "CASH") -> d
 def test_admin_sales_tickets_list_supports_filters_and_metrics(client: TestClient) -> None:
     _open_cash_session(client)
     sale_payload = _confirm_sale(client)
+    sale_detail_response = client.get(
+        f"/v1/sales/{sale_payload['id']}", headers=_cashier_headers(client)
+    )
+    assert sale_detail_response.status_code == 200
+    sale_detail = sale_detail_response.json()
     headers = _admin_headers(client)
 
     list_response = client.get(
@@ -117,7 +130,7 @@ def test_admin_sales_tickets_list_supports_filters_and_metrics(client: TestClien
     ticket = next(item for item in payload["items"] if item["id"] == sale_payload["id"])
     assert ticket["folio"].startswith("TCK-")
     assert ticket["branch_name"] == sale_payload["branch_name"]
-    assert ticket["cashier_name"] == sale_payload["operator_full_name"]
+    assert ticket["cashier_name"] == sale_detail["operator_full_name"]
     assert ticket["payment_methods_label"] == "CASH"
     assert ticket["status"] == "CONFIRMED"
 

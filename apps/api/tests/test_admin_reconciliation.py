@@ -21,6 +21,7 @@ from zeromerma_api.modules.cash_close.infrastructure.models import (
 from zeromerma_api.modules.catalog.infrastructure.models import Product
 from zeromerma_api.modules.outbox.infrastructure.models import OutboxEvent
 from zeromerma_api.testing.authorization import owner_headers
+from zeromerma_api.testing.idempotency import current_cash_session_id, new_idempotency_key
 from zeromerma_api.testing.sessions import login_headers
 
 
@@ -56,10 +57,17 @@ def _open_cash_session(client: TestClient, *, opening_amount: str = "150.00") ->
 
 
 def _confirm_direct_sale(client: TestClient) -> dict[str, object]:
+    headers = _cashier_headers(client)
+    cash_session_id = current_cash_session_id(
+        client, headers=headers, workstation_code=SEED_WORKSTATION_CODE
+    )
+    headers["Idempotency-Key"] = new_idempotency_key()
+
     response = client.post(
         "/v1/sales/confirm",
-        headers=_cashier_headers(client),
+        headers=headers,
         json={
+            "cash_session_id": cash_session_id,
             "lines": [
                 {
                     "capture_mode": "PRODUCT_DIRECT",

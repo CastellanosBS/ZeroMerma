@@ -3,6 +3,7 @@ import type { Page, Route } from "@playwright/test";
 
 const bootstrapResponse = {
   branch: {
+    id: "branch-1",
     code: "MAIN",
     name: "Main Branch",
     timezone: "America/Hermosillo",
@@ -16,6 +17,7 @@ const bootstrapResponse = {
     id: "user-1",
   },
   workstation: {
+    id: "00000000-0000-0000-0000-000000000002",
     code: "POS-01",
     name: "Front Register 01",
   },
@@ -137,7 +139,15 @@ export async function installPosApiMocks(
   });
 
   await page.route("**/v1/sales/confirm", async (route) => {
-    await fulfillJson(route, saleDetailResponse);
+    const key = route.request().headers()["idempotency-key"] ?? "";
+    const payload = route.request().postDataJSON();
+    if (
+      !/^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/.test(key) ||
+      payload.cash_session_id !== activeCashSession.id
+    ) {
+      throw new Error("Checkout must send a UUIDv7 intention key and the original cash session.");
+    }
+    await fulfillJson(route, saleDetailResponse, 201);
   });
 
   await page.route("**/v1/tickets/sale-1**", async (route) => {

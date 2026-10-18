@@ -36813,6 +36813,7 @@
         "type": "object"
       },
       "CashMovementView": {
+        "additionalProperties": false,
         "properties": {
           "amount": {
             "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
@@ -37038,6 +37039,12 @@
       },
       "ConfirmSaleRequest": {
         "properties": {
+          "cash_session_id": {
+            "format": "uuid",
+            "title": "Cash Session Id",
+            "type": "string",
+            "x-zeromerma-id-representation": "JSON_STRING"
+          },
           "lines": {
             "items": {
               "$ref": "#/components/schemas/ConfirmSaleLineRequest"
@@ -37063,6 +37070,7 @@
         },
         "required": [
           "workstation_code",
+          "cash_session_id",
           "lines",
           "payments"
         ],
@@ -43533,7 +43541,141 @@
         "title": "ReturnsSearchSalesResponse",
         "type": "object"
       },
+      "SaleConfirmationView": {
+        "additionalProperties": false,
+        "properties": {
+          "branch_code": {
+            "title": "Branch Code",
+            "type": "string"
+          },
+          "branch_id": {
+            "format": "uuid",
+            "title": "Branch Id",
+            "type": "string",
+            "x-zeromerma-id-representation": "JSON_STRING"
+          },
+          "branch_name": {
+            "title": "Branch Name",
+            "type": "string"
+          },
+          "cash_movements": {
+            "items": {
+              "$ref": "#/components/schemas/CashMovementView"
+            },
+            "title": "Cash Movements",
+            "type": "array"
+          },
+          "cash_session_id": {
+            "format": "uuid",
+            "title": "Cash Session Id",
+            "type": "string",
+            "x-zeromerma-id-representation": "JSON_STRING"
+          },
+          "change_amount": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Change Amount",
+            "type": "string",
+            "x-zeromerma-decimal-representation": "JSON_STRING"
+          },
+          "confirmed_at": {
+            "format": "date-time",
+            "title": "Confirmed At",
+            "type": "string",
+            "x-zeromerma-instant-format": "ISO8601_DATETIME"
+          },
+          "currency_code": {
+            "title": "Currency Code",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string",
+            "x-zeromerma-id-representation": "JSON_STRING"
+          },
+          "lines": {
+            "items": {
+              "$ref": "#/components/schemas/SaleLineView"
+            },
+            "title": "Lines",
+            "type": "array"
+          },
+          "operator_id": {
+            "format": "uuid",
+            "title": "Operator Id",
+            "type": "string",
+            "x-zeromerma-id-representation": "JSON_STRING"
+          },
+          "paid_amount": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Paid Amount",
+            "type": "string",
+            "x-zeromerma-decimal-representation": "JSON_STRING"
+          },
+          "payments": {
+            "items": {
+              "$ref": "#/components/schemas/SalePaymentView"
+            },
+            "title": "Payments",
+            "type": "array"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          },
+          "subtotal_amount": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Subtotal Amount",
+            "type": "string",
+            "x-zeromerma-decimal-representation": "JSON_STRING"
+          },
+          "total_amount": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Total Amount",
+            "type": "string",
+            "x-zeromerma-decimal-representation": "JSON_STRING"
+          },
+          "workstation_code": {
+            "title": "Workstation Code",
+            "type": "string"
+          },
+          "workstation_id": {
+            "format": "uuid",
+            "title": "Workstation Id",
+            "type": "string",
+            "x-zeromerma-id-representation": "JSON_STRING"
+          },
+          "workstation_name": {
+            "title": "Workstation Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "status",
+          "branch_id",
+          "branch_code",
+          "branch_name",
+          "workstation_id",
+          "workstation_code",
+          "workstation_name",
+          "cash_session_id",
+          "operator_id",
+          "currency_code",
+          "subtotal_amount",
+          "total_amount",
+          "paid_amount",
+          "change_amount",
+          "confirmed_at",
+          "lines",
+          "payments",
+          "cash_movements"
+        ],
+        "title": "SaleConfirmationView",
+        "type": "object"
+      },
       "SaleDetailView": {
+        "additionalProperties": false,
         "properties": {
           "branch_code": {
             "title": "Branch Code",
@@ -43660,8 +43802,6 @@
           "workstation_name",
           "cash_session_id",
           "operator_id",
-          "operator_email",
-          "operator_full_name",
           "currency_code",
           "subtotal_amount",
           "total_amount",
@@ -43670,12 +43810,15 @@
           "confirmed_at",
           "lines",
           "payments",
-          "cash_movements"
+          "cash_movements",
+          "operator_email",
+          "operator_full_name"
         ],
         "title": "SaleDetailView",
         "type": "object"
       },
       "SaleLineView": {
+        "additionalProperties": false,
         "properties": {
           "capture_mode": {
             "title": "Capture Mode",
@@ -43807,6 +43950,7 @@
         "type": "object"
       },
       "SalePaymentView": {
+        "additionalProperties": false,
         "properties": {
           "applied_amount": {
             "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
@@ -84465,6 +84609,22 @@
     "/v1/sales/confirm": {
       "post": {
         "operationId": "confirm_sale_v1_sales_confirm_post",
+        "parameters": [
+          {
+            "description": "A globally unique UUIDv7 identifying this business intention.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": true,
+            "schema": {
+              "description": "A globally unique UUIDv7 identifying this business intention.",
+              "maxLength": 36,
+              "minLength": 36,
+              "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-7[0-9a-fA-F]{3}-[89aAbB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$",
+              "title": "Idempotency-Key",
+              "type": "string"
+            }
+          }
+        ],
         "requestBody": {
           "content": {
             "application/json": {
@@ -84480,11 +84640,16 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/SaleDetailView"
+                  "$ref": "#/components/schemas/SaleConfirmationView"
                 }
               }
             },
-            "description": "Successful Response"
+            "description": "Successful Response",
+            "headers": {
+              "Idempotency-Replayed": {
+                "$ref": "#/components/headers/IdempotencyReplayed"
+              }
+            }
           },
           "400": {
             "content": {
@@ -84586,6 +84751,171 @@
           }
         ],
         "summary": "Confirm Sale",
+        "tags": [
+          "sales"
+        ],
+        "x-authorization-policy": "explicit-deny-by-default",
+        "x-required-capabilities": [
+          "pos.operate"
+        ],
+        "x-zeromerma-operation-id-policy": "FASTAPI_STABLE_GENERATED"
+      }
+    },
+    "/v1/sales/confirmations/{idempotency_key}": {
+      "get": {
+        "operationId": "recover_sale_confirmation_v1_sales_confirmations__idempotency_key__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "idempotency_key",
+            "required": true,
+            "schema": {
+              "maxLength": 36,
+              "minLength": 36,
+              "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-7[0-9a-fA-F]{3}-[89aAbB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$",
+              "title": "Idempotency Key",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "workstation_code",
+            "required": true,
+            "schema": {
+              "maxLength": 64,
+              "minLength": 1,
+              "title": "Workstation Code",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "cash_session_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Cash Session Id",
+              "type": "string",
+              "x-zeromerma-id-representation": "JSON_STRING"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SaleConfirmationView"
+                }
+              }
+            },
+            "description": "Successful Response",
+            "headers": {
+              "Idempotency-Replayed": {
+                "$ref": "#/components/headers/IdempotencyReplayed"
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Authentication Required"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "423": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Session Locked"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Login Rate Limited"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Internal Server Error"
+          }
+        },
+        "security": [
+          {
+            "PosSessionCookie": []
+          },
+          {
+            "BackofficeSessionCookie": []
+          }
+        ],
+        "summary": "Recover Sale Confirmation",
         "tags": [
           "sales"
         ],

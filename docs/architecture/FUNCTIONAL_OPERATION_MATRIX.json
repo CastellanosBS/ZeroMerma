@@ -11930,6 +11930,122 @@
       ]
     },
     {
+      "operation_key": "API:GET:/v1/sales/confirmations/{idempotency_key}",
+      "surface": "POS",
+      "method": "GET",
+      "path": "/v1/sales/confirmations/{idempotency_key}",
+      "operation_id": "recover_sale_confirmation_v1_sales_confirmations__idempotency_key__get",
+      "include_in_schema": true,
+      "tags": [
+        "sales"
+      ],
+      "router_file": "apps/api/src/zeromerma_api/modules/sales/presentation/router.py",
+      "router_symbol": "recover_sale_confirmation",
+      "module_owner": "API:sales",
+      "use_case": "recover_sale_confirmation",
+      "implementation_state": "IMPLEMENTED_VERIFIED",
+      "verification_state": "TESTED_IN_THIS_TASK",
+      "auth_requirement": "AUTHENTICATED",
+      "actual_auth_dependency": [
+        "fastapi.security.api_key:APIKeyCookie",
+        "zeromerma_api.db.session:get_session",
+        "zeromerma_api.modules.identity.presentation.dependencies:get_current_authentication",
+        "zeromerma_api.modules.identity.presentation.dependencies:get_current_user",
+        "zeromerma_api.presentation.access_policy:enforce_operation_policy"
+      ],
+      "actual_surface_guard": "EXPLICIT_POS_POLICY_WITH_EFFECTIVE_GRANTS",
+      "required_capability": "pos.operate",
+      "capability_enforcement_state": "CAPABILITY_ENFORCED",
+      "required_scope": "GLOBAL_OR_BRANCH_SET_PER_DEC04",
+      "scope_source": "SERVER_RESOLVED_ACTIVE_ROLE_ASSIGNMENT_SCOPES_INTERSECT_ACTIVE_USER_BRANCH_MEMBERSHIPS",
+      "scope_enforcement_state": "SCOPE_ENFORCED",
+      "request_schema": [
+        "NONE"
+      ],
+      "response_schema": "SaleConfirmationView",
+      "error_contract_state": "CANONICAL_API_ERROR_RESPONSE",
+      "application_service": [
+        "zeromerma_api.modules.sales.application.idempotency.SaleConfirmationService.recover"
+      ],
+      "domain_or_use_case_symbol": "SaleConfirmationService.recover",
+      "router_business_logic_present": false,
+      "transaction_owner": "zeromerma_api.modules.idempotency.application.service.IdempotencyExecutor.recover",
+      "transaction_boundary": "Read-only command-result lookup; executor commits or rolls back its authorization/read transaction without reserving a key or running the sale action",
+      "persistence": "READ_ONLY",
+      "external_side_effect": "NONE_OBSERVED_STATICALLY",
+      "reads_entities": [
+        "idempotency_records",
+        "workstations"
+      ],
+      "writes_entities": [
+        "NONE"
+      ],
+      "locks_or_concurrency_control": "Indexed unique-key lookup with exact saved actor/context comparison and current POS capability/scope checks; unknown or uncommitted result remains HTTP 409",
+      "audit_required": false,
+      "audit_actual": "NOT_REQUIRED",
+      "audit_atomicity": "NOT_REQUIRED",
+      "outbox_required": false,
+      "outbox_actual": "NOT_REQUIRED",
+      "outbox_atomicity": "NOT_REQUIRED",
+      "idempotency_required": false,
+      "idempotency_actual": "NOT_REQUIRED",
+      "idempotency_business_identity": "Reads the existing global UUIDv7 identity with workstation_code and explicit cash_session_id; no new identity is admitted",
+      "idempotency_replay_behavior": "HTTP 200 safe persisted confirmation snapshot for COMPLETED; unresolved/absent identity remains an explicit nonterminal error; no business effects or repricing",
+      "generated_client_operation": "recover_sale_confirmation_v1_sales_confirmations__idempotency_key__get",
+      "consumer_contract_state": "CLIENT_GENERATED_USED",
+      "consumer_disposition": "LOCAL_UI_PRESENT",
+      "consumer_reason": "POS getSaleConfirmation retrieves the existing confirmation after a lost response or reload using persisted recovery metadata; it does not replay a stored economic request body.",
+      "pos_consumers": [
+        "apps/pos-web/src/features/pos-terminal/pos-terminal-api.ts"
+      ],
+      "backoffice_consumers": [
+        "NONE"
+      ],
+      "other_consumers": [
+        "NONE"
+      ],
+      "direct_tests": [
+        "apps/api/tests/test_sale_idempotency.py",
+        "apps/api/tests/test_sale_idempotency.py#test_recovery_requires_current_authority_and_original_station",
+        "apps/pos-web/e2e-real/sale-confirmation.spec.ts"
+      ],
+      "indirect_tests": [
+        "apps/api/tests/conftest.py",
+        "apps/api/unit_tests/test_operation_policy.py#test_every_route_and_persisted_family_has_an_explicit_policy",
+        "apps/api/tests/test_operation_authorization.py#test_all_scoped_families_support_mapped_reads_and_aggregate_subqueries"
+      ],
+      "missing_test_types": [
+        "NONE"
+      ],
+      "approved_target_state": "Authorized POS recovery must return the same minimized confirmation snapshot for the original intention, preserve current access checks and report an unresolved result without creating another sale.",
+      "feature_complete_blocker": false,
+      "later_ZM_FIN_tasks": [
+        "NOT_APPLICABLE"
+      ],
+      "decision_refs": [
+        "DEC-03",
+        "DEC-04",
+        "DEC-05",
+        "DEC-07",
+        "DEC-15",
+        "DEC-16"
+      ],
+      "gate_refs": [
+        "G1",
+        "G5"
+      ],
+      "gap_ids": [
+        "NONE"
+      ],
+      "evidence": [
+        "apps/api/src/zeromerma_api/modules/sales/presentation/router.py#recover_sale_confirmation",
+        "apps/api/src/zeromerma_api/modules/sales/application/idempotency.py#class SaleConfirmationService",
+        "apps/pos-web/src/features/pos-terminal/pos-terminal-api.ts",
+        "docs/architecture/idempotency.md",
+        "docs/implementation/sale-idempotency-validation.md"
+      ]
+    },
+    {
       "operation_key": "API:GET:/v1/sales/{sale_id}",
       "surface": "POS",
       "method": "GET",
@@ -11976,8 +12092,11 @@
       "reads_entities": [
         "sales",
         "sale_lines",
-        "payments",
-        "inventory_movements"
+        "sale_payments",
+        "cash_movements",
+        "users",
+        "branches",
+        "workstations"
       ],
       "writes_entities": [
         "NONE"
@@ -25368,6 +25487,7 @@
       "actual_auth_dependency": [
         "fastapi.security.api_key:APIKeyCookie",
         "zeromerma_api.db.session:get_session",
+        "zeromerma_api.modules.idempotency.presentation.http:require_idempotency_key",
         "zeromerma_api.modules.identity.presentation.dependencies:get_current_authentication",
         "zeromerma_api.modules.identity.presentation.dependencies:get_current_user",
         "zeromerma_api.presentation.access_policy:enforce_operation_policy"
@@ -25381,30 +25501,38 @@
       "request_schema": [
         "ConfirmSaleRequest"
       ],
-      "response_schema": "SaleDetailView",
+      "response_schema": "SaleConfirmationView",
       "error_contract_state": "CANONICAL_API_ERROR_RESPONSE",
       "application_service": [
-        "zeromerma_api.modules.sales.application.services.SaleCommandService.confirm_sale"
+        "zeromerma_api.modules.sales.application.idempotency.SaleConfirmationService.confirm"
       ],
-      "domain_or_use_case_symbol": "confirm_sale",
+      "domain_or_use_case_symbol": "SaleConfirmationService.confirm",
       "router_business_logic_present": false,
-      "transaction_owner": "zeromerma_api.modules.sales.application.services.SaleCommandService.confirm_sale",
-      "transaction_boundary": "commit=True;flush=True;rollback=True",
+      "transaction_owner": "zeromerma_api.modules.idempotency.application.service.IdempotencyExecutor.execute",
+      "transaction_boundary": "One executor-owned root transaction; sale action flushes without committing; sale, payment, cash, audit, outbox and terminal result commit or roll back together",
       "persistence": "WRITE",
       "external_side_effect": "NONE_OBSERVED_STATICALLY",
       "reads_entities": [
+        "idempotency_records",
+        "cash_sessions",
+        "workstations",
+        "products",
+        "product_classes",
         "sales",
         "sale_lines",
-        "payments",
-        "inventory_movements"
+        "sale_payments",
+        "cash_movements"
       ],
       "writes_entities": [
+        "idempotency_records",
         "sales",
         "sale_lines",
-        "payments",
-        "inventory_movements"
+        "sale_payments",
+        "cash_movements",
+        "audit_logs",
+        "outbox_events"
       ],
-      "locks_or_concurrency_control": "identity_privilege_state FOR UPDATE for identity administration; FOR SHARE for domain mutation; authorization revalidated under the shared transaction boundary",
+      "locks_or_concurrency_control": "Global unique UUIDv7 identity with bounded same-key contention; authorization lifecycle shared lock; no operation-wide idempotency lock; sale-versus-close serialization remains ZM-FIN-036",
       "audit_required": true,
       "audit_actual": "ATOMIC",
       "audit_atomicity": "ATOMIC",
@@ -25412,13 +25540,13 @@
       "outbox_actual": "ATOMIC",
       "outbox_atomicity": "ATOMIC",
       "idempotency_required": true,
-      "idempotency_actual": "REQUEST_ID_ONLY",
-      "idempotency_business_identity": "NOT_IMPLEMENTED",
-      "idempotency_replay_behavior": "NOT_IMPLEMENTED",
+      "idempotency_actual": "DEC07_COMPLIANT",
+      "idempotency_business_identity": "Global UUIDv7 Idempotency-Key; sale.confirm; actor, branch, workstation and explicit cash_session_id plus versioned canonical payload fingerprint",
+      "idempotency_replay_behavior": "Original HTTP 201 minimized SaleConfirmationView snapshot with current authorization; no repricing or repeated sale action. Sequential and concurrent retries, pre-commit rollback, lost committed response and browser reload/tab recovery verified by the ZM-FIN-029 acceptance suites.",
       "generated_client_operation": "confirm_sale_v1_sales_confirm_post",
       "consumer_contract_state": "CLIENT_GENERATED_USED",
       "consumer_disposition": "LOCAL_UI_PRESENT",
-      "consumer_reason": "Located local UI consumer apps/pos-web/src/features/pos-terminal/pos-terminal-api.ts invokes POST /v1/sales/confirm for confirm_sale; the feature adapter now uses generated schema aliases through packages/api-client/src/transport.ts.",
+      "consumer_reason": "POS confirmPosSale sends a UUIDv7 per intention and explicit cash_session_id through the generated SaleConfirmationView contract; unresolved intentions are recovered through the read-only confirmation lookup.",
       "pos_consumers": [
         "apps/pos-web/src/features/pos-terminal/pos-terminal-api.ts"
       ],
@@ -25429,14 +25557,20 @@
         "NONE"
       ],
       "direct_tests": [
-        "apps/api/tests/test_admin_cash_cuts.py",
+        "apps/api/tests/test_sale_idempotency.py",
+        "apps/api/tests/test_phase_2a_pos_sales.py",
+        "apps/api/tests/test_phase_7a_cash_close.py",
+        "apps/api/tests/test_phase_7b_cash_close.py",
         "apps/api/tests/test_admin_cash_flow.py",
+        "apps/api/tests/test_admin_cash_cuts.py",
         "apps/api/tests/test_admin_reconciliation.py",
         "apps/api/tests/test_admin_returns_corrections.py",
         "apps/api/tests/test_admin_sales_tickets.py",
         "apps/api/tests/test_dev_audit_snapshot.py",
-        "apps/api/tests/test_phase_2a_pos_sales.py",
-        "apps/api/tests/test_phase_7a_cash_close.py"
+        "apps/api/tests/test_returns_module.py",
+        "apps/api/tests/test_tickets_module.py",
+        "apps/pos-web/src/features/pos-terminal/sale-confirmation-intent.test.ts",
+        "apps/pos-web/e2e-real/sale-confirmation.spec.ts"
       ],
       "indirect_tests": [
         "apps/api/tests/conftest.py",
@@ -25444,31 +25578,40 @@
         "apps/api/tests/test_operation_authorization.py#test_all_scoped_families_support_mapped_reads_and_aggregate_subqueries"
       ],
       "missing_test_types": [
-        "IDEMPOTENCY_REPLAY"
+        "NONE"
       ],
-      "approved_target_state": "DECISION_COMPLIANT_IMPLEMENTATION_WITH_DIRECT_TESTS",
+      "approved_target_state": "POS sale confirmation must preserve the accepted durable replay contract and complete the separate canonical inventory, sale-versus-close and integrated workflow requirements in ZM-FIN-036, ZM-FIN-049, ZM-FIN-050 and ZM-FIN-056.",
       "feature_complete_blocker": true,
       "later_ZM_FIN_tasks": [
+        "ZM-FIN-036",
+        "ZM-FIN-049",
+        "ZM-FIN-050",
         "ZM-FIN-056"
       ],
       "decision_refs": [
+        "DEC-03",
+        "DEC-04",
+        "DEC-05",
         "DEC-07",
         "DEC-08",
-        "DEC-11"
+        "DEC-11",
+        "DEC-15",
+        "DEC-18"
       ],
       "gate_refs": [
         "G1",
         "G5"
       ],
       "gap_ids": [
-        "GAP-0749"
+        "NONE"
       ],
       "evidence": [
         "apps/api/src/zeromerma_api/modules/sales/presentation/router.py#confirm_sale",
+        "apps/api/src/zeromerma_api/modules/sales/application/idempotency.py#class SaleConfirmationService",
         "apps/api/src/zeromerma_api/modules/sales/application/services.py#class SaleCommandService",
-        "apps/api/src/zeromerma_api/presentation/access_policy.py#ENDPOINT_POLICIES",
-        "apps/api/src/zeromerma_api/db/access_scope.py#bind_authorization_scope",
-        "docs/architecture/authorization.md"
+        "apps/api/src/zeromerma_api/modules/idempotency/application/service.py#class IdempotencyExecutor",
+        "docs/architecture/idempotency.md",
+        "docs/implementation/sale-idempotency-validation.md"
       ]
     },
     {
@@ -28089,19 +28232,21 @@
         "API:GET:/v1/pos/catalog",
         "API:GET:/v1/pos/classes/{class_id}/products",
         "API:GET:/v1/sales/{sale_id}",
-        "API:POST:/v1/sales/confirm"
+        "API:POST:/v1/sales/confirm",
+        "API:GET:/v1/sales/confirmations/{idempotency_key}"
       ],
       "queries": [
         "API:GET:/v1/pos/bootstrap",
         "API:GET:/v1/pos/catalog",
         "API:GET:/v1/pos/classes/{class_id}/products",
-        "API:GET:/v1/sales/{sale_id}"
+        "API:GET:/v1/sales/{sale_id}",
+        "API:GET:/v1/sales/confirmations/{idempotency_key}"
       ],
       "mutations": [
         "API:POST:/v1/sales/confirm"
       ],
       "implementation_state": "PARTIAL",
-      "verification_state": "NO_TEST",
+      "verification_state": "TESTED_IN_THIS_TASK",
       "approved_target_state": "The POS route /pos must provide tested navigate, view_or_list, confirm behavior through its declared canonical API operations, enforce capability pos.operate and scope GLOBAL_OR_BRANCH_SET_PER_DEC04 in the backend, and preserve recoverable persisted state for mutations under ZM-FIN-056, ZM-FIN-015, and ZM-FIN-020.",
       "placeholder_evidence": "NONE",
       "user_actions": [
@@ -28110,7 +28255,10 @@
         "confirm"
       ],
       "direct_tests": [
-        "NONE"
+        "apps/pos-web/src/features/pos-terminal/pos-checkout-panel.test.tsx",
+        "apps/pos-web/src/features/pos-terminal/sale-confirmation-intent.test.ts",
+        "apps/pos-web/e2e/pos-entry.spec.ts",
+        "apps/pos-web/e2e-real/sale-confirmation.spec.ts"
       ],
       "indirect_tests": [
         "NONE"
@@ -28121,7 +28269,9 @@
       "decision_refs": [
         "DEC-02",
         "DEC-03",
-        "DEC-04"
+        "DEC-04",
+        "DEC-07",
+        "DEC-15"
       ],
       "gate_refs": [
         "G1",
@@ -28132,7 +28282,11 @@
         "GAP-0796"
       ],
       "evidence": [
-        "apps/pos-web/src/router.tsx#posRoute"
+        "apps/pos-web/src/router.tsx#posRoute",
+        "apps/pos-web/src/features/pos-terminal/sale-confirmation-intent.ts",
+        "apps/pos-web/src/features/pos-terminal/use-sale-intention.ts",
+        "docs/architecture/idempotency.md",
+        "docs/implementation/sale-idempotency-validation.md"
       ]
     },
     {
@@ -32339,7 +32493,7 @@
   ],
   "module_summary": {
     "surface_counts": {
-      "api": 241,
+      "api": 242,
       "pos": 16,
       "backoffice": 41,
       "worker": 3,
@@ -32348,7 +32502,7 @@
     "implementation_state_counts": {
       "DEPRECATED": 4,
       "FRAMEWORK_ONLY": 6,
-      "IMPLEMENTED_VERIFIED": 17,
+      "IMPLEMENTED_VERIFIED": 18,
       "INTERNAL_ONLY": 15,
       "PARTIAL": 269,
       "PLACEHOLDER": 4
@@ -32356,24 +32510,24 @@
     "verification_state_counts": {
       "DIRECT_TEST_EXISTS_NOT_RUN": 143,
       "NOT_APPLICABLE": 12,
-      "NO_TEST": 109,
-      "TESTED_IN_THIS_TASK": 51
+      "NO_TEST": 108,
+      "TESTED_IN_THIS_TASK": 53
     },
     "consumer_contract_state_counts": {
-      "CLIENT_GENERATED_USED": 173,
+      "CLIENT_GENERATED_USED": 174,
       "NOT_CONSUMED": 67,
       "NO_CLIENT_OPERATION": 1
     },
     "consumer_disposition_counts": {
       "FUTURE_CONSUMER_NOT_IMPLEMENTED": 4,
-      "LOCAL_UI_PRESENT": 173,
+      "LOCAL_UI_PRESENT": 174,
       "LOCAL_UI_REQUIRED_NOT_WIRED": 63,
       "NOT_APPLICABLE": 1
     },
     "gap_type_counts": {
       "AUDIT_GAP": 13,
       "CAPABILITY_GAP": 6,
-      "IDEMPOTENCY_GAP": 53,
+      "IDEMPOTENCY_GAP": 52,
       "OUTBOX_GAP": 25,
       "PLACEHOLDER": 4,
       "SCOPE_GAP": 6,
@@ -32384,16 +32538,16 @@
     },
     "feature_complete_blocker_count": 273,
     "test_gap_count": 118,
-    "operation_count": 315
+    "operation_count": 316
   },
   "openapi_comparison": {
-    "runtime_operation_count": 240,
-    "tracked_operation_count": 240,
+    "runtime_operation_count": 241,
+    "tracked_operation_count": 241,
     "runtime_only": [],
     "tracked_only": [],
     "operation_id_drift": [],
-    "runtime_sha256_canonical_json": "0b4f69154d3b57a2a3a96df835451ff4912220b8151124838efa33fea29f6a1a",
-    "tracked_sha256_canonical_json": "0b4f69154d3b57a2a3a96df835451ff4912220b8151124838efa33fea29f6a1a",
+    "runtime_sha256_canonical_json": "eaa9d4463a9d6fe4e50e3f8c8bffbbbc6934b4f2e5c631c49bca8604d46f2741",
+    "tracked_sha256_canonical_json": "eaa9d4463a9d6fe4e50e3f8c8bffbbbc6934b4f2e5c631c49bca8604d46f2741",
     "schema_drift_suspected": false,
     "classification": "NO_DRIFT_OBSERVED"
   },
@@ -34367,19 +34521,6 @@
       ]
     },
     {
-      "gap_id": "GAP-0749",
-      "operation_key": "API:POST:/v1/sales/confirm",
-      "gap_type": "IDEMPOTENCY_GAP",
-      "current_state": "No durable DEC-07 replay contract",
-      "approved_target": "DECISION_COMPLIANT_AND_DIRECTLY_VERIFIED",
-      "risk": "IN_SCOPE_NOT_IMPLEMENTED",
-      "later_task": "ZM-FIN-056",
-      "gate": "G2",
-      "evidence": [
-        "apps/api/src/zeromerma_api/modules/sales/presentation/router.py#confirm_sale"
-      ]
-    },
-    {
       "gap_id": "GAP-0753",
       "operation_key": "API:POST:/v1/tickets/{ticket_id}/reprint",
       "gap_type": "OUTBOX_GAP",
@@ -34630,13 +34771,15 @@
       "gap_id": "GAP-0796",
       "operation_key": "UI:POS:/pos",
       "gap_type": "TEST_GAP",
-      "current_state": "No direct route behavior test classified",
+      "current_state": "Sale intention, replay and recovery behavior has direct unit, mocked and real browser coverage in ZM-FIN-029; the complete POS workflow including canonical inventory and sale-versus-close behavior remains unverified under ZM-FIN-056.",
       "approved_target": "DECISION_COMPLIANT_AND_DIRECTLY_VERIFIED",
       "risk": "IN_SCOPE_NOT_IMPLEMENTED",
-      "later_task": "ZM-FIN-013",
+      "later_task": "ZM-FIN-056",
       "gate": "G5",
       "evidence": [
-        "apps/pos-web/src/router.tsx#posRoute"
+        "apps/pos-web/src/router.tsx#posRoute",
+        "apps/pos-web/e2e-real/sale-confirmation.spec.ts",
+        "docs/implementation/sale-idempotency-validation.md"
       ]
     },
     {

@@ -105,6 +105,38 @@ def test_schema_change_is_detected() -> None:
     assert _openapi_drift(changed)
 
 
+def test_sale_confirmation_adopts_key_and_exposes_metadata_only_recovery() -> None:
+    operation = SCHEMA["paths"]["/v1/sales/confirm"]["post"]
+    key = next(item for item in operation["parameters"] if item["name"] == "Idempotency-Key")
+    assert key["in"] == "header" and key["required"] is True
+    assert "7[0-9a-fA-F]{3}" in key["schema"]["pattern"]
+    schemas = SCHEMA["components"]["schemas"]
+    assert "cash_session_id" in schemas["ConfirmSaleRequest"]["required"]
+    confirmation = schemas["SaleConfirmationView"]
+    assert confirmation["additionalProperties"] is False
+    assert "operator_email" not in confirmation["properties"]
+    assert "operator_full_name" not in confirmation["properties"]
+    assert operation["responses"]["201"]["content"]["application/json"]["schema"] == {
+        "$ref": "#/components/schemas/SaleConfirmationView"
+    }
+    assert operation["responses"]["201"]["headers"]["Idempotency-Replayed"] == {
+        "$ref": "#/components/headers/IdempotencyReplayed"
+    }
+    recovery = SCHEMA["paths"]["/v1/sales/confirmations/{idempotency_key}"]["get"]
+    assert "requestBody" not in recovery
+    assert {item["name"] for item in recovery["parameters"] if item["required"]} == {
+        "idempotency_key",
+        "workstation_code",
+        "cash_session_id",
+    }
+    assert recovery["responses"]["200"]["content"]["application/json"]["schema"] == {
+        "$ref": "#/components/schemas/SaleConfirmationView"
+    }
+    assert recovery["responses"]["200"]["headers"]["Idempotency-Replayed"] == {
+        "$ref": "#/components/headers/IdempotencyReplayed"
+    }
+
+
 def test_error_response_change_is_rejected() -> None:
     changed = copy.deepcopy(SCHEMA)
     _, _, operation = _first_operation(changed)
