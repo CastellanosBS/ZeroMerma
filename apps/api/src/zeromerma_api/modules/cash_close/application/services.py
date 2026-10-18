@@ -9,7 +9,6 @@ from decimal import ROUND_HALF_UP, Decimal
 from zoneinfo import ZoneInfo
 
 from sqlalchemy import func, or_, select
-from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, aliased
 
 from zeromerma_api.modules.audit.application.service import AuditRecorder
@@ -19,6 +18,7 @@ from zeromerma_api.modules.branches.application.access import (
 )
 from zeromerma_api.modules.branches.application.schemas import BranchSummary, WorkstationSummary
 from zeromerma_api.modules.branches.infrastructure.models import Branch, Workstation
+from zeromerma_api.modules.cash.application.command_context import lock_cash_session
 from zeromerma_api.modules.cash.application.schemas import CashSessionView
 from zeromerma_api.modules.cash.application.services import CashSessionQueryService
 from zeromerma_api.modules.cash.domain.constants import (
@@ -27,10 +27,13 @@ from zeromerma_api.modules.cash.domain.constants import (
 )
 from zeromerma_api.modules.cash.infrastructure.models import CashSession
 from zeromerma_api.modules.cash_close.application.schemas import (
+    CashCloseAlreadyExistsView,
     CashCloseAttributionLineView,
     CashCloseBaselineSnapshotSummaryView,
     CashCloseBootstrapResponse,
     CashCloseClassReconciliationView,
+    CashCloseCommitRequest,
+    CashCloseCommitResultView,
     CashCloseCountedPaymentMethodRequest,
     CashCloseCountedProductLineRequest,
     CashCloseCounterClassAvailabilityView,
@@ -118,6 +121,7 @@ from zeromerma_api.modules.corrections.infrastructure.models import (
     CorrectionDocument,
     CorrectionDocumentLine,
 )
+from zeromerma_api.modules.idempotency.domain.exceptions import DeterministicRejection
 from zeromerma_api.modules.identity.application.schemas import AuthenticatedUser
 from zeromerma_api.modules.identity.infrastructure.models import User, UserBranchAssignment
 from zeromerma_api.modules.operations.domain.constants import (
@@ -996,9 +1000,38 @@ class CashCloseCommandService:
         session: Session,
         *,
         current_user: AuthenticatedUser,
-        command: CashClosePreviewRequest,
+        command: CashCloseCommitRequest,
         request_id: str | None,
-    ) -> CashCloseDetailResponse:
+        idempotency_key: uuid.UUID,
+        operation_id: uuid.UUID,
+    ) -> CashCloseCommitResultView:
+        context = self._workstation_access.resolve_context(
+            session, user_id=current_user.id, workstation_code=command.workstation_code
+        )
+        active_cash_session = lock_cash_session(
+            session,
+            current_user=current_user,
+            workstation_id=context.workstation_id,
+            branch_id=context.branch_id,
+            cash_session_id=command.cash_session_id,
+            require_open=False,
+        )
+        existing_close_id = session.scalar(
+            select(CashSessionClose.id).where(
+                CashSessionClose.cash_session_id == active_cash_session.id
+            )
+        )
+        if existing_close_id is not None:
+            rejection = CashCloseAlreadyExistsView()
+            raise DeterministicRejection(
+                code=rejection.code,
+                status_code=409,
+                message=rejection.message,
+                snapshot=rejection,
+            )
+        if active_cash_session.status != CASH_SESSION_STATUS_OPEN:
+            raise CashCloseConflictError("The cash session is already closed.")
+        # All reconciliation reads belong to the same locked shift and transaction.
         prepared = self._query_service._prepare_preview(
             session,
             current_user=current_user,
@@ -1010,13 +1043,21 @@ class CashCloseCommandService:
         )
         if len(commit_blockers) > 0:
             raise CashCloseValidationError(_format_blocker_error(commit_blockers))
+        if prepared.financial_summary.expected_cash_amount < ZERO_MONEY:
+            raise CashCloseValidationError(
+                "The cash session cannot close with a negative expected cash amount."
+            )
 
         committed_at = datetime.now(tz=UTC)
         resolved_request_id = request_id or str(uuid.uuid4())
+        trace = {
+            "idempotency_key": str(idempotency_key),
+            "operation_id": str(operation_id),
+            "operation_code": "cash_session.close",
+        }
         has_count_capture = prepared.close_mode == CASH_CLOSE_MODE_WITH_COUNT
-        active_cash_session = session.execute(
-            select(CashSession).where(CashSession.id == prepared.active_cash_session.id)
-        ).scalar_one()
+        if prepared.active_cash_session.id != active_cash_session.id:
+            raise CashCloseConflictError("The cash session changed while preparing its close.")
 
         close_row = CashSessionClose(
             cash_session_id=active_cash_session.id,
@@ -1042,285 +1083,280 @@ class CashCloseCommandService:
             committed_at_utc=committed_at,
         )
 
-        try:
-            session.add(close_row)
-            session.flush()
+        session.add(close_row)
+        session.flush()
 
-            for row in prepared.payment_method_rows:
-                if row.counted_amount is None:
+        for row in prepared.payment_method_rows:
+            if row.counted_amount is None:
+                continue
+            session.add(
+                CashSessionClosePaymentMethodCount(
+                    cash_session_close_id=close_row.id,
+                    payment_method_code=row.payment_method_code,
+                    currency_code=row.currency_code,
+                    counted_amount=row.counted_amount,
+                    expected_amount=row.expected_amount,
+                    variance_amount=row.variance_amount,
+                )
+            )
+
+        if has_count_capture:
+            for product_state in prepared.computation.products:
+                if product_state.counted_quantity is None:
                     continue
                 session.add(
-                    CashSessionClosePaymentMethodCount(
+                    CashSessionCloseProductCount(
                         cash_session_close_id=close_row.id,
-                        payment_method_code=row.payment_method_code,
-                        currency_code=row.currency_code,
-                        counted_amount=row.counted_amount,
-                        expected_amount=row.expected_amount,
-                        variance_amount=row.variance_amount,
+                        product_id=product_state.identity.product_id,
+                        product_code_snapshot=product_state.identity.product_code,
+                        product_name_snapshot=product_state.identity.product_name,
+                        product_class_id=product_state.identity.product_class_id,
+                        product_class_code_snapshot=product_state.identity.product_class_code,
+                        product_class_name_snapshot=product_state.identity.product_class_name,
+                        quantity=product_state.counted_quantity,
+                        bucket_code=OPERATION_BUCKET_COUNTER,
+                        notes=product_state.notes,
                     )
                 )
 
-            if has_count_capture:
-                for product_state in prepared.computation.products:
-                    if product_state.counted_quantity is None:
-                        continue
-                    session.add(
-                        CashSessionCloseProductCount(
-                            cash_session_close_id=close_row.id,
-                            product_id=product_state.identity.product_id,
-                            product_code_snapshot=product_state.identity.product_code,
-                            product_name_snapshot=product_state.identity.product_name,
-                            product_class_id=product_state.identity.product_class_id,
-                            product_class_code_snapshot=product_state.identity.product_class_code,
-                            product_class_name_snapshot=product_state.identity.product_class_name,
-                            quantity=product_state.counted_quantity,
-                            bucket_code=OPERATION_BUCKET_COUNTER,
-                            notes=product_state.notes,
-                        )
-                    )
-
-                for class_state in prepared.computation.class_reconciliations:
-                    class_row = CashSessionCloseClassReconciliation(
-                        cash_session_close_id=close_row.id,
-                        product_class_id=class_state.product_class_id,
-                        product_class_code_snapshot=class_state.product_class_code,
-                        product_class_name_snapshot=class_state.product_class_name,
-                        expected_quantity=class_state.pending_quantity,
-                        auto_attributed_quantity=class_state.auto_attributed_quantity,
-                        attributed_quantity=class_state.final_attributed_quantity,
-                        variance_quantity=class_state.discrepancy_quantity,
-                        resolution_status=class_state.resolution_status,
-                        notes=class_state.notes,
-                    )
-                    session.add(class_row)
-                    session.flush()
-
-                    for attribution in class_state.attribution_lines:
-                        session.add(
-                            CashSessionCloseReconciliationAttribution(
-                                cash_session_close_id=close_row.id,
-                                class_reconciliation_id=class_row.id,
-                                product_id=attribution.identity.product_id,
-                                product_code_snapshot=attribution.identity.product_code,
-                                product_name_snapshot=attribution.identity.product_name,
-                                product_class_id=attribution.identity.product_class_id,
-                                product_class_code_snapshot=attribution.identity.product_class_code,
-                                product_class_name_snapshot=attribution.identity.product_class_name,
-                                attributed_quantity=attribution.attributed_quantity,
-                                notes=attribution.notes,
-                            )
-                        )
-
-            generated_documents: list[OperationDocument] = []
-            discrepancy_payload_rows: list[dict[str, str | None]] = []
-            if has_count_capture:
-                for discrepancy in prepared.computation.discrepancy_resolutions:
-                    generated_document = _create_discrepancy_document(
-                        session,
-                        discrepancy=discrepancy,
-                        branch_id=active_cash_session.branch_id,
-                        workstation_id=active_cash_session.workstation_id,
-                        actor_id=current_user.id,
-                        close_id=close_row.id,
-                        committed_at=committed_at,
-                    )
-                    generated_documents.append(generated_document)
-                    session.add(
-                        CashSessionCloseDiscrepancyResolution(
-                            cash_session_close_id=close_row.id,
-                            product_id=discrepancy.identity.product_id,
-                            product_code_snapshot=discrepancy.identity.product_code,
-                            product_name_snapshot=discrepancy.identity.product_name,
-                            product_class_id=discrepancy.identity.product_class_id,
-                            product_class_code_snapshot=discrepancy.identity.product_class_code,
-                            product_class_name_snapshot=discrepancy.identity.product_class_name,
-                            expected_quantity=discrepancy.expected_quantity,
-                            counted_quantity=discrepancy.counted_quantity,
-                            discrepancy_quantity=discrepancy.discrepancy_quantity,
-                            resolution_type=discrepancy.resolution_type,
-                            reason_code=discrepancy.reason_code or "",
-                            notes=discrepancy.notes,
-                            generated_document_id=generated_document.id,
-                        )
-                    )
-                    discrepancy_payload_rows.append(
-                        {
-                            "product_id": str(discrepancy.identity.product_id),
-                            "product_code": discrepancy.identity.product_code,
-                            "product_name": discrepancy.identity.product_name,
-                            "discrepancy_quantity": str(discrepancy.discrepancy_quantity),
-                            "resolution_type": discrepancy.resolution_type,
-                            "reason_code": discrepancy.reason_code,
-                            "generated_document_id": str(generated_document.id),
-                        }
-                    )
-
-            for warning in prepared.warnings:
-                session.add(
-                    CashSessionCloseIssue(
-                        cash_session_close_id=close_row.id,
-                        issue_level=CASH_CLOSE_ISSUE_LEVEL_WARNING,
-                        code=warning.code,
-                        message=warning.message,
-                    )
+            for class_state in prepared.computation.class_reconciliations:
+                class_row = CashSessionCloseClassReconciliation(
+                    cash_session_close_id=close_row.id,
+                    product_class_id=class_state.product_class_id,
+                    product_class_code_snapshot=class_state.product_class_code,
+                    product_class_name_snapshot=class_state.product_class_name,
+                    expected_quantity=class_state.pending_quantity,
+                    auto_attributed_quantity=class_state.auto_attributed_quantity,
+                    attributed_quantity=class_state.final_attributed_quantity,
+                    variance_quantity=class_state.discrepancy_quantity,
+                    resolution_status=class_state.resolution_status,
+                    notes=class_state.notes,
                 )
-
-            if has_count_capture:
-                closing_snapshot = BranchCounterSnapshot(
-                    branch_id=active_cash_session.branch_id,
-                    source_cash_session_close_id=close_row.id,
-                    snapshot_type=BRANCH_COUNTER_SNAPSHOT_TYPE_CLOSE_BASELINE,
-                    captured_by_user_id=current_user.id,
-                    captured_at_utc=committed_at,
-                )
-                session.add(closing_snapshot)
+                session.add(class_row)
                 session.flush()
-                for product_state in prepared.computation.products:
-                    if product_state.counted_quantity is None:
-                        continue
+
+                for attribution in class_state.attribution_lines:
                     session.add(
-                        BranchCounterSnapshotLine(
-                            snapshot_id=closing_snapshot.id,
-                            product_id=product_state.identity.product_id,
-                            product_code_snapshot=product_state.identity.product_code,
-                            product_name_snapshot=product_state.identity.product_name,
-                            product_class_id=product_state.identity.product_class_id,
-                            product_class_code_snapshot=product_state.identity.product_class_code,
-                            product_class_name_snapshot=product_state.identity.product_class_name,
-                            quantity=product_state.counted_quantity,
-                            bucket_code=OPERATION_BUCKET_COUNTER,
+                        CashSessionCloseReconciliationAttribution(
+                            cash_session_close_id=close_row.id,
+                            class_reconciliation_id=class_row.id,
+                            product_id=attribution.identity.product_id,
+                            product_code_snapshot=attribution.identity.product_code,
+                            product_name_snapshot=attribution.identity.product_name,
+                            product_class_id=attribution.identity.product_class_id,
+                            product_class_code_snapshot=attribution.identity.product_class_code,
+                            product_class_name_snapshot=attribution.identity.product_class_name,
+                            attributed_quantity=attribution.attributed_quantity,
+                            notes=attribution.notes,
                         )
                     )
 
-            pending_sale_lines = (
-                session.execute(
-                    select(SaleLine)
-                    .select_from(SaleLine)
-                    .join(Sale, Sale.id == SaleLine.sale_id)
-                    .where(
-                        Sale.cash_session_id == active_cash_session.id,
-                        SaleLine.capture_mode == "CLASS_CAPTURE",
-                        SaleLine.physical_attribution_status
-                        == SALE_LINE_PHYSICAL_ATTRIBUTION_PENDING_RECONCILIATION,
+        generated_documents: list[OperationDocument] = []
+        discrepancy_payload_rows: list[dict[str, str | None]] = []
+        if has_count_capture:
+            for discrepancy in prepared.computation.discrepancy_resolutions:
+                generated_document = _create_discrepancy_document(
+                    session,
+                    discrepancy=discrepancy,
+                    branch_id=active_cash_session.branch_id,
+                    workstation_id=active_cash_session.workstation_id,
+                    actor_id=current_user.id,
+                    close_id=close_row.id,
+                    committed_at=committed_at,
+                )
+                generated_documents.append(generated_document)
+                session.add(
+                    CashSessionCloseDiscrepancyResolution(
+                        cash_session_close_id=close_row.id,
+                        product_id=discrepancy.identity.product_id,
+                        product_code_snapshot=discrepancy.identity.product_code,
+                        product_name_snapshot=discrepancy.identity.product_name,
+                        product_class_id=discrepancy.identity.product_class_id,
+                        product_class_code_snapshot=discrepancy.identity.product_class_code,
+                        product_class_name_snapshot=discrepancy.identity.product_class_name,
+                        expected_quantity=discrepancy.expected_quantity,
+                        counted_quantity=discrepancy.counted_quantity,
+                        discrepancy_quantity=discrepancy.discrepancy_quantity,
+                        resolution_type=discrepancy.resolution_type,
+                        reason_code=discrepancy.reason_code or "",
+                        notes=discrepancy.notes,
+                        generated_document_id=generated_document.id,
                     )
                 )
-                .scalars()
-                .all()
+                discrepancy_payload_rows.append(
+                    {
+                        "product_id": str(discrepancy.identity.product_id),
+                        "product_code": discrepancy.identity.product_code,
+                        "product_name": discrepancy.identity.product_name,
+                        "discrepancy_quantity": str(discrepancy.discrepancy_quantity),
+                        "resolution_type": discrepancy.resolution_type,
+                        "reason_code": discrepancy.reason_code,
+                        "generated_document_id": str(generated_document.id),
+                    }
+                )
+
+        for warning in prepared.warnings:
+            session.add(
+                CashSessionCloseIssue(
+                    cash_session_close_id=close_row.id,
+                    issue_level=CASH_CLOSE_ISSUE_LEVEL_WARNING,
+                    code=warning.code,
+                    message=warning.message,
+                )
             )
-            if has_count_capture:
-                for sale_line in pending_sale_lines:
-                    sale_line.physical_attribution_status = (
-                        SALE_LINE_PHYSICAL_ATTRIBUTION_RECONCILED
-                    )
 
-            active_cash_session.status = CASH_SESSION_STATUS_CLOSED
-            active_cash_session.closed_at = committed_at
-
-            self._audit_recorder.record(
-                session,
-                actor_id=current_user.id,
-                action="cash_close.committed",
-                resource_type="cash_session_close",
-                resource_id=str(close_row.id),
+        if has_count_capture:
+            closing_snapshot = BranchCounterSnapshot(
                 branch_id=active_cash_session.branch_id,
-                request_id=resolved_request_id,
-                metadata={
-                    "cash_session_id": str(active_cash_session.id),
-                    "workstation_id": str(active_cash_session.workstation_id),
-                    "close_mode": close_row.close_mode,
-                    "counter_empty_confirmed": close_row.counter_empty_confirmed,
-                    "opening_amount": str(close_row.opening_amount),
-                    "expected_cash_amount": str(close_row.expected_cash_amount),
-                    "counted_cash_amount": _optional_decimal_to_string(
-                        close_row.counted_cash_amount
-                    ),
-                    "cash_variance_amount": _optional_decimal_to_string(
-                        close_row.cash_variance_amount
-                    ),
-                    "class_reconciliation_count": len(prepared.computation.class_reconciliations),
-                    "generated_discrepancy_document_count": len(generated_documents),
-                    "warning_codes": [warning.code for warning in prepared.warnings],
-                },
+                source_cash_session_close_id=close_row.id,
+                snapshot_type=BRANCH_COUNTER_SNAPSHOT_TYPE_CLOSE_BASELINE,
+                captured_by_user_id=current_user.id,
+                captured_at_utc=committed_at,
             )
+            session.add(closing_snapshot)
+            session.flush()
+            for product_state in prepared.computation.products:
+                if product_state.counted_quantity is None:
+                    continue
+                session.add(
+                    BranchCounterSnapshotLine(
+                        snapshot_id=closing_snapshot.id,
+                        product_id=product_state.identity.product_id,
+                        product_code_snapshot=product_state.identity.product_code,
+                        product_name_snapshot=product_state.identity.product_name,
+                        product_class_id=product_state.identity.product_class_id,
+                        product_class_code_snapshot=product_state.identity.product_class_code,
+                        product_class_name_snapshot=product_state.identity.product_class_name,
+                        quantity=product_state.counted_quantity,
+                        bucket_code=OPERATION_BUCKET_COUNTER,
+                    )
+                )
+
+        pending_sale_lines = (
+            session.execute(
+                select(SaleLine)
+                .select_from(SaleLine)
+                .join(Sale, Sale.id == SaleLine.sale_id)
+                .where(
+                    Sale.cash_session_id == active_cash_session.id,
+                    SaleLine.capture_mode == "CLASS_CAPTURE",
+                    SaleLine.physical_attribution_status
+                    == SALE_LINE_PHYSICAL_ATTRIBUTION_PENDING_RECONCILIATION,
+                )
+            )
+            .scalars()
+            .all()
+        )
+        if has_count_capture:
+            for sale_line in pending_sale_lines:
+                sale_line.physical_attribution_status = SALE_LINE_PHYSICAL_ATTRIBUTION_RECONCILED
+
+        active_cash_session.status = CASH_SESSION_STATUS_CLOSED
+        active_cash_session.closed_at = committed_at
+
+        self._audit_recorder.record(
+            session,
+            actor_id=current_user.id,
+            action="cash_close.committed",
+            resource_type="cash_session_close",
+            resource_id=str(close_row.id),
+            branch_id=active_cash_session.branch_id,
+            request_id=resolved_request_id,
+            metadata={
+                **trace,
+                "cash_session_id": str(active_cash_session.id),
+                "workstation_id": str(active_cash_session.workstation_id),
+                "close_mode": close_row.close_mode,
+                "counter_empty_confirmed": close_row.counter_empty_confirmed,
+                "opening_amount": str(close_row.opening_amount),
+                "expected_cash_amount": str(close_row.expected_cash_amount),
+                "counted_cash_amount": _optional_decimal_to_string(close_row.counted_cash_amount),
+                "cash_variance_amount": _optional_decimal_to_string(close_row.cash_variance_amount),
+                "class_reconciliation_count": len(prepared.computation.class_reconciliations),
+                "generated_discrepancy_document_count": len(generated_documents),
+                "warning_codes": [warning.code for warning in prepared.warnings],
+            },
+        )
+        self._outbox_writer.append(
+            session,
+            aggregate_type="cash_session_close",
+            aggregate_id=str(close_row.id),
+            event_name=OUTBOX_EVENT_CASH_SESSION_CLOSED_V1,
+            payload={
+                "close_id": str(close_row.id),
+                "cash_session_id": str(active_cash_session.id),
+                "branch_id": str(active_cash_session.branch_id),
+                "workstation_id": str(active_cash_session.workstation_id),
+                "closed_by_user_id": str(current_user.id),
+                "close_mode": close_row.close_mode,
+                "counter_empty_confirmed": close_row.counter_empty_confirmed,
+                "expected_cash_amount": str(close_row.expected_cash_amount),
+                "counted_cash_amount": _optional_decimal_to_string(close_row.counted_cash_amount),
+                "cash_variance_amount": _optional_decimal_to_string(close_row.cash_variance_amount),
+                "committed_at_utc": committed_at.isoformat(),
+            },
+            headers={"request_id": resolved_request_id, **trace},
+        )
+        if has_count_capture:
             self._outbox_writer.append(
                 session,
                 aggregate_type="cash_session_close",
                 aggregate_id=str(close_row.id),
-                event_name=OUTBOX_EVENT_CASH_SESSION_CLOSED_V1,
+                event_name=OUTBOX_EVENT_CLASS_CAPTURE_RECONCILED_V1,
                 payload={
                     "close_id": str(close_row.id),
                     "cash_session_id": str(active_cash_session.id),
-                    "branch_id": str(active_cash_session.branch_id),
-                    "workstation_id": str(active_cash_session.workstation_id),
-                    "closed_by_user_id": str(current_user.id),
-                    "close_mode": close_row.close_mode,
-                    "counter_empty_confirmed": close_row.counter_empty_confirmed,
-                    "expected_cash_amount": str(close_row.expected_cash_amount),
-                    "counted_cash_amount": _optional_decimal_to_string(
-                        close_row.counted_cash_amount
+                    "pending_class_capture_classes_count": (
+                        prepared.pending_class_capture.pending_class_capture_classes_count
                     ),
-                    "cash_variance_amount": _optional_decimal_to_string(
-                        close_row.cash_variance_amount
+                    "pending_class_capture_total_quantity": str(
+                        prepared.pending_class_capture.pending_class_capture_total_quantity
                     ),
-                    "committed_at_utc": committed_at.isoformat(),
+                    "class_reconciliations": [
+                        {
+                            "product_class_id": str(class_state.product_class_id),
+                            "product_class_code": class_state.product_class_code,
+                            "pending_quantity": str(class_state.pending_quantity),
+                            "final_attributed_quantity": str(class_state.final_attributed_quantity),
+                            "resolution_status": class_state.resolution_status,
+                        }
+                        for class_state in prepared.computation.class_reconciliations
+                    ],
                 },
-                headers={"request_id": resolved_request_id},
+                headers={"request_id": resolved_request_id, **trace},
             )
-            if has_count_capture:
-                self._outbox_writer.append(
-                    session,
-                    aggregate_type="cash_session_close",
-                    aggregate_id=str(close_row.id),
-                    event_name=OUTBOX_EVENT_CLASS_CAPTURE_RECONCILED_V1,
-                    payload={
-                        "close_id": str(close_row.id),
-                        "cash_session_id": str(active_cash_session.id),
-                        "pending_class_capture_classes_count": (
-                            prepared.pending_class_capture.pending_class_capture_classes_count
-                        ),
-                        "pending_class_capture_total_quantity": str(
-                            prepared.pending_class_capture.pending_class_capture_total_quantity
-                        ),
-                        "class_reconciliations": [
-                            {
-                                "product_class_id": str(class_state.product_class_id),
-                                "product_class_code": class_state.product_class_code,
-                                "pending_quantity": str(class_state.pending_quantity),
-                                "final_attributed_quantity": str(
-                                    class_state.final_attributed_quantity
-                                ),
-                                "resolution_status": class_state.resolution_status,
-                            }
-                            for class_state in prepared.computation.class_reconciliations
-                        ],
-                    },
-                    headers={"request_id": resolved_request_id},
-                )
-            if len(discrepancy_payload_rows) > 0:
-                self._outbox_writer.append(
-                    session,
-                    aggregate_type="cash_session_close",
-                    aggregate_id=str(close_row.id),
-                    event_name=OUTBOX_EVENT_CLOSE_DISCREPANCY_GENERATED_V1,
-                    payload={
-                        "close_id": str(close_row.id),
-                        "cash_session_id": str(active_cash_session.id),
-                        "generated_documents": discrepancy_payload_rows,
-                    },
-                    headers={"request_id": resolved_request_id},
-                )
+        if len(discrepancy_payload_rows) > 0:
+            self._outbox_writer.append(
+                session,
+                aggregate_type="cash_session_close",
+                aggregate_id=str(close_row.id),
+                event_name=OUTBOX_EVENT_CLOSE_DISCREPANCY_GENERATED_V1,
+                payload={
+                    "close_id": str(close_row.id),
+                    "cash_session_id": str(active_cash_session.id),
+                    "generated_documents": discrepancy_payload_rows,
+                },
+                headers={"request_id": resolved_request_id, **trace},
+            )
 
-            session.commit()
-        except IntegrityError as error:
-            session.rollback()
-            raise CashCloseValidationError(
-                "Cash close commit invariants were violated by a concurrent request."
-            ) from error
-
-        return self._query_service.get_close_detail(
-            session,
-            current_user=current_user,
-            close_id=close_row.id,
+        session.flush()
+        return CashCloseCommitResultView(
+            id=close_row.id,
+            cash_session_id=active_cash_session.id,
+            branch_id=active_cash_session.branch_id,
+            workstation_id=active_cash_session.workstation_id,
+            status="COMMITTED",
+            close_mode=close_row.close_mode,
+            opening_amount=close_row.opening_amount,
+            total_cash_in=close_row.total_cash_in,
+            total_cash_out=close_row.total_cash_out,
+            expected_cash_amount=close_row.expected_cash_amount,
+            counted_cash_amount=close_row.counted_cash_amount,
+            cash_variance_amount=close_row.cash_variance_amount,
+            currency_code=prepared.financial_summary.currency_code,
+            reconciliation_status=close_row.reconciliation_status,
+            committed_at_utc=committed_at,
+            generated_discrepancy_document_ids=[document.id for document in generated_documents],
         )
 
 

@@ -18,6 +18,7 @@ from zeromerma_api.db.session import SessionLocal
 from zeromerma_api.modules.audit.infrastructure.models import AuditLog
 from zeromerma_api.modules.branches.infrastructure.models import Branch, Workstation
 from zeromerma_api.modules.outbox.infrastructure.models import OutboxEvent
+from zeromerma_api.testing.idempotency import new_idempotency_key
 from zeromerma_api.testing.sessions import login_headers
 
 ALLOWED_POS_ORIGIN = "http://127.0.0.1:5173"
@@ -123,6 +124,7 @@ def test_open_cash_session_writes_audit_and_outbox_and_exposes_current_session(
         headers={
             **_authorization_header(client),
             "X-Request-ID": "phase-1a-open-session",
+            "Idempotency-Key": new_idempotency_key(),
         },
         json={
             "workstation_code": SEED_WORKSTATION_CODE,
@@ -134,8 +136,6 @@ def test_open_cash_session_writes_audit_and_outbox_and_exposes_current_session(
     payload = response.json()
     assert payload["status"] == "OPEN"
     assert Decimal(str(payload["opening_amount"])) == Decimal("150.00")
-    assert payload["workstation_code"] == SEED_WORKSTATION_CODE
-    assert payload["user_email"] == SEED_USER_EMAIL
 
     current_response = client.get(
         f"/v1/cash-sessions/current?workstation_code={SEED_WORKSTATION_CODE}",
@@ -143,6 +143,8 @@ def test_open_cash_session_writes_audit_and_outbox_and_exposes_current_session(
     )
     assert current_response.status_code == 200
     assert current_response.json()["id"] == payload["id"]
+    assert current_response.json()["workstation_code"] == SEED_WORKSTATION_CODE
+    assert current_response.json()["user_email"] == SEED_USER_EMAIL
 
     with SessionLocal() as session:
         audit_record = session.execute(
@@ -163,7 +165,7 @@ def test_opening_second_session_for_same_workstation_is_rejected(client: TestCli
     headers = _authorization_header(client)
     first_response = client.post(
         "/v1/cash-sessions/open",
-        headers=headers,
+        headers={**headers, "Idempotency-Key": new_idempotency_key()},
         json={
             "workstation_code": SEED_WORKSTATION_CODE,
             "opening_amount": "100.00",
@@ -173,7 +175,7 @@ def test_opening_second_session_for_same_workstation_is_rejected(client: TestCli
 
     second_response = client.post(
         "/v1/cash-sessions/open",
-        headers=headers,
+        headers={**headers, "Idempotency-Key": new_idempotency_key()},
         json={
             "workstation_code": SEED_WORKSTATION_CODE,
             "opening_amount": "80.00",
@@ -202,7 +204,7 @@ def test_opening_second_session_for_same_user_on_another_workstation_is_rejected
     headers = _authorization_header(client)
     first_response = client.post(
         "/v1/cash-sessions/open",
-        headers=headers,
+        headers={**headers, "Idempotency-Key": new_idempotency_key()},
         json={
             "workstation_code": SEED_WORKSTATION_CODE,
             "opening_amount": "120.00",
@@ -219,7 +221,7 @@ def test_opening_second_session_for_same_user_on_another_workstation_is_rejected
     )
     second_response = client.post(
         "/v1/cash-sessions/open",
-        headers=second_station_headers,
+        headers={**second_station_headers, "Idempotency-Key": new_idempotency_key()},
         json={
             "workstation_code": "POS-02",
             "opening_amount": "90.00",

@@ -179,3 +179,15 @@ export type WasteCommitRequest = components["schemas"]["WasteCommitRequest"];
 export type WasteReasonView = components["schemas"]["WasteReasonView"];
 
 export type ReturnCommitResultView = components["schemas"]["ReturnCommitResultView"];
+
+export type CashSessionOpenResultView = components["schemas"]["CashSessionOpenResultView"];
+
+export type OperationalPaymentCommitResultView =
+  components["schemas"]["OperationalPaymentCommitResultView"];
+
+export type OperationalDiscountCommitResultView =
+  components["schemas"]["OperationalDiscountCommitResultView"];
+
+export type CashCloseCommitResultView = components["schemas"]["CashCloseCommitResultView"];
+
+export type CashCloseCommitRequest = components["schemas"]["CashCloseCommitRequest"];

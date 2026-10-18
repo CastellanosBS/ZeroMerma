@@ -101,7 +101,7 @@ def _setup(client: TestClient) -> tuple[dict[str, str], dict[str, Any]]:
     headers = _login(client)
     opened = client.post(
         "/v1/cash-sessions/open",
-        headers=headers,
+        headers={**headers, "Idempotency-Key": new_idempotency_key()},
         json={"workstation_code": SEED_WORKSTATION_CODE, "opening_amount": "100.00"},
     )
     assert opened.status_code == 201

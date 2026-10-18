@@ -270,6 +270,59 @@ export async function dropNextOrderCommandResponse(
   return { committed };
 }
 
+/** Fault only an allowlisted cash command after its real transaction committed. */
+export async function dropNextCashCommandResponse(
+  page: PageObservation,
+  apiUrl: string,
+  evidence: NetworkEvidence,
+  path: string,
+) {
+  if (
+    realEnvironment("pos").apiUrl !== apiUrl ||
+    !["/v1/cash-sessions/open", "/v1/payments", "/v1/discounts", "/v1/cash-close/commit"].includes(
+      path,
+    )
+  ) {
+    throw new Error("Cash faults require an allowlisted isolated command path.");
+  }
+  const register = saleFaultRegistrations.get(page);
+  if (!register)
+    throw new Error(
+      "Real API observation must be installed before injecting an cash response loss.",
+    );
+  let resolveCommitted!: (value: unknown) => void;
+  let rejectCommitted!: (reason: unknown) => void;
+  const committed = new Promise<unknown>((resolve, reject) => {
+    resolveCommitted = resolve;
+    rejectCommitted = reject;
+  });
+  await register(
+    `${apiUrl}${path}`,
+    async (route) => {
+      try {
+        if (route.request().method() !== "POST")
+          throw new Error("Only POST cash commands can lose a response.");
+        const response = await route.fetch({ maxRedirects: 0 });
+        const expected = path === "/v1/cash-close/commit" ? 200 : 201;
+        if (response.status() !== expected)
+          throw new Error(`Expected a real committed cash command, received ${response.status()}.`);
+        evidence.push({
+          method: "POST",
+          path: path.replace(/[0-9a-f]{8}-[0-9a-f-]{27,}/gi, "{id}"),
+          status: expected,
+        });
+        resolveCommitted(await response.json());
+      } catch (error) {
+        rejectCommitted(error);
+      } finally {
+        await route.abort("failed");
+      }
+    },
+    { times: 1 },
+  );
+  return { committed };
+}
+
 function sanitize(value: string): string {
   let result = value;
   for (const name of [

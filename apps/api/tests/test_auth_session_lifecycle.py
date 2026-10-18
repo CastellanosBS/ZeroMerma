@@ -42,6 +42,7 @@ from zeromerma_api.modules.identity.infrastructure.session_models import (
 )
 from zeromerma_api.modules.outbox.infrastructure.models import OutboxEvent
 from zeromerma_api.testing.authorization import owner_headers
+from zeromerma_api.testing.idempotency import new_idempotency_key
 from zeromerma_api.testing.sessions import response_session_headers, surface_origin
 
 
@@ -465,7 +466,7 @@ def test_cash_open_binds_and_close_revokes_only_related_pos_sessions(client: Tes
     other, _ = _login(client, "BACKOFFICE")
     response = client.post(
         "/v1/cash-sessions/open",
-        headers=pos,
+        headers={**pos, "Idempotency-Key": new_idempotency_key()},
         json={"workstation_code": SEED_WORKSTATION_CODE, "opening_amount": "100.00"},
     )
     assert response.status_code == 201, response.text
@@ -597,7 +598,7 @@ def test_pos_workstation_binding_prevents_switch_and_inactive_unlock(client: Tes
     headers, _ = _login(client)
     response = client.post(
         "/v1/cash-sessions/open",
-        headers=headers,
+        headers={**headers, "Idempotency-Key": new_idempotency_key()},
         json={"workstation_code": "POS-02", "opening_amount": "0.00"},
     )
     assert response.status_code in (403, 404)

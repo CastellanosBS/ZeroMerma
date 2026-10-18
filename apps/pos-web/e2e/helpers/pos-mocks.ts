@@ -111,8 +111,25 @@ export async function installPosApiMocks(
   });
 
   await page.route("**/v1/cash-sessions/open", async (route) => {
+    if (
+      !/^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/.test(
+        route.request().headers()["idempotency-key"] ?? "",
+      )
+    )
+      throw new Error("Opening requires UUIDv7 Idempotency-Key");
     currentCashSession = activeCashSession;
-    await fulfillJson(route, activeCashSession);
+    await fulfillJson(
+      route,
+      {
+        id: activeCashSession.id,
+        status: "OPEN",
+        opening_amount: activeCashSession.opening_amount,
+        opened_at: activeCashSession.opened_at,
+        branch_id: bootstrapResponse.branch.id,
+        workstation_id: bootstrapResponse.workstation.id,
+      },
+      201,
+    );
   });
 
   await page.route("**/v1/orders**", async (route) => {

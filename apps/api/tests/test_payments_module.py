@@ -23,6 +23,7 @@ from zeromerma_api.modules.payments.infrastructure.models import (
     OperationalPaymentCategory,
 )
 from zeromerma_api.modules.sales.infrastructure.models import CashMovement
+from zeromerma_api.testing.idempotency import current_cash_session_id, new_idempotency_key
 from zeromerma_api.testing.sessions import login_headers
 
 
@@ -37,7 +38,7 @@ def _authorization_header(client: TestClient) -> dict[str, str]:
 def _open_cash_session(client: TestClient) -> None:
     response = client.post(
         "/v1/cash-sessions/open",
-        headers=_authorization_header(client),
+        headers={**_authorization_header(client), "Idempotency-Key": new_idempotency_key()},
         json={
             "workstation_code": SEED_WORKSTATION_CODE,
             "opening_amount": "300.00",
@@ -85,10 +86,16 @@ def test_payments_bootstrap_list_detail_and_cash_commit_work_end_to_end(
     ]
     assert bootstrap_payload["active_payment_methods"][2]["is_enabled"] is False
 
+    cash_command_headers = {**headers, "Idempotency-Key": new_idempotency_key()}
+    cash_command_cash_session_id = current_cash_session_id(
+        client, headers=cash_command_headers, workstation_code=SEED_WORKSTATION_CODE
+    )
+
     create_response = client.post(
         "/v1/payments",
-        headers=headers,
+        headers=cash_command_headers,
         json={
+            "cash_session_id": cash_command_cash_session_id,
             "workstation_code": SEED_WORKSTATION_CODE,
             "payee_name": "Proveedor El Trigo",
             "concept": "Compra urgente de harina",
@@ -105,7 +112,6 @@ def test_payments_bootstrap_list_detail_and_cash_commit_work_end_to_end(
     assert detail_payload["payment_method_code"] == "CASH"
     assert Decimal(str(detail_payload["total_amount"])) == Decimal("125.50")
     assert Decimal(str(detail_payload["cash_amount"])) == Decimal("125.50")
-    assert detail_payload["affects_cash_drawer"] is True
 
     list_response = client.get(
         "/v1/payments",
@@ -132,6 +138,7 @@ def test_payments_bootstrap_list_detail_and_cash_commit_work_end_to_end(
     assert reread_response.status_code == 200
     reread_payload = reread_response.json()
     assert reread_payload["id"] == detail_payload["id"]
+    assert reread_payload["affects_cash_drawer"] is True
     assert reread_payload["audit_summary"]["created_by"]["email"] == SEED_USER_EMAIL
     assert reread_payload["audit_summary"]["confirmed_by"]["full_name"] == "Main Branch Cashier"
 
@@ -171,10 +178,16 @@ def test_card_payment_does_not_reduce_drawer_cash_but_stays_visible_in_close_sum
     _open_cash_session(client)
     headers = _authorization_header(client)
 
+    cash_command_headers = {**headers, "Idempotency-Key": new_idempotency_key()}
+    cash_command_cash_session_id = current_cash_session_id(
+        client, headers=cash_command_headers, workstation_code=SEED_WORKSTATION_CODE
+    )
+
     card_response = client.post(
         "/v1/payments",
-        headers=headers,
+        headers=cash_command_headers,
         json={
+            "cash_session_id": cash_command_cash_session_id,
             "workstation_code": SEED_WORKSTATION_CODE,
             "payee_name": "Mensajeria Norte",
             "concept": "Pago de logistica",
@@ -186,10 +199,16 @@ def test_card_payment_does_not_reduce_drawer_cash_but_stays_visible_in_close_sum
     assert card_response.status_code == 201
     assert Decimal(str(card_response.json()["cash_amount"])) == Decimal("0.00")
 
+    cash_command_headers = {**headers, "Idempotency-Key": new_idempotency_key()}
+    cash_command_cash_session_id = current_cash_session_id(
+        client, headers=cash_command_headers, workstation_code=SEED_WORKSTATION_CODE
+    )
+
     cash_response = client.post(
         "/v1/payments",
-        headers=headers,
+        headers=cash_command_headers,
         json={
+            "cash_session_id": cash_command_cash_session_id,
             "workstation_code": SEED_WORKSTATION_CODE,
             "payee_name": "Gasolinera Centro",
             "concept": "Gas del reparto",
@@ -239,10 +258,19 @@ def test_payments_require_open_session_and_reject_unsupported_methods(
     )
 
     _open_cash_session(client)
+    cash_command_headers = {
+        **_authorization_header(client),
+        "Idempotency-Key": new_idempotency_key(),
+    }
+    cash_command_cash_session_id = current_cash_session_id(
+        client, headers=cash_command_headers, workstation_code=SEED_WORKSTATION_CODE
+    )
+
     unsupported_method_response = client.post(
         "/v1/payments",
-        headers=_authorization_header(client),
+        headers=cash_command_headers,
         json={
+            "cash_session_id": cash_command_cash_session_id,
             "workstation_code": SEED_WORKSTATION_CODE,
             "payee_name": "Pago mixto",
             "concept": "Prueba de metodo no disponible",
@@ -258,10 +286,16 @@ def test_payments_list_supports_scope_and_operator_filters(client: TestClient) -
     _open_cash_session(client)
     headers = _authorization_header(client)
 
+    cash_command_headers = {**headers, "Idempotency-Key": new_idempotency_key()}
+    cash_command_cash_session_id = current_cash_session_id(
+        client, headers=cash_command_headers, workstation_code=SEED_WORKSTATION_CODE
+    )
+
     create_response = client.post(
         "/v1/payments",
-        headers=headers,
+        headers=cash_command_headers,
         json={
+            "cash_session_id": cash_command_cash_session_id,
             "workstation_code": SEED_WORKSTATION_CODE,
             "payee_name": "Proveedor turno actual",
             "concept": "REF-TURNO",

@@ -1,3 +1,4 @@
+import type { OperationalDiscountCommitResultView } from "../../lib/api-contracts";
 import type {
   CreateOperationalDiscountRequest,
   DiscountsBootstrapResponse,
@@ -37,7 +38,6 @@ export function listDiscounts({
   scope,
   workstationCode,
 }: {
-
   category?: string;
   createdByUserId?: string;
   paymentMethod?: string;
@@ -61,7 +61,6 @@ export function getDiscountDetail({
   discountId,
   workstationCode,
 }: {
-
   discountId: string;
   workstationCode: string;
 }): Promise<OperationalDiscountDetailResponse> {
@@ -71,19 +70,21 @@ export function getDiscountDetail({
 }
 
 export function createDiscount({
+  idempotencyKey,
   payload,
   requestId,
 }: {
-
+  idempotencyKey: string;
   payload: CreateOperationalDiscountRequest;
   requestId: string;
-}): Promise<OperationalDiscountDetailResponse> {
-  return requestJson<OperationalDiscountDetailResponse>({
+}): Promise<OperationalDiscountCommitResultView> {
+  return requestJson<OperationalDiscountCommitResultView>({
     body: payload,
     method: "POST",
     path: "/v1/discounts",
     headers: {
       "X-Request-ID": requestId,
+      "Idempotency-Key": idempotencyKey,
     },
   });
 }

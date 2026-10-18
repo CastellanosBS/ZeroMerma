@@ -8,7 +8,7 @@ const context: Context = { userId: "actor", commandCode: "create", orderId: null
 const store = new Map<string, string>();
 const send = vi.fn();
 const recover = vi.fn();
-const coordinator = () =>
+const coordinator = (isRecoveredRejection?: (metadata: Context, error: unknown) => boolean) =>
   createCommandIntentionCoordinator<Context, { amount: string; customer: string }, { id: string }>({
     storagePrefix: "test-intent:",
     eventName: "intent",
@@ -17,6 +17,7 @@ const coordinator = () =>
     scope: () => "station",
     send,
     recover,
+    isRecoveredRejection,
   });
 beforeEach(() => {
   vi.stubGlobal("crypto", webcrypto);
@@ -102,4 +103,23 @@ it("coordinates synchronous and independently instantiated clients under the sam
   );
   await pending;
   expect(send).toHaveBeenCalledTimes(1);
+});
+
+it("resolves a verified durable rejection only during recovery and preserves the original error", async () => {
+  const rejection = new Error("durable rejection");
+  const predicate = vi.fn((_metadata: Context, error: unknown) => error === rejection);
+  const engine = coordinator(predicate);
+  send.mockRejectedValueOnce(new TypeError("lost"));
+  await expect(engine.begin(context, { amount: "20", customer: "x" }, null)).rejects.toThrow();
+  const key = engine.read("station")!.key;
+  send.mockRejectedValueOnce(rejection);
+  await expect(engine.retry(context)).rejects.toBe(rejection);
+  expect(predicate).not.toHaveBeenCalled();
+  expect(engine.read("station")?.status).toBe("UNKNOWN");
+  recover.mockRejectedValueOnce(rejection);
+  await expect(engine.recover(context)).rejects.toBe(rejection);
+  expect(engine.read("station")).toMatchObject({ key, status: "REJECTED" });
+  expect(engine.hasBody(key)).toBe(false);
+  await engine.begin(context, { amount: "21", customer: "x" }, key);
+  expect(engine.read("station")!.key).not.toBe(key);
 });

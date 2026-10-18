@@ -33,6 +33,7 @@ from zeromerma_api.modules.operations.infrastructure.models import (
     WasteReason,
 )
 from zeromerma_api.modules.outbox.infrastructure.models import OutboxEvent
+from zeromerma_api.testing.idempotency import new_idempotency_key
 from zeromerma_api.testing.sessions import login_headers
 
 
@@ -55,7 +56,10 @@ def _authorization_header(
 def _open_cash_session(client: TestClient, workstation_code: str = SEED_WORKSTATION_CODE) -> None:
     response = client.post(
         "/v1/cash-sessions/open",
-        headers=_authorization_header(client, workstation_code),
+        headers={
+            **_authorization_header(client, workstation_code),
+            "Idempotency-Key": new_idempotency_key(),
+        },
         json={
             "workstation_code": workstation_code,
             "opening_amount": "150.00",

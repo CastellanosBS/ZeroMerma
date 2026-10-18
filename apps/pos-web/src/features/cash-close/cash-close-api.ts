@@ -1,3 +1,4 @@
+import type { CashCloseCommitRequest, CashCloseCommitResultView } from "../../lib/api-contracts";
 import type {
   CashCloseBootstrapResponse,
   CashCloseDetailResponse,
@@ -16,9 +17,7 @@ export function getCashCloseBootstrap(
   });
 }
 
-export function getCashCloseSummary(
-  workstationCode: string,
-): Promise<CashCloseSummaryResponse> {
+export function getCashCloseSummary(workstationCode: string): Promise<CashCloseSummaryResponse> {
   return requestJson<CashCloseSummaryResponse>({
     path: `/v1/cash-close/summary?workstation_code=${encodeURIComponent(workstationCode)}`,
   });
@@ -43,18 +42,18 @@ export function previewCashClose(
 }
 
 export function commitCashClose(
-  payload: CashClosePreviewRequest,
-): Promise<CashCloseDetailResponse> {
-  return requestJson<CashCloseDetailResponse>({
+  payload: CashCloseCommitRequest,
+  idempotencyKey: string,
+): Promise<CashCloseCommitResultView> {
+  return requestJson<CashCloseCommitResultView>({
+    headers: { "Idempotency-Key": idempotencyKey },
     body: payload,
     method: "POST",
     path: "/v1/cash-close/commit",
   });
 }
 
-export function getCashCloseDetail(
-  closeId: string,
-): Promise<CashCloseDetailResponse> {
+export function getCashCloseDetail(closeId: string): Promise<CashCloseDetailResponse> {
   return requestJson<CashCloseDetailResponse>({
     path: `/v1/cash-close/${encodeURIComponent(closeId)}`,
   });

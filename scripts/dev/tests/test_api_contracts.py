@@ -278,6 +278,86 @@ def test_return_recovery_uses_only_identity_and_historical_cash_context() -> Non
     )
 
 
+@pytest.mark.parametrize(
+    ("prefix", "suffix", "request_name", "result_name", "status"),
+    [
+        ("cash-sessions", "/open", "OpenCashSessionRequest", "CashSessionOpenResultView", "201"),
+        (
+            "payments",
+            "",
+            "CreateOperationalPaymentRequest",
+            "OperationalPaymentCommitResultView",
+            "201",
+        ),
+        (
+            "discounts",
+            "",
+            "CreateOperationalDiscountRequest",
+            "OperationalDiscountCommitResultView",
+            "201",
+        ),
+        ("cash-close", "/commit", "CashCloseCommitRequest", "CashCloseCommitResultView", "200"),
+    ],
+)
+def test_cash_commands_publish_identity_context_and_minimal_recoverable_results(
+    prefix: str,
+    suffix: str,
+    request_name: str,
+    result_name: str,
+    status: str,
+) -> None:
+    schemas = SCHEMA["components"]["schemas"]
+    operation = SCHEMA["paths"][f"/v1/{prefix}{suffix}"]["post"]
+    key = next(item for item in operation["parameters"] if item["name"] == "Idempotency-Key")
+    assert key["in"] == "header" and key["required"] is True
+    assert "7[0-9a-fA-F]{3}" in key["schema"]["pattern"]
+    request = schemas[request_name]
+    assert "workstation_code" in request["required"]
+    if prefix != "cash-sessions":
+        assert "cash_session_id" in request["required"]
+    receipt = schemas[result_name]
+    assert receipt["additionalProperties"] is False
+    assert (
+        not {
+            "notes",
+            "payee_name",
+            "subject_name",
+            "concept",
+            "user_email",
+            "user_full_name",
+            "created_by",
+            "audit_summary",
+            "can_commit",
+        }
+        & receipt["properties"].keys()
+    )
+    response = operation["responses"][status]
+    assert response["content"]["application/json"]["schema"] == {
+        "$ref": f"#/components/schemas/{result_name}"
+    }
+    assert response["headers"]["Idempotency-Replayed"] == {
+        "$ref": "#/components/headers/IdempotencyReplayed"
+    }
+    recovery = SCHEMA["paths"][f"/v1/{prefix}/confirmations/{{idempotency_key}}"]["get"]
+    assert "requestBody" not in recovery
+    parameters = {item["name"] for item in recovery["parameters"] if item["required"]}
+    assert parameters == (
+        {"idempotency_key", "workstation_code"}
+        | ({"cash_session_id"} if prefix != "cash-sessions" else set())
+    )
+    assert recovery["responses"]["200"]["content"]["application/json"]["schema"] == {
+        "$ref": f"#/components/schemas/{result_name}"
+    }
+
+
+def test_cash_preview_remains_read_only_and_separate_from_commit_contract() -> None:
+    operation = SCHEMA["paths"]["/v1/cash-close/preview"]["post"]
+    assert not any(item["name"] == "Idempotency-Key" for item in operation.get("parameters", []))
+    assert operation["requestBody"]["content"]["application/json"]["schema"] == {
+        "$ref": "#/components/schemas/CashClosePreviewRequest"
+    }
+
+
 def test_error_response_change_is_rejected() -> None:
     changed = copy.deepcopy(SCHEMA)
     _, _, operation = _first_operation(changed)

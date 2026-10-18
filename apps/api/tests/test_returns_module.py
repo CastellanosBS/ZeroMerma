@@ -35,7 +35,7 @@ def _authorization_header(client: TestClient) -> dict[str, str]:
 def _open_cash_session(client: TestClient) -> None:
     response = client.post(
         "/v1/cash-sessions/open",
-        headers=_authorization_header(client),
+        headers={**_authorization_header(client), "Idempotency-Key": new_idempotency_key()},
         json={
             "workstation_code": SEED_WORKSTATION_CODE,
             "opening_amount": "150.00",

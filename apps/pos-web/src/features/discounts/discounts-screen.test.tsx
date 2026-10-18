@@ -1,4 +1,6 @@
 // @vitest-environment jsdom
+import { webcrypto } from "node:crypto";
+import { cashIntentions } from "../cash-commands/cash-command-intent";
 
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { act, type ReactNode } from "react";
@@ -13,8 +15,9 @@ import { createInitialOperationalDiscountDraftState } from "./model";
 import { createDiscount } from "./discounts-api";
 import { DiscountsRightPanel, DiscountsScreen } from "./discounts-screen";
 
-(globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT =
-  true;
+(
+  globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }
+).IS_REACT_ACT_ENVIRONMENT = true;
 
 const refetchMock = vi.fn();
 const showErrorMock = vi.fn();
@@ -97,7 +100,7 @@ const bootstrapResponse = {
     authorization_surface: "POS" as const,
     authorization_version: "test-authorization-v1",
     is_superadministrator: false,
-      password_reset_required: false,
+    password_reset_required: false,
     default_surface: "POS",
     email: "cashier@zeromerma.local",
     full_name: "Main Branch Cashier",
@@ -200,7 +203,8 @@ vi.mock("../cash-close/queries", () => ({
 }));
 
 vi.mock("../pos-shell/keyboard", async () => {
-  const actual = await vi.importActual<typeof import("../pos-shell/keyboard")>("../pos-shell/keyboard");
+  const actual =
+    await vi.importActual<typeof import("../pos-shell/keyboard")>("../pos-shell/keyboard");
 
   return {
     ...actual,
@@ -339,7 +343,9 @@ vi.mock("./queries", () => ({
     isPending: false,
   }),
   useDiscountDetailQuery: (discountId: string | null) => {
-    const discount = [...seededDiscounts, ...createdDiscounts].find((record) => record.id === discountId);
+    const discount = [...seededDiscounts, ...createdDiscounts].find(
+      (record) => record.id === discountId,
+    );
 
     return {
       data: discount ? toDiscountDetail(discount) : null,
@@ -464,6 +470,13 @@ function triggerShortcutByLabel(label: string) {
 let mountedRoots: Array<() => void> = [];
 
 beforeEach(() => {
+  localStorage.clear();
+  cashIntentions.forgetBodies();
+  vi.stubGlobal("crypto", webcrypto);
+  Object.defineProperty(navigator, "locks", {
+    configurable: true,
+    value: { request: vi.fn(async (_name, _options, callback) => callback({ name: "lock" })) },
+  });
   seededDiscounts = [...baseDiscounts];
   createdDiscounts = [];
   registeredShortcuts.clear();
@@ -479,8 +492,9 @@ beforeEach(() => {
       cash_amount: payload.payment_method_code === "CASH" ? totalAmount : "0.00",
       category_code: payload.category_code ?? null,
       category_name:
-        bootstrapResponse.active_categories.find((category) => category.code === payload.category_code)
-          ?.name ?? null,
+        bootstrapResponse.active_categories.find(
+          (category) => category.code === payload.category_code,
+        )?.name ?? null,
       concept: payload.concept,
       created_at_utc: "2026-04-22T19:30:00Z",
       created_by_user_id: bootstrapResponse.user.id,
@@ -497,11 +511,26 @@ beforeEach(() => {
     };
 
     createdDiscounts = [newRecord, ...createdDiscounts];
-    return toDiscountDetail(newRecord);
+    return {
+      id: newRecord.id,
+      folio: newRecord.folio,
+      status: "COMMITTED",
+      branch_id: bootstrapResponse.branch.id,
+      workstation_id: bootstrapResponse.workstation.id,
+      cash_session_id: bootstrapResponse.current_open_cash_session!.id,
+      cash_movement_id: "movement-new",
+      payment_method_code: newRecord.payment_method_code,
+      currency_code: newRecord.currency_code,
+      total_amount: newRecord.total_amount,
+      cash_amount: newRecord.cash_amount,
+      non_cash_amount: newRecord.non_cash_amount,
+      committed_at_utc: newRecord.created_at_utc,
+    };
   });
 });
 
 afterEach(() => {
+  vi.unstubAllGlobals();
   for (const unmount of mountedRoots) {
     unmount();
   }
@@ -571,15 +600,21 @@ describe("DiscountsScreen", () => {
     await flushPromises();
 
     setControlValue(
-      view.container.querySelector('input[aria-label="Persona o entidad del descuento"]') as HTMLInputElement,
+      view.container.querySelector(
+        'input[aria-label="Persona o entidad del descuento"]',
+      ) as HTMLInputElement,
       "Sergio Castellanos",
     );
     setControlValue(
-      view.container.querySelector('select[aria-label="Categoria del descuento"]') as HTMLSelectElement,
+      view.container.querySelector(
+        'select[aria-label="Categoria del descuento"]',
+      ) as HTMLSelectElement,
       "PAYROLL",
     );
     setControlValue(
-      view.container.querySelector('input[aria-label="Motivo o referencia del descuento"]') as HTMLInputElement,
+      view.container.querySelector(
+        'input[aria-label="Motivo o referencia del descuento"]',
+      ) as HTMLInputElement,
       "Prestamo interno abril",
     );
     setControlValue(
@@ -601,9 +636,7 @@ describe("DiscountsScreen", () => {
 
     expect(view.container.textContent).not.toContain("Confirmar descuento");
 
-    click(
-      view.container.querySelector('input[type="checkbox"]'),
-    );
+    click(view.container.querySelector('input[type="checkbox"]'));
     await flushPromises();
 
     triggerShortcut("discounts-submit");

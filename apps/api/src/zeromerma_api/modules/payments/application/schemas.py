@@ -2,9 +2,10 @@ from __future__ import annotations
 
 from datetime import datetime
 from decimal import Decimal
+from typing import Literal
 from uuid import UUID
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from zeromerma_api.modules.audit.application.schemas import AuditSummaryView
 from zeromerma_api.modules.branches.application.schemas import BranchSummary, WorkstationSummary
@@ -51,13 +52,54 @@ class PaymentsBootstrapResponse(BaseModel):
 
 
 class CreateOperationalPaymentRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     workstation_code: str = Field(min_length=1, max_length=64)
+    cash_session_id: UUID
     payee_name: str = Field(min_length=1, max_length=160)
     concept: str = Field(min_length=1, max_length=240)
     category_code: str | None = Field(default=None, max_length=40)
     payment_method_code: str = Field(min_length=1, max_length=40)
     total_amount: Decimal = Field(gt=Decimal("0.00"), max_digits=12, decimal_places=2)
     notes: str | None = None
+
+    @field_validator("payee_name", "concept")
+    @classmethod
+    def normalize_text(cls, value: str) -> str:
+        return value.strip()
+
+    @field_validator("payment_method_code")
+    @classmethod
+    def normalize_method(cls, value: str) -> str:
+        return value.strip().upper()
+
+    @field_validator("category_code")
+    @classmethod
+    def normalize_category(cls, value: str | None) -> str | None:
+        return (value.strip().upper() or None) if value is not None else None
+
+    @field_validator("notes")
+    @classmethod
+    def normalize_notes(cls, value: str | None) -> str | None:
+        return (value.strip() or None) if value is not None else None
+
+
+class OperationalPaymentCommitResultView(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    id: UUID
+    folio: str
+    status: Literal["COMMITTED"]
+    branch_id: UUID
+    workstation_id: UUID
+    cash_session_id: UUID
+    cash_movement_id: UUID | None
+    payment_method_code: str
+    currency_code: str
+    total_amount: Decimal
+    cash_amount: Decimal
+    non_cash_amount: Decimal
+    committed_at_utc: datetime
 
 
 class OperationalPaymentListItemView(BaseModel):

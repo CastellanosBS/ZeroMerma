@@ -8469,6 +8469,122 @@
       ]
     },
     {
+      "operation_key": "API:GET:/v1/cash-close/confirmations/{idempotency_key}",
+      "surface": "POS",
+      "method": "GET",
+      "path": "/v1/cash-close/confirmations/{idempotency_key}",
+      "operation_id": "recover_cash_close_v1_cash_close_confirmations__idempotency_key__get",
+      "include_in_schema": true,
+      "tags": [
+        "cash-close"
+      ],
+      "router_file": "apps/api/src/zeromerma_api/modules/cash_close/presentation/router.py",
+      "router_symbol": "recover_cash_close",
+      "module_owner": "API:cash-close",
+      "use_case": "recover_cash_close",
+      "implementation_state": "IMPLEMENTED_VERIFIED",
+      "verification_state": "TESTED_IN_THIS_TASK",
+      "auth_requirement": "AUTHENTICATED",
+      "actual_auth_dependency": [
+        "fastapi.security.api_key:APIKeyCookie",
+        "zeromerma_api.db.session:get_session",
+        "zeromerma_api.modules.identity.presentation.dependencies:get_current_authentication",
+        "zeromerma_api.modules.identity.presentation.dependencies:get_current_user",
+        "zeromerma_api.presentation.access_policy:enforce_operation_policy"
+      ],
+      "actual_surface_guard": "EXPLICIT_POS_POLICY_WITH_EFFECTIVE_GRANTS",
+      "required_capability": "pos.operate",
+      "capability_enforcement_state": "CAPABILITY_ENFORCED",
+      "required_scope": "GLOBAL_OR_BRANCH_SET_PER_DEC04",
+      "scope_source": "SERVER_RESOLVED_ACTIVE_ROLE_ASSIGNMENT_SCOPES_INTERSECT_ACTIVE_USER_BRANCH_MEMBERSHIPS",
+      "scope_enforcement_state": "SCOPE_ENFORCED",
+      "request_schema": [
+        "NONE"
+      ],
+      "response_schema": "CashCloseCommitResultView",
+      "error_contract_state": "CANONICAL_API_ERROR_RESPONSE",
+      "application_service": [
+        "zeromerma_api.modules.cash_close.application.idempotency.CashCloseCommitService.recover"
+      ],
+      "domain_or_use_case_symbol": "CashCloseCommitService.recover",
+      "router_business_logic_present": false,
+      "transaction_owner": "zeromerma_api.modules.idempotency.application.service.IdempotencyExecutor.recover",
+      "transaction_boundary": "Read-only result lookup with current authorization and exact actor/context checks; no reservation or cash business action is performed.",
+      "persistence": "READ_ONLY",
+      "external_side_effect": "NONE_OBSERVED_STATICALLY",
+      "reads_entities": [
+        "idempotency_records",
+        "workstations"
+      ],
+      "writes_entities": [
+        "NONE"
+      ],
+      "locks_or_concurrency_control": "Indexed unique-key lookup with exact saved actor/context comparison and current POS capability/scope checks; unknown or uncommitted result remains HTTP 409",
+      "audit_required": false,
+      "audit_actual": "NOT_REQUIRED",
+      "audit_atomicity": "NOT_REQUIRED",
+      "outbox_required": false,
+      "outbox_actual": "NOT_REQUIRED",
+      "outbox_atomicity": "NOT_REQUIRED",
+      "idempotency_required": false,
+      "idempotency_actual": "NOT_REQUIRED",
+      "idempotency_business_identity": "Reads the existing global UUIDv7 identity with workstation_code and explicit original cash_session_id; no new identity is admitted.",
+      "idempotency_replay_behavior": "HTTP 200 saved CashCloseCommitResultView for COMPLETED; saved rejection or nonterminal error otherwise, without executing another cash action.",
+      "generated_client_operation": "recover_return_confirmation_v1_returns_confirmations__idempotency_key__get",
+      "consumer_contract_state": "CLIENT_GENERATED_USED",
+      "consumer_disposition": "LOCAL_UI_PRESENT",
+      "consumer_reason": "Generated POS adapter submits an explicit intention key and recovers the original result from metadata after response loss; rich fields are queried separately.",
+      "pos_consumers": [
+        "apps/pos-web/src/features/cash-commands/cash-command-intent.ts"
+      ],
+      "backoffice_consumers": [
+        "NONE"
+      ],
+      "other_consumers": [
+        "NONE"
+      ],
+      "direct_tests": [
+        "apps/api/tests/test_cash_idempotency.py",
+        "apps/pos-web/e2e-real/aa-cash-command.spec.ts"
+      ],
+      "indirect_tests": [
+        "apps/api/tests/conftest.py",
+        "apps/api/unit_tests/test_operation_policy.py#test_every_route_and_persisted_family_has_an_explicit_policy",
+        "apps/api/tests/test_operation_authorization.py#test_all_scoped_families_support_mapped_reads_and_aggregate_subqueries"
+      ],
+      "missing_test_types": [
+        "NONE"
+      ],
+      "approved_target_state": "Authorized historical lookup returns the original minimized cash acknowledgement, including after fresh login following close, without executing or replacing the intention.",
+      "feature_complete_blocker": false,
+      "later_ZM_FIN_tasks": [
+        "NOT_APPLICABLE"
+      ],
+      "decision_refs": [
+        "DEC-05",
+        "DEC-06",
+        "DEC-07",
+        "DEC-03",
+        "DEC-04",
+        "DEC-15",
+        "DEC-16"
+      ],
+      "gate_refs": [
+        "G1",
+        "G5"
+      ],
+      "gap_ids": [
+        "NONE"
+      ],
+      "evidence": [
+        "apps/api/src/zeromerma_api/modules/cash_close/presentation/router.py#recover_cash_close",
+        "apps/api/src/zeromerma_api/modules/cash_close/application/idempotency.py#class CashCloseCommitService",
+        "docs/architecture/idempotency.md",
+        "docs/implementation/cash-idempotency-validation.md",
+        "apps/pos-web/src/features/cash-commands/cash-command-intent.ts"
+      ]
+    },
+    {
       "operation_key": "API:GET:/v1/cash-sessions/current",
       "surface": "POS",
       "method": "GET",
@@ -8578,6 +8694,122 @@
         "apps/api/src/zeromerma_api/presentation/access_policy.py#ENDPOINT_POLICIES",
         "apps/api/src/zeromerma_api/db/access_scope.py#bind_authorization_scope",
         "docs/architecture/authorization.md"
+      ]
+    },
+    {
+      "operation_key": "API:GET:/v1/cash-sessions/confirmations/{idempotency_key}",
+      "surface": "POS",
+      "method": "GET",
+      "path": "/v1/cash-sessions/confirmations/{idempotency_key}",
+      "operation_id": "recover_cash_session_opening_v1_cash_sessions_confirmations__idempotency_key__get",
+      "include_in_schema": true,
+      "tags": [
+        "cash-sessions"
+      ],
+      "router_file": "apps/api/src/zeromerma_api/modules/cash/presentation/router.py",
+      "router_symbol": "recover_cash_session_opening",
+      "module_owner": "API:cash-sessions",
+      "use_case": "recover_cash_session_opening",
+      "implementation_state": "IMPLEMENTED_VERIFIED",
+      "verification_state": "TESTED_IN_THIS_TASK",
+      "auth_requirement": "AUTHENTICATED",
+      "actual_auth_dependency": [
+        "fastapi.security.api_key:APIKeyCookie",
+        "zeromerma_api.db.session:get_session",
+        "zeromerma_api.modules.identity.presentation.dependencies:get_current_authentication",
+        "zeromerma_api.modules.identity.presentation.dependencies:get_current_user",
+        "zeromerma_api.presentation.access_policy:enforce_operation_policy"
+      ],
+      "actual_surface_guard": "EXPLICIT_POS_POLICY_WITH_EFFECTIVE_GRANTS",
+      "required_capability": "pos.operate",
+      "capability_enforcement_state": "CAPABILITY_ENFORCED",
+      "required_scope": "GLOBAL_OR_BRANCH_SET_PER_DEC04",
+      "scope_source": "SERVER_RESOLVED_ACTIVE_ROLE_ASSIGNMENT_SCOPES_INTERSECT_ACTIVE_USER_BRANCH_MEMBERSHIPS",
+      "scope_enforcement_state": "SCOPE_ENFORCED",
+      "request_schema": [
+        "NONE"
+      ],
+      "response_schema": "CashSessionOpenResultView",
+      "error_contract_state": "CANONICAL_API_ERROR_RESPONSE",
+      "application_service": [
+        "zeromerma_api.modules.cash.application.idempotency.CashSessionOpenService.recover"
+      ],
+      "domain_or_use_case_symbol": "CashSessionOpenService.recover",
+      "router_business_logic_present": false,
+      "transaction_owner": "zeromerma_api.modules.idempotency.application.service.IdempotencyExecutor.recover",
+      "transaction_boundary": "Read-only result lookup with current authorization and exact actor/context checks; no reservation or cash business action is performed.",
+      "persistence": "READ_ONLY",
+      "external_side_effect": "NONE_OBSERVED_STATICALLY",
+      "reads_entities": [
+        "idempotency_records",
+        "workstations"
+      ],
+      "writes_entities": [
+        "NONE"
+      ],
+      "locks_or_concurrency_control": "Indexed unique-key lookup with exact saved actor/context comparison and current POS capability/scope checks; unknown or uncommitted result remains HTTP 409",
+      "audit_required": false,
+      "audit_actual": "NOT_REQUIRED",
+      "audit_atomicity": "NOT_REQUIRED",
+      "outbox_required": false,
+      "outbox_actual": "NOT_REQUIRED",
+      "outbox_atomicity": "NOT_REQUIRED",
+      "idempotency_required": false,
+      "idempotency_actual": "NOT_REQUIRED",
+      "idempotency_business_identity": "Reads the existing global UUIDv7 identity with workstation_code; opening has no preexisting cash ID.",
+      "idempotency_replay_behavior": "HTTP 200 saved CashSessionOpenResultView for COMPLETED; saved rejection or nonterminal error otherwise, without executing another cash action.",
+      "generated_client_operation": "recover_return_confirmation_v1_returns_confirmations__idempotency_key__get",
+      "consumer_contract_state": "CLIENT_GENERATED_USED",
+      "consumer_disposition": "LOCAL_UI_PRESENT",
+      "consumer_reason": "Generated POS adapter submits an explicit intention key and recovers the original result from metadata after response loss; rich fields are queried separately.",
+      "pos_consumers": [
+        "apps/pos-web/src/features/cash-commands/cash-command-intent.ts"
+      ],
+      "backoffice_consumers": [
+        "NONE"
+      ],
+      "other_consumers": [
+        "NONE"
+      ],
+      "direct_tests": [
+        "apps/api/tests/test_cash_idempotency.py",
+        "apps/pos-web/e2e-real/aa-cash-command.spec.ts"
+      ],
+      "indirect_tests": [
+        "apps/api/tests/conftest.py",
+        "apps/api/unit_tests/test_operation_policy.py#test_every_route_and_persisted_family_has_an_explicit_policy",
+        "apps/api/tests/test_operation_authorization.py#test_all_scoped_families_support_mapped_reads_and_aggregate_subqueries"
+      ],
+      "missing_test_types": [
+        "NONE"
+      ],
+      "approved_target_state": "Authorized historical lookup returns the original minimized cash acknowledgement, including after fresh login following close, without executing or replacing the intention.",
+      "feature_complete_blocker": false,
+      "later_ZM_FIN_tasks": [
+        "NOT_APPLICABLE"
+      ],
+      "decision_refs": [
+        "DEC-05",
+        "DEC-06",
+        "DEC-07",
+        "DEC-03",
+        "DEC-04",
+        "DEC-15",
+        "DEC-16"
+      ],
+      "gate_refs": [
+        "G1",
+        "G5"
+      ],
+      "gap_ids": [
+        "NONE"
+      ],
+      "evidence": [
+        "apps/api/src/zeromerma_api/modules/cash/presentation/router.py#recover_cash_session_opening",
+        "apps/api/src/zeromerma_api/modules/cash/application/idempotency.py#class CashSessionOpenService",
+        "docs/architecture/idempotency.md",
+        "docs/implementation/cash-idempotency-validation.md",
+        "apps/pos-web/src/features/cash-commands/cash-command-intent.ts"
       ]
     },
     {
@@ -9572,6 +9804,121 @@
         "apps/api/src/zeromerma_api/presentation/access_policy.py#ENDPOINT_POLICIES",
         "apps/api/src/zeromerma_api/db/access_scope.py#bind_authorization_scope",
         "docs/architecture/authorization.md"
+      ]
+    },
+    {
+      "operation_key": "API:GET:/v1/discounts/confirmations/{idempotency_key}",
+      "surface": "POS",
+      "method": "GET",
+      "path": "/v1/discounts/confirmations/{idempotency_key}",
+      "operation_id": "recover_operational_discount_v1_discounts_confirmations__idempotency_key__get",
+      "include_in_schema": true,
+      "tags": [
+        "discounts"
+      ],
+      "router_file": "apps/api/src/zeromerma_api/modules/discounts/presentation/router.py",
+      "router_symbol": "recover_operational_discount",
+      "module_owner": "API:discounts",
+      "use_case": "recover_operational_discount",
+      "implementation_state": "IMPLEMENTED_VERIFIED",
+      "verification_state": "TESTED_IN_THIS_TASK",
+      "auth_requirement": "AUTHENTICATED",
+      "actual_auth_dependency": [
+        "fastapi.security.api_key:APIKeyCookie",
+        "zeromerma_api.db.session:get_session",
+        "zeromerma_api.modules.identity.presentation.dependencies:get_current_authentication",
+        "zeromerma_api.modules.identity.presentation.dependencies:get_current_user",
+        "zeromerma_api.presentation.access_policy:enforce_operation_policy"
+      ],
+      "actual_surface_guard": "EXPLICIT_POS_POLICY_WITH_EFFECTIVE_GRANTS",
+      "required_capability": "discounts.manage",
+      "capability_enforcement_state": "CAPABILITY_ENFORCED",
+      "required_scope": "GLOBAL_OR_BRANCH_SET_PER_DEC04",
+      "scope_source": "SERVER_RESOLVED_ACTIVE_ROLE_ASSIGNMENT_SCOPES_INTERSECT_ACTIVE_USER_BRANCH_MEMBERSHIPS",
+      "scope_enforcement_state": "SCOPE_ENFORCED",
+      "request_schema": [
+        "NONE"
+      ],
+      "response_schema": "OperationalDiscountCommitResultView",
+      "error_contract_state": "CANONICAL_API_ERROR_RESPONSE",
+      "application_service": [
+        "zeromerma_api.modules.discounts.application.idempotency.OperationalDiscountCommitService.recover"
+      ],
+      "domain_or_use_case_symbol": "OperationalDiscountCommitService.recover",
+      "router_business_logic_present": false,
+      "transaction_owner": "zeromerma_api.modules.idempotency.application.service.IdempotencyExecutor.recover",
+      "transaction_boundary": "Read-only result lookup with current authorization and exact actor/context checks; no reservation or cash business action is performed.",
+      "persistence": "READ_ONLY",
+      "external_side_effect": "NONE_OBSERVED_STATICALLY",
+      "reads_entities": [
+        "idempotency_records",
+        "workstations"
+      ],
+      "writes_entities": [
+        "NONE"
+      ],
+      "locks_or_concurrency_control": "Indexed unique-key lookup with exact saved actor/context comparison and current POS capability/scope checks; unknown or uncommitted result remains HTTP 409",
+      "audit_required": false,
+      "audit_actual": "NOT_REQUIRED",
+      "audit_atomicity": "NOT_REQUIRED",
+      "outbox_required": false,
+      "outbox_actual": "NOT_REQUIRED",
+      "outbox_atomicity": "NOT_REQUIRED",
+      "idempotency_required": false,
+      "idempotency_actual": "NOT_REQUIRED",
+      "idempotency_business_identity": "Reads the existing global UUIDv7 identity with workstation_code and explicit original cash_session_id; no new identity is admitted.",
+      "idempotency_replay_behavior": "HTTP 200 saved OperationalDiscountCommitResultView for COMPLETED; saved rejection or nonterminal error otherwise, without executing another cash action.",
+      "generated_client_operation": "recover_return_confirmation_v1_returns_confirmations__idempotency_key__get",
+      "consumer_contract_state": "CLIENT_GENERATED_USED",
+      "consumer_disposition": "LOCAL_UI_PRESENT",
+      "consumer_reason": "Generated POS adapter submits an explicit intention key and recovers the original result from metadata after response loss; rich fields are queried separately. The operational-discount adapter exists, but /descuentos remains release-gated; authenticated browser API coverage does not release that UI or implement commercial pricing.",
+      "pos_consumers": [
+        "apps/pos-web/src/features/cash-commands/cash-command-intent.ts"
+      ],
+      "backoffice_consumers": [
+        "NONE"
+      ],
+      "other_consumers": [
+        "NONE"
+      ],
+      "direct_tests": [
+        "apps/api/tests/test_cash_idempotency.py",
+        "apps/pos-web/e2e-real/aa-cash-command.spec.ts"
+      ],
+      "indirect_tests": [
+        "apps/api/tests/conftest.py",
+        "apps/api/unit_tests/test_operation_policy.py#test_every_route_and_persisted_family_has_an_explicit_policy",
+        "apps/api/tests/test_operation_authorization.py#test_all_scoped_families_support_mapped_reads_and_aggregate_subqueries"
+      ],
+      "missing_test_types": [
+        "NONE"
+      ],
+      "approved_target_state": "Authorized historical lookup returns the original minimized cash acknowledgement, including after fresh login following close, without executing or replacing the intention.",
+      "feature_complete_blocker": false,
+      "later_ZM_FIN_tasks": [
+        "NOT_APPLICABLE"
+      ],
+      "decision_refs": [
+        "DEC-07",
+        "DEC-03",
+        "DEC-04",
+        "DEC-06",
+        "DEC-15",
+        "DEC-16"
+      ],
+      "gate_refs": [
+        "G1",
+        "G5"
+      ],
+      "gap_ids": [
+        "NONE"
+      ],
+      "evidence": [
+        "apps/api/src/zeromerma_api/modules/discounts/presentation/router.py#recover_operational_discount",
+        "apps/api/src/zeromerma_api/modules/discounts/application/idempotency.py#class OperationalDiscountCommitService",
+        "docs/architecture/idempotency.md",
+        "docs/implementation/cash-idempotency-validation.md",
+        "apps/pos-web/src/features/cash-commands/cash-command-intent.ts"
       ]
     },
     {
@@ -11150,6 +11497,123 @@
         "apps/api/src/zeromerma_api/presentation/access_policy.py#ENDPOINT_POLICIES",
         "apps/api/src/zeromerma_api/db/access_scope.py#bind_authorization_scope",
         "docs/architecture/authorization.md"
+      ]
+    },
+    {
+      "operation_key": "API:GET:/v1/payments/confirmations/{idempotency_key}",
+      "surface": "POS",
+      "method": "GET",
+      "path": "/v1/payments/confirmations/{idempotency_key}",
+      "operation_id": "recover_operational_payment_v1_payments_confirmations__idempotency_key__get",
+      "include_in_schema": true,
+      "tags": [
+        "payments"
+      ],
+      "router_file": "apps/api/src/zeromerma_api/modules/payments/presentation/router.py",
+      "router_symbol": "recover_operational_payment",
+      "module_owner": "API:payments",
+      "use_case": "recover_operational_payment",
+      "implementation_state": "IMPLEMENTED_VERIFIED",
+      "verification_state": "TESTED_IN_THIS_TASK",
+      "auth_requirement": "AUTHENTICATED",
+      "actual_auth_dependency": [
+        "fastapi.security.api_key:APIKeyCookie",
+        "zeromerma_api.db.session:get_session",
+        "zeromerma_api.modules.identity.presentation.dependencies:get_current_authentication",
+        "zeromerma_api.modules.identity.presentation.dependencies:get_current_user",
+        "zeromerma_api.presentation.access_policy:enforce_operation_policy"
+      ],
+      "actual_surface_guard": "EXPLICIT_POS_POLICY_WITH_EFFECTIVE_GRANTS",
+      "required_capability": "pos.operate",
+      "capability_enforcement_state": "CAPABILITY_ENFORCED",
+      "required_scope": "GLOBAL_OR_BRANCH_SET_PER_DEC04",
+      "scope_source": "SERVER_RESOLVED_ACTIVE_ROLE_ASSIGNMENT_SCOPES_INTERSECT_ACTIVE_USER_BRANCH_MEMBERSHIPS",
+      "scope_enforcement_state": "SCOPE_ENFORCED",
+      "request_schema": [
+        "NONE"
+      ],
+      "response_schema": "OperationalPaymentCommitResultView",
+      "error_contract_state": "CANONICAL_API_ERROR_RESPONSE",
+      "application_service": [
+        "zeromerma_api.modules.payments.application.idempotency.OperationalPaymentCommitService.recover"
+      ],
+      "domain_or_use_case_symbol": "OperationalPaymentCommitService.recover",
+      "router_business_logic_present": false,
+      "transaction_owner": "zeromerma_api.modules.idempotency.application.service.IdempotencyExecutor.recover",
+      "transaction_boundary": "Read-only result lookup with current authorization and exact actor/context checks; no reservation or cash business action is performed.",
+      "persistence": "READ_ONLY",
+      "external_side_effect": "NONE_OBSERVED_STATICALLY",
+      "reads_entities": [
+        "idempotency_records",
+        "workstations"
+      ],
+      "writes_entities": [
+        "NONE"
+      ],
+      "locks_or_concurrency_control": "Indexed unique-key lookup with exact saved actor/context comparison and current POS capability/scope checks; unknown or uncommitted result remains HTTP 409",
+      "audit_required": false,
+      "audit_actual": "NOT_REQUIRED",
+      "audit_atomicity": "NOT_REQUIRED",
+      "outbox_required": false,
+      "outbox_actual": "NOT_REQUIRED",
+      "outbox_atomicity": "NOT_REQUIRED",
+      "idempotency_required": false,
+      "idempotency_actual": "NOT_REQUIRED",
+      "idempotency_business_identity": "Reads the existing global UUIDv7 identity with workstation_code and explicit original cash_session_id; no new identity is admitted.",
+      "idempotency_replay_behavior": "HTTP 200 saved OperationalPaymentCommitResultView for COMPLETED; saved rejection or nonterminal error otherwise, without executing another cash action.",
+      "generated_client_operation": "recover_return_confirmation_v1_returns_confirmations__idempotency_key__get",
+      "consumer_contract_state": "CLIENT_GENERATED_USED",
+      "consumer_disposition": "LOCAL_UI_PRESENT",
+      "consumer_reason": "Generated POS adapter submits an explicit intention key and recovers the original result from metadata after response loss; rich fields are queried separately.",
+      "pos_consumers": [
+        "apps/pos-web/src/features/cash-commands/cash-command-intent.ts"
+      ],
+      "backoffice_consumers": [
+        "NONE"
+      ],
+      "other_consumers": [
+        "NONE"
+      ],
+      "direct_tests": [
+        "apps/api/tests/test_cash_idempotency.py",
+        "apps/pos-web/e2e-real/aa-cash-command.spec.ts"
+      ],
+      "indirect_tests": [
+        "apps/api/tests/conftest.py",
+        "apps/api/unit_tests/test_operation_policy.py#test_every_route_and_persisted_family_has_an_explicit_policy",
+        "apps/api/tests/test_operation_authorization.py#test_all_scoped_families_support_mapped_reads_and_aggregate_subqueries"
+      ],
+      "missing_test_types": [
+        "NONE"
+      ],
+      "approved_target_state": "Authorized historical lookup returns the original minimized cash acknowledgement, including after fresh login following close, without executing or replacing the intention.",
+      "feature_complete_blocker": false,
+      "later_ZM_FIN_tasks": [
+        "NOT_APPLICABLE"
+      ],
+      "decision_refs": [
+        "DEC-07",
+        "DEC-11",
+        "DEC-14",
+        "DEC-03",
+        "DEC-04",
+        "DEC-06",
+        "DEC-15",
+        "DEC-16"
+      ],
+      "gate_refs": [
+        "G1",
+        "G5"
+      ],
+      "gap_ids": [
+        "NONE"
+      ],
+      "evidence": [
+        "apps/api/src/zeromerma_api/modules/payments/presentation/router.py#recover_operational_payment",
+        "apps/api/src/zeromerma_api/modules/payments/application/idempotency.py#class OperationalPaymentCommitService",
+        "docs/architecture/idempotency.md",
+        "docs/implementation/cash-idempotency-validation.md",
+        "apps/pos-web/src/features/cash-commands/cash-command-intent.ts"
       ]
     },
     {
@@ -24426,11 +24890,12 @@
       "module_owner": "API:cash-close",
       "use_case": "commit_cash_close",
       "implementation_state": "PARTIAL",
-      "verification_state": "DIRECT_TEST_EXISTS_NOT_RUN",
+      "verification_state": "TESTED_IN_THIS_TASK",
       "auth_requirement": "AUTHENTICATED",
       "actual_auth_dependency": [
         "fastapi.security.api_key:APIKeyCookie",
         "zeromerma_api.db.session:get_session",
+        "zeromerma_api.modules.idempotency.presentation.http:require_idempotency_key",
         "zeromerma_api.modules.identity.presentation.dependencies:get_current_authentication",
         "zeromerma_api.modules.identity.presentation.dependencies:get_current_user",
         "zeromerma_api.presentation.access_policy:enforce_operation_policy"
@@ -24442,28 +24907,50 @@
       "scope_source": "SERVER_RESOLVED_ACTIVE_ROLE_ASSIGNMENT_SCOPES_INTERSECT_ACTIVE_USER_BRANCH_MEMBERSHIPS",
       "scope_enforcement_state": "SCOPE_ENFORCED",
       "request_schema": [
-        "CashClosePreviewRequest"
+        "CashCloseCommitRequest"
       ],
-      "response_schema": "CashCloseDetailResponse",
+      "response_schema": "CashCloseCommitResultView",
       "error_contract_state": "CANONICAL_API_ERROR_RESPONSE",
       "application_service": [
-        "zeromerma_api.modules.cash_close.application.services.CashCloseCommandService.commit_close"
+        "zeromerma_api.modules.cash_close.application.idempotency.CashCloseCommitService.commit"
       ],
-      "domain_or_use_case_symbol": "commit_cash_close",
+      "domain_or_use_case_symbol": "CashCloseCommitService.commit",
       "router_business_logic_present": false,
-      "transaction_owner": "zeromerma_api.modules.cash_close.application.services.CashCloseCommandService.commit_close",
-      "transaction_boundary": "commit=True;flush=True;rollback=True",
+      "transaction_owner": "zeromerma_api.modules.idempotency.application.service.IdempotencyExecutor.execute",
+      "transaction_boundary": "One executor-owned transaction for command effects, business audit, outbox and durable result; domain actions may flush but cannot commit separately.",
       "persistence": "WRITE",
       "external_side_effect": "NONE_OBSERVED_STATICALLY",
       "reads_entities": [
+        "idempotency_records",
         "cash_sessions",
-        "cash_movements"
+        "workstations",
+        "branches",
+        "cash_movements",
+        "sales",
+        "sale_lines",
+        "operation_documents",
+        "branch_counter_snapshots"
       ],
       "writes_entities": [
         "cash_sessions",
-        "cash_movements"
+        "cash_session_closes",
+        "cash_session_close_payment_method_counts",
+        "cash_session_close_product_counts",
+        "cash_session_close_class_reconciliations",
+        "cash_session_close_reconciliation_attributions",
+        "cash_session_close_discrepancy_resolutions",
+        "cash_session_close_issues",
+        "branch_counter_snapshots",
+        "branch_counter_snapshot_lines",
+        "sale_lines",
+        "operation_documents",
+        "operation_document_lines",
+        "auth_sessions",
+        "audit_log",
+        "outbox_events",
+        "idempotency_records"
       ],
-      "locks_or_concurrency_control": "identity_privilege_state FOR UPDATE for identity administration; FOR SHARE for domain mutation; authorization revalidated under the shared transaction boundary",
+      "locks_or_concurrency_control": "Global unique-key reservation followed by the exact CashSession FOR NO KEY UPDATE (compatible with reservation foreign-key KEY SHARE); state is refreshed after waiting. Different keys for a closed shift cannot create a new effect. Broader adoption by other economic commands remains ZM-FIN-037.",
       "audit_required": true,
       "audit_actual": "ATOMIC",
       "audit_atomicity": "ATOMIC",
@@ -24471,13 +24958,13 @@
       "outbox_actual": "ATOMIC",
       "outbox_atomicity": "ATOMIC",
       "idempotency_required": true,
-      "idempotency_actual": "REQUEST_ID_ONLY",
-      "idempotency_business_identity": "NOT_IMPLEMENTED",
-      "idempotency_replay_behavior": "NOT_IMPLEMENTED",
+      "idempotency_actual": "DEC07_COMPLIANT",
+      "idempotency_business_identity": "Global UUIDv7 Idempotency-Key; operation=cash_session.close; actor, POS surface, branch and workstation are fingerprint context; explicit original intention cash_session_id is required.",
+      "idempotency_replay_behavior": "Returns the original minimized snapshot with stable resource/movement IDs and amounts; current authorization/context checks precede replay, no business action is repeated and historical shift closure does not redirect the intention. A different key for an existing close stores REJECTED 409 CASH_CLOSE_ALREADY_EXISTS without another close or revocation.",
       "generated_client_operation": "commit_cash_close_v1_cash_close_commit_post",
       "consumer_contract_state": "CLIENT_GENERATED_USED",
       "consumer_disposition": "LOCAL_UI_PRESENT",
-      "consumer_reason": "Located local UI consumer apps/pos-web/src/features/cash-close/cash-close-api.ts invokes POST /v1/cash-close/commit for commit_cash_close; the feature adapter now uses generated schema aliases through packages/api-client/src/transport.ts.",
+      "consumer_reason": "Generated POS adapter submits an explicit intention key and recovers the original result from metadata after response loss; rich fields are queried separately.",
       "pos_consumers": [
         "apps/pos-web/src/features/cash-close/cash-close-api.ts"
       ],
@@ -24491,7 +24978,9 @@
         "apps/api/tests/test_admin_cash_cuts.py",
         "apps/api/tests/test_admin_cash_flow.py",
         "apps/api/tests/test_admin_reconciliation.py",
-        "apps/api/tests/test_phase_7b_cash_close.py"
+        "apps/api/tests/test_phase_7b_cash_close.py",
+        "apps/api/tests/test_cash_idempotency.py",
+        "apps/pos-web/e2e-real/aa-cash-command.spec.ts"
       ],
       "indirect_tests": [
         "apps/api/tests/conftest.py",
@@ -24499,31 +24988,40 @@
         "apps/api/tests/test_operation_authorization.py#test_all_scoped_families_support_mapped_reads_and_aggregate_subqueries"
       ],
       "missing_test_types": [
-        "IDEMPOTENCY_REPLAY"
+        "NONE"
       ],
-      "approved_target_state": "DECISION_COMPLIANT_IMPLEMENTATION_WITH_DIRECT_TESTS",
+      "approved_target_state": "Existing cash command is atomic and recoverable with one minimized result per approved intention; full ledger, other-command close races and complete product surface remain explicitly separate tasks.",
       "feature_complete_blocker": true,
       "later_ZM_FIN_tasks": [
+        "ZM-FIN-037",
+        "ZM-FIN-043",
         "ZM-FIN-061"
       ],
       "decision_refs": [
         "DEC-05",
         "DEC-06",
-        "DEC-07"
+        "DEC-07",
+        "DEC-03",
+        "DEC-04",
+        "DEC-15",
+        "DEC-16"
       ],
       "gate_refs": [
         "G1",
         "G5"
       ],
       "gap_ids": [
-        "GAP-0701"
+        "NONE"
       ],
       "evidence": [
         "apps/api/src/zeromerma_api/modules/cash_close/presentation/router.py#commit_cash_close",
         "apps/api/src/zeromerma_api/modules/cash_close/application/services.py#class CashCloseCommandService",
         "apps/api/src/zeromerma_api/presentation/access_policy.py#ENDPOINT_POLICIES",
         "apps/api/src/zeromerma_api/db/access_scope.py#bind_authorization_scope",
-        "docs/architecture/authorization.md"
+        "docs/architecture/authorization.md",
+        "apps/api/src/zeromerma_api/modules/cash_close/application/idempotency.py#class CashCloseCommitService",
+        "apps/api/src/zeromerma_api/modules/cash/application/command_context.py",
+        "docs/implementation/cash-idempotency-validation.md"
       ]
     },
     {
@@ -24653,11 +25151,12 @@
       "module_owner": "API:cash-sessions",
       "use_case": "open_cash_session",
       "implementation_state": "PARTIAL",
-      "verification_state": "DIRECT_TEST_EXISTS_NOT_RUN",
+      "verification_state": "TESTED_IN_THIS_TASK",
       "auth_requirement": "AUTHENTICATED",
       "actual_auth_dependency": [
         "fastapi.security.api_key:APIKeyCookie",
         "zeromerma_api.db.session:get_session",
+        "zeromerma_api.modules.idempotency.presentation.http:require_idempotency_key",
         "zeromerma_api.modules.identity.presentation.dependencies:get_current_authentication",
         "zeromerma_api.modules.identity.presentation.dependencies:get_current_user",
         "zeromerma_api.presentation.access_policy:enforce_operation_policy"
@@ -24671,24 +25170,31 @@
       "request_schema": [
         "OpenCashSessionRequest"
       ],
-      "response_schema": "CashSessionView",
+      "response_schema": "CashSessionOpenResultView",
       "error_contract_state": "CANONICAL_API_ERROR_RESPONSE",
       "application_service": [
-        "zeromerma_api.modules.cash.application.services.CashSessionCommandService.open_session"
+        "zeromerma_api.modules.cash.application.idempotency.CashSessionOpenService.open"
       ],
-      "domain_or_use_case_symbol": "open_cash_session",
+      "domain_or_use_case_symbol": "CashSessionOpenService.open",
       "router_business_logic_present": false,
-      "transaction_owner": "zeromerma_api.modules.cash.application.services.CashSessionCommandService.open_session",
-      "transaction_boundary": "commit=True;flush=True;rollback=True",
+      "transaction_owner": "zeromerma_api.modules.idempotency.application.service.IdempotencyExecutor.execute",
+      "transaction_boundary": "One executor-owned transaction for command effects, business audit, outbox and durable result; domain actions may flush but cannot commit separately.",
       "persistence": "WRITE",
       "external_side_effect": "NONE_OBSERVED_STATICALLY",
       "reads_entities": [
-        "cash_sessions"
+        "idempotency_records",
+        "cash_sessions",
+        "workstations",
+        "branches"
       ],
       "writes_entities": [
-        "cash_sessions"
+        "cash_sessions",
+        "auth_sessions",
+        "audit_log",
+        "outbox_events",
+        "idempotency_records"
       ],
-      "locks_or_concurrency_control": "identity_privilege_state FOR UPDATE for identity administration; FOR SHARE for domain mutation; authorization revalidated under the shared transaction boundary",
+      "locks_or_concurrency_control": "Global unique-key reservation; actor and workstation FOR NO KEY UPDATE row locks (compatible with reservation foreign-key KEY SHARE) preserve active user/workstation uniqueness, with branch-before-station ordering and existing unique partial indexes. No operation-wide lock.",
       "audit_required": true,
       "audit_actual": "ATOMIC",
       "audit_atomicity": "ATOMIC",
@@ -24696,13 +25202,13 @@
       "outbox_actual": "ATOMIC",
       "outbox_atomicity": "ATOMIC",
       "idempotency_required": true,
-      "idempotency_actual": "REQUEST_ID_ONLY",
-      "idempotency_business_identity": "NOT_IMPLEMENTED",
-      "idempotency_replay_behavior": "NOT_IMPLEMENTED",
+      "idempotency_actual": "DEC07_COMPLIANT",
+      "idempotency_business_identity": "Global UUIDv7 Idempotency-Key; operation=cash_session.open; actor, POS surface, branch and workstation are fingerprint context. Opening has no preexisting cash session ID.",
+      "idempotency_replay_behavior": "Returns the original minimized snapshot with stable resource/movement IDs and amounts; current authorization/context checks precede replay, no business action is repeated and historical shift closure does not redirect the intention.",
       "generated_client_operation": "open_cash_session_v1_cash_sessions_open_post",
       "consumer_contract_state": "CLIENT_GENERATED_USED",
       "consumer_disposition": "LOCAL_UI_PRESENT",
-      "consumer_reason": "Located local UI consumer apps/pos-web/src/features/cash-session-open/cash-session-api.ts invokes POST /v1/cash-sessions/open for open_cash_session; the feature adapter now uses generated schema aliases through packages/api-client/src/transport.ts.",
+      "consumer_reason": "Generated POS adapter submits an explicit intention key and recovers the original result from metadata after response loss; rich fields are queried separately.",
       "pos_consumers": [
         "apps/pos-web/src/features/cash-session-open/cash-session-api.ts"
       ],
@@ -24720,7 +25226,9 @@
         "apps/api/tests/test_admin_reconciliation.py",
         "apps/api/tests/test_admin_returns_corrections.py",
         "apps/api/tests/test_admin_sales_tickets.py",
-        "apps/api/tests/test_admin_workstations.py"
+        "apps/api/tests/test_admin_workstations.py",
+        "apps/api/tests/test_cash_idempotency.py",
+        "apps/pos-web/e2e-real/aa-cash-command.spec.ts"
       ],
       "indirect_tests": [
         "apps/api/tests/conftest.py",
@@ -24728,31 +25236,39 @@
         "apps/api/tests/test_operation_authorization.py#test_all_scoped_families_support_mapped_reads_and_aggregate_subqueries"
       ],
       "missing_test_types": [
-        "IDEMPOTENCY_REPLAY"
+        "NONE"
       ],
-      "approved_target_state": "DECISION_COMPLIANT_IMPLEMENTATION_WITH_DIRECT_TESTS",
+      "approved_target_state": "Existing cash command is atomic and recoverable with one minimized result per approved intention; full ledger, other-command close races and complete product surface remain explicitly separate tasks.",
       "feature_complete_blocker": true,
       "later_ZM_FIN_tasks": [
+        "ZM-FIN-037",
         "ZM-FIN-061"
       ],
       "decision_refs": [
         "DEC-05",
         "DEC-06",
-        "DEC-07"
+        "DEC-07",
+        "DEC-03",
+        "DEC-04",
+        "DEC-15",
+        "DEC-16"
       ],
       "gate_refs": [
         "G1",
         "G5"
       ],
       "gap_ids": [
-        "GAP-0708"
+        "NONE"
       ],
       "evidence": [
         "apps/api/src/zeromerma_api/modules/cash/presentation/router.py#open_cash_session",
         "apps/api/src/zeromerma_api/modules/cash/application/services.py#class CashSessionCommandService",
         "apps/api/src/zeromerma_api/presentation/access_policy.py#ENDPOINT_POLICIES",
         "apps/api/src/zeromerma_api/db/access_scope.py#bind_authorization_scope",
-        "docs/architecture/authorization.md"
+        "docs/architecture/authorization.md",
+        "apps/api/src/zeromerma_api/modules/cash/application/idempotency.py#class CashSessionOpenService",
+        "apps/api/src/zeromerma_api/modules/cash/application/command_context.py",
+        "docs/implementation/cash-idempotency-validation.md"
       ]
     },
     {
@@ -24883,11 +25399,12 @@
       "module_owner": "API:discounts",
       "use_case": "create_discount",
       "implementation_state": "PARTIAL",
-      "verification_state": "DIRECT_TEST_EXISTS_NOT_RUN",
+      "verification_state": "TESTED_IN_THIS_TASK",
       "auth_requirement": "AUTHENTICATED",
       "actual_auth_dependency": [
         "fastapi.security.api_key:APIKeyCookie",
         "zeromerma_api.db.session:get_session",
+        "zeromerma_api.modules.idempotency.presentation.http:require_idempotency_key",
         "zeromerma_api.modules.identity.presentation.dependencies:get_current_authentication",
         "zeromerma_api.modules.identity.presentation.dependencies:get_current_user",
         "zeromerma_api.presentation.access_policy:enforce_operation_policy"
@@ -24901,24 +25418,32 @@
       "request_schema": [
         "CreateOperationalDiscountRequest"
       ],
-      "response_schema": "OperationalDiscountDetailResponse",
+      "response_schema": "OperationalDiscountCommitResultView",
       "error_contract_state": "CANONICAL_API_ERROR_RESPONSE",
       "application_service": [
-        "zeromerma_api.modules.discounts.application.services.DiscountsCommandService.create_discount"
+        "zeromerma_api.modules.discounts.application.idempotency.OperationalDiscountCommitService.commit"
       ],
-      "domain_or_use_case_symbol": "create_discount",
+      "domain_or_use_case_symbol": "OperationalDiscountCommitService.commit",
       "router_business_logic_present": false,
-      "transaction_owner": "zeromerma_api.modules.discounts.application.services.DiscountsCommandService.create_discount",
-      "transaction_boundary": "commit=True;flush=True;rollback=True",
+      "transaction_owner": "zeromerma_api.modules.idempotency.application.service.IdempotencyExecutor.execute",
+      "transaction_boundary": "One executor-owned transaction for command effects, business audit, outbox and durable result; domain actions may flush but cannot commit separately.",
       "persistence": "WRITE",
       "external_side_effect": "NONE_OBSERVED_STATICALLY",
       "reads_entities": [
-        "commercial_discounts"
+        "idempotency_records",
+        "cash_sessions",
+        "workstations",
+        "branches",
+        "operational_discount_categories"
       ],
       "writes_entities": [
-        "commercial_discounts"
+        "operational_discounts",
+        "cash_movements",
+        "audit_log",
+        "outbox_events",
+        "idempotency_records"
       ],
-      "locks_or_concurrency_control": "identity_privilege_state FOR UPDATE for identity administration; FOR SHARE for domain mutation; authorization revalidated under the shared transaction boundary",
+      "locks_or_concurrency_control": "Global unique-key reservation followed by the exact CashSession FOR NO KEY UPDATE (compatible with reservation foreign-key KEY SHARE); state is refreshed after waiting. Different keys for a closed shift cannot create a new effect. Broader adoption by other economic commands remains ZM-FIN-037.",
       "audit_required": true,
       "audit_actual": "ATOMIC",
       "audit_atomicity": "ATOMIC",
@@ -24926,13 +25451,13 @@
       "outbox_actual": "ATOMIC",
       "outbox_atomicity": "ATOMIC",
       "idempotency_required": true,
-      "idempotency_actual": "REQUEST_ID_ONLY",
-      "idempotency_business_identity": "NOT_IMPLEMENTED",
-      "idempotency_replay_behavior": "NOT_IMPLEMENTED",
+      "idempotency_actual": "DEC07_COMPLIANT",
+      "idempotency_business_identity": "Global UUIDv7 Idempotency-Key; operation=operational_discount.commit; actor, POS surface, branch and workstation are fingerprint context; explicit original intention cash_session_id is required.",
+      "idempotency_replay_behavior": "Returns the original minimized snapshot with stable resource/movement IDs and amounts; current authorization/context checks precede replay, no business action is repeated and historical shift closure does not redirect the intention.",
       "generated_client_operation": "create_discount_v1_discounts_post",
       "consumer_contract_state": "CLIENT_GENERATED_USED",
       "consumer_disposition": "LOCAL_UI_PRESENT",
-      "consumer_reason": "Located local UI consumer apps/pos-web/src/features/discounts/discounts-api.ts invokes POST /v1/discounts for create_discount; the feature adapter now uses generated schema aliases through packages/api-client/src/transport.ts.",
+      "consumer_reason": "Generated POS adapter submits an explicit intention key and recovers the original result from metadata after response loss; rich fields are queried separately. The operational-discount adapter exists, but /descuentos remains release-gated; authenticated browser API coverage does not release that UI or implement commercial pricing.",
       "pos_consumers": [
         "apps/pos-web/src/features/discounts/discounts-api.ts"
       ],
@@ -24943,7 +25468,9 @@
         "NONE"
       ],
       "direct_tests": [
-        "apps/api/tests/test_discounts_module.py"
+        "apps/api/tests/test_discounts_module.py",
+        "apps/api/tests/test_cash_idempotency.py",
+        "apps/pos-web/e2e-real/aa-cash-command.spec.ts"
       ],
       "indirect_tests": [
         "apps/api/tests/conftest.py",
@@ -24951,30 +25478,39 @@
         "apps/api/tests/test_operation_authorization.py#test_all_scoped_families_support_mapped_reads_and_aggregate_subqueries"
       ],
       "missing_test_types": [
-        "IDEMPOTENCY_REPLAY"
+        "NONE"
       ],
-      "approved_target_state": "DECISION_COMPLIANT_IMPLEMENTATION_WITH_DIRECT_TESTS",
+      "approved_target_state": "Existing cash command is atomic and recoverable with one minimized result per approved intention; full ledger, other-command close races and complete product surface remain explicitly separate tasks.",
       "feature_complete_blocker": true,
       "later_ZM_FIN_tasks": [
-        "ZM-FIN-072"
+        "ZM-FIN-037",
+        "ZM-FIN-043",
+        "ZM-FIN-061"
       ],
       "decision_refs": [
         "DEC-07",
-        "DEC-13"
+        "DEC-03",
+        "DEC-04",
+        "DEC-06",
+        "DEC-15",
+        "DEC-16"
       ],
       "gate_refs": [
         "G1",
         "G5"
       ],
       "gap_ids": [
-        "GAP-0716"
+        "NONE"
       ],
       "evidence": [
         "apps/api/src/zeromerma_api/modules/discounts/presentation/router.py#create_discount",
         "apps/api/src/zeromerma_api/modules/discounts/application/services.py#class DiscountsCommandService",
         "apps/api/src/zeromerma_api/presentation/access_policy.py#ENDPOINT_POLICIES",
         "apps/api/src/zeromerma_api/db/access_scope.py#bind_authorization_scope",
-        "docs/architecture/authorization.md"
+        "docs/architecture/authorization.md",
+        "apps/api/src/zeromerma_api/modules/discounts/application/idempotency.py#class OperationalDiscountCommitService",
+        "apps/api/src/zeromerma_api/modules/cash/application/command_context.py",
+        "docs/implementation/cash-idempotency-validation.md"
       ]
     },
     {
@@ -25752,11 +26288,12 @@
       "module_owner": "API:payments",
       "use_case": "create_payment",
       "implementation_state": "PARTIAL",
-      "verification_state": "DIRECT_TEST_EXISTS_NOT_RUN",
+      "verification_state": "TESTED_IN_THIS_TASK",
       "auth_requirement": "AUTHENTICATED",
       "actual_auth_dependency": [
         "fastapi.security.api_key:APIKeyCookie",
         "zeromerma_api.db.session:get_session",
+        "zeromerma_api.modules.idempotency.presentation.http:require_idempotency_key",
         "zeromerma_api.modules.identity.presentation.dependencies:get_current_authentication",
         "zeromerma_api.modules.identity.presentation.dependencies:get_current_user",
         "zeromerma_api.presentation.access_policy:enforce_operation_policy"
@@ -25770,24 +26307,32 @@
       "request_schema": [
         "CreateOperationalPaymentRequest"
       ],
-      "response_schema": "OperationalPaymentDetailResponse",
+      "response_schema": "OperationalPaymentCommitResultView",
       "error_contract_state": "CANONICAL_API_ERROR_RESPONSE",
       "application_service": [
-        "zeromerma_api.modules.payments.application.services.PaymentsCommandService.create_payment"
+        "zeromerma_api.modules.payments.application.idempotency.OperationalPaymentCommitService.commit"
       ],
-      "domain_or_use_case_symbol": "create_payment",
+      "domain_or_use_case_symbol": "OperationalPaymentCommitService.commit",
       "router_business_logic_present": false,
-      "transaction_owner": "zeromerma_api.modules.payments.application.services.PaymentsCommandService.create_payment",
-      "transaction_boundary": "commit=True;flush=True;rollback=True",
+      "transaction_owner": "zeromerma_api.modules.idempotency.application.service.IdempotencyExecutor.execute",
+      "transaction_boundary": "One executor-owned transaction for command effects, business audit, outbox and durable result; domain actions may flush but cannot commit separately.",
       "persistence": "WRITE",
       "external_side_effect": "NONE_OBSERVED_STATICALLY",
       "reads_entities": [
-        "payments"
+        "idempotency_records",
+        "cash_sessions",
+        "workstations",
+        "branches",
+        "operational_payment_categories"
       ],
       "writes_entities": [
-        "payments"
+        "operational_payments",
+        "cash_movements",
+        "audit_log",
+        "outbox_events",
+        "idempotency_records"
       ],
-      "locks_or_concurrency_control": "identity_privilege_state FOR UPDATE for identity administration; FOR SHARE for domain mutation; authorization revalidated under the shared transaction boundary",
+      "locks_or_concurrency_control": "Global unique-key reservation followed by the exact CashSession FOR NO KEY UPDATE (compatible with reservation foreign-key KEY SHARE); state is refreshed after waiting. Different keys for a closed shift cannot create a new effect. Broader adoption by other economic commands remains ZM-FIN-037.",
       "audit_required": true,
       "audit_actual": "ATOMIC",
       "audit_atomicity": "ATOMIC",
@@ -25795,13 +26340,13 @@
       "outbox_actual": "ATOMIC",
       "outbox_atomicity": "ATOMIC",
       "idempotency_required": true,
-      "idempotency_actual": "REQUEST_ID_ONLY",
-      "idempotency_business_identity": "NOT_IMPLEMENTED",
-      "idempotency_replay_behavior": "NOT_IMPLEMENTED",
+      "idempotency_actual": "DEC07_COMPLIANT",
+      "idempotency_business_identity": "Global UUIDv7 Idempotency-Key; operation=operational_payment.commit; actor, POS surface, branch and workstation are fingerprint context; explicit original intention cash_session_id is required.",
+      "idempotency_replay_behavior": "Returns the original minimized snapshot with stable resource/movement IDs and amounts; current authorization/context checks precede replay, no business action is repeated and historical shift closure does not redirect the intention.",
       "generated_client_operation": "create_payment_v1_payments_post",
       "consumer_contract_state": "CLIENT_GENERATED_USED",
       "consumer_disposition": "LOCAL_UI_PRESENT",
-      "consumer_reason": "Located local UI consumer apps/pos-web/src/features/payments/payments-api.ts invokes POST /v1/payments for create_payment; the feature adapter now uses generated schema aliases through packages/api-client/src/transport.ts.",
+      "consumer_reason": "Generated POS adapter submits an explicit intention key and recovers the original result from metadata after response loss; rich fields are queried separately.",
       "pos_consumers": [
         "apps/pos-web/src/features/payments/payments-api.ts"
       ],
@@ -25814,7 +26359,9 @@
       "direct_tests": [
         "apps/api/tests/test_admin_cash_cuts.py",
         "apps/api/tests/test_admin_cash_flow.py",
-        "apps/api/tests/test_payments_module.py"
+        "apps/api/tests/test_payments_module.py",
+        "apps/api/tests/test_cash_idempotency.py",
+        "apps/pos-web/e2e-real/aa-cash-command.spec.ts"
       ],
       "indirect_tests": [
         "apps/api/tests/conftest.py",
@@ -25822,31 +26369,42 @@
         "apps/api/tests/test_operation_authorization.py#test_all_scoped_families_support_mapped_reads_and_aggregate_subqueries"
       ],
       "missing_test_types": [
-        "IDEMPOTENCY_REPLAY"
+        "NONE"
       ],
-      "approved_target_state": "DECISION_COMPLIANT_IMPLEMENTATION_WITH_DIRECT_TESTS",
+      "approved_target_state": "Existing cash command is atomic and recoverable with one minimized result per approved intention; full ledger, other-command close races and complete product surface remain explicitly separate tasks.",
       "feature_complete_blocker": true,
       "later_ZM_FIN_tasks": [
-        "ZM-FIN-057"
+        "ZM-FIN-037",
+        "ZM-FIN-043",
+        "ZM-FIN-057",
+        "ZM-FIN-065"
       ],
       "decision_refs": [
         "DEC-07",
         "DEC-11",
-        "DEC-14"
+        "DEC-14",
+        "DEC-03",
+        "DEC-04",
+        "DEC-06",
+        "DEC-15",
+        "DEC-16"
       ],
       "gate_refs": [
         "G1",
         "G5"
       ],
       "gap_ids": [
-        "GAP-0741"
+        "NONE"
       ],
       "evidence": [
         "apps/api/src/zeromerma_api/modules/payments/presentation/router.py#create_payment",
         "apps/api/src/zeromerma_api/modules/payments/application/services.py#class PaymentsCommandService",
         "apps/api/src/zeromerma_api/presentation/access_policy.py#ENDPOINT_POLICIES",
         "apps/api/src/zeromerma_api/db/access_scope.py#bind_authorization_scope",
-        "docs/architecture/authorization.md"
+        "docs/architecture/authorization.md",
+        "apps/api/src/zeromerma_api/modules/payments/application/idempotency.py#class OperationalPaymentCommitService",
+        "apps/api/src/zeromerma_api/modules/cash/application/command_context.py",
+        "docs/implementation/cash-idempotency-validation.md"
       ]
     },
     {
@@ -28004,25 +28562,30 @@
       "backend_enforced": true,
       "api_operations_consumed": [
         "API:GET:/v1/cash-sessions/current",
-        "API:POST:/v1/cash-sessions/open"
+        "API:POST:/v1/cash-sessions/open",
+        "API:GET:/v1/cash-sessions/confirmations/{idempotency_key}"
       ],
       "queries": [
-        "API:GET:/v1/cash-sessions/current"
+        "API:GET:/v1/cash-sessions/current",
+        "API:GET:/v1/cash-sessions/confirmations/{idempotency_key}"
       ],
       "mutations": [
         "API:POST:/v1/cash-sessions/open"
       ],
       "implementation_state": "PARTIAL",
-      "verification_state": "NO_TEST",
+      "verification_state": "TESTED_IN_THIS_TASK",
       "approved_target_state": "The POS route /cash-session/open must provide tested navigate, view_or_list, open behavior through its declared canonical API operations, enforce capability pos.operate and scope GLOBAL_OR_BRANCH_SET_PER_DEC04 in the backend, and preserve recoverable persisted state for mutations under ZM-FIN-061, ZM-FIN-015, and ZM-FIN-020.",
       "placeholder_evidence": "NONE",
       "user_actions": [
         "navigate",
         "view_or_list",
-        "open"
+        "open",
+        "recover_original_intention",
+        "retry_same_in_memory_intention"
       ],
       "direct_tests": [
-        "NONE"
+        "apps/pos-web/src/features/cash-session-open/cash-session-open-screen.test.tsx",
+        "apps/pos-web/e2e-real/aa-cash-command.spec.ts"
       ],
       "indirect_tests": [
         "NONE"
@@ -28033,7 +28596,10 @@
       "decision_refs": [
         "DEC-02",
         "DEC-03",
-        "DEC-04"
+        "DEC-04",
+        "DEC-06",
+        "DEC-07",
+        "DEC-15"
       ],
       "gate_refs": [
         "G1",
@@ -28044,7 +28610,8 @@
         "GAP-0766"
       ],
       "evidence": [
-        "apps/pos-web/src/router.tsx#cashSessionOpenRoute"
+        "apps/pos-web/src/router.tsx#cashSessionOpenRoute",
+        "docs/implementation/cash-idempotency-validation.md"
       ]
     },
     {
@@ -28071,29 +28638,34 @@
         "API:GET:/v1/cash-close/summary",
         "API:GET:/v1/cash-close/{close_id}",
         "API:POST:/v1/cash-close/commit",
-        "API:POST:/v1/cash-close/preview"
+        "API:POST:/v1/cash-close/preview",
+        "API:GET:/v1/cash-close/confirmations/{idempotency_key}"
       ],
       "queries": [
         "API:GET:/v1/cash-close/bootstrap",
         "API:GET:/v1/cash-close/reconciliation",
         "API:GET:/v1/cash-close/summary",
-        "API:GET:/v1/cash-close/{close_id}"
+        "API:GET:/v1/cash-close/{close_id}",
+        "API:GET:/v1/cash-close/confirmations/{idempotency_key}"
       ],
       "mutations": [
         "API:POST:/v1/cash-close/commit",
         "API:POST:/v1/cash-close/preview"
       ],
       "implementation_state": "PARTIAL",
-      "verification_state": "NO_TEST",
+      "verification_state": "TESTED_IN_THIS_TASK",
       "approved_target_state": "The POS route /cerrar-turno must provide tested navigate, view_or_list, create_or_execute behavior through its declared canonical API operations, enforce capability pos.operate and scope GLOBAL_OR_BRANCH_SET_PER_DEC04 in the backend, and preserve recoverable persisted state for mutations under ZM-FIN-061, ZM-FIN-015, and ZM-FIN-020.",
       "placeholder_evidence": "NONE",
       "user_actions": [
         "navigate",
         "view_or_list",
-        "create_or_execute"
+        "create_or_execute",
+        "recover_original_intention",
+        "retry_same_in_memory_intention"
       ],
       "direct_tests": [
-        "NONE"
+        "apps/pos-web/src/features/cash-close/cash-close-screen.test.tsx",
+        "apps/pos-web/e2e-real/aa-cash-command.spec.ts"
       ],
       "indirect_tests": [
         "NONE"
@@ -28104,7 +28676,10 @@
       "decision_refs": [
         "DEC-02",
         "DEC-03",
-        "DEC-04"
+        "DEC-04",
+        "DEC-06",
+        "DEC-07",
+        "DEC-15"
       ],
       "gate_refs": [
         "G1",
@@ -28115,7 +28690,8 @@
         "GAP-0769"
       ],
       "evidence": [
-        "apps/pos-web/src/router.tsx#shiftCloseRoute"
+        "apps/pos-web/src/router.tsx#shiftCloseRoute",
+        "docs/implementation/cash-idempotency-validation.md"
       ]
     },
     {
@@ -28558,27 +29134,32 @@
         "API:GET:/v1/payments",
         "API:GET:/v1/payments/bootstrap",
         "API:GET:/v1/payments/{payment_id}",
-        "API:POST:/v1/payments"
+        "API:POST:/v1/payments",
+        "API:GET:/v1/payments/confirmations/{idempotency_key}"
       ],
       "queries": [
         "API:GET:/v1/payments",
         "API:GET:/v1/payments/bootstrap",
-        "API:GET:/v1/payments/{payment_id}"
+        "API:GET:/v1/payments/{payment_id}",
+        "API:GET:/v1/payments/confirmations/{idempotency_key}"
       ],
       "mutations": [
         "API:POST:/v1/payments"
       ],
       "implementation_state": "PARTIAL",
-      "verification_state": "NO_TEST",
+      "verification_state": "TESTED_IN_THIS_TASK",
       "approved_target_state": "The POS route /pagos must provide tested navigate, view_or_list, create_or_execute behavior through its declared canonical API operations, enforce capability pos.operate and scope GLOBAL_OR_BRANCH_SET_PER_DEC04 in the backend, and preserve recoverable persisted state for mutations under ZM-FIN-057, ZM-FIN-015, and ZM-FIN-020.",
       "placeholder_evidence": "NONE",
       "user_actions": [
         "navigate",
         "view_or_list",
-        "create_or_execute"
+        "create_or_execute",
+        "recover_original_intention",
+        "retry_same_in_memory_intention"
       ],
       "direct_tests": [
-        "NONE"
+        "apps/pos-web/src/features/payments/payments-screen.test.tsx",
+        "apps/pos-web/e2e-real/aa-cash-command.spec.ts"
       ],
       "indirect_tests": [
         "NONE"
@@ -28589,7 +29170,10 @@
       "decision_refs": [
         "DEC-02",
         "DEC-03",
-        "DEC-04"
+        "DEC-04",
+        "DEC-06",
+        "DEC-07",
+        "DEC-15"
       ],
       "gate_refs": [
         "G1",
@@ -28600,7 +29184,8 @@
         "GAP-0787"
       ],
       "evidence": [
-        "apps/pos-web/src/router.tsx#paymentsRoute"
+        "apps/pos-web/src/router.tsx#paymentsRoute",
+        "docs/implementation/cash-idempotency-validation.md"
       ]
     },
     {
@@ -33059,7 +33644,7 @@
   ],
   "module_summary": {
     "surface_counts": {
-      "api": 245,
+      "api": 249,
       "pos": 16,
       "backoffice": 41,
       "worker": 3,
@@ -33068,33 +33653,33 @@
     "implementation_state_counts": {
       "DEPRECATED": 4,
       "FRAMEWORK_ONLY": 6,
-      "IMPLEMENTED_VERIFIED": 21,
+      "IMPLEMENTED_VERIFIED": 25,
       "INTERNAL_ONLY": 15,
       "PARTIAL": 269,
       "PLACEHOLDER": 4
     },
     "verification_state_counts": {
-      "DIRECT_TEST_EXISTS_NOT_RUN": 127,
+      "DIRECT_TEST_EXISTS_NOT_RUN": 123,
       "INDIRECT_TEST_ONLY": 1,
       "NOT_APPLICABLE": 12,
-      "NO_TEST": 98,
-      "TESTED_IN_THIS_TASK": 81
+      "NO_TEST": 95,
+      "TESTED_IN_THIS_TASK": 92
     },
     "consumer_contract_state_counts": {
-      "CLIENT_GENERATED_USED": 185,
+      "CLIENT_GENERATED_USED": 189,
       "NOT_CONSUMED": 59,
       "NO_CLIENT_OPERATION": 1
     },
     "consumer_disposition_counts": {
       "FUTURE_CONSUMER_NOT_IMPLEMENTED": 4,
-      "LOCAL_UI_PRESENT": 185,
+      "LOCAL_UI_PRESENT": 189,
       "LOCAL_UI_REQUIRED_NOT_WIRED": 55,
       "NOT_APPLICABLE": 1
     },
     "gap_type_counts": {
       "AUDIT_GAP": 13,
       "CAPABILITY_GAP": 6,
-      "IDEMPOTENCY_GAP": 44,
+      "IDEMPOTENCY_GAP": 40,
       "OUTBOX_GAP": 25,
       "PLACEHOLDER": 4,
       "SCOPE_GAP": 6,
@@ -33105,16 +33690,16 @@
     },
     "feature_complete_blocker_count": 273,
     "test_gap_count": 112,
-    "operation_count": 319
+    "operation_count": 323
   },
   "openapi_comparison": {
-    "runtime_operation_count": 244,
-    "tracked_operation_count": 244,
+    "runtime_operation_count": 248,
+    "tracked_operation_count": 248,
     "runtime_only": [],
     "tracked_only": [],
     "operation_id_drift": [],
-    "runtime_sha256_canonical_json": "e9b4d48872fb7ca8510668b23bf376476a44bccd3f1acc74f7b2c0611e796784",
-    "tracked_sha256_canonical_json": "e9b4d48872fb7ca8510668b23bf376476a44bccd3f1acc74f7b2c0611e796784",
+    "runtime_sha256_canonical_json": "3c7f480da8b9aebbd0929363189ffe37771152e849d153fe37f7c86a5fdfb57f",
+    "tracked_sha256_canonical_json": "3c7f480da8b9aebbd0929363189ffe37771152e849d153fe37f7c86a5fdfb57f",
     "schema_drift_suspected": false,
     "classification": "NO_DRIFT_OBSERVED"
   },
@@ -34841,32 +35426,6 @@
       ]
     },
     {
-      "gap_id": "GAP-0701",
-      "operation_key": "API:POST:/v1/cash-close/commit",
-      "gap_type": "IDEMPOTENCY_GAP",
-      "current_state": "No durable DEC-07 replay contract",
-      "approved_target": "DECISION_COMPLIANT_AND_DIRECTLY_VERIFIED",
-      "risk": "IN_SCOPE_NOT_IMPLEMENTED",
-      "later_task": "ZM-FIN-061",
-      "gate": "G2",
-      "evidence": [
-        "apps/api/src/zeromerma_api/modules/cash_close/presentation/router.py#commit_cash_close"
-      ]
-    },
-    {
-      "gap_id": "GAP-0708",
-      "operation_key": "API:POST:/v1/cash-sessions/open",
-      "gap_type": "IDEMPOTENCY_GAP",
-      "current_state": "No durable DEC-07 replay contract",
-      "approved_target": "DECISION_COMPLIANT_AND_DIRECTLY_VERIFIED",
-      "risk": "IN_SCOPE_NOT_IMPLEMENTED",
-      "later_task": "ZM-FIN-061",
-      "gate": "G2",
-      "evidence": [
-        "apps/api/src/zeromerma_api/modules/cash/presentation/router.py#open_cash_session"
-      ]
-    },
-    {
       "gap_id": "GAP-0712",
       "operation_key": "API:POST:/v1/corrections/commit",
       "gap_type": "IDEMPOTENCY_GAP",
@@ -34877,32 +35436,6 @@
       "gate": "G2",
       "evidence": [
         "apps/api/src/zeromerma_api/modules/corrections/presentation/router.py#commit_correction"
-      ]
-    },
-    {
-      "gap_id": "GAP-0716",
-      "operation_key": "API:POST:/v1/discounts",
-      "gap_type": "IDEMPOTENCY_GAP",
-      "current_state": "No durable DEC-07 replay contract",
-      "approved_target": "DECISION_COMPLIANT_AND_DIRECTLY_VERIFIED",
-      "risk": "IN_SCOPE_NOT_IMPLEMENTED",
-      "later_task": "ZM-FIN-072",
-      "gate": "G2",
-      "evidence": [
-        "apps/api/src/zeromerma_api/modules/discounts/presentation/router.py#create_discount"
-      ]
-    },
-    {
-      "gap_id": "GAP-0741",
-      "operation_key": "API:POST:/v1/payments",
-      "gap_type": "IDEMPOTENCY_GAP",
-      "current_state": "No durable DEC-07 replay contract",
-      "approved_target": "DECISION_COMPLIANT_AND_DIRECTLY_VERIFIED",
-      "risk": "IN_SCOPE_NOT_IMPLEMENTED",
-      "later_task": "ZM-FIN-057",
-      "gate": "G2",
-      "evidence": [
-        "apps/api/src/zeromerma_api/modules/payments/presentation/router.py#create_payment"
       ]
     },
     {
@@ -34987,26 +35520,30 @@
       "gap_id": "GAP-0766",
       "operation_key": "UI:POS:/cash-session/open",
       "gap_type": "TEST_GAP",
-      "current_state": "No direct route behavior test classified",
+      "current_state": "Focused command and real route recovery behavior is directly tested by ZM-FIN-032; complete cash/payment vertical coverage remains outside this bounded adoption.",
       "approved_target": "DECISION_COMPLIANT_AND_DIRECTLY_VERIFIED",
-      "risk": "IN_SCOPE_NOT_IMPLEMENTED",
-      "later_task": "ZM-FIN-013",
+      "risk": "FULL_VERTICAL_COVERAGE_REMAINS_PENDING",
+      "later_task": "ZM-FIN-061",
       "gate": "G5",
       "evidence": [
-        "apps/pos-web/src/router.tsx#cashSessionOpenRoute"
+        "apps/pos-web/src/router.tsx#cashSessionOpenRoute",
+        "apps/pos-web/e2e-real/aa-cash-command.spec.ts",
+        "docs/implementation/cash-idempotency-validation.md"
       ]
     },
     {
       "gap_id": "GAP-0769",
       "operation_key": "UI:POS:/cerrar-turno",
       "gap_type": "TEST_GAP",
-      "current_state": "No direct route behavior test classified",
+      "current_state": "Focused command and real route recovery behavior is directly tested by ZM-FIN-032; complete cash/payment vertical coverage remains outside this bounded adoption.",
       "approved_target": "DECISION_COMPLIANT_AND_DIRECTLY_VERIFIED",
-      "risk": "IN_SCOPE_NOT_IMPLEMENTED",
-      "later_task": "ZM-FIN-013",
+      "risk": "FULL_VERTICAL_COVERAGE_REMAINS_PENDING",
+      "later_task": "ZM-FIN-061",
       "gate": "G5",
       "evidence": [
-        "apps/pos-web/src/router.tsx#shiftCloseRoute"
+        "apps/pos-web/src/router.tsx#shiftCloseRoute",
+        "apps/pos-web/e2e-real/aa-cash-command.spec.ts",
+        "docs/implementation/cash-idempotency-validation.md"
       ]
     },
     {
@@ -35119,13 +35656,15 @@
       "gap_id": "GAP-0787",
       "operation_key": "UI:POS:/pagos",
       "gap_type": "TEST_GAP",
-      "current_state": "No direct route behavior test classified",
+      "current_state": "Focused command and real route recovery behavior is directly tested by ZM-FIN-032; complete cash/payment vertical coverage remains outside this bounded adoption.",
       "approved_target": "DECISION_COMPLIANT_AND_DIRECTLY_VERIFIED",
-      "risk": "IN_SCOPE_NOT_IMPLEMENTED",
-      "later_task": "ZM-FIN-013",
+      "risk": "FULL_VERTICAL_COVERAGE_REMAINS_PENDING",
+      "later_task": "ZM-FIN-057",
       "gate": "G5",
       "evidence": [
-        "apps/pos-web/src/router.tsx#paymentsRoute"
+        "apps/pos-web/src/router.tsx#paymentsRoute",
+        "apps/pos-web/e2e-real/aa-cash-command.spec.ts",
+        "docs/implementation/cash-idempotency-validation.md"
       ]
     },
     {

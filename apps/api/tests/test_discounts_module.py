@@ -23,6 +23,7 @@ from zeromerma_api.modules.discounts.infrastructure.models import (
 from zeromerma_api.modules.identity.infrastructure.models import User, UserBranchAssignment
 from zeromerma_api.modules.outbox.infrastructure.models import OutboxEvent
 from zeromerma_api.modules.sales.infrastructure.models import CashMovement
+from zeromerma_api.testing.idempotency import current_cash_session_id, new_idempotency_key
 from zeromerma_api.testing.sessions import login_headers
 
 
@@ -37,7 +38,7 @@ def _authorization_header(client: TestClient) -> dict[str, str]:
 def _open_cash_session(client: TestClient) -> None:
     response = client.post(
         "/v1/cash-sessions/open",
-        headers=_authorization_header(client),
+        headers={**_authorization_header(client), "Idempotency-Key": new_idempotency_key()},
         json={
             "workstation_code": SEED_WORKSTATION_CODE,
             "opening_amount": "300.00",
@@ -87,10 +88,16 @@ def test_discounts_bootstrap_list_detail_and_cash_commit_work_end_to_end(
     ]
     assert bootstrap_payload["active_discount_methods"][2]["is_enabled"] is False
 
+    cash_command_headers = {**headers, "Idempotency-Key": new_idempotency_key()}
+    cash_command_cash_session_id = current_cash_session_id(
+        client, headers=cash_command_headers, workstation_code=SEED_WORKSTATION_CODE
+    )
+
     create_response = client.post(
         "/v1/discounts",
-        headers=headers,
+        headers=cash_command_headers,
         json={
+            "cash_session_id": cash_command_cash_session_id,
             "workstation_code": SEED_WORKSTATION_CODE,
             "subject_name": "Empleado Juan",
             "concept": "Prestamo interno abril",
@@ -107,7 +114,6 @@ def test_discounts_bootstrap_list_detail_and_cash_commit_work_end_to_end(
     assert detail_payload["payment_method_code"] == "CASH"
     assert Decimal(str(detail_payload["total_amount"])) == Decimal("125.50")
     assert Decimal(str(detail_payload["cash_amount"])) == Decimal("125.50")
-    assert detail_payload["affects_cash_drawer"] is True
 
     list_response = client.get(
         "/v1/discounts",
@@ -134,6 +140,7 @@ def test_discounts_bootstrap_list_detail_and_cash_commit_work_end_to_end(
     assert reread_response.status_code == 200
     reread_payload = reread_response.json()
     assert reread_payload["id"] == detail_payload["id"]
+    assert reread_payload["affects_cash_drawer"] is True
     assert reread_payload["audit_summary"]["created_by"]["email"] == SEED_USER_EMAIL
     assert reread_payload["audit_summary"]["confirmed_by"]["full_name"] == "Main Branch Cashier"
 
@@ -173,10 +180,16 @@ def test_card_discount_does_not_change_drawer_cash_but_cash_discount_does(
     _open_cash_session(client)
     headers = _authorization_header(client)
 
+    cash_command_headers = {**headers, "Idempotency-Key": new_idempotency_key()}
+    cash_command_cash_session_id = current_cash_session_id(
+        client, headers=cash_command_headers, workstation_code=SEED_WORKSTATION_CODE
+    )
+
     card_response = client.post(
         "/v1/discounts",
-        headers=headers,
+        headers=cash_command_headers,
         json={
+            "cash_session_id": cash_command_cash_session_id,
             "workstation_code": SEED_WORKSTATION_CODE,
             "subject_name": "Empleado Ana",
             "concept": "Seguro quincenal",
@@ -188,10 +201,16 @@ def test_card_discount_does_not_change_drawer_cash_but_cash_discount_does(
     assert card_response.status_code == 201
     assert Decimal(str(card_response.json()["cash_amount"])) == Decimal("0.00")
 
+    cash_command_headers = {**headers, "Idempotency-Key": new_idempotency_key()}
+    cash_command_cash_session_id = current_cash_session_id(
+        client, headers=cash_command_headers, workstation_code=SEED_WORKSTATION_CODE
+    )
+
     cash_response = client.post(
         "/v1/discounts",
-        headers=headers,
+        headers=cash_command_headers,
         json={
+            "cash_session_id": cash_command_cash_session_id,
             "workstation_code": SEED_WORKSTATION_CODE,
             "subject_name": "Empleado Luis",
             "concept": "Cargo interno",
@@ -232,10 +251,19 @@ def test_discounts_require_open_session_and_reject_unsupported_methods_and_missi
     )
 
     _open_cash_session(client)
+    cash_command_headers = {
+        **_authorization_header(client),
+        "Idempotency-Key": new_idempotency_key(),
+    }
+    cash_command_cash_session_id = current_cash_session_id(
+        client, headers=cash_command_headers, workstation_code=SEED_WORKSTATION_CODE
+    )
+
     unsupported_method_response = client.post(
         "/v1/discounts",
-        headers=_authorization_header(client),
+        headers=cash_command_headers,
         json={
+            "cash_session_id": cash_command_cash_session_id,
             "workstation_code": SEED_WORKSTATION_CODE,
             "subject_name": "Registro mixto",
             "concept": "Prueba de metodo no disponible",
@@ -246,10 +274,19 @@ def test_discounts_require_open_session_and_reject_unsupported_methods_and_missi
     assert unsupported_method_response.status_code == 400
     assert "efectivo o tarjeta" in unsupported_method_response.json()["message"]
 
+    cash_command_headers = {
+        **_authorization_header(client),
+        "Idempotency-Key": new_idempotency_key(),
+    }
+    cash_command_cash_session_id = current_cash_session_id(
+        client, headers=cash_command_headers, workstation_code=SEED_WORKSTATION_CODE
+    )
+
     high_value_response = client.post(
         "/v1/discounts",
-        headers=_authorization_header(client),
+        headers=cash_command_headers,
         json={
+            "cash_session_id": cash_command_cash_session_id,
             "workstation_code": SEED_WORKSTATION_CODE,
             "subject_name": "Empleado Rosa",
             "concept": "Descuento extraordinario",
@@ -271,10 +308,16 @@ def test_discounts_list_supports_scope_and_operator_filters_and_high_value_alert
         "X-Request-ID": "discounts-high-value",
     }
 
+    cash_command_headers = {**headers, "Idempotency-Key": new_idempotency_key()}
+    cash_command_cash_session_id = current_cash_session_id(
+        client, headers=cash_command_headers, workstation_code=SEED_WORKSTATION_CODE
+    )
+
     create_response = client.post(
         "/v1/discounts",
-        headers=headers,
+        headers=cash_command_headers,
         json={
+            "cash_session_id": cash_command_cash_session_id,
             "workstation_code": SEED_WORKSTATION_CODE,
             "subject_name": "Empleado turno actual",
             "concept": "DES-TURNO",
@@ -407,10 +450,16 @@ def test_discounts_list_supports_scope_and_operator_filters_and_high_value_alert
     today_payload = today_response.json()
     assert len(today_payload["discounts"]) == 1
 
+    cash_command_headers = {**headers, "Idempotency-Key": new_idempotency_key()}
+    cash_command_cash_session_id = current_cash_session_id(
+        client, headers=cash_command_headers, workstation_code=SEED_WORKSTATION_CODE
+    )
+
     high_value_response = client.post(
         "/v1/discounts",
-        headers=headers,
+        headers=cash_command_headers,
         json={
+            "cash_session_id": cash_command_cash_session_id,
             "workstation_code": SEED_WORKSTATION_CODE,
             "subject_name": "Empleado alto valor",
             "concept": "Descuento especial",

@@ -48,11 +48,18 @@ export class ApiError extends Error {
   readonly error: ApiErrorResponse | null;
   readonly responseBody: unknown;
   readonly statusCode: number;
+  readonly idempotencyReplayed: boolean;
 
-  constructor(statusCode: number, message: string, responseBody: unknown) {
+  constructor(
+    statusCode: number,
+    message: string,
+    responseBody: unknown,
+    idempotencyReplayed = false,
+  ) {
     super(message);
     this.name = "ApiError";
     this.statusCode = statusCode;
+    this.idempotencyReplayed = idempotencyReplayed;
     this.responseBody = responseBody;
     this.error = isApiErrorResponse(responseBody) ? responseBody : null;
   }
@@ -69,7 +76,8 @@ export async function requestApiJson<TResponse>({
 }: ApiRequestOptions): Promise<TResponse> {
   const requestHeaders = new Headers(headers);
 
-  if (requestHeaders.has("Authorization")) throw new Error("Bearer authentication is not supported.");
+  if (requestHeaders.has("Authorization"))
+    throw new Error("Bearer authentication is not supported.");
   requestHeaders.set("X-ZeroMerma-Surface", surface);
   requestHeaders.delete("X-CSRF-Token");
   if (method !== "GET" && csrfToken) requestHeaders.set("X-CSRF-Token", csrfToken);
@@ -98,7 +106,12 @@ export async function requestApiJson<TResponse>({
     const message = isApiErrorResponse(responseBody)
       ? responseBody.message
       : `${method} ${path} failed.`;
-    throw new ApiError(response.status, message, responseBody);
+    throw new ApiError(
+      response.status,
+      message,
+      responseBody,
+      response.headers.get("Idempotency-Replayed") === "true",
+    );
   }
 
   if (response.status === 204) {

@@ -248,6 +248,18 @@ ENDPOINT_POLICIES: dict[tuple[str, str], EndpointPolicy] = {
     ("GET", "/v1/cash-close/summary"): EndpointPolicy(("pos.operate",), "POS"),
     ("GET", "/v1/cash-close/{close_id}"): EndpointPolicy(("pos.operate",), "POS"),
     ("GET", "/v1/cash-sessions/current"): EndpointPolicy(("pos.operate",), "POS"),
+    ("GET", "/v1/cash-close/confirmations/{idempotency_key}"): EndpointPolicy(
+        ("pos.operate",), "POS"
+    ),
+    ("GET", "/v1/discounts/confirmations/{idempotency_key}"): EndpointPolicy(
+        ("discounts.manage",), "POS"
+    ),
+    ("GET", "/v1/payments/confirmations/{idempotency_key}"): EndpointPolicy(
+        ("pos.operate",), "POS"
+    ),
+    ("GET", "/v1/cash-sessions/confirmations/{idempotency_key}"): EndpointPolicy(
+        ("pos.operate",), "POS"
+    ),
     ("GET", "/v1/corrections/bootstrap"): EndpointPolicy(("pos.operate",), "POS"),
     ("GET", "/v1/corrections/history"): EndpointPolicy(("pos.operate",), "POS"),
     ("GET", "/v1/corrections/history/{correction_id}"): EndpointPolicy(("pos.operate",), "POS"),

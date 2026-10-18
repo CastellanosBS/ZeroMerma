@@ -1,3 +1,6 @@
+import { isCommandIntentionPending } from "@zeromerma/api-client";
+import { cashIntentions } from "../cash-commands/cash-command-intent";
+import { useCashIntention, useCashDraftIdentity } from "../cash-commands/use-cash-intention";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Navigate, useNavigate } from "@tanstack/react-router";
 import {
@@ -11,7 +14,10 @@ import {
 } from "react";
 
 import { useAppShellRightPanel } from "../../components/app-shell-right-panel";
-import { CapturedProductLineList, CapturedProductLineRow } from "../../components/captured-product-lines";
+import {
+  CapturedProductLineList,
+  CapturedProductLineRow,
+} from "../../components/captured-product-lines";
 import { CatalogSelectionCard } from "../../components/catalog-selection-card";
 import { CatalogVisual } from "../../components/catalog-visual";
 import {
@@ -30,12 +36,7 @@ import {
   ScrollPane,
   SearchField,
 } from "../../components/pos-module-primitives";
-import {
-  ArrowLeftIcon,
-  CheckCircleIcon,
-  MoneyIcon,
-  PackageIcon,
-} from "../../components/pos-icons";
+import { ArrowLeftIcon, CheckCircleIcon, MoneyIcon, PackageIcon } from "../../components/pos-icons";
 import { Button } from "../../components/ui/button";
 import { appEnv } from "../../env";
 import type {
@@ -59,7 +60,7 @@ import { useRovingFocusGrid } from "../pos-shell/keyboard";
 import { usePosTerminalStore } from "../pos-terminal/store";
 import { posInputClass, posOutlineButtonClass, posPrimaryButtonClass } from "../pos-theme/theme";
 import { useStatusMessageStore } from "../status-messages/store";
-import { commitCashClose, previewCashClose } from "./cash-close-api";
+import { previewCashClose } from "./cash-close-api";
 import { useCashCloseBootstrapQuery, useCashCloseSummaryQuery } from "./queries";
 import {
   CLOSE_PHYSICAL_STATE_CLASS_SELECTION,
@@ -611,6 +612,21 @@ export function CashCloseScreen() {
   const lastAutoFocusedGridKeyRef = useRef<string | null>(null);
   const livePreviewRequestRef = useRef(0);
   const currentOpenCashSession = bootstrapQuery.data?.current_open_cash_session ?? null;
+  const { metadata, error: intentionError } = useCashIntention(
+    bootstrapQuery.data?.workstation.id ?? "",
+  );
+  const clearConfirmedDraft = useCallback(() => {
+    setDraftState(createInitialCashCloseDraftState());
+    setCounterEmptyConfirmed(false);
+    setIsCloseWithoutCountDialogOpen(false);
+  }, []);
+  const observedKey = useCashDraftIdentity(
+    metadata,
+    Boolean(bootstrapQuery.data),
+    clearConfirmedDraft,
+  );
+  const isIntentionBlocked = Boolean(intentionError) || isCommandIntentionPending(metadata);
+
   const summaryQuery = useCashCloseSummaryQuery(currentOpenCashSession !== null);
   const debouncedSearchText = useDebouncedValue(draftState.physicalSearchText, 180);
   const catalogQuery = useOperationsCatalogQuery(
@@ -789,6 +805,7 @@ export function CashCloseScreen() {
               ? firstBlockingIssue.message
               : null;
   const canSubmit =
+    !isIntentionBlocked &&
     submitDisabledReason === null &&
     canAttemptCashCloseSubmit({
       isAuthenticated,
@@ -966,12 +983,30 @@ export function CashCloseScreen() {
   ]);
 
   const closeMutation = useMutation({
-    mutationFn: (payload: ReturnType<typeof buildCashClosePreviewRequest>) =>
-      submitCashCloseAttempt({
-        commit: (validatedPayload) => commitCashClose(validatedPayload),
+    mutationFn: (payload: ReturnType<typeof buildCashClosePreviewRequest>) => {
+      // Preview is asynchronous: never borrow the identity of another tab that finishes meanwhile.
+      const draftKey = observedKey.current ?? null;
+      return submitCashCloseAttempt({
+        commit: (validatedPayload) => {
+          const bootstrap = bootstrapQuery.data;
+          if (!bootstrap || !currentOpenCashSession) throw new Error("Necesitas una caja abierta.");
+          return cashIntentions.begin(
+            {
+              userId: bootstrap.user.id,
+              branchId: bootstrap.branch.id,
+              workstationId: bootstrap.workstation.id,
+              workstationCode: appEnv.VITE_POS_WORKSTATION_CODE,
+              cashSessionId: currentOpenCashSession.id,
+              commandCode: "close",
+            },
+            { ...validatedPayload, cash_session_id: currentOpenCashSession.id },
+            draftKey,
+          );
+        },
         payload,
         preview: (validatedPayload) => previewCashClose(validatedPayload),
-      }),
+      });
+    },
     onSuccess: async (result) => {
       setLivePreviewResult(result.preview);
 

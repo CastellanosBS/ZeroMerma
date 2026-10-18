@@ -46,7 +46,10 @@ def _open_cash_session(
 ) -> None:
     response = client.post(
         "/v1/cash-sessions/open",
-        headers=_authorization_header(client, workstation_code),
+        headers={
+            **_authorization_header(client, workstation_code),
+            "Idempotency-Key": new_idempotency_key(),
+        },
         json={
             "workstation_code": workstation_code,
             "opening_amount": "150.00",

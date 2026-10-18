@@ -47,7 +47,7 @@ def _get_product_id(code: str) -> str:
 def _open_cash_session(client: TestClient, *, opening_amount: str = "150.00") -> None:
     response = client.post(
         "/v1/cash-sessions/open",
-        headers=_cashier_headers(client),
+        headers={**_cashier_headers(client), "Idempotency-Key": new_idempotency_key()},
         json={
             "opening_amount": opening_amount,
             "workstation_code": SEED_WORKSTATION_CODE,
@@ -133,10 +133,16 @@ def _commit_cash_close_with_difference(
     assert summary_response.status_code == 200, summary_response.json()
     expected_cash = Decimal(str(summary_response.json()["expected_cash_amount"]))
     counted_cash = expected_cash + difference
+    cash_command_headers = {**_cashier_headers(client), "Idempotency-Key": new_idempotency_key()}
+    cash_command_cash_session_id = current_cash_session_id(
+        client, headers=cash_command_headers, workstation_code=SEED_WORKSTATION_CODE
+    )
+
     response = client.post(
         "/v1/cash-close/commit",
-        headers=_cashier_headers(client),
+        headers=cash_command_headers,
         json={
+            "cash_session_id": cash_command_cash_session_id,
             "counter_empty_confirmed": True,
             "counted_payment_methods": [
                 {"payment_method_code": "CASH", "counted_amount": str(counted_cash)}
@@ -280,7 +286,7 @@ def test_admin_reconciliation_can_create_review_resolve_and_keep_cut_immutable(
     assert list_payload["metrics"]["with_evidence_count"] == 1
 
     cut_response = client.get(
-        f"/v1/admin/cash-cuts/{close_payload['cash_session']['id']}",
+        f"/v1/admin/cash-cuts/{close_payload['cash_session_id']}",
         headers=headers,
     )
     assert cut_response.status_code == 200

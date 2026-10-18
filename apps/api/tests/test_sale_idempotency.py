@@ -82,7 +82,7 @@ def _setup(client: TestClient) -> tuple[dict[str, str], dict[str, Any]]:
     headers = _login(client)
     opened = client.post(
         "/v1/cash-sessions/open",
-        headers=headers,
+        headers={**headers, "Idempotency-Key": new_idempotency_key()},
         json={"workstation_code": SEED_WORKSTATION_CODE, "opening_amount": "100.00"},
     )
     assert opened.status_code == 201
@@ -181,7 +181,9 @@ def test_retries_recover_exact_sale_and_ticket_without_repeating_effects(
     assert ticket.status_code == 200
     assert _counts() == after
     with SessionLocal() as session:
-        record = session.scalars(select(IdempotencyRecord)).one()
+        record = session.scalars(
+            select(IdempotencyRecord).where(IdempotencyRecord.idempotency_key == UUID(key))
+        ).one()
         audit = session.scalars(select(AuditLog).where(AuditLog.action == "sale.confirmed")).one()
         event = session.scalars(
             select(OutboxEvent).where(OutboxEvent.event_name == "sale.confirmed.v1")

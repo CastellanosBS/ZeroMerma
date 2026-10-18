@@ -35546,6 +35546,212 @@
         "title": "CashCloseClassReconciliationView",
         "type": "object"
       },
+      "CashCloseCommitRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "cash_session_id": {
+            "format": "uuid",
+            "title": "Cash Session Id",
+            "type": "string",
+            "x-zeromerma-id-representation": "JSON_STRING"
+          },
+          "close_mode": {
+            "default": "WITH_COUNT",
+            "maxLength": 40,
+            "minLength": 1,
+            "title": "Close Mode",
+            "type": "string"
+          },
+          "counted_payment_methods": {
+            "items": {
+              "$ref": "#/components/schemas/CashCloseCountedPaymentMethodRequest"
+            },
+            "title": "Counted Payment Methods",
+            "type": "array"
+          },
+          "counted_product_lines": {
+            "items": {
+              "$ref": "#/components/schemas/CashCloseCountedProductLineRequest"
+            },
+            "title": "Counted Product Lines",
+            "type": "array"
+          },
+          "counter_empty_confirmed": {
+            "default": false,
+            "title": "Counter Empty Confirmed",
+            "type": "boolean"
+          },
+          "discrepancy_resolutions": {
+            "items": {
+              "$ref": "#/components/schemas/CashCloseDiscrepancyResolutionRequest"
+            },
+            "title": "Discrepancy Resolutions",
+            "type": "array"
+          },
+          "manual_reconciliation_overrides": {
+            "items": {
+              "$ref": "#/components/schemas/CashCloseManualReconciliationOverrideRequest"
+            },
+            "title": "Manual Reconciliation Overrides",
+            "type": "array"
+          },
+          "notes": {
+            "anyOf": [
+              {
+                "maxLength": 1000,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Notes"
+          },
+          "workstation_code": {
+            "maxLength": 64,
+            "minLength": 1,
+            "title": "Workstation Code",
+            "type": "string"
+          }
+        },
+        "required": [
+          "workstation_code",
+          "cash_session_id"
+        ],
+        "title": "CashCloseCommitRequest",
+        "type": "object"
+      },
+      "CashCloseCommitResultView": {
+        "additionalProperties": false,
+        "properties": {
+          "branch_id": {
+            "format": "uuid",
+            "title": "Branch Id",
+            "type": "string",
+            "x-zeromerma-id-representation": "JSON_STRING"
+          },
+          "cash_session_id": {
+            "format": "uuid",
+            "title": "Cash Session Id",
+            "type": "string",
+            "x-zeromerma-id-representation": "JSON_STRING"
+          },
+          "cash_variance_amount": {
+            "anyOf": [
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string",
+                "x-zeromerma-decimal-representation": "JSON_STRING"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cash Variance Amount"
+          },
+          "close_mode": {
+            "title": "Close Mode",
+            "type": "string"
+          },
+          "committed_at_utc": {
+            "format": "date-time",
+            "title": "Committed At Utc",
+            "type": "string",
+            "x-zeromerma-instant-format": "ISO8601_DATETIME"
+          },
+          "counted_cash_amount": {
+            "anyOf": [
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string",
+                "x-zeromerma-decimal-representation": "JSON_STRING"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Counted Cash Amount"
+          },
+          "currency_code": {
+            "title": "Currency Code",
+            "type": "string"
+          },
+          "expected_cash_amount": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Expected Cash Amount",
+            "type": "string",
+            "x-zeromerma-decimal-representation": "JSON_STRING"
+          },
+          "generated_discrepancy_document_ids": {
+            "items": {
+              "format": "uuid",
+              "type": "string",
+              "x-zeromerma-id-representation": "JSON_STRING"
+            },
+            "title": "Generated Discrepancy Document Ids",
+            "type": "array"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string",
+            "x-zeromerma-id-representation": "JSON_STRING"
+          },
+          "opening_amount": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Opening Amount",
+            "type": "string",
+            "x-zeromerma-decimal-representation": "JSON_STRING"
+          },
+          "reconciliation_status": {
+            "title": "Reconciliation Status",
+            "type": "string"
+          },
+          "status": {
+            "const": "COMMITTED",
+            "title": "Status",
+            "type": "string"
+          },
+          "total_cash_in": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Total Cash In",
+            "type": "string",
+            "x-zeromerma-decimal-representation": "JSON_STRING"
+          },
+          "total_cash_out": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Total Cash Out",
+            "type": "string",
+            "x-zeromerma-decimal-representation": "JSON_STRING"
+          },
+          "workstation_id": {
+            "format": "uuid",
+            "title": "Workstation Id",
+            "type": "string",
+            "x-zeromerma-id-representation": "JSON_STRING"
+          }
+        },
+        "required": [
+          "id",
+          "cash_session_id",
+          "branch_id",
+          "workstation_id",
+          "status",
+          "close_mode",
+          "opening_amount",
+          "total_cash_in",
+          "total_cash_out",
+          "expected_cash_amount",
+          "counted_cash_amount",
+          "cash_variance_amount",
+          "currency_code",
+          "reconciliation_status",
+          "committed_at_utc",
+          "generated_discrepancy_document_ids"
+        ],
+        "title": "CashCloseCommitResultView",
+        "type": "object"
+      },
       "CashCloseCountedPaymentMethodRequest": {
         "properties": {
           "counted_amount": {
@@ -36855,6 +37061,56 @@
           "occurred_at"
         ],
         "title": "CashMovementView",
+        "type": "object"
+      },
+      "CashSessionOpenResultView": {
+        "additionalProperties": false,
+        "properties": {
+          "branch_id": {
+            "format": "uuid",
+            "title": "Branch Id",
+            "type": "string",
+            "x-zeromerma-id-representation": "JSON_STRING"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string",
+            "x-zeromerma-id-representation": "JSON_STRING"
+          },
+          "opened_at": {
+            "format": "date-time",
+            "title": "Opened At",
+            "type": "string",
+            "x-zeromerma-instant-format": "ISO8601_DATETIME"
+          },
+          "opening_amount": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Opening Amount",
+            "type": "string",
+            "x-zeromerma-decimal-representation": "JSON_STRING"
+          },
+          "status": {
+            "const": "OPEN",
+            "title": "Status",
+            "type": "string"
+          },
+          "workstation_id": {
+            "format": "uuid",
+            "title": "Workstation Id",
+            "type": "string",
+            "x-zeromerma-id-representation": "JSON_STRING"
+          }
+        },
+        "required": [
+          "id",
+          "status",
+          "opening_amount",
+          "opened_at",
+          "branch_id",
+          "workstation_id"
+        ],
+        "title": "CashSessionOpenResultView",
         "type": "object"
       },
       "CashSessionView": {
@@ -38353,7 +38609,14 @@
         "type": "object"
       },
       "CreateOperationalDiscountRequest": {
+        "additionalProperties": false,
         "properties": {
+          "cash_session_id": {
+            "format": "uuid",
+            "title": "Cash Session Id",
+            "type": "string",
+            "x-zeromerma-id-representation": "JSON_STRING"
+          },
           "category_code": {
             "anyOf": [
               {
@@ -38424,6 +38687,7 @@
         },
         "required": [
           "workstation_code",
+          "cash_session_id",
           "subject_name",
           "concept",
           "payment_method_code",
@@ -38433,7 +38697,14 @@
         "type": "object"
       },
       "CreateOperationalPaymentRequest": {
+        "additionalProperties": false,
         "properties": {
+          "cash_session_id": {
+            "format": "uuid",
+            "title": "Cash Session Id",
+            "type": "string",
+            "x-zeromerma-id-representation": "JSON_STRING"
+          },
           "category_code": {
             "anyOf": [
               {
@@ -38499,6 +38770,7 @@
         },
         "required": [
           "workstation_code",
+          "cash_session_id",
           "payee_name",
           "concept",
           "payment_method_code",
@@ -39491,6 +39763,7 @@
         "type": "object"
       },
       "OpenCashSessionRequest": {
+        "additionalProperties": false,
         "properties": {
           "opening_amount": {
             "anyOf": [
@@ -40318,6 +40591,106 @@
         "title": "OperationalDiscountCategoryView",
         "type": "object"
       },
+      "OperationalDiscountCommitResultView": {
+        "additionalProperties": false,
+        "properties": {
+          "branch_id": {
+            "format": "uuid",
+            "title": "Branch Id",
+            "type": "string",
+            "x-zeromerma-id-representation": "JSON_STRING"
+          },
+          "cash_amount": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Cash Amount",
+            "type": "string",
+            "x-zeromerma-decimal-representation": "JSON_STRING"
+          },
+          "cash_movement_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string",
+                "x-zeromerma-id-representation": "JSON_STRING"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cash Movement Id"
+          },
+          "cash_session_id": {
+            "format": "uuid",
+            "title": "Cash Session Id",
+            "type": "string",
+            "x-zeromerma-id-representation": "JSON_STRING"
+          },
+          "committed_at_utc": {
+            "format": "date-time",
+            "title": "Committed At Utc",
+            "type": "string",
+            "x-zeromerma-instant-format": "ISO8601_DATETIME"
+          },
+          "currency_code": {
+            "title": "Currency Code",
+            "type": "string"
+          },
+          "folio": {
+            "title": "Folio",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string",
+            "x-zeromerma-id-representation": "JSON_STRING"
+          },
+          "non_cash_amount": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Non Cash Amount",
+            "type": "string",
+            "x-zeromerma-decimal-representation": "JSON_STRING"
+          },
+          "payment_method_code": {
+            "title": "Payment Method Code",
+            "type": "string"
+          },
+          "status": {
+            "const": "COMMITTED",
+            "title": "Status",
+            "type": "string"
+          },
+          "total_amount": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Total Amount",
+            "type": "string",
+            "x-zeromerma-decimal-representation": "JSON_STRING"
+          },
+          "workstation_id": {
+            "format": "uuid",
+            "title": "Workstation Id",
+            "type": "string",
+            "x-zeromerma-id-representation": "JSON_STRING"
+          }
+        },
+        "required": [
+          "id",
+          "folio",
+          "status",
+          "branch_id",
+          "workstation_id",
+          "cash_session_id",
+          "cash_movement_id",
+          "payment_method_code",
+          "currency_code",
+          "total_amount",
+          "cash_amount",
+          "non_cash_amount",
+          "committed_at_utc"
+        ],
+        "title": "OperationalDiscountCommitResultView",
+        "type": "object"
+      },
       "OperationalDiscountDetailResponse": {
         "properties": {
           "active_cash_session_id": {
@@ -40686,6 +41059,106 @@
           "display_order"
         ],
         "title": "OperationalPaymentCategoryView",
+        "type": "object"
+      },
+      "OperationalPaymentCommitResultView": {
+        "additionalProperties": false,
+        "properties": {
+          "branch_id": {
+            "format": "uuid",
+            "title": "Branch Id",
+            "type": "string",
+            "x-zeromerma-id-representation": "JSON_STRING"
+          },
+          "cash_amount": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Cash Amount",
+            "type": "string",
+            "x-zeromerma-decimal-representation": "JSON_STRING"
+          },
+          "cash_movement_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string",
+                "x-zeromerma-id-representation": "JSON_STRING"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cash Movement Id"
+          },
+          "cash_session_id": {
+            "format": "uuid",
+            "title": "Cash Session Id",
+            "type": "string",
+            "x-zeromerma-id-representation": "JSON_STRING"
+          },
+          "committed_at_utc": {
+            "format": "date-time",
+            "title": "Committed At Utc",
+            "type": "string",
+            "x-zeromerma-instant-format": "ISO8601_DATETIME"
+          },
+          "currency_code": {
+            "title": "Currency Code",
+            "type": "string"
+          },
+          "folio": {
+            "title": "Folio",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string",
+            "x-zeromerma-id-representation": "JSON_STRING"
+          },
+          "non_cash_amount": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Non Cash Amount",
+            "type": "string",
+            "x-zeromerma-decimal-representation": "JSON_STRING"
+          },
+          "payment_method_code": {
+            "title": "Payment Method Code",
+            "type": "string"
+          },
+          "status": {
+            "const": "COMMITTED",
+            "title": "Status",
+            "type": "string"
+          },
+          "total_amount": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Total Amount",
+            "type": "string",
+            "x-zeromerma-decimal-representation": "JSON_STRING"
+          },
+          "workstation_id": {
+            "format": "uuid",
+            "title": "Workstation Id",
+            "type": "string",
+            "x-zeromerma-id-representation": "JSON_STRING"
+          }
+        },
+        "required": [
+          "id",
+          "folio",
+          "status",
+          "branch_id",
+          "workstation_id",
+          "cash_session_id",
+          "cash_movement_id",
+          "payment_method_code",
+          "currency_code",
+          "total_amount",
+          "cash_amount",
+          "non_cash_amount",
+          "committed_at_utc"
+        ],
+        "title": "OperationalPaymentCommitResultView",
         "type": "object"
       },
       "OperationalPaymentDetailResponse": {
@@ -77708,11 +78181,27 @@
     "/v1/cash-close/commit": {
       "post": {
         "operationId": "commit_cash_close_v1_cash_close_commit_post",
+        "parameters": [
+          {
+            "description": "A globally unique UUIDv7 identifying this business intention.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": true,
+            "schema": {
+              "description": "A globally unique UUIDv7 identifying this business intention.",
+              "maxLength": 36,
+              "minLength": 36,
+              "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-7[0-9a-fA-F]{3}-[89aAbB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$",
+              "title": "Idempotency-Key",
+              "type": "string"
+            }
+          }
+        ],
         "requestBody": {
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/CashClosePreviewRequest"
+                "$ref": "#/components/schemas/CashCloseCommitRequest"
               }
             }
           },
@@ -77723,11 +78212,16 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/CashCloseDetailResponse"
+                  "$ref": "#/components/schemas/CashCloseCommitResultView"
                 }
               }
             },
-            "description": "Successful Response"
+            "description": "Successful Response",
+            "headers": {
+              "Idempotency-Replayed": {
+                "$ref": "#/components/headers/IdempotencyReplayed"
+              }
+            }
           },
           "400": {
             "content": {
@@ -77777,7 +78271,12 @@
                 }
               }
             },
-            "description": "Conflict"
+            "description": "Conflict",
+            "headers": {
+              "Idempotency-Replayed": {
+                "$ref": "#/components/headers/IdempotencyReplayed"
+              }
+            }
           },
           "422": {
             "content": {
@@ -77829,6 +78328,173 @@
           }
         ],
         "summary": "Commit Cash Close",
+        "tags": [
+          "cash-close"
+        ],
+        "x-authorization-policy": "explicit-deny-by-default",
+        "x-required-capabilities": [
+          "pos.operate"
+        ],
+        "x-zeromerma-operation-id-policy": "FASTAPI_STABLE_GENERATED"
+      }
+    },
+    "/v1/cash-close/confirmations/{idempotency_key}": {
+      "get": {
+        "operationId": "recover_cash_close_v1_cash_close_confirmations__idempotency_key__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "idempotency_key",
+            "required": true,
+            "schema": {
+              "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-7[0-9a-fA-F]{3}-[89aAbB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$",
+              "title": "Idempotency Key",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "workstation_code",
+            "required": true,
+            "schema": {
+              "minLength": 1,
+              "title": "Workstation Code",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "cash_session_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Cash Session Id",
+              "type": "string",
+              "x-zeromerma-id-representation": "JSON_STRING"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CashCloseCommitResultView"
+                }
+              }
+            },
+            "description": "Successful Response",
+            "headers": {
+              "Idempotency-Replayed": {
+                "$ref": "#/components/headers/IdempotencyReplayed"
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Authentication Required"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict",
+            "headers": {
+              "Idempotency-Replayed": {
+                "$ref": "#/components/headers/IdempotencyReplayed"
+              }
+            }
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "423": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Session Locked"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Login Rate Limited"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Internal Server Error"
+          }
+        },
+        "security": [
+          {
+            "PosSessionCookie": []
+          },
+          {
+            "BackofficeSessionCookie": []
+          }
+        ],
+        "summary": "Recover Cash Close",
         "tags": [
           "cash-close"
         ],
@@ -78382,6 +79048,162 @@
         "x-zeromerma-operation-id-policy": "FASTAPI_STABLE_GENERATED"
       }
     },
+    "/v1/cash-sessions/confirmations/{idempotency_key}": {
+      "get": {
+        "operationId": "recover_cash_session_opening_v1_cash_sessions_confirmations__idempotency_key__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "idempotency_key",
+            "required": true,
+            "schema": {
+              "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-7[0-9a-fA-F]{3}-[89aAbB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$",
+              "title": "Idempotency Key",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "workstation_code",
+            "required": true,
+            "schema": {
+              "minLength": 1,
+              "title": "Workstation Code",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CashSessionOpenResultView"
+                }
+              }
+            },
+            "description": "Successful Response",
+            "headers": {
+              "Idempotency-Replayed": {
+                "$ref": "#/components/headers/IdempotencyReplayed"
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Authentication Required"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict",
+            "headers": {
+              "Idempotency-Replayed": {
+                "$ref": "#/components/headers/IdempotencyReplayed"
+              }
+            }
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "423": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Session Locked"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Login Rate Limited"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Internal Server Error"
+          }
+        },
+        "security": [
+          {
+            "PosSessionCookie": []
+          },
+          {
+            "BackofficeSessionCookie": []
+          }
+        ],
+        "summary": "Recover Cash Session Opening",
+        "tags": [
+          "cash-sessions"
+        ],
+        "x-authorization-policy": "explicit-deny-by-default",
+        "x-required-capabilities": [
+          "pos.operate"
+        ],
+        "x-zeromerma-operation-id-policy": "FASTAPI_STABLE_GENERATED"
+      }
+    },
     "/v1/cash-sessions/current": {
       "get": {
         "operationId": "current_cash_session_v1_cash_sessions_current_get",
@@ -78529,6 +79351,22 @@
     "/v1/cash-sessions/open": {
       "post": {
         "operationId": "open_cash_session_v1_cash_sessions_open_post",
+        "parameters": [
+          {
+            "description": "A globally unique UUIDv7 identifying this business intention.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": true,
+            "schema": {
+              "description": "A globally unique UUIDv7 identifying this business intention.",
+              "maxLength": 36,
+              "minLength": 36,
+              "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-7[0-9a-fA-F]{3}-[89aAbB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$",
+              "title": "Idempotency-Key",
+              "type": "string"
+            }
+          }
+        ],
         "requestBody": {
           "content": {
             "application/json": {
@@ -78544,11 +79382,16 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/CashSessionView"
+                  "$ref": "#/components/schemas/CashSessionOpenResultView"
                 }
               }
             },
-            "description": "Successful Response"
+            "description": "Successful Response",
+            "headers": {
+              "Idempotency-Replayed": {
+                "$ref": "#/components/headers/IdempotencyReplayed"
+              }
+            }
           },
           "400": {
             "content": {
@@ -78598,7 +79441,12 @@
                 }
               }
             },
-            "description": "Conflict"
+            "description": "Conflict",
+            "headers": {
+              "Idempotency-Replayed": {
+                "$ref": "#/components/headers/IdempotencyReplayed"
+              }
+            }
           },
           "422": {
             "content": {
@@ -79992,6 +80840,22 @@
       },
       "post": {
         "operationId": "create_discount_v1_discounts_post",
+        "parameters": [
+          {
+            "description": "A globally unique UUIDv7 identifying this business intention.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": true,
+            "schema": {
+              "description": "A globally unique UUIDv7 identifying this business intention.",
+              "maxLength": 36,
+              "minLength": 36,
+              "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-7[0-9a-fA-F]{3}-[89aAbB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$",
+              "title": "Idempotency-Key",
+              "type": "string"
+            }
+          }
+        ],
         "requestBody": {
           "content": {
             "application/json": {
@@ -80007,11 +80871,16 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/OperationalDiscountDetailResponse"
+                  "$ref": "#/components/schemas/OperationalDiscountCommitResultView"
                 }
               }
             },
-            "description": "Successful Response"
+            "description": "Successful Response",
+            "headers": {
+              "Idempotency-Replayed": {
+                "$ref": "#/components/headers/IdempotencyReplayed"
+              }
+            }
           },
           "400": {
             "content": {
@@ -80061,7 +80930,12 @@
                 }
               }
             },
-            "description": "Conflict"
+            "description": "Conflict",
+            "headers": {
+              "Idempotency-Replayed": {
+                "$ref": "#/components/headers/IdempotencyReplayed"
+              }
+            }
           },
           "422": {
             "content": {
@@ -80255,6 +81129,173 @@
         "x-authorization-policy": "explicit-deny-by-default",
         "x-required-capabilities": [
           "pos.operate"
+        ],
+        "x-zeromerma-operation-id-policy": "FASTAPI_STABLE_GENERATED"
+      }
+    },
+    "/v1/discounts/confirmations/{idempotency_key}": {
+      "get": {
+        "operationId": "recover_operational_discount_v1_discounts_confirmations__idempotency_key__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "idempotency_key",
+            "required": true,
+            "schema": {
+              "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-7[0-9a-fA-F]{3}-[89aAbB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$",
+              "title": "Idempotency Key",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "workstation_code",
+            "required": true,
+            "schema": {
+              "minLength": 1,
+              "title": "Workstation Code",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "cash_session_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Cash Session Id",
+              "type": "string",
+              "x-zeromerma-id-representation": "JSON_STRING"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OperationalDiscountCommitResultView"
+                }
+              }
+            },
+            "description": "Successful Response",
+            "headers": {
+              "Idempotency-Replayed": {
+                "$ref": "#/components/headers/IdempotencyReplayed"
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Authentication Required"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict",
+            "headers": {
+              "Idempotency-Replayed": {
+                "$ref": "#/components/headers/IdempotencyReplayed"
+              }
+            }
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "423": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Session Locked"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Login Rate Limited"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Internal Server Error"
+          }
+        },
+        "security": [
+          {
+            "PosSessionCookie": []
+          },
+          {
+            "BackofficeSessionCookie": []
+          }
+        ],
+        "summary": "Recover Operational Discount",
+        "tags": [
+          "discounts"
+        ],
+        "x-authorization-policy": "explicit-deny-by-default",
+        "x-required-capabilities": [
+          "discounts.manage"
         ],
         "x-zeromerma-operation-id-policy": "FASTAPI_STABLE_GENERATED"
       }
@@ -83402,6 +84443,22 @@
       },
       "post": {
         "operationId": "create_payment_v1_payments_post",
+        "parameters": [
+          {
+            "description": "A globally unique UUIDv7 identifying this business intention.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": true,
+            "schema": {
+              "description": "A globally unique UUIDv7 identifying this business intention.",
+              "maxLength": 36,
+              "minLength": 36,
+              "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-7[0-9a-fA-F]{3}-[89aAbB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$",
+              "title": "Idempotency-Key",
+              "type": "string"
+            }
+          }
+        ],
         "requestBody": {
           "content": {
             "application/json": {
@@ -83417,11 +84474,16 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/OperationalPaymentDetailResponse"
+                  "$ref": "#/components/schemas/OperationalPaymentCommitResultView"
                 }
               }
             },
-            "description": "Successful Response"
+            "description": "Successful Response",
+            "headers": {
+              "Idempotency-Replayed": {
+                "$ref": "#/components/headers/IdempotencyReplayed"
+              }
+            }
           },
           "400": {
             "content": {
@@ -83471,7 +84533,12 @@
                 }
               }
             },
-            "description": "Conflict"
+            "description": "Conflict",
+            "headers": {
+              "Idempotency-Replayed": {
+                "$ref": "#/components/headers/IdempotencyReplayed"
+              }
+            }
           },
           "422": {
             "content": {
@@ -83659,6 +84726,173 @@
           }
         ],
         "summary": "Get Payments Bootstrap",
+        "tags": [
+          "payments"
+        ],
+        "x-authorization-policy": "explicit-deny-by-default",
+        "x-required-capabilities": [
+          "pos.operate"
+        ],
+        "x-zeromerma-operation-id-policy": "FASTAPI_STABLE_GENERATED"
+      }
+    },
+    "/v1/payments/confirmations/{idempotency_key}": {
+      "get": {
+        "operationId": "recover_operational_payment_v1_payments_confirmations__idempotency_key__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "idempotency_key",
+            "required": true,
+            "schema": {
+              "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-7[0-9a-fA-F]{3}-[89aAbB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$",
+              "title": "Idempotency Key",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "workstation_code",
+            "required": true,
+            "schema": {
+              "minLength": 1,
+              "title": "Workstation Code",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "cash_session_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Cash Session Id",
+              "type": "string",
+              "x-zeromerma-id-representation": "JSON_STRING"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OperationalPaymentCommitResultView"
+                }
+              }
+            },
+            "description": "Successful Response",
+            "headers": {
+              "Idempotency-Replayed": {
+                "$ref": "#/components/headers/IdempotencyReplayed"
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Authentication Required"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict",
+            "headers": {
+              "Idempotency-Replayed": {
+                "$ref": "#/components/headers/IdempotencyReplayed"
+              }
+            }
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "423": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Session Locked"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Login Rate Limited"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Internal Server Error"
+          }
+        },
+        "security": [
+          {
+            "PosSessionCookie": []
+          },
+          {
+            "BackofficeSessionCookie": []
+          }
+        ],
+        "summary": "Recover Operational Payment",
         "tags": [
           "payments"
         ],

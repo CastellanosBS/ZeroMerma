@@ -1,4 +1,7 @@
 // @vitest-environment jsdom
+import { webcrypto } from "node:crypto";
+import { setTimeout as waitForCrypto } from "node:timers/promises";
+import { cashIntentions } from "../cash-commands/cash-command-intent";
 
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import * as React from "react";
@@ -311,7 +314,10 @@ vi.mock("../../components/app-shell-right-panel", () => ({
 
 vi.mock("../auth/auth-store", () => ({
   usePosAuthStore: (
-    selector: (state: { isAuthenticated: boolean; clearSession: typeof clearSessionMock }) => unknown,
+    selector: (state: {
+      isAuthenticated: boolean;
+      clearSession: typeof clearSessionMock;
+    }) => unknown,
   ) =>
     selector({
       isAuthenticated: true,
@@ -505,6 +511,8 @@ function setInputValue(input: HTMLInputElement | HTMLTextAreaElement, value: str
 
 async function flushAsync() {
   await act(async () => {
+    // WebCrypto finishes outside Vitest fake timers. Drain that work before assertions.
+    await waitForCrypto(10);
     await Promise.resolve();
     await Promise.resolve();
   });
@@ -549,6 +557,13 @@ async function addPhysicalCountWithKeyboard(container: HTMLElement) {
 let mountedRoots: Array<() => void> = [];
 
 beforeEach(() => {
+  localStorage.clear();
+  cashIntentions.forgetBodies();
+  vi.stubGlobal("crypto", webcrypto);
+  Object.defineProperty(navigator, "locks", {
+    configurable: true,
+    value: { request: vi.fn(async (_name, _options, callback) => callback({ name: "lock" })) },
+  });
   vi.useFakeTimers();
   vi.setSystemTime(new Date("2026-04-22T19:30:00Z"));
   mockBootstrapResponse = buildBootstrapResponse(true);
@@ -564,6 +579,7 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+  vi.unstubAllGlobals();
   for (const unmount of mountedRoots) {
     unmount();
   }
@@ -643,6 +659,7 @@ describe("cash close screen", () => {
 
     expect(commitCashCloseMock).toHaveBeenCalledTimes(1);
     expect(commitCashCloseMock.mock.calls[0]?.[0]).toEqual({
+      cash_session_id: "cash-session-1",
       close_mode: "WITH_COUNT",
       counter_empty_confirmed: false,
       counted_payment_methods: [
@@ -669,6 +686,49 @@ describe("cash close screen", () => {
     expect(clearSessionMock).toHaveBeenCalledTimes(1);
     expect(navigateMock).toHaveBeenCalledWith({ to: "/login" });
     expect(view.container.textContent).not.toContain("Abrir nuevo turno");
+  });
+
+  it("does not borrow another tab's confirmed identity while its preview is pending", async () => {
+    const view = renderUi(<CashCloseScreen />);
+    mountedRoots.push(view.unmount);
+    await addPhysicalCountWithKeyboard(view.container);
+    click(getButtonByText(view.container, "Cerrar con conteo"));
+    await flushAsync();
+    setInputValue(getInputByLabel(view.container, "Efectivo")!, "180.00");
+    await advancePreview();
+    const draft = previewCashCloseMock.mock.calls.at(-1)![0];
+    let finishPreview!: (value: ReturnType<typeof buildPreviewResponse>) => void;
+    previewCashCloseMock.mockReturnValueOnce(
+      new Promise((resolve) => {
+        finishPreview = resolve;
+      }),
+    );
+    click(getButtonByText(view.container, "Cerrar turno"));
+    await flushAsync();
+    await act(async () => {
+      await cashIntentions.begin(
+        {
+          userId: user.id,
+          branchId: branch.id,
+          workstationId: workstation.id,
+          workstationCode: workstation.code,
+          cashSessionId: openCashSession.id,
+          commandCode: "close",
+        },
+        { ...draft, cash_session_id: openCashSession.id },
+        null,
+      );
+    });
+    const confirmed = cashIntentions.read(workstation.id)!;
+    expect(confirmed.status).toBe("CONFIRMED");
+    await act(async () => finishPreview(buildPreviewResponse(draft)));
+    await flushAsync();
+    expect(commitCashCloseMock).toHaveBeenCalledTimes(1);
+    expect(cashIntentions.read(workstation.id)).toMatchObject({
+      key: confirmed.key,
+      status: "CONFIRMED",
+    });
+    expect(clearSessionMock).not.toHaveBeenCalled();
   });
 
   it("keeps the cashier in close shift when the backend rejects the close", async () => {
@@ -731,6 +791,7 @@ describe("cash close screen", () => {
 
     expect(commitCashCloseMock).toHaveBeenCalledTimes(1);
     expect(commitCashCloseMock.mock.calls[0]?.[0]).toEqual({
+      cash_session_id: "cash-session-1",
       close_mode: "WITH_COUNT",
       counter_empty_confirmed: true,
       counted_payment_methods: [

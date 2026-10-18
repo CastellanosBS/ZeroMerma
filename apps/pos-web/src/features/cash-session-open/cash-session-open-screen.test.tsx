@@ -1,16 +1,23 @@
 // @vitest-environment jsdom
+import { webcrypto } from "node:crypto";
+import { cashIntentions } from "../cash-commands/cash-command-intent";
 
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { act, type ReactElement, type ReactNode } from "react";
 import { createRoot } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import type { CashSessionView, PosBootstrapResponse } from "../../lib/api-contracts";
+import type {
+  CashSessionView,
+  CashSessionOpenResultView,
+  PosBootstrapResponse,
+} from "../../lib/api-contracts";
 import { openCashSession } from "./cash-session-api";
 import { CashSessionOpenScreen } from "./cash-session-open-screen";
 
-(globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean })
-  .IS_REACT_ACT_ENVIRONMENT = true;
+(
+  globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }
+).IS_REACT_ACT_ENVIRONMENT = true;
 
 const routerMocks = vi.hoisted(() => ({
   navigate: vi.fn<() => Promise<void>>().mockResolvedValue(undefined),
@@ -94,10 +101,7 @@ function renderUi(element: ReactElement) {
 }
 
 function setInputValue(target: HTMLInputElement, value: string) {
-  const setNativeValue = Object.getOwnPropertyDescriptor(
-    HTMLInputElement.prototype,
-    "value",
-  )?.set;
+  const setNativeValue = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")?.set;
 
   act(() => {
     setNativeValue?.call(target, value);
@@ -132,7 +136,7 @@ const bootstrap = {
     authorization_surface: "POS" as const,
     authorization_version: "test-authorization-v1",
     is_superadministrator: false,
-      password_reset_required: false,
+    password_reset_required: false,
     default_surface: "POS",
     email: "cashier@zeromerma.local",
     full_name: "Main Branch Cashier",
@@ -154,7 +158,7 @@ const openCashSessionView = {
   id: "cash-session-1",
   opening_amount: "250.00",
   opened_at: "2026-04-13T10:01:00Z",
-  status: "OPEN",
+  status: "OPEN" as const,
   user_email: "cashier@zeromerma.local",
   user_full_name: "Main Branch Cashier",
   user_id: "user-1",
@@ -166,6 +170,13 @@ const openCashSessionView = {
 let mountedRoots: Array<() => void> = [];
 
 beforeEach(() => {
+  localStorage.clear();
+  cashIntentions.forgetBodies();
+  vi.stubGlobal("crypto", webcrypto);
+  Object.defineProperty(navigator, "locks", {
+    configurable: true,
+    value: { request: vi.fn(async (_name, _options, callback) => callback({ name: "lock" })) },
+  });
   queryState.bootstrap = {
     data: bootstrap,
     error: null,
@@ -185,6 +196,7 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+  vi.unstubAllGlobals();
   for (const unmount of mountedRoots) {
     unmount();
   }
@@ -241,9 +253,12 @@ describe("CashSessionOpenScreen", () => {
         opening_amount: "250.00",
         workstation_code: "POS-01",
       },
-      requestId: expect.stringMatching(/^cash-session-open-/),
+      requestId: expect.stringMatching(/^cash-open-/),
+      idempotencyKey: expect.any(String),
     });
-    expect(statusMessageMocks.showSuccess).toHaveBeenCalledWith("Caja abierta \u00b7 Turno iniciado");
+    expect(statusMessageMocks.showSuccess).toHaveBeenCalledWith(
+      "Caja abierta \u00b7 Turno iniciado",
+    );
     expect(routerMocks.navigate).toHaveBeenCalledWith({ to: "/pos" });
     expect(view.container.textContent).not.toContain("La apertura quedo registrada");
     expect(view.container.textContent).not.toContain("Ir al POS");
@@ -271,9 +286,9 @@ describe("CashSessionOpenScreen", () => {
   });
 
   it("disables the submit button while the opening request is in flight", async () => {
-    let resolveOpening: (value: CashSessionView) => void = () => undefined;
+    let resolveOpening: (value: CashSessionOpenResultView) => void = () => undefined;
     vi.mocked(openCashSession).mockReturnValue(
-      new Promise<CashSessionView>((resolve) => {
+      new Promise<CashSessionOpenResultView>((resolve) => {
         resolveOpening = resolve;
       }),
     );

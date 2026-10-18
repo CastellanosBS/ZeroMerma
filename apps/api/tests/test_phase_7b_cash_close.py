@@ -47,7 +47,7 @@ def _authorization_header(client: TestClient) -> dict[str, str]:
 def _open_cash_session(client: TestClient) -> None:
     response = client.post(
         "/v1/cash-sessions/open",
-        headers=_authorization_header(client),
+        headers={**_authorization_header(client), "Idempotency-Key": new_idempotency_key()},
         json={
             "workstation_code": SEED_WORKSTATION_CODE,
             "opening_amount": "150.00",
@@ -255,10 +255,19 @@ def test_cash_close_commit_blocks_unresolved_class_capture_mismatch(
         tendered_amount="10.00",
     )
 
+    cash_command_headers = {
+        **_authorization_header(client),
+        "Idempotency-Key": new_idempotency_key(),
+    }
+    cash_command_cash_session_id = current_cash_session_id(
+        client, headers=cash_command_headers, workstation_code=SEED_WORKSTATION_CODE
+    )
+
     response = client.post(
         "/v1/cash-close/commit",
-        headers=_authorization_header(client),
+        headers=cash_command_headers,
         json={
+            "cash_session_id": cash_command_cash_session_id,
             "workstation_code": SEED_WORKSTATION_CODE,
             "counted_payment_methods": [
                 {"payment_method_code": "CASH", "counted_amount": "156.00"},
@@ -293,10 +302,19 @@ def test_cash_close_commit_with_empty_counter_registers_zero_bread_count(
         tendered_amount="10.00",
     )
 
+    cash_command_headers = {
+        **_authorization_header(client),
+        "Idempotency-Key": new_idempotency_key(),
+    }
+    cash_command_cash_session_id = current_cash_session_id(
+        client, headers=cash_command_headers, workstation_code=SEED_WORKSTATION_CODE
+    )
+
     response = client.post(
         "/v1/cash-close/commit",
-        headers=_authorization_header(client),
+        headers=cash_command_headers,
         json={
+            "cash_session_id": cash_command_cash_session_id,
             "workstation_code": SEED_WORKSTATION_CODE,
             "counter_empty_confirmed": True,
             "counted_payment_methods": [
@@ -306,7 +324,14 @@ def test_cash_close_commit_with_empty_counter_registers_zero_bread_count(
     )
 
     assert response.status_code == 200
-    payload = response.json()
+    committed = response.json()
+    detail = client.get(
+        f"/v1/cash-close/{committed['id']}",
+        headers=_authorization_header(client),
+    )
+    assert detail.status_code == 200
+    payload = detail.json()
+    assert payload["id"] == committed["id"]
     assert payload["close_mode"] == "WITH_COUNT"
     assert payload["counter_empty_confirmed"] is True
     assert payload["counted_cash_amount"] == "156.00"
@@ -367,10 +392,19 @@ def test_cash_close_empty_counter_still_requires_money_count(
     _seed_counter_baseline([(SEED_PRODUCT_BOLILLO_STD_CODE, "10.000")])
     _open_cash_session(client)
 
+    cash_command_headers = {
+        **_authorization_header(client),
+        "Idempotency-Key": new_idempotency_key(),
+    }
+    cash_command_cash_session_id = current_cash_session_id(
+        client, headers=cash_command_headers, workstation_code=SEED_WORKSTATION_CODE
+    )
+
     response = client.post(
         "/v1/cash-close/commit",
-        headers=_authorization_header(client),
+        headers=cash_command_headers,
         json={
+            "cash_session_id": cash_command_cash_session_id,
             "workstation_code": SEED_WORKSTATION_CODE,
             "counter_empty_confirmed": True,
         },
@@ -402,10 +436,19 @@ def test_cash_close_commit_with_manual_override_and_auto_discrepancy_resolution(
         tendered_amount="50.00",
     )
 
+    cash_command_headers = {
+        **_authorization_header(client),
+        "Idempotency-Key": new_idempotency_key(),
+    }
+    cash_command_cash_session_id = current_cash_session_id(
+        client, headers=cash_command_headers, workstation_code=SEED_WORKSTATION_CODE
+    )
+
     response = client.post(
         "/v1/cash-close/commit",
-        headers=_authorization_header(client),
+        headers=cash_command_headers,
         json={
+            "cash_session_id": cash_command_cash_session_id,
             "workstation_code": SEED_WORKSTATION_CODE,
             "counted_payment_methods": [
                 {"payment_method_code": "CASH", "counted_amount": "174.00"},
@@ -440,19 +483,19 @@ def test_cash_close_commit_with_manual_override_and_auto_discrepancy_resolution(
     )
 
     assert response.status_code == 200
-    payload = response.json()
+    committed = response.json()
+    detail = client.get(
+        f"/v1/cash-close/{committed['id']}",
+        headers=_authorization_header(client),
+    )
+    assert detail.status_code == 200
+    payload = detail.json()
+    assert payload["id"] == committed["id"]
     assert payload["cash_session"]["status"] == "CLOSED"
     assert payload["class_reconciliations"][0]["resolution_status"] == "MANUAL_RESOLVED"
     assert (
         payload["generated_discrepancy_documents"][0]["document_type"] == "CLOSE_COUNTER_ADJUSTMENT"
     )
-
-    detail = client.get(
-        f"/v1/cash-close/{payload['id']}",
-        headers=_authorization_header(client),
-    )
-    assert detail.status_code == 200
-    assert detail.json()["id"] == payload["id"]
 
     with SessionLocal() as session:
         cash_session = session.execute(select(CashSession)).scalar_one()

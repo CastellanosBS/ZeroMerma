@@ -2554,6 +2554,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/cash-close/confirmations/{idempotency_key}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Recover Cash Close */
+        get: operations["recover_cash_close_v1_cash_close_confirmations__idempotency_key__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/cash-close/preview": {
         parameters: {
             query?: never;
@@ -2614,6 +2631,23 @@ export interface paths {
         };
         /** Get Cash Close Detail */
         get: operations["get_cash_close_detail_v1_cash_close__close_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/cash-sessions/confirmations/{idempotency_key}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Recover Cash Session Opening */
+        get: operations["recover_cash_session_opening_v1_cash_sessions_confirmations__idempotency_key__get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -2802,6 +2836,23 @@ export interface paths {
         };
         /** Get Discounts Bootstrap */
         get: operations["get_discounts_bootstrap_v1_discounts_bootstrap_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/discounts/confirmations/{idempotency_key}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Recover Operational Discount */
+        get: operations["recover_operational_discount_v1_discounts_confirmations__idempotency_key__get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -3127,6 +3178,23 @@ export interface paths {
         };
         /** Get Payments Bootstrap */
         get: operations["get_payments_bootstrap_v1_payments_bootstrap_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/payments/confirmations/{idempotency_key}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Recover Operational Payment */
+        get: operations["recover_operational_payment_v1_payments_confirmations__idempotency_key__get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -16169,6 +16237,89 @@ export interface components {
             /** Resolution Status */
             resolution_status: string;
         };
+        /** CashCloseCommitRequest */
+        CashCloseCommitRequest: {
+            /**
+             * Cash Session Id
+             * Format: uuid
+             */
+            cash_session_id: string;
+            /**
+             * Close Mode
+             * @default WITH_COUNT
+             */
+            close_mode: string;
+            /** Counted Payment Methods */
+            counted_payment_methods?: components["schemas"]["CashCloseCountedPaymentMethodRequest"][];
+            /** Counted Product Lines */
+            counted_product_lines?: components["schemas"]["CashCloseCountedProductLineRequest"][];
+            /**
+             * Counter Empty Confirmed
+             * @default false
+             */
+            counter_empty_confirmed: boolean;
+            /** Discrepancy Resolutions */
+            discrepancy_resolutions?: components["schemas"]["CashCloseDiscrepancyResolutionRequest"][];
+            /** Manual Reconciliation Overrides */
+            manual_reconciliation_overrides?: components["schemas"]["CashCloseManualReconciliationOverrideRequest"][];
+            /** Notes */
+            notes?: string | null;
+            /** Workstation Code */
+            workstation_code: string;
+        };
+        /** CashCloseCommitResultView */
+        CashCloseCommitResultView: {
+            /**
+             * Branch Id
+             * Format: uuid
+             */
+            branch_id: string;
+            /**
+             * Cash Session Id
+             * Format: uuid
+             */
+            cash_session_id: string;
+            /** Cash Variance Amount */
+            cash_variance_amount: string | null;
+            /** Close Mode */
+            close_mode: string;
+            /**
+             * Committed At Utc
+             * Format: date-time
+             */
+            committed_at_utc: string;
+            /** Counted Cash Amount */
+            counted_cash_amount: string | null;
+            /** Currency Code */
+            currency_code: string;
+            /** Expected Cash Amount */
+            expected_cash_amount: string;
+            /** Generated Discrepancy Document Ids */
+            generated_discrepancy_document_ids: string[];
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Opening Amount */
+            opening_amount: string;
+            /** Reconciliation Status */
+            reconciliation_status: string;
+            /**
+             * Status
+             * @constant
+             */
+            status: "COMMITTED";
+            /** Total Cash In */
+            total_cash_in: string;
+            /** Total Cash Out */
+            total_cash_out: string;
+            /**
+             * Workstation Id
+             * Format: uuid
+             */
+            workstation_id: string;
+        };
         /** CashCloseCountedPaymentMethodRequest */
         CashCloseCountedPaymentMethodRequest: {
             /** Counted Amount */
@@ -16582,6 +16733,36 @@ export interface components {
             occurred_at: string;
             /** Payment Method Code */
             payment_method_code: string;
+        };
+        /** CashSessionOpenResultView */
+        CashSessionOpenResultView: {
+            /**
+             * Branch Id
+             * Format: uuid
+             */
+            branch_id: string;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /**
+             * Opened At
+             * Format: date-time
+             */
+            opened_at: string;
+            /** Opening Amount */
+            opening_amount: string;
+            /**
+             * Status
+             * @constant
+             */
+            status: "OPEN";
+            /**
+             * Workstation Id
+             * Format: uuid
+             */
+            workstation_id: string;
         };
         /** CashSessionView */
         CashSessionView: {
@@ -17084,6 +17265,11 @@ export interface components {
         };
         /** CreateOperationalDiscountRequest */
         CreateOperationalDiscountRequest: {
+            /**
+             * Cash Session Id
+             * Format: uuid
+             */
+            cash_session_id: string;
             /** Category Code */
             category_code?: string | null;
             /** Concept */
@@ -17106,6 +17292,11 @@ export interface components {
         };
         /** CreateOperationalPaymentRequest */
         CreateOperationalPaymentRequest: {
+            /**
+             * Cash Session Id
+             * Format: uuid
+             */
+            cash_session_id: string;
             /** Category Code */
             category_code?: string | null;
             /** Concept */
@@ -17698,6 +17889,53 @@ export interface components {
             /** Name */
             name: string;
         };
+        /** OperationalDiscountCommitResultView */
+        OperationalDiscountCommitResultView: {
+            /**
+             * Branch Id
+             * Format: uuid
+             */
+            branch_id: string;
+            /** Cash Amount */
+            cash_amount: string;
+            /** Cash Movement Id */
+            cash_movement_id: string | null;
+            /**
+             * Cash Session Id
+             * Format: uuid
+             */
+            cash_session_id: string;
+            /**
+             * Committed At Utc
+             * Format: date-time
+             */
+            committed_at_utc: string;
+            /** Currency Code */
+            currency_code: string;
+            /** Folio */
+            folio: string;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Non Cash Amount */
+            non_cash_amount: string;
+            /** Payment Method Code */
+            payment_method_code: string;
+            /**
+             * Status
+             * @constant
+             */
+            status: "COMMITTED";
+            /** Total Amount */
+            total_amount: string;
+            /**
+             * Workstation Id
+             * Format: uuid
+             */
+            workstation_id: string;
+        };
         /** OperationalDiscountDetailResponse */
         OperationalDiscountDetailResponse: {
             /**
@@ -17833,6 +18071,53 @@ export interface components {
             display_order: number;
             /** Name */
             name: string;
+        };
+        /** OperationalPaymentCommitResultView */
+        OperationalPaymentCommitResultView: {
+            /**
+             * Branch Id
+             * Format: uuid
+             */
+            branch_id: string;
+            /** Cash Amount */
+            cash_amount: string;
+            /** Cash Movement Id */
+            cash_movement_id: string | null;
+            /**
+             * Cash Session Id
+             * Format: uuid
+             */
+            cash_session_id: string;
+            /**
+             * Committed At Utc
+             * Format: date-time
+             */
+            committed_at_utc: string;
+            /** Currency Code */
+            currency_code: string;
+            /** Folio */
+            folio: string;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Non Cash Amount */
+            non_cash_amount: string;
+            /** Payment Method Code */
+            payment_method_code: string;
+            /**
+             * Status
+             * @constant
+             */
+            status: "COMMITTED";
+            /** Total Amount */
+            total_amount: string;
+            /**
+             * Workstation Id
+             * Format: uuid
+             */
+            workstation_id: string;
         };
         /** OperationalPaymentDetailResponse */
         OperationalPaymentDetailResponse: {
@@ -39082,23 +39367,27 @@ export interface operations {
     commit_cash_close_v1_cash_close_commit_post: {
         parameters: {
             query?: never;
-            header?: never;
+            header: {
+                /** @description A globally unique UUIDv7 identifying this business intention. */
+                "Idempotency-Key": string;
+            };
             path?: never;
             cookie?: never;
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["CashClosePreviewRequest"];
+                "application/json": components["schemas"]["CashCloseCommitRequest"];
             };
         };
         responses: {
             /** @description Successful Response */
             200: {
                 headers: {
+                    "Idempotency-Replayed": components["headers"]["IdempotencyReplayed"];
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["CashCloseDetailResponse"];
+                    "application/json": components["schemas"]["CashCloseCommitResultView"];
                 };
             };
             /** @description Bad Request */
@@ -39140,6 +39429,115 @@ export interface operations {
             /** @description Conflict */
             409: {
                 headers: {
+                    "Idempotency-Replayed": components["headers"]["IdempotencyReplayed"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorResponse"];
+                };
+            };
+            /** @description Session Locked */
+            423: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorResponse"];
+                };
+            };
+            /** @description Login Rate Limited */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorResponse"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorResponse"];
+                };
+            };
+        };
+    };
+    recover_cash_close_v1_cash_close_confirmations__idempotency_key__get: {
+        parameters: {
+            query: {
+                workstation_code: string;
+                cash_session_id: string;
+            };
+            header?: never;
+            path: {
+                idempotency_key: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    "Idempotency-Replayed": components["headers"]["IdempotencyReplayed"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CashCloseCommitResultView"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorResponse"];
+                };
+            };
+            /** @description Authentication Required */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorResponse"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorResponse"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorResponse"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    "Idempotency-Replayed": components["headers"]["IdempotencyReplayed"];
                     [name: string]: unknown;
                 };
                 content: {
@@ -39598,6 +39996,113 @@ export interface operations {
             };
         };
     };
+    recover_cash_session_opening_v1_cash_sessions_confirmations__idempotency_key__get: {
+        parameters: {
+            query: {
+                workstation_code: string;
+            };
+            header?: never;
+            path: {
+                idempotency_key: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    "Idempotency-Replayed": components["headers"]["IdempotencyReplayed"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CashSessionOpenResultView"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorResponse"];
+                };
+            };
+            /** @description Authentication Required */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorResponse"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorResponse"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorResponse"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    "Idempotency-Replayed": components["headers"]["IdempotencyReplayed"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorResponse"];
+                };
+            };
+            /** @description Session Locked */
+            423: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorResponse"];
+                };
+            };
+            /** @description Login Rate Limited */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorResponse"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorResponse"];
+                };
+            };
+        };
+    };
     current_cash_session_v1_cash_sessions_current_get: {
         parameters: {
             query: {
@@ -39704,7 +40209,10 @@ export interface operations {
     open_cash_session_v1_cash_sessions_open_post: {
         parameters: {
             query?: never;
-            header?: never;
+            header: {
+                /** @description A globally unique UUIDv7 identifying this business intention. */
+                "Idempotency-Key": string;
+            };
             path?: never;
             cookie?: never;
         };
@@ -39717,10 +40225,11 @@ export interface operations {
             /** @description Successful Response */
             201: {
                 headers: {
+                    "Idempotency-Replayed": components["headers"]["IdempotencyReplayed"];
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["CashSessionView"];
+                    "application/json": components["schemas"]["CashSessionOpenResultView"];
                 };
             };
             /** @description Bad Request */
@@ -39762,6 +40271,7 @@ export interface operations {
             /** @description Conflict */
             409: {
                 headers: {
+                    "Idempotency-Replayed": components["headers"]["IdempotencyReplayed"];
                     [name: string]: unknown;
                 };
                 content: {
@@ -40652,7 +41162,10 @@ export interface operations {
     create_discount_v1_discounts_post: {
         parameters: {
             query?: never;
-            header?: never;
+            header: {
+                /** @description A globally unique UUIDv7 identifying this business intention. */
+                "Idempotency-Key": string;
+            };
             path?: never;
             cookie?: never;
         };
@@ -40665,10 +41178,11 @@ export interface operations {
             /** @description Successful Response */
             201: {
                 headers: {
+                    "Idempotency-Replayed": components["headers"]["IdempotencyReplayed"];
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["OperationalDiscountDetailResponse"];
+                    "application/json": components["schemas"]["OperationalDiscountCommitResultView"];
                 };
             };
             /** @description Bad Request */
@@ -40710,6 +41224,7 @@ export interface operations {
             /** @description Conflict */
             409: {
                 headers: {
+                    "Idempotency-Replayed": components["headers"]["IdempotencyReplayed"];
                     [name: string]: unknown;
                 };
                 content: {
@@ -40813,6 +41328,114 @@ export interface operations {
             /** @description Conflict */
             409: {
                 headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorResponse"];
+                };
+            };
+            /** @description Session Locked */
+            423: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorResponse"];
+                };
+            };
+            /** @description Login Rate Limited */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorResponse"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorResponse"];
+                };
+            };
+        };
+    };
+    recover_operational_discount_v1_discounts_confirmations__idempotency_key__get: {
+        parameters: {
+            query: {
+                workstation_code: string;
+                cash_session_id: string;
+            };
+            header?: never;
+            path: {
+                idempotency_key: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    "Idempotency-Replayed": components["headers"]["IdempotencyReplayed"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OperationalDiscountCommitResultView"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorResponse"];
+                };
+            };
+            /** @description Authentication Required */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorResponse"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorResponse"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorResponse"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    "Idempotency-Replayed": components["headers"]["IdempotencyReplayed"];
                     [name: string]: unknown;
                 };
                 content: {
@@ -42888,7 +43511,10 @@ export interface operations {
     create_payment_v1_payments_post: {
         parameters: {
             query?: never;
-            header?: never;
+            header: {
+                /** @description A globally unique UUIDv7 identifying this business intention. */
+                "Idempotency-Key": string;
+            };
             path?: never;
             cookie?: never;
         };
@@ -42901,10 +43527,11 @@ export interface operations {
             /** @description Successful Response */
             201: {
                 headers: {
+                    "Idempotency-Replayed": components["headers"]["IdempotencyReplayed"];
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["OperationalPaymentDetailResponse"];
+                    "application/json": components["schemas"]["OperationalPaymentCommitResultView"];
                 };
             };
             /** @description Bad Request */
@@ -42946,6 +43573,7 @@ export interface operations {
             /** @description Conflict */
             409: {
                 headers: {
+                    "Idempotency-Replayed": components["headers"]["IdempotencyReplayed"];
                     [name: string]: unknown;
                 };
                 content: {
@@ -43049,6 +43677,114 @@ export interface operations {
             /** @description Conflict */
             409: {
                 headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorResponse"];
+                };
+            };
+            /** @description Session Locked */
+            423: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorResponse"];
+                };
+            };
+            /** @description Login Rate Limited */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorResponse"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorResponse"];
+                };
+            };
+        };
+    };
+    recover_operational_payment_v1_payments_confirmations__idempotency_key__get: {
+        parameters: {
+            query: {
+                workstation_code: string;
+                cash_session_id: string;
+            };
+            header?: never;
+            path: {
+                idempotency_key: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    "Idempotency-Replayed": components["headers"]["IdempotencyReplayed"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OperationalPaymentCommitResultView"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorResponse"];
+                };
+            };
+            /** @description Authentication Required */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorResponse"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorResponse"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorResponse"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    "Idempotency-Replayed": components["headers"]["IdempotencyReplayed"];
                     [name: string]: unknown;
                 };
                 content: {

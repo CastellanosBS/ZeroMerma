@@ -25,6 +25,7 @@ export function createCommandIntentionCoordinator<C extends object, P, R>(option
   validateContext?: (context: C) => boolean;
   send: (context: C, payload: P, key: string) => Promise<R>;
   recover: (metadata: CommandIntentionMetadata<C>) => Promise<R>;
+  isRecoveredRejection?: (metadata: CommandIntentionMetadata<C>, error: unknown) => boolean;
 }) {
   type Metadata = CommandIntentionMetadata<C>;
   const bodies = new Map<string, P>();
@@ -104,14 +105,20 @@ export function createCommandIntentionCoordinator<C extends object, P, R>(option
     return Array.from(new Uint8Array(hash), (byte) => byte.toString(16).padStart(2, "0")).join("");
   }
 
-  function recordError(metadata: Metadata, error: unknown, firstKnownSend: boolean) {
+  function recordError(
+    metadata: Metadata,
+    error: unknown,
+    firstKnownSend: boolean,
+    recoveredRejection = false,
+  ) {
     const code = error instanceof ApiError ? error.error?.code : null;
     const rejected =
-      firstKnownSend &&
-      error instanceof ApiError &&
-      error.error !== null &&
-      [400, 404, 409, 422].includes(error.statusCode) &&
-      !code?.startsWith("IDEMPOTENCY_");
+      recoveredRejection ||
+      (firstKnownSend &&
+        error instanceof ApiError &&
+        error.error !== null &&
+        [400, 404, 409, 422].includes(error.statusCode) &&
+        !code?.startsWith("IDEMPOTENCY_"));
     write({
       ...metadata,
       status: code === "IDEMPOTENCY_KEY_REUSED" ? "CONFLICT" : rejected ? "REJECTED" : "UNKNOWN",
@@ -206,7 +213,12 @@ export function createCommandIntentionCoordinator<C extends object, P, R>(option
           bodies.delete(metadata.key);
           return result;
         } catch (error) {
-          recordError(metadata, error, false);
+          recordError(
+            metadata,
+            error,
+            false,
+            options.isRecoveredRejection?.(metadata, error) === true,
+          );
           throw error;
         }
       });

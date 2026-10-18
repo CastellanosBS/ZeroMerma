@@ -1,3 +1,4 @@
+import type { OperationalPaymentCommitResultView } from "../../lib/api-contracts";
 import type {
   CreateOperationalPaymentRequest,
   OperationalPaymentDetailResponse,
@@ -21,9 +22,7 @@ function buildQueryString(params: Record<string, string | undefined>): string {
   return serialized.length > 0 ? `?${serialized}` : "";
 }
 
-export function getPaymentsBootstrap(
-  workstationCode: string,
-): Promise<PaymentsBootstrapResponse> {
+export function getPaymentsBootstrap(workstationCode: string): Promise<PaymentsBootstrapResponse> {
   return requestJson<PaymentsBootstrapResponse>({
     path: `/v1/payments/bootstrap?workstation_code=${encodeURIComponent(workstationCode)}`,
   });
@@ -37,7 +36,6 @@ export function listPayments({
   scope,
   workstationCode,
 }: {
-
   category?: string;
   createdByUserId?: string;
   paymentMethod?: string;
@@ -61,7 +59,6 @@ export function getPaymentDetail({
   paymentId,
   workstationCode,
 }: {
-
   paymentId: string;
   workstationCode: string;
 }): Promise<OperationalPaymentDetailResponse> {
@@ -71,19 +68,21 @@ export function getPaymentDetail({
 }
 
 export function createPayment({
+  idempotencyKey,
   payload,
   requestId,
 }: {
-
+  idempotencyKey: string;
   payload: CreateOperationalPaymentRequest;
   requestId: string;
-}): Promise<OperationalPaymentDetailResponse> {
-  return requestJson<OperationalPaymentDetailResponse>({
+}): Promise<OperationalPaymentCommitResultView> {
+  return requestJson<OperationalPaymentCommitResultView>({
     body: payload,
     method: "POST",
     path: "/v1/payments",
     headers: {
       "X-Request-ID": requestId,
+      "Idempotency-Key": idempotencyKey,
     },
   });
 }

@@ -24,6 +24,7 @@ from zeromerma_api.modules.branches.application.access import (
 )
 from zeromerma_api.modules.branches.application.schemas import BranchSummary, WorkstationSummary
 from zeromerma_api.modules.branches.infrastructure.models import Branch, Brand, Workstation
+from zeromerma_api.modules.cash.application.command_context import lock_cash_session
 from zeromerma_api.modules.cash.application.schemas import CashSessionView
 from zeromerma_api.modules.cash.application.services import CashSessionQueryService
 from zeromerma_api.modules.catalog.infrastructure.models import Product, ProductClass
@@ -44,6 +45,7 @@ from zeromerma_api.modules.discounts.application.schemas import (
     DiscountsBootstrapResponse,
     DiscountsListResponse,
     OperationalDiscountCategoryView,
+    OperationalDiscountCommitResultView,
     OperationalDiscountDetailResponse,
     OperationalDiscountFilterOptionView,
     OperationalDiscountListItemView,
@@ -1193,18 +1195,20 @@ class DiscountsCommandService:
         current_user: AuthenticatedUser,
         command: CreateOperationalDiscountRequest,
         request_id: str | None,
-    ) -> OperationalDiscountDetailResponse:
+        idempotency_key: uuid.UUID,
+        operation_id: uuid.UUID,
+    ) -> OperationalDiscountCommitResultView:
         context = self._workstation_access.resolve_context(
             session,
             user_id=current_user.id,
             workstation_code=command.workstation_code,
         )
-        current_open_cash_session = _require_open_cash_session(
+        current_open_cash_session = lock_cash_session(
             session,
-            cash_session_query=self._cash_session_query,
             current_user=current_user,
-            workstation_code=command.workstation_code,
-            context=context,
+            workstation_id=context.workstation_id,
+            branch_id=context.branch_id,
+            cash_session_id=command.cash_session_id,
         )
         subject_name = _require_non_empty(command.subject_name, field_label="persona o entidad")
         concept = _require_non_empty(command.concept, field_label="motivo o referencia")
@@ -1220,6 +1224,13 @@ class DiscountsCommandService:
         created_at = datetime.now(tz=UTC)
         resolved_request_id = request_id or str(uuid.uuid4())
         cash_amount = total_amount if payment_method_code == PAYMENT_METHOD_CASH else ZERO_MONEY
+        cash_movement_id = uuid.uuid4() if cash_amount > ZERO_MONEY else None
+        trace = {
+            "idempotency_key": str(idempotency_key),
+            "operation_id": str(operation_id),
+            "operation_code": "operational_discount.commit",
+            "cash_movement_id": str(cash_movement_id) if cash_movement_id else None,
+        }
         non_cash_amount = total_amount if payment_method_code == PAYMENT_METHOD_CARD else ZERO_MONEY
 
         discount = OperationalDiscount(
@@ -1241,144 +1252,146 @@ class DiscountsCommandService:
             committed_at_utc=created_at,
         )
 
-        try:
-            session.add(discount)
-            session.flush()
+        session.add(discount)
+        session.flush()
 
-            if cash_amount > ZERO_MONEY:
-                session.add(
-                    CashMovement(
-                        sale_id=None,
-                        cash_session_id=current_open_cash_session.id,
-                        branch_id=context.branch_id,
-                        workstation_id=context.workstation_id,
-                        operator_id=current_user.id,
-                        movement_type=CASH_MOVEMENT_TYPE_OPERATIONAL_DISCOUNT,
-                        direction=CASH_MOVEMENT_DIRECTION_IN,
-                        payment_method_code=PAYMENT_METHOD_CASH,
-                        amount=cash_amount,
-                        currency_code="MXN",
-                        occurred_at=created_at,
-                    )
+        if cash_amount > ZERO_MONEY:
+            session.add(
+                CashMovement(
+                    id=cash_movement_id,
+                    sale_id=None,
+                    cash_session_id=current_open_cash_session.id,
+                    branch_id=context.branch_id,
+                    workstation_id=context.workstation_id,
+                    operator_id=current_user.id,
+                    movement_type=CASH_MOVEMENT_TYPE_OPERATIONAL_DISCOUNT,
+                    direction=CASH_MOVEMENT_DIRECTION_IN,
+                    payment_method_code=PAYMENT_METHOD_CASH,
+                    amount=cash_amount,
+                    currency_code="MXN",
+                    occurred_at=created_at,
                 )
+            )
 
-            discount_folio = _build_discount_folio(discount.id)
+        discount_folio = _build_discount_folio(discount.id)
+        self._audit_recorder.record(
+            session,
+            actor_id=current_user.id,
+            action=AUDIT_ACTION_OPERATIONAL_DISCOUNT_COMMITTED,
+            resource_type=OPERATIONAL_DISCOUNT_RESOURCE_TYPE,
+            resource_id=str(discount.id),
+            branch_id=context.branch_id,
+            request_id=resolved_request_id,
+            metadata={
+                **trace,
+                "folio": discount_folio,
+                "branch_code": context.branch_code,
+                "workstation_code": context.workstation_code,
+                "cash_session_id": str(current_open_cash_session.id),
+                "subject_name": subject_name,
+                "concept": concept,
+                "category_code": category_code,
+                "payment_method_code": payment_method_code,
+                "currency_code": "MXN",
+                "total_amount": str(total_amount),
+                "cash_amount": str(cash_amount),
+                "non_cash_amount": str(non_cash_amount),
+                "notes": notes,
+                "high_value": is_high_value,
+                "high_value_acknowledged": command.high_value_acknowledged,
+                "high_value_threshold_amount": str(
+                    self._settings.discount_high_value_amount_threshold
+                ),
+            },
+        )
+        self._outbox_writer.append(
+            session,
+            aggregate_type=OPERATIONAL_DISCOUNT_RESOURCE_TYPE,
+            aggregate_id=str(discount.id),
+            event_name=OUTBOX_EVENT_OPERATIONAL_DISCOUNT_COMMITTED_V1,
+            payload={
+                "discount_id": str(discount.id),
+                "folio": discount_folio,
+                "branch_id": str(context.branch_id),
+                "branch_code": context.branch_code,
+                "workstation_id": str(context.workstation_id),
+                "workstation_code": context.workstation_code,
+                "cash_session_id": str(current_open_cash_session.id),
+                "created_by_user_id": str(current_user.id),
+                "subject_name": subject_name,
+                "concept": concept,
+                "category_code": category_code,
+                "payment_method_code": payment_method_code,
+                "currency_code": "MXN",
+                "total_amount": str(total_amount),
+                "cash_amount": str(cash_amount),
+                "non_cash_amount": str(non_cash_amount),
+                "notes": notes,
+                "high_value": is_high_value,
+                "high_value_acknowledged": command.high_value_acknowledged,
+                "high_value_threshold_amount": str(
+                    self._settings.discount_high_value_amount_threshold
+                ),
+                "committed_at_utc": created_at.isoformat(),
+            },
+            headers={"request_id": resolved_request_id, **trace},
+        )
+        if is_high_value:
             self._audit_recorder.record(
                 session,
                 actor_id=current_user.id,
-                action=AUDIT_ACTION_OPERATIONAL_DISCOUNT_COMMITTED,
+                action=AUDIT_ACTION_OPERATIONAL_DISCOUNT_HIGH_VALUE_ALERT_REQUESTED,
                 resource_type=OPERATIONAL_DISCOUNT_RESOURCE_TYPE,
                 resource_id=str(discount.id),
                 branch_id=context.branch_id,
                 request_id=resolved_request_id,
                 metadata={
+                    **trace,
                     "folio": discount_folio,
-                    "branch_code": context.branch_code,
-                    "workstation_code": context.workstation_code,
-                    "cash_session_id": str(current_open_cash_session.id),
-                    "subject_name": subject_name,
-                    "concept": concept,
-                    "category_code": category_code,
-                    "payment_method_code": payment_method_code,
-                    "currency_code": "MXN",
+                    "notification_target": "backoffice",
+                    "threshold_amount": str(self._settings.discount_high_value_amount_threshold),
                     "total_amount": str(total_amount),
-                    "cash_amount": str(cash_amount),
-                    "non_cash_amount": str(non_cash_amount),
-                    "notes": notes,
-                    "high_value": is_high_value,
-                    "high_value_acknowledged": command.high_value_acknowledged,
-                    "high_value_threshold_amount": str(
-                        self._settings.discount_high_value_amount_threshold
-                    ),
+                    "category_code": category_code,
                 },
             )
             self._outbox_writer.append(
                 session,
                 aggregate_type=OPERATIONAL_DISCOUNT_RESOURCE_TYPE,
                 aggregate_id=str(discount.id),
-                event_name=OUTBOX_EVENT_OPERATIONAL_DISCOUNT_COMMITTED_V1,
+                event_name=OUTBOX_EVENT_OPERATIONAL_DISCOUNT_HIGH_VALUE_ALERT_V1,
                 payload={
                     "discount_id": str(discount.id),
                     "folio": discount_folio,
+                    "notification_target": "backoffice",
                     "branch_id": str(context.branch_id),
                     "branch_code": context.branch_code,
                     "workstation_id": str(context.workstation_id),
                     "workstation_code": context.workstation_code,
-                    "cash_session_id": str(current_open_cash_session.id),
                     "created_by_user_id": str(current_user.id),
                     "subject_name": subject_name,
-                    "concept": concept,
                     "category_code": category_code,
-                    "payment_method_code": payment_method_code,
-                    "currency_code": "MXN",
                     "total_amount": str(total_amount),
-                    "cash_amount": str(cash_amount),
-                    "non_cash_amount": str(non_cash_amount),
-                    "notes": notes,
-                    "high_value": is_high_value,
-                    "high_value_acknowledged": command.high_value_acknowledged,
-                    "high_value_threshold_amount": str(
-                        self._settings.discount_high_value_amount_threshold
-                    ),
+                    "threshold_amount": str(self._settings.discount_high_value_amount_threshold),
                     "committed_at_utc": created_at.isoformat(),
                 },
-                headers={"request_id": resolved_request_id},
+                headers={"request_id": resolved_request_id, **trace},
             )
-            if is_high_value:
-                self._audit_recorder.record(
-                    session,
-                    actor_id=current_user.id,
-                    action=AUDIT_ACTION_OPERATIONAL_DISCOUNT_HIGH_VALUE_ALERT_REQUESTED,
-                    resource_type=OPERATIONAL_DISCOUNT_RESOURCE_TYPE,
-                    resource_id=str(discount.id),
-                    branch_id=context.branch_id,
-                    request_id=resolved_request_id,
-                    metadata={
-                        "folio": discount_folio,
-                        "notification_target": "backoffice",
-                        "threshold_amount": str(
-                            self._settings.discount_high_value_amount_threshold
-                        ),
-                        "total_amount": str(total_amount),
-                        "category_code": category_code,
-                    },
-                )
-                self._outbox_writer.append(
-                    session,
-                    aggregate_type=OPERATIONAL_DISCOUNT_RESOURCE_TYPE,
-                    aggregate_id=str(discount.id),
-                    event_name=OUTBOX_EVENT_OPERATIONAL_DISCOUNT_HIGH_VALUE_ALERT_V1,
-                    payload={
-                        "discount_id": str(discount.id),
-                        "folio": discount_folio,
-                        "notification_target": "backoffice",
-                        "branch_id": str(context.branch_id),
-                        "branch_code": context.branch_code,
-                        "workstation_id": str(context.workstation_id),
-                        "workstation_code": context.workstation_code,
-                        "created_by_user_id": str(current_user.id),
-                        "subject_name": subject_name,
-                        "category_code": category_code,
-                        "total_amount": str(total_amount),
-                        "threshold_amount": str(
-                            self._settings.discount_high_value_amount_threshold
-                        ),
-                        "committed_at_utc": created_at.isoformat(),
-                    },
-                    headers={"request_id": resolved_request_id},
-                )
-            session.commit()
-        except IntegrityError as error:
-            session.rollback()
-            raise OperationalDiscountValidationError(
-                "Las reglas de integridad del descuento fallaron durante el guardado."
-            ) from error
 
-        return self._query_service.get_discount_detail(
-            session,
-            current_user=current_user,
-            workstation_code=command.workstation_code,
-            discount_id=discount.id,
+        session.flush()
+        return OperationalDiscountCommitResultView(
+            id=discount.id,
+            folio=_build_discount_folio(discount.id),
+            status="COMMITTED",
+            branch_id=discount.branch_id,
+            workstation_id=discount.workstation_id,
+            cash_session_id=discount.active_cash_session_id,
+            cash_movement_id=cash_movement_id,
+            payment_method_code=discount.payment_method_code,
+            currency_code=discount.currency_code,
+            total_amount=discount.total_amount,
+            cash_amount=discount.cash_amount,
+            non_cash_amount=discount.non_cash_amount,
+            committed_at_utc=discount.committed_at_utc,
         )
 
 

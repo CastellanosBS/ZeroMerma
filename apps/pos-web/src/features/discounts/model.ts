@@ -4,11 +4,7 @@ import type {
   OperationalDiscountCategoryView,
   OperationalDiscountMethodView,
 } from "../../lib/api-contracts";
-import {
-  formatMoneyFromCents,
-  parseMoneyToCents,
-  sanitizeMoneyInput,
-} from "../pos-terminal/model";
+import { formatMoneyFromCents, parseMoneyToCents, sanitizeMoneyInput } from "../pos-terminal/model";
 
 export interface OperationalDiscountDraftState {
   categoryCode: string;
@@ -295,6 +291,7 @@ export function getOperationalDiscountCreateStepKey(
 
 export function buildCreateOperationalDiscountRequest(
   workstationCode: string,
+  cashSessionId: string,
   draft: OperationalDiscountDraftState,
   methods: OperationalDiscountMethodView[] = [],
   categories: OperationalDiscountCategoryView[] = [],
@@ -329,6 +326,7 @@ export function buildCreateOperationalDiscountRequest(
 
   return {
     workstation_code: workstationCode,
+    cash_session_id: cashSessionId,
     subject_name: draft.subjectName.trim(),
     concept: derivedConcept,
     category_code: draft.categoryCode.length > 0 ? draft.categoryCode : undefined,

@@ -1,6 +1,6 @@
 {
   "application_baseline_commit": "c020649885869cbf7e2987c39e9d14a16d5c3e89",
-  "operation_count": 244,
+  "operation_count": 248,
   "operations": [
     {
       "consumer_contract_state": "CLIENT_GENERATED_USED",
@@ -18214,15 +18214,108 @@
       "path": "/v1/cash-close/commit",
       "request_schema": {
         "body_schema": {
-          "$ref": "#/components/schemas/CashClosePreviewRequest"
+          "$ref": "#/components/schemas/CashCloseCommitRequest"
         },
-        "parameters": []
+        "parameters": [
+          {
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": true,
+            "schema": {
+              "description": "A globally unique UUIDv7 identifying this business intention.",
+              "maxLength": 36,
+              "minLength": 36,
+              "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-7[0-9a-fA-F]{3}-[89aAbB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$",
+              "title": "Idempotency-Key",
+              "type": "string"
+            }
+          }
+        ]
       },
       "stable_order": "NOT_APPLICABLE",
       "success_response_schema": [
         {
           "schema": {
-            "$ref": "#/components/schemas/CashCloseDetailResponse"
+            "$ref": "#/components/schemas/CashCloseCommitResultView"
+          },
+          "status": "200"
+        }
+      ]
+    },
+    {
+      "consumer_contract_state": "CLIENT_GENERATED_USED",
+      "contract_gap": [],
+      "datetime_fields": [],
+      "decimal_fields": [],
+      "declared_error_responses": [
+        "400",
+        "401",
+        "403",
+        "404",
+        "409",
+        "422",
+        "423",
+        "429",
+        "500"
+      ],
+      "enum_fields": [],
+      "expected_growth": "NOT_APPLICABLE",
+      "filter_class": [],
+      "frontend_consumers": [
+        "apps/pos-web/src/features/cash-commands/cash-command-intent.ts"
+      ],
+      "generated_client_symbol": "recover_cash_close_v1_cash_close_confirmations__idempotency_key__get",
+      "id_fields": [
+        "$.request.parameters[2].schema"
+      ],
+      "method": "GET",
+      "nullable_fields": [],
+      "operation_id": "recover_cash_close_v1_cash_close_confirmations__idempotency_key__get",
+      "operation_id_source": "FASTAPI_STABLE_GENERATED",
+      "operation_key": "API:GET:/v1/cash-close/confirmations/{idempotency_key}",
+      "pagination_class": "NOT_APPLICABLE",
+      "path": "/v1/cash-close/confirmations/{idempotency_key}",
+      "request_schema": {
+        "body_schema": null,
+        "parameters": [
+          {
+            "in": "path",
+            "name": "idempotency_key",
+            "required": true,
+            "schema": {
+              "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-7[0-9a-fA-F]{3}-[89aAbB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$",
+              "title": "Idempotency Key",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "workstation_code",
+            "required": true,
+            "schema": {
+              "minLength": 1,
+              "title": "Workstation Code",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "cash_session_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Cash Session Id",
+              "type": "string",
+              "x-zeromerma-id-representation": "JSON_STRING"
+            }
+          }
+        ]
+      },
+      "stable_order": "NOT_APPLICABLE",
+      "success_response_schema": [
+        {
+          "schema": {
+            "$ref": "#/components/schemas/CashCloseCommitResultView"
           },
           "status": "200"
         }
@@ -18466,6 +18559,72 @@
       "expected_growth": "NOT_APPLICABLE",
       "filter_class": [],
       "frontend_consumers": [
+        "apps/pos-web/src/features/cash-commands/cash-command-intent.ts"
+      ],
+      "generated_client_symbol": "recover_cash_session_opening_v1_cash_sessions_confirmations__idempotency_key__get",
+      "id_fields": [],
+      "method": "GET",
+      "nullable_fields": [],
+      "operation_id": "recover_cash_session_opening_v1_cash_sessions_confirmations__idempotency_key__get",
+      "operation_id_source": "FASTAPI_STABLE_GENERATED",
+      "operation_key": "API:GET:/v1/cash-sessions/confirmations/{idempotency_key}",
+      "pagination_class": "NOT_APPLICABLE",
+      "path": "/v1/cash-sessions/confirmations/{idempotency_key}",
+      "request_schema": {
+        "body_schema": null,
+        "parameters": [
+          {
+            "in": "path",
+            "name": "idempotency_key",
+            "required": true,
+            "schema": {
+              "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-7[0-9a-fA-F]{3}-[89aAbB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$",
+              "title": "Idempotency Key",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "workstation_code",
+            "required": true,
+            "schema": {
+              "minLength": 1,
+              "title": "Workstation Code",
+              "type": "string"
+            }
+          }
+        ]
+      },
+      "stable_order": "NOT_APPLICABLE",
+      "success_response_schema": [
+        {
+          "schema": {
+            "$ref": "#/components/schemas/CashSessionOpenResultView"
+          },
+          "status": "200"
+        }
+      ]
+    },
+    {
+      "consumer_contract_state": "CLIENT_GENERATED_USED",
+      "contract_gap": [],
+      "datetime_fields": [],
+      "decimal_fields": [],
+      "declared_error_responses": [
+        "400",
+        "401",
+        "403",
+        "404",
+        "409",
+        "422",
+        "423",
+        "429",
+        "500"
+      ],
+      "enum_fields": [],
+      "expected_growth": "NOT_APPLICABLE",
+      "filter_class": [],
+      "frontend_consumers": [
         "apps/pos-web/src/features/cash-session-open/cash-session-api.ts"
       ],
       "generated_client_symbol": "current_cash_session_v1_cash_sessions_current_get",
@@ -18547,13 +18706,27 @@
         "body_schema": {
           "$ref": "#/components/schemas/OpenCashSessionRequest"
         },
-        "parameters": []
+        "parameters": [
+          {
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": true,
+            "schema": {
+              "description": "A globally unique UUIDv7 identifying this business intention.",
+              "maxLength": 36,
+              "minLength": 36,
+              "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-7[0-9a-fA-F]{3}-[89aAbB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$",
+              "title": "Idempotency-Key",
+              "type": "string"
+            }
+          }
+        ]
       },
       "stable_order": "NOT_APPLICABLE",
       "success_response_schema": [
         {
           "schema": {
-            "$ref": "#/components/schemas/CashSessionView"
+            "$ref": "#/components/schemas/CashSessionOpenResultView"
           },
           "status": "201"
         }
@@ -19324,13 +19497,27 @@
         "body_schema": {
           "$ref": "#/components/schemas/CreateOperationalDiscountRequest"
         },
-        "parameters": []
+        "parameters": [
+          {
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": true,
+            "schema": {
+              "description": "A globally unique UUIDv7 identifying this business intention.",
+              "maxLength": 36,
+              "minLength": 36,
+              "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-7[0-9a-fA-F]{3}-[89aAbB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$",
+              "title": "Idempotency-Key",
+              "type": "string"
+            }
+          }
+        ]
       },
       "stable_order": "NOT_APPLICABLE",
       "success_response_schema": [
         {
           "schema": {
-            "$ref": "#/components/schemas/OperationalDiscountDetailResponse"
+            "$ref": "#/components/schemas/OperationalDiscountCommitResultView"
           },
           "status": "201"
         }
@@ -19387,6 +19574,85 @@
         {
           "schema": {
             "$ref": "#/components/schemas/DiscountsBootstrapResponse"
+          },
+          "status": "200"
+        }
+      ]
+    },
+    {
+      "consumer_contract_state": "CLIENT_GENERATED_USED",
+      "contract_gap": [],
+      "datetime_fields": [],
+      "decimal_fields": [],
+      "declared_error_responses": [
+        "400",
+        "401",
+        "403",
+        "404",
+        "409",
+        "422",
+        "423",
+        "429",
+        "500"
+      ],
+      "enum_fields": [],
+      "expected_growth": "NOT_APPLICABLE",
+      "filter_class": [],
+      "frontend_consumers": [
+        "apps/pos-web/src/features/cash-commands/cash-command-intent.ts"
+      ],
+      "generated_client_symbol": "recover_operational_discount_v1_discounts_confirmations__idempotency_key__get",
+      "id_fields": [
+        "$.request.parameters[2].schema"
+      ],
+      "method": "GET",
+      "nullable_fields": [],
+      "operation_id": "recover_operational_discount_v1_discounts_confirmations__idempotency_key__get",
+      "operation_id_source": "FASTAPI_STABLE_GENERATED",
+      "operation_key": "API:GET:/v1/discounts/confirmations/{idempotency_key}",
+      "pagination_class": "NOT_APPLICABLE",
+      "path": "/v1/discounts/confirmations/{idempotency_key}",
+      "request_schema": {
+        "body_schema": null,
+        "parameters": [
+          {
+            "in": "path",
+            "name": "idempotency_key",
+            "required": true,
+            "schema": {
+              "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-7[0-9a-fA-F]{3}-[89aAbB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$",
+              "title": "Idempotency Key",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "workstation_code",
+            "required": true,
+            "schema": {
+              "minLength": 1,
+              "title": "Workstation Code",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "cash_session_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Cash Session Id",
+              "type": "string",
+              "x-zeromerma-id-representation": "JSON_STRING"
+            }
+          }
+        ]
+      },
+      "stable_order": "NOT_APPLICABLE",
+      "success_response_schema": [
+        {
+          "schema": {
+            "$ref": "#/components/schemas/OperationalDiscountCommitResultView"
           },
           "status": "200"
         }
@@ -21066,13 +21332,27 @@
         "body_schema": {
           "$ref": "#/components/schemas/CreateOperationalPaymentRequest"
         },
-        "parameters": []
+        "parameters": [
+          {
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": true,
+            "schema": {
+              "description": "A globally unique UUIDv7 identifying this business intention.",
+              "maxLength": 36,
+              "minLength": 36,
+              "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-7[0-9a-fA-F]{3}-[89aAbB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$",
+              "title": "Idempotency-Key",
+              "type": "string"
+            }
+          }
+        ]
       },
       "stable_order": "NOT_APPLICABLE",
       "success_response_schema": [
         {
           "schema": {
-            "$ref": "#/components/schemas/OperationalPaymentDetailResponse"
+            "$ref": "#/components/schemas/OperationalPaymentCommitResultView"
           },
           "status": "201"
         }
@@ -21129,6 +21409,85 @@
         {
           "schema": {
             "$ref": "#/components/schemas/PaymentsBootstrapResponse"
+          },
+          "status": "200"
+        }
+      ]
+    },
+    {
+      "consumer_contract_state": "CLIENT_GENERATED_USED",
+      "contract_gap": [],
+      "datetime_fields": [],
+      "decimal_fields": [],
+      "declared_error_responses": [
+        "400",
+        "401",
+        "403",
+        "404",
+        "409",
+        "422",
+        "423",
+        "429",
+        "500"
+      ],
+      "enum_fields": [],
+      "expected_growth": "NOT_APPLICABLE",
+      "filter_class": [],
+      "frontend_consumers": [
+        "apps/pos-web/src/features/cash-commands/cash-command-intent.ts"
+      ],
+      "generated_client_symbol": "recover_operational_payment_v1_payments_confirmations__idempotency_key__get",
+      "id_fields": [
+        "$.request.parameters[2].schema"
+      ],
+      "method": "GET",
+      "nullable_fields": [],
+      "operation_id": "recover_operational_payment_v1_payments_confirmations__idempotency_key__get",
+      "operation_id_source": "FASTAPI_STABLE_GENERATED",
+      "operation_key": "API:GET:/v1/payments/confirmations/{idempotency_key}",
+      "pagination_class": "NOT_APPLICABLE",
+      "path": "/v1/payments/confirmations/{idempotency_key}",
+      "request_schema": {
+        "body_schema": null,
+        "parameters": [
+          {
+            "in": "path",
+            "name": "idempotency_key",
+            "required": true,
+            "schema": {
+              "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-7[0-9a-fA-F]{3}-[89aAbB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$",
+              "title": "Idempotency Key",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "workstation_code",
+            "required": true,
+            "schema": {
+              "minLength": 1,
+              "title": "Workstation Code",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "cash_session_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Cash Session Id",
+              "type": "string",
+              "x-zeromerma-id-representation": "JSON_STRING"
+            }
+          }
+        ]
+      },
+      "stable_order": "NOT_APPLICABLE",
+      "success_response_schema": [
+        {
+          "schema": {
+            "$ref": "#/components/schemas/OperationalPaymentCommitResultView"
           },
           "status": "200"
         }

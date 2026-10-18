@@ -1,3 +1,6 @@
+import { isCommandIntentionPending } from "@zeromerma/api-client";
+import { cashIntentions } from "../cash-commands/cash-command-intent";
+import { useCashIntention, useCashDraftIdentity } from "../cash-commands/use-cash-intention";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Navigate } from "@tanstack/react-router";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -57,7 +60,6 @@ import {
 import { useModuleHotkeys } from "../pos-shell/keyboard";
 import { posInputClass } from "../pos-theme/theme";
 import { useStatusMessageStore } from "../status-messages/store";
-import { createPayment } from "./payments-api";
 import {
   buildCreateOperationalPaymentRequest,
   canCommitOperationalPaymentDraft,
@@ -81,14 +83,6 @@ import {
 } from "./queries";
 
 type PaymentsMode = "create" | "list";
-
-function createRequestId(scope: string): string {
-  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
-    return `${scope}-${crypto.randomUUID()}`;
-  }
-
-  return `${scope}-${Date.now()}-${Math.random().toString(16).slice(2)}`;
-}
 
 function useDebouncedValue(value: string, delayMs: number): string {
   const [debouncedValue, setDebouncedValue] = useState(value);
@@ -240,9 +234,7 @@ function PaymentMethodButton({
       <div className="min-w-0">
         <p className="text-sm font-semibold text-slate-950">{method.label}</p>
         {method.helper_text ? (
-          <p className="line-clamp-1 text-[11px] leading-4 text-slate-600">
-            {method.helper_text}
-          </p>
+          <p className="line-clamp-1 text-[11px] leading-4 text-slate-600">{method.helper_text}</p>
         ) : null}
       </div>
     </button>
@@ -367,9 +359,7 @@ function PaymentCaptureWorkspace({
             </PosFieldLabel>
 
             <div className="grid gap-2 md:col-span-2">
-              <PosFieldLabel required>
-                Metodo
-              </PosFieldLabel>
+              <PosFieldLabel required>Metodo</PosFieldLabel>
               <div className="grid gap-2 sm:grid-cols-3">
                 {methods.map((method) => (
                   <PaymentMethodButton
@@ -413,11 +403,7 @@ function PaymentCaptureWorkspace({
   );
 }
 
-function PaymentDetailSummary({
-  payment,
-}: {
-  payment: OperationalPaymentDetailResponse;
-}) {
+function PaymentDetailSummary({ payment }: { payment: OperationalPaymentDetailResponse }) {
   const detailRows = [
     { key: "reference", label: "Referencia", value: payment.concept },
     { key: "payee", label: "Beneficiario", value: payment.payee_name },
@@ -509,10 +495,7 @@ function PaymentDetailSummary({
         ) : null}
       </div>
 
-      <PosAuditSummary
-        auditSummary={payment.audit_summary}
-        timeZone={payment.branch.timezone}
-      />
+      <PosAuditSummary auditSummary={payment.audit_summary} timeZone={payment.branch.timezone} />
     </div>
   );
 }
@@ -609,7 +592,10 @@ export function PaymentsRightPanel({
                 <span className="text-xs font-semibold uppercase tracking-[0.08em] text-slate-500">
                   {row.label}
                 </span>
-                <span className="truncate text-right font-semibold text-slate-950" title={row.value}>
+                <span
+                  className="truncate text-right font-semibold text-slate-950"
+                  title={row.value}
+                >
                   {row.value}
                 </span>
               </div>
@@ -642,11 +628,7 @@ export function PaymentsRightPanel({
 
   if (!paymentDetail) {
     return (
-      <PosSummaryPanel
-        stateLabel="Consulta"
-        stateTone="draft"
-        title="Detalle del pago"
-      >
+      <PosSummaryPanel stateLabel="Consulta" stateTone="draft" title="Detalle del pago">
         <div className="rounded-xl border border-dashed border-[var(--pos-shell-border)] bg-white px-3 py-3 text-sm text-slate-600">
           {paymentCount > 0
             ? "Selecciona un pago para revisar su informacion."
@@ -658,7 +640,10 @@ export function PaymentsRightPanel({
 
   return (
     <PosSummaryPanel
-      description={formatLocalDateTime(paymentDetail.committed_at_utc, paymentDetail.branch.timezone)}
+      description={formatLocalDateTime(
+        paymentDetail.committed_at_utc,
+        paymentDetail.branch.timezone,
+      )}
       stateLabel={paymentDetail.affects_cash_drawer ? "Afecta caja" : "Auditado"}
       stateTone={paymentDetail.affects_cash_drawer ? "warning" : "confirmed"}
       title={paymentDetail.folio}
@@ -721,10 +706,7 @@ export function PaymentsScreen() {
     [bootstrapData?.available_scopes],
   );
   const paymentsResponse = paymentsListQuery.data;
-  const payments = useMemo(
-    () => paymentsResponse?.payments ?? [],
-    [paymentsResponse?.payments],
-  );
+  const payments = useMemo(() => paymentsResponse?.payments ?? [], [paymentsResponse?.payments]);
   const totalPaymentsAmount = useMemo(
     () => payments.reduce((sum, payment) => sum + Number(payment.total_amount), 0),
     [payments],
@@ -742,11 +724,7 @@ export function PaymentsScreen() {
   const selectedPayment = paymentDetailQuery.data ?? null;
   const selectedMethod = getOperationalPaymentMethod(draftState.paymentMethodCode, methods);
   const affectsCash = doesOperationalPaymentAffectCashDrawer(draftState.paymentMethodCode, methods);
-  const createBlockedReason = getOperationalPaymentBlockedReason(
-    draftState,
-    methods,
-    categories,
-  );
+  const createBlockedReason = getOperationalPaymentBlockedReason(draftState, methods, categories);
   const captureUiState = getOperationalPaymentUiState({
     categories,
     draft: draftState,
@@ -757,8 +735,16 @@ export function PaymentsScreen() {
     isCommitPending: false,
     methods,
   });
-  const canCommitDraft = canCommitOperationalPaymentDraft(draftState, methods, categories);
+  const isDraftValid = canCommitOperationalPaymentDraft(draftState, methods, categories);
   const defaultScope = bootstrapData?.default_scope ?? "CURRENT_SHIFT";
+  const { metadata, error: intentionError } = useCashIntention(bootstrapData?.workstation.id ?? "");
+  const clearConfirmedDraft = useCallback(() => {
+    setDraftState(createInitialOperationalPaymentDraftState());
+    setIsConfirmDialogOpen(false);
+  }, []);
+  const observedKey = useCashDraftIdentity(metadata, Boolean(bootstrapData), clearConfirmedDraft);
+  const isIntentionBlocked = Boolean(intentionError) || isCommandIntentionPending(metadata);
+  const canCommitDraft = isDraftValid && !isIntentionBlocked;
 
   useEffect(() => {
     if (!bootstrapData) {
@@ -769,18 +755,6 @@ export function PaymentsScreen() {
       currentScope.trim().length > 0 ? currentScope : bootstrapData.default_scope,
     );
   }, [bootstrapData]);
-
-  useEffect(() => {
-    if (mode !== "list" || selectedPaymentId === null) {
-      return;
-    }
-
-    if (payments.some((payment) => payment.id === selectedPaymentId)) {
-      return;
-    }
-
-    setSelectedPaymentId(null);
-  }, [mode, payments, selectedPaymentId]);
 
   useEffect(() => {
     setCreateError(null);
@@ -813,17 +787,29 @@ export function PaymentsScreen() {
         throw new Error("Necesitas iniciar sesion antes de registrar un pago.");
       }
 
-      return createPayment({
-        payload: buildCreateOperationalPaymentRequest(
+      const cashSession = bootstrapData?.current_open_cash_session;
+      if (!bootstrapData || !cashSession) throw new Error("Necesitas una caja abierta.");
+      return cashIntentions.begin(
+        {
+          userId: bootstrapData.user.id,
+          branchId: bootstrapData.branch.id,
+          workstationId: bootstrapData.workstation.id,
+          workstationCode: appEnv.VITE_POS_WORKSTATION_CODE,
+          cashSessionId: cashSession.id,
+          commandCode: "payment",
+        },
+        buildCreateOperationalPaymentRequest(
           appEnv.VITE_POS_WORKSTATION_CODE,
+          cashSession.id,
           draftState,
           methods,
           categories,
         ),
-        requestId: createRequestId("operational-payment"),
-      });
+        observedKey.current ?? null,
+      );
     },
-    onSuccess: async (result) => {
+    onSuccess: (result) => {
+      if (!("folio" in result)) return;
       setMode("list");
       setSelectedScope(defaultScope);
       setSearchText("");
@@ -836,7 +822,7 @@ export function PaymentsScreen() {
       setIsConfirmDialogOpen(false);
       showSuccess(`Pago ${result.folio} registrado por ${formatCurrency(result.total_amount)}.`);
 
-      await Promise.all([
+      void Promise.all([
         queryClient.invalidateQueries({
           queryKey: paymentsBootstrapQueryKey(appEnv.VITE_POS_WORKSTATION_CODE),
         }),
@@ -867,8 +853,8 @@ export function PaymentsScreen() {
       showError(message);
     },
   });
-  const commitPaymentAsync = createPaymentMutation.mutateAsync;
-  const isCreatePaymentPending = createPaymentMutation.isPending;
+  const commitPaymentAsync = createPaymentMutation.mutate;
+  const isCreatePaymentPending = createPaymentMutation.isPending || isIntentionBlocked;
 
   const handleCommit = useCallback(() => {
     if (!canCommitDraft) {

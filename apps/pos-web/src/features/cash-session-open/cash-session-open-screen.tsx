@@ -1,6 +1,9 @@
+import { isCommandIntentionPending } from "@zeromerma/api-client";
+import { cashIntentions } from "../cash-commands/cash-command-intent";
+import { useCashIntention, useCashDraftIdentity } from "../cash-commands/use-cash-intention";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Navigate, useNavigate } from "@tanstack/react-router";
-import { useState } from "react";
+import { useCallback, useState } from "react";
 
 import { PosErrorState, PosLoadingState } from "../../components/pos-feedback";
 import { PosButton } from "../../components/pos-foundations";
@@ -10,7 +13,6 @@ import { toOperationalErrorMessage } from "../../lib/http";
 import { usePosAuthStore } from "../auth/auth-store";
 import { bootstrapQueryKey, usePosBootstrapQuery } from "../pos-bootstrap/queries";
 import { useStatusMessageStore } from "../status-messages/store";
-import { openCashSession } from "./cash-session-api";
 import { CashSessionOpenForm } from "./cash-session-open-form";
 import { currentCashSessionQueryKey, useCurrentCashSessionQuery } from "./queries";
 
@@ -23,30 +25,34 @@ export function CashSessionOpenScreen() {
   const [submitError, setSubmitError] = useState<string | null>(null);
   const showSuccess = useStatusMessageStore((state) => state.showSuccess);
 
-  function createRequestId(scope: string): string {
-    if (
-      typeof globalThis.crypto !== "undefined" &&
-      typeof globalThis.crypto.randomUUID === "function"
-    ) {
-      return `${scope}-${globalThis.crypto.randomUUID()}`;
-    }
-
-    return `${scope}-${Date.now()}-${Math.random().toString(16).slice(2)}`;
-  }
+  const { metadata, error: intentionError } = useCashIntention(
+    bootstrapQuery.data?.workstation.id ?? "",
+  );
+  const [formVersion, setFormVersion] = useState(0);
+  const clearDraft = useCallback(() => setFormVersion((version) => version + 1), []);
+  const observedKey = useCashDraftIdentity(metadata, Boolean(bootstrapQuery.data), clearDraft);
+  const isIntentionBlocked = Boolean(intentionError) || isCommandIntentionPending(metadata);
   const openCashSessionMutation = useMutation({
-    mutationFn: (payload: OpenCashSessionRequest) =>
-      openCashSession({
+    mutationFn: (payload: OpenCashSessionRequest) => {
+      const bootstrap = bootstrapQuery.data;
+      if (!bootstrap) throw new Error("Espera el contexto de la estación.");
+      return cashIntentions.begin(
+        {
+          userId: bootstrap.user.id,
+          branchId: bootstrap.branch.id,
+          workstationId: bootstrap.workstation.id,
+          workstationCode: appEnv.VITE_POS_WORKSTATION_CODE,
+          cashSessionId: null,
+          commandCode: "open",
+        },
         payload,
-        requestId: createRequestId("cash-session-open"),
-      }),
-    onSuccess: async (cashSession) => {
+        observedKey.current ?? null,
+      );
+    },
+    onSuccess: () => {
       setSubmitError(null);
       showSuccess("Caja abierta \u00b7 Turno iniciado");
-      queryClient.setQueryData(
-        currentCashSessionQueryKey(appEnv.VITE_POS_WORKSTATION_CODE),
-        cashSession,
-      );
-      await Promise.all([
+      void Promise.all([
         queryClient.invalidateQueries({
           queryKey: bootstrapQueryKey(appEnv.VITE_POS_WORKSTATION_CODE),
         }),
@@ -54,7 +60,7 @@ export function CashSessionOpenScreen() {
           queryKey: currentCashSessionQueryKey(appEnv.VITE_POS_WORKSTATION_CODE),
         }),
       ]);
-      await navigate({ to: "/pos" });
+      void navigate({ to: "/pos" });
     },
   });
 
@@ -123,8 +129,9 @@ export function CashSessionOpenScreen() {
 
   return (
     <CashSessionOpenForm
+      key={formVersion}
       bootstrap={bootstrapQuery.data}
-      isSubmitDisabled={openCashSessionMutation.isPending}
+      isSubmitDisabled={openCashSessionMutation.isPending || isIntentionBlocked}
       onSubmit={async (values) => {
         openCashSessionMutation.reset();
         setSubmitError(null);
@@ -143,7 +150,7 @@ export function CashSessionOpenScreen() {
           );
         }
       }}
-      submitError={submitError}
+      submitError={intentionError ?? submitError}
     />
   );
 }

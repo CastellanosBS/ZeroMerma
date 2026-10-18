@@ -1,4 +1,6 @@
 // @vitest-environment jsdom
+import { webcrypto } from "node:crypto";
+import { cashIntentions } from "../cash-commands/cash-command-intent";
 
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { act, type ReactNode } from "react";
@@ -13,8 +15,9 @@ import { createInitialOperationalPaymentDraftState } from "./model";
 import { createPayment } from "./payments-api";
 import { PaymentsRightPanel, PaymentsScreen } from "./payments-screen";
 
-(globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT =
-  true;
+(
+  globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }
+).IS_REACT_ACT_ENVIRONMENT = true;
 
 const refetchMock = vi.fn();
 const showErrorMock = vi.fn();
@@ -93,7 +96,7 @@ const bootstrapResponse = {
     authorization_surface: "POS" as const,
     authorization_version: "test-authorization-v1",
     is_superadministrator: false,
-      password_reset_required: false,
+    password_reset_required: false,
     default_surface: "POS",
     email: "cashier@zeromerma.local",
     full_name: "Main Branch Cashier",
@@ -196,7 +199,8 @@ vi.mock("../cash-close/queries", () => ({
 }));
 
 vi.mock("../pos-shell/keyboard", async () => {
-  const actual = await vi.importActual<typeof import("../pos-shell/keyboard")>("../pos-shell/keyboard");
+  const actual =
+    await vi.importActual<typeof import("../pos-shell/keyboard")>("../pos-shell/keyboard");
 
   return {
     ...actual,
@@ -334,7 +338,9 @@ vi.mock("./queries", () => ({
     isPending: false,
   }),
   usePaymentDetailQuery: (paymentId: string | null) => {
-    const payment = [...seededPayments, ...createdPayments].find((record) => record.id === paymentId);
+    const payment = [...seededPayments, ...createdPayments].find(
+      (record) => record.id === paymentId,
+    );
 
     return {
       data: payment ? toPaymentDetail(payment) : null,
@@ -459,6 +465,13 @@ function triggerShortcutByLabel(label: string) {
 let mountedRoots: Array<() => void> = [];
 
 beforeEach(() => {
+  localStorage.clear();
+  cashIntentions.forgetBodies();
+  vi.stubGlobal("crypto", webcrypto);
+  Object.defineProperty(navigator, "locks", {
+    configurable: true,
+    value: { request: vi.fn(async (_name, _options, callback) => callback({ name: "lock" })) },
+  });
   seededPayments = [...basePayments];
   createdPayments = [];
   registeredShortcuts.clear();
@@ -474,8 +487,9 @@ beforeEach(() => {
       cash_amount: payload.payment_method_code === "CASH" ? totalAmount : "0.00",
       category_code: payload.category_code ?? null,
       category_name:
-        bootstrapResponse.active_categories.find((category) => category.code === payload.category_code)
-          ?.name ?? null,
+        bootstrapResponse.active_categories.find(
+          (category) => category.code === payload.category_code,
+        )?.name ?? null,
       concept: payload.concept,
       created_at_utc: "2026-04-22T19:30:00Z",
       created_by_user_id: bootstrapResponse.user.id,
@@ -492,11 +506,26 @@ beforeEach(() => {
     };
 
     createdPayments = [newRecord, ...createdPayments];
-    return toPaymentDetail(newRecord);
+    return {
+      id: newRecord.id,
+      folio: newRecord.folio,
+      status: "COMMITTED",
+      branch_id: bootstrapResponse.branch.id,
+      workstation_id: bootstrapResponse.workstation.id,
+      cash_session_id: bootstrapResponse.current_open_cash_session!.id,
+      cash_movement_id: "movement-new",
+      payment_method_code: newRecord.payment_method_code,
+      currency_code: newRecord.currency_code,
+      total_amount: newRecord.total_amount,
+      cash_amount: newRecord.cash_amount,
+      non_cash_amount: newRecord.non_cash_amount,
+      committed_at_utc: newRecord.created_at_utc,
+    };
   });
 });
 
 afterEach(() => {
+  vi.unstubAllGlobals();
   for (const unmount of mountedRoots) {
     unmount();
   }

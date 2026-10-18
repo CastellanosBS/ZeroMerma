@@ -8,13 +8,16 @@ from typing import Any
 
 from sqlalchemy import Select, select
 from sqlalchemy.engine import RowMapping
-from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from zeromerma_api.modules.audit.application.service import AuditRecorder
 from zeromerma_api.modules.branches.application.access import WorkstationAccessService
 from zeromerma_api.modules.branches.infrastructure.models import Branch, Workstation
-from zeromerma_api.modules.cash.application.schemas import CashSessionView, OpenCashSessionRequest
+from zeromerma_api.modules.cash.application.schemas import (
+    CashSessionOpenResultView,
+    CashSessionView,
+    OpenCashSessionRequest,
+)
 from zeromerma_api.modules.cash.domain.constants import (
     CASH_SESSION_STATUS_OPEN,
     OUTBOX_EVENT_CASH_SESSION_OPENED_V1,
@@ -33,20 +36,26 @@ class CashSessionQueryService:
         *,
         workstation_code: str,
     ) -> CashSessionView | None:
-        result = session.execute(
-            self._base_query().where(
-                Workstation.code == workstation_code,
-                CashSession.status == CASH_SESSION_STATUS_OPEN,
+        result = (
+            session.execute(
+                self._base_query().where(
+                    Workstation.code == workstation_code,
+                    CashSession.status == CASH_SESSION_STATUS_OPEN,
+                )
             )
-        ).mappings().one_or_none()
+            .mappings()
+            .one_or_none()
+        )
         if result is None:
             return None
         return self._to_view(result)
 
     def get_session_by_id(self, session: Session, *, cash_session_id: uuid.UUID) -> CashSessionView:
-        result = session.execute(
-            self._base_query().where(CashSession.id == cash_session_id)
-        ).mappings().one()
+        result = (
+            session.execute(self._base_query().where(CashSession.id == cash_session_id))
+            .mappings()
+            .one()
+        )
         return self._to_view(result)
 
     @staticmethod
@@ -112,7 +121,9 @@ class CashSessionCommandService:
         current_user: AuthenticatedUser,
         command: OpenCashSessionRequest,
         request_id: str | None,
-    ) -> CashSessionView:
+        idempotency_key: uuid.UUID,
+        operation_id: uuid.UUID,
+    ) -> CashSessionOpenResultView:
         if command.opening_amount < Decimal("0.00"):
             raise CashSessionConflictError("Opening amount must be non-negative.")
 
@@ -144,6 +155,11 @@ class CashSessionCommandService:
 
         opened_at = datetime.now(tz=UTC)
         resolved_request_id = request_id or str(uuid.uuid4())
+        trace = {
+            "idempotency_key": str(idempotency_key),
+            "operation_id": str(operation_id),
+            "operation_code": "cash_session.open",
+        }
         cash_session = CashSession(
             branch_id=context.branch_id,
             workstation_id=context.workstation_id,
@@ -153,48 +169,50 @@ class CashSessionCommandService:
             opened_at=opened_at,
         )
 
-        try:
-            session.add(cash_session)
-            session.flush()
+        session.add(cash_session)
+        session.flush()
 
-            self._audit_recorder.record(
-                session,
-                actor_id=current_user.id,
-                action="cash_session.opened",
-                resource_type="cash_session",
-                resource_id=str(cash_session.id),
-                branch_id=context.branch_id,
-                request_id=resolved_request_id,
-                metadata={
-                    "branch_code": context.branch_code,
-                    "workstation_code": context.workstation_code,
-                    "opening_amount": str(command.opening_amount),
-                    "user_email": current_user.email,
-                },
-            )
-            self._outbox_writer.append(
-                session,
-                aggregate_type="cash_session",
-                aggregate_id=str(cash_session.id),
-                event_name=OUTBOX_EVENT_CASH_SESSION_OPENED_V1,
-                payload={
-                    "cash_session_id": str(cash_session.id),
-                    "branch_id": str(context.branch_id),
-                    "branch_code": context.branch_code,
-                    "workstation_id": str(context.workstation_id),
-                    "workstation_code": context.workstation_code,
-                    "user_id": str(current_user.id),
-                    "user_email": current_user.email,
-                    "opening_amount": str(command.opening_amount),
-                    "opened_at": opened_at.isoformat(),
-                },
-                headers={"request_id": resolved_request_id},
-            )
-            session.commit()
-        except IntegrityError as error:
-            session.rollback()
-            raise CashSessionConflictError(
-                "Open cash session invariants were violated by a concurrent request."
-            ) from error
+        self._audit_recorder.record(
+            session,
+            actor_id=current_user.id,
+            action="cash_session.opened",
+            resource_type="cash_session",
+            resource_id=str(cash_session.id),
+            branch_id=context.branch_id,
+            request_id=resolved_request_id,
+            metadata={
+                **trace,
+                "branch_code": context.branch_code,
+                "workstation_code": context.workstation_code,
+                "opening_amount": str(command.opening_amount),
+                "user_email": current_user.email,
+            },
+        )
+        self._outbox_writer.append(
+            session,
+            aggregate_type="cash_session",
+            aggregate_id=str(cash_session.id),
+            event_name=OUTBOX_EVENT_CASH_SESSION_OPENED_V1,
+            payload={
+                "cash_session_id": str(cash_session.id),
+                "branch_id": str(context.branch_id),
+                "branch_code": context.branch_code,
+                "workstation_id": str(context.workstation_id),
+                "workstation_code": context.workstation_code,
+                "user_id": str(current_user.id),
+                "user_email": current_user.email,
+                "opening_amount": str(command.opening_amount),
+                "opened_at": opened_at.isoformat(),
+            },
+            headers={"request_id": resolved_request_id, **trace},
+        )
 
-        return self._query_service.get_session_by_id(session, cash_session_id=cash_session.id)
+        session.flush()
+        return CashSessionOpenResultView(
+            id=cash_session.id,
+            status="OPEN",
+            opening_amount=cash_session.opening_amount,
+            opened_at=cash_session.opened_at,
+            branch_id=cash_session.branch_id,
+            workstation_id=cash_session.workstation_id,
+        )

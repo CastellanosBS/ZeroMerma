@@ -1,3 +1,6 @@
+import { isCommandIntentionPending } from "@zeromerma/api-client";
+import { cashIntentions } from "../cash-commands/cash-command-intent";
+import { useCashIntention, useCashDraftIdentity } from "../cash-commands/use-cash-intention";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Navigate } from "@tanstack/react-router";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -58,7 +61,6 @@ import {
 import { useModuleHotkeys } from "../pos-shell/keyboard";
 import { posInputClass } from "../pos-theme/theme";
 import { useStatusMessageStore } from "../status-messages/store";
-import { createDiscount } from "./discounts-api";
 import {
   buildCreateOperationalDiscountRequest,
   canCommitOperationalDiscountDraft,
@@ -84,14 +86,6 @@ import {
 } from "./queries";
 
 type DiscountsMode = "create" | "list";
-
-function createRequestId(scope: string): string {
-  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
-    return `${scope}-${crypto.randomUUID()}`;
-  }
-
-  return `${scope}-${Date.now()}-${Math.random().toString(16).slice(2)}`;
-}
 
 function useDebouncedValue(value: string, delayMs: number): string {
   const [debouncedValue, setDebouncedValue] = useState(value);
@@ -245,9 +239,7 @@ function PaymentMethodButton({
       <div className="min-w-0">
         <p className="text-sm font-semibold text-slate-950">{method.label}</p>
         {method.helper_text ? (
-          <p className="line-clamp-1 text-[11px] leading-4 text-slate-600">
-            {method.helper_text}
-          </p>
+          <p className="line-clamp-1 text-[11px] leading-4 text-slate-600">{method.helper_text}</p>
         ) : null}
       </div>
     </button>
@@ -380,9 +372,7 @@ function DiscountCaptureWorkspace({
             </PosFieldLabel>
 
             <div className="grid gap-2 md:col-span-2">
-              <PosFieldLabel required>
-                Metodo
-              </PosFieldLabel>
+              <PosFieldLabel required>Metodo</PosFieldLabel>
               <div className="grid gap-2 sm:grid-cols-3">
                 {methods.map((method) => (
                   <PaymentMethodButton
@@ -443,11 +433,7 @@ function DiscountCaptureWorkspace({
   );
 }
 
-function DiscountDetailSummary({
-  discount,
-}: {
-  discount: OperationalDiscountDetailResponse;
-}) {
+function DiscountDetailSummary({ discount }: { discount: OperationalDiscountDetailResponse }) {
   const detailRows = [
     { key: "concept", label: "Motivo", value: discount.concept },
     { key: "subject", label: "Persona", value: discount.subject_name },
@@ -509,7 +495,9 @@ function DiscountDetailSummary({
         </div>
         <div className="grid gap-1 rounded-[var(--pos-radius-control)] border border-[var(--pos-shell-border)] bg-white px-3 py-2.5">
           <span className="pos-label-text">Categoria</span>
-          <p className="font-semibold text-slate-950">{discount.category_name ?? "Sin categoria"}</p>
+          <p className="font-semibold text-slate-950">
+            {discount.category_name ?? "Sin categoria"}
+          </p>
         </div>
         <div className="grid gap-1 rounded-[var(--pos-radius-control)] border border-[var(--pos-shell-border)] bg-white px-3 py-2.5">
           <span className="pos-label-text">Metodo e impacto</span>
@@ -539,10 +527,7 @@ function DiscountDetailSummary({
         ) : null}
       </div>
 
-      <PosAuditSummary
-        auditSummary={discount.audit_summary}
-        timeZone={discount.branch.timezone}
-      />
+      <PosAuditSummary auditSummary={discount.audit_summary} timeZone={discount.branch.timezone} />
     </div>
   );
 }
@@ -643,7 +628,10 @@ export function DiscountsRightPanel({
                 <span className="text-xs font-semibold uppercase tracking-[0.08em] text-slate-500">
                   {row.label}
                 </span>
-                <span className="truncate text-right font-semibold text-slate-950" title={row.value}>
+                <span
+                  className="truncate text-right font-semibold text-slate-950"
+                  title={row.value}
+                >
                   {row.value}
                 </span>
               </div>
@@ -652,9 +640,8 @@ export function DiscountsRightPanel({
 
           {isCreateHighValue ? (
             <PosInlineValidationMessage tone="warning">
-              Este descuento supera{" "}
-              {formatCurrency(controls?.high_value_amount_threshold ?? "0")} y requiere
-              confirmacion explicita.
+              Este descuento supera {formatCurrency(controls?.high_value_amount_threshold ?? "0")} y
+              requiere confirmacion explicita.
             </PosInlineValidationMessage>
           ) : null}
 
@@ -684,11 +671,7 @@ export function DiscountsRightPanel({
 
   if (!discountDetail) {
     return (
-      <PosSummaryPanel
-        stateLabel="Consulta"
-        stateTone="draft"
-        title="Detalle del descuento"
-      >
+      <PosSummaryPanel stateLabel="Consulta" stateTone="draft" title="Detalle del descuento">
         <div className="rounded-xl border border-dashed border-[var(--pos-shell-border)] bg-white px-3 py-3 text-sm text-slate-600">
           {discountCount > 0
             ? "Selecciona un descuento para revisar su informacion."
@@ -700,7 +683,10 @@ export function DiscountsRightPanel({
 
   return (
     <PosSummaryPanel
-      description={formatLocalDateTime(discountDetail.committed_at_utc, discountDetail.branch.timezone)}
+      description={formatLocalDateTime(
+        discountDetail.committed_at_utc,
+        discountDetail.branch.timezone,
+      )}
       stateLabel={discountDetail.affects_cash_drawer ? "Afecta caja" : "Auditado"}
       stateTone={discountDetail.affects_cash_drawer ? "warning" : "confirmed"}
       title={discountDetail.folio}
@@ -784,7 +770,10 @@ export function DiscountsScreen() {
   const shouldShowAdvancedFilters = discounts.length > 0 || hasActiveAdvancedFilters;
   const selectedDiscount = discountDetailQuery.data ?? null;
   const selectedMethod = getOperationalDiscountMethod(draftState.paymentMethodCode, methods);
-  const affectsCash = doesOperationalDiscountAffectCashDrawer(draftState.paymentMethodCode, methods);
+  const affectsCash = doesOperationalDiscountAffectCashDrawer(
+    draftState.paymentMethodCode,
+    methods,
+  );
   const createBlockedReason = getOperationalDiscountBlockedReason(
     draftState,
     methods,
@@ -803,13 +792,21 @@ export function DiscountsScreen() {
     isCommitPending: false,
     methods,
   });
-  const canCommitDraft = canCommitOperationalDiscountDraft(
+  const isDraftValid = canCommitOperationalDiscountDraft(
     draftState,
     methods,
     categories,
     discountControls,
   );
   const defaultScope = bootstrapData?.default_scope ?? "CURRENT_SHIFT";
+  const { metadata, error: intentionError } = useCashIntention(bootstrapData?.workstation.id ?? "");
+  const clearConfirmedDraft = useCallback(() => {
+    setDraftState(createInitialOperationalDiscountDraftState());
+    setIsConfirmDialogOpen(false);
+  }, []);
+  const observedKey = useCashDraftIdentity(metadata, Boolean(bootstrapData), clearConfirmedDraft);
+  const isIntentionBlocked = Boolean(intentionError) || isCommandIntentionPending(metadata);
+  const canCommitDraft = isDraftValid && !isIntentionBlocked;
 
   useEffect(() => {
     if (!bootstrapData) {
@@ -820,18 +817,6 @@ export function DiscountsScreen() {
       currentScope.trim().length > 0 ? currentScope : bootstrapData.default_scope,
     );
   }, [bootstrapData]);
-
-  useEffect(() => {
-    if (mode !== "list" || selectedDiscountId === null) {
-      return;
-    }
-
-    if (discounts.some((discount) => discount.id === selectedDiscountId)) {
-      return;
-    }
-
-    setSelectedDiscountId(null);
-  }, [mode, discounts, selectedDiscountId]);
 
   useEffect(() => {
     setCreateError(null);
@@ -865,18 +850,30 @@ export function DiscountsScreen() {
         throw new Error("Necesitas iniciar sesion antes de registrar un descuento.");
       }
 
-      return createDiscount({
-        payload: buildCreateOperationalDiscountRequest(
+      const cashSession = bootstrapData?.current_open_cash_session;
+      if (!bootstrapData || !cashSession) throw new Error("Necesitas una caja abierta.");
+      return cashIntentions.begin(
+        {
+          userId: bootstrapData.user.id,
+          branchId: bootstrapData.branch.id,
+          workstationId: bootstrapData.workstation.id,
+          workstationCode: appEnv.VITE_POS_WORKSTATION_CODE,
+          cashSessionId: cashSession.id,
+          commandCode: "discount",
+        },
+        buildCreateOperationalDiscountRequest(
           appEnv.VITE_POS_WORKSTATION_CODE,
+          cashSession.id,
           draftState,
           methods,
           categories,
           discountControls,
         ),
-        requestId: createRequestId("operational-discount"),
-      });
+        observedKey.current ?? null,
+      );
     },
-    onSuccess: async (result) => {
+    onSuccess: (result) => {
+      if (!("folio" in result)) return;
       setMode("list");
       setSelectedScope(defaultScope);
       setSearchText("");
@@ -887,9 +884,11 @@ export function DiscountsScreen() {
       setDraftState(createInitialOperationalDiscountDraftState());
       setCreateError(null);
       setIsConfirmDialogOpen(false);
-      showSuccess(`Descuento ${result.folio} registrado por ${formatCurrency(result.total_amount)}.`);
+      showSuccess(
+        `Descuento ${result.folio} registrado por ${formatCurrency(result.total_amount)}.`,
+      );
 
-      await Promise.all([
+      void Promise.all([
         queryClient.invalidateQueries({
           queryKey: discountsBootstrapQueryKey(appEnv.VITE_POS_WORKSTATION_CODE),
         }),
@@ -920,8 +919,8 @@ export function DiscountsScreen() {
       showError(message);
     },
   });
-  const commitDiscountAsync = createDiscountMutation.mutateAsync;
-  const isCreateDiscountPending = createDiscountMutation.isPending;
+  const commitDiscountAsync = createDiscountMutation.mutate;
+  const isCreateDiscountPending = createDiscountMutation.isPending || isIntentionBlocked;
 
   const handleCommit = useCallback(() => {
     if (!canCommitDraft) {

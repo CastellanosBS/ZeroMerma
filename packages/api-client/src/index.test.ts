@@ -10,23 +10,35 @@ afterEach(() => {
 describe("api client package", () => {
   it("preserves an intention key across explicit retries with independent request IDs", async () => {
     const key: components["schemas"]["IdempotencyKey"] = "019a0000-0000-7000-8000-000000000001";
-    const fetchMock = vi.fn().mockImplementation(() => Promise.resolve(
-      new Response(JSON.stringify({ status: "ok" }), {
-        status: 200, headers: { "Content-Type": "application/json" },
-      }),
-    ));
+    const fetchMock = vi.fn().mockImplementation(() =>
+      Promise.resolve(
+        new Response(JSON.stringify({ status: "ok" }), {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        }),
+      ),
+    );
     vi.stubGlobal("fetch", fetchMock);
     for (const requestId of ["request-one", "request-two"]) {
       await requestApiJson({
-        surface: "POS", baseUrl: "https://api.test", path: "/command", method: "POST",
-        body: { amount: "12.30" }, csrfToken: "memory-csrf",
+        surface: "POS",
+        baseUrl: "https://api.test",
+        path: "/command",
+        method: "POST",
+        body: { amount: "12.30" },
+        csrfToken: "memory-csrf",
         headers: { "Idempotency-Key": key, "X-Request-ID": requestId },
       });
     }
     expect(fetchMock).toHaveBeenCalledTimes(2);
-    const headers = fetchMock.mock.calls.map(([, init]) => (init as RequestInit).headers as Headers);
+    const headers = fetchMock.mock.calls.map(
+      ([, init]) => (init as RequestInit).headers as Headers,
+    );
     expect(headers.map((value) => value.get("Idempotency-Key"))).toEqual([key, key]);
-    expect(headers.map((value) => value.get("X-Request-ID"))).toEqual(["request-one", "request-two"]);
+    expect(headers.map((value) => value.get("X-Request-ID"))).toEqual([
+      "request-one",
+      "request-two",
+    ]);
   });
   it("keeps generated contracts as the package boundary", () => {
     const payload = {
@@ -61,7 +73,11 @@ describe("api client package", () => {
       ),
     );
 
-    const result = requestApiJson({ surface: "POS", baseUrl: "http://api.test", path: "/resource" });
+    const result = requestApiJson({
+      surface: "POS",
+      baseUrl: "http://api.test",
+      path: "/resource",
+    });
 
     await expect(result).rejects.toBeInstanceOf(ApiError);
     await expect(result).rejects.toMatchObject({
@@ -101,3 +117,40 @@ describe("api client package", () => {
     expect(init.body).toBe('{"value":"1.25"}');
   });
 });
+
+it.each([undefined, "false", "TRUE", "true"])(
+  "exposes only the canonical replay boolean from an error response header %s",
+  async (value) => {
+    const headers = new Headers({
+      "Content-Type": "application/json",
+      "Set-Cookie": "private-session",
+      "X-Private": "secret",
+    });
+    if (value !== undefined) headers.set("Idempotency-Replayed", value);
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue(
+        new Response(
+          JSON.stringify({
+            code: "CASH_CLOSE_ALREADY_EXISTS",
+            message: "Already closed",
+            details: null,
+            field_errors: null,
+            request_id: null,
+          }),
+          { status: 409, headers },
+        ),
+      ),
+    );
+    const failure = await requestApiJson({
+      surface: "POS",
+      baseUrl: "https://api.test",
+      path: "/recovery",
+    }).catch((error) => error);
+    expect(failure).toBeInstanceOf(ApiError);
+    if (!(failure instanceof ApiError)) throw new Error("Expected canonical ApiError");
+    expect(failure.idempotencyReplayed).toBe(value === "true");
+    expect(failure).not.toHaveProperty("headers");
+    expect(JSON.stringify(failure)).not.toMatch(/private-session|X-Private|secret/);
+  },
+);

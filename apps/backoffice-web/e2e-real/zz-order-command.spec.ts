@@ -32,7 +32,7 @@ test("real administrative transition recovers a lost response after reload witho
   let cash = (await current.json()) as components["schemas"]["CashSessionView"] | null;
   if (!cash) {
     const opening = await page.request.post(`${environment.apiUrl}/v1/cash-sessions/open`, {
-      headers,
+      headers: { ...headers, "Idempotency-Key": createIdempotencyKey() },
       data: { workstation_code: station, opening_amount: "0.00" },
     });
     expect(opening.ok()).toBe(true);

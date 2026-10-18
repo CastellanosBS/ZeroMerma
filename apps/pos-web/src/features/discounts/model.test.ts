@@ -225,6 +225,7 @@ describe("discounts model", () => {
     expect(
       buildCreateOperationalDiscountRequest(
         "POS-01",
+        "cash-session-1",
         draft,
         discountMethods,
         discountCategories,
@@ -232,6 +233,7 @@ describe("discounts model", () => {
       ),
     ).toEqual({
       workstation_code: "POS-01",
+      cash_session_id: "cash-session-1",
       subject_name: "Empleado Luis",
       concept: "Prestamo interno abril",
       payment_method_code: "CASH",

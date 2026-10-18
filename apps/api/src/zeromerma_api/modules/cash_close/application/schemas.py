@@ -2,9 +2,10 @@ from __future__ import annotations
 
 from datetime import datetime
 from decimal import Decimal
+from typing import Literal
 from uuid import UUID
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from zeromerma_api.modules.branches.application.schemas import BranchSummary, WorkstationSummary
 from zeromerma_api.modules.cash.application.schemas import CashSessionView
@@ -92,6 +93,11 @@ class CashCloseCountedPaymentMethodRequest(BaseModel):
     payment_method_code: str = Field(min_length=1, max_length=40)
     counted_amount: Decimal = Field(ge=Decimal("0.00"), max_digits=12, decimal_places=2)
 
+    @field_validator("payment_method_code")
+    @classmethod
+    def normalize_code(cls, value: str) -> str:
+        return value.strip().upper()
+
 
 class CashCloseCountedProductLineRequest(BaseModel):
     product_id: UUID
@@ -119,6 +125,11 @@ class CashCloseDiscrepancyResolutionRequest(BaseModel):
     quantity: Decimal = Field(gt=Decimal("0.000"), max_digits=12, decimal_places=3)
     notes: str | None = Field(default=None, max_length=1000)
 
+    @field_validator("resolution_type", "reason_code")
+    @classmethod
+    def normalize_code(cls, value: str) -> str:
+        return value.strip().upper()
+
 
 class CashClosePreviewRequest(BaseModel):
     workstation_code: str = Field(min_length=1, max_length=64)
@@ -135,6 +146,46 @@ class CashClosePreviewRequest(BaseModel):
         default_factory=list
     )
     notes: str | None = Field(default=None, max_length=1000)
+
+
+class CashCloseCommitRequest(CashClosePreviewRequest):
+    model_config = ConfigDict(extra="forbid")
+
+    cash_session_id: UUID
+
+    @field_validator("close_mode")
+    @classmethod
+    def normalize_close_mode(cls, value: str) -> str:
+        return value.strip().upper()
+
+
+class CashCloseCommitResultView(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    id: UUID
+    cash_session_id: UUID
+    branch_id: UUID
+    workstation_id: UUID
+    status: Literal["COMMITTED"]
+    close_mode: str
+    opening_amount: Decimal
+    total_cash_in: Decimal
+    total_cash_out: Decimal
+    expected_cash_amount: Decimal
+    counted_cash_amount: Decimal | None
+    cash_variance_amount: Decimal | None
+    currency_code: str
+    reconciliation_status: str
+    committed_at_utc: datetime
+    generated_discrepancy_document_ids: list[UUID]
+
+
+class CashCloseAlreadyExistsView(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    code: Literal["CASH_CLOSE_ALREADY_EXISTS"] = "CASH_CLOSE_ALREADY_EXISTS"
+    message: str = "The cash session already has a committed close."
+    details: None = None
 
 
 class CashCloseReconciliationProductView(BaseModel):

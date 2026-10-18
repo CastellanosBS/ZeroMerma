@@ -3,6 +3,7 @@
 ZM-FIN-028 implements the shared infrastructure governed by DEC-07. ZM-FIN-029
 adopts it for POS sale confirmation; ZM-FIN-030 adopts the existing order commands
 on POS and Backoffice; ZM-FIN-031 adopts the existing POS return and cash refund.
+ZM-FIN-032 adopts opening, operational payment, operational discount and close.
 Other business commands retain their own
 pending adoption tasks; the existence of the foundation does not make them
 idempotent. POS and Backoffice remain separate, and PostgreSQL remains the
@@ -307,11 +308,55 @@ own retention policy and cannot substitute for the idempotency identity. This
 foundation does not introduce a blanket deletion job, indefinite PII retention,
 or a claim of legal compliance.
 
+## Cash opening, operational movements and close
+
+The four existing POS commands use `cash_session.open`,
+`operational_payment.commit`, `operational_discount.commit` and
+`cash_session.close`. Every command requires a UUIDv7 header; payment, operational
+discount and close also require the intention's explicit cash session. Opening
+has no cash session before it creates one. The operational discount is an IN
+cash movement for CASH, separate from commercial pricing. Operational payments
+are OUT for CASH; their existing CARD variants remain noncash records without
+new provider calls.
+
+Opening preserves active user/workstation uniqueness with local actor/station
+locking and the existing database constraints. The other three commands lock
+the exact `CashSession` with `FOR NO KEY UPDATE`, revalidate after waiting and
+perform their existing business writes inside the executor transaction. The
+opening actor/station locks use this non-key mode too, so concurrent reservations'
+foreign-key `KEY SHARE` locks do not cause a lock-upgrade deadlock. The mode still
+serializes competing writes while leaving referenced keys unchanged.
+Close recalculates under that
+lock, keeps explicit money counting and the existing reconciliation formula,
+and commits its existing POS session revocation atomically. A second key for the
+same closed shift receives durable `CASH_CLOSE_ALREADY_EXISTS`; a completed
+original key returns its saved close without repeating any close effect.
+
+The response DTOs are `CashSessionOpenResultView`,
+`OperationalPaymentCommitResultView`, `OperationalDiscountCommitResultView` and
+`CashCloseCommitResultView`. They preserve stable IDs, state and amounts while
+omitting operator personal data, payee/concept text, notes and dynamic UI fields.
+Existing authenticated detail endpoints supply those fields separately.
+
+Recovery GETs live under each module's `/confirmations/{idempotency_key}` and
+take workstation context, plus the original cash session except for opening.
+They authenticate the current actor and scope, never execute an action, and
+retain uncertainty when no committed result is available. Since close revokes
+its bound POS sessions, historical recovery uses a fresh valid login without
+opening another shift. Browser metadata cannot recreate an economic body after
+reload; no replacement key is generated automatically for an unknown outcome.
+
+This adoption does not apply the cash lock to all other economic commands or
+release the hidden operational-discount UI. Its executed evidence and remaining
+boundaries are recorded in
+[the cash validation record](../implementation/cash-idempotency-validation.md).
+
 ## Adoption boundaries
 
 ZM-FIN-029 adopts the foundation in sales; 030 covers the seven existing order
 commands and their embedded payment effects; 031 covers the existing return and
-its CASH refund. Tasks 032–035 cover cash, transfers, corrections/waste and production.
+its CASH refund; 032 covers the four existing cash commands. Tasks 033–035 cover
+transfers, corrections/waste and production.
 The wider review of commit ownership belongs to 039 and unified causal context to
 040. Historical order request correlation is not converted into fabricated
 idempotency records during adoption.

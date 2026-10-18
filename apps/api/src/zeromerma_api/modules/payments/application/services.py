@@ -6,7 +6,6 @@ from decimal import ROUND_HALF_UP, Decimal
 from zoneinfo import ZoneInfo
 
 from sqlalchemy import Select, String, cast, func, or_, select
-from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from zeromerma_api.modules.audit.application.service import AuditRecorder
@@ -20,6 +19,7 @@ from zeromerma_api.modules.branches.application.access import (
 )
 from zeromerma_api.modules.branches.application.schemas import BranchSummary, WorkstationSummary
 from zeromerma_api.modules.branches.infrastructure.models import Branch, Workstation
+from zeromerma_api.modules.cash.application.command_context import lock_cash_session
 from zeromerma_api.modules.cash.application.schemas import CashSessionView
 from zeromerma_api.modules.cash.application.services import CashSessionQueryService
 from zeromerma_api.modules.identity.application.schemas import AuthenticatedUser
@@ -29,6 +29,7 @@ from zeromerma_api.modules.outbox.application.service import OutboxWriter
 from zeromerma_api.modules.payments.application.schemas import (
     CreateOperationalPaymentRequest,
     OperationalPaymentCategoryView,
+    OperationalPaymentCommitResultView,
     OperationalPaymentDetailResponse,
     OperationalPaymentFilterOptionView,
     OperationalPaymentListItemView,
@@ -236,26 +237,32 @@ class PaymentsQueryService:
                 )
             )
 
-        available_user_rows = session.execute(
-            base_statement.with_only_columns(
-                OperationalPayment.created_by_user_id,
-                User.full_name.label("operator_full_name"),
+        available_user_rows = (
+            session.execute(
+                base_statement.with_only_columns(
+                    OperationalPayment.created_by_user_id,
+                    User.full_name.label("operator_full_name"),
+                )
+                .distinct()
+                .order_by(User.full_name.asc())
             )
-            .distinct()
-            .order_by(User.full_name.asc())
-        ).mappings().all()
+            .mappings()
+            .all()
+        )
 
         statement = base_statement
         if created_by_user_id is not None:
-            statement = statement.where(
-                OperationalPayment.created_by_user_id == created_by_user_id
-            )
+            statement = statement.where(OperationalPayment.created_by_user_id == created_by_user_id)
 
-        records = session.execute(
-            statement
-            .order_by(OperationalPayment.created_at_utc.desc())
-            .limit(MAX_PAYMENTS_PER_LIST)
-        ).mappings().all()
+        records = (
+            session.execute(
+                statement.order_by(OperationalPayment.created_at_utc.desc()).limit(
+                    MAX_PAYMENTS_PER_LIST
+                )
+            )
+            .mappings()
+            .all()
+        )
         return PaymentsListResponse(
             workstation_code=workstation_code,
             scope=normalized_scope,
@@ -349,18 +356,20 @@ class PaymentsCommandService:
         current_user: AuthenticatedUser,
         command: CreateOperationalPaymentRequest,
         request_id: str | None,
-    ) -> OperationalPaymentDetailResponse:
+        idempotency_key: uuid.UUID,
+        operation_id: uuid.UUID,
+    ) -> OperationalPaymentCommitResultView:
         context = self._workstation_access.resolve_context(
             session,
             user_id=current_user.id,
             workstation_code=command.workstation_code,
         )
-        current_open_cash_session = _require_open_cash_session(
+        current_open_cash_session = lock_cash_session(
             session,
-            cash_session_query=self._cash_session_query,
             current_user=current_user,
-            workstation_code=command.workstation_code,
-            context=context,
+            workstation_id=context.workstation_id,
+            branch_id=context.branch_id,
+            cash_session_id=command.cash_session_id,
         )
         payee_name = _require_non_empty(command.payee_name, field_label="beneficiario")
         concept = _require_non_empty(command.concept, field_label="concepto")
@@ -371,6 +380,13 @@ class PaymentsCommandService:
         created_at = datetime.now(tz=UTC)
         resolved_request_id = request_id or str(uuid.uuid4())
         cash_amount = total_amount if payment_method_code == PAYMENT_METHOD_CASH else ZERO_MONEY
+        cash_movement_id = uuid.uuid4() if cash_amount > ZERO_MONEY else None
+        trace = {
+            "idempotency_key": str(idempotency_key),
+            "operation_id": str(operation_id),
+            "operation_code": "operational_payment.commit",
+            "cash_movement_id": str(cash_movement_id) if cash_movement_id else None,
+        }
         non_cash_amount = total_amount if payment_method_code == PAYMENT_METHOD_CARD else ZERO_MONEY
 
         payment = OperationalPayment(
@@ -392,90 +408,95 @@ class PaymentsCommandService:
             committed_at_utc=created_at,
         )
 
-        try:
-            session.add(payment)
-            session.flush()
+        session.add(payment)
+        session.flush()
 
-            if cash_amount > ZERO_MONEY:
-                session.add(
-                    CashMovement(
-                        sale_id=None,
-                        cash_session_id=current_open_cash_session.id,
-                        branch_id=context.branch_id,
-                        workstation_id=context.workstation_id,
-                        operator_id=current_user.id,
-                        movement_type=CASH_MOVEMENT_TYPE_OPERATIONAL_PAYMENT,
-                        direction=CASH_MOVEMENT_DIRECTION_OUT,
-                        payment_method_code=PAYMENT_METHOD_CASH,
-                        amount=cash_amount,
-                        currency_code="MXN",
-                        occurred_at=created_at,
-                    )
+        if cash_amount > ZERO_MONEY:
+            session.add(
+                CashMovement(
+                    id=cash_movement_id,
+                    sale_id=None,
+                    cash_session_id=current_open_cash_session.id,
+                    branch_id=context.branch_id,
+                    workstation_id=context.workstation_id,
+                    operator_id=current_user.id,
+                    movement_type=CASH_MOVEMENT_TYPE_OPERATIONAL_PAYMENT,
+                    direction=CASH_MOVEMENT_DIRECTION_OUT,
+                    payment_method_code=PAYMENT_METHOD_CASH,
+                    amount=cash_amount,
+                    currency_code="MXN",
+                    occurred_at=created_at,
                 )
-
-            self._audit_recorder.record(
-                session,
-                actor_id=current_user.id,
-                action=AUDIT_ACTION_OPERATIONAL_PAYMENT_COMMITTED,
-                resource_type=OPERATIONAL_PAYMENT_RESOURCE_TYPE,
-                resource_id=str(payment.id),
-                branch_id=context.branch_id,
-                request_id=resolved_request_id,
-                metadata={
-                    "folio": _build_payment_folio(payment.id),
-                    "branch_code": context.branch_code,
-                    "workstation_code": context.workstation_code,
-                    "cash_session_id": str(current_open_cash_session.id),
-                    "payee_name": payee_name,
-                    "concept": concept,
-                    "category_code": category_code,
-                    "payment_method_code": payment_method_code,
-                    "currency_code": "MXN",
-                    "total_amount": str(total_amount),
-                    "cash_amount": str(cash_amount),
-                    "non_cash_amount": str(non_cash_amount),
-                    "notes": notes,
-                },
             )
-            self._outbox_writer.append(
-                session,
-                aggregate_type=OPERATIONAL_PAYMENT_RESOURCE_TYPE,
-                aggregate_id=str(payment.id),
-                event_name=OUTBOX_EVENT_OPERATIONAL_PAYMENT_COMMITTED_V1,
-                payload={
-                    "payment_id": str(payment.id),
-                    "folio": _build_payment_folio(payment.id),
-                    "branch_id": str(context.branch_id),
-                    "branch_code": context.branch_code,
-                    "workstation_id": str(context.workstation_id),
-                    "workstation_code": context.workstation_code,
-                    "cash_session_id": str(current_open_cash_session.id),
-                    "created_by_user_id": str(current_user.id),
-                    "payee_name": payee_name,
-                    "concept": concept,
-                    "category_code": category_code,
-                    "payment_method_code": payment_method_code,
-                    "currency_code": "MXN",
-                    "total_amount": str(total_amount),
-                    "cash_amount": str(cash_amount),
-                    "non_cash_amount": str(non_cash_amount),
-                    "notes": notes,
-                    "committed_at_utc": created_at.isoformat(),
-                },
-                headers={"request_id": resolved_request_id},
-            )
-            session.commit()
-        except IntegrityError as error:
-            session.rollback()
-            raise OperationalPaymentValidationError(
-                "Las reglas de integridad del pago fallaron durante el guardado."
-            ) from error
 
-        return self._query_service.get_payment_detail(
+        self._audit_recorder.record(
             session,
-            current_user=current_user,
-            workstation_code=command.workstation_code,
-            payment_id=payment.id,
+            actor_id=current_user.id,
+            action=AUDIT_ACTION_OPERATIONAL_PAYMENT_COMMITTED,
+            resource_type=OPERATIONAL_PAYMENT_RESOURCE_TYPE,
+            resource_id=str(payment.id),
+            branch_id=context.branch_id,
+            request_id=resolved_request_id,
+            metadata={
+                **trace,
+                "folio": _build_payment_folio(payment.id),
+                "branch_code": context.branch_code,
+                "workstation_code": context.workstation_code,
+                "cash_session_id": str(current_open_cash_session.id),
+                "payee_name": payee_name,
+                "concept": concept,
+                "category_code": category_code,
+                "payment_method_code": payment_method_code,
+                "currency_code": "MXN",
+                "total_amount": str(total_amount),
+                "cash_amount": str(cash_amount),
+                "non_cash_amount": str(non_cash_amount),
+                "notes": notes,
+            },
+        )
+        self._outbox_writer.append(
+            session,
+            aggregate_type=OPERATIONAL_PAYMENT_RESOURCE_TYPE,
+            aggregate_id=str(payment.id),
+            event_name=OUTBOX_EVENT_OPERATIONAL_PAYMENT_COMMITTED_V1,
+            payload={
+                "payment_id": str(payment.id),
+                "folio": _build_payment_folio(payment.id),
+                "branch_id": str(context.branch_id),
+                "branch_code": context.branch_code,
+                "workstation_id": str(context.workstation_id),
+                "workstation_code": context.workstation_code,
+                "cash_session_id": str(current_open_cash_session.id),
+                "created_by_user_id": str(current_user.id),
+                "payee_name": payee_name,
+                "concept": concept,
+                "category_code": category_code,
+                "payment_method_code": payment_method_code,
+                "currency_code": "MXN",
+                "total_amount": str(total_amount),
+                "cash_amount": str(cash_amount),
+                "non_cash_amount": str(non_cash_amount),
+                "notes": notes,
+                "committed_at_utc": created_at.isoformat(),
+            },
+            headers={"request_id": resolved_request_id, **trace},
+        )
+
+        session.flush()
+        return OperationalPaymentCommitResultView(
+            id=payment.id,
+            folio=_build_payment_folio(payment.id),
+            status="COMMITTED",
+            branch_id=payment.branch_id,
+            workstation_id=payment.workstation_id,
+            cash_session_id=payment.active_cash_session_id,
+            cash_movement_id=cash_movement_id,
+            payment_method_code=payment.payment_method_code,
+            currency_code=payment.currency_code,
+            total_amount=payment.total_amount,
+            cash_amount=payment.cash_amount,
+            non_cash_amount=payment.non_cash_amount,
+            committed_at_utc=payment.committed_at_utc,
         )
 
 
@@ -564,9 +585,7 @@ def _get_payment_for_branch(
         )
     ).scalar_one_or_none()
     if payment is None:
-        raise OperationalPaymentNotFoundError(
-            "El pago solicitado no existe en la sucursal actual."
-        )
+        raise OperationalPaymentNotFoundError("El pago solicitado no existe en la sucursal actual.")
     return payment
 
 

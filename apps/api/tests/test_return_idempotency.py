@@ -134,7 +134,7 @@ def _setup(
     headers = _login(client)
     opening = client.post(
         "/v1/cash-sessions/open",
-        headers=headers,
+        headers={**headers, "Idempotency-Key": new_idempotency_key()},
         json={"workstation_code": SEED_WORKSTATION_CODE, "opening_amount": "200.00"},
     )
     assert opening.status_code == 201
@@ -553,7 +553,7 @@ def test_replay_survives_later_returns_closed_cash_and_session_rotation(
     assert _post(client, fresh, body, new_idempotency_key()).status_code == 409
     opening = client.post(
         "/v1/cash-sessions/open",
-        headers=fresh,
+        headers={**fresh, "Idempotency-Key": new_idempotency_key()},
         json={"workstation_code": SEED_WORKSTATION_CODE, "opening_amount": "100.00"},
     )
     assert opening.status_code == 201

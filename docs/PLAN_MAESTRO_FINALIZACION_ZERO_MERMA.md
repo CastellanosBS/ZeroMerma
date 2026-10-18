@@ -215,6 +215,44 @@ su alcance de diagnóstico, reconstrucción y opening state/backfill legítimo.
 No se declara completada la devolución física, una reversa bancaria ni el módulo
 completo. No se introduce migración. La siguiente adopción es **ZM-FIN-032**.
 
+### 0.8 Registro de ejecución — ZM-FIN-032
+
+El bloque del 2026-10-18, rama `codex/zm-fin-032-cash-idempotency`, parte de
+`3efca6a9cc53fe568b280939a239a2692482e3ee` y adopta cuatro comandos existentes:
+apertura, pago operativo, descuento operativo de entrada y cierre. Cada intención
+usa UUIDv7; los tres comandos posteriores a apertura identifican explícitamente
+la caja del intento. El descuento operativo no es el motor comercial de 072.
+Los snapshots omiten datos personales y texto de negocio; los GET de detalle
+conservan su contrato y cuatro GET permiten recuperar el resultado histórico.
+
+La apertura mantiene unicidad por usuario y estación. Los otros tres comandos
+revalidan la fila de caja bajo lock; el cierre conserva conteo obligatorio,
+fórmula vigente y revocación atómica de sesiones POS. Otra clave para una caja ya
+cerrada produce `409 CASH_CLOSE_ALREADY_EXISTS`. La recuperación posterior usa
+una autenticación válida nueva sin abrir otro turno.
+
+El [registro de validación](implementation/cash-idempotency-validation.md)
+identifica 49 callers explícitos en 22 archivos y 68 casos dedicados PostgreSQL/HTTP
+aprobados, además de 16 regresiones focales de concurrencia. Las reservas simultáneas
+por claves distintas se serializan con `FOR NO KEY UPDATE`, compatible con los
+locks de referencias FK. Contracts pasó 68 pruebas; Web, 587 unitarias y 11 E2E
+simuladas; Browser, 13 flujos reales. La matriz de 323 entradas y 248 operaciones
+OpenAPI cierra solamente GAP-0701/0708/0716/0741; los módulos amplios siguen
+parciales y `/descuentos` continúa oculto. La ejecución amplia de los callers
+completó 280 casos: 274 aprobados y seis fallos por fixtures anteriores al nuevo
+contrato; los seis se corrigieron y aprobaron en dos corridas focales de tres.
+La evidencia amplia fallida se conserva como diagnóstico, sin presentarla como
+una ejecución completamente verde. Las 28 pruebas específicas de matriz pasaron.
+
+La entrega integrada requiere las ocho etapas Foundation y **Foundation required**
+del SHA publicado. No se modifica la base habitual ni se introduce migración.
+037, 043, 057/061, 065 y 072 conservan sus alcances posteriores; un egreso operativo
+todavía puede exceder el efectivo disponible y bloquear el cierre por saldo
+esperado negativo. Se conserva rechazo controlado sin cambiar la fórmula ni
+inventar fondos; prevención y remedio siguen en el trabajo financiero posterior.
+No se declara la solución completa ni lista para producción. La siguiente
+adopción es **ZM-FIN-033**.
+
 ## 1. Resumen ejecutivo
 
 ZeroMerma posee una base adecuada para evolucionar sin reescritura: monolito modular, FastAPI/SQLAlchemy/PostgreSQL, POS y Backoffice separados, OpenAPI generado, precisión decimal, auditoría y outbox transaccionales. La auditoría activa demostró que una parte importante de ventas, pagos, pedidos, documentos y administración es real. También demostró defectos sistémicos: el POS no alimenta el inventario canónico; el pago de pedido no entra en caja/corte; el worker no procesa eventos; la trazabilidad de identidad/origen es incorrecta; y varias superficies administrativas son simuladas o incompletas.

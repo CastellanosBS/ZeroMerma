@@ -37,7 +37,7 @@ def _cashier_headers(client: TestClient) -> dict[str, str]:
 def _open_cash_session(client: TestClient) -> None:
     response = client.post(
         "/v1/cash-sessions/open",
-        headers=_cashier_headers(client),
+        headers={**_cashier_headers(client), "Idempotency-Key": new_idempotency_key()},
         json={
             "workstation_code": SEED_WORKSTATION_CODE,
             "opening_amount": "200.00",

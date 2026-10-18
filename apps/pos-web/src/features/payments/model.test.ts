@@ -71,9 +71,7 @@ describe("payments model", () => {
     ).toBe("details");
     expect(
       getOperationalPaymentBlockedReason(initialDraft, paymentMethods, paymentCategories),
-    ).toBe(
-      "Captura el beneficiario del pago.",
-    );
+    ).toBe("Captura el beneficiario del pago.");
 
     const detailsDraft = {
       ...initialDraft,
@@ -103,9 +101,9 @@ describe("payments model", () => {
       totalAmountText: "40.50",
     };
 
-    expect(
-      getOperationalPaymentCreateStepKey(amountDraft, paymentMethods, paymentCategories),
-    ).toBe("method");
+    expect(getOperationalPaymentCreateStepKey(amountDraft, paymentMethods, paymentCategories)).toBe(
+      "method",
+    );
     expect(
       getOperationalPaymentUiState({
         categories: paymentCategories,
@@ -124,9 +122,9 @@ describe("payments model", () => {
       paymentMethodCode: "CASH",
     };
 
-    expect(
-      getOperationalPaymentCreateStepKey(readyDraft, paymentMethods, paymentCategories),
-    ).toBe("save");
+    expect(getOperationalPaymentCreateStepKey(readyDraft, paymentMethods, paymentCategories)).toBe(
+      "save",
+    );
     expect(
       getOperationalPaymentUiState({
         categories: paymentCategories,
@@ -157,12 +155,14 @@ describe("payments model", () => {
     expect(
       buildCreateOperationalPaymentRequest(
         "POS-01",
+        "cash-session-1",
         draft,
         paymentMethods,
         paymentCategories,
       ),
     ).toEqual({
       workstation_code: "POS-01",
+      cash_session_id: "cash-session-1",
       payee_name: "Proveedor",
       concept: "REF-8891",
       payment_method_code: "CASH",

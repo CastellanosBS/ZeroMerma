@@ -4,6 +4,7 @@ import {
   dropNextSaleConfirmationResponse,
   dropNextReturnConfirmationResponse,
   dropNextOrderCommandResponse,
+  dropNextCashCommandResponse,
   observeRealApi,
   realEnvironment,
 } from "../../../../scripts/dev/web-integration-support.mjs";
@@ -144,6 +145,60 @@ describe("real browser integration safety", () => {
         status === 201 ? [{ method: "POST", path: "/v1/returns/commit", status: 201 }] : [],
       );
       expect(() => page.route("", undefined)).toThrow("interception is forbidden");
+    },
+  );
+
+  it("limits cash faults to the four exact command paths", async () => {
+    isolatedEnvironment();
+    const register = vi.fn();
+    const page = { on: vi.fn(), route: register };
+    const evidence = observeRealApi({ on: vi.fn() }, page, "https://127.0.0.1:41201");
+    for (const path of [
+      "/v1/auth/login",
+      "/v1/payments?unsafe=true",
+      "/v1/cash-close/preview",
+      "/v1/admin/cash-cuts",
+    ]) {
+      await expect(
+        dropNextCashCommandResponse(page, "https://127.0.0.1:41201", evidence, path),
+      ).rejects.toThrow("allowlisted");
+    }
+    expect(register).not.toHaveBeenCalled();
+  });
+  it.each([201, 409])(
+    "records only a successful real cash transaction before dropping response %i",
+    async (status) => {
+      isolatedEnvironment();
+      const route = {
+        request: () => ({ method: () => "POST" }),
+        fetch: vi.fn(async () => ({ status: () => status, json: async () => ({ id: "cash" }) })),
+        abort: vi.fn(async () => {}),
+      };
+      let handler: ((value: typeof route) => Promise<void>) | undefined;
+      const page = {
+        on: vi.fn(),
+        route: vi.fn(async (_url: string, callback: typeof handler) => {
+          handler = callback;
+        }),
+      };
+      const evidence = observeRealApi({ on: vi.fn() }, page, "https://127.0.0.1:41201");
+      const fault = await dropNextCashCommandResponse(
+        page,
+        "https://127.0.0.1:41201",
+        evidence,
+        "/v1/cash-sessions/open",
+      );
+      const outcome =
+        status === 201
+          ? expect(fault.committed).resolves.toEqual({ id: "cash" })
+          : expect(fault.committed).rejects.toThrow("received 409");
+      await handler!(route);
+      await outcome;
+      expect(route.fetch).toHaveBeenCalledWith({ maxRedirects: 0 });
+      expect(route.abort).toHaveBeenCalledWith("failed");
+      expect(evidence).toEqual(
+        status === 201 ? [{ method: "POST", path: "/v1/cash-sessions/open", status: 201 }] : [],
+      );
     },
   );
 

@@ -3,11 +3,7 @@ import type {
   OperationalPaymentCategoryView,
   OperationalPaymentMethodView,
 } from "../../lib/api-contracts";
-import {
-  formatMoneyFromCents,
-  parseMoneyToCents,
-  sanitizeMoneyInput,
-} from "../pos-terminal/model";
+import { formatMoneyFromCents, parseMoneyToCents, sanitizeMoneyInput } from "../pos-terminal/model";
 
 export interface OperationalPaymentDraftState {
   categoryCode: string;
@@ -245,6 +241,7 @@ export function getOperationalPaymentCreateStepKey(
 
 export function buildCreateOperationalPaymentRequest(
   workstationCode: string,
+  cashSessionId: string,
   draft: OperationalPaymentDraftState,
   methods: OperationalPaymentMethodView[] = [],
   categories: OperationalPaymentCategoryView[] = [],
@@ -274,6 +271,7 @@ export function buildCreateOperationalPaymentRequest(
 
   return {
     workstation_code: workstationCode,
+    cash_session_id: cashSessionId,
     payee_name: draft.payeeName.trim(),
     concept: derivedConcept,
     category_code: draft.categoryCode.length > 0 ? draft.categoryCode : undefined,
