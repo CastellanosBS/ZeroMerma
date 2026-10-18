@@ -2,9 +2,10 @@ from __future__ import annotations
 
 from datetime import date, datetime
 from decimal import Decimal
+from typing import Literal
 from uuid import UUID
 
-from pydantic import BaseModel, Field
+from pydantic import AwareDatetime, BaseModel, ConfigDict, Field, field_validator
 
 from zeromerma_api.modules.branches.application.schemas import BranchSummary, WorkstationSummary
 from zeromerma_api.modules.cash.application.schemas import CashSessionView
@@ -69,17 +70,28 @@ class CreateCustomerOrderAdvancePaymentRequest(BaseModel):
     payment_method_code: str = Field(min_length=1, max_length=40)
     amount: Decimal = Field(gt=Decimal("0.00"), max_digits=12, decimal_places=2)
 
+    @field_validator("payment_method_code")
+    @classmethod
+    def normalize_payment_method(cls, value: str) -> str:
+        return value.strip().upper()
+
 
 class DeliverCustomerOrderSettlementPaymentRequest(BaseModel):
     payment_method_code: str = Field(min_length=1, max_length=40)
     amount: Decimal = Field(gt=Decimal("0.00"), max_digits=12, decimal_places=2)
 
+    @field_validator("payment_method_code")
+    @classmethod
+    def normalize_payment_method(cls, value: str) -> str:
+        return value.strip().upper()
+
 
 class CreateCustomerOrderRequest(BaseModel):
     workstation_code: str = Field(min_length=1, max_length=64)
+    cash_session_id: UUID
     customer_name: str = Field(min_length=1, max_length=160)
     customer_phone: str | None = Field(default=None, max_length=32)
-    requested_for_at: datetime | None = None
+    requested_for_at: AwareDatetime | None = None
     notes: str | None = None
     items: list[CreateCustomerOrderItemRequest] = Field(min_length=1)
     advance_amount: Decimal = Field(
@@ -88,13 +100,36 @@ class CreateCustomerOrderRequest(BaseModel):
     advance_payment_method_code: str | None = Field(default=None, max_length=40)
     advance_payments: list[CreateCustomerOrderAdvancePaymentRequest] = Field(default_factory=list)
 
+    @field_validator("customer_name")
+    @classmethod
+    def normalize_customer_name(cls, value: str) -> str:
+        normalized = value.strip()
+        if not normalized:
+            raise ValueError("Customer name must not be empty.")
+        return normalized
+
+    @field_validator("customer_phone", "notes", "advance_payment_method_code")
+    @classmethod
+    def normalize_optional_text(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        normalized = value.strip() or None
+        return normalized
+
+    @field_validator("advance_payment_method_code")
+    @classmethod
+    def normalize_advance_method(cls, value: str | None) -> str | None:
+        return value.upper() if value is not None else None
+
 
 class OrderActionRequest(BaseModel):
     workstation_code: str = Field(min_length=1, max_length=64)
+    cash_session_id: UUID
 
 
 class DeliverCustomerOrderRequest(BaseModel):
     workstation_code: str = Field(min_length=1, max_length=64)
+    cash_session_id: UUID
     settlement_amount: Decimal | None = Field(
         default=None, ge=Decimal("0.00"), max_digits=12, decimal_places=2
     )
@@ -103,10 +138,58 @@ class DeliverCustomerOrderRequest(BaseModel):
         default_factory=list
     )
 
+    @field_validator("settlement_payment_method_code")
+    @classmethod
+    def normalize_settlement_method(cls, value: str | None) -> str | None:
+        return value.strip().upper() or None if value is not None else None
+
 
 class CancelCustomerOrderRequest(BaseModel):
     workstation_code: str = Field(min_length=1, max_length=64)
+    cash_session_id: UUID
     cancellation_reason: str = Field(min_length=4, max_length=240)
+
+    @field_validator("cancellation_reason")
+    @classmethod
+    def normalize_reason(cls, value: str) -> str:
+        normalized = value.strip()
+        if len(normalized) < 4:
+            raise ValueError("Cancellation reason requires at least four characters.")
+        return normalized
+
+
+OrderCommandCode = Literal["create", "mark-ready", "deliver", "cancel"]
+AdminOrderCommandCode = Literal["mark-ready", "deliver", "cancel"]
+
+
+class OrderCommandPaymentView(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    id: UUID
+    sequence: int
+    payment_type: Literal["ADVANCE", "SETTLEMENT", "REFUND"]
+    payment_method_code: str
+    amount: Decimal
+    currency_code: str
+    workstation_id: UUID
+    cash_session_id: UUID
+    recorded_at_utc: datetime
+
+
+class OrderCommandResultView(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    id: UUID
+    folio: str
+    status: Literal["PENDING", "READY", "DELIVERED", "CANCELED"]
+    branch_id: UUID
+    currency_code: str
+    subtotal_amount: Decimal
+    total_amount: Decimal
+    advance_amount: Decimal
+    remaining_balance_amount: Decimal
+    updated_at_utc: datetime
+    payments: list[OrderCommandPaymentView]
 
 
 class CustomerOrderListItemView(BaseModel):

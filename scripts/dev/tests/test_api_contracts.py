@@ -137,6 +137,93 @@ def test_sale_confirmation_adopts_key_and_exposes_metadata_only_recovery() -> No
     }
 
 
+@pytest.mark.parametrize(
+    ("path", "request_schema", "status"),
+    [
+        ("/v1/orders", "CreateCustomerOrderRequest", "201"),
+        ("/v1/orders/{order_id}/mark-ready", "OrderActionRequest", "200"),
+        ("/v1/orders/{order_id}/deliver", "DeliverCustomerOrderRequest", "200"),
+        ("/v1/orders/{order_id}/cancel", "CancelCustomerOrderRequest", "200"),
+        ("/v1/admin/orders/{order_id}/mark-ready", "AdminOrderActionRequest", "200"),
+        ("/v1/admin/orders/{order_id}/deliver", "AdminOrderActionRequest", "200"),
+        ("/v1/admin/orders/{order_id}/cancel", "AdminOrderActionRequest", "200"),
+    ],
+)
+def test_order_commands_require_one_identity_and_return_safe_receipts(
+    path: str, request_schema: str, status: str
+) -> None:
+    operation = SCHEMA["paths"][path]["post"]
+    key = next(item for item in operation["parameters"] if item["name"] == "Idempotency-Key")
+    assert key["in"] == "header" and key["required"] is True
+    assert "7[0-9a-fA-F]{3}" in key["schema"]["pattern"]
+    schemas = SCHEMA["components"]["schemas"]
+    request = schemas[request_schema]
+    if path.startswith("/v1/orders"):
+        assert "cash_session_id" in request["required"]
+    else:
+        assert request["properties"] == {} and request["additionalProperties"] is False
+    receipt = schemas["OrderCommandResultView"]
+    assert receipt["additionalProperties"] is False
+    assert (
+        not {
+            "customer_name",
+            "customer_phone",
+            "notes",
+            "cancellation_reason",
+            "operator_full_name",
+            "operator_email",
+            "can_deliver",
+            "can_cancel",
+        }
+        & receipt["properties"].keys()
+    )
+    assert (
+        not {
+            "operator_full_name",
+            "operator_email",
+            "notes",
+        }
+        & schemas["OrderCommandPaymentView"]["properties"].keys()
+    )
+    response = operation["responses"][status]
+    assert response["content"]["application/json"]["schema"] == {
+        "$ref": "#/components/schemas/OrderCommandResultView"
+    }
+    assert response["headers"]["Idempotency-Replayed"] == {
+        "$ref": "#/components/headers/IdempotencyReplayed"
+    }
+
+
+@pytest.mark.parametrize(
+    ("path", "context"),
+    [
+        (
+            "/v1/orders/commands/{command_code}/{idempotency_key}",
+            {"workstation_code", "cash_session_id"},
+        ),
+        ("/v1/admin/orders/commands/{command_code}/{idempotency_key}", {"branch_id"}),
+    ],
+)
+def test_order_recovery_requires_metadata_without_economic_payload(
+    path: str, context: set[str]
+) -> None:
+    recovery = SCHEMA["paths"][path]["get"]
+    assert "requestBody" not in recovery
+    assert {item["name"] for item in recovery["parameters"] if item["required"]} == {
+        "command_code",
+        "idempotency_key",
+        *context,
+    }
+    assert "order_id" not in {item["name"] for item in recovery["parameters"]}
+    response = recovery["responses"]["200"]
+    assert response["content"]["application/json"]["schema"] == {
+        "$ref": "#/components/schemas/OrderCommandResultView"
+    }
+    assert response["headers"]["Idempotency-Replayed"] == {
+        "$ref": "#/components/headers/IdempotencyReplayed"
+    }
+
+
 def test_error_response_change_is_rejected() -> None:
     changed = copy.deepcopy(SCHEMA)
     _, _, operation = _first_operation(changed)

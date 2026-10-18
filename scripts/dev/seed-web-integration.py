@@ -147,6 +147,46 @@ def main(argv: Sequence[str] = ()) -> None:
             session.add(
                 UserRoleAssignmentBranchScope(assignment_id=assignment.id, branch_id=branch.id)
             )
+            order_operator = User(
+                email=os.environ["ZM_E2E_ORDER_OPERATOR_EMAIL"],
+                full_name="Integration order operator",
+                password_hash=PasswordHasher().hash_password(password),
+                allowed_surfaces=["BACKOFFICE"],
+                default_surface="BACKOFFICE",
+            )
+            order_role = Role(
+                code="integration_orders",
+                name="Integration orders",
+                surfaces=["BACKOFFICE"],
+                is_active=True,
+            )
+            session.add_all([order_operator, order_role])
+            session.flush()
+            order_capabilities = {"orders.view", "orders.manage", "orders.cancel"}
+            order_permissions = list(
+                session.scalars(select(Permission).where(Permission.code.in_(order_capabilities)))
+            )
+            if {permission.code for permission in order_permissions} != order_capabilities:
+                raise RuntimeError("Canonical order capabilities were not seeded")
+            session.add_all(
+                RolePermission(role_id=order_role.id, permission_id=permission.id)
+                for permission in order_permissions
+            )
+            session.add(
+                UserBranchAssignment(
+                    user_id=order_operator.id, branch_id=branch.id, is_default=True
+                )
+            )
+            order_assignment = UserRoleAssignment(
+                user_id=order_operator.id, role_id=order_role.id, scope_type="BRANCH_SET"
+            )
+            session.add(order_assignment)
+            session.flush()
+            session.add(
+                UserRoleAssignmentBranchScope(
+                    assignment_id=order_assignment.id, branch_id=branch.id
+                )
+            )
             session.add(
                 User(
                     email=f"denied-{config.run_id}@example.invalid",

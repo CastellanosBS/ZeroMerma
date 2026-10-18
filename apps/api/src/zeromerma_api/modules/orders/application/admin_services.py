@@ -30,9 +30,12 @@ from zeromerma_api.modules.orders.application.admin_schemas import (
     AdminOrdersListResponse,
     AdminOrderTimelineEventView,
 )
+from zeromerma_api.modules.orders.application.schemas import OrderCommandResultView
 from zeromerma_api.modules.orders.application.services import (
     ORDER_STATUS_SEQUENCE,
     ZERO_MONEY,
+    OrderCommandTrace,
+    _build_command_result,
     _build_order_folio,
     _get_cancellation_refund_amount,
     _quantize_money,
@@ -183,8 +186,9 @@ class AdminOrdersService:
         actor_id: uuid.UUID,
         order_id: uuid.UUID,
         request_id: str | None,
-    ) -> AdminOrderDetailView:
-        order = _get_order(session, order_id=order_id)
+        trace: OrderCommandTrace,
+    ) -> OrderCommandResultView:
+        order = _get_order(session, order_id=order_id, for_update=True)
         if order.status != ORDER_STATUS_PENDING:
             raise OrderStateConflictError(
                 "Solo los pedidos pendientes se pueden marcar como listos para entrega."
@@ -204,6 +208,7 @@ class AdminOrdersService:
             branch_id=order.branch_id,
             request_id=resolved_request_id,
             metadata={
+                **trace.metadata,
                 "folio": _build_order_folio(order.id),
                 "source": "backoffice",
                 "status": ORDER_STATUS_READY,
@@ -223,10 +228,10 @@ class AdminOrdersService:
                 "marked_ready_by_user_id": str(actor_id),
                 "marked_ready_at_utc": now.isoformat(),
             },
-            headers={"request_id": resolved_request_id},
+            headers={"request_id": resolved_request_id, **trace.metadata},
         )
-        session.commit()
-        return _build_order_detail(session, order)
+        session.flush()
+        return _build_command_result(session, order)
 
     def deliver_order(
         self,
@@ -235,8 +240,9 @@ class AdminOrdersService:
         actor_id: uuid.UUID,
         order_id: uuid.UUID,
         request_id: str | None,
-    ) -> AdminOrderDetailView:
-        order = _get_order(session, order_id=order_id)
+        trace: OrderCommandTrace,
+    ) -> OrderCommandResultView:
+        order = _get_order(session, order_id=order_id, for_update=True)
         if order.status != ORDER_STATUS_READY:
             raise OrderStateConflictError(
                 "Solo los pedidos listos para entrega se pueden entregar."
@@ -263,6 +269,7 @@ class AdminOrdersService:
             branch_id=order.branch_id,
             request_id=resolved_request_id,
             metadata={
+                **trace.metadata,
                 "folio": _build_order_folio(order.id),
                 "source": "backoffice",
                 "status": ORDER_STATUS_DELIVERED,
@@ -284,10 +291,10 @@ class AdminOrdersService:
                 "settlement_amount": "0.00",
                 "delivered_at_utc": now.isoformat(),
             },
-            headers={"request_id": resolved_request_id},
+            headers={"request_id": resolved_request_id, **trace.metadata},
         )
-        session.commit()
-        return _build_order_detail(session, order)
+        session.flush()
+        return _build_command_result(session, order)
 
     def cancel_order(
         self,
@@ -296,8 +303,9 @@ class AdminOrdersService:
         actor_id: uuid.UUID,
         order_id: uuid.UUID,
         request_id: str | None,
-    ) -> AdminOrderDetailView:
-        order = _get_order(session, order_id=order_id)
+        trace: OrderCommandTrace,
+    ) -> OrderCommandResultView:
+        order = _get_order(session, order_id=order_id, for_update=True)
         if order.status == ORDER_STATUS_DELIVERED:
             raise OrderStateConflictError("No se puede cancelar un pedido que ya fue entregado.")
         if order.status == ORDER_STATUS_CANCELED:
@@ -327,6 +335,7 @@ class AdminOrdersService:
             branch_id=order.branch_id,
             request_id=resolved_request_id,
             metadata={
+                **trace.metadata,
                 "folio": _build_order_folio(order.id),
                 "source": "backoffice",
                 "status": ORDER_STATUS_CANCELED,
@@ -351,10 +360,10 @@ class AdminOrdersService:
                 "refund_payments": [],
                 "canceled_at_utc": now.isoformat(),
             },
-            headers={"request_id": resolved_request_id},
+            headers={"request_id": resolved_request_id, **trace.metadata},
         )
-        session.commit()
-        return _build_order_detail(session, order)
+        session.flush()
+        return _build_command_result(session, order)
 
     def _build_metrics(
         self,
@@ -833,8 +842,13 @@ def _build_timeline(
     return sorted(events, key=lambda event: event.occurred_at)
 
 
-def _get_order(session: Session, *, order_id: uuid.UUID) -> CustomerOrder:
-    order = session.get(CustomerOrder, order_id)
+def _get_order(session: Session, *, order_id: uuid.UUID, for_update: bool = False) -> CustomerOrder:
+    statement = select(CustomerOrder).where(CustomerOrder.id == order_id)
+    if for_update:
+        statement = statement.with_for_update(of=CustomerOrder).execution_options(
+            populate_existing=True
+        )
+    order = session.scalar(statement)
     if order is None:
         raise OrderNotFoundError("Order was not found.")
     return order

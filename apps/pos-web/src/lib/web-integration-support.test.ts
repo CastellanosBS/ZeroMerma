@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import {
   dropNextSaleConfirmationResponse,
+  dropNextOrderCommandResponse,
   observeRealApi,
   realEnvironment,
 } from "../../../../scripts/dev/web-integration-support.mjs";
@@ -19,6 +20,60 @@ function isolatedEnvironment() {
 }
 
 describe("real browser integration safety", () => {
+  it("does not expose order response loss for arbitrary or administrative creation paths", async () => {
+    isolatedEnvironment();
+    const register = vi.fn();
+    const page = { on: vi.fn(), route: register };
+    const evidence = observeRealApi({ on: vi.fn() }, page, "https://127.0.0.1:41201");
+    for (const path of [
+      "/v1/auth/login",
+      "/v1/admin/orders",
+      "/v1/orders?override=true",
+      "/v1/orders/anything/cancel",
+    ]) {
+      await expect(
+        dropNextOrderCommandResponse(page, "https://127.0.0.1:41201", evidence, path),
+      ).rejects.toThrow("allowlisted");
+    }
+    expect(register).not.toHaveBeenCalled();
+  });
+  it.each([200, 409])(
+    "drops only a real successful order transition response, received %i",
+    async (status) => {
+      isolatedEnvironment();
+      const route = {
+        request: () => ({ method: () => "POST" }),
+        fetch: vi.fn(async () => ({ status: () => status, json: async () => ({ id: "order" }) })),
+        abort: vi.fn(async () => {}),
+      };
+      let handler: ((value: typeof route) => Promise<void>) | undefined;
+      const register = vi.fn(async (_url: string, callback: typeof handler) => {
+        handler = callback;
+      });
+      const page = { on: vi.fn(), route: register };
+      const evidence = observeRealApi({ on: vi.fn() }, page, "https://127.0.0.1:41201");
+      const path = "/v1/admin/orders/00000000-0000-4000-8000-000000000001/mark-ready";
+      const fault = await dropNextOrderCommandResponse(
+        page,
+        "https://127.0.0.1:41201",
+        evidence,
+        path,
+      );
+      const outcome =
+        status === 200
+          ? expect(fault.committed).resolves.toEqual({ id: "order" })
+          : expect(fault.committed).rejects.toThrow("received 409");
+      await handler!(route);
+      await outcome;
+      expect(route.fetch).toHaveBeenCalledWith({ maxRedirects: 0 });
+      expect(route.abort).toHaveBeenCalledWith("failed");
+      expect(evidence).toEqual(
+        status === 200
+          ? [{ method: "POST", path: "/v1/admin/orders/{id}/mark-ready", status: 200 }]
+          : [],
+      );
+    },
+  );
   it.each([201, 409])(
     "loses a response only after the real sale fetch and requires 201, received %i",
     async (status) => {

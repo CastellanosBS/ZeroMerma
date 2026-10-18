@@ -1,17 +1,18 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { isCommandIntentionPending } from "@zeromerma/api-client";
 
 import { toBackofficeErrorMessage } from "../../../../lib/api";
 import { useBackofficeAuthStore } from "../../../auth/backoffice-auth-store";
 import { AdminPageHeader } from "../../components/AdminPageHeader";
+import { adminOrdersBackendContract, fetchAdminOrderDetail, fetchAdminOrders } from "../api";
+import type { OrderCommandResultView } from "../api";
 import {
-  adminOrdersBackendContract,
-  cancelAdminOrder,
-  deliverAdminOrder,
-  fetchAdminOrderDetail,
-  fetchAdminOrders,
-  markAdminOrderReady,
-} from "../api";
+  adminOrderIntentions,
+  type AdminOrderCommandCode,
+  type AdminOrderIntentionContext,
+} from "../order-command-intent";
+import { useAdminOrderIntention } from "../use-order-intention";
 import { AdminOrderDetailPanel } from "../components/AdminOrderDetailPanel";
 import { AdminOrdersFilters } from "../components/AdminOrdersFilters";
 import { AdminOrdersTable } from "../components/AdminOrdersTable";
@@ -128,10 +129,13 @@ function AdminOrdersMetricStrip({
   );
 }
 
-type OrderMutationKind = "cancel" | "deliver" | "markReady";
+type OrderMutationKind = AdminOrderCommandCode;
 
 export function AdminOrdersPage() {
   const isAuthenticated = useBackofficeAuthStore((state) => state.isAuthenticated);
+  const user = useBackofficeAuthStore((state) => state.user);
+  const intention = useAdminOrderIntention();
+  const observedKey = useRef(intention.metadata?.key ?? null);
   const queryClient = useQueryClient();
   const [filters, setFilters] = useState<AdminOrderListFilters>(initialFilters);
   const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null);
@@ -159,28 +163,43 @@ export function AdminOrdersPage() {
     retry: false,
   });
 
+  function confirmed(result: OrderCommandResultView) {
+    setSelectedOrderId(result.id);
+    setFeedback({ tone: "success", message: `${result.folio}: operación confirmada.` });
+    // Detail refresh is read-only and cannot turn a confirmed command into a retry.
+    void queryClient.invalidateQueries({ queryKey: ["admin", "orders"] });
+  }
   const actionMutation = useMutation({
-    mutationFn: ({ kind, orderId }: { kind: OrderMutationKind; orderId: string }) => {
-      if (kind === "markReady") {
-        return markAdminOrderReady(orderId);
-      }
-      if (kind === "deliver") {
-        return deliverAdminOrder(orderId);
-      }
-      return cancelAdminOrder(orderId);
-    },
+    mutationFn: (context: AdminOrderIntentionContext) =>
+      adminOrderIntentions.begin(context, {}, observedKey.current),
     onError: (error) => {
       setFeedback({
         tone: "error",
         message: toBackofficeErrorMessage(error, "No se pudo actualizar el pedido."),
       });
     },
-    onSuccess: (detail) => {
-      setSelectedOrderId(detail.overview.id);
-      setFeedback({ tone: "success", message: `${detail.overview.folio} actualizado.` });
-      void queryClient.invalidateQueries({ queryKey: ["admin", "orders"] });
-    },
+    onSuccess: confirmed,
   });
+  const recoveryMutation = useMutation({
+    mutationFn: (retry: boolean) => {
+      const metadata = intention.metadata;
+      if (!metadata || metadata.userId !== user?.id)
+        throw new Error("Se requiere el operador original.");
+      return retry ? adminOrderIntentions.retry(metadata) : adminOrderIntentions.recover(metadata);
+    },
+    onSuccess: confirmed,
+    onError: (error) =>
+      setFeedback({
+        tone: "error",
+        message: toBackofficeErrorMessage(error, "No se pudo recuperar el resultado."),
+      }),
+  });
+  useEffect(() => {
+    const key = intention.metadata?.key ?? null;
+    if (key !== observedKey.current)
+      void queryClient.invalidateQueries({ queryKey: ["admin", "orders"] });
+    observedKey.current = key;
+  }, [intention.metadata?.key, queryClient]);
 
   const listErrorMessage = ordersQuery.isError
     ? toBackofficeErrorMessage(
@@ -216,11 +235,18 @@ export function AdminOrdersPage() {
 
   function handleAction(kind: OrderMutationKind, order: AdminOrderListItem | AdminOrderDetail) {
     const orderId = "overview" in order ? order.overview.id : order.id;
-    if (!orderId || actionMutation.isPending) {
+    if (
+      !orderId ||
+      !user ||
+      actionMutation.isPending ||
+      intention.error ||
+      isCommandIntentionPending(intention.metadata)
+    ) {
       return;
     }
     setFeedback(null);
-    actionMutation.mutate({ kind, orderId });
+    const branchId = "overview" in order ? order.overview.branchId : order.branchId;
+    actionMutation.mutate({ commandCode: kind, orderId, branchId, userId: user.id });
   }
 
   return (
@@ -235,6 +261,41 @@ export function AdminOrdersPage() {
       />
 
       <div className="flex min-h-0 min-w-0 flex-1 flex-col gap-2.5 overflow-hidden p-3">
+        {intention.error || isCommandIntentionPending(intention.metadata) ? (
+          <section role="alert" className="rounded-xl border border-amber-400 bg-amber-50 p-3">
+            <h2>Pedido pendiente de confirmar</h2>
+            <p>
+              {intention.error ??
+                "Consulta el resultado antes de repetir o iniciar otra acción de pedidos."}
+            </p>
+            {intention.metadata ? (
+              <>
+                <p>
+                  Referencia: {intention.metadata.key} · {intention.metadata.commandCode}
+                </p>
+                <button
+                  type="button"
+                  disabled={recoveryMutation.isPending || intention.metadata.userId !== user?.id}
+                  onClick={() => recoveryMutation.mutate(false)}
+                >
+                  Consultar resultado del pedido
+                </button>
+                {adminOrderIntentions.hasBody(intention.metadata.key) &&
+                intention.metadata.status !== "CONFLICT" ? (
+                  <button
+                    type="button"
+                    disabled={recoveryMutation.isPending || intention.metadata.userId !== user?.id}
+                    onClick={() => recoveryMutation.mutate(true)}
+                  >
+                    Reintentar el mismo comando
+                  </button>
+                ) : (
+                  <p>Tras recargar sólo se consulta el resultado.</p>
+                )}
+              </>
+            ) : null}
+          </section>
+        ) : null}
         <AdminOrdersFilters
           filters={filters}
           isBackendConnected={orderList.isBackendConnected}
@@ -267,7 +328,7 @@ export function AdminOrdersPage() {
             total={orderList.total}
             onCancel={(item) => handleAction("cancel", item)}
             onDeliver={(item) => handleAction("deliver", item)}
-            onMarkReady={(item) => handleAction("markReady", item)}
+            onMarkReady={(item) => handleAction("mark-ready", item)}
             onPageChange={handlePageChange}
             onSelectOrder={handleSelectOrder}
           />
@@ -279,7 +340,7 @@ export function AdminOrdersPage() {
             selectedOrder={selectedOrder}
             onCancel={(item) => handleAction("cancel", item)}
             onDeliver={(item) => handleAction("deliver", item)}
-            onMarkReady={(item) => handleAction("markReady", item)}
+            onMarkReady={(item) => handleAction("mark-ready", item)}
           />
         </div>
       </div>

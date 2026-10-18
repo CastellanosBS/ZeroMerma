@@ -33,5 +33,5 @@ def current_cash_session_id(
     )
     assert response.status_code == 200, response.json()
     payload = response.json()
-    assert payload is not None, "The sale fixture must explicitly open a cash session first."
+    assert payload is not None, "The command fixture must explicitly open a cash session first."
     return str(UUID(payload["id"]))

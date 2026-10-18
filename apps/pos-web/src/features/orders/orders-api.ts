@@ -1,3 +1,7 @@
+import type { components, paths } from "@zeromerma/api-client";
+export type OrderCommandResultView = components["schemas"]["OrderCommandResultView"];
+export type OrderCommandCode =
+  paths["/v1/orders/commands/{command_code}/{idempotency_key}"]["get"]["parameters"]["path"]["command_code"];
 import type {
   CancelCustomerOrderRequest,
   CreateCustomerOrderRequest,
@@ -26,9 +30,7 @@ function buildQueryString(params: Record<string, string | undefined>): string {
   return serialized.length > 0 ? `?${serialized}` : "";
 }
 
-export function getOrdersBootstrap(
-  workstationCode: string,
-): Promise<OrdersBootstrapResponse> {
+export function getOrdersBootstrap(workstationCode: string): Promise<OrdersBootstrapResponse> {
   return requestJson<OrdersBootstrapResponse>({
     path: `/v1/orders/bootstrap?workstation_code=${encodeURIComponent(workstationCode)}`,
   });
@@ -41,7 +43,6 @@ export function listOrders({
   status,
   workstationCode,
 }: {
-
   dateFrom?: string;
   dateTo?: string;
   query?: string;
@@ -63,7 +64,6 @@ export function getOrderDetail({
   orderId,
   workstationCode,
 }: {
-
   orderId: string;
   workstationCode: string;
 }): Promise<CustomerOrderDetailResponse> {
@@ -76,7 +76,6 @@ export function getOrdersCatalog({
   query,
   workstationCode,
 }: {
-
   query?: string;
   workstationCode: string;
 }): Promise<OrdersCatalogResponse> {
@@ -93,7 +92,6 @@ export function getOrdersClassProducts({
   query,
   workstationCode,
 }: {
-
   classId: string;
   query?: string;
   workstationCode: string;
@@ -109,17 +107,19 @@ export function getOrdersClassProducts({
 export function createOrder({
   payload,
   requestId,
+  idempotencyKey,
 }: {
-
   payload: CreateCustomerOrderRequest;
   requestId: string;
-}): Promise<CustomerOrderDetailResponse> {
-  return requestJson<CustomerOrderDetailResponse>({
+  idempotencyKey: string;
+}): Promise<OrderCommandResultView> {
+  return requestJson<OrderCommandResultView>({
     body: payload,
     method: "POST",
     path: "/v1/orders",
     headers: {
       "X-Request-ID": requestId,
+      "Idempotency-Key": idempotencyKey,
     },
   });
 }
@@ -128,18 +128,20 @@ export function markOrderReady({
   orderId,
   payload,
   requestId,
+  idempotencyKey,
 }: {
-
   orderId: string;
   payload: OrderActionRequest;
   requestId: string;
-}): Promise<CustomerOrderDetailResponse> {
-  return requestJson<CustomerOrderDetailResponse>({
+  idempotencyKey: string;
+}): Promise<OrderCommandResultView> {
+  return requestJson<OrderCommandResultView>({
     body: payload,
     method: "POST",
     path: `/v1/orders/${encodeURIComponent(orderId)}/mark-ready`,
     headers: {
       "X-Request-ID": requestId,
+      "Idempotency-Key": idempotencyKey,
     },
   });
 }
@@ -148,18 +150,20 @@ export function deliverOrder({
   orderId,
   payload,
   requestId,
+  idempotencyKey,
 }: {
-
   orderId: string;
   payload: DeliverCustomerOrderRequest;
   requestId: string;
-}): Promise<CustomerOrderDetailResponse> {
-  return requestJson<CustomerOrderDetailResponse>({
+  idempotencyKey: string;
+}): Promise<OrderCommandResultView> {
+  return requestJson<OrderCommandResultView>({
     body: payload,
     method: "POST",
     path: `/v1/orders/${encodeURIComponent(orderId)}/deliver`,
     headers: {
       "X-Request-ID": requestId,
+      "Idempotency-Key": idempotencyKey,
     },
   });
 }
@@ -168,18 +172,31 @@ export function cancelOrder({
   orderId,
   payload,
   requestId,
+  idempotencyKey,
 }: {
-
   orderId: string;
   payload: CancelCustomerOrderRequest;
   requestId: string;
-}): Promise<CustomerOrderDetailResponse> {
-  return requestJson<CustomerOrderDetailResponse>({
+  idempotencyKey: string;
+}): Promise<OrderCommandResultView> {
+  return requestJson<OrderCommandResultView>({
     body: payload,
     method: "POST",
     path: `/v1/orders/${encodeURIComponent(orderId)}/cancel`,
     headers: {
       "X-Request-ID": requestId,
+      "Idempotency-Key": idempotencyKey,
     },
+  });
+}
+
+export function recoverOrderCommand(
+  commandCode: OrderCommandCode,
+  key: string,
+  workstationCode: string,
+  cashSessionId: string,
+): Promise<OrderCommandResultView> {
+  return requestJson<OrderCommandResultView>({
+    path: `/v1/orders/commands/${commandCode}/${encodeURIComponent(key)}${buildQueryString({ workstation_code: workstationCode, cash_session_id: cashSessionId })}`,
   });
 }

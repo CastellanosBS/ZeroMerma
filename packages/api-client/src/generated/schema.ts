@@ -712,6 +712,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/admin/orders/commands/{command_code}/{idempotency_key}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Recover Admin Order Command */
+        get: operations["recover_admin_order_command_v1_admin_orders_commands__command_code___idempotency_key__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/admin/orders/{order_id}": {
         parameters: {
             query?: never;
@@ -2990,6 +3007,23 @@ export interface paths {
         };
         /** Get Orders Class Products */
         get: operations["get_orders_class_products_v1_orders_classes__class_id__products_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/orders/commands/{command_code}/{idempotency_key}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Recover Order Command */
+        get: operations["recover_order_command_v1_orders_commands__command_code___idempotency_key__get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -8541,10 +8575,7 @@ export interface components {
             warning_state: string;
         };
         /** AdminOrderActionRequest */
-        AdminOrderActionRequest: {
-            /** Idempotency Key */
-            idempotency_key?: string | null;
-        };
+        AdminOrderActionRequest: Record<string, never>;
         /** AdminOrderAvailableActionsView */
         AdminOrderAvailableActionsView: {
             /** Can Cancel */
@@ -16021,6 +16052,11 @@ export interface components {
         CancelCustomerOrderRequest: {
             /** Cancellation Reason */
             cancellation_reason: string;
+            /**
+             * Cash Session Id
+             * Format: uuid
+             */
+            cash_session_id: string;
             /** Workstation Code */
             workstation_code: string;
         };
@@ -17011,6 +17047,11 @@ export interface components {
             advance_payment_method_code?: string | null;
             /** Advance Payments */
             advance_payments?: components["schemas"]["CreateCustomerOrderAdvancePaymentRequest"][];
+            /**
+             * Cash Session Id
+             * Format: uuid
+             */
+            cash_session_id: string;
             /** Customer Name */
             customer_name: string;
             /** Customer Phone */
@@ -17236,6 +17277,11 @@ export interface components {
         };
         /** DeliverCustomerOrderRequest */
         DeliverCustomerOrderRequest: {
+            /**
+             * Cash Session Id
+             * Format: uuid
+             */
+            cash_session_id: string;
             /** Settlement Amount */
             settlement_amount?: number | string | null;
             /** Settlement Payment Method Code */
@@ -17985,8 +18031,86 @@ export interface components {
         };
         /** OrderActionRequest */
         OrderActionRequest: {
+            /**
+             * Cash Session Id
+             * Format: uuid
+             */
+            cash_session_id: string;
             /** Workstation Code */
             workstation_code: string;
+        };
+        /** OrderCommandPaymentView */
+        OrderCommandPaymentView: {
+            /** Amount */
+            amount: string;
+            /**
+             * Cash Session Id
+             * Format: uuid
+             */
+            cash_session_id: string;
+            /** Currency Code */
+            currency_code: string;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Payment Method Code */
+            payment_method_code: string;
+            /**
+             * Payment Type
+             * @enum {string}
+             */
+            payment_type: "ADVANCE" | "SETTLEMENT" | "REFUND";
+            /**
+             * Recorded At Utc
+             * Format: date-time
+             */
+            recorded_at_utc: string;
+            /** Sequence */
+            sequence: number;
+            /**
+             * Workstation Id
+             * Format: uuid
+             */
+            workstation_id: string;
+        };
+        /** OrderCommandResultView */
+        OrderCommandResultView: {
+            /** Advance Amount */
+            advance_amount: string;
+            /**
+             * Branch Id
+             * Format: uuid
+             */
+            branch_id: string;
+            /** Currency Code */
+            currency_code: string;
+            /** Folio */
+            folio: string;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Payments */
+            payments: components["schemas"]["OrderCommandPaymentView"][];
+            /** Remaining Balance Amount */
+            remaining_balance_amount: string;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "PENDING" | "READY" | "DELIVERED" | "CANCELED";
+            /** Subtotal Amount */
+            subtotal_amount: string;
+            /** Total Amount */
+            total_amount: string;
+            /**
+             * Updated At Utc
+             * Format: date-time
+             */
+            updated_at_utc: string;
         };
         /** OrderStatusCounterView */
         OrderStatusCounterView: {
@@ -25085,6 +25209,113 @@ export interface operations {
             };
         };
     };
+    recover_admin_order_command_v1_admin_orders_commands__command_code___idempotency_key__get: {
+        parameters: {
+            query: {
+                branch_id: string;
+            };
+            header?: never;
+            path: {
+                command_code: "mark-ready" | "deliver" | "cancel";
+                idempotency_key: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    "Idempotency-Replayed": components["headers"]["IdempotencyReplayed"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OrderCommandResultView"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorResponse"];
+                };
+            };
+            /** @description Authentication Required */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorResponse"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorResponse"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorResponse"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorResponse"];
+                };
+            };
+            /** @description Session Locked */
+            423: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorResponse"];
+                };
+            };
+            /** @description Login Rate Limited */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorResponse"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorResponse"];
+                };
+            };
+        };
+    };
     get_admin_order_detail_v1_admin_orders__order_id__get: {
         parameters: {
             query?: never;
@@ -25191,7 +25422,10 @@ export interface operations {
     cancel_admin_order_v1_admin_orders__order_id__cancel_post: {
         parameters: {
             query?: never;
-            header?: never;
+            header: {
+                /** @description A globally unique UUIDv7 identifying this business intention. */
+                "Idempotency-Key": string;
+            };
             path: {
                 order_id: string;
             };
@@ -25206,10 +25440,11 @@ export interface operations {
             /** @description Successful Response */
             200: {
                 headers: {
+                    "Idempotency-Replayed": components["headers"]["IdempotencyReplayed"];
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["AdminOrderDetailView"];
+                    "application/json": components["schemas"]["OrderCommandResultView"];
                 };
             };
             /** @description Bad Request */
@@ -25298,7 +25533,10 @@ export interface operations {
     deliver_admin_order_v1_admin_orders__order_id__deliver_post: {
         parameters: {
             query?: never;
-            header?: never;
+            header: {
+                /** @description A globally unique UUIDv7 identifying this business intention. */
+                "Idempotency-Key": string;
+            };
             path: {
                 order_id: string;
             };
@@ -25313,10 +25551,11 @@ export interface operations {
             /** @description Successful Response */
             200: {
                 headers: {
+                    "Idempotency-Replayed": components["headers"]["IdempotencyReplayed"];
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["AdminOrderDetailView"];
+                    "application/json": components["schemas"]["OrderCommandResultView"];
                 };
             };
             /** @description Bad Request */
@@ -25405,7 +25644,10 @@ export interface operations {
     mark_admin_order_ready_v1_admin_orders__order_id__mark_ready_post: {
         parameters: {
             query?: never;
-            header?: never;
+            header: {
+                /** @description A globally unique UUIDv7 identifying this business intention. */
+                "Idempotency-Key": string;
+            };
             path: {
                 order_id: string;
             };
@@ -25420,10 +25662,11 @@ export interface operations {
             /** @description Successful Response */
             200: {
                 headers: {
+                    "Idempotency-Replayed": components["headers"]["IdempotencyReplayed"];
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["AdminOrderDetailView"];
+                    "application/json": components["schemas"]["OrderCommandResultView"];
                 };
             };
             /** @description Bad Request */
@@ -41454,7 +41697,10 @@ export interface operations {
     create_order_v1_orders_post: {
         parameters: {
             query?: never;
-            header?: never;
+            header: {
+                /** @description A globally unique UUIDv7 identifying this business intention. */
+                "Idempotency-Key": string;
+            };
             path?: never;
             cookie?: never;
         };
@@ -41467,10 +41713,11 @@ export interface operations {
             /** @description Successful Response */
             201: {
                 headers: {
+                    "Idempotency-Replayed": components["headers"]["IdempotencyReplayed"];
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["CustomerOrderDetailResponse"];
+                    "application/json": components["schemas"]["OrderCommandResultView"];
                 };
             };
             /** @description Bad Request */
@@ -41869,6 +42116,114 @@ export interface operations {
             };
         };
     };
+    recover_order_command_v1_orders_commands__command_code___idempotency_key__get: {
+        parameters: {
+            query: {
+                workstation_code: string;
+                cash_session_id: string;
+            };
+            header?: never;
+            path: {
+                command_code: "create" | "mark-ready" | "deliver" | "cancel";
+                idempotency_key: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    "Idempotency-Replayed": components["headers"]["IdempotencyReplayed"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OrderCommandResultView"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorResponse"];
+                };
+            };
+            /** @description Authentication Required */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorResponse"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorResponse"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorResponse"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorResponse"];
+                };
+            };
+            /** @description Session Locked */
+            423: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorResponse"];
+                };
+            };
+            /** @description Login Rate Limited */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorResponse"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorResponse"];
+                };
+            };
+        };
+    };
     get_order_detail_v1_orders__order_id__get: {
         parameters: {
             query: {
@@ -41977,7 +42332,10 @@ export interface operations {
     cancel_order_v1_orders__order_id__cancel_post: {
         parameters: {
             query?: never;
-            header?: never;
+            header: {
+                /** @description A globally unique UUIDv7 identifying this business intention. */
+                "Idempotency-Key": string;
+            };
             path: {
                 order_id: string;
             };
@@ -41992,10 +42350,11 @@ export interface operations {
             /** @description Successful Response */
             200: {
                 headers: {
+                    "Idempotency-Replayed": components["headers"]["IdempotencyReplayed"];
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["CustomerOrderDetailResponse"];
+                    "application/json": components["schemas"]["OrderCommandResultView"];
                 };
             };
             /** @description Bad Request */
@@ -42084,7 +42443,10 @@ export interface operations {
     deliver_order_v1_orders__order_id__deliver_post: {
         parameters: {
             query?: never;
-            header?: never;
+            header: {
+                /** @description A globally unique UUIDv7 identifying this business intention. */
+                "Idempotency-Key": string;
+            };
             path: {
                 order_id: string;
             };
@@ -42099,10 +42461,11 @@ export interface operations {
             /** @description Successful Response */
             200: {
                 headers: {
+                    "Idempotency-Replayed": components["headers"]["IdempotencyReplayed"];
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["CustomerOrderDetailResponse"];
+                    "application/json": components["schemas"]["OrderCommandResultView"];
                 };
             };
             /** @description Bad Request */
@@ -42191,7 +42554,10 @@ export interface operations {
     mark_order_ready_v1_orders__order_id__mark_ready_post: {
         parameters: {
             query?: never;
-            header?: never;
+            header: {
+                /** @description A globally unique UUIDv7 identifying this business intention. */
+                "Idempotency-Key": string;
+            };
             path: {
                 order_id: string;
             };
@@ -42206,10 +42572,11 @@ export interface operations {
             /** @description Successful Response */
             200: {
                 headers: {
+                    "Idempotency-Replayed": components["headers"]["IdempotencyReplayed"];
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["CustomerOrderDetailResponse"];
+                    "application/json": components["schemas"]["OrderCommandResultView"];
                 };
             };
             /** @description Bad Request */

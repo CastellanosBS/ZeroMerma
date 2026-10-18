@@ -207,9 +207,9 @@ describe("admin orders API", () => {
       status: "all",
     });
     const detail = await fetchAdminOrderDetail("order-1");
-    await markAdminOrderReady("order-1");
-    await deliverAdminOrder("order-1");
-    await cancelAdminOrder("order-1");
+    await markAdminOrderReady("order-1", "key-ready");
+    await deliverAdminOrder("order-1", "key-deliver");
+    await cancelAdminOrder("order-1", "key-cancel");
 
     expect(list.total).toBe(1);
     expect(detail.lines[0].productName).toBe("Concha");
@@ -218,6 +218,12 @@ describe("admin orders API", () => {
       `${apiBase}/v1/admin/orders/order-1/mark-ready`,
       expect.objectContaining({ method: "POST" }),
     );
+    expect(
+      fetchMock.mock.calls
+        .slice(2)
+        .map(([, init]) => (init?.headers as Headers).get("Idempotency-Key")),
+    ).toEqual(["key-ready", "key-deliver", "key-cancel"]);
+    expect(fetchMock.mock.calls.slice(2).every(([, init]) => init?.body === "{}")).toBe(true);
     fetchMock.mockRestore();
   });
 });

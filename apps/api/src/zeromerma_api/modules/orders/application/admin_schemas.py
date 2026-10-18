@@ -4,7 +4,7 @@ from datetime import datetime
 from decimal import Decimal
 from uuid import UUID
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict
 
 
 class AdminOrderFilterOptionView(BaseModel):
@@ -174,4 +174,4 @@ class AdminOrderDetailView(BaseModel):
 
 
 class AdminOrderActionRequest(BaseModel):
-    idempotency_key: str | None = Field(default=None, max_length=120)
+    model_config = ConfigDict(extra="forbid")

@@ -1,4 +1,5 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { isCommandIntentionPending } from "@zeromerma/api-client";
 import { Navigate } from "@tanstack/react-router";
 import { DialogBody, DialogFooter, DialogHeader, DialogSurface } from "@zeromerma/ui";
 import {
@@ -86,7 +87,9 @@ import {
 import { posInputClass, posOutlineButtonClass, posPrimaryButtonClass } from "../pos-theme/theme";
 import { useStatusMessageStore } from "../status-messages/store";
 import { getOrderDeliveryActionLabel } from "./delivery-action-labels";
-import { cancelOrder, createOrder, deliverOrder, markOrderReady } from "./orders-api";
+import type { OrderCommandCode } from "./orders-api";
+import { orderIntentions, type OrderCommandPayload } from "./order-command-intent";
+import { useOrderDraftIdentity, useOrderIntention } from "./use-order-intention";
 import {
   addPendingSelectionLine,
   buildDeliverOrderSettlementPayments,
@@ -172,14 +175,6 @@ const ORDER_CREATE_GUIDE_STEPS: Array<{
 type OrderActionDialogState =
   | { kind: "discard" }
   | { kind: "cancel"; order: CancelableOrderSummary };
-
-function createRequestId(scope: string): string {
-  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
-    return `${scope}-${crypto.randomUUID()}`;
-  }
-
-  return `${scope}-${Date.now()}-${Math.random().toString(16).slice(2)}`;
-}
 
 function useDebouncedValue(value: string, delayMs: number): string {
   const [debouncedValue, setDebouncedValue] = useState(value);
@@ -1208,6 +1203,7 @@ function OrdersDecisionPanel({
                       onKeyDown={submitOrderFromPaymentInput}
                       placeholder="0.00"
                       ref={advanceInputRef}
+                      aria-label="Anticipo del pedido"
                       value={draftAdvanceAmountText}
                     />
                   </div>
@@ -1955,6 +1951,7 @@ export function OrderConsultationDetailSurface({
 
 export function OrdersScreen() {
   const isAuthenticated = usePosAuthStore((state) => state.isAuthenticated);
+  const user = usePosAuthStore((state) => state.user);
   const showError = useStatusMessageStore((state) => state.showError);
   const showSuccess = useStatusMessageStore((state) => state.showSuccess);
   const queryClient = useQueryClient();
@@ -1982,6 +1979,9 @@ export function OrdersScreen() {
   const [customerName, setCustomerName] = useState("");
   const [customerPhone, setCustomerPhone] = useState("");
   const ordersBootstrapQuery = useOrdersBootstrapQuery();
+  const orderIntention = useOrderIntention(
+    ordersBootstrapQuery.data?.workstation.id ?? "unavailable",
+  );
   const initialRequestedForDraft = useMemo(
     () => createInitialRequestedForDraftState(ordersBootstrapQuery.data?.local_timestamp ?? null),
     [ordersBootstrapQuery.data?.local_timestamp],
@@ -2173,6 +2173,17 @@ export function OrdersScreen() {
     setOrderActionDialog(null);
     setSelectionErrorMessage(null);
   }, [ordersBootstrapQuery.data?.local_timestamp]);
+
+  const observedKey = useOrderDraftIdentity(
+    orderIntention.metadata,
+    Boolean(ordersBootstrapQuery.data),
+    useCallback(() => {
+      resetCreateDraft();
+      setMode("list");
+      void queryClient.invalidateQueries({ queryKey: ["orders-list"] });
+      void queryClient.invalidateQueries({ queryKey: ["order-detail"] });
+    }, [queryClient, resetCreateDraft]),
+  );
 
   useEffect(() => {
     if (mode !== "create") {
@@ -2400,6 +2411,31 @@ export function OrdersScreen() {
     [queryClient],
   );
 
+  function beginCommand(
+    commandCode: OrderCommandCode,
+    payload: OrderCommandPayload,
+    orderId: string | null = null,
+  ) {
+    const bootstrap = ordersBootstrapQuery.data;
+    const cashSession = currentCashSessionQuery.data;
+    if (!user || !bootstrap || !cashSession)
+      throw new Error("Se requiere operador, estación y caja activa.");
+    if (orderIntention.error) throw new Error(orderIntention.error);
+    return orderIntentions.begin(
+      {
+        userId: user.id,
+        branchId: bootstrap.branch.id,
+        workstationId: bootstrap.workstation.id,
+        workstationCode: bootstrap.workstation.code,
+        cashSessionId: cashSession.id,
+        commandCode,
+        orderId,
+      },
+      payload,
+      observedKey.current ?? null,
+    );
+  }
+
   const createOrderMutation = useMutation({
     mutationFn: async () => {
       if (!isAuthenticated || ordersBootstrapQuery.data === undefined) {
@@ -2422,6 +2458,7 @@ export function OrdersScreen() {
       }
 
       const payload: CreateCustomerOrderRequest = {
+        cash_session_id: currentCashSessionQuery.data!.id,
         workstation_code: ordersBootstrapQuery.data.workstation.code,
         customer_name: customerName.trim(),
         customer_phone: customerPhone.trim().length > 0 ? customerPhone.trim() : null,
@@ -2439,17 +2476,13 @@ export function OrdersScreen() {
         }),
       };
 
-      return createOrder({
-        payload,
-        requestId: createRequestId("orders-create"),
-      });
+      return beginCommand("create", payload);
     },
     onSuccess: async (orderDetail) => {
-      await refreshOrdersData(orderDetail.id);
+      void refreshOrdersData(orderDetail.id);
       setSelectedStatus(orderDetail.status);
       setSelectedOrderId(orderDetail.id);
       setMode("list");
-      resetCreateDraft();
       setOrderActionDialog(null);
       showSuccess(`Pedido guardado. Folio ${orderDetail.folio}.`);
     },
@@ -2465,26 +2498,19 @@ export function OrdersScreen() {
 
   const markReadyMutation = useMutation({
     mutationFn: async () => {
-      if (
-        !isAuthenticated ||
-        ordersBootstrapQuery.data === undefined ||
-        selectedOrderId === null
-      ) {
+      if (!isAuthenticated || ordersBootstrapQuery.data === undefined || selectedOrderId === null) {
         throw new Error("Selecciona un pedido antes de marcarlo como listo.");
       }
 
       const payload: OrderActionRequest = {
+        cash_session_id: currentCashSessionQuery.data!.id,
         workstation_code: ordersBootstrapQuery.data.workstation.code,
       };
 
-      return markOrderReady({
-        orderId: selectedOrderId,
-        payload,
-        requestId: createRequestId("orders-ready"),
-      });
+      return beginCommand("mark-ready", payload, selectedOrderId);
     },
     onSuccess: async (orderDetail) => {
-      await refreshOrdersData(orderDetail.id);
+      void refreshOrdersData(orderDetail.id);
       setSelectedStatus(orderDetail.status);
       setSelectedOrderId(orderDetail.id);
       setOrderActionDialog(null);
@@ -2511,9 +2537,10 @@ export function OrdersScreen() {
         throw new Error("Selecciona un pedido listo para entrega.");
       }
 
-      return deliverOrder({
-        orderId: selectedOrderId,
-        payload: {
+      return beginCommand(
+        "deliver",
+        {
+          cash_session_id: currentCashSessionQuery.data!.id,
           workstation_code: ordersBootstrapQuery.data.workstation.code,
           settlement_amount:
             orderDetailQuery.data.remaining_balance_amount !== "0.00"
@@ -2532,11 +2559,11 @@ export function OrdersScreen() {
                 })
               : [],
         },
-        requestId: createRequestId("orders-deliver"),
-      });
+        selectedOrderId,
+      );
     },
     onSuccess: async (orderDetail) => {
-      await refreshOrdersData(orderDetail.id);
+      void refreshOrdersData(orderDetail.id);
       setSelectedStatus(orderDetail.status);
       setSelectedOrderId(orderDetail.id);
       setOrderActionDialog(null);
@@ -2558,27 +2585,20 @@ export function OrdersScreen() {
 
   const cancelMutation = useMutation({
     mutationFn: async () => {
-      if (
-        !isAuthenticated ||
-        ordersBootstrapQuery.data === undefined ||
-        selectedOrderId === null
-      ) {
+      if (!isAuthenticated || ordersBootstrapQuery.data === undefined || selectedOrderId === null) {
         throw new Error("Selecciona un pedido antes de cancelarlo.");
       }
 
       const payload: CancelCustomerOrderRequest = {
+        cash_session_id: currentCashSessionQuery.data!.id,
         cancellation_reason: "Cancelacion operativa desde POS",
         workstation_code: ordersBootstrapQuery.data.workstation.code,
       };
 
-      return cancelOrder({
-        orderId: selectedOrderId,
-        payload,
-        requestId: createRequestId("orders-cancel"),
-      });
+      return beginCommand("cancel", payload, selectedOrderId);
     },
     onSuccess: async (orderDetail) => {
-      await refreshOrdersData(orderDetail.id);
+      void refreshOrdersData(orderDetail.id);
       setSelectedStatus(orderDetail.status);
       setSelectedOrderId(orderDetail.id);
       setOrderActionDialog(null);
@@ -2627,7 +2647,10 @@ export function OrdersScreen() {
     lineCount: draftState.lines.length,
     requestedForInput,
   });
-  const saveOrderDisabled = createOrderBlockingMessage !== null;
+  const saveOrderDisabled =
+    createOrderBlockingMessage !== null ||
+    Boolean(orderIntention.error) ||
+    isCommandIntentionPending(orderIntention.metadata);
   const visibleOrderCount = ordersListQuery.data?.orders.length ?? 0;
   const hasAnyOrders = getOrderTotalCount(ordersBootstrapQuery.data?.status_counters ?? []) > 0;
   const hasActiveOrderFilters = getOrderListHasActiveFilters({
@@ -2637,10 +2660,12 @@ export function OrdersScreen() {
     status: selectedStatus,
   });
   const startNewOrderCapture = useCallback(() => {
+    if (orderIntention.error || isCommandIntentionPending(orderIntention.metadata)) return;
+    observedKey.current = orderIntention.metadata?.key ?? null;
     resetCreateDraft();
     setSelectedOrderId(null);
     setMode("create");
-  }, [resetCreateDraft]);
+  }, [resetCreateDraft, orderIntention, observedKey]);
   const openDatePicker = useCallback((input: HTMLInputElement) => {
     input.focus();
     if (typeof input.showPicker !== "function") {
@@ -2680,7 +2705,7 @@ export function OrdersScreen() {
         }
         mode={mode}
         onCreateOrder={() => {
-          void createOrderMutation.mutateAsync();
+          void createOrderMutation.mutate();
         }}
         onDismissDeliverySettlementFlow={() => {
           setDeliveryPaymentMethodCode("");
@@ -2738,7 +2763,7 @@ export function OrdersScreen() {
           }));
         }}
         onMarkReady={() => {
-          void markReadyMutation.mutateAsync();
+          void markReadyMutation.mutate();
         }}
         onRequestCancelDraft={() => {
           setOrderActionDialog({ kind: "discard" });
@@ -2758,7 +2783,7 @@ export function OrdersScreen() {
         }}
         onRequestDeliverOrder={() => {
           if (orderDetailQuery.data) {
-            void deliverMutation.mutateAsync();
+            void deliverMutation.mutate();
           }
         }}
         onSetDraftNotes={setOrderNotes}
@@ -3224,6 +3249,7 @@ export function OrdersScreen() {
                       openPickupDatePicker();
                     }}
                     ref={pickupDateInputRef}
+                    aria-label="Fecha de recoleccion"
                     type="date"
                     value={requestedForDraft.date}
                   />
@@ -3566,6 +3592,7 @@ export function OrdersScreen() {
                               }}
                               placeholder="0"
                               ref={quantityInputRef}
+                              aria-label="Cantidad del pedido"
                               value={quantitySelection.quantityText}
                             />
 
@@ -3637,7 +3664,7 @@ export function OrdersScreen() {
             return;
           }
 
-          void cancelMutation.mutateAsync();
+          void cancelMutation.mutate();
         }}
         state={orderActionDialog}
       />

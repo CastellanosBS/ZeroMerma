@@ -27,14 +27,21 @@ export const adminOrdersBackendContract: AdminOrderBackendContract = {
   markReadyEndpoint: "POST /v1/admin/orders/{order_id}/mark-ready",
 };
 
-function appendOptionalParam(params: URLSearchParams, key: string, value: string | null | undefined) {
+function appendOptionalParam(
+  params: URLSearchParams,
+  key: string,
+  value: string | null | undefined,
+) {
   if (!value || value === "all") {
     return;
   }
   params.set(key, value);
 }
 
-function toDateTimeParam(value: string | null | undefined, boundary: "start" | "end"): string | null {
+function toDateTimeParam(
+  value: string | null | undefined,
+  boundary: "start" | "end",
+): string | null {
   if (!value) {
     return null;
   }
@@ -48,7 +55,9 @@ function mapOption(option: ApiOrderFilterOption): AdminOrderFilterOption {
   };
 }
 
-function mapBackendContract(contract: ApiOrderListResponse["backend_contract"]): AdminOrderBackendContract {
+function mapBackendContract(
+  contract: ApiOrderListResponse["backend_contract"],
+): AdminOrderBackendContract {
   return {
     cancelEndpoint: contract.cancel_endpoint,
     createEndpoint: contract.create_endpoint ?? null,
@@ -172,10 +181,19 @@ function mapDetailFromApi(response: ApiOrderDetail): AdminOrderDetail {
       activeCashSessionId: readContextValue(response.operational_context, "activeCashSessionId"),
       branchId: readContextValue(response.operational_context, "branchId"),
       branchName: readContextValue(response.operational_context, "branchName"),
-      canceledByUserFullName: readContextValue(response.operational_context, "canceledByUserFullName"),
-      createdByUserFullName: readContextValue(response.operational_context, "createdByUserFullName"),
+      canceledByUserFullName: readContextValue(
+        response.operational_context,
+        "canceledByUserFullName",
+      ),
+      createdByUserFullName: readContextValue(
+        response.operational_context,
+        "createdByUserFullName",
+      ),
       createdByUserId: readContextValue(response.operational_context, "createdByUserId"),
-      deliveredByUserFullName: readContextValue(response.operational_context, "deliveredByUserFullName"),
+      deliveredByUserFullName: readContextValue(
+        response.operational_context,
+        "deliveredByUserFullName",
+      ),
       workstationCode: readContextValue(response.operational_context, "workstationCode"),
       workstationId: readContextValue(response.operational_context, "workstationId"),
       workstationName: readContextValue(response.operational_context, "workstationName"),
@@ -246,9 +264,7 @@ export function buildAdminOrdersListPath(filters: AdminOrderListFilters): string
   return `/v1/admin/orders?${params.toString()}`;
 }
 
-export function fetchAdminOrders(
-  filters: AdminOrderListFilters,
-): Promise<AdminOrdersListResponse> {
+export function fetchAdminOrders(filters: AdminOrderListFilters): Promise<AdminOrdersListResponse> {
   return requestJson<ApiOrderListResponse>({
     path: buildAdminOrdersListPath(filters),
   }).then(mapListFromApi);
@@ -260,26 +276,34 @@ export function fetchAdminOrderDetail(orderId: string): Promise<AdminOrderDetail
   }).then(mapDetailFromApi);
 }
 
-export function markAdminOrderReady(orderId: string): Promise<AdminOrderDetail> {
-  return requestJson<ApiOrderDetail>({
-    body: {},
-    method: "POST",
-    path: `/v1/admin/orders/${orderId}/mark-ready`,
-  }).then(mapDetailFromApi);
+export type OrderCommandResultView = components["schemas"]["OrderCommandResultView"];
+export function markAdminOrderReady(orderId: string, key: string): Promise<OrderCommandResultView> {
+  return sendAdminOrderCommand("mark-ready", orderId, key);
 }
-
-export function deliverAdminOrder(orderId: string): Promise<AdminOrderDetail> {
-  return requestJson<ApiOrderDetail>({
-    body: {},
-    method: "POST",
-    path: `/v1/admin/orders/${orderId}/deliver`,
-  }).then(mapDetailFromApi);
+export function deliverAdminOrder(orderId: string, key: string): Promise<OrderCommandResultView> {
+  return sendAdminOrderCommand("deliver", orderId, key);
 }
-
-export function cancelAdminOrder(orderId: string): Promise<AdminOrderDetail> {
-  return requestJson<ApiOrderDetail>({
+export function cancelAdminOrder(orderId: string, key: string): Promise<OrderCommandResultView> {
+  return sendAdminOrderCommand("cancel", orderId, key);
+}
+export function sendAdminOrderCommand(
+  commandCode: "mark-ready" | "deliver" | "cancel",
+  orderId: string,
+  key: string,
+): Promise<OrderCommandResultView> {
+  return requestJson<OrderCommandResultView>({
     body: {},
     method: "POST",
-    path: `/v1/admin/orders/${orderId}/cancel`,
-  }).then(mapDetailFromApi);
+    path: `/v1/admin/orders/${encodeURIComponent(orderId)}/${commandCode}`,
+    headers: { "Idempotency-Key": key },
+  });
+}
+export function recoverAdminOrderCommand(
+  commandCode: "mark-ready" | "deliver" | "cancel",
+  key: string,
+  branchId: string,
+): Promise<OrderCommandResultView> {
+  return requestJson<OrderCommandResultView>({
+    path: `/v1/admin/orders/commands/${commandCode}/${encodeURIComponent(key)}?branch_id=${encodeURIComponent(branchId)}`,
+  });
 }

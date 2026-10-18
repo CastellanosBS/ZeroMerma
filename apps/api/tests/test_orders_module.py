@@ -24,6 +24,7 @@ from zeromerma_api.modules.orders.infrastructure.models import (
     CustomerOrderPayment,
 )
 from zeromerma_api.modules.outbox.infrastructure.models import OutboxEvent
+from zeromerma_api.testing.idempotency import current_cash_session_id, new_idempotency_key
 from zeromerma_api.testing.sessions import login_headers
 
 
@@ -61,6 +62,18 @@ def _get_product_class_id(code: str) -> str:
     return str(product_class.id)
 
 
+def _read_order_detail(
+    client: TestClient, *, order_id: str, headers: dict[str, str]
+) -> dict[str, object]:
+    response = client.get(
+        f"/v1/orders/{order_id}",
+        params={"workstation_code": SEED_WORKSTATION_CODE},
+        headers=headers,
+    )
+    assert response.status_code == 200
+    return response.json()
+
+
 def _create_order(
     client: TestClient,
     *,
@@ -94,16 +107,21 @@ def _create_order(
     if advance_payments is not None:
         payload["advance_payments"] = advance_payments
 
+    command_headers = _authorization_header(client)
+    cash_session_id = current_cash_session_id(
+        client, headers=command_headers, workstation_code=SEED_WORKSTATION_CODE
+    )
     response = client.post(
         "/v1/orders",
         headers={
-            **_authorization_header(client),
+            "Idempotency-Key": new_idempotency_key(),
+            **command_headers,
             "X-Request-ID": f"orders-create-{customer_name}",
         },
-        json=payload,
+        json={**payload, "cash_session_id": cash_session_id},
     )
     assert response.status_code == 201
-    return response.json()
+    return _read_order_detail(client, order_id=response.json()["id"], headers=command_headers)
 
 
 def test_orders_bootstrap_catalog_and_class_products_follow_current_branch_context(
@@ -303,34 +321,49 @@ def test_order_lifecycle_marks_ready_and_delivers_with_final_settlement(client: 
         advance_payment_method_code="CARD",
     )
 
+    command_headers = _authorization_header(client)
+    cash_session_id = current_cash_session_id(
+        client, headers=command_headers, workstation_code=SEED_WORKSTATION_CODE
+    )
     ready_response = client.post(
         f"/v1/orders/{created_order['id']}/mark-ready",
         headers={
-            **_authorization_header(client),
+            "Idempotency-Key": new_idempotency_key(),
+            **command_headers,
             "X-Request-ID": "orders-ready-cliente-entrega",
         },
-        json={"workstation_code": SEED_WORKSTATION_CODE},
+        json={"cash_session_id": cash_session_id, "workstation_code": SEED_WORKSTATION_CODE},
     )
     assert ready_response.status_code == 200
-    ready_payload = ready_response.json()
+    ready_payload = _read_order_detail(
+        client, order_id=ready_response.json()["id"], headers=command_headers
+    )
     assert ready_payload["status"] == "READY"
     assert ready_payload["can_deliver"] is True
     assert ready_payload["requires_settlement_on_delivery"] is True
 
+    command_headers = _authorization_header(client)
+    cash_session_id = current_cash_session_id(
+        client, headers=command_headers, workstation_code=SEED_WORKSTATION_CODE
+    )
     deliver_response = client.post(
         f"/v1/orders/{created_order['id']}/deliver",
         headers={
-            **_authorization_header(client),
+            "Idempotency-Key": new_idempotency_key(),
+            **command_headers,
             "X-Request-ID": "orders-deliver-cliente-entrega",
         },
         json={
+            "cash_session_id": cash_session_id,
             "workstation_code": SEED_WORKSTATION_CODE,
             "settlement_amount": "24.00",
             "settlement_payment_method_code": "CASH",
         },
     )
     assert deliver_response.status_code == 200
-    delivered_payload = deliver_response.json()
+    delivered_payload = _read_order_detail(
+        client, order_id=deliver_response.json()["id"], headers=command_headers
+    )
     assert delivered_payload["status"] == "DELIVERED"
     assert Decimal(str(delivered_payload["remaining_balance_amount"])) == Decimal("0.00")
     assert delivered_payload["can_mark_ready"] is False
@@ -378,20 +411,30 @@ def test_order_delivery_records_mixed_final_settlement_as_cash_and_card(client: 
         advance_payment_method_code="CARD",
     )
 
+    command_headers = _authorization_header(client)
+    cash_session_id = current_cash_session_id(
+        client, headers=command_headers, workstation_code=SEED_WORKSTATION_CODE
+    )
     ready_response = client.post(
         f"/v1/orders/{created_order['id']}/mark-ready",
-        headers=_authorization_header(client),
-        json={"workstation_code": SEED_WORKSTATION_CODE},
+        headers={**command_headers, "Idempotency-Key": new_idempotency_key()},
+        json={"cash_session_id": cash_session_id, "workstation_code": SEED_WORKSTATION_CODE},
     )
     assert ready_response.status_code == 200
 
+    command_headers = _authorization_header(client)
+    cash_session_id = current_cash_session_id(
+        client, headers=command_headers, workstation_code=SEED_WORKSTATION_CODE
+    )
     deliver_response = client.post(
         f"/v1/orders/{created_order['id']}/deliver",
         headers={
-            **_authorization_header(client),
+            "Idempotency-Key": new_idempotency_key(),
+            **command_headers,
             "X-Request-ID": "orders-deliver-cliente-entrega-mixta",
         },
         json={
+            "cash_session_id": cash_session_id,
             "workstation_code": SEED_WORKSTATION_CODE,
             "settlement_amount": "24.00",
             "settlement_payment_method_code": "MIXED",
@@ -450,17 +493,26 @@ def test_order_delivery_rejects_mixed_settlement_without_cash_and_card_breakdown
         advance_payment_method_code="CARD",
     )
 
+    command_headers = _authorization_header(client)
+    cash_session_id = current_cash_session_id(
+        client, headers=command_headers, workstation_code=SEED_WORKSTATION_CODE
+    )
     ready_response = client.post(
         f"/v1/orders/{created_order['id']}/mark-ready",
-        headers=_authorization_header(client),
-        json={"workstation_code": SEED_WORKSTATION_CODE},
+        headers={**command_headers, "Idempotency-Key": new_idempotency_key()},
+        json={"cash_session_id": cash_session_id, "workstation_code": SEED_WORKSTATION_CODE},
     )
     assert ready_response.status_code == 200
 
+    command_headers = _authorization_header(client)
+    cash_session_id = current_cash_session_id(
+        client, headers=command_headers, workstation_code=SEED_WORKSTATION_CODE
+    )
     deliver_response = client.post(
         f"/v1/orders/{created_order['id']}/deliver",
-        headers=_authorization_header(client),
+        headers={**command_headers, "Idempotency-Key": new_idempotency_key()},
         json={
+            "cash_session_id": cash_session_id,
             "workstation_code": SEED_WORKSTATION_CODE,
             "settlement_amount": "24.00",
             "settlement_payment_method_code": "MIXED",
@@ -477,10 +529,15 @@ def test_order_delivery_rejects_mixed_settlement_without_cash_and_card_breakdown
 def test_order_creation_rejects_removed_other_payment_method(client: TestClient) -> None:
     _open_cash_session(client)
 
+    command_headers = _authorization_header(client)
+    cash_session_id = current_cash_session_id(
+        client, headers=command_headers, workstation_code=SEED_WORKSTATION_CODE
+    )
     response = client.post(
         "/v1/orders",
-        headers=_authorization_header(client),
+        headers={**command_headers, "Idempotency-Key": new_idempotency_key()},
         json={
+            "cash_session_id": cash_session_id,
             "workstation_code": SEED_WORKSTATION_CODE,
             "customer_name": "Cliente Metodo Invalido",
             "customer_phone": "6621234567",
@@ -505,10 +562,15 @@ def test_order_creation_rejects_mixed_advance_without_cash_and_card_breakdown(
 ) -> None:
     _open_cash_session(client)
 
+    command_headers = _authorization_header(client)
+    cash_session_id = current_cash_session_id(
+        client, headers=command_headers, workstation_code=SEED_WORKSTATION_CODE
+    )
     response = client.post(
         "/v1/orders",
-        headers=_authorization_header(client),
+        headers={**command_headers, "Idempotency-Key": new_idempotency_key()},
         json={
+            "cash_session_id": cash_session_id,
             "workstation_code": SEED_WORKSTATION_CODE,
             "customer_name": "Cliente Mixto Invalido",
             "customer_phone": "6621234567",
@@ -539,19 +601,29 @@ def test_cancel_refunds_advance_when_order_is_canceled_before_cutoff(client: Tes
         advance_payment_method_code="CASH",
         requested_for_at=(datetime.now(tz=UTC) + timedelta(days=2)).isoformat(),
     )
+    command_headers = _authorization_header(client)
+    cash_session_id = current_cash_session_id(
+        client, headers=command_headers, workstation_code=SEED_WORKSTATION_CODE
+    )
     ready_response = client.post(
         f"/v1/orders/{refundable_order['id']}/mark-ready",
-        headers=_authorization_header(client),
-        json={"workstation_code": SEED_WORKSTATION_CODE},
+        headers={**command_headers, "Idempotency-Key": new_idempotency_key()},
+        json={"cash_session_id": cash_session_id, "workstation_code": SEED_WORKSTATION_CODE},
     )
     assert ready_response.status_code == 200
+    command_headers = _authorization_header(client)
+    cash_session_id = current_cash_session_id(
+        client, headers=command_headers, workstation_code=SEED_WORKSTATION_CODE
+    )
     cancel_response = client.post(
         f"/v1/orders/{refundable_order['id']}/cancel",
         headers={
-            **_authorization_header(client),
+            "Idempotency-Key": new_idempotency_key(),
+            **command_headers,
             "X-Request-ID": "orders-cancel-advance-refund",
         },
         json={
+            "cash_session_id": cash_session_id,
             "workstation_code": SEED_WORKSTATION_CODE,
             "cancellation_reason": "Cliente cancelo con anticipacion.",
         },
@@ -611,16 +683,23 @@ def test_cancel_keeps_advance_when_order_is_canceled_after_cutoff(client: TestCl
         advance_payment_method_code="CASH",
         requested_for_at=(datetime.now(tz=UTC) + timedelta(hours=8)).isoformat(),
     )
+    command_headers = _authorization_header(client)
+    cash_session_id = current_cash_session_id(
+        client, headers=command_headers, workstation_code=SEED_WORKSTATION_CODE
+    )
     cancel_response = client.post(
         f"/v1/orders/{late_cancel_order['id']}/cancel",
-        headers=_authorization_header(client),
+        headers={**command_headers, "Idempotency-Key": new_idempotency_key()},
         json={
+            "cash_session_id": cash_session_id,
             "workstation_code": SEED_WORKSTATION_CODE,
             "cancellation_reason": "Cancelacion fuera de plazo.",
         },
     )
     assert cancel_response.status_code == 200
-    canceled_payload = cancel_response.json()
+    canceled_payload = _read_order_detail(
+        client, order_id=cancel_response.json()["id"], headers=command_headers
+    )
     assert canceled_payload["status"] == "CANCELED"
     assert Decimal(str(canceled_payload["advance_amount"])) == Decimal("5.00")
     assert Decimal(str(canceled_payload["remaining_balance_amount"])) == Decimal("0.00")
@@ -648,33 +727,50 @@ def test_cancel_rules_still_block_delivered_orders_and_allow_safe_cancel(
     _open_cash_session(client)
 
     safe_order = _create_order(client, customer_name="Cliente Cancelable")
+    command_headers = _authorization_header(client)
+    cash_session_id = current_cash_session_id(
+        client, headers=command_headers, workstation_code=SEED_WORKSTATION_CODE
+    )
     cancel_response = client.post(
         f"/v1/orders/{safe_order['id']}/cancel",
         headers={
-            **_authorization_header(client),
+            "Idempotency-Key": new_idempotency_key(),
+            **command_headers,
             "X-Request-ID": "orders-cancel-cliente-cancelable",
         },
         json={
+            "cash_session_id": cash_session_id,
             "workstation_code": SEED_WORKSTATION_CODE,
             "cancellation_reason": "Cliente ya no requiere el pedido.",
         },
     )
     assert cancel_response.status_code == 200
-    canceled_payload = cancel_response.json()
+    canceled_payload = _read_order_detail(
+        client, order_id=cancel_response.json()["id"], headers=command_headers
+    )
     assert canceled_payload["status"] == "CANCELED"
     assert canceled_payload["can_cancel"] is False
 
     delivered_order = _create_order(client, customer_name="Cliente Ya Entregado")
+    command_headers = _authorization_header(client)
+    cash_session_id = current_cash_session_id(
+        client, headers=command_headers, workstation_code=SEED_WORKSTATION_CODE
+    )
     ready_response = client.post(
         f"/v1/orders/{delivered_order['id']}/mark-ready",
-        headers=_authorization_header(client),
-        json={"workstation_code": SEED_WORKSTATION_CODE},
+        headers={**command_headers, "Idempotency-Key": new_idempotency_key()},
+        json={"cash_session_id": cash_session_id, "workstation_code": SEED_WORKSTATION_CODE},
     )
     assert ready_response.status_code == 200
+    command_headers = _authorization_header(client)
+    cash_session_id = current_cash_session_id(
+        client, headers=command_headers, workstation_code=SEED_WORKSTATION_CODE
+    )
     deliver_response = client.post(
         f"/v1/orders/{delivered_order['id']}/deliver",
-        headers=_authorization_header(client),
+        headers={**command_headers, "Idempotency-Key": new_idempotency_key()},
         json={
+            "cash_session_id": cash_session_id,
             "workstation_code": SEED_WORKSTATION_CODE,
             "settlement_amount": "34.00",
             "settlement_payment_method_code": "CARD",
@@ -682,10 +778,15 @@ def test_cancel_rules_still_block_delivered_orders_and_allow_safe_cancel(
     )
     assert deliver_response.status_code == 200
 
+    command_headers = _authorization_header(client)
+    cash_session_id = current_cash_session_id(
+        client, headers=command_headers, workstation_code=SEED_WORKSTATION_CODE
+    )
     delivered_cancel_response = client.post(
         f"/v1/orders/{delivered_order['id']}/cancel",
-        headers=_authorization_header(client),
+        headers={**command_headers, "Idempotency-Key": new_idempotency_key()},
         json={
+            "cash_session_id": cash_session_id,
             "workstation_code": SEED_WORKSTATION_CODE,
             "cancellation_reason": "Intento invalido tras entrega.",
         },
@@ -717,10 +818,14 @@ def test_cancel_requires_reason_and_rejects_invalid_date_range_filter(client: Te
 
     created_order = _create_order(client, customer_name="Cliente Validacion Cancelacion")
 
+    command_headers = _authorization_header(client)
+    cash_session_id = current_cash_session_id(
+        client, headers=command_headers, workstation_code=SEED_WORKSTATION_CODE
+    )
     cancel_response = client.post(
         f"/v1/orders/{created_order['id']}/cancel",
-        headers=_authorization_header(client),
-        json={"workstation_code": SEED_WORKSTATION_CODE},
+        headers={**command_headers, "Idempotency-Key": new_idempotency_key()},
+        json={"cash_session_id": cash_session_id, "workstation_code": SEED_WORKSTATION_CODE},
     )
     assert cancel_response.status_code == 422
 

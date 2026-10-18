@@ -267,6 +267,22 @@ ENDPOINT_POLICIES: dict[tuple[str, str], EndpointPolicy] = {
     ("GET", "/v1/orders/catalog"): EndpointPolicy(("orders.view",), "POS"),
     ("GET", "/v1/orders/classes/{class_id}/products"): EndpointPolicy(("orders.view",), "POS"),
     ("GET", "/v1/orders/{order_id}"): EndpointPolicy(("orders.view",), "POS"),
+    ("GET", "/v1/orders/commands/{command_code}/{idempotency_key}"): EndpointPolicy(
+        (),
+        "POS",
+        exception_reason=(
+            "OrdersIdempotencyService binds orders.manage or orders.cancel from the typed "
+            "command code and validates the original actor, station, cash and branch."
+        ),
+    ),
+    ("GET", "/v1/admin/orders/commands/{command_code}/{idempotency_key}"): EndpointPolicy(
+        (),
+        "BACKOFFICE",
+        exception_reason=(
+            "OrdersIdempotencyService binds orders.manage or orders.cancel from the typed "
+            "command code and validates the original actor, surface and branch."
+        ),
+    ),
     ("GET", "/v1/payments"): EndpointPolicy(("pos.operate",), "POS"),
     ("GET", "/v1/payments/bootstrap"): EndpointPolicy(("pos.operate",), "POS"),
     ("GET", "/v1/payments/{payment_id}"): EndpointPolicy(("pos.operate",), "POS"),
@@ -631,8 +647,8 @@ def enforce_operation_policy(
                 status_code=403, detail="This application surface is not authorized."
             )
         if policy.exception_reason and policy.surface is not None:
-            # The privileged service selects its capability from the typed lifecycle change.
-            # Keep its exclusive transaction and wrap only denial auditing at the HTTP boundary.
+            # The declared service selects its capability from its typed command.
+            # Keep that transaction boundary and wrap denial auditing at the HTTP boundary.
             yield
             return
         if not policy.capabilities:

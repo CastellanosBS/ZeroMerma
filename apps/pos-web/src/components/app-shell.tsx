@@ -18,6 +18,7 @@ import { Button } from "./ui/button";
 import { PosCheckoutPanel } from "../features/pos-terminal/pos-checkout-panel";
 import { useSaleIntention } from "../features/pos-terminal/use-sale-intention";
 import { isSaleIntentionPending } from "../features/pos-terminal/sale-confirmation-intent";
+import { OrderRecoveryPanel } from "../features/orders/order-recovery-panel";
 import { usePosTerminalStore } from "../features/pos-terminal/store";
 import { useCashCloseSummaryQuery } from "../features/cash-close/queries";
 import { useOrdersListQuery } from "../features/orders/queries";
@@ -820,6 +821,7 @@ function AppShellFrame({ bootstrap, cashSession, children, onSignOut, onLock }: 
             ) : null}
 
             <main className="min-w-0 min-h-0 overflow-hidden" data-pos-shell-region="center">
+              <OrderRecoveryPanel workstationId={bootstrap.workstation.id} />
               {children}
             </main>
 

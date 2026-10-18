@@ -1,10 +1,11 @@
 from __future__ import annotations
 
+from dataclasses import replace
 from datetime import date, datetime
 from typing import Annotated
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
+from fastapi import APIRouter, Depends, HTTPException, Path, Query, Request, Response, status
 from sqlalchemy.orm import Session
 
 from zeromerma_api.db.session import get_session
@@ -20,6 +21,14 @@ from zeromerma_api.modules.catalog.domain.exceptions import (
     ProductClassNotFoundError,
     ProductNotFoundError,
 )
+from zeromerma_api.modules.idempotency.application.canonicalization import (
+    IDEMPOTENCY_KEY_PATTERN,
+    parse_idempotency_key,
+)
+from zeromerma_api.modules.idempotency.presentation.http import (
+    idempotency_response,
+    require_idempotency_key,
+)
 from zeromerma_api.modules.identity.application.schemas import AuthenticatedUser
 from zeromerma_api.modules.identity.application.services import user_can_access_surface
 from zeromerma_api.modules.identity.domain.constants import IDENTITY_SURFACE_BACKOFFICE
@@ -30,19 +39,22 @@ from zeromerma_api.modules.orders.application.admin_schemas import (
     AdminOrdersListResponse,
 )
 from zeromerma_api.modules.orders.application.admin_services import AdminOrdersService
+from zeromerma_api.modules.orders.application.idempotency import OrdersIdempotencyService
 from zeromerma_api.modules.orders.application.schemas import (
+    AdminOrderCommandCode,
     CancelCustomerOrderRequest,
     CreateCustomerOrderRequest,
     CustomerOrderDetailResponse,
     DeliverCustomerOrderRequest,
     OrderActionRequest,
+    OrderCommandCode,
+    OrderCommandResultView,
     OrdersBootstrapResponse,
     OrdersCatalogResponse,
     OrdersClassProductsResponse,
     OrdersListResponse,
 )
 from zeromerma_api.modules.orders.application.services import (
-    OrdersCommandService,
     OrdersQueryService,
 )
 from zeromerma_api.modules.orders.domain.exceptions import (
@@ -54,6 +66,9 @@ from zeromerma_api.modules.orders.domain.exceptions import (
 
 router = APIRouter(prefix="/v1/orders", tags=["orders"])
 admin_router = APIRouter(prefix="/v1/admin/orders", tags=["admin-orders"])
+_REPLAY_RESPONSE = {
+    "headers": {"Idempotency-Replayed": {"$ref": "#/components/headers/IdempotencyReplayed"}}
+}
 
 
 def _require_backoffice_user(current_user: AuthenticatedUser) -> AuthenticatedUser:
@@ -136,62 +151,82 @@ def get_admin_order_detail(
         raise _to_http_exception(error) from error
 
 
-@admin_router.post("/{order_id}/mark-ready", response_model=AdminOrderDetailView)
+@admin_router.post(
+    "/{order_id}/mark-ready",
+    response_model=OrderCommandResultView,
+    responses={200: _REPLAY_RESPONSE},
+)
 def mark_admin_order_ready(
     order_id: UUID,
     payload: AdminOrderActionRequest,
     request: Request,
     current_user: Annotated[AuthenticatedUser, Depends(get_current_user)],
     session: Annotated[Session, Depends(get_session)],
-) -> AdminOrderDetailView:
+    key: Annotated[UUID, Depends(require_idempotency_key)],
+) -> Response:
     _require_backoffice_user(current_user)
     try:
-        return AdminOrdersService().mark_ready(
+        result = OrdersIdempotencyService().execute_admin(
             session,
-            actor_id=current_user.id,
+            current_user=current_user,
+            command_code="mark-ready",
+            key=key,
             order_id=order_id,
-            request_id=payload.idempotency_key or request.headers.get("X-Request-ID"),
+            request_id=request.headers.get("X-Request-ID"),
         )
+        return idempotency_response(result, request)
     except OrderError as error:
         raise _to_http_exception(error) from error
 
 
-@admin_router.post("/{order_id}/deliver", response_model=AdminOrderDetailView)
+@admin_router.post(
+    "/{order_id}/deliver", response_model=OrderCommandResultView, responses={200: _REPLAY_RESPONSE}
+)
 def deliver_admin_order(
     order_id: UUID,
     payload: AdminOrderActionRequest,
     request: Request,
     current_user: Annotated[AuthenticatedUser, Depends(get_current_user)],
     session: Annotated[Session, Depends(get_session)],
-) -> AdminOrderDetailView:
+    key: Annotated[UUID, Depends(require_idempotency_key)],
+) -> Response:
     _require_backoffice_user(current_user)
     try:
-        return AdminOrdersService().deliver_order(
+        result = OrdersIdempotencyService().execute_admin(
             session,
-            actor_id=current_user.id,
+            current_user=current_user,
+            command_code="deliver",
+            key=key,
             order_id=order_id,
-            request_id=payload.idempotency_key or request.headers.get("X-Request-ID"),
+            request_id=request.headers.get("X-Request-ID"),
         )
+        return idempotency_response(result, request)
     except OrderError as error:
         raise _to_http_exception(error) from error
 
 
-@admin_router.post("/{order_id}/cancel", response_model=AdminOrderDetailView)
+@admin_router.post(
+    "/{order_id}/cancel", response_model=OrderCommandResultView, responses={200: _REPLAY_RESPONSE}
+)
 def cancel_admin_order(
     order_id: UUID,
     payload: AdminOrderActionRequest,
     request: Request,
     current_user: Annotated[AuthenticatedUser, Depends(get_current_user)],
     session: Annotated[Session, Depends(get_session)],
-) -> AdminOrderDetailView:
+    key: Annotated[UUID, Depends(require_idempotency_key)],
+) -> Response:
     _require_backoffice_user(current_user)
     try:
-        return AdminOrdersService().cancel_order(
+        result = OrdersIdempotencyService().execute_admin(
             session,
-            actor_id=current_user.id,
+            current_user=current_user,
+            command_code="cancel",
+            key=key,
             order_id=order_id,
-            request_id=payload.idempotency_key or request.headers.get("X-Request-ID"),
+            request_id=request.headers.get("X-Request-ID"),
         )
+        return idempotency_response(result, request)
     except OrderError as error:
         raise _to_http_exception(error) from error
 
@@ -292,80 +327,164 @@ def get_order_detail(
         raise _to_http_exception(error) from error
 
 
-@router.post("", response_model=CustomerOrderDetailResponse, status_code=status.HTTP_201_CREATED)
+@router.post(
+    "",
+    response_model=OrderCommandResultView,
+    status_code=status.HTTP_201_CREATED,
+    responses={201: _REPLAY_RESPONSE},
+)
 def create_order(
     payload: CreateCustomerOrderRequest,
     request: Request,
     current_user: Annotated[AuthenticatedUser, Depends(get_current_user)],
     session: Annotated[Session, Depends(get_session)],
-) -> CustomerOrderDetailResponse:
+    key: Annotated[UUID, Depends(require_idempotency_key)],
+) -> Response:
     try:
-        return OrdersCommandService().create_order(
+        result = OrdersIdempotencyService().execute_pos(
             session,
             current_user=current_user,
+            command_code="create",
+            key=key,
             command=payload,
             request_id=request.headers.get("X-Request-ID"),
         )
+        return idempotency_response(result, request)
     except (BranchAccessError, CatalogError, OrderError) as error:
         raise _to_http_exception(error) from error
 
 
-@router.post("/{order_id}/mark-ready", response_model=CustomerOrderDetailResponse)
+@router.post(
+    "/{order_id}/mark-ready",
+    response_model=OrderCommandResultView,
+    responses={200: _REPLAY_RESPONSE},
+)
 def mark_order_ready(
     order_id: UUID,
     payload: OrderActionRequest,
     request: Request,
     current_user: Annotated[AuthenticatedUser, Depends(get_current_user)],
     session: Annotated[Session, Depends(get_session)],
-) -> CustomerOrderDetailResponse:
+    key: Annotated[UUID, Depends(require_idempotency_key)],
+) -> Response:
     try:
-        return OrdersCommandService().mark_ready(
+        result = OrdersIdempotencyService().execute_pos(
             session,
             current_user=current_user,
+            command_code="mark-ready",
+            key=key,
             order_id=order_id,
             command=payload,
             request_id=request.headers.get("X-Request-ID"),
         )
+        return idempotency_response(result, request)
     except (BranchAccessError, CatalogError, OrderError) as error:
         raise _to_http_exception(error) from error
 
 
-@router.post("/{order_id}/deliver", response_model=CustomerOrderDetailResponse)
+@router.post(
+    "/{order_id}/deliver", response_model=OrderCommandResultView, responses={200: _REPLAY_RESPONSE}
+)
 def deliver_order(
     order_id: UUID,
     payload: DeliverCustomerOrderRequest,
     request: Request,
     current_user: Annotated[AuthenticatedUser, Depends(get_current_user)],
     session: Annotated[Session, Depends(get_session)],
-) -> CustomerOrderDetailResponse:
+    key: Annotated[UUID, Depends(require_idempotency_key)],
+) -> Response:
     try:
-        return OrdersCommandService().deliver_order(
+        result = OrdersIdempotencyService().execute_pos(
             session,
             current_user=current_user,
+            command_code="deliver",
+            key=key,
             order_id=order_id,
             command=payload,
             request_id=request.headers.get("X-Request-ID"),
         )
+        return idempotency_response(result, request)
     except (BranchAccessError, CatalogError, OrderError) as error:
         raise _to_http_exception(error) from error
 
 
-@router.post("/{order_id}/cancel", response_model=CustomerOrderDetailResponse)
+@router.post(
+    "/{order_id}/cancel", response_model=OrderCommandResultView, responses={200: _REPLAY_RESPONSE}
+)
 def cancel_order(
     order_id: UUID,
     payload: CancelCustomerOrderRequest,
     request: Request,
     current_user: Annotated[AuthenticatedUser, Depends(get_current_user)],
     session: Annotated[Session, Depends(get_session)],
-) -> CustomerOrderDetailResponse:
+    key: Annotated[UUID, Depends(require_idempotency_key)],
+) -> Response:
     try:
-        return OrdersCommandService().cancel_order(
+        result = OrdersIdempotencyService().execute_pos(
             session,
             current_user=current_user,
+            command_code="cancel",
+            key=key,
             order_id=order_id,
             command=payload,
             request_id=request.headers.get("X-Request-ID"),
         )
+        return idempotency_response(result, request)
     except (BranchAccessError, CatalogError, OrderError) as error:
         raise _to_http_exception(error) from error
 
+
+@router.get(
+    "/commands/{command_code}/{idempotency_key}",
+    response_model=OrderCommandResultView,
+    responses={200: _REPLAY_RESPONSE},
+)
+def recover_order_command(
+    command_code: OrderCommandCode,
+    idempotency_key: Annotated[
+        str, Path(min_length=36, max_length=36, pattern=IDEMPOTENCY_KEY_PATTERN)
+    ],
+    workstation_code: Annotated[str, Query(min_length=1, max_length=64)],
+    cash_session_id: UUID,
+    request: Request,
+    current_user: Annotated[AuthenticatedUser, Depends(get_current_user)],
+    session: Annotated[Session, Depends(get_session)],
+) -> Response:
+    result = OrdersIdempotencyService().recover_pos(
+        session,
+        current_user=current_user,
+        command_code=command_code,
+        key=parse_idempotency_key(idempotency_key),
+        workstation_code=workstation_code,
+        cash_session_id=cash_session_id,
+    )
+    if result.status == "COMPLETED":
+        result = replace(result, status_code=status.HTTP_200_OK)
+    return idempotency_response(result, request)
+
+
+@admin_router.get(
+    "/commands/{command_code}/{idempotency_key}",
+    response_model=OrderCommandResultView,
+    responses={200: _REPLAY_RESPONSE},
+)
+def recover_admin_order_command(
+    command_code: AdminOrderCommandCode,
+    idempotency_key: Annotated[
+        str, Path(min_length=36, max_length=36, pattern=IDEMPOTENCY_KEY_PATTERN)
+    ],
+    branch_id: UUID,
+    request: Request,
+    current_user: Annotated[AuthenticatedUser, Depends(get_current_user)],
+    session: Annotated[Session, Depends(get_session)],
+) -> Response:
+    result = OrdersIdempotencyService().recover_admin(
+        session,
+        current_user=current_user,
+        command_code=command_code,
+        key=parse_idempotency_key(idempotency_key),
+        branch_id=branch_id,
+    )
+    if result.status == "COMPLETED":
+        result = replace(result, status_code=status.HTTP_200_OK)
+    return idempotency_response(result, request)

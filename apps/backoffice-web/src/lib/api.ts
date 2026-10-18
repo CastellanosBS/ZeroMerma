@@ -1,4 +1,9 @@
-import { ApiError, requestApiJson, type components, type SessionResponse } from "@zeromerma/api-client";
+import {
+  ApiError,
+  requestApiJson,
+  type components,
+  type SessionResponse,
+} from "@zeromerma/api-client";
 
 import { appEnv } from "../env";
 import {
@@ -16,14 +21,15 @@ export type LoginRequest = components["schemas"]["LoginRequest"];
 export type LoginResponse = components["schemas"]["LoginResponse"];
 
 interface RequestJsonOptions {
-
   body?: unknown;
+  headers?: HeadersInit;
   method?: "DELETE" | "GET" | "PATCH" | "POST";
   path: string;
 }
 
 export async function requestJson<TResponse>({
   body,
+  headers,
   method = "GET",
   path,
 }: RequestJsonOptions): Promise<TResponse> {
@@ -34,25 +40,37 @@ export async function requestJson<TResponse>({
       csrfToken: useBackofficeAuthStore.getState().csrfToken,
       baseUrl: appEnv.VITE_API_BASE_URL,
       body,
+      headers,
       method,
       path,
     });
   } catch (error) {
-    if (error instanceof ApiError && useBackofficeAuthStore.getState().generation === generation && path !== "/v1/auth/login") {
-      if (error.statusCode === 401 && error.error?.code !== "INVALID_CREDENTIALS") useBackofficeAuthStore.getState().clearSession();
-      if (error.error?.code === "PASSWORD_RESET_REQUIRED") useBackofficeAuthStore.getState().requirePasswordChange();
+    if (
+      error instanceof ApiError &&
+      useBackofficeAuthStore.getState().generation === generation &&
+      path !== "/v1/auth/login"
+    ) {
+      if (error.statusCode === 401 && error.error?.code !== "INVALID_CREDENTIALS")
+        useBackofficeAuthStore.getState().clearSession();
+      if (error.error?.code === "PASSWORD_RESET_REQUIRED")
+        useBackofficeAuthStore.getState().requirePasswordChange();
       if (error.error?.code === "CSRF_FAILED" && path !== "/v1/auth/session") {
         // Restore a cookie rotated by another tab, but never replay an unsafe request.
         useBackofficeAuthStore.getState().requireVerification();
         const recoveryGeneration = useBackofficeAuthStore.getState().generation;
         try {
           const response = await requestJson<SessionResponse>({ path: "/v1/auth/session" });
-          if (useBackofficeAuthStore.getState().generation === recoveryGeneration) useBackofficeAuthStore.getState().setSession(response);
+          if (useBackofficeAuthStore.getState().generation === recoveryGeneration)
+            useBackofficeAuthStore.getState().setSession(response);
         } catch {
           // Preserve the original operation error; session reads handle revocation separately.
         }
       }
-      if (error.statusCode === 403 && error.error?.code !== "CSRF_FAILED" && path.split("?")[0] !== "/v1/auth/me") {
+      if (
+        error.statusCode === 403 &&
+        error.error?.code !== "CSRF_FAILED" &&
+        path.split("?")[0] !== "/v1/auth/me"
+      ) {
         void clearAdministrativeQueries(queryClient).then(() =>
           queryClient.invalidateQueries({ queryKey: backofficeAuthorizationQueryKey }),
         );

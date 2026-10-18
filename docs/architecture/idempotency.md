@@ -1,7 +1,8 @@
 # Transactional idempotency foundation
 
 ZM-FIN-028 implements the shared infrastructure governed by DEC-07. ZM-FIN-029
-adopts it for POS sale confirmation. Other business commands retain their own
+adopts it for POS sale confirmation; ZM-FIN-030 adopts the existing order commands
+on POS and Backoffice. Other business commands retain their own
 pending adoption tasks; the existence of the foundation does not make them
 idempotent. POS and Backoffice remain separate, and PostgreSQL remains the
 authority for both the command and its result.
@@ -130,6 +131,53 @@ not offline sale capture or a promise of offline availability.
 Executed adoption evidence and limitations are recorded in
 [the sale validation record](../implementation/sale-idempotency-validation.md).
 
+## Order commands and recovery
+
+The seven existing order mutations share the executor: POS create, mark-ready,
+deliver and cancel, plus Backoffice mark-ready, deliver and cancel. They do not
+constitute independent payment endpoints. Initial advance legs belong to create,
+final settlement legs to POS delivery, and applicable refund legs to POS
+cancellation. Backoffice retains its prohibition on capturing pending settlement
+or refund effects. Each command is a separate intention with its own key.
+
+All four POS command payloads identify `cash_session_id` explicitly. The old
+optional Backoffice body field named `idempotency_key` is removed; the UUIDv7
+header is the sole idempotency input, and `X-Request-ID` remains attempt
+correlation. The result is a minimized `OrderCommandResultView` with order and
+payment identities, state and amounts. Customer/operator personal information,
+free text and current UI actions belong to authenticated detail queries rather
+than durable replay snapshots.
+
+Order transitions lock their `CustomerOrder` row before validating current state
+and balance, regardless of which surface initiated the command. Distinct keys
+must not permit duplicate delivery/refund or incompatible transitions. The root
+executor transaction covers order/items, existing payment legs, audit, outbox and
+the terminal response. The action does not commit independently. Unrelated
+orders are not serialized by an operation-wide lock.
+
+Read-only recovery is exposed under
+`/v1/orders/commands/{command_code}/{idempotency_key}` with workstation and cash
+session, or `/v1/admin/orders/commands/{command_code}/{idempotency_key}` with
+branch context. The command code selects an explicit supported operation. A
+completed retry returns the original acknowledgement even if the order has since
+advanced; it does not rebuild the old result from its mutable current detail.
+Unknown or uncommitted outcomes remain uncertain and cannot authorize a new key.
+Current authorization and original context apply to every lookup.
+
+Browser recovery stores only minimal metadata, while the request body stays in
+memory. It must not become a queue of economic operations or customer PII. The
+accepted DEC-15 online-only boundary applies to orders as it does to sales.
+Existing v1 order audit/outbox payloads retain their historical personal fields;
+the privacy reduction here applies to the new replay snapshot and browser
+recovery metadata, not every persisted domain or event record.
+
+This adoption does not make `CustomerOrderPayment` part of the canonical cash
+ledger: that integration is ZM-FIN-042. It also does not complete DEC-10's minimum
+advance, production commitment, reservation, amendment or terminal-state rules.
+The full POS and Backoffice order workflows remain later tasks 058 and 078.
+Commands, validation status and those known differences are recorded in
+[the order validation record](../implementation/order-idempotency-validation.md).
+
 ## Transaction and replay boundary
 
 For an internal command, the reservation, business document, economic and physical
@@ -225,12 +273,12 @@ or a claim of legal compliance.
 
 ## Adoption boundaries
 
-ZM-FIN-029 adopts the foundation in sales; 030 covers orders and their payments;
+ZM-FIN-029 adopts the foundation in sales; 030 covers the seven existing order
+commands and their embedded payment effects;
 031–035 cover returns/refunds, cash, transfers, corrections/waste and production.
 The wider review of commit ownership belongs to 039 and unified causal context to
-040. The misleading historical order `idempotency_key` currently used as request
-correlation must be corrected during its command adoption, without fabricating
-historical idempotency records.
+040. Historical order request correlation is not converted into fabricated
+idempotency records during adoption.
 
 Read-only endpoints do not require idempotency keys. The shared foundation is
 tested through isolated transactional commands; no diagnostic business endpoint

@@ -8,7 +8,6 @@ from decimal import ROUND_HALF_UP, Decimal
 from zoneinfo import ZoneInfo
 
 from sqlalchemy import Select, String, cast, func, or_, select
-from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from zeromerma_api.modules.audit.application.service import AuditRecorder
@@ -41,6 +40,7 @@ from zeromerma_api.modules.orders.application.schemas import (
     DeliverCustomerOrderRequest,
     DeliverCustomerOrderSettlementPaymentRequest,
     OrderActionRequest,
+    OrderCommandResultView,
     OrdersBootstrapResponse,
     OrdersCatalogClassView,
     OrdersCatalogProductView,
@@ -107,6 +107,35 @@ class PreparedOrderItem:
 class PreparedOrderAdvancePayment:
     payment_method_code: str
     amount: Decimal
+
+
+@dataclass(frozen=True)
+class PreparedOrderCreation:
+    context: WorkstationContext
+    cash_session: CashSession
+    items: Sequence[PreparedOrderItem]
+    payments: Sequence[PreparedOrderAdvancePayment]
+    currency_code: str
+    subtotal_amount: Decimal
+    total_amount: Decimal
+    advance_amount: Decimal
+    advance_payment_method_code: str | None
+    remaining_balance_amount: Decimal
+
+
+@dataclass(frozen=True)
+class OrderCommandTrace:
+    key: uuid.UUID
+    operation_id: uuid.UUID
+    operation_code: str
+
+    @property
+    def metadata(self) -> dict[str, str]:
+        return {
+            "idempotency_key": str(self.key),
+            "operation_id": str(self.operation_id),
+            "operation_code": self.operation_code,
+        }
 
 
 class OrdersQueryService:
@@ -460,19 +489,19 @@ class OrdersCommandService:
             cash_session_query=self._cash_session_query,
         )
 
-    def create_order(
+    def prepare_create_order(
         self,
         session: Session,
         *,
         current_user: AuthenticatedUser,
         command: CreateCustomerOrderRequest,
-        request_id: str | None,
-    ) -> CustomerOrderDetailResponse:
+    ) -> PreparedOrderCreation:
         context, cash_session = _resolve_context_and_open_session(
             session,
             workstation_access=self._workstation_access,
             current_user=current_user,
             workstation_code=command.workstation_code,
+            cash_session_id=command.cash_session_id,
         )
         prepared_items = _prepare_order_items(session, command.items)
         currency_code = _resolve_order_currency(prepared_items)
@@ -504,6 +533,36 @@ class OrdersCommandService:
             advance_payment_method_code = None
             prepared_advance_payments = []
         remaining_balance_amount = _quantize_money(total_amount - advance_amount)
+        return PreparedOrderCreation(
+            context=context,
+            cash_session=cash_session,
+            items=prepared_items,
+            payments=prepared_advance_payments,
+            currency_code=currency_code,
+            subtotal_amount=subtotal_amount,
+            total_amount=total_amount,
+            advance_amount=advance_amount,
+            advance_payment_method_code=advance_payment_method_code,
+            remaining_balance_amount=remaining_balance_amount,
+        )
+
+    def create_order(
+        self,
+        session: Session,
+        *,
+        current_user: AuthenticatedUser,
+        command: CreateCustomerOrderRequest,
+        prepared: PreparedOrderCreation,
+        trace: OrderCommandTrace,
+        request_id: str | None,
+    ) -> OrderCommandResultView:
+        context, cash_session = prepared.context, prepared.cash_session
+        prepared_items, prepared_advance_payments = prepared.items, prepared.payments
+        currency_code = prepared.currency_code
+        subtotal_amount, total_amount = prepared.subtotal_amount, prepared.total_amount
+        advance_amount = prepared.advance_amount
+        advance_payment_method_code = prepared.advance_payment_method_code
+        remaining_balance_amount = prepared.remaining_balance_amount
         created_at = datetime.now(tz=UTC)
         resolved_request_id = request_id or str(uuid.uuid4())
 
@@ -526,131 +585,120 @@ class OrdersCommandService:
             updated_at_utc=created_at,
         )
 
-        try:
-            session.add(order)
-            session.flush()
+        session.add(order)
+        session.flush()
 
-            for line_number, item in enumerate(prepared_items, start=1):
-                session.add(
-                    CustomerOrderItem(
-                        customer_order_id=order.id,
-                        line_number=line_number,
-                        product_id=item.product_id,
-                        product_code_snapshot=item.product_code,
-                        product_name_snapshot=item.product_name,
-                        product_class_id=item.product_class_id,
-                        product_class_code_snapshot=item.product_class_code,
-                        product_class_name_snapshot=item.product_class_name,
-                        quantity=item.quantity,
-                        unit_price=item.unit_price,
-                        line_total_amount=item.line_total_amount,
-                    )
+        for line_number, item in enumerate(prepared_items, start=1):
+            session.add(
+                CustomerOrderItem(
+                    customer_order_id=order.id,
+                    line_number=line_number,
+                    product_id=item.product_id,
+                    product_code_snapshot=item.product_code,
+                    product_name_snapshot=item.product_name,
+                    product_class_id=item.product_class_id,
+                    product_class_code_snapshot=item.product_class_code,
+                    product_class_name_snapshot=item.product_class_name,
+                    quantity=item.quantity,
+                    unit_price=item.unit_price,
+                    line_total_amount=item.line_total_amount,
                 )
+            )
 
-            for sequence, payment in enumerate(prepared_advance_payments, start=1):
-                session.add(
-                    CustomerOrderPayment(
-                        customer_order_id=order.id,
-                        sequence=sequence,
-                        payment_type=ORDER_PAYMENT_TYPE_ADVANCE,
-                        payment_method_code=payment.payment_method_code,
-                        amount=payment.amount,
-                        currency_code=currency_code,
-                        workstation_id=context.workstation_id,
-                        cash_session_id=cash_session.id,
-                        recorded_by_user_id=current_user.id,
-                        recorded_at_utc=created_at,
-                    )
+        for sequence, payment in enumerate(prepared_advance_payments, start=1):
+            session.add(
+                CustomerOrderPayment(
+                    customer_order_id=order.id,
+                    sequence=sequence,
+                    payment_type=ORDER_PAYMENT_TYPE_ADVANCE,
+                    payment_method_code=payment.payment_method_code,
+                    amount=payment.amount,
+                    currency_code=currency_code,
+                    workstation_id=context.workstation_id,
+                    cash_session_id=cash_session.id,
+                    recorded_by_user_id=current_user.id,
+                    recorded_at_utc=created_at,
                 )
-
-            self._audit_recorder.record(
-                session,
-                actor_id=current_user.id,
-                action="order.created",
-                resource_type="customer_order",
-                resource_id=str(order.id),
-                branch_id=context.branch_id,
-                request_id=resolved_request_id,
-                metadata={
-                    "folio": _build_order_folio(order.id),
-                    "branch_code": context.branch_code,
-                    "workstation_code": context.workstation_code,
-                    "cash_session_id": str(cash_session.id),
-                    "customer_name": order.customer_name,
-                    "line_count": len(prepared_items),
-                    "total_amount": str(total_amount),
-                    "advance_amount": str(advance_amount),
-                    "advance_payment_method_code": advance_payment_method_code,
-                    "advance_payment_count": len(prepared_advance_payments),
-                    "remaining_balance_amount": str(remaining_balance_amount),
-                },
             )
-            self._outbox_writer.append(
-                session,
-                aggregate_type="customer_order",
-                aggregate_id=str(order.id),
-                event_name=OUTBOX_EVENT_ORDER_CREATED_V1,
-                payload={
-                    "order_id": str(order.id),
-                    "folio": _build_order_folio(order.id),
-                    "branch_id": str(context.branch_id),
-                    "branch_code": context.branch_code,
-                    "workstation_id": str(context.workstation_id),
-                    "workstation_code": context.workstation_code,
-                    "cash_session_id": str(cash_session.id),
-                    "created_by_user_id": str(current_user.id),
-                    "created_by_user_email": current_user.email,
-                    "status": ORDER_STATUS_PENDING,
-                    "customer_name": order.customer_name,
-                    "customer_phone": order.customer_phone,
-                    "requested_for_at": order.requested_for_at.isoformat()
-                    if order.requested_for_at
-                    else None,
-                    "notes": order.notes,
-                    "currency_code": currency_code,
-                    "subtotal_amount": str(subtotal_amount),
-                    "total_amount": str(total_amount),
-                    "advance_amount": str(advance_amount),
-                    "remaining_balance_amount": str(remaining_balance_amount),
-                    "items": [
-                        {
-                            "product_id": str(item.product_id),
-                            "product_code_snapshot": item.product_code,
-                            "product_name_snapshot": item.product_name,
-                            "product_class_id": str(item.product_class_id),
-                            "product_class_code_snapshot": item.product_class_code,
-                            "product_class_name_snapshot": item.product_class_name,
-                            "quantity": str(item.quantity),
-                            "unit_price": str(item.unit_price),
-                            "line_total_amount": str(item.line_total_amount),
-                        }
-                        for item in prepared_items
-                    ],
-                    "payments": [
-                        {
-                            "payment_type": ORDER_PAYMENT_TYPE_ADVANCE,
-                            "payment_method_code": payment.payment_method_code,
-                            "amount": str(payment.amount),
-                        }
-                        for payment in prepared_advance_payments
-                    ],
-                    "created_at_utc": created_at.isoformat(),
-                },
-                headers={"request_id": resolved_request_id},
-            )
-            session.commit()
-        except IntegrityError as error:
-            session.rollback()
-            raise OrderStateConflictError(
-                "La captura del pedido entro en conflicto con otra solicitud concurrente."
-            ) from error
 
-        return self._query_service.get_order_detail(
+        self._audit_recorder.record(
             session,
-            current_user=current_user,
-            workstation_code=command.workstation_code,
-            order_id=order.id,
+            actor_id=current_user.id,
+            action="order.created",
+            resource_type="customer_order",
+            resource_id=str(order.id),
+            branch_id=context.branch_id,
+            request_id=resolved_request_id,
+            metadata={
+                **trace.metadata,
+                "folio": _build_order_folio(order.id),
+                "branch_code": context.branch_code,
+                "workstation_code": context.workstation_code,
+                "cash_session_id": str(cash_session.id),
+                "customer_name": order.customer_name,
+                "line_count": len(prepared_items),
+                "total_amount": str(total_amount),
+                "advance_amount": str(advance_amount),
+                "advance_payment_method_code": advance_payment_method_code,
+                "advance_payment_count": len(prepared_advance_payments),
+                "remaining_balance_amount": str(remaining_balance_amount),
+            },
         )
+        self._outbox_writer.append(
+            session,
+            aggregate_type="customer_order",
+            aggregate_id=str(order.id),
+            event_name=OUTBOX_EVENT_ORDER_CREATED_V1,
+            payload={
+                "order_id": str(order.id),
+                "folio": _build_order_folio(order.id),
+                "branch_id": str(context.branch_id),
+                "branch_code": context.branch_code,
+                "workstation_id": str(context.workstation_id),
+                "workstation_code": context.workstation_code,
+                "cash_session_id": str(cash_session.id),
+                "created_by_user_id": str(current_user.id),
+                "created_by_user_email": current_user.email,
+                "status": ORDER_STATUS_PENDING,
+                "customer_name": order.customer_name,
+                "customer_phone": order.customer_phone,
+                "requested_for_at": order.requested_for_at.isoformat()
+                if order.requested_for_at
+                else None,
+                "notes": order.notes,
+                "currency_code": currency_code,
+                "subtotal_amount": str(subtotal_amount),
+                "total_amount": str(total_amount),
+                "advance_amount": str(advance_amount),
+                "remaining_balance_amount": str(remaining_balance_amount),
+                "items": [
+                    {
+                        "product_id": str(item.product_id),
+                        "product_code_snapshot": item.product_code,
+                        "product_name_snapshot": item.product_name,
+                        "product_class_id": str(item.product_class_id),
+                        "product_class_code_snapshot": item.product_class_code,
+                        "product_class_name_snapshot": item.product_class_name,
+                        "quantity": str(item.quantity),
+                        "unit_price": str(item.unit_price),
+                        "line_total_amount": str(item.line_total_amount),
+                    }
+                    for item in prepared_items
+                ],
+                "payments": [
+                    {
+                        "payment_type": ORDER_PAYMENT_TYPE_ADVANCE,
+                        "payment_method_code": payment.payment_method_code,
+                        "amount": str(payment.amount),
+                    }
+                    for payment in prepared_advance_payments
+                ],
+                "created_at_utc": created_at.isoformat(),
+            },
+            headers={"request_id": resolved_request_id, **trace.metadata},
+        )
+        session.flush()
+        return _build_command_result(session, order)
 
     def mark_ready(
         self,
@@ -659,15 +707,19 @@ class OrdersCommandService:
         current_user: AuthenticatedUser,
         order_id: uuid.UUID,
         command: OrderActionRequest,
+        trace: OrderCommandTrace,
         request_id: str | None,
-    ) -> CustomerOrderDetailResponse:
+    ) -> OrderCommandResultView:
         context, cash_session = _resolve_context_and_open_session(
             session,
             workstation_access=self._workstation_access,
             current_user=current_user,
             workstation_code=command.workstation_code,
+            cash_session_id=command.cash_session_id,
         )
-        order = _get_order_for_branch(session, order_id=order_id, branch_id=context.branch_id)
+        order = _get_order_for_branch(
+            session, order_id=order_id, branch_id=context.branch_id, for_update=True
+        )
         if order.status != ORDER_STATUS_PENDING:
             raise OrderStateConflictError(
                 "Solo los pedidos pendientes se pueden marcar como listos para entrega."
@@ -687,6 +739,7 @@ class OrdersCommandService:
             branch_id=context.branch_id,
             request_id=resolved_request_id,
             metadata={
+                **trace.metadata,
                 "folio": _build_order_folio(order.id),
                 "branch_code": context.branch_code,
                 "workstation_code": context.workstation_code,
@@ -711,16 +764,10 @@ class OrdersCommandService:
                 "marked_ready_by_user_id": str(current_user.id),
                 "marked_ready_at_utc": order.updated_at_utc.isoformat(),
             },
-            headers={"request_id": resolved_request_id},
+            headers={"request_id": resolved_request_id, **trace.metadata},
         )
-        session.commit()
-
-        return self._query_service.get_order_detail(
-            session,
-            current_user=current_user,
-            workstation_code=command.workstation_code,
-            order_id=order.id,
-        )
+        session.flush()
+        return _build_command_result(session, order)
 
     def deliver_order(
         self,
@@ -729,15 +776,19 @@ class OrdersCommandService:
         current_user: AuthenticatedUser,
         order_id: uuid.UUID,
         command: DeliverCustomerOrderRequest,
+        trace: OrderCommandTrace,
         request_id: str | None,
-    ) -> CustomerOrderDetailResponse:
+    ) -> OrderCommandResultView:
         context, cash_session = _resolve_context_and_open_session(
             session,
             workstation_access=self._workstation_access,
             current_user=current_user,
             workstation_code=command.workstation_code,
+            cash_session_id=command.cash_session_id,
         )
-        order = _get_order_for_branch(session, order_id=order_id, branch_id=context.branch_id)
+        order = _get_order_for_branch(
+            session, order_id=order_id, branch_id=context.branch_id, for_update=True
+        )
         if order.status != ORDER_STATUS_READY:
             raise OrderStateConflictError(
                 "Solo los pedidos listos para entrega se pueden entregar."
@@ -811,6 +862,7 @@ class OrdersCommandService:
             branch_id=context.branch_id,
             request_id=resolved_request_id,
             metadata={
+                **trace.metadata,
                 "folio": _build_order_folio(order.id),
                 "branch_code": context.branch_code,
                 "workstation_code": context.workstation_code,
@@ -847,16 +899,10 @@ class OrdersCommandService:
                 ],
                 "delivered_at_utc": delivered_at.isoformat(),
             },
-            headers={"request_id": resolved_request_id},
+            headers={"request_id": resolved_request_id, **trace.metadata},
         )
-        session.commit()
-
-        return self._query_service.get_order_detail(
-            session,
-            current_user=current_user,
-            workstation_code=command.workstation_code,
-            order_id=order.id,
-        )
+        session.flush()
+        return _build_command_result(session, order)
 
     def cancel_order(
         self,
@@ -865,15 +911,19 @@ class OrdersCommandService:
         current_user: AuthenticatedUser,
         order_id: uuid.UUID,
         command: CancelCustomerOrderRequest,
+        trace: OrderCommandTrace,
         request_id: str | None,
-    ) -> CustomerOrderDetailResponse:
+    ) -> OrderCommandResultView:
         context, cash_session = _resolve_context_and_open_session(
             session,
             workstation_access=self._workstation_access,
             current_user=current_user,
             workstation_code=command.workstation_code,
+            cash_session_id=command.cash_session_id,
         )
-        order = _get_order_for_branch(session, order_id=order_id, branch_id=context.branch_id)
+        order = _get_order_for_branch(
+            session, order_id=order_id, branch_id=context.branch_id, for_update=True
+        )
         if order.status == ORDER_STATUS_DELIVERED:
             raise OrderStateConflictError("No se puede cancelar un pedido que ya fue entregado.")
         if order.status == ORDER_STATUS_CANCELED:
@@ -935,6 +985,7 @@ class OrdersCommandService:
             branch_id=context.branch_id,
             request_id=resolved_request_id,
             metadata={
+                **trace.metadata,
                 "folio": _build_order_folio(order.id),
                 "branch_code": context.branch_code,
                 "workstation_code": context.workstation_code,
@@ -973,16 +1024,10 @@ class OrdersCommandService:
                 ],
                 "canceled_at_utc": canceled_at.isoformat(),
             },
-            headers={"request_id": resolved_request_id},
+            headers={"request_id": resolved_request_id, **trace.metadata},
         )
-        session.commit()
-
-        return self._query_service.get_order_detail(
-            session,
-            current_user=current_user,
-            workstation_code=command.workstation_code,
-            order_id=order.id,
-        )
+        session.flush()
+        return _build_command_result(session, order)
 
 
 def _resolve_context_and_open_session(
@@ -991,6 +1036,7 @@ def _resolve_context_and_open_session(
     workstation_access: WorkstationAccessService,
     current_user: AuthenticatedUser,
     workstation_code: str,
+    cash_session_id: uuid.UUID,
 ) -> tuple[WorkstationContext, CashSession]:
     context = workstation_access.resolve_context(
         session,
@@ -999,6 +1045,7 @@ def _resolve_context_and_open_session(
     )
     cash_session = session.execute(
         select(CashSession).where(
+            CashSession.id == cash_session_id,
             CashSession.workstation_id == context.workstation_id,
             CashSession.status == CASH_SESSION_STATUS_OPEN,
         )
@@ -1209,16 +1256,58 @@ def _get_order_for_branch(
     *,
     order_id: uuid.UUID,
     branch_id: uuid.UUID,
+    for_update: bool = False,
 ) -> CustomerOrder:
-    order = session.execute(
-        select(CustomerOrder).where(
-            CustomerOrder.id == order_id,
-            CustomerOrder.branch_id == branch_id,
+    statement = select(CustomerOrder).where(
+        CustomerOrder.id == order_id, CustomerOrder.branch_id == branch_id
+    )
+    if for_update:
+        statement = statement.with_for_update(of=CustomerOrder).execution_options(
+            populate_existing=True
         )
-    ).scalar_one_or_none()
+    order = session.scalar(statement)
     if order is None:
         raise OrderNotFoundError("Order was not found.")
     return order
+
+
+def _build_command_result(session: Session, order: CustomerOrder) -> OrderCommandResultView:
+    payments = session.scalars(
+        select(CustomerOrderPayment)
+        .where(CustomerOrderPayment.customer_order_id == order.id)
+        .order_by(CustomerOrderPayment.sequence)
+    ).all()
+    return OrderCommandResultView.model_validate(
+        {
+            "id": order.id,
+            "folio": _build_order_folio(order.id),
+            "status": order.status,
+            "branch_id": order.branch_id,
+            "currency_code": order.currency_code,
+            "subtotal_amount": order.subtotal_amount,
+            "total_amount": order.total_amount,
+            "advance_amount": order.advance_amount,
+            "remaining_balance_amount": order.remaining_balance_amount,
+            "updated_at_utc": order.updated_at_utc,
+            "payments": [
+                {
+                    name: getattr(payment, name)
+                    for name in (
+                        "id",
+                        "sequence",
+                        "payment_type",
+                        "payment_method_code",
+                        "amount",
+                        "currency_code",
+                        "workstation_id",
+                        "cash_session_id",
+                        "recorded_at_utc",
+                    )
+                }
+                for payment in payments
+            ],
+        }
+    )
 
 
 def _to_user_summary(user: User | None) -> AuthenticatedUser | None:
@@ -1298,9 +1387,7 @@ def _prepare_advance_payments(
         ]
 
     if len(advance_payments) != 2:
-        raise OrderValidationError(
-            "El cobro mixto del anticipo requiere efectivo y tarjeta."
-        )
+        raise OrderValidationError("El cobro mixto del anticipo requiere efectivo y tarjeta.")
 
     normalized_payments: list[PreparedOrderAdvancePayment] = []
     seen_payment_methods: set[str] = set()
@@ -1311,9 +1398,7 @@ def _prepare_advance_payments(
                 "El cobro mixto del anticipo debe desglosarse en efectivo y tarjeta."
             )
         if payment_method_code in seen_payment_methods:
-            raise OrderValidationError(
-                "No repitas el mismo metodo dentro del anticipo mixto."
-            )
+            raise OrderValidationError("No repitas el mismo metodo dentro del anticipo mixto.")
         normalized_payments.append(
             PreparedOrderAdvancePayment(
                 payment_method_code=payment_method_code,
@@ -1323,9 +1408,7 @@ def _prepare_advance_payments(
         seen_payment_methods.add(payment_method_code)
 
     if seen_payment_methods != {ORDER_PAYMENT_METHOD_CASH, ORDER_PAYMENT_METHOD_CARD}:
-        raise OrderValidationError(
-            "El cobro mixto del anticipo requiere efectivo y tarjeta."
-        )
+        raise OrderValidationError("El cobro mixto del anticipo requiere efectivo y tarjeta.")
 
     captured_amount = _quantize_money(
         sum((payment.amount for payment in normalized_payments), ZERO_MONEY)

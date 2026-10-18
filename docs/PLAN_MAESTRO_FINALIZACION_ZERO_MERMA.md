@@ -152,6 +152,40 @@ Este bloque no completa el inventario de 049–050, la carrera venta/cierre de
 No declara Feature Complete ni Production Ready. La siguiente adopción del
 plan es **ZM-FIN-030**, pedidos y sus pagos.
 
+### 0.6 Registro de ejecución — ZM-FIN-030
+
+El bloque del 2026-10-18 adopta la fundación aceptada para los siete comandos
+actuales de pedidos, en `codex/zm-fin-030-order-idempotency`: crear, preparar,
+entregar y cancelar en POS; preparar, entregar y cancelar en Backoffice. Los
+anticipos, liquidaciones y refunds ya embebidos pertenecen a la intención de su
+comando; no se añade un flujo de pago independiente ni una migración.
+
+La clave UUIDv7 requerida sustituye la correlación que aparentaba idempotencia.
+POS declara la caja original; las transiciones comparten el lock del pedido y
+la transacción conserva resultado, agregado, pagos, auditoría y outbox juntos.
+El resultado durable minimiza datos personales; la consulta de detalle mantiene
+la información autenticada de pantalla. Los payloads v1 existentes de auditoría
+y outbox conservan sus campos personales históricos; la reducción de este bloque
+aplica al snapshot de replay y a la metadata de recuperación. La recuperación no
+autoriza repetir una operación incierta con otra clave ni persistir cuerpos
+económicos en el browser.
+
+El [registro de validación de pedidos](implementation/order-idempotency-validation.md)
+separa la evidencia local: **49 pruebas PostgreSQL/HTTP**, **16 regresiones** de
+consumidores, **61 pruebas Contracts**, **533 unitarias web + 11 E2E mock** y
+**11 recorridos reales** (POS 4, Backoffice 7). Ruff y mypy (333 archivos) pasan;
+15 pruebas negativas también. La matriz valida 318 entradas y 243 operaciones
+OpenAPI, conservando los pendientes posteriores. La aceptación integrada exige
+ocho etapas Foundation y **Foundation required** verdes para el SHA entregado;
+el enlace inmutable acompaña la entrega. Las pruebas usan PostgreSQL efímero y no
+alteran la base local normal.
+
+La integración financiera de pagos de pedido en caja/corte continúa en 042;
+las reglas completas DEC-10 y las superficies finales permanecen en sus tareas,
+incluidas 058 y 078. No se declara completado el ledger, el módulo completo de
+pedidos, Feature Complete ni Production Ready. La siguiente adopción del plan es
+**ZM-FIN-031**, devoluciones y reembolsos.
+
 ## 1. Resumen ejecutivo
 
 ZeroMerma posee una base adecuada para evolucionar sin reescritura: monolito modular, FastAPI/SQLAlchemy/PostgreSQL, POS y Backoffice separados, OpenAPI generado, precisión decimal, auditoría y outbox transaccionales. La auditoría activa demostró que una parte importante de ventas, pagos, pedidos, documentos y administración es real. También demostró defectos sistémicos: el POS no alimenta el inventario canónico; el pago de pedido no entra en caja/corte; el worker no procesa eventos; la trazabilidad de identidad/origen es incorrecta; y varias superficies administrativas son simuladas o incompletas.

@@ -18,6 +18,7 @@ from zeromerma_api.modules.audit.infrastructure.models import AuditLog
 from zeromerma_api.modules.catalog.infrastructure.models import Product
 from zeromerma_api.modules.outbox.infrastructure.models import OutboxEvent
 from zeromerma_api.testing.authorization import owner_headers
+from zeromerma_api.testing.idempotency import current_cash_session_id, new_idempotency_key
 from zeromerma_api.testing.sessions import login_headers
 
 
@@ -74,7 +75,15 @@ def _create_order(
     }
     if advance_payment_method_code is not None:
         payload["advance_payment_method_code"] = advance_payment_method_code
-    response = client.post("/v1/orders", headers=_cashier_headers(client), json=payload)
+    command_headers = _cashier_headers(client)
+    cash_session_id = current_cash_session_id(
+        client, headers=command_headers, workstation_code=SEED_WORKSTATION_CODE
+    )
+    response = client.post(
+        "/v1/orders",
+        headers={**command_headers, "Idempotency-Key": new_idempotency_key()},
+        json={**payload, "cash_session_id": cash_session_id},
+    )
     assert response.status_code == 201
     return response.json()
 
@@ -145,20 +154,28 @@ def test_admin_order_can_mark_ready_and_deliver_when_paid_without_mutating_pos_f
 
     ready_response = client.post(
         f"/v1/admin/orders/{order['id']}/mark-ready",
-        headers={**_admin_headers(client), "X-Request-ID": "admin-order-ready"},
+        headers={
+            "Idempotency-Key": new_idempotency_key(),
+            **_admin_headers(client),
+            "X-Request-ID": "admin-order-ready",
+        },
         json={},
     )
     assert ready_response.status_code == 200
-    assert ready_response.json()["overview"]["status"] == "READY"
+    assert ready_response.json()["status"] == "READY"
 
     deliver_response = client.post(
         f"/v1/admin/orders/{order['id']}/deliver",
-        headers={**_admin_headers(client), "X-Request-ID": "admin-order-deliver"},
+        headers={
+            "Idempotency-Key": new_idempotency_key(),
+            **_admin_headers(client),
+            "X-Request-ID": "admin-order-deliver",
+        },
         json={},
     )
 
     assert deliver_response.status_code == 200
-    assert deliver_response.json()["overview"]["status"] == "DELIVERED"
+    assert deliver_response.json()["status"] == "DELIVERED"
 
     with SessionLocal() as session:
         audit_actions = [
@@ -192,14 +209,14 @@ def test_admin_order_blocks_financial_actions_and_cancels_non_refundable_order(
     )
     ready_response = client.post(
         f"/v1/admin/orders/{balance_order['id']}/mark-ready",
-        headers=_admin_headers(client),
+        headers={**_admin_headers(client), "Idempotency-Key": new_idempotency_key()},
         json={},
     )
     assert ready_response.status_code == 200
 
     deliver_response = client.post(
         f"/v1/admin/orders/{balance_order['id']}/deliver",
-        headers=_admin_headers(client),
+        headers={**_admin_headers(client), "Idempotency-Key": new_idempotency_key()},
         json={},
     )
     assert deliver_response.status_code == 409
@@ -207,7 +224,7 @@ def test_admin_order_blocks_financial_actions_and_cancels_non_refundable_order(
 
     refundable_cancel_response = client.post(
         f"/v1/admin/orders/{balance_order['id']}/cancel",
-        headers=_admin_headers(client),
+        headers={**_admin_headers(client), "Idempotency-Key": new_idempotency_key()},
         json={},
     )
     assert refundable_cancel_response.status_code == 409
@@ -222,12 +239,16 @@ def test_admin_order_blocks_financial_actions_and_cancels_non_refundable_order(
     )
     cancel_response = client.post(
         f"/v1/admin/orders/{non_refundable_order['id']}/cancel",
-        headers={**_admin_headers(client), "X-Request-ID": "admin-order-cancel"},
+        headers={
+            "Idempotency-Key": new_idempotency_key(),
+            **_admin_headers(client),
+            "X-Request-ID": "admin-order-cancel",
+        },
         json={},
     )
 
     assert cancel_response.status_code == 200
     payload = cancel_response.json()
-    assert payload["overview"]["status"] == "CANCELED"
-    assert Decimal(str(payload["overview"]["advance_amount"])) == Decimal("5.00")
-    assert Decimal(str(payload["overview"]["remaining_balance_amount"])) == Decimal("0.00")
+    assert payload["status"] == "CANCELED"
+    assert Decimal(str(payload["advance_amount"])) == Decimal("5.00")
+    assert Decimal(str(payload["remaining_balance_amount"])) == Decimal("0.00")
