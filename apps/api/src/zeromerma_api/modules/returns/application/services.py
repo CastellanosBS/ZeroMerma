@@ -4,13 +4,12 @@ import uuid
 from collections.abc import Sequence
 from dataclasses import dataclass
 from datetime import UTC, date, datetime, time, timedelta
-from decimal import ROUND_HALF_UP, Decimal
+from decimal import ROUND_HALF_UP, Decimal, localcontext
 from typing import cast as type_cast
 from zoneinfo import ZoneInfo
 
 from sqlalchemy import Select, String, cast, exists, func, or_, select
 from sqlalchemy.engine import RowMapping
-from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from zeromerma_api.core.config import ApiSettings, get_settings
@@ -44,6 +43,7 @@ from zeromerma_api.modules.outbox.application.service import OutboxWriter
 from zeromerma_api.modules.returns.application.schemas import (
     ReturnableSaleLineView,
     ReturnCommitRequest,
+    ReturnCommitResultView,
     ReturnControlsView,
     ReturnFilterOptionView,
     ReturnHistoryListItemView,
@@ -90,6 +90,7 @@ from zeromerma_api.modules.sales.domain.constants import (
     SALE_PAYMENT_METHOD_CASH,
     SALE_STATUS_CONFIRMED,
 )
+from zeromerma_api.modules.sales.domain.exceptions import SaleNotFoundError
 from zeromerma_api.modules.sales.infrastructure.models import CashMovement, Sale, SaleLine
 
 MAX_RETURN_SEARCH_RESULTS = 80
@@ -143,6 +144,18 @@ class PreparedReturnLine:
     refund_unit_price: Decimal
     refund_line_total_amount: Decimal
     disposition_code: str
+
+
+@dataclass(frozen=True)
+class ReturnedLineTotals:
+    quantity: Decimal = ZERO_QUANTITY
+    amount: Decimal = ZERO_MONEY
+
+
+@dataclass(frozen=True)
+class PreparedReturnContext:
+    context: WorkstationContext
+    cash_session: CashSessionView
 
 
 class ReturnsQueryService:
@@ -308,9 +321,13 @@ class ReturnsQueryService:
                 date_to=normalized_date_to,
             )
         statement = _apply_search_filters(statement, normalized_query)
-        rows = session.execute(
-            statement.order_by(Sale.confirmed_at.desc()).limit(MAX_RETURN_SEARCH_RESULTS)
-        ).mappings().all()
+        rows = (
+            session.execute(
+                statement.order_by(Sale.confirmed_at.desc()).limit(MAX_RETURN_SEARCH_RESULTS)
+            )
+            .mappings()
+            .all()
+        )
         sale_ids = [row["id"] for row in rows]
         return_summary_by_sale_id = _get_return_summary_by_sale_ids(
             session,
@@ -415,22 +432,30 @@ class ReturnsQueryService:
                 date_to=normalized_date_to,
             )
 
-        available_user_rows = session.execute(
-            base_statement.with_only_columns(
-                SaleReturn.created_by_user_id,
-                User.full_name.label("created_by_user_full_name"),
+        available_user_rows = (
+            session.execute(
+                base_statement.with_only_columns(
+                    SaleReturn.created_by_user_id,
+                    User.full_name.label("created_by_user_full_name"),
+                )
+                .distinct()
+                .order_by(User.full_name.asc())
             )
-            .distinct()
-            .order_by(User.full_name.asc())
-        ).mappings().all()
-        available_reason_rows = session.execute(
-            base_statement.with_only_columns(
-                SaleReturn.reason_code,
-                SaleReturn.reason_name,
+            .mappings()
+            .all()
+        )
+        available_reason_rows = (
+            session.execute(
+                base_statement.with_only_columns(
+                    SaleReturn.reason_code,
+                    SaleReturn.reason_name,
+                )
+                .distinct()
+                .order_by(SaleReturn.reason_name.asc(), SaleReturn.reason_code.asc())
             )
-            .distinct()
-            .order_by(SaleReturn.reason_name.asc(), SaleReturn.reason_code.asc())
-        ).mappings().all()
+            .mappings()
+            .all()
+        )
 
         filtered_statement = base_statement
         if created_by_user_id is not None:
@@ -455,9 +480,15 @@ class ReturnsQueryService:
                 )
             )
 
-        rows = session.execute(
-            filtered_statement.order_by(SaleReturn.created_at_utc.desc()).limit(MAX_RETURN_SEARCH_RESULTS)
-        ).mappings().all()
+        rows = (
+            session.execute(
+                filtered_statement.order_by(SaleReturn.created_at_utc.desc()).limit(
+                    MAX_RETURN_SEARCH_RESULTS
+                )
+            )
+            .mappings()
+            .all()
+        )
 
         return ReturnsHistoryResponse(
             workstation_code=workstation_code,
@@ -540,7 +571,7 @@ class ReturnsQueryService:
         if sale_detail.branch_id != context.branch_id:
             raise SaleReturnNotFoundError("La venta original no existe en la sucursal actual.")
 
-        returned_quantities = _get_returned_quantity_by_sale_line_ids(
+        returned_totals = _get_returned_line_totals(
             session,
             sale_line_ids=[line.id for line in sale_detail.lines],
         )
@@ -555,7 +586,7 @@ class ReturnsQueryService:
         returnable_lines = [
             _build_returnable_sale_line_view(
                 line,
-                already_returned_quantity=returned_quantities.get(line.id, ZERO_QUANTITY),
+                totals=returned_totals.get(line.id, ReturnedLineTotals()),
             )
             for line in sale_detail.lines
         ]
@@ -825,14 +856,13 @@ class ReturnsCommandService:
             sale_query_service=self._sale_query_service,
         )
 
-    def commit_return(
+    def prepare_return(
         self,
         session: Session,
         *,
         current_user: AuthenticatedUser,
         command: ReturnCommitRequest,
-        request_id: str | None,
-    ) -> SaleReturnDetailResponse:
+    ) -> PreparedReturnContext:
         context = self._workstation_access.resolve_context(
             session,
             user_id=current_user.id,
@@ -844,20 +874,48 @@ class ReturnsCommandService:
             current_user=current_user,
             workstation_code=command.workstation_code,
             context=context,
+            cash_session_id=command.cash_session_id,
         )
+        _validate_return_reason(command.reason_code)
+        _validate_refund_method_code(command.refund_method_code)
+        return PreparedReturnContext(context, current_open_cash_session)
+
+    def commit_return(
+        self,
+        session: Session,
+        *,
+        current_user: AuthenticatedUser,
+        command: ReturnCommitRequest,
+        prepared: PreparedReturnContext,
+        idempotency_key: uuid.UUID,
+        operation_id: uuid.UUID,
+        request_id: str | None,
+    ) -> ReturnCommitResultView:
+        context, current_open_cash_session = prepared.context, prepared.cash_session
+        # The original sale serializes entitlement and refund budgets across all its lines.
+        # Acquire this lock only after the executor has reserved the command identity.
+        sale = session.scalar(
+            select(Sale)
+            .where(Sale.id == command.original_sale_id, Sale.branch_id == context.branch_id)
+            .with_for_update(of=Sale)
+            .execution_options(populate_existing=True)
+        )
+        if sale is None:
+            raise SaleReturnNotFoundError("La venta original no existe en la sucursal actual.")
         reason = _validate_return_reason(command.reason_code)
         refund_method_code = _validate_refund_method_code(command.refund_method_code)
-        sale_detail = self._sale_query_service.get_sale_by_id(
-            session,
-            sale_id=command.original_sale_id,
-            user_id=current_user.id,
-        )
+        try:
+            sale_detail = self._sale_query_service.get_sale_by_id(
+                session,
+                sale_id=command.original_sale_id,
+                user_id=current_user.id,
+            )
+        except SaleNotFoundError as error:
+            raise SaleReturnNotFoundError(str(error)) from error
         if sale_detail.branch_id != context.branch_id:
             raise SaleReturnNotFoundError("La venta original no existe en la sucursal actual.")
         if sale_detail.status != SALE_STATUS_CONFIRMED:
-            raise SaleReturnValidationError(
-                "Solo se pueden devolver ventas confirmadas."
-            )
+            raise SaleReturnValidationError("Solo se pueden devolver ventas confirmadas.")
 
         sale_lines_by_id = {line.id: line for line in sale_detail.lines}
         if not command.lines:
@@ -875,10 +933,20 @@ class ReturnsCommandService:
                 "No repitas la misma linea de venta dentro de la misma devolucion."
             )
 
-        returned_quantities = _get_returned_quantity_by_sale_line_ids(
+        returned_totals = _get_returned_line_totals(
             session,
             sale_line_ids=list(sale_lines_by_id.keys()),
         )
+        for historical_line in sale_detail.lines:
+            totals = returned_totals.get(historical_line.id, ReturnedLineTotals())
+            if (
+                totals.quantity > historical_line.quantity
+                or totals.amount > historical_line.line_total_amount
+            ):
+                raise SaleReturnConflictError(
+                    "El historial de devoluciones excede la cantidad o el importe original. "
+                    "Requiere revision antes de registrar otra devolucion."
+                )
         prepared_lines: list[PreparedReturnLine] = []
         for line_request in command.lines:
             original_line = sale_lines_by_id.get(line_request.original_sale_line_id)
@@ -887,13 +955,14 @@ class ReturnsCommandService:
                     "La devolucion incluye una linea que no pertenece a la venta original."
                 )
 
-            already_returned_quantity = returned_quantities.get(original_line.id, ZERO_QUANTITY)
+            totals = returned_totals.get(original_line.id, ReturnedLineTotals())
+            already_returned_quantity = totals.quantity
             returned_quantity = _quantize_quantity(line_request.returned_quantity)
-            remaining_returnable_quantity = _quantize_quantity(
+            remaining_returnable_quantity = _quantize_optional_quantity(
                 original_line.quantity - already_returned_quantity
             )
             if returned_quantity > remaining_returnable_quantity:
-                raise SaleReturnValidationError(
+                raise SaleReturnConflictError(
                     "La cantidad a devolver supera lo que aun se puede devolver en esa linea."
                 )
 
@@ -919,7 +988,9 @@ class ReturnsCommandService:
                     returned_product_class_name_snapshot=exact_product.product_class_name,
                     returned_quantity=returned_quantity,
                     refund_unit_price=refund_unit_price,
-                    refund_line_total_amount=_quantize_money(refund_unit_price * returned_quantity),
+                    refund_line_total_amount=_calculate_refund_amount(
+                        original_line, totals=totals, returned_quantity=returned_quantity
+                    ),
                     disposition_code=disposition_code,
                 )
             )
@@ -930,9 +1001,20 @@ class ReturnsCommandService:
                 ZERO_MONEY,
             )
         )
-        is_high_amount = (
-            total_refund_amount >= self._settings.return_high_refund_amount_threshold
+        previous_refund_amount = session.scalar(
+            select(func.coalesce(func.sum(SaleReturn.total_refund_amount), ZERO_MONEY)).where(
+                SaleReturn.original_sale_id == sale_detail.id
+            )
         )
+        previous_line_amount = sum((item.amount for item in returned_totals.values()), ZERO_MONEY)
+        if (
+            _quantize_money(previous_refund_amount) + total_refund_amount > sale_detail.total_amount
+            or previous_line_amount + total_refund_amount > sale_detail.total_amount
+        ):
+            raise SaleReturnConflictError(
+                "El importe acumulado de las devoluciones supera el total de la venta original."
+            )
+        is_high_amount = total_refund_amount >= self._settings.return_high_refund_amount_threshold
         sale_age_days = _get_sale_age_in_days(
             confirmed_at=sale_detail.confirmed_at,
             branch_timezone=context.branch_timezone,
@@ -961,184 +1043,186 @@ class ReturnsCommandService:
             created_at_utc=created_at,
         )
 
-        try:
-            session.add(sale_return)
-            session.flush()
+        refund_cash_movement_id = uuid.uuid4()
+        trace = {
+            "idempotency_key": str(idempotency_key),
+            "operation_id": str(operation_id),
+            "operation_code": "return.commit",
+            "refund_cash_movement_id": str(refund_cash_movement_id),
+        }
+        session.add(sale_return)
+        session.flush()
 
-            for index, prepared_line in enumerate(prepared_lines, start=1):
-                session.add(
-                    SaleReturnLine(
-                        sale_return_id=sale_return.id,
-                        line_number=index,
-                        original_sale_line_id=prepared_line.original_sale_line_id,
-                        original_capture_mode=prepared_line.original_capture_mode,
-                        original_catalog_code_snapshot=prepared_line.original_catalog_code_snapshot,
-                        original_catalog_name_snapshot=prepared_line.original_catalog_name_snapshot,
-                        returned_product_id=prepared_line.returned_product_id,
-                        returned_product_code_snapshot=prepared_line.returned_product_code_snapshot,
-                        returned_product_name_snapshot=prepared_line.returned_product_name_snapshot,
-                        returned_product_class_id=prepared_line.returned_product_class_id,
-                        returned_product_class_code_snapshot=prepared_line.returned_product_class_code_snapshot,
-                        returned_product_class_name_snapshot=prepared_line.returned_product_class_name_snapshot,
-                        returned_quantity=prepared_line.returned_quantity,
-                        refund_unit_price=prepared_line.refund_unit_price,
-                        refund_line_total_amount=prepared_line.refund_line_total_amount,
-                        disposition_code=prepared_line.disposition_code,
-                    )
-                )
-
+        for index, prepared_line in enumerate(prepared_lines, start=1):
             session.add(
-                CashMovement(
-                    sale_id=sale_detail.id,
-                    cash_session_id=current_open_cash_session.id,
-                    branch_id=context.branch_id,
-                    workstation_id=context.workstation_id,
-                    operator_id=current_user.id,
-                    movement_type=CASH_MOVEMENT_TYPE_SALE_RETURN_REFUND,
-                    direction=CASH_MOVEMENT_DIRECTION_OUT,
-                    payment_method_code=SALE_PAYMENT_METHOD_CASH,
-                    amount=total_refund_amount,
-                    currency_code=sale_detail.currency_code,
-                    occurred_at=created_at,
+                SaleReturnLine(
+                    sale_return_id=sale_return.id,
+                    line_number=index,
+                    original_sale_line_id=prepared_line.original_sale_line_id,
+                    original_capture_mode=prepared_line.original_capture_mode,
+                    original_catalog_code_snapshot=prepared_line.original_catalog_code_snapshot,
+                    original_catalog_name_snapshot=prepared_line.original_catalog_name_snapshot,
+                    returned_product_id=prepared_line.returned_product_id,
+                    returned_product_code_snapshot=prepared_line.returned_product_code_snapshot,
+                    returned_product_name_snapshot=prepared_line.returned_product_name_snapshot,
+                    returned_product_class_id=prepared_line.returned_product_class_id,
+                    returned_product_class_code_snapshot=prepared_line.returned_product_class_code_snapshot,
+                    returned_product_class_name_snapshot=prepared_line.returned_product_class_name_snapshot,
+                    returned_quantity=prepared_line.returned_quantity,
+                    refund_unit_price=prepared_line.refund_unit_price,
+                    refund_line_total_amount=prepared_line.refund_line_total_amount,
+                    disposition_code=prepared_line.disposition_code,
                 )
             )
 
+        session.add(
+            CashMovement(
+                id=refund_cash_movement_id,
+                sale_id=sale_detail.id,
+                cash_session_id=current_open_cash_session.id,
+                branch_id=context.branch_id,
+                workstation_id=context.workstation_id,
+                operator_id=current_user.id,
+                movement_type=CASH_MOVEMENT_TYPE_SALE_RETURN_REFUND,
+                direction=CASH_MOVEMENT_DIRECTION_OUT,
+                payment_method_code=SALE_PAYMENT_METHOD_CASH,
+                amount=total_refund_amount,
+                currency_code=sale_detail.currency_code,
+                occurred_at=created_at,
+            )
+        )
+
+        self._audit_recorder.record(
+            session,
+            actor_id=current_user.id,
+            action="sale_return.committed",
+            resource_type="sale_return",
+            resource_id=str(sale_return.id),
+            branch_id=context.branch_id,
+            request_id=resolved_request_id,
+            metadata={
+                **trace,
+                "folio": _build_return_folio(sale_return.id),
+                "original_sale_id": str(sale_detail.id),
+                "original_sale_folio": _build_sale_folio(sale_detail.id),
+                "branch_code": context.branch_code,
+                "workstation_code": context.workstation_code,
+                "cash_session_id": str(current_open_cash_session.id),
+                "reason_code": reason.code,
+                "reason_name": reason.label,
+                "refund_method_code": refund_method_code,
+                "currency_code": sale_detail.currency_code,
+                "total_refund_amount": str(total_refund_amount),
+                "high_amount": is_high_amount,
+                "old_sale": is_old_sale,
+                "sale_age_days": sale_age_days,
+                "high_risk_acknowledged": command.high_risk_acknowledged,
+                "high_refund_amount_threshold": str(
+                    self._settings.return_high_refund_amount_threshold
+                ),
+                "old_sale_days_threshold": self._settings.return_old_sale_days_threshold,
+                "line_count": len(prepared_lines),
+            },
+        )
+        self._outbox_writer.append(
+            session,
+            aggregate_type="sale_return",
+            aggregate_id=str(sale_return.id),
+            event_name=OUTBOX_EVENT_SALE_RETURN_COMMITTED_V1,
+            payload={
+                "refund_cash_movement_id": str(refund_cash_movement_id),
+                "sale_return_id": str(sale_return.id),
+                "folio": _build_return_folio(sale_return.id),
+                "original_sale_id": str(sale_detail.id),
+                "original_sale_folio": _build_sale_folio(sale_detail.id),
+                "branch_id": str(context.branch_id),
+                "branch_code": context.branch_code,
+                "workstation_id": str(context.workstation_id),
+                "workstation_code": context.workstation_code,
+                "cash_session_id": str(current_open_cash_session.id),
+                "created_by_user_id": str(current_user.id),
+                "reason_code": reason.code,
+                "reason_name": reason.label,
+                "refund_method_code": refund_method_code,
+                "currency_code": sale_detail.currency_code,
+                "total_refund_amount": str(total_refund_amount),
+                "high_amount": is_high_amount,
+                "old_sale": is_old_sale,
+                "sale_age_days": sale_age_days,
+                "high_risk_acknowledged": command.high_risk_acknowledged,
+                "high_refund_amount_threshold": str(
+                    self._settings.return_high_refund_amount_threshold
+                ),
+                "old_sale_days_threshold": self._settings.return_old_sale_days_threshold,
+                "notes": sale_return.notes,
+                "created_at_utc": created_at.isoformat(),
+                "lines": [
+                    {
+                        "original_sale_line_id": str(line.original_sale_line_id),
+                        "original_capture_mode": line.original_capture_mode,
+                        "returned_product_id": str(line.returned_product_id),
+                        "returned_product_code_snapshot": line.returned_product_code_snapshot,
+                        "returned_product_name_snapshot": line.returned_product_name_snapshot,
+                        "returned_product_class_id": str(line.returned_product_class_id),
+                        "returned_quantity": str(line.returned_quantity),
+                        "refund_unit_price": str(line.refund_unit_price),
+                        "refund_line_total_amount": str(line.refund_line_total_amount),
+                        "disposition_code": line.disposition_code,
+                    }
+                    for line in prepared_lines
+                ],
+            },
+            headers={"request_id": resolved_request_id, **trace},
+        )
+        if requires_high_risk_acknowledgement:
             self._audit_recorder.record(
                 session,
                 actor_id=current_user.id,
-                action="sale_return.committed",
+                action="sale_return.backoffice_review_requested",
                 resource_type="sale_return",
                 resource_id=str(sale_return.id),
                 branch_id=context.branch_id,
                 request_id=resolved_request_id,
                 metadata={
+                    **trace,
+                    "sale_return_id": str(sale_return.id),
                     "folio": _build_return_folio(sale_return.id),
+                    "notification_target": "backoffice",
                     "original_sale_id": str(sale_detail.id),
                     "original_sale_folio": _build_sale_folio(sale_detail.id),
-                    "branch_code": context.branch_code,
-                    "workstation_code": context.workstation_code,
-                    "cash_session_id": str(current_open_cash_session.id),
                     "reason_code": reason.code,
-                    "reason_name": reason.label,
-                    "refund_method_code": refund_method_code,
-                    "currency_code": sale_detail.currency_code,
                     "total_refund_amount": str(total_refund_amount),
                     "high_amount": is_high_amount,
                     "old_sale": is_old_sale,
                     "sale_age_days": sale_age_days,
-                    "high_risk_acknowledged": command.high_risk_acknowledged,
-                    "high_refund_amount_threshold": str(
-                        self._settings.return_high_refund_amount_threshold
-                    ),
-                    "old_sale_days_threshold": self._settings.return_old_sale_days_threshold,
-                    "line_count": len(prepared_lines),
                 },
             )
             self._outbox_writer.append(
                 session,
                 aggregate_type="sale_return",
                 aggregate_id=str(sale_return.id),
-                event_name=OUTBOX_EVENT_SALE_RETURN_COMMITTED_V1,
+                event_name=OUTBOX_EVENT_SALE_RETURN_BACKOFFICE_REVIEW_REQUESTED_V1,
                 payload={
+                    "refund_cash_movement_id": str(refund_cash_movement_id),
                     "sale_return_id": str(sale_return.id),
                     "folio": _build_return_folio(sale_return.id),
+                    "notification_target": "backoffice",
+                    "branch_code": context.branch_code,
+                    "workstation_code": context.workstation_code,
                     "original_sale_id": str(sale_detail.id),
                     "original_sale_folio": _build_sale_folio(sale_detail.id),
-                    "branch_id": str(context.branch_id),
-                    "branch_code": context.branch_code,
-                    "workstation_id": str(context.workstation_id),
-                    "workstation_code": context.workstation_code,
-                    "cash_session_id": str(current_open_cash_session.id),
-                    "created_by_user_id": str(current_user.id),
                     "reason_code": reason.code,
                     "reason_name": reason.label,
-                    "refund_method_code": refund_method_code,
-                    "currency_code": sale_detail.currency_code,
                     "total_refund_amount": str(total_refund_amount),
                     "high_amount": is_high_amount,
                     "old_sale": is_old_sale,
                     "sale_age_days": sale_age_days,
-                    "high_risk_acknowledged": command.high_risk_acknowledged,
-                    "high_refund_amount_threshold": str(
-                        self._settings.return_high_refund_amount_threshold
-                    ),
-                    "old_sale_days_threshold": self._settings.return_old_sale_days_threshold,
-                    "notes": sale_return.notes,
-                    "created_at_utc": created_at.isoformat(),
-                    "lines": [
-                        {
-                            "original_sale_line_id": str(line.original_sale_line_id),
-                            "original_capture_mode": line.original_capture_mode,
-                            "returned_product_id": str(line.returned_product_id),
-                            "returned_product_code_snapshot": line.returned_product_code_snapshot,
-                            "returned_product_name_snapshot": line.returned_product_name_snapshot,
-                            "returned_product_class_id": str(line.returned_product_class_id),
-                            "returned_quantity": str(line.returned_quantity),
-                            "refund_unit_price": str(line.refund_unit_price),
-                            "refund_line_total_amount": str(line.refund_line_total_amount),
-                            "disposition_code": line.disposition_code,
-                        }
-                        for line in prepared_lines
-                    ],
                 },
-                headers={"request_id": resolved_request_id},
+                headers={"request_id": resolved_request_id, **trace},
             )
-            if requires_high_risk_acknowledgement:
-                self._audit_recorder.record(
-                    session,
-                    actor_id=current_user.id,
-                    action="sale_return.backoffice_review_requested",
-                    resource_type="sale_return",
-                    resource_id=str(sale_return.id),
-                    branch_id=context.branch_id,
-                    request_id=resolved_request_id,
-                    metadata={
-                        "sale_return_id": str(sale_return.id),
-                        "folio": _build_return_folio(sale_return.id),
-                        "notification_target": "backoffice",
-                        "original_sale_id": str(sale_detail.id),
-                        "original_sale_folio": _build_sale_folio(sale_detail.id),
-                        "reason_code": reason.code,
-                        "total_refund_amount": str(total_refund_amount),
-                        "high_amount": is_high_amount,
-                        "old_sale": is_old_sale,
-                        "sale_age_days": sale_age_days,
-                    },
-                )
-                self._outbox_writer.append(
-                    session,
-                    aggregate_type="sale_return",
-                    aggregate_id=str(sale_return.id),
-                    event_name=OUTBOX_EVENT_SALE_RETURN_BACKOFFICE_REVIEW_REQUESTED_V1,
-                    payload={
-                        "sale_return_id": str(sale_return.id),
-                        "folio": _build_return_folio(sale_return.id),
-                        "notification_target": "backoffice",
-                        "branch_code": context.branch_code,
-                        "workstation_code": context.workstation_code,
-                        "original_sale_id": str(sale_detail.id),
-                        "original_sale_folio": _build_sale_folio(sale_detail.id),
-                        "reason_code": reason.code,
-                        "reason_name": reason.label,
-                        "total_refund_amount": str(total_refund_amount),
-                        "high_amount": is_high_amount,
-                        "old_sale": is_old_sale,
-                        "sale_age_days": sale_age_days,
-                    },
-                    headers={"request_id": resolved_request_id},
-                )
-            session.commit()
-        except IntegrityError as error:
-            session.rollback()
-            raise SaleReturnValidationError(
-                "Las reglas de integridad de la devolucion fallaron durante el guardado."
-            ) from error
-
-        return self._query_service.get_sale_return_detail(
-            session,
-            current_user=current_user,
-            workstation_code=command.workstation_code,
-            return_id=sale_return.id,
+        session.flush()
+        return _build_commit_result(
+            session, sale_return=sale_return, refund_cash_movement_id=refund_cash_movement_id
         )
 
 
@@ -1177,14 +1261,14 @@ def _build_return_sale_search_item_view(
 def _build_returnable_sale_line_view(
     line: SaleLineView,
     *,
-    already_returned_quantity: Decimal,
+    totals: ReturnedLineTotals,
 ) -> ReturnableSaleLineView:
     if line.product_class_id is None:
         raise SaleReturnValidationError(
             "La linea original no tiene una clase valida para calcular devoluciones."
         )
 
-    normalized_returned_quantity = _quantize_optional_quantity(already_returned_quantity)
+    normalized_returned_quantity = _quantize_optional_quantity(totals.quantity)
     remaining_returnable_quantity = _quantize_optional_quantity(
         line.quantity - normalized_returned_quantity
     )
@@ -1207,15 +1291,19 @@ def _build_returnable_sale_line_view(
         line_total_amount=_quantize_money(line.line_total_amount),
         already_returned_quantity=normalized_returned_quantity,
         remaining_returnable_quantity=remaining_returnable_quantity,
+        already_refunded_amount=totals.amount,
+        remaining_refundable_amount=max(
+            ZERO_MONEY, _quantize_money(line.line_total_amount - totals.amount)
+        ),
         requires_exact_product_selection=requires_exact_product_selection,
     )
 
 
-def _get_returned_quantity_by_sale_line_ids(
+def _get_returned_line_totals(
     session: Session,
     *,
     sale_line_ids: Sequence[uuid.UUID],
-) -> dict[uuid.UUID, Decimal]:
+) -> dict[uuid.UUID, ReturnedLineTotals]:
     if not sale_line_ids:
         return {}
 
@@ -1225,14 +1313,79 @@ def _get_returned_quantity_by_sale_line_ids(
             func.coalesce(func.sum(SaleReturnLine.returned_quantity), ZERO_QUANTITY).label(
                 "returned_quantity"
             ),
+            func.coalesce(func.sum(SaleReturnLine.refund_line_total_amount), ZERO_MONEY).label(
+                "refunded_amount"
+            ),
         )
         .where(SaleReturnLine.original_sale_line_id.in_(tuple(sale_line_ids)))
         .group_by(SaleReturnLine.original_sale_line_id)
     ).mappings()
     return {
-        row["original_sale_line_id"]: _quantize_optional_quantity(row["returned_quantity"])
+        row["original_sale_line_id"]: ReturnedLineTotals(
+            _quantize_optional_quantity(row["returned_quantity"]),
+            _quantize_money(row["refunded_amount"]),
+        )
         for row in rows
     }
+
+
+def _calculate_refund_amount(
+    line: SaleLineView, *, totals: ReturnedLineTotals, returned_quantity: Decimal
+) -> Decimal:
+    cumulative_quantity = totals.quantity + returned_quantity
+    # Allocate the original rounded line budget cumulatively, rather than rounding every
+    # partial refund independently. The last returned quantity exhausts exactly that budget.
+    with localcontext() as decimal_context:
+        decimal_context.prec = 50
+        cumulative_amount = (
+            line.line_total_amount
+            if cumulative_quantity == line.quantity
+            else _quantize_money(line.line_total_amount * cumulative_quantity / line.quantity)
+        )
+    return max(ZERO_MONEY, _quantize_money(cumulative_amount - totals.amount))
+
+
+def _build_commit_result(
+    session: Session, *, sale_return: SaleReturn, refund_cash_movement_id: uuid.UUID
+) -> ReturnCommitResultView:
+    lines = session.scalars(
+        select(SaleReturnLine)
+        .where(SaleReturnLine.sale_return_id == sale_return.id)
+        .order_by(SaleReturnLine.line_number)
+    ).all()
+    return ReturnCommitResultView.model_validate(
+        {
+            "id": sale_return.id,
+            "folio": _build_return_folio(sale_return.id),
+            "status": sale_return.status,
+            "original_sale_id": sale_return.original_sale_id,
+            "original_sale_folio": _build_sale_folio(sale_return.original_sale_id),
+            "branch_id": sale_return.branch_id,
+            "workstation_id": sale_return.workstation_id,
+            "cash_session_id": sale_return.cash_session_id,
+            "refund_cash_movement_id": refund_cash_movement_id,
+            "refund_method_code": sale_return.refund_method_code,
+            "currency_code": sale_return.currency_code,
+            "total_refund_amount": sale_return.total_refund_amount,
+            "created_at_utc": sale_return.created_at_utc,
+            "lines": [
+                {
+                    name: getattr(line, name)
+                    for name in (
+                        "id",
+                        "line_number",
+                        "original_sale_line_id",
+                        "returned_product_id",
+                        "returned_quantity",
+                        "refund_unit_price",
+                        "refund_line_total_amount",
+                        "disposition_code",
+                    )
+                }
+                for line in lines
+            ],
+        }
+    )
 
 
 def _get_return_summary_by_sale_ids(
@@ -1340,19 +1493,23 @@ def _resolve_exact_return_product(
 
 
 def _load_product_snapshot(session: Session, *, product_id: uuid.UUID) -> PreparedExactProduct:
-    record = session.execute(
-        select(
-            Product.id,
-            Product.code,
-            Product.name,
-            ProductClass.id.label("product_class_id"),
-            ProductClass.code.label("product_class_code"),
-            ProductClass.name.label("product_class_name"),
+    record = (
+        session.execute(
+            select(
+                Product.id,
+                Product.code,
+                Product.name,
+                ProductClass.id.label("product_class_id"),
+                ProductClass.code.label("product_class_code"),
+                ProductClass.name.label("product_class_name"),
+            )
+            .select_from(Product)
+            .join(ProductClass, ProductClass.id == Product.product_class_id)
+            .where(Product.id == product_id)
         )
-        .select_from(Product)
-        .join(ProductClass, ProductClass.id == Product.product_class_id)
-        .where(Product.id == product_id)
-    ).mappings().one_or_none()
+        .mappings()
+        .one_or_none()
+    )
     if record is None:
         raise ProductNotFoundError("Product was not found.")
 
@@ -1373,6 +1530,7 @@ def _require_open_cash_session(
     current_user: AuthenticatedUser,
     workstation_code: str,
     context: WorkstationContext,
+    cash_session_id: uuid.UUID | None = None,
 ) -> CashSessionView:
     current_open_cash_session = cash_session_query.get_open_session_for_workstation_code(
         session,
@@ -1382,10 +1540,10 @@ def _require_open_cash_session(
         raise SaleReturnConflictError(
             "Necesitas una caja abierta en esta estacion para registrar devoluciones."
         )
+    if cash_session_id is not None and current_open_cash_session.id != cash_session_id:
+        raise SaleReturnConflictError("La caja original del comando ya no esta abierta.")
     if current_open_cash_session.user_id != current_user.id:
-        raise SaleReturnConflictError(
-            "La caja abierta de esta estacion pertenece a otro cajero."
-        )
+        raise SaleReturnConflictError("La caja abierta de esta estacion pertenece a otro cajero.")
     if (
         current_open_cash_session.branch_id != context.branch_id
         or current_open_cash_session.workstation_id != context.workstation_id
@@ -1543,9 +1701,7 @@ def _validate_date_range(
     date_to: date | None,
 ) -> tuple[date | None, date | None]:
     if date_from is not None and date_to is not None and date_from > date_to:
-        raise SaleReturnValidationError(
-            "La fecha inicial no puede ser posterior a la fecha final."
-        )
+        raise SaleReturnValidationError("La fecha inicial no puede ser posterior a la fecha final.")
     return date_from, date_to
 
 

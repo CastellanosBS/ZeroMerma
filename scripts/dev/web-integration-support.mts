@@ -173,6 +173,47 @@ export async function dropNextSaleConfirmationResponse(
   return { committed };
 }
 
+/** Lose only a real committed return response. No fabricated response or arbitrary interception is exposed. */
+export async function dropNextReturnConfirmationResponse(
+  page: PageObservation,
+  apiUrl: string,
+  evidence: NetworkEvidence,
+) {
+  if (realEnvironment("pos").apiUrl !== apiUrl)
+    throw new Error("Return faults require the isolated real POS API.");
+  const register = saleFaultRegistrations.get(page);
+  if (!register)
+    throw new Error(
+      "Real API observation must be installed before injecting a return response loss.",
+    );
+  let resolveCommitted!: (value: unknown) => void;
+  let rejectCommitted!: (reason: unknown) => void;
+  const committed = new Promise<unknown>((resolve, reject) => {
+    resolveCommitted = resolve;
+    rejectCommitted = reject;
+  });
+  await register(
+    `${apiUrl}/v1/returns/commit`,
+    async (route) => {
+      try {
+        if (route.request().method() !== "POST")
+          throw new Error("Only POST return confirmation can lose a response.");
+        const response = await route.fetch({ maxRedirects: 0 });
+        if (response.status() !== 201)
+          throw new Error(`Expected a real committed return, received ${response.status()}.`);
+        evidence.push({ method: "POST", path: "/v1/returns/commit", status: 201 });
+        resolveCommitted(await response.json());
+      } catch (error) {
+        rejectCommitted(error);
+      } finally {
+        await route.abort("failed");
+      }
+    },
+    { times: 1 },
+  );
+  return { committed };
+}
+
 /** Fault only an allowlisted order command after its real transaction committed. */
 export async function dropNextOrderCommandResponse(
   page: PageObservation,

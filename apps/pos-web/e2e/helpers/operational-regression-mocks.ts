@@ -228,7 +228,9 @@ const returnSaleDetail = {
   id: "sale-1",
   lines: [
     {
-      already_returned_quantity: "0",
+      already_returned_quantity: "4",
+      already_refunded_amount: "48.00",
+      remaining_refundable_amount: "24.00",
       capture_mode: "PRODUCT_DIRECT",
       catalog_name_snapshot: "Concha vainilla",
       id: "sale-line-1",
@@ -542,7 +544,10 @@ export async function installOperationalRegressionApiMocks(page: Page) {
     const url = new URL(request.url());
     const pathname = url.pathname;
 
-    if (pathname.startsWith("/v1/auth/")) { await route.fallback(); return; }
+    if (pathname.startsWith("/v1/auth/")) {
+      await route.fallback();
+      return;
+    }
 
     if (pathname === "/v1/pos/bootstrap") {
       await fulfillJson(route, {
@@ -588,7 +593,12 @@ export async function installOperationalRegressionApiMocks(page: Page) {
           stock_validated_source_bucket_codes: ["COUNTER"],
         },
         waste_reasons: [
-          { code: "OLD_COUNTER", display_order: 10, name: "Producto rezagado", requires_note: false },
+          {
+            code: "OLD_COUNTER",
+            display_order: 10,
+            name: "Producto rezagado",
+            requires_note: false,
+          },
           { code: "DAMAGED", display_order: 20, name: "Danado", requires_note: true },
         ],
         workstation,
@@ -761,8 +771,20 @@ export async function installOperationalRegressionApiMocks(page: Page) {
           { code: "SERVICES", display_order: 20, name: "Servicios" },
         ],
         active_payment_methods: [
-          { affects_cash_drawer: true, code: "CASH", helper_text: null, is_enabled: true, label: "Efectivo" },
-          { affects_cash_drawer: false, code: "CARD", helper_text: null, is_enabled: true, label: "Tarjeta" },
+          {
+            affects_cash_drawer: true,
+            code: "CASH",
+            helper_text: null,
+            is_enabled: true,
+            label: "Efectivo",
+          },
+          {
+            affects_cash_drawer: false,
+            code: "CARD",
+            helper_text: null,
+            is_enabled: true,
+            label: "Tarjeta",
+          },
         ],
         available_scopes: [
           { code: "CURRENT_SHIFT", label: "Turno actual" },
@@ -802,8 +824,20 @@ export async function installOperationalRegressionApiMocks(page: Page) {
           { code: "OTHER", display_order: 20, name: "Otros" },
         ],
         active_discount_methods: [
-          { affects_cash_drawer: true, code: "CASH", helper_text: null, is_enabled: true, label: "Efectivo" },
-          { affects_cash_drawer: false, code: "CARD", helper_text: null, is_enabled: true, label: "Tarjeta" },
+          {
+            affects_cash_drawer: true,
+            code: "CASH",
+            helper_text: null,
+            is_enabled: true,
+            label: "Efectivo",
+          },
+          {
+            affects_cash_drawer: false,
+            code: "CARD",
+            helper_text: null,
+            is_enabled: true,
+            label: "Tarjeta",
+          },
         ],
         available_scopes: [
           { code: "CURRENT_SHIFT", label: "Turno actual" },
@@ -865,6 +899,10 @@ export async function installOperationalRegressionApiMocks(page: Page) {
       return;
     }
 
-    await fulfillJson(route, { message: `Unhandled operational regression mock for ${pathname}` }, 404);
+    await fulfillJson(
+      route,
+      { message: `Unhandled operational regression mock for ${pathname}` },
+      404,
+    );
   });
 }

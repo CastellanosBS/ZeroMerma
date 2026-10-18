@@ -1,5 +1,6 @@
 import type {
   ReturnCommitRequest,
+  ReturnCommitResultView,
   ReturnsHistoryResponse,
   ReturnOriginalSaleDetailResponse,
   ReturnsBootstrapResponse,
@@ -24,9 +25,7 @@ function buildQueryString(params: Record<string, string | undefined>): string {
   return serialized.length > 0 ? `?${serialized}` : "";
 }
 
-export function getReturnsBootstrap(
-  workstationCode: string,
-): Promise<ReturnsBootstrapResponse> {
+export function getReturnsBootstrap(workstationCode: string): Promise<ReturnsBootstrapResponse> {
   return requestJson<ReturnsBootstrapResponse>({
     path: `/v1/returns/bootstrap?workstation_code=${encodeURIComponent(workstationCode)}`,
   });
@@ -39,7 +38,6 @@ export function searchReturnSales({
   scope,
   workstationCode,
 }: {
-
   dateFrom?: string;
   dateTo?: string;
   query?: string;
@@ -61,7 +59,6 @@ export function getReturnSaleDetail({
   saleId,
   workstationCode,
 }: {
-
   saleId: string;
   workstationCode: string;
 }): Promise<ReturnOriginalSaleDetailResponse> {
@@ -79,7 +76,6 @@ export function getReturnsHistory({
   scope,
   workstationCode,
 }: {
-
   createdByUserId?: string;
   dateFrom?: string;
   dateTo?: string;
@@ -105,7 +101,6 @@ export function getReturnsClassProducts({
   classId,
   workstationCode,
 }: {
-
   classId: string;
   workstationCode: string;
 }): Promise<ReturnsClassProductsResponse> {
@@ -117,17 +112,19 @@ export function getReturnsClassProducts({
 export function commitSaleReturn({
   payload,
   requestId,
+  idempotencyKey,
 }: {
-
   payload: ReturnCommitRequest;
   requestId: string;
-}): Promise<SaleReturnDetailResponse> {
-  return requestJson<SaleReturnDetailResponse>({
+  idempotencyKey: string;
+}): Promise<ReturnCommitResultView> {
+  return requestJson<ReturnCommitResultView>({
     body: payload,
     method: "POST",
     path: "/v1/returns/commit",
     headers: {
       "X-Request-ID": requestId,
+      "Idempotency-Key": idempotencyKey,
     },
   });
 }
@@ -136,11 +133,24 @@ export function getSaleReturnDetail({
   returnId,
   workstationCode,
 }: {
-
   returnId: string;
   workstationCode: string;
 }): Promise<SaleReturnDetailResponse> {
   return requestJson<SaleReturnDetailResponse>({
     path: `/v1/returns/${encodeURIComponent(returnId)}?workstation_code=${encodeURIComponent(workstationCode)}`,
+  });
+}
+
+export function recoverSaleReturn(
+  idempotencyKey: string,
+  workstationCode: string,
+  cashSessionId: string,
+): Promise<ReturnCommitResultView> {
+  const params = new URLSearchParams({
+    workstation_code: workstationCode,
+    cash_session_id: cashSessionId,
+  });
+  return requestJson<ReturnCommitResultView>({
+    path: `/v1/returns/confirmations/${encodeURIComponent(idempotencyKey)}?${params}`,
   });
 }

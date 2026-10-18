@@ -290,6 +290,9 @@ ENDPOINT_POLICIES: dict[tuple[str, str], EndpointPolicy] = {
     ("GET", "/v1/pos/catalog"): EndpointPolicy(("pos.operate",), "POS"),
     ("GET", "/v1/pos/classes/{class_id}/products"): EndpointPolicy(("pos.operate",), "POS"),
     ("GET", "/v1/returns/bootstrap"): EndpointPolicy(("pos.operate",), "POS"),
+    ("GET", "/v1/returns/confirmations/{idempotency_key}"): EndpointPolicy(
+        ("returns_corrections.manage",), "POS"
+    ),
     ("GET", "/v1/returns/classes/{class_id}/products"): EndpointPolicy(("pos.operate",), "POS"),
     ("GET", "/v1/returns/history"): EndpointPolicy(("pos.operate",), "POS"),
     ("GET", "/v1/returns/sales/{sale_id}"): EndpointPolicy(("pos.operate",), "POS"),

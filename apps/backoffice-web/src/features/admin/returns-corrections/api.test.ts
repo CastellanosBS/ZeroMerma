@@ -320,6 +320,13 @@ describe("admin returns corrections api", () => {
     expect(returns.items[0]?.folio).toBe("DEV-123");
     expect(corrections.items[0]?.folio).toBe("COR-123");
     expect(returnDetail.returnedLines[0]?.productName).toBe("Concha");
+    expect(returnDetail.refundImpact.linkedCashMovementId).toBe(
+      returnDetailPayload.refund_impact.linked_cash_movement_id,
+    );
+    expect(returnDetail.refundImpact.refundAmount).toBe(
+      String(returnDetailPayload.refund_impact.refund_amount),
+    );
+    expect(returnDetail.backendContract.createEndpoint).toBeNull();
     expect(correctionDetail.affectedLines[0]?.differenceQuantity).toBe("-1.000");
     expect(fetchMock).toHaveBeenNthCalledWith(
       1,

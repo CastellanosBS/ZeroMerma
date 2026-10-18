@@ -1,11 +1,12 @@
 from __future__ import annotations
 
+from dataclasses import replace
 from datetime import UTC, date, datetime, time
 from decimal import Decimal
 from typing import Annotated
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
+from fastapi import APIRouter, Depends, HTTPException, Path, Query, Request, Response, status
 from sqlalchemy.orm import Session
 
 from zeromerma_api.db.session import get_session
@@ -21,6 +22,14 @@ from zeromerma_api.modules.catalog.domain.exceptions import (
     ProductClassNotFoundError,
     ProductNotFoundError,
 )
+from zeromerma_api.modules.idempotency.application.canonicalization import (
+    IDEMPOTENCY_KEY_PATTERN,
+    parse_idempotency_key,
+)
+from zeromerma_api.modules.idempotency.presentation.http import (
+    idempotency_response,
+    require_idempotency_key,
+)
 from zeromerma_api.modules.identity.application.schemas import AuthenticatedUser
 from zeromerma_api.modules.identity.application.services import user_can_access_surface
 from zeromerma_api.modules.identity.domain.constants import IDENTITY_SURFACE_BACKOFFICE
@@ -30,8 +39,10 @@ from zeromerma_api.modules.returns.application.admin_schemas import (
     AdminReturnsListResponse,
 )
 from zeromerma_api.modules.returns.application.admin_services import AdminReturnsService
+from zeromerma_api.modules.returns.application.idempotency import ReturnCommitService
 from zeromerma_api.modules.returns.application.schemas import (
     ReturnCommitRequest,
+    ReturnCommitResultView,
     ReturnOriginalSaleDetailResponse,
     ReturnsBootstrapResponse,
     ReturnsClassProductsResponse,
@@ -39,22 +50,23 @@ from zeromerma_api.modules.returns.application.schemas import (
     ReturnsSearchSalesResponse,
     SaleReturnDetailResponse,
 )
-from zeromerma_api.modules.returns.application.services import (
-    ReturnsCommandService,
-    ReturnsQueryService,
-)
+from zeromerma_api.modules.returns.application.services import ReturnsQueryService
 from zeromerma_api.modules.returns.domain.exceptions import (
     SaleReturnConflictError,
     SaleReturnError,
     SaleReturnNotFoundError,
     SaleReturnValidationError,
 )
+from zeromerma_api.modules.sales.domain.exceptions import SaleNotFoundError
 
 router = APIRouter(prefix="/v1/returns", tags=["returns"])
 admin_router = APIRouter(
     prefix="/v1/admin/returns-corrections/returns",
     tags=["admin-returns-corrections"],
 )
+_REPLAY_RESPONSE = {
+    "headers": {"Idempotency-Replayed": {"$ref": "#/components/headers/IdempotencyReplayed"}}
+}
 
 
 def _require_backoffice_user(current_user: AuthenticatedUser) -> AuthenticatedUser:
@@ -74,6 +86,7 @@ def _to_http_exception(error: Exception) -> HTTPException:
             ProductClassNotFoundError,
             ProductNotFoundError,
             SaleReturnNotFoundError,
+            SaleNotFoundError,
         ),
     ):
         return HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(error))
@@ -156,7 +169,7 @@ def get_returns_bootstrap(
             current_user=current_user,
             workstation_code=workstation_code,
         )
-    except (BranchAccessError, CatalogError, SaleReturnError) as error:
+    except (BranchAccessError, CatalogError, SaleReturnError, SaleNotFoundError) as error:
         raise _to_http_exception(error) from error
 
 
@@ -180,7 +193,7 @@ def search_return_sales(
             date_from=date_from,
             date_to=date_to,
         )
-    except (BranchAccessError, CatalogError, SaleReturnError) as error:
+    except (BranchAccessError, CatalogError, SaleReturnError, SaleNotFoundError) as error:
         raise _to_http_exception(error) from error
 
 
@@ -208,7 +221,7 @@ def list_return_history(
             created_by_user_id=created_by_user_id,
             reason_code=reason_code,
         )
-    except (BranchAccessError, CatalogError, SaleReturnError) as error:
+    except (BranchAccessError, CatalogError, SaleReturnError, SaleNotFoundError) as error:
         raise _to_http_exception(error) from error
 
 
@@ -226,7 +239,7 @@ def get_return_sale_detail(
             workstation_code=workstation_code,
             sale_id=sale_id,
         )
-    except (BranchAccessError, CatalogError, SaleReturnError) as error:
+    except (BranchAccessError, CatalogError, SaleReturnError, SaleNotFoundError) as error:
         raise _to_http_exception(error) from error
 
 
@@ -246,30 +259,61 @@ def get_returns_class_products(
             class_id=class_id,
             query=query,
         )
-    except (BranchAccessError, CatalogError, SaleReturnError) as error:
+    except (BranchAccessError, CatalogError, SaleReturnError, SaleNotFoundError) as error:
         raise _to_http_exception(error) from error
 
 
 @router.post(
     "/commit",
-    response_model=SaleReturnDetailResponse,
+    response_model=ReturnCommitResultView,
     status_code=status.HTTP_201_CREATED,
+    responses={201: _REPLAY_RESPONSE},
 )
 def commit_sale_return(
     payload: ReturnCommitRequest,
     request: Request,
     current_user: Annotated[AuthenticatedUser, Depends(get_current_user)],
     session: Annotated[Session, Depends(get_session)],
-) -> SaleReturnDetailResponse:
+    key: Annotated[UUID, Depends(require_idempotency_key)],
+) -> Response:
     try:
-        return ReturnsCommandService().commit_return(
+        result = ReturnCommitService().commit(
             session,
             current_user=current_user,
             command=payload,
+            key=key,
             request_id=request.headers.get("X-Request-ID"),
         )
-    except (BranchAccessError, CatalogError, SaleReturnError) as error:
+        return idempotency_response(result, request)
+    except (BranchAccessError, CatalogError, SaleReturnError, SaleNotFoundError) as error:
         raise _to_http_exception(error) from error
+
+
+@router.get(
+    "/confirmations/{idempotency_key}",
+    response_model=ReturnCommitResultView,
+    responses={200: _REPLAY_RESPONSE},
+)
+def recover_return_confirmation(
+    idempotency_key: Annotated[
+        str, Path(min_length=36, max_length=36, pattern=IDEMPOTENCY_KEY_PATTERN)
+    ],
+    workstation_code: Annotated[str, Query(min_length=1, max_length=64)],
+    cash_session_id: UUID,
+    request: Request,
+    current_user: Annotated[AuthenticatedUser, Depends(get_current_user)],
+    session: Annotated[Session, Depends(get_session)],
+) -> Response:
+    result = ReturnCommitService().recover(
+        session,
+        current_user=current_user,
+        key=parse_idempotency_key(idempotency_key),
+        workstation_code=workstation_code,
+        cash_session_id=cash_session_id,
+    )
+    if result.status == "COMPLETED":
+        result = replace(result, status_code=status.HTTP_200_OK)
+    return idempotency_response(result, request)
 
 
 @router.get("/{return_id}", response_model=SaleReturnDetailResponse)
@@ -286,6 +330,5 @@ def get_sale_return_detail(
             workstation_code=workstation_code,
             return_id=return_id,
         )
-    except (BranchAccessError, CatalogError, SaleReturnError) as error:
+    except (BranchAccessError, CatalogError, SaleReturnError, SaleNotFoundError) as error:
         raise _to_http_exception(error) from error
-

@@ -5212,7 +5212,7 @@
       "module_owner": "API:admin-returns-corrections",
       "use_case": "list_admin_returns",
       "implementation_state": "PARTIAL",
-      "verification_state": "DIRECT_TEST_EXISTS_NOT_RUN",
+      "verification_state": "TESTED_IN_THIS_TASK",
       "auth_requirement": "AUTHENTICATED",
       "actual_auth_dependency": [
         "fastapi.security.api_key:APIKeyCookie",
@@ -5242,8 +5242,12 @@
       "persistence": "READ_ONLY",
       "external_side_effect": "NONE_OBSERVED_STATICALLY",
       "reads_entities": [
-        "returns",
-        "corrections"
+        "sale_returns",
+        "sale_return_lines",
+        "sales",
+        "branches",
+        "workstations",
+        "users"
       ],
       "writes_entities": [
         "NONE"
@@ -5323,7 +5327,7 @@
       "module_owner": "API:admin-returns-corrections",
       "use_case": "get_admin_return_detail",
       "implementation_state": "PARTIAL",
-      "verification_state": "DIRECT_TEST_EXISTS_NOT_RUN",
+      "verification_state": "TESTED_IN_THIS_TASK",
       "auth_requirement": "AUTHENTICATED",
       "actual_auth_dependency": [
         "fastapi.security.api_key:APIKeyCookie",
@@ -5353,8 +5357,16 @@
       "persistence": "READ_ONLY",
       "external_side_effect": "NONE_OBSERVED_STATICALLY",
       "reads_entities": [
-        "returns",
-        "corrections"
+        "sale_returns",
+        "sale_return_lines",
+        "sale_lines",
+        "sales",
+        "cash_movements",
+        "branches",
+        "workstations",
+        "users",
+        "audit_log",
+        "outbox_events"
       ],
       "writes_entities": [
         "NONE"
@@ -5385,7 +5397,9 @@
         "NONE"
       ],
       "direct_tests": [
-        "apps/api/tests/test_admin_returns_corrections.py"
+        "apps/api/tests/test_admin_returns_corrections.py",
+        "apps/api/tests/test_return_idempotency.py#test_distinct_partial_returns_keep_exact_admin_cash_links",
+        "apps/api/tests/test_return_idempotency.py#test_backoffice_never_guesses_a_refund_link_for_unlinked_history"
       ],
       "indirect_tests": [
         "apps/api/tests/conftest.py",
@@ -5416,7 +5430,8 @@
         "apps/api/src/zeromerma_api/modules/returns/application/admin_services.py#class AdminReturnsService",
         "apps/api/src/zeromerma_api/presentation/access_policy.py#ENDPOINT_POLICIES",
         "apps/api/src/zeromerma_api/db/access_scope.py#bind_authorization_scope",
-        "docs/architecture/authorization.md"
+        "docs/architecture/authorization.md",
+        "docs/implementation/return-idempotency-validation.md"
       ]
     },
     {
@@ -11494,7 +11509,7 @@
       "module_owner": "API:returns",
       "use_case": "get_returns_bootstrap",
       "implementation_state": "PARTIAL",
-      "verification_state": "DIRECT_TEST_EXISTS_NOT_RUN",
+      "verification_state": "TESTED_IN_THIS_TASK",
       "auth_requirement": "AUTHENTICATED",
       "actual_auth_dependency": [
         "fastapi.security.api_key:APIKeyCookie",
@@ -11524,10 +11539,10 @@
       "persistence": "READ_ONLY",
       "external_side_effect": "NONE_OBSERVED_STATICALLY",
       "reads_entities": [
-        "returns",
-        "return_lines",
-        "payments",
-        "inventory_movements"
+        "branches",
+        "workstations",
+        "cash_sessions",
+        "users"
       ],
       "writes_entities": [
         "NONE"
@@ -11636,10 +11651,11 @@
       "persistence": "READ_ONLY",
       "external_side_effect": "NONE_OBSERVED_STATICALLY",
       "reads_entities": [
-        "returns",
-        "return_lines",
-        "payments",
-        "inventory_movements"
+        "product_classes",
+        "products",
+        "branches",
+        "workstations",
+        "cash_sessions"
       ],
       "writes_entities": [
         "NONE"
@@ -11656,11 +11672,11 @@
       "idempotency_business_identity": "NOT_APPLICABLE",
       "idempotency_replay_behavior": "NOT_APPLICABLE",
       "generated_client_operation": "get_returns_class_products_v1_returns_classes__class_id__products_get",
-      "consumer_contract_state": "NOT_CONSUMED",
-      "consumer_disposition": "LOCAL_UI_REQUIRED_NOT_WIRED",
-      "consumer_reason": "No registered POS route references GET /v1/returns/classes/{class_id}/products for get_returns_class_products; ZM-FIN-063 owns the functional workflow and ZM-FIN-009 owns generated-client wiring.",
+      "consumer_contract_state": "CLIENT_GENERATED_USED",
+      "consumer_disposition": "LOCAL_UI_PRESENT",
+      "consumer_reason": "The registered returns screen invokes useReturnClassProductsQueries through the generated getReturnsClassProducts adapter to resolve concrete products for CLASS_CAPTURE lines.",
       "pos_consumers": [
-        "NONE"
+        "apps/pos-web/src/features/returns/returns-api.ts"
       ],
       "backoffice_consumers": [
         "NONE"
@@ -11694,15 +11710,17 @@
         "G5"
       ],
       "gap_ids": [
-        "GAP-0299",
-        "GAP-0926"
+        "GAP-0299"
       ],
       "evidence": [
         "apps/api/src/zeromerma_api/modules/returns/presentation/router.py#get_returns_class_products",
         "apps/api/src/zeromerma_api/modules/returns/application/services.py#class ReturnsQueryService",
         "apps/api/src/zeromerma_api/presentation/access_policy.py#ENDPOINT_POLICIES",
         "apps/api/src/zeromerma_api/db/access_scope.py#bind_authorization_scope",
-        "docs/architecture/authorization.md"
+        "docs/architecture/authorization.md",
+        "apps/pos-web/src/features/returns/returns-api.ts",
+        "apps/pos-web/src/features/returns/queries.ts#useReturnClassProductsQueries",
+        "apps/pos-web/src/features/returns/returns-screen.tsx"
       ]
     },
     {
@@ -11720,7 +11738,7 @@
       "module_owner": "API:returns",
       "use_case": "list_return_history",
       "implementation_state": "PARTIAL",
-      "verification_state": "DIRECT_TEST_EXISTS_NOT_RUN",
+      "verification_state": "TESTED_IN_THIS_TASK",
       "auth_requirement": "AUTHENTICATED",
       "actual_auth_dependency": [
         "fastapi.security.api_key:APIKeyCookie",
@@ -11750,10 +11768,13 @@
       "persistence": "READ_ONLY",
       "external_side_effect": "NONE_OBSERVED_STATICALLY",
       "reads_entities": [
-        "returns",
-        "return_lines",
-        "payments",
-        "inventory_movements"
+        "sale_returns",
+        "sale_return_lines",
+        "sales",
+        "users",
+        "branches",
+        "workstations",
+        "cash_sessions"
       ],
       "writes_entities": [
         "NONE"
@@ -11832,7 +11853,7 @@
       "module_owner": "API:returns",
       "use_case": "get_return_sale_detail",
       "implementation_state": "PARTIAL",
-      "verification_state": "DIRECT_TEST_EXISTS_NOT_RUN",
+      "verification_state": "TESTED_IN_THIS_TASK",
       "auth_requirement": "AUTHENTICATED",
       "actual_auth_dependency": [
         "fastapi.security.api_key:APIKeyCookie",
@@ -11862,10 +11883,15 @@
       "persistence": "READ_ONLY",
       "external_side_effect": "NONE_OBSERVED_STATICALLY",
       "reads_entities": [
-        "returns",
-        "return_lines",
-        "payments",
-        "inventory_movements"
+        "sales",
+        "sale_lines",
+        "sale_payments",
+        "sale_returns",
+        "sale_return_lines",
+        "users",
+        "branches",
+        "workstations",
+        "cash_sessions"
       ],
       "writes_entities": [
         "NONE"
@@ -11950,7 +11976,7 @@
       "module_owner": "API:returns",
       "use_case": "search_return_sales",
       "implementation_state": "PARTIAL",
-      "verification_state": "DIRECT_TEST_EXISTS_NOT_RUN",
+      "verification_state": "TESTED_IN_THIS_TASK",
       "auth_requirement": "AUTHENTICATED",
       "actual_auth_dependency": [
         "fastapi.security.api_key:APIKeyCookie",
@@ -11980,10 +12006,14 @@
       "persistence": "READ_ONLY",
       "external_side_effect": "NONE_OBSERVED_STATICALLY",
       "reads_entities": [
-        "returns",
-        "return_lines",
-        "payments",
-        "inventory_movements"
+        "sales",
+        "sale_lines",
+        "sale_returns",
+        "sale_return_lines",
+        "users",
+        "branches",
+        "workstations",
+        "cash_sessions"
       ],
       "writes_entities": [
         "NONE"
@@ -12048,6 +12078,123 @@
       ]
     },
     {
+      "operation_key": "API:GET:/v1/returns/confirmations/{idempotency_key}",
+      "surface": "POS",
+      "method": "GET",
+      "path": "/v1/returns/confirmations/{idempotency_key}",
+      "operation_id": "recover_return_confirmation_v1_returns_confirmations__idempotency_key__get",
+      "include_in_schema": true,
+      "tags": [
+        "returns"
+      ],
+      "router_file": "apps/api/src/zeromerma_api/modules/returns/presentation/router.py",
+      "router_symbol": "recover_return_confirmation",
+      "module_owner": "API:returns",
+      "use_case": "recover_return_confirmation",
+      "implementation_state": "IMPLEMENTED_VERIFIED",
+      "verification_state": "TESTED_IN_THIS_TASK",
+      "auth_requirement": "AUTHENTICATED",
+      "actual_auth_dependency": [
+        "fastapi.security.api_key:APIKeyCookie",
+        "zeromerma_api.db.session:get_session",
+        "zeromerma_api.modules.identity.presentation.dependencies:get_current_authentication",
+        "zeromerma_api.modules.identity.presentation.dependencies:get_current_user",
+        "zeromerma_api.presentation.access_policy:enforce_operation_policy"
+      ],
+      "actual_surface_guard": "EXPLICIT_POS_POLICY_WITH_EFFECTIVE_GRANTS",
+      "required_capability": "returns_corrections.manage",
+      "capability_enforcement_state": "CAPABILITY_ENFORCED",
+      "required_scope": "GLOBAL_OR_BRANCH_SET_PER_DEC04",
+      "scope_source": "SERVER_RESOLVED_ACTIVE_ROLE_ASSIGNMENT_SCOPES_INTERSECT_ACTIVE_USER_BRANCH_MEMBERSHIPS",
+      "scope_enforcement_state": "SCOPE_ENFORCED",
+      "request_schema": [
+        "NONE"
+      ],
+      "response_schema": "ReturnCommitResultView",
+      "error_contract_state": "CANONICAL_API_ERROR_RESPONSE",
+      "application_service": [
+        "zeromerma_api.modules.returns.application.idempotency.ReturnCommitService.recover"
+      ],
+      "domain_or_use_case_symbol": "ReturnCommitService.recover",
+      "router_business_logic_present": false,
+      "transaction_owner": "zeromerma_api.modules.idempotency.application.service.IdempotencyExecutor.recover",
+      "transaction_boundary": "Read-only command-result lookup; the executor completes its authorization/read transaction without reserving a key or executing the return/refund action.",
+      "persistence": "READ_ONLY",
+      "external_side_effect": "NONE_OBSERVED_STATICALLY",
+      "reads_entities": [
+        "idempotency_records",
+        "workstations"
+      ],
+      "writes_entities": [
+        "NONE"
+      ],
+      "locks_or_concurrency_control": "Indexed unique-key lookup with exact saved actor/context comparison and current POS capability/scope checks; unknown or uncommitted result remains HTTP 409",
+      "audit_required": false,
+      "audit_actual": "NOT_REQUIRED",
+      "audit_atomicity": "NOT_REQUIRED",
+      "outbox_required": false,
+      "outbox_actual": "NOT_REQUIRED",
+      "outbox_atomicity": "NOT_REQUIRED",
+      "idempotency_required": false,
+      "idempotency_actual": "NOT_REQUIRED",
+      "idempotency_business_identity": "Reads the existing global UUIDv7 identity with workstation_code and explicit cash_session_id; no new identity is admitted",
+      "idempotency_replay_behavior": "HTTP 200 safe persisted return acknowledgement for COMPLETED, including exact refund cash movement identity; absent or unresolved identity remains an explicit nonterminal error without business effects.",
+      "generated_client_operation": "recover_return_confirmation_v1_returns_confirmations__idempotency_key__get",
+      "consumer_contract_state": "CLIENT_GENERATED_USED",
+      "consumer_disposition": "LOCAL_UI_PRESENT",
+      "consumer_reason": "The POS return recovery panel looks up the original result after response loss or reload using metadata only; no stored economic body or automatically replaced key is replayed.",
+      "pos_consumers": [
+        "apps/pos-web/src/features/returns/returns-api.ts"
+      ],
+      "backoffice_consumers": [
+        "NONE"
+      ],
+      "other_consumers": [
+        "NONE"
+      ],
+      "direct_tests": [
+        "apps/api/tests/test_return_idempotency.py",
+        "apps/pos-web/e2e-real/zz-return-command.spec.ts"
+      ],
+      "indirect_tests": [
+        "apps/api/tests/conftest.py",
+        "apps/api/unit_tests/test_operation_policy.py#test_every_route_and_persisted_family_has_an_explicit_policy",
+        "apps/api/tests/test_operation_authorization.py#test_all_scoped_families_support_mapped_reads_and_aggregate_subqueries"
+      ],
+      "missing_test_types": [
+        "NONE"
+      ],
+      "approved_target_state": "Authorized POS recovery returns the same minimized return/refund snapshot for the original intention, preserves current capability and context checks, and never executes a second refund.",
+      "feature_complete_blocker": false,
+      "later_ZM_FIN_tasks": [
+        "NOT_APPLICABLE"
+      ],
+      "decision_refs": [
+        "DEC-03",
+        "DEC-04",
+        "DEC-05",
+        "DEC-07",
+        "DEC-09",
+        "DEC-11",
+        "DEC-15",
+        "DEC-16"
+      ],
+      "gate_refs": [
+        "G1",
+        "G5"
+      ],
+      "gap_ids": [
+        "NONE"
+      ],
+      "evidence": [
+        "apps/api/src/zeromerma_api/modules/returns/presentation/router.py#recover_return_confirmation",
+        "apps/api/src/zeromerma_api/modules/returns/application/idempotency.py#class ReturnCommitService",
+        "apps/pos-web/src/features/returns/returns-api.ts",
+        "docs/architecture/idempotency.md",
+        "docs/implementation/return-idempotency-validation.md"
+      ]
+    },
+    {
       "operation_key": "API:GET:/v1/returns/{return_id}",
       "surface": "POS",
       "method": "GET",
@@ -12062,7 +12209,7 @@
       "module_owner": "API:returns",
       "use_case": "get_sale_return_detail",
       "implementation_state": "PARTIAL",
-      "verification_state": "DIRECT_TEST_EXISTS_NOT_RUN",
+      "verification_state": "TESTED_IN_THIS_TASK",
       "auth_requirement": "AUTHENTICATED",
       "actual_auth_dependency": [
         "fastapi.security.api_key:APIKeyCookie",
@@ -12092,10 +12239,15 @@
       "persistence": "READ_ONLY",
       "external_side_effect": "NONE_OBSERVED_STATICALLY",
       "reads_entities": [
-        "returns",
-        "return_lines",
-        "payments",
-        "inventory_movements"
+        "sale_returns",
+        "sale_return_lines",
+        "sales",
+        "users",
+        "branches",
+        "workstations",
+        "cash_sessions",
+        "audit_log",
+        "outbox_events"
       ],
       "writes_entities": [
         "NONE"
@@ -25712,11 +25864,12 @@
       "module_owner": "API:returns",
       "use_case": "commit_sale_return",
       "implementation_state": "PARTIAL",
-      "verification_state": "DIRECT_TEST_EXISTS_NOT_RUN",
+      "verification_state": "TESTED_IN_THIS_TASK",
       "auth_requirement": "AUTHENTICATED",
       "actual_auth_dependency": [
         "fastapi.security.api_key:APIKeyCookie",
         "zeromerma_api.db.session:get_session",
+        "zeromerma_api.modules.idempotency.presentation.http:require_idempotency_key",
         "zeromerma_api.modules.identity.presentation.dependencies:get_current_authentication",
         "zeromerma_api.modules.identity.presentation.dependencies:get_current_user",
         "zeromerma_api.presentation.access_policy:enforce_operation_policy"
@@ -25730,30 +25883,39 @@
       "request_schema": [
         "ReturnCommitRequest"
       ],
-      "response_schema": "SaleReturnDetailResponse",
+      "response_schema": "ReturnCommitResultView",
       "error_contract_state": "CANONICAL_API_ERROR_RESPONSE",
       "application_service": [
+        "zeromerma_api.modules.returns.application.idempotency.ReturnCommitService.commit",
         "zeromerma_api.modules.returns.application.services.ReturnsCommandService.commit_return"
       ],
-      "domain_or_use_case_symbol": "commit_sale_return",
+      "domain_or_use_case_symbol": "ReturnCommitService.commit",
       "router_business_logic_present": false,
-      "transaction_owner": "zeromerma_api.modules.returns.application.services.ReturnsCommandService.commit_return",
-      "transaction_boundary": "commit=True;flush=True;rollback=True",
+      "transaction_owner": "zeromerma_api.modules.idempotency.application.service.IdempotencyExecutor.execute",
+      "transaction_boundary": "One executor transaction commits the reserved identity, sale return and lines, CASH refund movement, business audit/outbox and minimized terminal result; the return command flushes but never commits independently.",
       "persistence": "WRITE",
       "external_side_effect": "NONE_OBSERVED_STATICALLY",
       "reads_entities": [
-        "returns",
-        "return_lines",
-        "payments",
-        "inventory_movements"
+        "idempotency_records",
+        "sales",
+        "sale_lines",
+        "sale_payments",
+        "sale_returns",
+        "sale_return_lines",
+        "cash_sessions",
+        "products",
+        "product_classes",
+        "workstations"
       ],
       "writes_entities": [
-        "returns",
-        "return_lines",
-        "payments",
-        "inventory_movements"
+        "idempotency_records",
+        "sale_returns",
+        "sale_return_lines",
+        "cash_movements",
+        "audit_log",
+        "outbox_events"
       ],
-      "locks_or_concurrency_control": "identity_privilege_state FOR UPDATE for identity administration; FOR SHARE for domain mutation; authorization revalidated under the shared transaction boundary",
+      "locks_or_concurrency_control": "Unique UUIDv7 reservation precedes original sales row FOR UPDATE; committed quantity/value budgets are recalculated under that sale-local lock. The shared identity authorization lock remains in place. CashSession-versus-close synchronization and inventory locking are later 037/050/051 work.",
       "audit_required": true,
       "audit_actual": "ATOMIC",
       "audit_atomicity": "ATOMIC",
@@ -25761,13 +25923,13 @@
       "outbox_actual": "ATOMIC",
       "outbox_atomicity": "ATOMIC",
       "idempotency_required": true,
-      "idempotency_actual": "REQUEST_ID_ONLY",
-      "idempotency_business_identity": "NOT_IMPLEMENTED",
-      "idempotency_replay_behavior": "NOT_IMPLEMENTED",
+      "idempotency_actual": "DEC07_COMPLIANT",
+      "idempotency_business_identity": "Global UUIDv7 Idempotency-Key identifies return.commit with canonical payload and original actor/POS/branch/workstation/explicit cash_session_id context; X-Request-ID is attempt tracing only.",
+      "idempotency_replay_behavior": "Same authorized key and payload returns the saved safe acknowledgement and explicit refund_cash_movement_id without another return/refund/audit/outbox event; changed identity context conflicts, unresolved lookup never authorizes a replacement key, and completed recovery survives cash closure.",
       "generated_client_operation": "commit_sale_return_v1_returns_commit_post",
       "consumer_contract_state": "CLIENT_GENERATED_USED",
       "consumer_disposition": "LOCAL_UI_PRESENT",
-      "consumer_reason": "Located local UI consumer apps/pos-web/src/features/returns/returns-api.ts invokes POST /v1/returns/commit for commit_sale_return; the feature adapter now uses generated schema aliases through packages/api-client/src/transport.ts.",
+      "consumer_reason": "The POS return adapter uses generated request/result schemas with explicit UUIDv7 intention and original cash context; the body stays in memory and only recovery metadata persists.",
       "pos_consumers": [
         "apps/pos-web/src/features/returns/returns-api.ts"
       ],
@@ -25784,7 +25946,8 @@
         "apps/api/tests/test_admin_returns_corrections.py",
         "apps/api/tests/test_admin_sales_tickets.py",
         "apps/api/tests/test_returns_module.py",
-        "apps/api/tests/test_tickets_module.py"
+        "apps/api/tests/test_tickets_module.py",
+        "apps/api/tests/test_return_idempotency.py"
       ],
       "indirect_tests": [
         "apps/api/tests/conftest.py",
@@ -25792,30 +25955,46 @@
         "apps/api/tests/test_operation_authorization.py#test_all_scoped_families_support_mapped_reads_and_aggregate_subqueries"
       ],
       "missing_test_types": [
-        "IDEMPOTENCY_REPLAY"
+        "NONE"
       ],
-      "approved_target_state": "DECISION_COMPLIANT_IMPLEMENTATION_WITH_DIRECT_TESTS",
+      "approved_target_state": "The existing CASH return must replay once with serialized quantity and original net-value budgets, explicit causal cash linkage and safe recovery. Canonical financial settlement, cash-close concurrency, physical disposition and the complete POS flow remain separate later tasks.",
       "feature_complete_blocker": true,
       "later_ZM_FIN_tasks": [
+        "ZM-FIN-037",
+        "ZM-FIN-044",
+        "ZM-FIN-045",
+        "ZM-FIN-050",
+        "ZM-FIN-051",
         "ZM-FIN-063"
       ],
       "decision_refs": [
+        "DEC-03",
+        "DEC-04",
+        "DEC-05",
         "DEC-07",
-        "DEC-09"
+        "DEC-09",
+        "DEC-11",
+        "DEC-13",
+        "DEC-15",
+        "DEC-16"
       ],
       "gate_refs": [
         "G1",
         "G5"
       ],
       "gap_ids": [
-        "GAP-0745"
+        "NONE"
       ],
       "evidence": [
         "apps/api/src/zeromerma_api/modules/returns/presentation/router.py#commit_sale_return",
         "apps/api/src/zeromerma_api/modules/returns/application/services.py#class ReturnsCommandService",
         "apps/api/src/zeromerma_api/presentation/access_policy.py#ENDPOINT_POLICIES",
         "apps/api/src/zeromerma_api/db/access_scope.py#bind_authorization_scope",
-        "docs/architecture/authorization.md"
+        "docs/architecture/authorization.md",
+        "apps/api/src/zeromerma_api/modules/returns/application/idempotency.py#class ReturnCommitService",
+        "apps/api/src/zeromerma_api/modules/returns/application/services.py#_calculate_refund_amount",
+        "docs/implementation/return-idempotency-validation.md",
+        "docs/architecture/idempotency.md"
       ]
     },
     {
@@ -28101,7 +28280,8 @@
         "API:GET:/v1/returns/sales/{sale_id}",
         "API:GET:/v1/returns/search-sales",
         "API:GET:/v1/returns/{return_id}",
-        "API:POST:/v1/returns/commit"
+        "API:POST:/v1/returns/commit",
+        "API:GET:/v1/returns/confirmations/{idempotency_key}"
       ],
       "queries": [
         "API:GET:/v1/returns/bootstrap",
@@ -28109,14 +28289,15 @@
         "API:GET:/v1/returns/history",
         "API:GET:/v1/returns/sales/{sale_id}",
         "API:GET:/v1/returns/search-sales",
-        "API:GET:/v1/returns/{return_id}"
+        "API:GET:/v1/returns/{return_id}",
+        "API:GET:/v1/returns/confirmations/{idempotency_key}"
       ],
       "mutations": [
         "API:POST:/v1/returns/commit"
       ],
       "implementation_state": "PARTIAL",
-      "verification_state": "NO_TEST",
-      "approved_target_state": "The POS route /devoluciones must provide tested navigate, view_or_list, create_or_execute behavior through its declared canonical API operations, enforce capability pos.operate and scope GLOBAL_OR_BRANCH_SET_PER_DEC04 in the backend, and preserve recoverable persisted state for mutations under ZM-FIN-063, ZM-FIN-015, and ZM-FIN-020.",
+      "verification_state": "TESTED_IN_THIS_TASK",
+      "approved_target_state": "The POS return route must preserve a single intention through committed-response loss and metadata-only recovery, require backend returns_corrections.manage for mutation and lookup, and retain the complete financial/physical return workflow as later ZM-FIN-063 work.",
       "placeholder_evidence": "NONE",
       "user_actions": [
         "navigate",
@@ -28124,7 +28305,11 @@
         "create_or_execute"
       ],
       "direct_tests": [
-        "NONE"
+        "apps/pos-web/src/features/returns/model.test.ts",
+        "apps/pos-web/src/features/returns/returns-screen.test.tsx",
+        "apps/pos-web/src/features/returns/return-command-intent.test.ts",
+        "apps/pos-web/src/features/returns/use-return-intention.test.tsx",
+        "apps/pos-web/e2e-real/zz-return-command.spec.ts"
       ],
       "indirect_tests": [
         "NONE"
@@ -28135,7 +28320,11 @@
       "decision_refs": [
         "DEC-02",
         "DEC-03",
-        "DEC-04"
+        "DEC-04",
+        "DEC-07",
+        "DEC-09",
+        "DEC-11",
+        "DEC-15"
       ],
       "gate_refs": [
         "G1",
@@ -28146,7 +28335,11 @@
         "GAP-0779"
       ],
       "evidence": [
-        "apps/pos-web/src/router.tsx#returnsRoute"
+        "apps/pos-web/src/router.tsx#returnsRoute",
+        "apps/pos-web/src/features/returns/returns-api.ts",
+        "apps/pos-web/src/features/returns/return-command-intent.ts",
+        "apps/pos-web/src/features/returns/return-recovery-panel.tsx",
+        "docs/implementation/return-idempotency-validation.md"
       ]
     },
     {
@@ -30305,8 +30498,8 @@
         "NONE"
       ],
       "implementation_state": "PARTIAL",
-      "verification_state": "NO_TEST",
-      "approved_target_state": "The Backoffice route /admin/devoluciones-correcciones must provide tested navigate, view_or_list behavior through its declared canonical API operations, enforce capability MODULE_SPECIFIC_DEC03_CAPABILITY and scope GLOBAL_OR_BRANCH_SET_PER_DEC04 in the backend, and preserve recoverable persisted state for mutations under ZM-FIN-079, ZM-FIN-015, and ZM-FIN-020.",
+      "verification_state": "INDIRECT_TEST_ONLY",
+      "approved_target_state": "The Backoffice route remains a scoped read-only return/correction workflow. Return details must expose an explicitly validated refund movement identity; complete navigation and business-flow coverage remains ZM-FIN-079 work, without introducing a refund mutation here.",
       "placeholder_evidence": "NONE",
       "user_actions": [
         "navigate",
@@ -30316,7 +30509,9 @@
         "NONE"
       ],
       "indirect_tests": [
-        "NONE"
+        "apps/backoffice-web/src/features/admin/returns-corrections/api.test.ts",
+        "apps/api/tests/test_admin_returns_corrections.py",
+        "apps/api/tests/test_return_idempotency.py"
       ],
       "later_ZM_FIN_tasks": [
         "ZM-FIN-079"
@@ -30337,7 +30532,9 @@
       "evidence": [
         "apps/backoffice-web/src/router.tsx#adminModuleRoutes",
         "apps/backoffice-web/src/features/admin/navigation/adminCapabilities.ts",
-        "apps/backoffice-web/src/features/auth/authorization.ts"
+        "apps/backoffice-web/src/features/auth/authorization.ts",
+        "apps/api/src/zeromerma_api/modules/returns/application/admin_services.py",
+        "docs/implementation/return-idempotency-validation.md"
       ]
     },
     {
@@ -32862,7 +33059,7 @@
   ],
   "module_summary": {
     "surface_counts": {
-      "api": 244,
+      "api": 245,
       "pos": 16,
       "backoffice": 41,
       "worker": 3,
@@ -32871,52 +33068,53 @@
     "implementation_state_counts": {
       "DEPRECATED": 4,
       "FRAMEWORK_ONLY": 6,
-      "IMPLEMENTED_VERIFIED": 20,
+      "IMPLEMENTED_VERIFIED": 21,
       "INTERNAL_ONLY": 15,
       "PARTIAL": 269,
       "PLACEHOLDER": 4
     },
     "verification_state_counts": {
-      "DIRECT_TEST_EXISTS_NOT_RUN": 135,
+      "DIRECT_TEST_EXISTS_NOT_RUN": 127,
+      "INDIRECT_TEST_ONLY": 1,
       "NOT_APPLICABLE": 12,
-      "NO_TEST": 100,
-      "TESTED_IN_THIS_TASK": 71
+      "NO_TEST": 98,
+      "TESTED_IN_THIS_TASK": 81
     },
     "consumer_contract_state_counts": {
-      "CLIENT_GENERATED_USED": 183,
-      "NOT_CONSUMED": 60,
+      "CLIENT_GENERATED_USED": 185,
+      "NOT_CONSUMED": 59,
       "NO_CLIENT_OPERATION": 1
     },
     "consumer_disposition_counts": {
       "FUTURE_CONSUMER_NOT_IMPLEMENTED": 4,
-      "LOCAL_UI_PRESENT": 183,
-      "LOCAL_UI_REQUIRED_NOT_WIRED": 56,
+      "LOCAL_UI_PRESENT": 185,
+      "LOCAL_UI_REQUIRED_NOT_WIRED": 55,
       "NOT_APPLICABLE": 1
     },
     "gap_type_counts": {
       "AUDIT_GAP": 13,
       "CAPABILITY_GAP": 6,
-      "IDEMPOTENCY_GAP": 45,
+      "IDEMPOTENCY_GAP": 44,
       "OUTBOX_GAP": 25,
       "PLACEHOLDER": 4,
       "SCOPE_GAP": 6,
       "TEST_GAP": 112,
       "TRANSACTION_GAP": 1,
-      "UI_DISCONNECTED": 61,
+      "UI_DISCONNECTED": 60,
       "WORKER_GAP": 2
     },
     "feature_complete_blocker_count": 273,
     "test_gap_count": 112,
-    "operation_count": 318
+    "operation_count": 319
   },
   "openapi_comparison": {
-    "runtime_operation_count": 243,
-    "tracked_operation_count": 243,
+    "runtime_operation_count": 244,
+    "tracked_operation_count": 244,
     "runtime_only": [],
     "tracked_only": [],
     "operation_id_drift": [],
-    "runtime_sha256_canonical_json": "d681077af541396bd3cacb92b859d0d386ddad104085576dc8633e9a67fd3072",
-    "tracked_sha256_canonical_json": "d681077af541396bd3cacb92b859d0d386ddad104085576dc8633e9a67fd3072",
+    "runtime_sha256_canonical_json": "e9b4d48872fb7ca8510668b23bf376476a44bccd3f1acc74f7b2c0611e796784",
+    "tracked_sha256_canonical_json": "e9b4d48872fb7ca8510668b23bf376476a44bccd3f1acc74f7b2c0611e796784",
     "schema_drift_suspected": false,
     "classification": "NO_DRIFT_OBSERVED"
   },
@@ -34708,19 +34906,6 @@
       ]
     },
     {
-      "gap_id": "GAP-0745",
-      "operation_key": "API:POST:/v1/returns/commit",
-      "gap_type": "IDEMPOTENCY_GAP",
-      "current_state": "No durable DEC-07 replay contract",
-      "approved_target": "DECISION_COMPLIANT_AND_DIRECTLY_VERIFIED",
-      "risk": "IN_SCOPE_NOT_IMPLEMENTED",
-      "later_task": "ZM-FIN-063",
-      "gate": "G2",
-      "evidence": [
-        "apps/api/src/zeromerma_api/modules/returns/presentation/router.py#commit_sale_return"
-      ]
-    },
-    {
       "gap_id": "GAP-0753",
       "operation_key": "API:POST:/v1/tickets/{ticket_id}/reprint",
       "gap_type": "OUTBOX_GAP",
@@ -34893,13 +35078,15 @@
       "gap_id": "GAP-0779",
       "operation_key": "UI:POS:/devoluciones",
       "gap_type": "TEST_GAP",
-      "current_state": "No direct route behavior test classified",
+      "current_state": "ZM-FIN-031 directly verifies current return intention/draft handling and real committed-response recovery. Complete POS return financial/physical workflow coverage remains ZM-FIN-063.",
       "approved_target": "DECISION_COMPLIANT_AND_DIRECTLY_VERIFIED",
-      "risk": "IN_SCOPE_NOT_IMPLEMENTED",
-      "later_task": "ZM-FIN-013",
+      "risk": "FULL_WORKFLOW_COVERAGE_PENDING",
+      "later_task": "ZM-FIN-063",
       "gate": "G5",
       "evidence": [
-        "apps/pos-web/src/router.tsx#returnsRoute"
+        "apps/pos-web/src/router.tsx#returnsRoute",
+        "apps/pos-web/e2e-real/zz-return-command.spec.ts",
+        "docs/implementation/return-idempotency-validation.md"
       ]
     },
     {
@@ -35364,13 +35551,14 @@
       "gap_id": "GAP-0852",
       "operation_key": "UI:BACKOFFICE:/admin/devoluciones-correcciones",
       "gap_type": "TEST_GAP",
-      "current_state": "No direct route behavior test classified",
+      "current_state": "Adapter tests exist; complete Backoffice return/correction route behavior is not established by API linkage tests alone.",
       "approved_target": "DECISION_COMPLIANT_AND_DIRECTLY_VERIFIED",
       "risk": "IN_SCOPE_NOT_IMPLEMENTED",
-      "later_task": "ZM-FIN-012",
+      "later_task": "ZM-FIN-079",
       "gate": "G5",
       "evidence": [
-        "apps/backoffice-web/src/router.tsx#adminModuleRoutes"
+        "apps/backoffice-web/src/router.tsx#adminModuleRoutes",
+        "apps/backoffice-web/src/features/admin/returns-corrections/api.test.ts"
       ]
     },
     {
@@ -35804,20 +35992,6 @@
       "evidence": [
         "apps/api/src/zeromerma_api/modules/catalog/presentation/router.py#get_pos_class_products",
         "apps/api/src/zeromerma_api/modules/catalog/application/services.py#class PosCatalogQueryService"
-      ]
-    },
-    {
-      "gap_id": "GAP-0926",
-      "operation_key": "API:GET:/v1/returns/classes/{class_id}/products",
-      "gap_type": "UI_DISCONNECTED",
-      "current_state": "No registered POS route consumes GET /v1/returns/classes/{class_id}/products for get_returns_class_products",
-      "approved_target": "The POS workflow owned by ZM-FIN-063 invokes GET /v1/returns/classes/{class_id}/products through the generated client with direct route coverage",
-      "risk": "IN_SCOPE_NOT_IMPLEMENTED",
-      "later_task": "ZM-FIN-063",
-      "gate": "G2",
-      "evidence": [
-        "apps/api/src/zeromerma_api/modules/returns/presentation/router.py#get_returns_class_products",
-        "apps/api/src/zeromerma_api/modules/returns/application/services.py#class ReturnsQueryService"
       ]
     },
     {

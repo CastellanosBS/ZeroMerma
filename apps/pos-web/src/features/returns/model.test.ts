@@ -16,11 +16,13 @@ import {
 
 const classCaptureLine: ReturnableSaleLineView = {
   already_returned_quantity: "0.000",
+  already_refunded_amount: "0.00",
   capture_mode: "CLASS_CAPTURE",
   catalog_code_snapshot: "PAN-DULCE",
   catalog_name_snapshot: "Pan dulce",
   id: "sale-line-class",
   line_total_amount: "24.00",
+  remaining_refundable_amount: "24.00",
   product_class_code: "PAN-DULCE",
   product_class_id: "class-pan-dulce",
   product_class_name: "Pan dulce",
@@ -36,11 +38,13 @@ const classCaptureLine: ReturnableSaleLineView = {
 
 const productDirectLine: ReturnableSaleLineView = {
   already_returned_quantity: "0.000",
+  already_refunded_amount: "0.00",
   capture_mode: "PRODUCT_DIRECT",
   catalog_code_snapshot: "COCA-355",
   catalog_name_snapshot: "Coca-Cola 355 ml",
   id: "sale-line-direct",
   line_total_amount: "18.00",
+  remaining_refundable_amount: "18.00",
   product_class_code: "BEBIDAS",
   product_class_id: "class-bebidas",
   product_class_name: "Bebidas",
@@ -117,9 +121,7 @@ describe("returns model", () => {
         reasonCode: "",
         refundMethodCode: "",
       }),
-    ).toEqual([
-      "Selecciona una venta original.",
-    ]);
+    ).toEqual(["Selecciona una venta original."]);
 
     const [draftLine] = addReturnDraftLine([], classCaptureLine);
     expect(
@@ -152,3 +154,71 @@ describe("returns model", () => {
     ).toContain("Confirma la devolucion de alto riesgo antes de registrarla.");
   });
 });
+
+it.each([
+  ["0.000", "0.00", "0.05", "1", 2],
+  ["1.000", "0.02", "0.03", "1", 1],
+  ["2.000", "0.03", "0.02", "1", 2],
+])(
+  "allocates cumulative HALF_UP refunds and exhausts the final balance (%s)",
+  (returned, refunded, remaining, quantity, expected) => {
+    const source = {
+      ...productDirectLine,
+      quantity: "3.000",
+      line_total_amount: "0.05",
+      unit_price: "0.02",
+      already_returned_quantity: returned,
+      already_refunded_amount: refunded,
+      remaining_refundable_amount: remaining,
+      remaining_returnable_quantity: String(3 - Number(returned)),
+    };
+    const lines = setReturnDraftLineQuantityText(
+      addReturnDraftLine([], source),
+      source.id,
+      quantity,
+    );
+    expect(getReturnDraftTotalRefundCents(lines)).toBe(expected);
+  },
+);
+it("uses exact integer multiplication for large fractional allocations", () => {
+  const source = {
+    ...productDirectLine,
+    quantity: "999999999.999",
+    remaining_returnable_quantity: "999999999.999",
+    line_total_amount: "999999999.99",
+    remaining_refundable_amount: "999999999.99",
+  };
+  const lines = setReturnDraftLineQuantityText(
+    addReturnDraftLine([], source),
+    source.id,
+    "500000000.001",
+  );
+  expect(getReturnDraftTotalRefundCents(lines)).toBe(50000000000);
+});
+it("refunds the paid line total including discounts rather than the original unit price", () => {
+  const source = {
+    ...productDirectLine,
+    quantity: "3.000",
+    remaining_returnable_quantity: "3.000",
+    line_total_amount: "27.00",
+    remaining_refundable_amount: "27.00",
+    unit_price: "12.00",
+  };
+  const lines = setReturnDraftLineQuantityText(addReturnDraftLine([], source), source.id, "1");
+  expect(getReturnDraftTotalRefundCents(lines)).toBe(900);
+});
+
+it.each(["0.00", "1.00"])(
+  "preserves a valid zero refund balance for a fractional line priced at %s",
+  (unitPrice) => {
+    const source = {
+      ...productDirectLine,
+      quantity: "0.001",
+      remaining_returnable_quantity: "0.001",
+      line_total_amount: "0.00",
+      remaining_refundable_amount: "0.00",
+      unit_price: unitPrice,
+    };
+    expect(getReturnDraftTotalRefundCents(addReturnDraftLine([], source))).toBe(0);
+  },
+);

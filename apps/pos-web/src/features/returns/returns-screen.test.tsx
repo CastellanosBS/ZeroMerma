@@ -1,5 +1,8 @@
 // @vitest-environment jsdom
 
+import { webcrypto } from "node:crypto";
+import { returnIntentions } from "./return-command-intent";
+import { ApiError } from "@zeromerma/api-client";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import * as React from "react";
 import { act, type ReactElement } from "react";
@@ -9,8 +12,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { KeyboardShortcutRegistry } from "../pos-shell/keyboard";
 import { ReturnsScreen } from "./returns-screen";
 
-(globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT =
-  true;
+(
+  globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }
+).IS_REACT_ACT_ENVIRONMENT = true;
 
 const refetchMock = vi.fn();
 const showErrorMock = vi.fn();
@@ -20,6 +24,7 @@ const commitSaleReturnMock = vi.fn();
 let publishRightPanel: ((node: React.ReactNode) => void) | null = null;
 
 let routerSearch: Record<string, unknown> = {};
+let returnDetailUnavailable = false;
 
 const bootstrapResponse = {
   available_scopes: [
@@ -113,11 +118,13 @@ const saleDetailsById = {
     lines: [
       {
         already_returned_quantity: "0.000",
+        already_refunded_amount: "0.00",
         capture_mode: "PRODUCT_DIRECT",
         catalog_code_snapshot: "BOL-001",
         catalog_name_snapshot: "Bolillo",
         id: "sale-line-1",
         line_total_amount: "36.00",
+        remaining_refundable_amount: "36.00",
         product_class_code: "BREAD",
         product_class_id: "class-bread",
         product_class_name: "Bread",
@@ -163,11 +170,13 @@ const saleDetailsById = {
     lines: [
       {
         already_returned_quantity: "0.000",
+        already_refunded_amount: "0.00",
         capture_mode: "PRODUCT_DIRECT",
         catalog_code_snapshot: "BOL-001",
         catalog_name_snapshot: "Bolillo",
         id: "sale-line-preloaded",
         line_total_amount: "40.00",
+        remaining_refundable_amount: "40.00",
         product_class_code: "BREAD",
         product_class_id: "class-bread",
         product_class_name: "Bread",
@@ -359,7 +368,7 @@ vi.mock("../auth/auth-store", () => ({
 
 vi.mock("../cash-session-open/queries", () => ({
   useCurrentCashSessionQuery: () => ({
-    data: { user_id: "user-1" },
+    data: { id: "cash-session-1", user_id: "user-1" },
     error: null,
     isPending: false,
     refetch: refetchMock,
@@ -408,10 +417,8 @@ vi.mock("./queries", () => ({
     const filteredSales = saleRecords.filter((sale) => {
       const matchesQuery =
         normalizedQuery.length === 0 || sale.folio.toLowerCase().includes(normalizedQuery);
-      const matchesDateFrom =
-        dateFrom.length === 0 || sale.confirmed_at.slice(0, 10) >= dateFrom;
-      const matchesDateTo =
-        dateTo.length === 0 || sale.confirmed_at.slice(0, 10) <= dateTo;
+      const matchesDateFrom = dateFrom.length === 0 || sale.confirmed_at.slice(0, 10) >= dateFrom;
+      const matchesDateTo = dateTo.length === 0 || sale.confirmed_at.slice(0, 10) <= dateTo;
       return matchesQuery && matchesDateFrom && matchesDateTo;
     });
 
@@ -423,14 +430,18 @@ vi.mock("./queries", () => ({
     };
   },
   useReturnSaleDetailQuery: (saleId: string | null) => ({
-    data: saleId ? saleDetailsById[saleId as keyof typeof saleDetailsById] ?? null : null,
+    data: saleId ? (saleDetailsById[saleId as keyof typeof saleDetailsById] ?? null) : null,
     error: null,
     isPending: false,
     refetch: refetchMock,
   }),
   useSaleReturnDetailQuery: (returnId: string | null) => ({
-    data: returnId ? returnDetailsById[returnId as keyof typeof returnDetailsById] ?? null : null,
-    error: null,
+    data: returnDetailUnavailable
+      ? null
+      : returnId
+        ? (returnDetailsById[returnId as keyof typeof returnDetailsById] ?? null)
+        : null,
+    error: returnDetailUnavailable ? new Error("detail unavailable") : null,
     isPending: false,
     refetch: refetchMock,
   }),
@@ -453,12 +464,18 @@ vi.mock("./queries", () => ({
           .includes(normalizedQuery);
       const matchesDateFrom =
         dateFrom.length === 0 || record.created_at_utc.slice(0, 10) >= dateFrom;
-      const matchesDateTo =
-        dateTo.length === 0 || record.created_at_utc.slice(0, 10) <= dateTo;
+      const matchesDateTo = dateTo.length === 0 || record.created_at_utc.slice(0, 10) <= dateTo;
       const matchesUser =
         createdByUserId.length === 0 || record.created_by_user_id === createdByUserId;
       const matchesReason = reasonCode.length === 0 || record.reason_code === reasonCode;
-      return matchesScope && matchesQuery && matchesDateFrom && matchesDateTo && matchesUser && matchesReason;
+      return (
+        matchesScope &&
+        matchesQuery &&
+        matchesDateFrom &&
+        matchesDateTo &&
+        matchesUser &&
+        matchesReason
+      );
     });
 
     return {
@@ -548,10 +565,7 @@ async function flush() {
 }
 
 function setInputValue(input: HTMLInputElement | HTMLTextAreaElement, value: string) {
-  const descriptor = Object.getOwnPropertyDescriptor(
-    Object.getPrototypeOf(input),
-    "value",
-  )?.set;
+  const descriptor = Object.getOwnPropertyDescriptor(Object.getPrototypeOf(input), "value")?.set;
 
   act(() => {
     descriptor?.call(input, value);
@@ -570,6 +584,14 @@ function setSelectValue(select: HTMLSelectElement, value: string) {
 let mountedRoots: Array<() => void> = [];
 
 beforeEach(() => {
+  returnDetailUnavailable = false;
+  localStorage.clear();
+  returnIntentions.forgetBodies();
+  vi.stubGlobal("crypto", webcrypto);
+  Object.defineProperty(navigator, "locks", {
+    configurable: true,
+    value: { request: vi.fn(async (_name, _options, callback) => callback({ name: "lock" })) },
+  });
   routerSearch = { saleId: "sale-preloaded" };
   showErrorMock.mockReset();
   showSuccessMock.mockReset();
@@ -614,6 +636,7 @@ afterEach(() => {
   mountedRoots = [];
   document.body.innerHTML = "";
   vi.useRealTimers();
+  vi.unstubAllGlobals();
 });
 
 describe("ReturnsScreen", () => {
@@ -662,9 +685,9 @@ describe("ReturnsScreen", () => {
     });
     await flush();
 
-    const lineRow = Array.from(view.container.querySelectorAll<HTMLTableRowElement>("tbody tr")).find(
-      (row) => row.textContent?.includes("Bolillo"),
-    ) as HTMLTableRowElement;
+    const lineRow = Array.from(
+      view.container.querySelectorAll<HTMLTableRowElement>("tbody tr"),
+    ).find((row) => row.textContent?.includes("Bolillo")) as HTMLTableRowElement;
     act(() => {
       lineRow.click();
     });
@@ -695,9 +718,9 @@ describe("ReturnsScreen", () => {
     });
     await flush();
 
-    const lineRow = Array.from(view.container.querySelectorAll<HTMLTableRowElement>("tbody tr")).find(
-      (row) => row.textContent?.includes("Bolillo"),
-    ) as HTMLTableRowElement;
+    const lineRow = Array.from(
+      view.container.querySelectorAll<HTMLTableRowElement>("tbody tr"),
+    ).find((row) => row.textContent?.includes("Bolillo")) as HTMLTableRowElement;
     act(() => {
       lineRow.click();
     });
@@ -728,8 +751,9 @@ describe("ReturnsScreen", () => {
     act(() => {
       commitButton.click();
     });
-    await flush();
-    await flush();
+    await act(async () => {
+      await vi.waitFor(() => expect(commitSaleReturnMock).toHaveBeenCalledTimes(1));
+    });
     await flush();
 
     expect(commitSaleReturnMock).toHaveBeenCalledWith(
@@ -764,4 +788,71 @@ describe("ReturnsScreen", () => {
       to: "/tickets",
     });
   });
+});
+
+async function prepareReturn() {
+  routerSearch = {};
+  const view = renderUi(<ReturnsScreen />);
+  mountedRoots.push(view.unmount);
+  await flush();
+  act(() => view.container.querySelector<HTMLTableRowElement>("tbody tr")!.click());
+  await flush();
+  const input = view.container.querySelector<HTMLInputElement>(
+    'input[aria-label="Cantidad a devolver de Bolillo"]',
+  )!;
+  act(() => input.focus());
+  setInputValue(input, "1");
+  setSelectValue(
+    view.container.querySelector<HTMLSelectElement>('select[aria-label="Motivo de devolucion"]')!,
+    "WRONG_ITEM",
+  );
+  await flush();
+  return {
+    view,
+    input,
+    button: () =>
+      Array.from(view.container.querySelectorAll("button")).find((button) =>
+        button.textContent?.includes("Confirmar devolucion"),
+      )!,
+  };
+}
+it("preserves quantity and reason after a deterministic rejection so the operator can correct the refund", async () => {
+  commitSaleReturnMock.mockRejectedValueOnce(
+    new ApiError(400, "Correct the reason", {
+      code: "VALIDATION_ERROR",
+      message: "Correct the reason",
+      details: null,
+      field_errors: null,
+      request_id: null,
+    }),
+  );
+  const { view, input, button } = await prepareReturn();
+  await act(async () => {
+    button().click();
+    await vi.waitFor(() => expect(showErrorMock).toHaveBeenCalled());
+  });
+  expect(input.value).toBe("1");
+  expect(
+    view.container.querySelector<HTMLSelectElement>('select[aria-label="Motivo de devolucion"]')!
+      .value,
+  ).toBe("WRONG_ITEM");
+  expect(button().disabled).toBe(false);
+  const firstKey = commitSaleReturnMock.mock.calls[0]![0].idempotencyKey;
+  await act(async () => {
+    button().click();
+    await vi.waitFor(() => expect(showSuccessMock).toHaveBeenCalled());
+  });
+  expect(commitSaleReturnMock.mock.calls[1]![0].idempotencyKey).not.toBe(firstKey);
+});
+it("keeps the refund confirmed when its separate detail lookup fails", async () => {
+  returnDetailUnavailable = true;
+  const { view, button } = await prepareReturn();
+  await act(async () => {
+    button().click();
+    await vi.waitFor(() => expect(showSuccessMock).toHaveBeenCalled());
+  });
+  expect(returnIntentions.read(bootstrapResponse.workstation.id)?.status).toBe("CONFIRMED");
+  expect(commitSaleReturnMock).toHaveBeenCalledTimes(1);
+  expect(showErrorMock).not.toHaveBeenCalled();
+  expect(view.container.textContent).toContain("La devolución ya está registrada.");
 });

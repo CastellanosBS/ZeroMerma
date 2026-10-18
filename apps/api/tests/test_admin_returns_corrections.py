@@ -97,10 +97,17 @@ def _commit_return(client: TestClient, sale_id: str) -> dict[str, object]:
     direct_line = next(
         line for line in sale_detail.json()["lines"] if line["capture_mode"] == "PRODUCT_DIRECT"
     )
+    return_headers = _cashier_headers(client)
+    return_cash_session_id = current_cash_session_id(
+        client, headers=return_headers, workstation_code=SEED_WORKSTATION_CODE
+    )
+    return_headers["Idempotency-Key"] = new_idempotency_key()
+
     response = client.post(
         "/v1/returns/commit",
-        headers=_cashier_headers(client),
+        headers=return_headers,
         json={
+            "cash_session_id": return_cash_session_id,
             "workstation_code": SEED_WORKSTATION_CODE,
             "original_sale_id": sale_id,
             "reason_code": "WRONG_ITEM",

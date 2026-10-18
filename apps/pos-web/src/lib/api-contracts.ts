@@ -177,3 +177,5 @@ export type TransferReceiptHistoryResponse =
 export type TransferReceiveRequest = components["schemas"]["TransferReceiveRequest"];
 export type WasteCommitRequest = components["schemas"]["WasteCommitRequest"];
 export type WasteReasonView = components["schemas"]["WasteReasonView"];
+
+export type ReturnCommitResultView = components["schemas"]["ReturnCommitResultView"];

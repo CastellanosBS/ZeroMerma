@@ -186,6 +186,35 @@ incluidas 058 y 078. No se declara completado el ledger, el módulo completo de
 pedidos, Feature Complete ni Production Ready. La siguiente adopción del plan es
 **ZM-FIN-031**, devoluciones y reembolsos.
 
+### 0.7 Registro de ejecución — ZM-FIN-031
+
+El bloque del 2026-10-18, rama `codex/zm-fin-031-return-idempotency`, adopta
+`return.commit` sobre la base aceptada `e53ac6bd57865db0875a5d66bb1dd6e4da17fb7f`.
+El único comando actual es POS; Backoffice conserva consulta y enlace financiero.
+La clave UUIDv7 y caja explícita del intento de devolución —que puede ser distinta
+de la caja de la venta original— protegen devolución, refund CASH, auditoría,
+outbox y respuesta durable en una transacción. El lock de la fila `Sale` protege
+cantidad y valor neto acumulados; el refund conserva su identidad de movimiento
+sin inferirla por importe o fecha. El snapshot y la metadata de recuperación
+omiten datos personales y cuerpos económicos persistentes.
+
+El [registro de validación](implementation/return-idempotency-validation.md)
+registra 17 callers actualizados, 27 regresiones y 49 casos de aceptación
+PostgreSQL/HTTP aprobados, sin fallos ni omisiones. Contracts pasó 63 pruebas;
+Web, 556 unitarias y 11 E2E simuladas; Browser, 12 flujos reales. La matriz de
+319 entradas y 244 operaciones OpenAPI cierra GAP-0745 para el comando actual y
+conserva las brechas funcionales restantes. La entrega integrada exige ocho
+etapas Foundation y **Foundation required** para el SHA publicado; su enlace
+acompaña la entrega y no se presupone en este registro local. Sólo se usan
+entornos de desarrollo y prueba aislados, sin modificar la base habitual ni
+inventar historia productiva.
+
+Siguen pendientes la frontera caja/cierre 037, liquidación financiera completa
+044–046, efectos físicos 050–051 y superficies completas 063/079. 047/055 conservan
+su alcance de diagnóstico, reconstrucción y opening state/backfill legítimo.
+No se declara completada la devolución física, una reversa bancaria ni el módulo
+completo. No se introduce migración. La siguiente adopción es **ZM-FIN-032**.
+
 ## 1. Resumen ejecutivo
 
 ZeroMerma posee una base adecuada para evolucionar sin reescritura: monolito modular, FastAPI/SQLAlchemy/PostgreSQL, POS y Backoffice separados, OpenAPI generado, precisión decimal, auditoría y outbox transaccionales. La auditoría activa demostró que una parte importante de ventas, pagos, pedidos, documentos y administración es real. También demostró defectos sistémicos: el POS no alimenta el inventario canónico; el pago de pedido no entra en caja/corte; el worker no procesa eventos; la trazabilidad de identidad/origen es incorrecta; y varias superficies administrativas son simuladas o incompletas.

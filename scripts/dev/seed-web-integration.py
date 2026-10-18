@@ -162,7 +162,9 @@ def main(argv: Sequence[str] = ()) -> None:
             )
             session.add_all([order_operator, order_role])
             session.flush()
-            order_capabilities = {"orders.view", "orders.manage", "orders.cancel"}
+            order_capabilities = {
+                "orders.view", "orders.manage", "orders.cancel", "returns_corrections.view"
+            }
             order_permissions = list(
                 session.scalars(select(Permission).where(Permission.code.in_(order_capabilities)))
             )

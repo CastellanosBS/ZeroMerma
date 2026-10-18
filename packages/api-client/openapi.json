@@ -42721,8 +42721,80 @@
         "title": "ReturnCommitLineRequest",
         "type": "object"
       },
+      "ReturnCommitLineResultView": {
+        "additionalProperties": false,
+        "properties": {
+          "disposition_code": {
+            "enum": [
+              "RESTOCK_COUNTER",
+              "RESTOCK_BACKROOM",
+              "SEND_TO_WASTE"
+            ],
+            "title": "Disposition Code",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string",
+            "x-zeromerma-id-representation": "JSON_STRING"
+          },
+          "line_number": {
+            "title": "Line Number",
+            "type": "integer"
+          },
+          "original_sale_line_id": {
+            "format": "uuid",
+            "title": "Original Sale Line Id",
+            "type": "string",
+            "x-zeromerma-id-representation": "JSON_STRING"
+          },
+          "refund_line_total_amount": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Refund Line Total Amount",
+            "type": "string",
+            "x-zeromerma-decimal-representation": "JSON_STRING"
+          },
+          "refund_unit_price": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Refund Unit Price",
+            "type": "string",
+            "x-zeromerma-decimal-representation": "JSON_STRING"
+          },
+          "returned_product_id": {
+            "format": "uuid",
+            "title": "Returned Product Id",
+            "type": "string",
+            "x-zeromerma-id-representation": "JSON_STRING"
+          },
+          "returned_quantity": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Returned Quantity",
+            "type": "string",
+            "x-zeromerma-decimal-representation": "JSON_STRING"
+          }
+        },
+        "required": [
+          "id",
+          "line_number",
+          "original_sale_line_id",
+          "returned_product_id",
+          "returned_quantity",
+          "refund_unit_price",
+          "refund_line_total_amount",
+          "disposition_code"
+        ],
+        "title": "ReturnCommitLineResultView",
+        "type": "object"
+      },
       "ReturnCommitRequest": {
         "properties": {
+          "cash_session_id": {
+            "format": "uuid",
+            "title": "Cash Session Id",
+            "type": "string",
+            "x-zeromerma-id-representation": "JSON_STRING"
+          },
           "high_risk_acknowledged": {
             "default": false,
             "title": "High Risk Acknowledged",
@@ -42774,12 +42846,113 @@
         },
         "required": [
           "workstation_code",
+          "cash_session_id",
           "original_sale_id",
           "reason_code",
           "refund_method_code",
           "lines"
         ],
         "title": "ReturnCommitRequest",
+        "type": "object"
+      },
+      "ReturnCommitResultView": {
+        "additionalProperties": false,
+        "properties": {
+          "branch_id": {
+            "format": "uuid",
+            "title": "Branch Id",
+            "type": "string",
+            "x-zeromerma-id-representation": "JSON_STRING"
+          },
+          "cash_session_id": {
+            "format": "uuid",
+            "title": "Cash Session Id",
+            "type": "string",
+            "x-zeromerma-id-representation": "JSON_STRING"
+          },
+          "created_at_utc": {
+            "format": "date-time",
+            "title": "Created At Utc",
+            "type": "string",
+            "x-zeromerma-instant-format": "ISO8601_DATETIME"
+          },
+          "currency_code": {
+            "title": "Currency Code",
+            "type": "string"
+          },
+          "folio": {
+            "title": "Folio",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string",
+            "x-zeromerma-id-representation": "JSON_STRING"
+          },
+          "lines": {
+            "items": {
+              "$ref": "#/components/schemas/ReturnCommitLineResultView"
+            },
+            "title": "Lines",
+            "type": "array"
+          },
+          "original_sale_folio": {
+            "title": "Original Sale Folio",
+            "type": "string"
+          },
+          "original_sale_id": {
+            "format": "uuid",
+            "title": "Original Sale Id",
+            "type": "string",
+            "x-zeromerma-id-representation": "JSON_STRING"
+          },
+          "refund_cash_movement_id": {
+            "format": "uuid",
+            "title": "Refund Cash Movement Id",
+            "type": "string",
+            "x-zeromerma-id-representation": "JSON_STRING"
+          },
+          "refund_method_code": {
+            "const": "CASH",
+            "title": "Refund Method Code",
+            "type": "string"
+          },
+          "status": {
+            "const": "COMMITTED",
+            "title": "Status",
+            "type": "string"
+          },
+          "total_refund_amount": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Total Refund Amount",
+            "type": "string",
+            "x-zeromerma-decimal-representation": "JSON_STRING"
+          },
+          "workstation_id": {
+            "format": "uuid",
+            "title": "Workstation Id",
+            "type": "string",
+            "x-zeromerma-id-representation": "JSON_STRING"
+          }
+        },
+        "required": [
+          "id",
+          "folio",
+          "status",
+          "original_sale_id",
+          "original_sale_folio",
+          "branch_id",
+          "workstation_id",
+          "cash_session_id",
+          "refund_cash_movement_id",
+          "refund_method_code",
+          "currency_code",
+          "total_refund_amount",
+          "created_at_utc",
+          "lines"
+        ],
+        "title": "ReturnCommitResultView",
         "type": "object"
       },
       "ReturnControlsView": {
@@ -43292,6 +43465,12 @@
       },
       "ReturnableSaleLineView": {
         "properties": {
+          "already_refunded_amount": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Already Refunded Amount",
+            "type": "string",
+            "x-zeromerma-decimal-representation": "JSON_STRING"
+          },
           "already_returned_quantity": {
             "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
             "title": "Already Returned Quantity",
@@ -43377,6 +43556,12 @@
             "type": "string",
             "x-zeromerma-decimal-representation": "JSON_STRING"
           },
+          "remaining_refundable_amount": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Remaining Refundable Amount",
+            "type": "string",
+            "x-zeromerma-decimal-representation": "JSON_STRING"
+          },
           "remaining_returnable_quantity": {
             "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
             "title": "Remaining Returnable Quantity",
@@ -43412,6 +43597,8 @@
           "line_total_amount",
           "already_returned_quantity",
           "remaining_returnable_quantity",
+          "already_refunded_amount",
+          "remaining_refundable_amount",
           "requires_exact_product_selection"
         ],
         "title": "ReturnableSaleLineView",
@@ -84385,6 +84572,22 @@
     "/v1/returns/commit": {
       "post": {
         "operationId": "commit_sale_return_v1_returns_commit_post",
+        "parameters": [
+          {
+            "description": "A globally unique UUIDv7 identifying this business intention.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": true,
+            "schema": {
+              "description": "A globally unique UUIDv7 identifying this business intention.",
+              "maxLength": 36,
+              "minLength": 36,
+              "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-7[0-9a-fA-F]{3}-[89aAbB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$",
+              "title": "Idempotency-Key",
+              "type": "string"
+            }
+          }
+        ],
         "requestBody": {
           "content": {
             "application/json": {
@@ -84400,11 +84603,16 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/SaleReturnDetailResponse"
+                  "$ref": "#/components/schemas/ReturnCommitResultView"
                 }
               }
             },
-            "description": "Successful Response"
+            "description": "Successful Response",
+            "headers": {
+              "Idempotency-Replayed": {
+                "$ref": "#/components/headers/IdempotencyReplayed"
+              }
+            }
           },
           "400": {
             "content": {
@@ -84506,6 +84714,171 @@
           }
         ],
         "summary": "Commit Sale Return",
+        "tags": [
+          "returns"
+        ],
+        "x-authorization-policy": "explicit-deny-by-default",
+        "x-required-capabilities": [
+          "returns_corrections.manage"
+        ],
+        "x-zeromerma-operation-id-policy": "FASTAPI_STABLE_GENERATED"
+      }
+    },
+    "/v1/returns/confirmations/{idempotency_key}": {
+      "get": {
+        "operationId": "recover_return_confirmation_v1_returns_confirmations__idempotency_key__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "idempotency_key",
+            "required": true,
+            "schema": {
+              "maxLength": 36,
+              "minLength": 36,
+              "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-7[0-9a-fA-F]{3}-[89aAbB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$",
+              "title": "Idempotency Key",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "workstation_code",
+            "required": true,
+            "schema": {
+              "maxLength": 64,
+              "minLength": 1,
+              "title": "Workstation Code",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "cash_session_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Cash Session Id",
+              "type": "string",
+              "x-zeromerma-id-representation": "JSON_STRING"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReturnCommitResultView"
+                }
+              }
+            },
+            "description": "Successful Response",
+            "headers": {
+              "Idempotency-Replayed": {
+                "$ref": "#/components/headers/IdempotencyReplayed"
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Authentication Required"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "423": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Session Locked"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Login Rate Limited"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Internal Server Error"
+          }
+        },
+        "security": [
+          {
+            "PosSessionCookie": []
+          },
+          {
+            "BackofficeSessionCookie": []
+          }
+        ],
+        "summary": "Recover Return Confirmation",
         "tags": [
           "returns"
         ],

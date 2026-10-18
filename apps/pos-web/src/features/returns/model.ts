@@ -1,7 +1,4 @@
-import type {
-  ReturnCommitLineRequest,
-  ReturnableSaleLineView,
-} from "../../lib/api-contracts";
+import type { ReturnCommitLineRequest, ReturnableSaleLineView } from "../../lib/api-contracts";
 import {
   formatMoneyFromCents,
   formatQuantityFromMilliUnits,
@@ -16,6 +13,9 @@ export const RETURN_DISPOSITION_SEND_TO_WASTE = "SEND_TO_WASTE";
 
 export interface ReturnDraftLine {
   alreadyReturnedMilliUnits: number;
+  alreadyRefundedCents: number;
+  originalLineTotalCents: number;
+  remainingRefundableCents: number;
   captureMode: string;
   dispositionCode: string;
   exactProductId: string;
@@ -82,8 +82,7 @@ export function setReturnDraftLineQuantityText(
       ? {
           ...line,
           quantityText: sanitizeQuantityInput(quantityText),
-          quantityMilliUnits:
-            parseQuantityToMilliUnits(sanitizeQuantityInput(quantityText)) ?? 0,
+          quantityMilliUnits: parseQuantityToMilliUnits(sanitizeQuantityInput(quantityText)) ?? 0,
         }
       : line,
   );
@@ -161,7 +160,20 @@ export function setReturnDraftLineExactProduct(
 }
 
 export function getReturnDraftLineRefundCents(line: ReturnDraftLine): number {
-  return Math.round((line.quantityMilliUnits * line.refundUnitPriceCents) / 1000);
+  if (line.quantityMilliUnits <= 0 || line.originalQuantityMilliUnits <= 0) return 0;
+  const cumulativeQuantity = Math.min(
+    line.originalQuantityMilliUnits,
+    line.alreadyReturnedMilliUnits + line.quantityMilliUnits,
+  );
+  if (cumulativeQuantity === line.originalQuantityMilliUnits) return line.remainingRefundableCents;
+  // Calculate positive HALF_UP cumulative entitlement without binary floating-point products.
+  const numerator = BigInt(line.originalLineTotalCents) * BigInt(cumulativeQuantity);
+  const denominator = BigInt(line.originalQuantityMilliUnits);
+  const cumulativeCents = (2n * numerator + denominator) / (2n * denominator);
+  return Math.max(
+    0,
+    Math.min(line.remainingRefundableCents, Number(cumulativeCents) - line.alreadyRefundedCents),
+  );
 }
 
 export function getReturnDraftTotalRefundCents(lines: ReturnDraftLine[]): number {
@@ -197,9 +209,7 @@ export function hasReturnDraftInvalidQuantity(lines: ReturnDraftLine[]): boolean
 }
 
 export function hasReturnDraftMissingExactProduct(lines: ReturnDraftLine[]): boolean {
-  return lines.some(
-    (line) => line.exactProductRequired && line.exactProductId.trim().length === 0,
-  );
+  return lines.some((line) => line.exactProductRequired && line.exactProductId.trim().length === 0);
 }
 
 export function hasReturnDraftMissingDisposition(lines: ReturnDraftLine[]): boolean {
@@ -214,25 +224,23 @@ export function hasReturnDraftMissingRefundMethod(refundMethodCode: string): boo
   return refundMethodCode.trim().length === 0;
 }
 
-export function getReturnDraftBlockingMessages(
-  {
-    additionalBlockingMessages = [],
-    hasHighRiskAcknowledgement = true,
-    hasSelectedSale,
-    highRiskAcknowledgementRequired = false,
-    lines,
-    reasonCode,
-    refundMethodCode,
-  }: {
-    additionalBlockingMessages?: string[];
-    hasHighRiskAcknowledgement?: boolean;
-    hasSelectedSale: boolean;
-    highRiskAcknowledgementRequired?: boolean;
-    lines: ReturnDraftLine[];
-    reasonCode: string;
-    refundMethodCode: string;
-  },
-): string[] {
+export function getReturnDraftBlockingMessages({
+  additionalBlockingMessages = [],
+  hasHighRiskAcknowledgement = true,
+  hasSelectedSale,
+  highRiskAcknowledgementRequired = false,
+  lines,
+  reasonCode,
+  refundMethodCode,
+}: {
+  additionalBlockingMessages?: string[];
+  hasHighRiskAcknowledgement?: boolean;
+  hasSelectedSale: boolean;
+  highRiskAcknowledgementRequired?: boolean;
+  lines: ReturnDraftLine[];
+  reasonCode: string;
+  refundMethodCode: string;
+}): string[] {
   if (!hasSelectedSale) {
     return ["Selecciona una venta original."];
   }
@@ -266,25 +274,23 @@ export function getReturnDraftBlockingMessages(
   return messages;
 }
 
-export function getReturnDraftBlockedReason(
-  {
-    additionalBlockingMessages,
-    hasHighRiskAcknowledgement,
-    hasSelectedSale,
-    highRiskAcknowledgementRequired,
-    lines,
-    reasonCode,
-    refundMethodCode,
-  }: {
-    additionalBlockingMessages?: string[];
-    hasHighRiskAcknowledgement?: boolean;
-    hasSelectedSale: boolean;
-    highRiskAcknowledgementRequired?: boolean;
-    lines: ReturnDraftLine[];
-    reasonCode: string;
-    refundMethodCode: string;
-  },
-): string | null {
+export function getReturnDraftBlockedReason({
+  additionalBlockingMessages,
+  hasHighRiskAcknowledgement,
+  hasSelectedSale,
+  highRiskAcknowledgementRequired,
+  lines,
+  reasonCode,
+  refundMethodCode,
+}: {
+  additionalBlockingMessages?: string[];
+  hasHighRiskAcknowledgement?: boolean;
+  hasSelectedSale: boolean;
+  highRiskAcknowledgementRequired?: boolean;
+  lines: ReturnDraftLine[];
+  reasonCode: string;
+  refundMethodCode: string;
+}): string | null {
   return (
     getReturnDraftBlockingMessages({
       additionalBlockingMessages,
@@ -298,9 +304,7 @@ export function getReturnDraftBlockedReason(
   );
 }
 
-export function buildReturnCommitLines(
-  lines: ReturnDraftLine[],
-): ReturnCommitLineRequest[] {
+export function buildReturnCommitLines(lines: ReturnDraftLine[]): ReturnCommitLineRequest[] {
   if (lines.length === 0) {
     throw new Error("Selecciona al menos una linea para devolver.");
   }
@@ -338,15 +342,31 @@ export function getReturnTotalUnitsMilli(lines: ReturnDraftLine[]): number {
 }
 
 function buildReturnDraftLine(originalLine: ReturnableSaleLineView): ReturnDraftLine {
-  const refundUnitPriceCents = parseMoneyToCents(String(originalLine.unit_price));
+  const refundUnitPriceCents = parseRefundBalanceCents(String(originalLine.unit_price));
   if (refundUnitPriceCents === null) {
     throw new Error("No fue posible interpretar el precio de la linea original.");
   }
 
+  const originalLineTotalCents = parseRefundBalanceCents(String(originalLine.line_total_amount));
+  const alreadyRefundedCents = parseRefundBalanceCents(
+    String(originalLine.already_refunded_amount),
+  );
+  const remainingRefundableCents = parseRefundBalanceCents(
+    String(originalLine.remaining_refundable_amount),
+  );
+  if (
+    originalLineTotalCents === null ||
+    alreadyRefundedCents === null ||
+    remainingRefundableCents === null
+  ) {
+    throw new Error("No fue posible interpretar el saldo de reembolso de la linea original.");
+  }
   const remainingReturnableMilliUnits = parseQuantityToMilliUnits(
     String(originalLine.remaining_returnable_quantity),
   );
-  const originalQuantityMilliUnits = parseQuantityToMilliUnitsAllowZero(String(originalLine.quantity));
+  const originalQuantityMilliUnits = parseQuantityToMilliUnitsAllowZero(
+    String(originalLine.quantity),
+  );
   const alreadyReturnedMilliUnits = parseQuantityToMilliUnitsAllowZero(
     String(originalLine.already_returned_quantity),
   );
@@ -361,6 +381,9 @@ function buildReturnDraftLine(originalLine: ReturnableSaleLineView): ReturnDraft
 
   return {
     alreadyReturnedMilliUnits,
+    alreadyRefundedCents,
+    originalLineTotalCents,
+    remainingRefundableCents,
     captureMode: originalLine.capture_mode,
     dispositionCode: "",
     exactProductId: "",
@@ -398,4 +421,8 @@ function parseQuantityToMilliUnitsAllowZero(value: string): number | null {
 
   const paddedDecimalPart = decimalPart.padEnd(3, "0");
   return Number.parseInt(wholePart, 10) * 1000 + Number.parseInt(paddedDecimalPart, 10);
+}
+
+function parseRefundBalanceCents(value: string): number | null {
+  return /^0+(\.0{1,2})?$/.test(value.trim()) ? 0 : parseMoneyToCents(value);
 }

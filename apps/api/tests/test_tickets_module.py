@@ -204,10 +204,17 @@ def test_ticket_visual_state_updates_after_sale_return(client: TestClient) -> No
     assert sale_detail_response.status_code == 200
     product_direct_line_id = sale_detail_response.json()["lines"][1]["id"]
 
+    return_headers = {**headers}
+    return_cash_session_id = current_cash_session_id(
+        client, headers=return_headers, workstation_code=SEED_WORKSTATION_CODE
+    )
+    return_headers["Idempotency-Key"] = new_idempotency_key()
+
     return_response = client.post(
         "/v1/returns/commit",
-        headers=headers,
+        headers=return_headers,
         json={
+            "cash_session_id": return_cash_session_id,
             "workstation_code": SEED_WORKSTATION_CODE,
             "original_sale_id": sale_payload["id"],
             "reason_code": "WRONG_ITEM",

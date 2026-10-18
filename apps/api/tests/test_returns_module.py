@@ -198,13 +198,20 @@ def test_product_direct_return_commits_refund_and_writes_audit_and_outbox(
         line for line in sale_detail["lines"] if line["capture_mode"] == "PRODUCT_DIRECT"
     )
 
+    return_headers = {
+        **_authorization_header(client),
+        "X-Request-ID": "returns-product-direct",
+    }
+    return_cash_session_id = current_cash_session_id(
+        client, headers=return_headers, workstation_code=SEED_WORKSTATION_CODE
+    )
+    return_headers["Idempotency-Key"] = new_idempotency_key()
+
     response = client.post(
         "/v1/returns/commit",
-        headers={
-            **_authorization_header(client),
-            "X-Request-ID": "returns-product-direct",
-        },
+        headers=return_headers,
         json={
+            "cash_session_id": return_cash_session_id,
             "workstation_code": SEED_WORKSTATION_CODE,
             "original_sale_id": sale_payload["id"],
             "reason_code": "WRONG_ITEM",
@@ -273,7 +280,7 @@ def test_product_direct_return_commits_refund_and_writes_audit_and_outbox(
     assert audit_record.request_id == "returns-product-direct"
     assert outbox_event.payload["original_sale_id"] == str(sale_payload["id"])
     assert return_record.reason_code == "WRONG_ITEM"
-    assert payload["reason_code"] == "WRONG_ITEM"
+    assert reread_response.json()["reason_code"] == "WRONG_ITEM"
 
 
 def test_class_capture_return_requires_exact_product_and_blocks_over_return(
@@ -286,10 +293,17 @@ def test_class_capture_return_requires_exact_product_and_blocks_over_return(
         line for line in sale_detail["lines"] if line["capture_mode"] == "CLASS_CAPTURE"
     )
 
+    return_headers = _authorization_header(client)
+    return_cash_session_id = current_cash_session_id(
+        client, headers=return_headers, workstation_code=SEED_WORKSTATION_CODE
+    )
+    return_headers["Idempotency-Key"] = new_idempotency_key()
+
     missing_product_response = client.post(
         "/v1/returns/commit",
-        headers=_authorization_header(client),
+        headers=return_headers,
         json={
+            "cash_session_id": return_cash_session_id,
             "workstation_code": SEED_WORKSTATION_CODE,
             "original_sale_id": sale_payload["id"],
             "reason_code": "QUALITY_ISSUE",
@@ -306,10 +320,17 @@ def test_class_capture_return_requires_exact_product_and_blocks_over_return(
     assert missing_product_response.status_code == 400
     assert "producto exacto" in missing_product_response.json()["message"]
 
+    return_headers = _authorization_header(client)
+    return_cash_session_id = current_cash_session_id(
+        client, headers=return_headers, workstation_code=SEED_WORKSTATION_CODE
+    )
+    return_headers["Idempotency-Key"] = new_idempotency_key()
+
     valid_response = client.post(
         "/v1/returns/commit",
-        headers=_authorization_header(client),
+        headers=return_headers,
         json={
+            "cash_session_id": return_cash_session_id,
             "workstation_code": SEED_WORKSTATION_CODE,
             "original_sale_id": sale_payload["id"],
             "reason_code": "QUALITY_ISSUE",
@@ -326,10 +347,17 @@ def test_class_capture_return_requires_exact_product_and_blocks_over_return(
     )
     assert valid_response.status_code == 201
 
+    return_headers = _authorization_header(client)
+    return_cash_session_id = current_cash_session_id(
+        client, headers=return_headers, workstation_code=SEED_WORKSTATION_CODE
+    )
+    return_headers["Idempotency-Key"] = new_idempotency_key()
+
     over_return_response = client.post(
         "/v1/returns/commit",
-        headers=_authorization_header(client),
+        headers=return_headers,
         json={
+            "cash_session_id": return_cash_session_id,
             "workstation_code": SEED_WORKSTATION_CODE,
             "original_sale_id": sale_payload["id"],
             "reason_code": "QUALITY_ISSUE",
@@ -344,7 +372,7 @@ def test_class_capture_return_requires_exact_product_and_blocks_over_return(
             ],
         },
     )
-    assert over_return_response.status_code == 400
+    assert over_return_response.status_code == 409
     assert "supera" in over_return_response.json()["message"]
 
 
@@ -359,10 +387,17 @@ def test_class_capture_line_allows_returning_only_remaining_quantity(
     )
     exact_product_id = _get_product_id(SEED_PRODUCT_CONCHA_VAN_CODE)
 
+    return_headers = _authorization_header(client)
+    return_cash_session_id = current_cash_session_id(
+        client, headers=return_headers, workstation_code=SEED_WORKSTATION_CODE
+    )
+    return_headers["Idempotency-Key"] = new_idempotency_key()
+
     first_response = client.post(
         "/v1/returns/commit",
-        headers=_authorization_header(client),
+        headers=return_headers,
         json={
+            "cash_session_id": return_cash_session_id,
             "workstation_code": SEED_WORKSTATION_CODE,
             "original_sale_id": sale_payload["id"],
             "reason_code": "DAMAGED_ON_DELIVERY",
@@ -379,10 +414,17 @@ def test_class_capture_line_allows_returning_only_remaining_quantity(
     )
     assert first_response.status_code == 201
 
+    return_headers = _authorization_header(client)
+    return_cash_session_id = current_cash_session_id(
+        client, headers=return_headers, workstation_code=SEED_WORKSTATION_CODE
+    )
+    return_headers["Idempotency-Key"] = new_idempotency_key()
+
     second_response = client.post(
         "/v1/returns/commit",
-        headers=_authorization_header(client),
+        headers=return_headers,
         json={
+            "cash_session_id": return_cash_session_id,
             "workstation_code": SEED_WORKSTATION_CODE,
             "original_sale_id": sale_payload["id"],
             "reason_code": "DAMAGED_ON_DELIVERY",
@@ -415,10 +457,17 @@ def test_return_requires_reason_and_valid_refund_method(client: TestClient) -> N
         line for line in sale_detail["lines"] if line["capture_mode"] == "PRODUCT_DIRECT"
     )
 
+    return_headers = _authorization_header(client)
+    return_cash_session_id = current_cash_session_id(
+        client, headers=return_headers, workstation_code=SEED_WORKSTATION_CODE
+    )
+    return_headers["Idempotency-Key"] = new_idempotency_key()
+
     missing_reason_response = client.post(
         "/v1/returns/commit",
-        headers=_authorization_header(client),
+        headers=return_headers,
         json={
+            "cash_session_id": return_cash_session_id,
             "workstation_code": SEED_WORKSTATION_CODE,
             "original_sale_id": sale_payload["id"],
             "reason_code": " ",
@@ -435,10 +484,17 @@ def test_return_requires_reason_and_valid_refund_method(client: TestClient) -> N
     assert missing_reason_response.status_code == 400
     assert "motivo" in missing_reason_response.json()["message"].lower()
 
+    return_headers = _authorization_header(client)
+    return_cash_session_id = current_cash_session_id(
+        client, headers=return_headers, workstation_code=SEED_WORKSTATION_CODE
+    )
+    return_headers["Idempotency-Key"] = new_idempotency_key()
+
     invalid_refund_method_response = client.post(
         "/v1/returns/commit",
-        headers=_authorization_header(client),
+        headers=return_headers,
         json={
+            "cash_session_id": return_cash_session_id,
             "workstation_code": SEED_WORKSTATION_CODE,
             "original_sale_id": sale_payload["id"],
             "reason_code": "WRONG_ITEM",
@@ -471,13 +527,20 @@ def test_old_sale_return_requires_acknowledgement_and_prepares_backoffice_review
         sale.confirmed_at = datetime.now(tz=UTC) - timedelta(days=10)
         session.commit()
 
+    return_headers = {
+        **_authorization_header(client),
+        "X-Request-ID": "returns-high-risk-blocked",
+    }
+    return_cash_session_id = current_cash_session_id(
+        client, headers=return_headers, workstation_code=SEED_WORKSTATION_CODE
+    )
+    return_headers["Idempotency-Key"] = new_idempotency_key()
+
     blocked_response = client.post(
         "/v1/returns/commit",
-        headers={
-            **_authorization_header(client),
-            "X-Request-ID": "returns-high-risk-blocked",
-        },
+        headers=return_headers,
         json={
+            "cash_session_id": return_cash_session_id,
             "workstation_code": SEED_WORKSTATION_CODE,
             "original_sale_id": sale_payload["id"],
             "reason_code": "QUALITY_ISSUE",
@@ -495,13 +558,20 @@ def test_old_sale_return_requires_acknowledgement_and_prepares_backoffice_review
     assert blocked_response.status_code == 400
     assert "alto riesgo" in blocked_response.json()["message"].lower()
 
+    return_headers = {
+        **_authorization_header(client),
+        "X-Request-ID": "returns-high-risk-confirmed",
+    }
+    return_cash_session_id = current_cash_session_id(
+        client, headers=return_headers, workstation_code=SEED_WORKSTATION_CODE
+    )
+    return_headers["Idempotency-Key"] = new_idempotency_key()
+
     allowed_response = client.post(
         "/v1/returns/commit",
-        headers={
-            **_authorization_header(client),
-            "X-Request-ID": "returns-high-risk-confirmed",
-        },
+        headers=return_headers,
         json={
+            "cash_session_id": return_cash_session_id,
             "workstation_code": SEED_WORKSTATION_CODE,
             "original_sale_id": sale_payload["id"],
             "reason_code": "QUALITY_ISSUE",
@@ -559,13 +629,20 @@ def test_returns_history_and_detail_expose_safe_audit_summary(client: TestClient
         line for line in sale_detail["lines"] if line["capture_mode"] == "PRODUCT_DIRECT"
     )
 
+    return_headers = {
+        **_authorization_header(client),
+        "X-Request-ID": "returns-history-audit",
+    }
+    return_cash_session_id = current_cash_session_id(
+        client, headers=return_headers, workstation_code=SEED_WORKSTATION_CODE
+    )
+    return_headers["Idempotency-Key"] = new_idempotency_key()
+
     create_response = client.post(
         "/v1/returns/commit",
-        headers={
-            **_authorization_header(client),
-            "X-Request-ID": "returns-history-audit",
-        },
+        headers=return_headers,
         json={
+            "cash_session_id": return_cash_session_id,
             "workstation_code": SEED_WORKSTATION_CODE,
             "original_sale_id": sale_payload["id"],
             "reason_code": "WRONG_ITEM",

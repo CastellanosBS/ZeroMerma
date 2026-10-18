@@ -173,7 +173,10 @@ const returnSaleDetail = {
   folio: "TK-5001",
   lines: [
     {
-      already_returned_quantity: "0",
+      already_returned_quantity: "4",
+      already_refunded_amount: "48.00",
+      remaining_refundable_amount: "24.00",
+      line_total_amount: "72.00",
       capture_mode: "PRODUCT_DIRECT",
       catalog_name_snapshot: "Concha vainilla",
       id: "sale-line-1",
@@ -419,7 +422,10 @@ async function installApiMocks(page: Page) {
     const url = new URL(request.url());
     const pathname = url.pathname;
 
-    if (pathname.startsWith("/v1/auth/")) { await route.fallback(); return; }
+    if (pathname.startsWith("/v1/auth/")) {
+      await route.fallback();
+      return;
+    }
 
     if (pathname === "/v1/pos/bootstrap") {
       await fulfillJson(route, posBootstrap);
@@ -606,6 +612,7 @@ async function installApiMocks(page: Page) {
           { code: "QUALITY_ISSUE", label: "Problema de calidad" },
         ],
         user,
+        workstation,
       });
       return;
     }

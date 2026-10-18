@@ -2,9 +2,10 @@ from __future__ import annotations
 
 from datetime import date, datetime
 from decimal import Decimal
+from typing import Literal
 from uuid import UUID
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from zeromerma_api.modules.audit.application.schemas import AuditSummaryView
 from zeromerma_api.modules.branches.application.schemas import BranchSummary, WorkstationSummary
@@ -156,6 +157,8 @@ class ReturnableSaleLineView(BaseModel):
     line_total_amount: Decimal
     already_returned_quantity: Decimal
     remaining_returnable_quantity: Decimal
+    already_refunded_amount: Decimal
+    remaining_refundable_amount: Decimal
     requires_exact_product_selection: bool
 
 
@@ -187,15 +190,63 @@ class ReturnCommitLineRequest(BaseModel):
     disposition_code: str = Field(min_length=1, max_length=32)
     exact_product_id: UUID | None = None
 
+    @field_validator("disposition_code")
+    @classmethod
+    def normalize_disposition(cls, value: str) -> str:
+        return value.strip().upper()
+
 
 class ReturnCommitRequest(BaseModel):
     workstation_code: str = Field(min_length=1, max_length=64)
+    cash_session_id: UUID
     original_sale_id: UUID
     reason_code: str = Field(min_length=1, max_length=40)
     high_risk_acknowledged: bool = False
     notes: str | None = None
     refund_method_code: str = Field(min_length=1, max_length=40)
     lines: list[ReturnCommitLineRequest] = Field(min_length=1)
+
+    @field_validator("reason_code", "refund_method_code")
+    @classmethod
+    def normalize_code(cls, value: str) -> str:
+        return value.strip().upper()
+
+    @field_validator("notes")
+    @classmethod
+    def normalize_notes(cls, value: str | None) -> str | None:
+        return value.strip() or None if value is not None else None
+
+
+class ReturnCommitLineResultView(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    id: UUID
+    line_number: int
+    original_sale_line_id: UUID
+    returned_product_id: UUID
+    returned_quantity: Decimal
+    refund_unit_price: Decimal
+    refund_line_total_amount: Decimal
+    disposition_code: Literal["RESTOCK_COUNTER", "RESTOCK_BACKROOM", "SEND_TO_WASTE"]
+
+
+class ReturnCommitResultView(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    id: UUID
+    folio: str
+    status: Literal["COMMITTED"]
+    original_sale_id: UUID
+    original_sale_folio: str
+    branch_id: UUID
+    workstation_id: UUID
+    cash_session_id: UUID
+    refund_cash_movement_id: UUID
+    refund_method_code: Literal["CASH"]
+    currency_code: str
+    total_refund_amount: Decimal
+    created_at_utc: datetime
+    lines: list[ReturnCommitLineResultView]
 
 
 class SaleReturnCommittedLineView(BaseModel):

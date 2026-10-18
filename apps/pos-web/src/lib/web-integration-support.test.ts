@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import {
   dropNextSaleConfirmationResponse,
+  dropNextReturnConfirmationResponse,
   dropNextOrderCommandResponse,
   observeRealApi,
   realEnvironment,
@@ -105,6 +106,42 @@ describe("real browser integration safety", () => {
       expect(route.abort).toHaveBeenCalledWith("failed");
       expect(network).toEqual(
         status === 201 ? [{ method: "POST", path: "/v1/sales/confirm", status: 201 }] : [],
+      );
+      expect(() => page.route("", undefined)).toThrow("interception is forbidden");
+    },
+  );
+
+  it.each([201, 409])(
+    "loses a response only after the real return fetch and requires 201, received %i",
+    async (status) => {
+      isolatedEnvironment();
+      const route = {
+        request: () => ({ method: () => "POST" }),
+        fetch: vi.fn(async () => ({ status: () => status, json: async () => ({ id: "return" }) })),
+        abort: vi.fn(async () => {}),
+      };
+      let handler: ((value: typeof route) => Promise<void>) | undefined;
+      const register = vi.fn(async (_url: string, callback: typeof handler) => {
+        handler = callback;
+      });
+      const page = { on: vi.fn(), route: register };
+      const network = observeRealApi({ on: vi.fn() }, page, "https://127.0.0.1:41201");
+      const fault = await dropNextReturnConfirmationResponse(
+        page,
+        "https://127.0.0.1:41201",
+        network,
+      );
+      const outcome =
+        status === 201
+          ? expect(fault.committed).resolves.toEqual({ id: "return" })
+          : expect(fault.committed).rejects.toThrow("received 409");
+      await handler!(route);
+      await outcome;
+      expect(register.mock.calls[0]?.[0]).toBe("https://127.0.0.1:41201/v1/returns/commit");
+      expect(route.fetch).toHaveBeenCalledWith({ maxRedirects: 0 });
+      expect(route.abort).toHaveBeenCalledWith("failed");
+      expect(network).toEqual(
+        status === 201 ? [{ method: "POST", path: "/v1/returns/commit", status: 201 }] : [],
       );
       expect(() => page.route("", undefined)).toThrow("interception is forbidden");
     },

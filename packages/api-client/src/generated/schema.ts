@@ -3254,6 +3254,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/returns/confirmations/{idempotency_key}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Recover Return Confirmation */
+        get: operations["recover_return_confirmation_v1_returns_confirmations__idempotency_key__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/returns/history": {
         parameters: {
             query?: never;
@@ -18527,8 +18544,44 @@ export interface components {
             /** Returned Quantity */
             returned_quantity: number | string;
         };
+        /** ReturnCommitLineResultView */
+        ReturnCommitLineResultView: {
+            /**
+             * Disposition Code
+             * @enum {string}
+             */
+            disposition_code: "RESTOCK_COUNTER" | "RESTOCK_BACKROOM" | "SEND_TO_WASTE";
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Line Number */
+            line_number: number;
+            /**
+             * Original Sale Line Id
+             * Format: uuid
+             */
+            original_sale_line_id: string;
+            /** Refund Line Total Amount */
+            refund_line_total_amount: string;
+            /** Refund Unit Price */
+            refund_unit_price: string;
+            /**
+             * Returned Product Id
+             * Format: uuid
+             */
+            returned_product_id: string;
+            /** Returned Quantity */
+            returned_quantity: string;
+        };
         /** ReturnCommitRequest */
         ReturnCommitRequest: {
+            /**
+             * Cash Session Id
+             * Format: uuid
+             */
+            cash_session_id: string;
             /**
              * High Risk Acknowledged
              * @default false
@@ -18549,6 +18602,64 @@ export interface components {
             refund_method_code: string;
             /** Workstation Code */
             workstation_code: string;
+        };
+        /** ReturnCommitResultView */
+        ReturnCommitResultView: {
+            /**
+             * Branch Id
+             * Format: uuid
+             */
+            branch_id: string;
+            /**
+             * Cash Session Id
+             * Format: uuid
+             */
+            cash_session_id: string;
+            /**
+             * Created At Utc
+             * Format: date-time
+             */
+            created_at_utc: string;
+            /** Currency Code */
+            currency_code: string;
+            /** Folio */
+            folio: string;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Lines */
+            lines: components["schemas"]["ReturnCommitLineResultView"][];
+            /** Original Sale Folio */
+            original_sale_folio: string;
+            /**
+             * Original Sale Id
+             * Format: uuid
+             */
+            original_sale_id: string;
+            /**
+             * Refund Cash Movement Id
+             * Format: uuid
+             */
+            refund_cash_movement_id: string;
+            /**
+             * Refund Method Code
+             * @constant
+             */
+            refund_method_code: "CASH";
+            /**
+             * Status
+             * @constant
+             */
+            status: "COMMITTED";
+            /** Total Refund Amount */
+            total_refund_amount: string;
+            /**
+             * Workstation Id
+             * Format: uuid
+             */
+            workstation_id: string;
         };
         /** ReturnControlsView */
         ReturnControlsView: {
@@ -18761,6 +18872,8 @@ export interface components {
         };
         /** ReturnableSaleLineView */
         ReturnableSaleLineView: {
+            /** Already Refunded Amount */
+            already_refunded_amount: string;
             /** Already Returned Quantity */
             already_returned_quantity: string;
             /** Capture Mode */
@@ -18793,6 +18906,8 @@ export interface components {
             product_name?: string | null;
             /** Quantity */
             quantity: string;
+            /** Remaining Refundable Amount */
+            remaining_refundable_amount: string;
             /** Remaining Returnable Quantity */
             remaining_returnable_quantity: string;
             /** Requires Exact Product Selection */
@@ -43608,7 +43723,10 @@ export interface operations {
     commit_sale_return_v1_returns_commit_post: {
         parameters: {
             query?: never;
-            header?: never;
+            header: {
+                /** @description A globally unique UUIDv7 identifying this business intention. */
+                "Idempotency-Key": string;
+            };
             path?: never;
             cookie?: never;
         };
@@ -43621,10 +43739,118 @@ export interface operations {
             /** @description Successful Response */
             201: {
                 headers: {
+                    "Idempotency-Replayed": components["headers"]["IdempotencyReplayed"];
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["SaleReturnDetailResponse"];
+                    "application/json": components["schemas"]["ReturnCommitResultView"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorResponse"];
+                };
+            };
+            /** @description Authentication Required */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorResponse"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorResponse"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorResponse"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorResponse"];
+                };
+            };
+            /** @description Session Locked */
+            423: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorResponse"];
+                };
+            };
+            /** @description Login Rate Limited */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorResponse"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorResponse"];
+                };
+            };
+        };
+    };
+    recover_return_confirmation_v1_returns_confirmations__idempotency_key__get: {
+        parameters: {
+            query: {
+                workstation_code: string;
+                cash_session_id: string;
+            };
+            header?: never;
+            path: {
+                idempotency_key: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    "Idempotency-Replayed": components["headers"]["IdempotencyReplayed"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReturnCommitResultView"];
                 };
             };
             /** @description Bad Request */

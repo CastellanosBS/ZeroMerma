@@ -15,6 +15,7 @@ from zeromerma_api.modules.audit.application.visibility import (
     BackofficeNotificationConfig,
     build_audit_actor_snapshot,
 )
+from zeromerma_api.modules.audit.infrastructure.models import AuditLog
 from zeromerma_api.modules.branches.infrastructure.models import Branch, Workstation
 from zeromerma_api.modules.identity.infrastructure.models import User
 from zeromerma_api.modules.returns.application.admin_schemas import (
@@ -187,16 +188,7 @@ class AdminReturnsService:
             session,
             user_id=type_cast(uuid.UUID, overview_row["sale_operator_id"]),
         )
-        cash_movement_id = session.execute(
-            select(CashMovement.id)
-            .where(
-                CashMovement.sale_id == overview_row["original_sale_id"],
-                CashMovement.movement_type == CASH_MOVEMENT_TYPE_SALE_RETURN_REFUND,
-                CashMovement.amount == overview_row["total_refund_amount"],
-                CashMovement.cash_session_id == overview_row["cash_session_id"],
-            )
-            .order_by(CashMovement.occurred_at.desc())
-        ).scalar_one_or_none()
+        cash_movement_id = _linked_refund_cash_movement_id(session, overview_row)
         audit_summary = self._audit_visibility.build_summary(
             session,
             created_actor=build_audit_actor_snapshot(
@@ -296,6 +288,49 @@ class AdminReturnsService:
                 for row in line_rows
             ],
         )
+
+
+def _linked_refund_cash_movement_id(session: Session, row: RowMapping) -> uuid.UUID | None:
+    metadata_rows = session.scalars(
+        select(AuditLog.metadata_).where(
+            AuditLog.action == "sale_return.committed",
+            AuditLog.resource_type == "sale_return",
+            AuditLog.resource_id == str(row["id"]),
+            AuditLog.branch_id == row["branch_id"],
+            AuditLog.actor_id == row["created_by_user_id"],
+        )
+    ).all()
+    references: set[uuid.UUID] = set()
+    for metadata in metadata_rows:
+        reference = metadata.get("refund_cash_movement_id")
+        if reference is None:
+            continue
+        if not isinstance(reference, str):
+            return None
+        try:
+            references.add(uuid.UUID(reference))
+        except ValueError:
+            return None
+    if len(references) != 1:
+        # Historical records without a causal reference remain explicitly unlinked.
+        # Neither matching amounts nor ordering can identify their actual refund.
+        return None
+    return session.scalar(
+        select(CashMovement.id).where(
+            CashMovement.id == next(iter(references)),
+            CashMovement.sale_id == row["original_sale_id"],
+            CashMovement.cash_session_id == row["cash_session_id"],
+            CashMovement.branch_id == row["branch_id"],
+            CashMovement.workstation_id == row["workstation_id"],
+            CashMovement.operator_id == row["created_by_user_id"],
+            CashMovement.movement_type == CASH_MOVEMENT_TYPE_SALE_RETURN_REFUND,
+            CashMovement.direction == "OUT",
+            CashMovement.payment_method_code == row["refund_method_code"],
+            CashMovement.currency_code == row["currency_code"],
+            CashMovement.amount == row["total_refund_amount"],
+            CashMovement.occurred_at == row["created_at_utc"],
+        )
+    )
 
 
 def _backend_contract() -> AdminReturnsBackendContractView:

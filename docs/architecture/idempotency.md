@@ -2,7 +2,8 @@
 
 ZM-FIN-028 implements the shared infrastructure governed by DEC-07. ZM-FIN-029
 adopts it for POS sale confirmation; ZM-FIN-030 adopts the existing order commands
-on POS and Backoffice. Other business commands retain their own
+on POS and Backoffice; ZM-FIN-031 adopts the existing POS return and cash refund.
+Other business commands retain their own
 pending adoption tasks; the existence of the foundation does not make them
 idempotent. POS and Backoffice remain separate, and PostgreSQL remains the
 authority for both the command and its result.
@@ -178,6 +179,41 @@ The full POS and Backoffice order workflows remain later tasks 058 and 078.
 Commands, validation status and those known differences are recorded in
 [the order validation record](../implementation/order-idempotency-validation.md).
 
+## Return commitment and recovery
+
+The existing POS `POST /v1/returns/commit` uses operation `return.commit`, a
+required UUIDv7 header and an explicit `cash_session_id` for the return intention.
+That session is open when the return starts and can differ from the original
+sale's cash session. Its capability is `returns_corrections.manage`; Backoffice
+remains a reader of committed returns.
+The executor owns the transaction containing return/lines, the existing cash
+refund movement, audit, outbox and the terminal acknowledgement.
+
+The original `Sale` row is locked with `FOR UPDATE` after identity reservation,
+protecting cumulative returned quantity and net refund value across its lines.
+Distinct keys cannot spend the same remaining entitlement. Refund
+deltas account for amounts already refunded and the original net line amount;
+the final partial return receives the rounding residual. This does not replace
+the later canonical pricing-allocation or cash-capacity work.
+
+`ReturnCommitResultView` contains minimal stable identities, amounts and lines,
+including the explicit `refund_cash_movement_id`. Personal operator fields,
+notes and dynamic audit details remain in authenticated detail reads. Existing
+v1 event/domain fields are not represented as universally free of PII.
+
+`GET /v1/returns/confirmations/{idempotency_key}` takes the return intention's
+workstation and cash session and performs authorized read-only recovery. It never reserves
+a key or issues a refund. An unresolved result cannot justify a new intention;
+after reload, metadata without the in-memory body supports lookup only.
+
+This adoption does not create physical stock movements from the currently stored
+disposition codes, complete external/partial settlement, or solve the separate
+cash-close race boundary. Those remain 050–051, 044–046 and 037 respectively.
+Existing CASH refunds of originally CARD/MIXED sales remain valid; unsupported
+refund methods do not become simulated bank reversals. The
+[return validation record](../implementation/return-idempotency-validation.md)
+tracks executed evidence and remaining boundaries.
+
 ## Transaction and replay boundary
 
 For an internal command, the reservation, business document, economic and physical
@@ -274,8 +310,8 @@ or a claim of legal compliance.
 ## Adoption boundaries
 
 ZM-FIN-029 adopts the foundation in sales; 030 covers the seven existing order
-commands and their embedded payment effects;
-031–035 cover returns/refunds, cash, transfers, corrections/waste and production.
+commands and their embedded payment effects; 031 covers the existing return and
+its CASH refund. Tasks 032–035 cover cash, transfers, corrections/waste and production.
 The wider review of commit ownership belongs to 039 and unified causal context to
 040. Historical order request correlation is not converted into fabricated
 idempotency records during adoption.

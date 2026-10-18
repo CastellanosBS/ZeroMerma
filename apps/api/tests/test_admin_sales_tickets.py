@@ -157,10 +157,17 @@ def test_admin_sales_ticket_detail_reprint_and_related_returns(client: TestClien
     assert sale_return_source_response.status_code == 200
     product_direct_line_id = sale_return_source_response.json()["lines"][1]["id"]
 
+    return_headers = {**cashier_headers}
+    return_cash_session_id = current_cash_session_id(
+        client, headers=return_headers, workstation_code=SEED_WORKSTATION_CODE
+    )
+    return_headers["Idempotency-Key"] = new_idempotency_key()
+
     return_response = client.post(
         "/v1/returns/commit",
-        headers=cashier_headers,
+        headers=return_headers,
         json={
+            "cash_session_id": return_cash_session_id,
             "workstation_code": SEED_WORKSTATION_CODE,
             "original_sale_id": sale_payload["id"],
             "reason_code": "WRONG_ITEM",

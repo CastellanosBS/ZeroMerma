@@ -224,6 +224,60 @@ def test_order_recovery_requires_metadata_without_economic_payload(
     }
 
 
+def test_return_command_requires_identity_and_keeps_private_data_out_of_receipt() -> None:
+    operation = SCHEMA["paths"]["/v1/returns/commit"]["post"]
+    key = next(item for item in operation["parameters"] if item["name"] == "Idempotency-Key")
+    assert key["in"] == "header" and key["required"] is True
+    assert "7[0-9a-fA-F]{3}" in key["schema"]["pattern"]
+    schemas = SCHEMA["components"]["schemas"]
+    assert "cash_session_id" in schemas["ReturnCommitRequest"]["required"]
+    for name in ("ReturnCommitResultView", "ReturnCommitLineResultView"):
+        receipt = schemas[name]
+        assert receipt["additionalProperties"] is False
+        assert (
+            not {
+                "notes",
+                "created_by",
+                "operator_email",
+                "operator_full_name",
+                "reason_code",
+                "reason_name",
+                "audit_summary",
+                "returned_product_name_snapshot",
+            }
+            & receipt["properties"].keys()
+        )
+    assert "refund_cash_movement_id" in schemas["ReturnCommitResultView"]["required"]
+    response = operation["responses"]["201"]
+    assert response["content"]["application/json"]["schema"] == {
+        "$ref": "#/components/schemas/ReturnCommitResultView"
+    }
+    assert response["headers"]["Idempotency-Replayed"] == {
+        "$ref": "#/components/headers/IdempotencyReplayed"
+    }
+
+
+def test_return_recovery_uses_only_identity_and_historical_cash_context() -> None:
+    recovery = SCHEMA["paths"]["/v1/returns/confirmations/{idempotency_key}"]["get"]
+    assert "requestBody" not in recovery
+    assert {item["name"] for item in recovery["parameters"] if item["required"]} == {
+        "idempotency_key",
+        "workstation_code",
+        "cash_session_id",
+    }
+    response = recovery["responses"]["200"]
+    assert response["content"]["application/json"]["schema"] == {
+        "$ref": "#/components/schemas/ReturnCommitResultView"
+    }
+    assert response["headers"]["Idempotency-Replayed"] == {
+        "$ref": "#/components/headers/IdempotencyReplayed"
+    }
+    schemas = SCHEMA["components"]["schemas"]
+    assert {"already_refunded_amount", "remaining_refundable_amount"} <= set(
+        schemas["ReturnableSaleLineView"]["required"]
+    )
+
+
 def test_error_response_change_is_rejected() -> None:
     changed = copy.deepcopy(SCHEMA)
     _, _, operation = _first_operation(changed)

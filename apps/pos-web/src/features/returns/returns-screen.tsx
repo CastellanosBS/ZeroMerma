@@ -1,3 +1,4 @@
+import { isCommandIntentionPending } from "@zeromerma/api-client";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Navigate, useNavigate, useRouterState } from "@tanstack/react-router";
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -26,6 +27,7 @@ import {
 import { MoneyIcon, TrashIcon } from "../../components/pos-icons";
 import { appEnv } from "../../env";
 import type {
+  ReturnCommitResultView,
   ReturnFilterOptionView,
   ReturnHistoryListItemView,
   ReturnOriginalSaleDetailResponse,
@@ -44,10 +46,7 @@ import {
 import { toOperationalErrorMessage } from "../../lib/http";
 import { usePosAuthStore } from "../auth/auth-store";
 import { useCurrentCashSessionQuery } from "../cash-session-open/queries";
-import {
-  parseMoneyToCents,
-  sanitizeQuantityInput,
-} from "../pos-terminal/model";
+import { parseMoneyToCents, sanitizeQuantityInput } from "../pos-terminal/model";
 import { posInputClass } from "../pos-theme/theme";
 import { useStatusMessageStore } from "../status-messages/store";
 import {
@@ -70,7 +69,8 @@ import {
   type ReturnDraftState,
 } from "./model";
 import { writeReturnReceiptToPrintWindow } from "./print";
-import { commitSaleReturn } from "./returns-api";
+import { returnIntentions } from "./return-command-intent";
+import { useReturnDraftIdentity, useReturnIntention } from "./use-return-intention";
 import {
   returnSaleDetailQueryKey,
   saleReturnDetailQueryKey,
@@ -141,14 +141,6 @@ type ReturnsUiState =
   | "RETURN_CONFIRMED"
   | "RETURN_ERROR";
 
-function createRequestId(scope: string): string {
-  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
-    return `${scope}-${crypto.randomUUID()}`;
-  }
-
-  return `${scope}-${Date.now()}-${Math.random().toString(16).slice(2)}`;
-}
-
 function useDebouncedValue(value: string, delayMs: number): string {
   const [debouncedValue, setDebouncedValue] = useState(value);
 
@@ -194,9 +186,7 @@ function getSaleReturnStatusLabel(status: string): string | null {
   }
 }
 
-function getSaleReturnStatusTone(
-  status: string,
-): "draft" | "success" | "warning" {
+function getSaleReturnStatusTone(status: string): "draft" | "success" | "warning" {
   switch (status) {
     case "PARTIALLY_RETURNED":
       return "warning";
@@ -229,9 +219,7 @@ function getReturnStatusLabel(status: string): string {
   }
 }
 
-function getReturnStatusTone(
-  status: string,
-): "confirmed" | "draft" | "success" | "warning" {
+function getReturnStatusTone(status: string): "confirmed" | "draft" | "success" | "warning" {
   switch (status) {
     case "COMMITTED":
       return "confirmed";
@@ -239,7 +227,6 @@ function getReturnStatusTone(
       return "draft";
   }
 }
-
 
 function getReturnUiStateLabel(uiState: ReturnsUiState): string {
   switch (uiState) {
@@ -297,10 +284,7 @@ function getDraftLineErrorMessage(line: ReturnDraftLine): string | null {
 }
 
 function getReturnableRefundAmount(line: ReturnableSaleLineView): string {
-  const refundCents = Math.round(
-    Number(line.remaining_returnable_quantity) * Number(line.unit_price) * 100,
-  );
-  return formatRefundCurrency(refundCents);
+  return formatCurrency(line.remaining_refundable_amount);
 }
 
 function applyDefaultReturnDisposition(lines: ReturnDraftLine[]): ReturnDraftLine[] {
@@ -346,7 +330,7 @@ function getReturnUiState({
   commitPending: boolean;
   draftLines: ReturnDraftLine[];
   hasSelectedSale: boolean;
-  lastCommittedReturn: SaleReturnDetailResponse | null;
+  lastCommittedReturn: ReturnCommitResultView | null;
 }): ReturnsUiState {
   if (commitPending) {
     return "CONFIRMING";
@@ -397,7 +381,9 @@ function SelectedSaleReferenceBar({
         </span>
         <span>{getReturnableLineCount(saleDetail)} lineas</span>
         <span>{getReturnableUnitsText(saleDetail)} disp.</span>
-        <span className="font-semibold text-slate-950">{formatCurrency(saleDetail.total_amount)}</span>
+        <span className="font-semibold text-slate-950">
+          {formatCurrency(saleDetail.total_amount)}
+        </span>
       </div>
     </div>
   );
@@ -432,7 +418,10 @@ function ReturnableLinesTable({
         header: "Producto",
         key: "article",
         renderCell: (line) => (
-          <span className="block truncate font-semibold text-slate-950" title={line.catalog_name_snapshot}>
+          <span
+            className="block truncate font-semibold text-slate-950"
+            title={line.catalog_name_snapshot}
+          >
             {line.catalog_name_snapshot}
           </span>
         ),
@@ -481,7 +470,9 @@ function ReturnableLinesTable({
                 aria-label={`Cantidad a devolver de ${line.catalog_name_snapshot}`}
                 className="h-8 min-w-0 border-x border-[var(--pos-shell-border)] px-1 text-center text-sm font-semibold text-slate-950 outline-none [font-variant-numeric:tabular-nums]"
                 inputMode="decimal"
-                onChange={(event) => onDraftQuantityChange(line, sanitizeQuantityInput(event.target.value))}
+                onChange={(event) =>
+                  onDraftQuantityChange(line, sanitizeQuantityInput(event.target.value))
+                }
                 onFocus={() => onSelect(line)}
                 value={draftLine?.quantityText ?? ""}
               />
@@ -651,7 +642,9 @@ function ReturnSummaryPanel({
 
   return (
     <PosSummaryPanel
-      description={saleDetail ? "Motivo, reembolso y confirmacion." : "Selecciona una venta para comenzar."}
+      description={
+        saleDetail ? "Motivo, reembolso y confirmacion." : "Selecciona una venta para comenzar."
+      }
       footer={footer}
       stateLabel={getReturnUiStateLabel(uiState)}
       stateTone={
@@ -666,7 +659,9 @@ function ReturnSummaryPanel({
       title="Devolucion"
     >
       <div className="grid h-full min-h-0 gap-3 overflow-hidden">
-        {commitError ? <PosInlineValidationMessage tone="error">{commitError}</PosInlineValidationMessage> : null}
+        {commitError ? (
+          <PosInlineValidationMessage tone="error">{commitError}</PosInlineValidationMessage>
+        ) : null}
 
         {!saleDetail ? (
           <div className="rounded-xl border border-dashed border-[var(--pos-shell-border)] bg-[var(--pos-shell-muted)] px-3 py-4 text-sm text-slate-600">
@@ -682,7 +677,10 @@ function ReturnSummaryPanel({
 
             {selectedDraftLine?.exactProductRequired ? (
               <div className="grid gap-2 rounded-xl border border-[var(--pos-shell-border)] bg-white px-3 py-2.5">
-                <p className="truncate text-sm font-semibold text-slate-950" title={selectedDraftLine.lineName}>
+                <p
+                  className="truncate text-sm font-semibold text-slate-950"
+                  title={selectedDraftLine.lineName}
+                >
                   {selectedDraftLine.lineName}
                 </p>
                 {selectedDraftLine.exactProductRequired ? (
@@ -703,10 +701,14 @@ function ReturnSummaryPanel({
                   </select>
                 ) : null}
                 {selectedLineValidationMessage ? (
-                  <PosInlineValidationMessage tone="warning">{selectedLineValidationMessage}</PosInlineValidationMessage>
+                  <PosInlineValidationMessage tone="warning">
+                    {selectedLineValidationMessage}
+                  </PosInlineValidationMessage>
                 ) : null}
                 {exactProductsError ? (
-                  <PosInlineValidationMessage tone="error">{exactProductsError}</PosInlineValidationMessage>
+                  <PosInlineValidationMessage tone="error">
+                    {exactProductsError}
+                  </PosInlineValidationMessage>
                 ) : null}
               </div>
             ) : null}
@@ -765,7 +767,9 @@ function ReturnSummaryPanel({
                 onClick={() => setNotesOpen((current) => !current)}
                 type="button"
               >
-                <span>{draftState.notes.trim().length > 0 ? "Observacion" : "Agregar observacion"}</span>
+                <span>
+                  {draftState.notes.trim().length > 0 ? "Observacion" : "Agregar observacion"}
+                </span>
                 <span className="text-xs text-slate-500">{isNotesOpen ? "Ocultar" : "Abrir"}</span>
               </button>
               {isNotesOpen ? (
@@ -875,10 +879,21 @@ function ReturnHistoryDetailPanel({
               returnDetail.branch.timezone,
             )}
           />
-          <KeyValueRow label="Cajero" title={returnDetail.created_by.full_name} value={returnDetail.created_by.full_name} />
+          <KeyValueRow
+            label="Cajero"
+            title={returnDetail.created_by.full_name}
+            value={returnDetail.created_by.full_name}
+          />
           <KeyValueRow label="Monto" value={formatCurrency(returnDetail.total_refund_amount)} />
-          <KeyValueRow label="Metodo" value={getRefundMethodLabel(returnDetail.refund_method_code)} />
-          <KeyValueRow label="Motivo" title={returnDetail.reason_name} value={returnDetail.reason_name} />
+          <KeyValueRow
+            label="Metodo"
+            value={getRefundMethodLabel(returnDetail.refund_method_code)}
+          />
+          <KeyValueRow
+            label="Motivo"
+            title={returnDetail.reason_name}
+            value={returnDetail.reason_name}
+          />
         </div>
 
         <div className="min-h-0 overflow-hidden rounded-xl border border-[var(--pos-shell-border)] bg-white">
@@ -893,7 +908,10 @@ function ReturnHistoryDetailPanel({
                 className="grid grid-cols-[minmax(0,1fr)_4.25rem_5rem] items-center gap-2 px-3 py-2"
                 key={line.id}
               >
-                <span className="truncate text-sm font-semibold text-slate-950" title={line.original_catalog_name_snapshot}>
+                <span
+                  className="truncate text-sm font-semibold text-slate-950"
+                  title={line.original_catalog_name_snapshot}
+                >
                   {line.original_catalog_name_snapshot}
                 </span>
                 <span className="text-right text-sm font-semibold text-slate-700 [font-variant-numeric:tabular-nums]">
@@ -934,10 +952,24 @@ export function ReturnsScreen() {
   const [centerSection, setCenterSection] = useState<ReturnsCenterSection>("sales");
   const [selectedDraftLineId, setSelectedDraftLineId] = useState<string | null>(null);
   const [draftState, setDraftState] = useState<ReturnDraftState>(createInitialReturnDraftState);
-  const [lastCommittedReturn, setLastCommittedReturn] = useState<SaleReturnDetailResponse | null>(
+  const [lastCommittedReturn, setLastCommittedReturn] = useState<ReturnCommitResultView | null>(
     null,
   );
   const [commitError, setCommitError] = useState<string | null>(null);
+  const { metadata: intention, error: intentionError } = useReturnIntention(
+    returnsBootstrapQuery.data?.workstation.id ?? "",
+  );
+  const draftObservedKey = useReturnDraftIdentity(
+    intention,
+    Boolean(returnsBootstrapQuery.data),
+    () => {
+      setDraftState(createInitialReturnDraftState());
+      setSelectedDraftLineId(null);
+      setSelectedSaleId(null);
+      setCenterSection("history");
+      void queryClient.invalidateQueries({ queryKey: ["returns"] });
+    },
+  );
   const routeSaleId = useRouterState({
     select: (state) => {
       const rawSaleId = (state.location.search as Record<string, unknown> | undefined)?.saleId;
@@ -1008,7 +1040,7 @@ export function ReturnsScreen() {
     setDraftState(createInitialReturnDraftState());
     setSelectedDraftLineId(null);
     setCommitError(null);
-    setLastCommittedReturn(null);
+    if (selectedSaleId) setLastCommittedReturn(null);
   }, [selectedSaleId]);
 
   useEffect(() => {
@@ -1022,6 +1054,7 @@ export function ReturnsScreen() {
 
   useEffect(() => {
     const historyRecords = returnsHistoryQuery.data?.records ?? [];
+    if (lastCommittedReturn && selectedHistoryReturnId === lastCommittedReturn.id) return;
     if (historyRecords.length === 0) {
       setSelectedHistoryReturnId(null);
       return;
@@ -1104,36 +1137,32 @@ export function ReturnsScreen() {
   const selectedDraftLine = useMemo(
     () =>
       selectedDraftLineId
-        ? draftState.lines.find((line) => line.originalSaleLineId === selectedDraftLineId) ?? null
+        ? (draftState.lines.find((line) => line.originalSaleLineId === selectedDraftLineId) ?? null)
         : null,
     [draftState.lines, selectedDraftLineId],
   );
 
   const selectedDraftLineExactProductOptions = selectedDraftLine
-    ? exactProductsByClassId[selectedDraftLine.productClassId] ?? []
+    ? (exactProductsByClassId[selectedDraftLine.productClassId] ?? [])
     : [];
   const selectedDraftLineExactProductsError = selectedDraftLine
-    ? exactProductErrorsByClassId[selectedDraftLine.productClassId] ?? null
+    ? (exactProductErrorsByClassId[selectedDraftLine.productClassId] ?? null)
     : null;
   const selectedDraftLineExactProductsLoading = selectedDraftLine
     ? classIdsNeedingExactProduct.includes(selectedDraftLine.productClassId) &&
-      exactProductQueries[
-        classIdsNeedingExactProduct.indexOf(selectedDraftLine.productClassId)
-      ]?.isPending === true
+      exactProductQueries[classIdsNeedingExactProduct.indexOf(selectedDraftLine.productClassId)]
+        ?.isPending === true
     : false;
 
-  const scopeOptions =
-    returnsBootstrapQuery.data?.available_scopes.length
-      ? returnsBootstrapQuery.data.available_scopes
-      : RETURN_SCOPE_OPTIONS_FALLBACK;
-  const reasonOptions =
-    returnsBootstrapQuery.data?.return_reasons.length
-      ? returnsBootstrapQuery.data.return_reasons
-      : RETURN_REASON_OPTIONS_FALLBACK;
-  const refundMethodOptions =
-    returnsBootstrapQuery.data?.refund_methods.length
-      ? returnsBootstrapQuery.data.refund_methods
-      : RETURN_REFUND_METHODS_FALLBACK;
+  const scopeOptions = returnsBootstrapQuery.data?.available_scopes.length
+    ? returnsBootstrapQuery.data.available_scopes
+    : RETURN_SCOPE_OPTIONS_FALLBACK;
+  const reasonOptions = returnsBootstrapQuery.data?.return_reasons.length
+    ? returnsBootstrapQuery.data.return_reasons
+    : RETURN_REASON_OPTIONS_FALLBACK;
+  const refundMethodOptions = returnsBootstrapQuery.data?.refund_methods.length
+    ? returnsBootstrapQuery.data.refund_methods
+    : RETURN_REFUND_METHODS_FALLBACK;
 
   useEffect(() => {
     if (!selectedSale || draftState.refundMethodCode.trim().length > 0) {
@@ -1155,19 +1184,18 @@ export function ReturnsScreen() {
     );
   }, [draftState.refundMethodCode, refundMethodOptions, selectedSale]);
 
-  const historyScopeOptions =
-    returnsHistoryQuery.data?.available_scopes.length
-      ? returnsHistoryQuery.data.available_scopes
-      : scopeOptions;
+  const historyScopeOptions = returnsHistoryQuery.data?.available_scopes.length
+    ? returnsHistoryQuery.data.available_scopes
+    : scopeOptions;
   const historyUserOptions: ReturnFilterOptionView[] =
     returnsHistoryQuery.data?.available_users ?? [];
-  const historyReasonOptions: ReturnFilterOptionView[] =
-    returnsHistoryQuery.data?.available_reasons.length
-      ? returnsHistoryQuery.data.available_reasons
-      : reasonOptions.map((reason) => ({
-          value: reason.code,
-          label: reason.label,
-        }));
+  const historyReasonOptions: ReturnFilterOptionView[] = returnsHistoryQuery.data?.available_reasons
+    .length
+    ? returnsHistoryQuery.data.available_reasons
+    : reasonOptions.map((reason) => ({
+        value: reason.code,
+        label: reason.label,
+      }));
   const sales = returnSalesQuery.data?.sales ?? [];
   const branchTimeZone = returnsBootstrapQuery.data?.branch.timezone ?? "America/Hermosillo";
   const historyRecords = returnsHistoryQuery.data?.records ?? [];
@@ -1205,9 +1233,13 @@ export function ReturnsScreen() {
     (method) => method.code === draftState.refundMethodCode,
   );
   const additionalBlockingMessages = [
+    intentionError,
+    isCommandIntentionPending(intention)
+      ? "Una devolución está pendiente de confirmar. Consulta su resultado antes de iniciar otra."
+      : null,
     selectedRefundMethod && !selectedRefundMethod.is_enabled
-      ? selectedRefundMethod.availability_note ??
-        "El metodo de reembolso seleccionado no esta disponible."
+      ? (selectedRefundMethod.availability_note ??
+        "El metodo de reembolso seleccionado no esta disponible.")
       : null,
   ].filter((message): message is string => message !== null);
   const isHighRiskAcknowledgementRequired =
@@ -1249,10 +1281,7 @@ export function ReturnsScreen() {
     }
   };
 
-  const handleReturnableLineQuantityChange = (
-    line: ReturnableSaleLineView,
-    value: string,
-  ) => {
+  const handleReturnableLineQuantityChange = (line: ReturnableSaleLineView, value: string) => {
     try {
       updateDraftState((current) => {
         const nextLines = applyDefaultReturnDisposition(addReturnDraftLine(current.lines, line));
@@ -1307,13 +1336,24 @@ export function ReturnsScreen() {
 
   const commitMutation = useMutation({
     mutationFn: async () => {
-      if (!isAuthenticated || !selectedSaleId) {
+      const bootstrap = returnsBootstrapQuery.data;
+      const cashSession = currentCashSessionQuery.data;
+      if (!isAuthenticated || !selectedSaleId || !bootstrap || !cashSession || intentionError) {
         throw new Error("Selecciona una venta antes de registrar la devolucion.");
       }
 
-      return commitSaleReturn({
-        payload: {
+      return returnIntentions.begin(
+        {
+          userId: bootstrap.user.id,
+          branchId: bootstrap.branch.id,
+          workstationId: bootstrap.workstation.id,
+          workstationCode: appEnv.VITE_POS_WORKSTATION_CODE,
+          cashSessionId: cashSession.id,
+          originalSaleId: selectedSaleId,
+        },
+        {
           workstation_code: appEnv.VITE_POS_WORKSTATION_CODE,
+          cash_session_id: cashSession.id,
           original_sale_id: selectedSaleId,
           reason_code: draftState.reasonCode,
           high_risk_acknowledged: draftState.highRiskAcknowledged,
@@ -1321,10 +1361,10 @@ export function ReturnsScreen() {
           notes: draftState.notes.trim().length > 0 ? draftState.notes.trim() : undefined,
           lines: buildReturnCommitLines(draftState.lines),
         },
-        requestId: createRequestId("sale-return"),
-      });
+        draftObservedKey.current ?? null,
+      );
     },
-    onSuccess: async (result) => {
+    onSuccess: (result) => {
       const requiresReview = isHighRiskAcknowledgementRequired;
       setLastCommittedReturn(result);
       setSelectedHistoryReturnId(result.id);
@@ -1338,7 +1378,7 @@ export function ReturnsScreen() {
           ? `Devolucion registrada. Folio ${result.folio}. Se preparo revision de backoffice.`
           : `Devolucion registrada. Folio ${result.folio}.`,
       );
-      await Promise.all([
+      void Promise.all([
         queryClient.invalidateQueries({
           queryKey: returnsBootstrapQueryKey(appEnv.VITE_POS_WORKSTATION_CODE),
         }),
@@ -1361,10 +1401,7 @@ export function ReturnsScreen() {
       ]);
     },
     onError: (error) => {
-      const message = toOperationalErrorMessage(
-        error,
-        "No fue posible registrar la devolucion.",
-      );
+      const message = toOperationalErrorMessage(error, "No fue posible registrar la devolucion.");
       setCommitError(message);
       showError(message);
     },
@@ -1382,7 +1419,7 @@ export function ReturnsScreen() {
       highRiskMessages={highRiskMessages}
       isHighRiskAcknowledgementRequired={isHighRiskAcknowledgementRequired}
       onCommit={() => {
-        void commitMutation.mutateAsync();
+        commitMutation.mutate();
       }}
       onDispositionChangeAll={(value) => {
         updateDraftState((current) => ({
@@ -1456,7 +1493,8 @@ export function ReturnsScreen() {
     />
   );
   const selectedHistoryRecord =
-    returnsHistoryQuery.data?.records.find((record) => record.id === selectedHistoryReturnId) ?? null;
+    returnsHistoryQuery.data?.records.find((record) => record.id === selectedHistoryReturnId) ??
+    null;
 
   const handleNewReturn = () => {
     setSelectedSaleId(null);
@@ -1473,40 +1511,48 @@ export function ReturnsScreen() {
 
   const summaryPanel =
     centerSection === "history" ? (
-      <ReturnHistoryDetailPanel
-        onNewReturn={handleNewReturn}
-        onPrintReceipt={() => {
-          if (!selectedHistoryReturn) {
-            return;
-          }
+      <>
+        {selectedHistoryReturnQuery.error ? (
+          <InlineNotice tone="warning">
+            La devolución ya está registrada. No se pudo consultar su detalle; actualiza el
+            historial para imprimirla.
+          </InlineNotice>
+        ) : null}
+        <ReturnHistoryDetailPanel
+          onNewReturn={handleNewReturn}
+          onPrintReceipt={() => {
+            if (!selectedHistoryReturn) {
+              return;
+            }
 
-          const printWindow = openBrowserPrintWindow();
-          if (!printWindow) {
-            showError("No se pudo abrir la ventana de impresion.");
-            return;
-          }
+            const printWindow = openBrowserPrintWindow();
+            if (!printWindow) {
+              showError("No se pudo abrir la ventana de impresion.");
+              return;
+            }
 
-          writeReturnReceiptToPrintWindow(printWindow, selectedHistoryReturn);
-        }}
-        onViewTicket={() => {
-          if (!selectedHistoryReturn) {
-            return;
-          }
+            writeReturnReceiptToPrintWindow(printWindow, selectedHistoryReturn);
+          }}
+          onViewTicket={() => {
+            if (!selectedHistoryReturn) {
+              return;
+            }
 
-          void navigate({
-            search: { ticketId: selectedHistoryReturn.original_sale_id } as never,
-            to: "/tickets",
-          });
-        }}
-        returnDetail={selectedHistoryReturn}
-        selectedHistoryRecord={selectedHistoryRecord}
-      />
+            void navigate({
+              search: { ticketId: selectedHistoryReturn.original_sale_id } as never,
+              to: "/tickets",
+            });
+          }}
+          returnDetail={selectedHistoryReturn}
+          selectedHistoryRecord={selectedHistoryRecord}
+        />
+      </>
     ) : (
       draftSummaryPanel
-    );  useAppShellRightPanel(summaryPanel);
+    );
+  useAppShellRightPanel(summaryPanel);
 
-  const isBootstrapPending =
-    returnsBootstrapQuery.isPending || currentCashSessionQuery.isPending;
+  const isBootstrapPending = returnsBootstrapQuery.isPending || currentCashSessionQuery.isPending;
 
   if (isBootstrapPending) {
     return (
@@ -1941,11 +1987,7 @@ export function ReturnsScreen() {
       id: "lines",
       label: "Lineas",
       state:
-        selectedSale === null
-          ? "blocked"
-          : draftState.lines.length === 0
-            ? "current"
-            : "completed",
+        selectedSale === null ? "blocked" : draftState.lines.length === 0 ? "current" : "completed",
     },
     {
       id: "refund",
@@ -1995,13 +2037,11 @@ export function ReturnsScreen() {
           </CompactPageHeader>
         }
       >
-        {centerSection === "history" ? (
-          historyPane
-        ) : centerSection === "lines" ? (
-          returnDetailPane
-        ) : (
-          salesListPane
-        )}
+        {centerSection === "history"
+          ? historyPane
+          : centerSection === "lines"
+            ? returnDetailPane
+            : salesListPane}
       </CentralWorkspaceSheet>
     </>
   );
