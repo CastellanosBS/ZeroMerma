@@ -52,6 +52,7 @@ def _build_user() -> AuthenticatedUser:
         email="cashier@zeromerma.local",
         full_name="Main Branch Cashier",
         is_active=True,
+        authorization_surface="POS",
     )
 
 

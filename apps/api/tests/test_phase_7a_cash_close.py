@@ -24,12 +24,20 @@ from zeromerma_api.modules.catalog.infrastructure.models import Product, Product
 from zeromerma_api.testing.sessions import login_headers
 
 
-def _login(client: TestClient) -> dict[str, str]:
-    return login_headers(client, email=SEED_USER_EMAIL, password=SEED_USER_PASSWORD, audience="POS")
+def _login(client: TestClient, workstation_code: str = SEED_WORKSTATION_CODE) -> dict[str, str]:
+    return login_headers(
+        client,
+        email=SEED_USER_EMAIL,
+        password=SEED_USER_PASSWORD,
+        audience="POS",
+        workstation_code=workstation_code,
+    )
 
 
-def _authorization_header(client: TestClient) -> dict[str, str]:
-    return _login(client)
+def _authorization_header(
+    client: TestClient, workstation_code: str = SEED_WORKSTATION_CODE
+) -> dict[str, str]:
+    return _login(client, workstation_code)
 
 
 def _open_cash_session(
@@ -37,7 +45,7 @@ def _open_cash_session(
 ) -> None:
     response = client.post(
         "/v1/cash-sessions/open",
-        headers=_authorization_header(client),
+        headers=_authorization_header(client, workstation_code),
         json={
             "workstation_code": workstation_code,
             "opening_amount": "150.00",
@@ -260,7 +268,7 @@ def test_cash_close_summary_exposes_inbound_and_outbound_transfer_warnings(
 
     inbound_dispatch = client.post(
         "/v1/transfers/dispatch/commit",
-        headers=_authorization_header(client),
+        headers=_authorization_header(client, SEED_DESTINATION_WORKSTATION_CODE),
         json={
             "workstation_code": SEED_DESTINATION_WORKSTATION_CODE,
             "destination_branch_id": _get_branch_id("MAIN"),

@@ -14,6 +14,7 @@ from sqlalchemy.orm import (
     Mapper,
     ORMExecuteState,
     Session,
+    SessionTransaction,
     with_loader_criteria,
 )
 from sqlalchemy.orm.util import AliasedClass, AliasedInsp
@@ -34,6 +35,7 @@ from zeromerma_api.modules.identity.application.schemas import (
 )
 from zeromerma_api.modules.identity.infrastructure.models import User, UserBranchAssignment
 from zeromerma_api.modules.identity.infrastructure.privileged_models import IdentityPrivilegeState
+from zeromerma_api.modules.operations.infrastructure.models import OperationDocument
 from zeromerma_api.modules.outbox.infrastructure.models import OutboxEvent
 
 AUTHORIZATION_METADATA_OPTION = "zeromerma_authorization_metadata"
@@ -155,6 +157,15 @@ _TRACE_TABLES = frozenset({"audit_log", "outbox_events"})
 
 
 @dataclass
+class TransferReceiptCause:
+    shipment: OperationDocument
+    receipt: OperationDocument
+    transaction: SessionTransaction
+    workstation_id: UUID
+    actor_id: UUID
+
+
+@dataclass
 class AuthorizationScope:
     user: AuthenticatedUser
     capabilities: tuple[CapabilityCode, ...]
@@ -165,6 +176,8 @@ class AuthorizationScope:
     branch_ids: frozenset[UUID] | None
     identity_mutation: bool
     resource_branch_ids: set[UUID] = field(default_factory=set)
+    transfer_receipts: dict[OperationDocument, SessionTransaction] = field(default_factory=dict)
+    received_shipments: dict[OperationDocument, TransferReceiptCause] = field(default_factory=dict)
     validating: bool = False
 
     @property
@@ -558,6 +571,67 @@ def _entity_branches(
     return branches
 
 
+def _has_live_transfer_receipt(session: Session, cause: TransferReceiptCause) -> bool:
+    shipment, receipt = cause.shipment, cause.receipt
+    shipment_state, receipt_state = inspect(shipment), inspect(receipt)
+    return (
+        cause.transaction is session.get_transaction()
+        and shipment_state.session is session
+        and shipment_state.persistent
+        and shipment not in session.deleted
+        and receipt_state.session is session
+        and receipt_state.persistent
+        and receipt not in session.deleted
+        and shipment.document_type == "BRANCH_TRANSFER_SHIPMENT"
+        and shipment.status in {"RECEIVED", "RECEIVED_WITH_VARIANCE"}
+        and receipt.document_type == "BRANCH_TRANSFER_RECEIPT"
+        and receipt.reference_document_id == shipment.id
+        and receipt.source_branch_id == shipment.source_branch_id
+        and receipt.destination_branch_id == shipment.destination_branch_id
+        and receipt.workstation_id == cause.workstation_id
+        and receipt.created_by_user_id == cause.actor_id
+        and receipt.status == shipment.status
+    )
+
+
+def _received_shipment_cause(
+    session: Session,
+    context: AuthorizationScope,
+    instance: Base,
+    workstation_id: UUID | None,
+) -> TransferReceiptCause | None:
+    if (
+        not isinstance(instance, OperationDocument)
+        or instance.document_type != "BRANCH_TRANSFER_SHIPMENT"
+        or "transfers.execute" not in context.capabilities
+        or instance in session.deleted
+        or workstation_id is None
+    ):
+        return None
+    state = inspect(instance)
+    changed = {attribute.key for attribute in state.attrs if attribute.history.has_changes()}
+    if (
+        not state.persistent
+        or changed != {"status"}
+        or list(state.attrs.status.history.deleted) != ["IN_TRANSIT"]
+        or instance.status not in {"RECEIVED", "RECEIVED_WITH_VARIANCE"}
+    ):
+        return None
+    for receipt, transaction in context.transfer_receipts.items():
+        cause = TransferReceiptCause(
+            instance, receipt, transaction, workstation_id, context.user.id
+        )
+        if _has_live_transfer_receipt(session, cause):
+            return cause
+    return None
+
+
+def _validate_transfer_receipt_causes(session: Session, context: AuthorizationScope) -> None:
+    for cause in context.received_shipments.values():
+        if not _has_live_transfer_receipt(session, cause):
+            raise _deny("A received shipment requires its current-transaction receipt.")
+
+
 def _validate_entity(
     session: Session, context: AuthorizationScope, instance: Base, models: dict[str, type[Base]]
 ) -> None:
@@ -569,6 +643,7 @@ def _validate_entity(
     )
 
     authentication = session.info.get(AUTH_CONTEXT_KEY)
+    receipt_cause = None
     if isinstance(authentication, SessionAuthentication):
         if name == "auth_sessions" and getattr(instance, "id", None) == authentication.record.id:
             changed = {
@@ -579,12 +654,37 @@ def _validate_entity(
             if changed <= {"last_activity_at", "idle_expires_at"}:
                 return
         if authentication.record.audience == "POS" and "workstation_id" in table.c:
-            workstation_id = _value(instance, "workstation_id")
-            if (
-                workstation_id is not None
-                and workstation_id != authentication.record.workstation_id
-            ):
-                raise _deny("This POS session is bound to another workstation.")
+            state = inspect(instance)
+            history = state.attrs.workstation_id.history
+            workstation_ids = {
+                _value(instance, "workstation_id"),
+                *history.deleted,
+            }
+            if state.persistent and history.has_changes() and not history.deleted:
+                # Assigning an expired attribute can omit its original value from ORM history.
+                assert state.identity is not None
+                workstation_ids.add(
+                    session.scalar(
+                        select(_column(type(instance), "workstation_id")).where(
+                            *(
+                                _column(
+                                    type(instance), state.mapper.get_property_by_column(key).key
+                                )
+                                == value
+                                for key, value in zip(
+                                    state.mapper.primary_key, state.identity, strict=True
+                                )
+                            )
+                        )
+                    )
+                )
+            workstation_ids -= {None, authentication.record.workstation_id}
+            if workstation_ids:
+                receipt_cause = _received_shipment_cause(
+                    session, context, instance, authentication.record.workstation_id
+                )
+                if receipt_cause is None:
+                    raise _deny("This POS session is bound to another workstation.")
     if name in IDENTITY_METADATA_TABLES:
         if not context.identity_mutation:
             raise _deny("Identity mutations require explicit identity authority.")
@@ -692,6 +792,17 @@ def _validate_entity(
         cash_session = _reference(session, models["cash_sessions"], "id", cash_session_id)
         if _value(cash_session, "workstation_id") != workstation_id:
             raise _deny("The cash session and workstation do not match.")
+    if (
+        isinstance(instance, OperationDocument)
+        and instance.document_type == "BRANCH_TRANSFER_RECEIPT"
+        and inspect(instance).pending
+    ):
+        transaction = session.get_transaction()
+        if transaction is not None:
+            # Only validated inserts in this transaction can authorize the source status update.
+            context.transfer_receipts[instance] = transaction
+    if receipt_cause is not None:
+        context.received_shipments[receipt_cause.shipment] = receipt_cause
 
 
 def _revalidate(session: Session, context: AuthorizationScope) -> None:
@@ -742,6 +853,7 @@ def _before_flush(session: Session, flush_context: object, instances: object) ->
         for instance in changed:
             if isinstance(instance, Base):
                 _validate_entity(session, context, instance, models)
+        _validate_transfer_receipt_causes(session, context)
         _stamp_traces(context, session.new)
     finally:
         context.validating = False
@@ -753,8 +865,31 @@ def _before_commit(session: Session) -> None:
         context.validating = True
         try:
             _revalidate(session, context)
+            _validate_transfer_receipt_causes(session, context)
         finally:
             context.validating = False
+
+
+def _after_transaction_end(session: Session, transaction: SessionTransaction) -> None:
+    context = authorization_scope(session)
+    if context is not None and transaction.parent is None:
+        context.transfer_receipts.clear()
+        context.received_shipments.clear()
+
+
+def _after_soft_rollback(session: Session, transaction: SessionTransaction) -> None:
+    context = authorization_scope(session)
+    if context is not None and transaction.nested and session.is_active:
+        context.transfer_receipts = {
+            receipt: owner
+            for receipt, owner in context.transfer_receipts.items()
+            if inspect(receipt).session is session and inspect(receipt).persistent
+        }
+        context.received_shipments = {
+            shipment: cause
+            for shipment, cause in context.received_shipments.items()
+            if _has_live_transfer_receipt(session, cause)
+        }
 
 
 def install_scope_guards() -> None:
@@ -762,3 +897,5 @@ def install_scope_guards() -> None:
         event.listen(Session, "do_orm_execute", _scope_statement)
         event.listen(Session, "before_flush", _before_flush)
         event.listen(Session, "before_commit", _before_commit)
+        event.listen(Session, "after_transaction_end", _after_transaction_end)
+        event.listen(Session, "after_soft_rollback", _after_soft_rollback)

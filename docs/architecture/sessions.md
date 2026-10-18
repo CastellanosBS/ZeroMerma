@@ -46,6 +46,15 @@ renew idle time within the fixed absolute deadline. Locking does not close cash.
 Closing cash revokes only POS sessions linked to that cash session, in the same
 transaction. The client returns to authentication after the close result.
 
+POS commands use the authenticated workstation. Receiving a branch transfer
+creates its receipt at the destination and preserves the shipment's original
+workstation. The `transfers.execute` policy permits only the shipment's
+`IN_TRANSIT` to `RECEIVED` or `RECEIVED_WITH_VARIANCE` transition when a validated
+receipt was inserted in the same transaction, with matching shipment, branches,
+recipient and destination workstation. That causal link must remain valid through
+commit. Historical or rolled-back receipts cannot authorize a transition, and
+this exception does not permit reassigning a document's workstation.
+
 The identity boundary lock precedes user, workstation and session locks.
 PostgreSQL enforces active POS slot uniqueness. Triggers revoke affected
 sessions when user security, role/permission status, assignments, surfaces or

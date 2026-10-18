@@ -1,11 +1,15 @@
 from __future__ import annotations
 
 from decimal import Decimal
+from uuid import UUID
 
+import pytest
+from fastapi import HTTPException
 from fastapi.testclient import TestClient
-from sqlalchemy import select
+from sqlalchemy import func, select
 
 from zeromerma_api.bootstrap.seed_local import (
+    SEED_ALT_DESTINATION_BRANCH_CODE,
     SEED_DESTINATION_BRANCH_CODE,
     SEED_DESTINATION_WORKSTATION_CODE,
     SEED_PRODUCT_BOLILLO_STD_CODE,
@@ -17,10 +21,12 @@ from zeromerma_api.bootstrap.seed_local import (
     SEED_USER_PASSWORD,
     SEED_WORKSTATION_CODE,
 )
+from zeromerma_api.db.access_scope import bind_authorization_scope
 from zeromerma_api.db.session import SessionLocal
 from zeromerma_api.modules.audit.infrastructure.models import AuditLog
-from zeromerma_api.modules.branches.infrastructure.models import Branch
+from zeromerma_api.modules.branches.infrastructure.models import Branch, Workstation
 from zeromerma_api.modules.catalog.infrastructure.models import Product, ProductClass
+from zeromerma_api.modules.identity.application.session_services import SessionService
 from zeromerma_api.modules.operations.infrastructure.models import (
     OperationDocument,
     OperationDocumentLine,
@@ -30,18 +36,26 @@ from zeromerma_api.modules.outbox.infrastructure.models import OutboxEvent
 from zeromerma_api.testing.sessions import login_headers
 
 
-def _login(client: TestClient) -> dict[str, str]:
-    return login_headers(client, email=SEED_USER_EMAIL, password=SEED_USER_PASSWORD, audience="POS")
+def _login(client: TestClient, workstation_code: str = SEED_WORKSTATION_CODE) -> dict[str, str]:
+    return login_headers(
+        client,
+        email=SEED_USER_EMAIL,
+        password=SEED_USER_PASSWORD,
+        audience="POS",
+        workstation_code=workstation_code,
+    )
 
 
-def _authorization_header(client: TestClient) -> dict[str, str]:
-    return _login(client)
+def _authorization_header(
+    client: TestClient, workstation_code: str = SEED_WORKSTATION_CODE
+) -> dict[str, str]:
+    return _login(client, workstation_code)
 
 
 def _open_cash_session(client: TestClient, workstation_code: str = SEED_WORKSTATION_CODE) -> None:
     response = client.post(
         "/v1/cash-sessions/open",
-        headers=_authorization_header(client),
+        headers=_authorization_header(client, workstation_code),
         json={
             "workstation_code": workstation_code,
             "opening_amount": "150.00",
@@ -502,7 +516,7 @@ def test_transfer_dispatch_pending_detail_and_receive_work_end_to_end(client: Te
     pending_response = client.get(
         "/v1/transfers/inbound/pending",
         params={"workstation_code": SEED_DESTINATION_WORKSTATION_CODE},
-        headers=_authorization_header(client),
+        headers=_authorization_header(client, SEED_DESTINATION_WORKSTATION_CODE),
     )
     assert pending_response.status_code == 200
     pending_payload = pending_response.json()
@@ -515,7 +529,7 @@ def test_transfer_dispatch_pending_detail_and_receive_work_end_to_end(client: Te
     detail_response = client.get(
         f"/v1/transfers/{shipment['id']}",
         params={"workstation_code": SEED_DESTINATION_WORKSTATION_CODE},
-        headers=_authorization_header(client),
+        headers=_authorization_header(client, SEED_DESTINATION_WORKSTATION_CODE),
     )
     assert detail_response.status_code == 200
     detail_payload = detail_response.json()
@@ -532,7 +546,7 @@ def test_transfer_dispatch_pending_detail_and_receive_work_end_to_end(client: Te
     receive_response = client.post(
         f"/v1/transfers/{shipment['id']}/receive",
         headers={
-            **_authorization_header(client),
+            **_authorization_header(client, SEED_DESTINATION_WORKSTATION_CODE),
             "X-Request-ID": "phase-3a-transfer-receive",
         },
         json={
@@ -681,7 +695,7 @@ def test_transfer_inbound_history_returns_folio_status_and_filters(client: TestC
 
     receive_response = client.post(
         f"/v1/transfers/{shipment['id']}/receive",
-        headers=_authorization_header(client),
+        headers=_authorization_header(client, SEED_DESTINATION_WORKSTATION_CODE),
         json={
             "workstation_code": SEED_DESTINATION_WORKSTATION_CODE,
             "lines": [
@@ -703,7 +717,7 @@ def test_transfer_inbound_history_returns_folio_status_and_filters(client: TestC
             "source_branch_id": _get_branch_id("MAIN"),
             "status": "RECEIVED",
         },
-        headers=_authorization_header(client),
+        headers=_authorization_header(client, SEED_DESTINATION_WORKSTATION_CODE),
     )
 
     assert history_response.status_code == 200
@@ -760,7 +774,7 @@ def test_transfer_receive_rejects_already_received_transfer(client: TestClient) 
 
     first_receive = client.post(
         f"/v1/transfers/{shipment['id']}/receive",
-        headers=_authorization_header(client),
+        headers=_authorization_header(client, SEED_DESTINATION_WORKSTATION_CODE),
         json={
             "workstation_code": SEED_DESTINATION_WORKSTATION_CODE,
             "lines": [
@@ -776,7 +790,7 @@ def test_transfer_receive_rejects_already_received_transfer(client: TestClient) 
 
     second_receive = client.post(
         f"/v1/transfers/{shipment['id']}/receive",
-        headers=_authorization_header(client),
+        headers=_authorization_header(client, SEED_DESTINATION_WORKSTATION_CODE),
         json={
             "workstation_code": SEED_DESTINATION_WORKSTATION_CODE,
             "lines": [
@@ -818,7 +832,7 @@ def test_transfer_receive_with_variance_marks_receipt_and_shipment(client: TestC
     receive_response = client.post(
         f"/v1/transfers/{shipment['id']}/receive",
         headers={
-            **_authorization_header(client),
+            **_authorization_header(client, SEED_DESTINATION_WORKSTATION_CODE),
             "X-Request-ID": "phase-3c-transfer-variance",
         },
         json={
@@ -908,7 +922,7 @@ def test_transfer_receive_requires_variance_reason_when_quantity_differs(
 
     receive_response = client.post(
         f"/v1/transfers/{shipment['id']}/receive",
-        headers=_authorization_header(client),
+        headers=_authorization_header(client, SEED_DESTINATION_WORKSTATION_CODE),
         json={
             "workstation_code": SEED_DESTINATION_WORKSTATION_CODE,
             "lines": [
@@ -925,3 +939,237 @@ def test_transfer_receive_requires_variance_reason_when_quantity_differs(
     assert receive_response.json()["message"] == (
         "Variance reason is required when the received quantity differs from the shipment."
     )
+
+
+@pytest.mark.parametrize(
+    "scenario",
+    [
+        "missing_receipt",
+        "changed_workstation",
+        "changed_notes",
+        "foreign_receipt_workstation",
+        "foreign_receipt_branch",
+        "committed_receipt",
+        "rolled_back_receipt",
+        "savepoint_rolled_back_receipt",
+        "savepoint_rolled_back_transition",
+        "deleted_receipt_after_flush",
+        "relinked_receipt_after_flush",
+        "changed_receipt_status_after_flush",
+    ],
+)
+def test_pos_transfer_receipt_cannot_bypass_workstation_binding(
+    client: TestClient, scenario: str
+) -> None:
+    dispatch = client.post(
+        "/v1/transfers/dispatch/commit",
+        headers=_authorization_header(client),
+        json={
+            "workstation_code": SEED_WORKSTATION_CODE,
+            "destination_branch_id": _get_branch_id(SEED_DESTINATION_BRANCH_CODE),
+            "lines": [
+                {"product_id": _get_product_id(SEED_PRODUCT_BOLILLO_STD_CODE), "quantity": "1"}
+            ],
+        },
+    )
+    assert dispatch.status_code == 201
+    shipment_id = UUID(dispatch.json()["shipment"]["id"])
+    destination_headers = _authorization_header(client, SEED_DESTINATION_WORKSTATION_CODE)
+    foreign_branch_id = UUID(_get_branch_id(SEED_ALT_DESTINATION_BRANCH_CODE))
+
+    with SessionLocal() as session:
+        audit_count = session.scalar(select(func.count(AuditLog.id)))
+        outbox_count = session.scalar(select(func.count(OutboxEvent.id)))
+        authentication = SessionService().authenticate(
+            session,
+            credential=destination_headers["Cookie"].split("=", 1)[1],
+            audience="POS",
+        )
+        bind_authorization_scope(
+            session,
+            user=authentication.user,
+            capabilities=("transfers.execute",),
+            mutation=True,
+            surface="POS",
+        )
+        shipment = session.get(OperationDocument, shipment_id)
+        assert shipment is not None
+        original_workstation_id = shipment.workstation_id
+        with pytest.raises(HTTPException) as denied:
+            if scenario != "missing_receipt":
+                savepoint = (
+                    session.begin_nested() if scenario.startswith("savepoint_rolled_back") else None
+                )
+                receipt = OperationDocument(
+                    document_type="BRANCH_TRANSFER_RECEIPT",
+                    status="RECEIVED",
+                    source_branch_id=shipment.source_branch_id,
+                    destination_branch_id=(
+                        foreign_branch_id
+                        if scenario == "foreign_receipt_branch"
+                        else shipment.destination_branch_id
+                    ),
+                    workstation_id=(
+                        shipment.workstation_id
+                        if scenario == "foreign_receipt_workstation"
+                        else authentication.record.workstation_id
+                    ),
+                    created_by_user_id=authentication.user.id,
+                    reference_document_id=shipment.id,
+                )
+                session.add(receipt)
+                session.flush()
+                if scenario == "committed_receipt":
+                    session.commit()
+                elif scenario == "rolled_back_receipt":
+                    session.rollback()
+                    shipment = session.get(OperationDocument, shipment_id)
+                    assert shipment is not None
+                elif savepoint is not None:
+                    if scenario == "savepoint_rolled_back_transition":
+                        shipment.status = "RECEIVED"
+                        session.flush()
+                    savepoint.rollback()
+            if scenario == "changed_workstation":
+                assert authentication.record.workstation_id is not None
+                shipment.workstation_id = authentication.record.workstation_id
+            elif scenario == "changed_notes":
+                shipment.notes = "Unauthorized edit alongside receipt"
+            shipment.status = "RECEIVED"
+            session.flush()
+            if scenario == "deleted_receipt_after_flush":
+                session.delete(receipt)
+                session.commit()
+            elif scenario == "relinked_receipt_after_flush":
+                receipt.reference_document_id = None
+                session.flush()
+            elif scenario == "changed_receipt_status_after_flush":
+                receipt.status = "IN_TRANSIT"
+                session.commit()
+        assert denied.value.status_code == 403
+        session.rollback()
+
+    with SessionLocal() as session:
+        original = session.get(OperationDocument, shipment_id)
+        assert original is not None
+        assert original.status == "IN_TRANSIT"
+        assert original.workstation_id == original_workstation_id
+        assert original.notes is None
+        assert session.scalar(select(func.count(AuditLog.id))) == audit_count
+        assert session.scalar(select(func.count(OutboxEvent.id))) == outbox_count
+        assert session.scalar(
+            select(func.count(OperationDocument.id)).where(
+                OperationDocument.reference_document_id == shipment_id,
+                OperationDocument.document_type == "BRANCH_TRANSFER_RECEIPT",
+            )
+        ) == (1 if scenario == "committed_receipt" else 0)
+
+
+def test_pos_transfer_receipt_savepoint_rollback_allows_a_fresh_cause(client: TestClient) -> None:
+    headers = _authorization_header(client, SEED_DESTINATION_WORKSTATION_CODE)
+    with SessionLocal() as session:
+        authentication = SessionService().authenticate(
+            session, credential=headers["Cookie"].split("=", 1)[1], audience="POS"
+        )
+        source = session.scalars(
+            select(Workstation).where(Workstation.code == SEED_WORKSTATION_CODE)
+        ).one()
+        destination = session.get(Workstation, authentication.record.workstation_id)
+        assert destination is not None
+        shipment = OperationDocument(
+            document_type="BRANCH_TRANSFER_SHIPMENT",
+            status="IN_TRANSIT",
+            source_branch_id=source.branch_id,
+            destination_branch_id=destination.branch_id,
+            workstation_id=source.id,
+            created_by_user_id=authentication.user.id,
+        )
+        session.add(shipment)
+        session.commit()
+        shipment_id = shipment.id
+        bind_authorization_scope(
+            session,
+            user=authentication.user,
+            capabilities=("transfers.execute",),
+            mutation=True,
+            surface="POS",
+        )
+        shipment = session.get(OperationDocument, shipment_id)
+        assert shipment is not None
+        for roll_back in (True, False):
+            savepoint = session.begin_nested() if roll_back else None
+            receipt = OperationDocument(
+                document_type="BRANCH_TRANSFER_RECEIPT",
+                status="RECEIVED",
+                source_branch_id=shipment.source_branch_id,
+                destination_branch_id=shipment.destination_branch_id,
+                workstation_id=authentication.record.workstation_id,
+                created_by_user_id=authentication.user.id,
+                reference_document_id=shipment.id,
+            )
+            session.add(receipt)
+            session.flush()
+            shipment.status = "RECEIVED"
+            session.flush()
+            if savepoint is not None:
+                savepoint.rollback()
+                assert shipment.status == "IN_TRANSIT"
+        session.commit()
+        assert session.get(OperationDocument, shipment_id).status == "RECEIVED"
+        assert (
+            session.scalar(
+                select(func.count(OperationDocument.id)).where(
+                    OperationDocument.reference_document_id == shipment_id
+                )
+            )
+            == 1
+        )
+
+
+def test_pos_workstation_binding_checks_expired_original_station_in_same_branch(
+    client: TestClient,
+) -> None:
+    headers = _authorization_header(client)
+    with SessionLocal() as session:
+        authentication = SessionService().authenticate(
+            session, credential=headers["Cookie"].split("=", 1)[1], audience="POS"
+        )
+        station = session.get(Workstation, authentication.record.workstation_id)
+        assert station is not None
+        other_station = Workstation(
+            code="OTHER-POS-SAME-BRANCH", name="Other station", branch_id=station.branch_id
+        )
+        session.add(other_station)
+        session.flush()
+        document = OperationDocument(
+            document_type="WASTE_RECORD",
+            status="COMMITTED",
+            source_branch_id=station.branch_id,
+            workstation_id=other_station.id,
+            created_by_user_id=authentication.user.id,
+        )
+        session.add(document)
+        session.commit()
+        document_id, original_station_id = document.id, other_station.id
+        bind_authorization_scope(
+            session,
+            user=authentication.user,
+            capabilities=("pos.operate",),
+            mutation=True,
+            surface="POS",
+        )
+        document = session.get(OperationDocument, document_id)
+        assert document is not None
+        session.expire(document, ["workstation_id"])
+        assert authentication.record.workstation_id is not None
+        document.workstation_id = authentication.record.workstation_id
+        document.notes = "Unauthorized station reassignment"
+        with pytest.raises(HTTPException) as denied:
+            session.flush()
+        assert denied.value.status_code == 403
+        session.rollback()
+    with SessionLocal() as session:
+        original = session.get(OperationDocument, document_id)
+        assert original is not None
+        assert original.workstation_id == original_station_id
+        assert original.notes is None

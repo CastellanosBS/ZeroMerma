@@ -33,12 +33,20 @@ from zeromerma_api.modules.outbox.infrastructure.models import OutboxEvent
 from zeromerma_api.testing.sessions import login_headers
 
 
-def _login(client: TestClient) -> dict[str, str]:
-    return login_headers(client, email=SEED_USER_EMAIL, password=SEED_USER_PASSWORD, audience="POS")
+def _login(client: TestClient, workstation_code: str = SEED_WORKSTATION_CODE) -> dict[str, str]:
+    return login_headers(
+        client,
+        email=SEED_USER_EMAIL,
+        password=SEED_USER_PASSWORD,
+        audience="POS",
+        workstation_code=workstation_code,
+    )
 
 
-def _authorization_header(client: TestClient) -> dict[str, str]:
-    return _login(client)
+def _authorization_header(
+    client: TestClient, workstation_code: str = SEED_WORKSTATION_CODE
+) -> dict[str, str]:
+    return _login(client, workstation_code)
 
 
 def _open_cash_session(client: TestClient) -> None:
@@ -298,7 +306,7 @@ def test_shipment_correction_after_receipt_is_rejected(client: TestClient) -> No
 
     first_receive = client.post(
         f"/v1/transfers/{shipment['id']}/receive",
-        headers=_authorization_header(client),
+        headers=_authorization_header(client, SEED_DESTINATION_WORKSTATION_CODE),
         json={
             "workstation_code": SEED_DESTINATION_WORKSTATION_CODE,
             "lines": [

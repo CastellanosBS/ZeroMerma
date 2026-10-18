@@ -67,6 +67,8 @@ The following local evidence was obtained on 2026-10-18:
 | Final runtime configuration review | 54 focused tests passed, including rejection of deployment mode selected only by checkout `.env` | `.tmp/runtime-security-review.log` |
 | Final browser session review | 23 focused unit tests (8 new regressions), 7 affected mocked browser tests and 2 real POS tests passed; cross-tab recovery does not extend activity | Browser run `c40b2a6a779242919142e03586137c4d` |
 | Privileged access regression | 5 affected tests passed; authority changes revoke sessions and preserve business audit/outbox assertions | `.tmp/session-privileged-regressions.log` |
+| Transfer workstation binding | 21 tests passed: 7 existing HTTP flows and 14 causal-link, workstation and rollback cases | `.tmp/session-transfer-binding-current.xml` |
+| Training bootstrap regression | 3 unit tests passed with explicit POS authorization context | `.tmp/session-training-regressions.log` |
 
 The integrated API regression is additionally required; its final status is
 supplied by Foundation for the delivered commit. The
