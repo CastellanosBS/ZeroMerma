@@ -109,9 +109,10 @@ The real sale scenario loses an actual committed HTTP 201 response, reloads the
 POS, retrieves the same snapshot through the recovery GET, clears a stale draft
 in another tab and confirms that the next intention has a new key and sale ID.
 Earlier browser attempts failed before sending a confirmation POST because the
-background page did not have input focus; the final scenario explicitly focuses
-the intended tab and amount field. No timeout increase or product bypass was
-used to obtain the passing result. The final frontend typecheck also passed.
+exact button selector omitted the accessible shortcut text `Enter`. The final
+scenario matches `Cobrar Enter` and explicitly focuses each tab and payment
+input. No timeout increase or product bypass was used to obtain the passing
+result. The final frontend typecheck also passed.
 
 `GAP-0749` is closed by the executed PostgreSQL and real browser evidence. The
 sale POST and POS route remain partial for the separate inventory, sale/close
