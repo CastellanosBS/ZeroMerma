@@ -190,9 +190,17 @@ local diagnostics, not uploaded evidence.
 | Static checks | API compileall and whole-repository Ruff passed; combined API/worker mypy passed for 339 source files; diff check passed |
 | Foundation Contracts | 68 passed in 153.82 s; 248 OpenAPI operations, 249 registered API operations and 323 matrix entries; run `641cc630aa564f33b0338f4942d18baa` |
 | Final matrix | Semantic validator and 28 specific tests passed after closing only GAP-0701/0708/0716/0741; protected `.tmp/validation-published/cash-matrix/matrix.xml` |
-| Foundation Web | 587 unit tests (POS 332, Backoffice 231, API client 21, UI 3) and 11 mocked E2E passed; lint, typecheck and builds passed; run `6058ab2925814918bdc8fcc82ef3b0ac` |
+| Foundation Web | 587 unit tests (POS 332, Backoffice 231, API client 21, UI 3) and 11 mocked E2E passed; lint, typecheck and builds passed; run `20c7b00cf08a4897b4a7a0526f8775de` |
 | Real Browser | 13/13 passed (POS 6, Backoffice 7), protected wrapper exit 0; run `1983be2e23774d6a96b5d41535b68347` |
 | Exact-commit Foundation CI | Required at delivery; no future run assumed |
+
+Hosted Web run `39172816970` exposed a synchronization failure in the opening
+error test: a fixed number of microtask flushes did not await the coordinator's
+real WebCrypto digest. The four cash screen test files now wait for observable
+mutation completion with `vi.waitFor` inside React `act`, preserving their
+original assertions and removing the close test's fixed 10 ms pause. The 22
+focused tests and the local Foundation Web rerun above passed. Application code
+and runtime timeouts are unchanged; a successful hosted rerun is still required.
 
 The wide caller run exposed six stale fixture assumptions, not six accepted
 failures. Three sale replay variants selected the only idempotency row in the

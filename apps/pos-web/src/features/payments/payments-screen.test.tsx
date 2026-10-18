@@ -440,6 +440,12 @@ async function flushPromises() {
   });
 }
 
+async function waitForMutation(assertion: () => void) {
+  await act(async () => {
+    await vi.waitFor(assertion);
+  });
+}
+
 function triggerShortcut(shortcutId: string) {
   const shortcut = registeredShortcuts.get(shortcutId);
   if (!shortcut) {
@@ -629,7 +635,9 @@ describe("PaymentsScreen", () => {
         button.textContent?.includes("Confirmar pago"),
       ),
     );
-    await flushPromises();
+    await waitForMutation(() => {
+      expect(showSuccessMock).toHaveBeenCalledWith("Pago PAG-NEW001 registrado por $250.00.");
+    });
 
     expect(vi.mocked(createPayment)).toHaveBeenCalledTimes(1);
     expect(vi.mocked(createPayment).mock.calls[0]?.[0].payload).toMatchObject({

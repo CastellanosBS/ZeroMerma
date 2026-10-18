@@ -1,6 +1,5 @@
 // @vitest-environment jsdom
 import { webcrypto } from "node:crypto";
-import { setTimeout as waitForCrypto } from "node:timers/promises";
 import { cashIntentions } from "../cash-commands/cash-command-intent";
 
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
@@ -511,10 +510,14 @@ function setInputValue(input: HTMLInputElement | HTMLTextAreaElement, value: str
 
 async function flushAsync() {
   await act(async () => {
-    // WebCrypto finishes outside Vitest fake timers. Drain that work before assertions.
-    await waitForCrypto(10);
     await Promise.resolve();
     await Promise.resolve();
+  });
+}
+
+async function waitForMutation(assertion: () => void) {
+  await act(async () => {
+    await vi.waitFor(assertion);
   });
 }
 
@@ -655,7 +658,9 @@ describe("cash close screen", () => {
     await advancePreview();
 
     click(getButtonByText(view.container, "Cerrar turno"));
-    await flushAsync();
+    await waitForMutation(() => {
+      expect(navigateMock).toHaveBeenCalledWith({ to: "/login" });
+    });
 
     expect(commitCashCloseMock).toHaveBeenCalledTimes(1);
     expect(commitCashCloseMock.mock.calls[0]?.[0]).toEqual({
@@ -722,7 +727,11 @@ describe("cash close screen", () => {
     const confirmed = cashIntentions.read(workstation.id)!;
     expect(confirmed.status).toBe("CONFIRMED");
     await act(async () => finishPreview(buildPreviewResponse(draft)));
-    await flushAsync();
+    await waitForMutation(() => {
+      expect(showErrorMock).toHaveBeenCalledWith(
+        "Hay una intención de otra pestaña. Recupera su resultado antes de continuar.",
+      );
+    });
     expect(commitCashCloseMock).toHaveBeenCalledTimes(1);
     expect(cashIntentions.read(workstation.id)).toMatchObject({
       key: confirmed.key,
@@ -750,7 +759,9 @@ describe("cash close screen", () => {
     await advancePreview();
 
     click(getButtonByText(view.container, "Cerrar turno"));
-    await flushAsync();
+    await waitForMutation(() => {
+      expect(showErrorMock).toHaveBeenCalledWith("Fallo del backend");
+    });
 
     expect(commitCashCloseMock).toHaveBeenCalledTimes(1);
     expect(showErrorMock).toHaveBeenCalledWith("Fallo del backend");
@@ -786,8 +797,9 @@ describe("cash close screen", () => {
     expect(view.container.textContent).toContain("conteo físico de pan registrado en cero piezas");
 
     click(getButtonByText(view.container, "Cerrar con mostrador vacío"));
-    await flushAsync();
-    await flushAsync();
+    await waitForMutation(() => {
+      expect(navigateMock).toHaveBeenCalledWith({ to: "/login" });
+    });
 
     expect(commitCashCloseMock).toHaveBeenCalledTimes(1);
     expect(commitCashCloseMock.mock.calls[0]?.[0]).toEqual({
@@ -835,7 +847,9 @@ describe("cash close screen", () => {
     await advancePreview();
 
     click(getButtonByText(view.container, "Cerrar turno"));
-    await flushAsync();
+    await waitForMutation(() => {
+      expect(navigateMock).toHaveBeenCalledWith({ to: "/login" });
+    });
 
     expect(commitCashCloseMock.mock.calls[0]?.[0].counted_payment_methods).toEqual([
       {

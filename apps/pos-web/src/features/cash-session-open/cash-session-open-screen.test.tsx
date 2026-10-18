@@ -116,9 +116,9 @@ function clickButton(button: HTMLButtonElement) {
   });
 }
 
-async function flushAsync() {
+async function waitForMutation(assertion: () => void) {
   await act(async () => {
-    await Promise.resolve();
+    await vi.waitFor(assertion);
   });
 }
 
@@ -245,8 +245,9 @@ describe("CashSessionOpenScreen", () => {
     setInputValue(input, "250.00");
     clickButton(button);
 
-    await flushAsync();
-    await flushAsync();
+    await waitForMutation(() => {
+      expect(routerMocks.navigate).toHaveBeenCalledWith({ to: "/pos" });
+    });
 
     expect(openCashSession).toHaveBeenCalledWith({
       payload: {
@@ -277,8 +278,9 @@ describe("CashSessionOpenScreen", () => {
     setInputValue(input, "150.00");
     clickButton(button);
 
-    await flushAsync();
-    await flushAsync();
+    await waitForMutation(() => {
+      expect(cashIntentions.read(bootstrap.workstation.id)?.status).toBe("UNKNOWN");
+    });
 
     expect(routerMocks.navigate).not.toHaveBeenCalled();
     expect(input.value).toBe("150.00");
@@ -302,7 +304,9 @@ describe("CashSessionOpenScreen", () => {
 
     setInputValue(input, "100.00");
     clickButton(button);
-    await flushAsync();
+    await waitForMutation(() => {
+      expect(openCashSession).toHaveBeenCalledTimes(1);
+    });
 
     expect(openCashSession).toHaveBeenCalledTimes(1);
     expect(button.disabled).toBe(true);
@@ -313,6 +317,9 @@ describe("CashSessionOpenScreen", () => {
     await act(async () => {
       resolveOpening(openCashSessionView);
       await Promise.resolve();
+    });
+    await waitForMutation(() => {
+      expect(routerMocks.navigate).toHaveBeenCalledWith({ to: "/pos" });
     });
   });
 });
