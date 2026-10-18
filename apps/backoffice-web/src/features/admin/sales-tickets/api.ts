@@ -207,31 +207,25 @@ export function buildAdminSalesTicketsListPath(filters: AdminSalesTicketListFilt
 }
 
 export function fetchAdminSalesTickets(
-  accessToken: string,
   filters: AdminSalesTicketListFilters,
 ): Promise<AdminSalesTicketListResponse> {
   return requestJson<ApiTicketListResponse>({
-    accessToken,
     path: buildAdminSalesTicketsListPath(filters),
   }).then(mapListFromApi);
 }
 
 export function fetchAdminSalesTicketDetail(
-  accessToken: string,
   ticketId: string,
 ): Promise<AdminSalesTicketDetail> {
   return requestJson<ApiTicketDetail>({
-    accessToken,
     path: `/v1/admin/sales/tickets/${ticketId}`,
   }).then(mapDetailFromApi);
 }
 
 export function reprintAdminSalesTicket(
-  accessToken: string,
   ticketId: string,
 ): Promise<AdminSalesTicketDetail> {
   return requestJson<ApiTicketDetail>({
-    accessToken,
     method: "POST",
     path: `/v1/admin/sales/tickets/${ticketId}/reprint`,
   }).then(mapDetailFromApi);

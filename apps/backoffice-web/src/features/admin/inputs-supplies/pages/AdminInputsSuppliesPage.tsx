@@ -146,7 +146,7 @@ function AdminInputSupplyMetricStrip({
 }
 
 export function AdminInputsSuppliesPage() {
-  const accessToken = useBackofficeAuthStore((state) => state.accessToken);
+  const isAuthenticated = useBackofficeAuthStore((state) => state.isAuthenticated);
   const queryClient = useQueryClient();
   const [filters, setFilters] = useState<AdminInputSupplyListFilters>(getInitialFilters);
   const [selectedInputId, setSelectedInputId] = useState<string | null>(() => {
@@ -162,8 +162,8 @@ export function AdminInputsSuppliesPage() {
   );
 
   const inputsQuery = useQuery({
-    enabled: Boolean(accessToken),
-    queryFn: () => fetchAdminInputSupplies(accessToken ?? "", filters),
+    enabled: isAuthenticated,
+    queryFn: () => fetchAdminInputSupplies(filters),
     queryKey: ["admin", "inputs-supplies", "list", filters],
     retry: false,
   });
@@ -175,15 +175,15 @@ export function AdminInputsSuppliesPage() {
   );
 
   const inputDetailQuery = useQuery({
-    enabled: Boolean(accessToken && selectedInputId),
-    queryFn: () => fetchAdminInputSupplyDetail(accessToken ?? "", selectedInputId ?? ""),
+    enabled: Boolean(isAuthenticated && selectedInputId),
+    queryFn: () => fetchAdminInputSupplyDetail(selectedInputId ?? ""),
     queryKey: ["admin", "inputs-supplies", "detail", selectedInputId],
     retry: false,
   });
 
   const createMutation = useMutation({
     mutationFn: (payload: AdminInputSupplyPayload) =>
-      createAdminInputSupply(accessToken ?? "", payload),
+      createAdminInputSupply(payload),
     onError: (error) => {
       setFeedback({
         tone: "error",
@@ -201,7 +201,7 @@ export function AdminInputsSuppliesPage() {
 
   const updateMutation = useMutation({
     mutationFn: ({ payload, productId }: { payload: AdminInputSupplyPayload; productId: string }) =>
-      updateAdminInputSupply(accessToken ?? "", productId, payload),
+      updateAdminInputSupply(productId, payload),
     onError: (error) => {
       setFeedback({
         tone: "error",
@@ -219,7 +219,7 @@ export function AdminInputsSuppliesPage() {
 
   const statusMutation = useMutation({
     mutationFn: ({ isActive, productId }: { isActive: boolean; productId: string }) =>
-      changeAdminInputSupplyStatus(accessToken ?? "", productId, {
+      changeAdminInputSupplyStatus(productId, {
         isActive,
         notes: isActive ? "Activado desde Backoffice." : "Desactivado desde Backoffice.",
       }),
@@ -260,7 +260,7 @@ export function AdminInputsSuppliesPage() {
   }
 
   function handleSubmit(payload: AdminInputSupplyPayload) {
-    if (!accessToken || isSubmitting) {
+    if (!isAuthenticated || isSubmitting) {
       return;
     }
     setFeedback(null);
@@ -272,7 +272,7 @@ export function AdminInputsSuppliesPage() {
   }
 
   function handleChangeStatus(item: AdminInputSupplyListItem, isActive: boolean) {
-    if (!accessToken || isSubmitting) {
+    if (!isAuthenticated || isSubmitting) {
       return;
     }
     if (!isActive && item.warnings.length > 0 && typeof window !== "undefined") {

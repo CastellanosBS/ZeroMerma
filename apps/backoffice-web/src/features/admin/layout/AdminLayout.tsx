@@ -1,7 +1,8 @@
 import { Link, Outlet, useRouterState } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 
-import { useBackofficeAuthStore } from "../../auth/backoffice-auth-store";
+import { logoutSession } from "../../auth/session-api";
+import { OwnSessionsPanel } from "../../auth/OwnSessionsPanel";
 import { useBackofficeAuthorization } from "../../auth/authorization-context";
 import { AdminAccessDenied } from "../../auth/AdminAccessDenied";
 import { canReadAdminModule, adminReadCapabilities } from "../navigation/adminCapabilities";
@@ -116,7 +117,7 @@ export function AdminLayout() {
     !routeModule ||
     !isAdminModuleVisibleInCurrentRelease(routeModule.key) ||
     canReadAdminModule(currentUser, routeModule.key);
-  const clearSession = useBackofficeAuthStore((state) => state.clearSession);
+  const [sessionError, setSessionError] = useState<string | null>(null);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(getInitialAdminSidebarCollapsed);
   const [openSections, setOpenSections] = useState<Set<string>>(() => new Set());
   useEffect(() => {
@@ -172,6 +173,8 @@ export function AdminLayout() {
           </div>
 
           <div className="flex min-w-0 flex-wrap items-center justify-end gap-2 text-sm">
+            <OwnSessionsPanel />
+            {sessionError ? <p role="alert">{sessionError}</p> : null}
             <span
               className="max-w-[16rem] truncate rounded-full border border-[var(--ui-color-border)] bg-white px-3 py-2 font-medium text-slate-700"
               title={currentUser?.full_name ?? "Usuario administrativo"}
@@ -185,7 +188,7 @@ export function AdminLayout() {
             </span>
             <button
               className="rounded-full border border-[var(--ui-color-border)] bg-white px-3 py-2 font-semibold text-slate-700 transition hover:bg-slate-50 focus:outline-none focus:ring-4 focus:ring-[var(--ui-color-ring)]"
-              onClick={clearSession}
+              onClick={() => void logoutSession().catch(() => setSessionError("No se pudo cerrar la sesión. Reintenta."))}
               type="button"
             >
               Salir

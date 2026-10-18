@@ -136,7 +136,7 @@ function AdminTransferMetricStrip({
 }
 
 export function AdminTransfersPage() {
-  const accessToken = useBackofficeAuthStore((state) => state.accessToken);
+  const isAuthenticated = useBackofficeAuthStore((state) => state.isAuthenticated);
   const queryClient = useQueryClient();
   const [filters, setFilters] = useState<AdminTransferListFilters>(getInitialFilters);
   const [selectedTransferId, setSelectedTransferId] = useState<string | null>(null);
@@ -147,8 +147,8 @@ export function AdminTransfersPage() {
   );
 
   const transfersQuery = useQuery({
-    enabled: Boolean(accessToken),
-    queryFn: () => fetchAdminTransfers(accessToken ?? "", filters),
+    enabled: isAuthenticated,
+    queryFn: () => fetchAdminTransfers(filters),
     queryKey: ["admin", "transfers", "list", filters],
     retry: false,
   });
@@ -160,15 +160,15 @@ export function AdminTransfersPage() {
   );
 
   const transferDetailQuery = useQuery({
-    enabled: Boolean(accessToken && selectedTransferId),
-    queryFn: () => fetchAdminTransferDetail(accessToken ?? "", selectedTransferId ?? ""),
+    enabled: Boolean(isAuthenticated && selectedTransferId),
+    queryFn: () => fetchAdminTransferDetail(selectedTransferId ?? ""),
     queryKey: ["admin", "transfers", "detail", selectedTransferId],
     retry: false,
   });
 
   const workflowTransferQuery = useQuery({
-    enabled: Boolean(accessToken && workflowTransferId),
-    queryFn: () => fetchAdminTransferDetail(accessToken ?? "", workflowTransferId ?? ""),
+    enabled: Boolean(isAuthenticated && workflowTransferId),
+    queryFn: () => fetchAdminTransferDetail(workflowTransferId ?? ""),
     queryKey: ["admin", "transfers", "workflow-detail", workflowTransferId],
     retry: false,
   });
@@ -181,11 +181,11 @@ export function AdminTransfersPage() {
       dispatchNow: boolean;
       payload: AdminTransferCreatePayload;
     }) => {
-      const created = await createAdminTransfer(accessToken ?? "", payload);
+      const created = await createAdminTransfer(payload);
       if (!dispatchNow) {
         return created;
       }
-      return dispatchAdminTransfer(accessToken ?? "", created.overview.id, payload.notes ?? null);
+      return dispatchAdminTransfer(created.overview.id, payload.notes ?? null);
     },
     onError: (error) => {
       setFeedback({
@@ -209,7 +209,7 @@ export function AdminTransfersPage() {
     }: {
       payload: AdminTransferUpdatePayload;
       transferId: string;
-    }) => updateAdminTransfer(accessToken ?? "", transferId, payload),
+    }) => updateAdminTransfer(transferId, payload),
     onError: (error) => {
       setFeedback({
         tone: "error",
@@ -227,7 +227,7 @@ export function AdminTransfersPage() {
 
   const dispatchMutation = useMutation({
     mutationFn: ({ notes, transferId }: { notes?: string | null; transferId: string }) =>
-      dispatchAdminTransfer(accessToken ?? "", transferId, notes),
+      dispatchAdminTransfer(transferId, notes),
     onError: (error) => {
       setFeedback({
         tone: "error",
@@ -250,7 +250,7 @@ export function AdminTransfersPage() {
     }: {
       payload: AdminTransferReceivePayload;
       transferId: string;
-    }) => receiveAdminTransfer(accessToken ?? "", transferId, payload),
+    }) => receiveAdminTransfer(transferId, payload),
     onError: (error) => {
       setFeedback({
         tone: "error",
@@ -268,7 +268,7 @@ export function AdminTransfersPage() {
 
   const cancelMutation = useMutation({
     mutationFn: ({ reason, transferId }: { reason?: string | null; transferId: string }) =>
-      cancelAdminTransfer(accessToken ?? "", transferId, reason),
+      cancelAdminTransfer(transferId, reason),
     onError: (error) => {
       setFeedback({
         tone: "error",
@@ -363,7 +363,7 @@ export function AdminTransfersPage() {
   }
 
   function handleCreate(payload: AdminTransferCreatePayload, dispatchNow: boolean) {
-    if (!accessToken || isSubmitting) {
+    if (!isAuthenticated || isSubmitting) {
       return;
     }
     setFeedback(null);
@@ -371,7 +371,7 @@ export function AdminTransfersPage() {
   }
 
   function handleUpdate(payload: AdminTransferUpdatePayload) {
-    if (!accessToken || isSubmitting || !workflowTransferId) {
+    if (!isAuthenticated || isSubmitting || !workflowTransferId) {
       return;
     }
     setFeedback(null);
@@ -379,7 +379,7 @@ export function AdminTransfersPage() {
   }
 
   function handleDispatch(notes?: string | null) {
-    if (!accessToken || isSubmitting || !workflowTransferId) {
+    if (!isAuthenticated || isSubmitting || !workflowTransferId) {
       return;
     }
     setFeedback(null);
@@ -387,7 +387,7 @@ export function AdminTransfersPage() {
   }
 
   function handleReceive(payload: AdminTransferReceivePayload) {
-    if (!accessToken || isSubmitting || !workflowTransferId) {
+    if (!isAuthenticated || isSubmitting || !workflowTransferId) {
       return;
     }
     setFeedback(null);
@@ -395,7 +395,7 @@ export function AdminTransfersPage() {
   }
 
   function handleCancelTransfer(reason?: string | null) {
-    if (!accessToken || isSubmitting || !workflowTransferId) {
+    if (!isAuthenticated || isSubmitting || !workflowTransferId) {
       return;
     }
     setFeedback(null);

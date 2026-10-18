@@ -145,7 +145,7 @@ describe("admin workstations API boundary", () => {
       }),
     );
 
-    const response = await fetchAdminWorkstations("token-1", filters);
+    const response = await fetchAdminWorkstations(filters);
 
     expect(fetchSpy).toHaveBeenCalledWith(
       expect.stringContaining("/v1/admin/workstations?page=1&page_size=25"),
@@ -163,7 +163,7 @@ describe("admin workstations API boundary", () => {
   it("loads workstation detail by id", async () => {
     const fetchSpy = vi.spyOn(globalThis, "fetch").mockImplementation(() => mockJsonResponse(apiDetail));
 
-    const workstation = await fetchAdminWorkstationDetail("token-1", "workstation-1");
+    const workstation = await fetchAdminWorkstationDetail("workstation-1");
 
     expect(fetchSpy).toHaveBeenCalledWith(
       expect.stringContaining("/v1/admin/workstations/workstation-1"),
@@ -177,7 +177,7 @@ describe("admin workstations API boundary", () => {
   it("submits new workstations through the backend contract", async () => {
     const fetchSpy = vi.spyOn(globalThis, "fetch").mockImplementation(() => mockJsonResponse(apiDetail, 201));
 
-    const workstation = await createAdminWorkstation("token-1", {
+    const workstation = await createAdminWorkstation({
       branchId: "branch-1",
       code: "POS-02",
       isActive: true,

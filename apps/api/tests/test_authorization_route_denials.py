@@ -16,9 +16,9 @@ from zeromerma_api.db.session import SessionLocal
 from zeromerma_api.modules.audit.infrastructure.models import AuditLog
 from zeromerma_api.modules.identity.application.authorization import resolve_authorization
 from zeromerma_api.modules.identity.application.schemas import IdentitySurface
-from zeromerma_api.modules.identity.application.security import TokenService
 from zeromerma_api.modules.identity.infrastructure.models import User
 from zeromerma_api.presentation.access_policy import ENDPOINT_POLICIES
+from zeromerma_api.testing.sessions import fixture_session_headers
 
 
 def _persisted_state(session: Session) -> dict[str, list[dict[str, Any]]]:
@@ -50,9 +50,10 @@ def test_every_mutating_route_denies_without_capabilities_before_body_validation
         session.add(user)
         session.commit()
         # Missing capabilities are rejected before an operation scope is bound.
-        actor = resolve_authorization(session, user)
+        actor = resolve_authorization(session, user, surface=surface)
         assert actor.effective_grants == []
-        token = TokenService().issue_access_token(user.id)
+        headers = fixture_session_headers(session, user, audience=surface)
+        session.commit()
         before = _persisted_state(session)
         previous_audit_ids = set(session.scalars(select(AuditLog.id)))
 
@@ -85,7 +86,7 @@ def test_every_mutating_route_denies_without_capabilities_before_body_validation
         denied = client.request(
             method,
             path,
-            headers={"Authorization": f"Bearer {token}", "X-Request-ID": request_id},
+            headers={**headers, "X-Request-ID": request_id},
             json=body,
         )
         assert denied.status_code == 403, (method, template, denied.text)
@@ -120,7 +121,10 @@ def test_every_mutating_route_denies_without_capabilities_before_body_validation
             assert provenance["scope_type"] == "UNRESOLVED"
             assert provenance["branch_ids"] == []
             serialized = json.dumps(metadata)
-            if any(secret in serialized for secret in (token, body_secret, actor.email)):
+            if any(
+                secret in serialized
+                for secret in (headers["Cookie"], headers["X-CSRF-Token"], body_secret, actor.email)
+            ):
                 pytest.fail(
                     "Denied-operation audit retained private request material", pytrace=False
                 )

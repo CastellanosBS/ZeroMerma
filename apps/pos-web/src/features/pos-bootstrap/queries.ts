@@ -9,11 +9,11 @@ export function bootstrapQueryKey(workstationCode: string) {
 }
 
 export function usePosBootstrapQuery() {
-  const accessToken = usePosAuthStore((state) => state.accessToken);
+  const isAuthenticated = usePosAuthStore((state) => state.isAuthenticated);
 
   return useQuery({
     queryKey: bootstrapQueryKey(appEnv.VITE_POS_WORKSTATION_CODE),
-    queryFn: () => getPosBootstrap(accessToken!, appEnv.VITE_POS_WORKSTATION_CODE),
-    enabled: accessToken !== null,
+    queryFn: () => getPosBootstrap(appEnv.VITE_POS_WORKSTATION_CODE),
+    enabled: isAuthenticated,
   });
 }

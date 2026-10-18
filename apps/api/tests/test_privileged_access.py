@@ -7,6 +7,7 @@ from datetime import UTC, datetime, timedelta
 import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import delete, func, select
+from sqlalchemy.orm import object_session
 
 from zeromerma_api.db.session import SessionLocal
 from zeromerma_api.modules.audit.infrastructure.models import AuditLog
@@ -16,7 +17,6 @@ from zeromerma_api.modules.identity.application.privileged_access import (
     PrivilegedAccessService,
     active_superadmin_ids,
 )
-from zeromerma_api.modules.identity.application.security import TokenService
 from zeromerma_api.modules.identity.infrastructure.models import (
     Permission,
     Role,
@@ -28,12 +28,15 @@ from zeromerma_api.modules.identity.infrastructure.models import (
 )
 from zeromerma_api.modules.identity.infrastructure.privileged_models import IdentityPrivilegedChange
 from zeromerma_api.modules.outbox.infrastructure.models import OutboxEvent
+from zeromerma_api.testing.sessions import fixture_session_headers
 
 PREFIX = "/v1/admin/roles/privileged-changes"
 
 
 def _headers(user: User) -> dict[str, str]:
-    return {"Authorization": f"Bearer {TokenService().issue_access_token(user.id)}"}
+    session = object_session(user)
+    assert session is not None
+    return fixture_session_headers(session, user)
 
 
 def _new_user(email: str, *, surfaces: list[str] | None = None) -> User:

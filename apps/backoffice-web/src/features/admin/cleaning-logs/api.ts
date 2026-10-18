@@ -310,34 +310,28 @@ export function buildAdminCleaningLogsListPath(filters: AdminCleaningListFilters
 }
 
 export function fetchAdminCleaningLogs(
-  accessToken: string,
   filters: AdminCleaningListFilters,
 ): Promise<AdminCleaningLogListResponse> {
   return requestJson<ApiListResponse>({
-    accessToken,
     path: buildAdminCleaningLogsListPath(filters),
   }).then(mapListFromApi);
 }
 
-export function fetchAdminCleaningTemplates(accessToken: string): Promise<AdminCleaningTemplate[]> {
+export function fetchAdminCleaningTemplates(): Promise<AdminCleaningTemplate[]> {
   return requestJson<ApiTemplate[]>({
-    accessToken,
     path: "/v1/admin/cleaning-logs/templates",
   }).then((response) => response.map(mapAdminCleaningTemplateFromApi));
 }
 
 export function fetchAdminCleaningLogDetail(
-  accessToken: string,
   cleaningLogId: string,
 ): Promise<AdminCleaningLogDetail> {
   return requestJson<ApiDetail>({
-    accessToken,
     path: `/v1/admin/cleaning-logs/${cleaningLogId}`,
   }).then(mapDetailFromApi);
 }
 
 export function createAdminCleaningLog(
-  accessToken: string,
   payload: AdminCleaningCreatePayload,
 ): Promise<AdminCleaningLogDetail> {
   const body: ApiCreateRequest = {
@@ -361,7 +355,6 @@ export function createAdminCleaningLog(
   };
 
   return requestJson<ApiDetail>({
-    accessToken,
     body,
     method: "POST",
     path: "/v1/admin/cleaning-logs",
@@ -369,7 +362,6 @@ export function createAdminCleaningLog(
 }
 
 export function completeAdminCleaningLog(
-  accessToken: string,
   cleaningLogId: string,
   payload: AdminCleaningCompletePayload,
 ): Promise<AdminCleaningLogDetail> {
@@ -382,7 +374,6 @@ export function completeAdminCleaningLog(
   };
 
   return requestJson<ApiDetail>({
-    accessToken,
     body,
     method: "POST",
     path: `/v1/admin/cleaning-logs/${cleaningLogId}/complete`,
@@ -390,12 +381,10 @@ export function completeAdminCleaningLog(
 }
 
 export function cancelAdminCleaningLog(
-  accessToken: string,
   cleaningLogId: string,
   payload: AdminCleaningCancelPayload,
 ): Promise<AdminCleaningLogDetail> {
   return requestJson<ApiDetail>({
-    accessToken,
     body: { reason: payload.reason },
     method: "POST",
     path: `/v1/admin/cleaning-logs/${cleaningLogId}/cancel`,

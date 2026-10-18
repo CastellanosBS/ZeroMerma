@@ -15,12 +15,11 @@ from zeromerma_api.db.session import SessionLocal
 from zeromerma_api.modules.catalog.infrastructure.models import Product
 from zeromerma_api.modules.payments.infrastructure.models import OperationalPaymentCategory
 from zeromerma_api.testing.authorization import owner_headers
+from zeromerma_api.testing.sessions import login_headers
 
 
-def _login(client: TestClient, *, email: str, password: str) -> str:
-    response = client.post("/v1/auth/login", json={"email": email, "password": password})
-    assert response.status_code == 200, response.json()
-    return str(response.json()["access_token"])
+def _login(client: TestClient, *, email: str, password: str) -> dict[str, str]:
+    return login_headers(client, email=email, password=password, audience="POS")
 
 
 def _admin_headers(client: TestClient) -> dict[str, str]:
@@ -29,7 +28,7 @@ def _admin_headers(client: TestClient) -> dict[str, str]:
 
 def _cashier_headers(client: TestClient) -> dict[str, str]:
     token = _login(client, email=SEED_USER_EMAIL, password=SEED_USER_PASSWORD)
-    return {"Authorization": f"Bearer {token}"}
+    return token
 
 
 def _get_product_id(code: str) -> str:

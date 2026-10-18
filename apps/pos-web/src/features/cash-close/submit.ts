@@ -9,15 +9,15 @@ import {
 } from "./model";
 
 export function canAttemptCashCloseSubmit({
-  accessToken,
+  isAuthenticated,
   hasOpenCashSession,
   isCommitPending,
 }: {
-  accessToken: string | null;
+  isAuthenticated: boolean;
   hasOpenCashSession: boolean;
   isCommitPending: boolean;
 }): boolean {
-  return accessToken !== null && hasOpenCashSession && !isCommitPending;
+  return isAuthenticated && hasOpenCashSession && !isCommitPending;
 }
 
 export function getCashCloseSubmitTargetSection(

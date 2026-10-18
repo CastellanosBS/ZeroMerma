@@ -58,6 +58,20 @@ class WorkstationAccessService:
         if result is None:
             raise WorkstationNotFoundError(f"Workstation {workstation_code} was not found.")
 
+        from zeromerma_api.modules.identity.application.session_services import (
+            AUTH_CONTEXT_KEY,
+            SessionAuthentication,
+            auth_error,
+        )
+
+        authentication = session.info.get(AUTH_CONTEXT_KEY)
+        if (
+            isinstance(authentication, SessionAuthentication)
+            and authentication.record.audience == "POS"
+            and authentication.record.workstation_id != result["workstation_id"]
+        ):
+            raise auth_error(403, "FORBIDDEN", "This POS session is bound to another workstation.")
+
         if not result["branch_is_active"]:
             raise BranchInactiveError(f"Branch for workstation {workstation_code} is inactive.")
 

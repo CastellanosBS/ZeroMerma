@@ -107,7 +107,7 @@ describe("admin product classes API boundary", () => {
       }),
     );
 
-    const response = await fetchAdminProductClasses("token-1", filters);
+    const response = await fetchAdminProductClasses(filters);
 
     expect(fetchSpy).toHaveBeenCalledWith(
       expect.stringContaining("/v1/admin/product-classes?page=1&page_size=25"),
@@ -129,7 +129,7 @@ describe("admin product classes API boundary", () => {
       mockJsonResponse(apiProductClass),
     );
 
-    const productClass = await fetchAdminProductClassDetail("token-1", "class-1");
+    const productClass = await fetchAdminProductClassDetail("class-1");
 
     expect(fetchSpy).toHaveBeenCalledWith(
       expect.stringContaining("/v1/admin/product-classes/class-1"),
@@ -144,7 +144,7 @@ describe("admin product classes API boundary", () => {
       mockJsonResponse(apiProductClass, 201),
     );
 
-    const productClass = await createAdminProductClass("token-1", {
+    const productClass = await createAdminProductClass({
       brandId: "brand-1",
       captureModeDefault: "CLASS_CAPTURE",
       classCaptureUnitPrice: "12.00",
@@ -185,7 +185,7 @@ describe("admin product classes API boundary", () => {
       mockJsonResponse(apiProductClass),
     );
 
-    const productClass = await updateAdminProductClass("token-1", "class-1", {
+    const productClass = await updateAdminProductClass("class-1", {
       displayOrder: 20,
       status: "inactive",
     });

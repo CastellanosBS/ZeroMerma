@@ -347,10 +347,15 @@ def test_me_exposes_canonical_scopes_without_promoting_seed_administrator(
     client: TestClient,
 ) -> None:
     login = client.post(
-        "/v1/auth/login", json={"email": SEED_ADMIN_EMAIL, "password": SEED_ADMIN_PASSWORD}
+        "/v1/auth/login",
+        headers={"Origin": "http://localhost:5174", "X-ZeroMerma-Surface": "BACKOFFICE"},
+        json={"email": SEED_ADMIN_EMAIL, "password": SEED_ADMIN_PASSWORD, "audience": "BACKOFFICE"},
     )
     assert login.status_code == 200
-    headers = {"Authorization": f"Bearer {login.json()['access_token']}"}
+    from zeromerma_api.testing.sessions import response_session_headers
+
+    headers = response_session_headers(login, "BACKOFFICE")
+    client.cookies.clear()
     response = client.get("/v1/auth/me", headers=headers)
     assert response.status_code == 200
     context = response.json()

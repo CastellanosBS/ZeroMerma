@@ -33,6 +33,55 @@ class EndpointPolicy:
 # Each method/path is deliberate. Unlisted operations are denied, never inferred.
 # Shared masters have no branch owner: mutations require explicit GLOBAL (DEC-04).
 ENDPOINT_POLICIES: dict[tuple[str, str], EndpointPolicy] = {
+    ("GET", "/v1/auth/session"): EndpointPolicy(
+        (),
+        None,
+        exception_reason="Cookie introspection validates audience and Origin; idle is unchanged.",
+    ),
+    ("POST", "/v1/auth/activity"): EndpointPolicy(
+        (),
+        None,
+        exception_reason="Human activity requires audience, Origin and CSRF.",
+    ),
+    ("POST", "/v1/auth/lock"): EndpointPolicy(
+        (), None, exception_reason="The authenticated owner can lock the current POS session."
+    ),
+    ("POST", "/v1/auth/reauthenticate"): EndpointPolicy(
+        (),
+        None,
+        exception_reason="Owner reauthentication rotates credentials and validates CSRF.",
+    ),
+    ("POST", "/v1/auth/logout"): EndpointPolicy(
+        (),
+        None,
+        exception_reason="Owner logout requires CSRF.",
+    ),
+    ("GET", "/v1/auth/sessions"): EndpointPolicy(
+        (), None, exception_reason="Session listing is restricted to the authenticated owner."
+    ),
+    ("DELETE", "/v1/auth/sessions/{session_id}"): EndpointPolicy(
+        (), None, exception_reason="Individual revocation is restricted to the authenticated owner."
+    ),
+    ("POST", "/v1/auth/sessions/revoke-others"): EndpointPolicy(
+        (), None, exception_reason="Bulk revocation is restricted to the authenticated owner."
+    ),
+    ("POST", "/v1/auth/password/change"): EndpointPolicy(
+        (),
+        None,
+        exception_reason="Current password, audience, Origin and CSRF protect password changes.",
+    ),
+    ("POST", "/v1/auth/password/reset"): EndpointPolicy(
+        (),
+        None,
+        exception_reason="Recovery requires a single-use credential and audience Origin.",
+    ),
+    ("GET", "/v1/admin/users/{user_id}/sessions"): EndpointPolicy(("users.manage",), "BACKOFFICE"),
+    ("DELETE", "/v1/admin/users/{user_id}/sessions/{session_id}"): EndpointPolicy(
+        ("users.manage",), "BACKOFFICE", mutation=True
+    ),
+    ("POST", "/v1/admin/users/{user_id}/password-reset"): EndpointPolicy(
+        ("users.manage",), "BACKOFFICE", mutation=True
+    ),
     ("POST", "/v1/admin/roles/privileged-changes"): EndpointPolicy(
         (),
         "BACKOFFICE",
@@ -573,7 +622,10 @@ def enforce_operation_policy(
     policy = ENDPOINT_POLICIES.get((request.method, route.path))
     try:
         policy = get_endpoint_policy(request.method, route.path)
-        if policy.surface is not None and policy.surface not in current_user.allowed_surfaces:
+        if policy.surface is not None and (
+            policy.surface not in current_user.allowed_surfaces
+            or policy.surface != current_user.authorization_surface
+        ):
             raise HTTPException(
                 status_code=403, detail="This application surface is not authorized."
             )

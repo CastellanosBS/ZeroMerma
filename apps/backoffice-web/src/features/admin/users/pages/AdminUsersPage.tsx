@@ -113,7 +113,7 @@ function UserMetricStrip({
 }
 
 export function AdminUsersPage() {
-  const accessToken = useBackofficeAuthStore((state) => state.accessToken);
+  const isAuthenticated = useBackofficeAuthStore((state) => state.isAuthenticated);
   const queryClient = useQueryClient();
   const [filters, setFilters] = useState<AdminUserListFilters>(initialFilters);
   const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
@@ -123,8 +123,8 @@ export function AdminUsersPage() {
   );
 
   const usersQuery = useQuery({
-    enabled: Boolean(accessToken),
-    queryFn: () => fetchAdminUsers(accessToken ?? "", filters),
+    enabled: isAuthenticated,
+    queryFn: () => fetchAdminUsers(filters),
     queryKey: ["admin", "users", "list", filters],
     retry: false,
   });
@@ -136,28 +136,28 @@ export function AdminUsersPage() {
   );
 
   const detailQuery = useQuery({
-    enabled: Boolean(accessToken && selectedUserId),
-    queryFn: () => fetchAdminUserDetail(accessToken ?? "", selectedUserId ?? ""),
+    enabled: Boolean(isAuthenticated && selectedUserId),
+    queryFn: () => fetchAdminUserDetail(selectedUserId ?? ""),
     queryKey: ["admin", "users", "detail", selectedUserId],
     retry: false,
   });
 
   const assignmentMutation = useMutation({
     mutationFn: (payload: AdminUserRoleAssignmentPayload) =>
-      assignAdminUserRole(accessToken ?? "", selectedUserId!, payload),
+      assignAdminUserRole(selectedUserId!, payload),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ["admin", "users"] });
     },
   });
   const removeAssignmentMutation = useMutation({
-    mutationFn: (roleId: string) => removeAdminUserRole(accessToken ?? "", selectedUserId!, roleId),
+    mutationFn: (roleId: string) => removeAdminUserRole(selectedUserId!, roleId),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ["admin", "users"] });
     },
   });
 
   const createMutation = useMutation({
-    mutationFn: (payload: AdminUserCreatePayload) => createAdminUser(accessToken ?? "", payload),
+    mutationFn: (payload: AdminUserCreatePayload) => createAdminUser(payload),
     onError: (error) => {
       setFeedback({
         tone: "error",
@@ -174,7 +174,7 @@ export function AdminUsersPage() {
 
   const updateMutation = useMutation({
     mutationFn: ({ payload, userId }: { payload: AdminUserUpdatePayload; userId: string }) =>
-      updateAdminUser(accessToken ?? "", userId, payload),
+      updateAdminUser(userId, payload),
     onError: (error) => {
       setFeedback({
         tone: "error",
@@ -191,7 +191,7 @@ export function AdminUsersPage() {
 
   const statusMutation = useMutation({
     mutationFn: ({ isActive, userId }: { isActive: boolean; userId: string }) =>
-      changeAdminUserStatus(accessToken ?? "", userId, { isActive }),
+      changeAdminUserStatus(userId, { isActive }),
     onError: (error) => {
       setFeedback({
         tone: "error",
@@ -210,7 +210,7 @@ export function AdminUsersPage() {
 
   const lockMutation = useMutation({
     mutationFn: ({ reason, userId }: { reason: string | null; userId: string }) =>
-      lockAdminUser(accessToken ?? "", userId, { reason }),
+      lockAdminUser(userId, { reason }),
     onError: (error) => {
       setFeedback({
         tone: "error",
@@ -225,7 +225,7 @@ export function AdminUsersPage() {
   });
 
   const unlockMutation = useMutation({
-    mutationFn: (userId: string) => unlockAdminUser(accessToken ?? "", userId),
+    mutationFn: (userId: string) => unlockAdminUser(userId),
     onError: (error) => {
       setFeedback({
         tone: "error",
@@ -248,7 +248,7 @@ export function AdminUsersPage() {
       branchId: string;
       isDefault: boolean;
       userId: string;
-    }) => addAdminUserBranchAssignment(accessToken ?? "", userId, branchId, isDefault),
+    }) => addAdminUserBranchAssignment(userId, branchId, isDefault),
     onError: (error) => {
       setFeedback({
         tone: "error",

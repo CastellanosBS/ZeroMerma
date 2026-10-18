@@ -108,7 +108,7 @@ describe("admin discounts API", () => {
       total: 1,
     });
 
-    const response = await fetchAdminDiscounts("token", baseFilters);
+    const response = await fetchAdminDiscounts(baseFilters);
 
     expect(response.items).toHaveLength(1);
     expect(response.items[0]?.name).toBe("Ten percent");
@@ -161,8 +161,8 @@ describe("admin discounts API", () => {
       value: "10.0000",
     };
 
-    await createAdminDiscount("token", payload);
-    await updateAdminDiscount("token", "discount-1", payload);
+    await createAdminDiscount(payload);
+    await updateAdminDiscount("discount-1", payload);
 
     expect(fetchMock).toHaveBeenNthCalledWith(
       1,

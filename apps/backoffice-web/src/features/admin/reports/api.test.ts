@@ -119,7 +119,7 @@ describe("admin reports API boundary", () => {
       }),
     );
 
-    const response = await fetchAdminReports("token-1", {
+    const response = await fetchAdminReports({
       ...filters,
       category: "ventas_pedidos",
       status: "available",
@@ -136,7 +136,7 @@ describe("admin reports API boundary", () => {
   it("generates preview through backend POST", async () => {
     const fetchSpy = vi.spyOn(globalThis, "fetch").mockImplementation(() => mockJsonResponse(apiPreview));
 
-    const preview = await previewAdminReport("token-1", "sales_summary_by_branch", {
+    const preview = await previewAdminReport("sales_summary_by_branch", {
       date_from: "2026-05-01",
       date_to: "2026-05-22",
     });
@@ -163,7 +163,7 @@ describe("admin reports API boundary", () => {
       }),
     );
 
-    const payload = await exportAdminReport("token-1", "user_access_summary", {
+    const payload = await exportAdminReport("user_access_summary", {
       app_access: "BACKOFFICE",
     });
 

@@ -170,7 +170,7 @@ describe("admin roles API boundary", () => {
       }),
     );
 
-    const response = await fetchAdminRoles("token-1", {
+    const response = await fetchAdminRoles({
       ...filters,
       appSurface: "BACKOFFICE",
       search: "admin",
@@ -196,8 +196,8 @@ describe("admin roles API boundary", () => {
       return mockJsonResponse(apiDetail);
     });
 
-    const detail = await fetchAdminRoleDetail("token-1", "role-1");
-    const permissions = await fetchAdminRolePermissions("token-1");
+    const detail = await fetchAdminRoleDetail("role-1");
+    const permissions = await fetchAdminRolePermissions();
 
     expect(fetchSpy).toHaveBeenCalledTimes(2);
     expect(detail.overview.isHighPrivilege).toBe(true);
@@ -210,7 +210,7 @@ describe("admin roles API boundary", () => {
       mockJsonResponse(apiDetail, 201),
     );
 
-    await createAdminRole("token-1", {
+    await createAdminRole({
       code: "cash_auditor",
       confirmedHighRiskChange: true,
       description: "Consulta caja.",
@@ -229,4 +229,3 @@ describe("admin roles API boundary", () => {
     );
   });
 });
-

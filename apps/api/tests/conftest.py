@@ -46,6 +46,7 @@ TEST_ENGINE, SessionLocal, seed_local_data, create_app = TEST_RUNTIME
 
 TRUNCATE_SQL = """
 TRUNCATE TABLE
+  auth_login_limits,
   identity_recovery_credentials,
   identity_privileged_changes,
   identity_privilege_state,
@@ -162,5 +163,5 @@ def seeded_database(migrated_database: None) -> Iterator[None]:
 
 @pytest.fixture
 def client() -> Iterator[TestClient]:
-    with TestClient(create_app()) as test_client:
+    with TestClient(create_app(), base_url="https://testserver") as test_client:
         yield test_client

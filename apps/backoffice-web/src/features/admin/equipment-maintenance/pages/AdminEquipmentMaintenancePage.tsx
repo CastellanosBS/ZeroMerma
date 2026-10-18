@@ -122,7 +122,7 @@ function EquipmentMetricStrip({
 }
 
 export function AdminEquipmentMaintenancePage() {
-  const accessToken = useBackofficeAuthStore((state) => state.accessToken);
+  const isAuthenticated = useBackofficeAuthStore((state) => state.isAuthenticated);
   const queryClient = useQueryClient();
   const [filters, setFilters] = useState<AdminEquipmentListFilters>(initialFilters);
   const [selectedEquipmentId, setSelectedEquipmentId] = useState<string | null>(null);
@@ -136,8 +136,8 @@ export function AdminEquipmentMaintenancePage() {
   );
 
   const equipmentQuery = useQuery({
-    enabled: Boolean(accessToken),
-    queryFn: () => fetchAdminEquipment(accessToken ?? "", filters),
+    enabled: isAuthenticated,
+    queryFn: () => fetchAdminEquipment(filters),
     queryKey: ["admin", "equipment-maintenance", "list", filters],
     retry: false,
   });
@@ -149,15 +149,15 @@ export function AdminEquipmentMaintenancePage() {
   );
 
   const detailQuery = useQuery({
-    enabled: Boolean(accessToken && selectedEquipmentId),
-    queryFn: () => fetchAdminEquipmentDetail(accessToken ?? "", selectedEquipmentId ?? ""),
+    enabled: Boolean(isAuthenticated && selectedEquipmentId),
+    queryFn: () => fetchAdminEquipmentDetail(selectedEquipmentId ?? ""),
     queryKey: ["admin", "equipment-maintenance", "detail", selectedEquipmentId],
     retry: false,
   });
 
   const createEquipmentMutation = useMutation({
     mutationFn: (payload: AdminEquipmentCreatePayload) =>
-      createAdminEquipment(accessToken ?? "", payload),
+      createAdminEquipment(payload),
     onError: (error) => {
       setFeedback({
         tone: "error",
@@ -174,7 +174,7 @@ export function AdminEquipmentMaintenancePage() {
 
   const createMaintenanceMutation = useMutation({
     mutationFn: (payload: AdminMaintenanceCreatePayload) =>
-      createAdminMaintenance(accessToken ?? "", payload),
+      createAdminMaintenance(payload),
     onError: (error) => {
       setFeedback({
         tone: "error",
@@ -199,7 +199,7 @@ export function AdminEquipmentMaintenancePage() {
     }: {
       maintenanceId: string;
       payload: AdminMaintenanceCompletePayload;
-    }) => completeAdminMaintenance(accessToken ?? "", maintenanceId, payload),
+    }) => completeAdminMaintenance(maintenanceId, payload),
     onError: (error) => {
       setFeedback({
         tone: "error",
@@ -219,7 +219,7 @@ export function AdminEquipmentMaintenancePage() {
   });
 
   const startMaintenanceMutation = useMutation({
-    mutationFn: (maintenanceId: string) => startAdminMaintenance(accessToken ?? "", maintenanceId),
+    mutationFn: (maintenanceId: string) => startAdminMaintenance(maintenanceId),
     onError: (error) => {
       setFeedback({
         tone: "error",
@@ -246,7 +246,7 @@ export function AdminEquipmentMaintenancePage() {
       reason: string | null;
       status: "OPERATIONAL" | "OUT_OF_SERVICE";
     }) =>
-      updateAdminEquipmentStatus(accessToken ?? "", equipmentId, {
+      updateAdminEquipmentStatus(equipmentId, {
         operationalStatus: status,
         reason,
       }),

@@ -251,21 +251,17 @@ export function buildAdminIncidentsListPath(filters: AdminIncidentListFilters): 
 }
 
 export function fetchAdminIncidents(
-  accessToken: string,
   filters: AdminIncidentListFilters,
 ): Promise<AdminIncidentListResponse> {
   return requestJson<ApiListResponse>({
-    accessToken,
     path: buildAdminIncidentsListPath(filters),
   }).then(mapListFromApi);
 }
 
 export function fetchAdminIncidentDetail(
-  accessToken: string,
   incidentId: string,
 ): Promise<AdminIncidentDetail> {
   return requestJson<ApiDetail>({
-    accessToken,
     path: `/v1/admin/incidents/${incidentId}`,
   }).then(mapDetailFromApi);
 }
@@ -297,11 +293,9 @@ function mapCreatePayload(payload: AdminIncidentCreatePayload): ApiCreate {
 }
 
 export function createAdminIncident(
-  accessToken: string,
   payload: AdminIncidentCreatePayload,
 ): Promise<AdminIncidentDetail> {
   return requestJson<ApiDetail>({
-    accessToken,
     body: mapCreatePayload(payload),
     method: "POST",
     path: "/v1/admin/incidents",
@@ -309,7 +303,6 @@ export function createAdminIncident(
 }
 
 export function addAdminIncidentFollowUp(
-  accessToken: string,
   incidentId: string,
   payload: AdminIncidentFollowUpPayload,
 ): Promise<AdminIncidentDetail> {
@@ -318,7 +311,6 @@ export function addAdminIncidentFollowUp(
     status_change: payload.statusChange,
   };
   return requestJson<ApiDetail>({
-    accessToken,
     body,
     method: "POST",
     path: `/v1/admin/incidents/${incidentId}/follow-ups`,
@@ -326,7 +318,6 @@ export function addAdminIncidentFollowUp(
 }
 
 export function changeAdminIncidentStatus(
-  accessToken: string,
   incidentId: string,
   payload: AdminIncidentStatusPayload,
 ): Promise<AdminIncidentDetail> {
@@ -336,7 +327,6 @@ export function changeAdminIncidentStatus(
     status: payload.status,
   };
   return requestJson<ApiDetail>({
-    accessToken,
     body,
     method: "POST",
     path: `/v1/admin/incidents/${incidentId}/status`,
@@ -344,7 +334,6 @@ export function changeAdminIncidentStatus(
 }
 
 export function resolveAdminIncident(
-  accessToken: string,
   incidentId: string,
   payload: AdminIncidentResolvePayload,
 ): Promise<AdminIncidentDetail> {
@@ -355,7 +344,6 @@ export function resolveAdminIncident(
     result: payload.result,
   };
   return requestJson<ApiDetail>({
-    accessToken,
     body,
     method: "POST",
     path: `/v1/admin/incidents/${incidentId}/resolve`,
@@ -363,12 +351,10 @@ export function resolveAdminIncident(
 }
 
 export function reopenAdminIncident(
-  accessToken: string,
   incidentId: string,
   note: string,
 ): Promise<AdminIncidentDetail> {
   return requestJson<ApiDetail>({
-    accessToken,
     body: { note },
     method: "POST",
     path: `/v1/admin/incidents/${incidentId}/reopen`,

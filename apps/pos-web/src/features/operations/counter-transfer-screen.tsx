@@ -396,7 +396,7 @@ function updateLineQuantity(
 }
 
 export function CounterTransferScreen() {
-  const accessToken = usePosAuthStore((state) => state.accessToken);
+  const isAuthenticated = usePosAuthStore((state) => state.isAuthenticated);
   const showError = useStatusMessageStore((state) => state.showError);
   const showSuccess = useStatusMessageStore((state) => state.showSuccess);
   const showWarning = useStatusMessageStore((state) => state.showWarning);
@@ -504,7 +504,7 @@ export function CounterTransferScreen() {
 
   const commitMutation = useMutation({
     mutationFn: async () => {
-      if (accessToken === null || operationsBootstrapQuery.data === undefined) {
+      if (!isAuthenticated || operationsBootstrapQuery.data === undefined) {
         throw new Error("No hay contexto operativo para registrar el movimiento.");
       }
 
@@ -514,7 +514,7 @@ export function CounterTransferScreen() {
         workstation_code: operationsBootstrapQuery.data.workstation.code,
       };
 
-      return commitCounterTransfer(accessToken, payload);
+      return commitCounterTransfer(payload);
     },
     onError: (error) => {
       const message = toOperationalErrorMessage(
@@ -548,7 +548,7 @@ export function CounterTransferScreen() {
   const adjustmentMutation = useMutation({
     mutationFn: async () => {
       const selectedDocument = selectedHistoryDocumentQuery.data;
-      if (!accessToken || !selectedDocument) {
+      if (!isAuthenticated || !selectedDocument) {
         throw new Error("Selecciona un movimiento antes de aplicar un ajuste.");
       }
 
@@ -569,7 +569,6 @@ export function CounterTransferScreen() {
       }
 
       return commitCorrection({
-        accessToken,
         payload: {
           high_impact_acknowledged: adjustmentDraft.highImpactAcknowledged,
           lines: adjustmentActiveLines.map(({ deltaQuantityMilliUnits, line }) => ({
@@ -694,7 +693,7 @@ export function CounterTransferScreen() {
 
   const commitMutationIsPending = commitMutation.isPending;
   const canSubmit =
-    accessToken !== null &&
+    isAuthenticated &&
     operationsBootstrapQuery.data !== undefined &&
     lineCount > 0 &&
     !commitMutationIsPending;

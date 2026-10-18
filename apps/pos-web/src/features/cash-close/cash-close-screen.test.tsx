@@ -311,10 +311,10 @@ vi.mock("../../components/app-shell-right-panel", () => ({
 
 vi.mock("../auth/auth-store", () => ({
   usePosAuthStore: (
-    selector: (state: { accessToken: string; clearSession: typeof clearSessionMock }) => unknown,
+    selector: (state: { isAuthenticated: boolean; clearSession: typeof clearSessionMock }) => unknown,
   ) =>
     selector({
-      accessToken: "token",
+      isAuthenticated: true,
       clearSession: clearSessionMock,
     }),
 }));
@@ -559,7 +559,7 @@ beforeEach(() => {
   clearSessionMock.mockReset();
   previewCashCloseMock.mockReset();
   commitCashCloseMock.mockReset();
-  previewCashCloseMock.mockImplementation(async (_token, payload) => buildPreviewResponse(payload));
+  previewCashCloseMock.mockImplementation(async (payload) => buildPreviewResponse(payload));
   commitCashCloseMock.mockResolvedValue(committedCloseDetail);
 });
 
@@ -642,7 +642,7 @@ describe("cash close screen", () => {
     await flushAsync();
 
     expect(commitCashCloseMock).toHaveBeenCalledTimes(1);
-    expect(commitCashCloseMock.mock.calls[0]?.[1]).toEqual({
+    expect(commitCashCloseMock.mock.calls[0]?.[0]).toEqual({
       close_mode: "WITH_COUNT",
       counter_empty_confirmed: false,
       counted_payment_methods: [
@@ -730,7 +730,7 @@ describe("cash close screen", () => {
     await flushAsync();
 
     expect(commitCashCloseMock).toHaveBeenCalledTimes(1);
-    expect(commitCashCloseMock.mock.calls[0]?.[1]).toEqual({
+    expect(commitCashCloseMock.mock.calls[0]?.[0]).toEqual({
       close_mode: "WITH_COUNT",
       counter_empty_confirmed: true,
       counted_payment_methods: [
@@ -776,7 +776,7 @@ describe("cash close screen", () => {
     click(getButtonByText(view.container, "Cerrar turno"));
     await flushAsync();
 
-    expect(commitCashCloseMock.mock.calls[0]?.[1].counted_payment_methods).toEqual([
+    expect(commitCashCloseMock.mock.calls[0]?.[0].counted_payment_methods).toEqual([
       {
         counted_amount: "20.00",
         payment_method_code: "CASH",

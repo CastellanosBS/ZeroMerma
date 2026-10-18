@@ -129,7 +129,7 @@ function AdminWasteMetricStrip({
 }
 
 export function AdminWastePage() {
-  const accessToken = useBackofficeAuthStore((state) => state.accessToken);
+  const isAuthenticated = useBackofficeAuthStore((state) => state.isAuthenticated);
   const queryClient = useQueryClient();
   const [filters, setFilters] = useState<AdminWasteListFilters>(getInitialFilters);
   const [selectedWasteId, setSelectedWasteId] = useState<string | null>(null);
@@ -139,8 +139,8 @@ export function AdminWastePage() {
   );
 
   const wasteQuery = useQuery({
-    enabled: Boolean(accessToken),
-    queryFn: () => fetchAdminWaste(accessToken ?? "", filters),
+    enabled: isAuthenticated,
+    queryFn: () => fetchAdminWaste(filters),
     queryKey: ["admin", "waste", "list", filters],
     retry: false,
   });
@@ -152,14 +152,14 @@ export function AdminWastePage() {
   );
 
   const wasteDetailQuery = useQuery({
-    enabled: Boolean(accessToken && selectedWasteId),
-    queryFn: () => fetchAdminWasteDetail(accessToken ?? "", selectedWasteId ?? ""),
+    enabled: Boolean(isAuthenticated && selectedWasteId),
+    queryFn: () => fetchAdminWasteDetail(selectedWasteId ?? ""),
     queryKey: ["admin", "waste", "detail", selectedWasteId],
     retry: false,
   });
 
   const createMutation = useMutation({
-    mutationFn: (payload: AdminWasteCreatePayload) => createAdminWaste(accessToken ?? "", payload),
+    mutationFn: (payload: AdminWasteCreatePayload) => createAdminWaste(payload),
     onError: (error) => {
       setFeedback({
         tone: "error",
@@ -223,7 +223,7 @@ export function AdminWastePage() {
   }
 
   function handleCreate(payload: AdminWasteCreatePayload) {
-    if (!accessToken || createMutation.isPending) {
+    if (!isAuthenticated || createMutation.isPending) {
       return;
     }
     setFeedback(null);

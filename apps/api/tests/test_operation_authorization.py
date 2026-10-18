@@ -26,7 +26,6 @@ from zeromerma_api.modules.identity.application.authorization import resolve_aut
 from zeromerma_api.modules.identity.application.permissions import PERMISSION_CODES
 from zeromerma_api.modules.identity.application.privileged_access import lock_privileged_lifecycle
 from zeromerma_api.modules.identity.application.schemas import AuthenticatedUser, CapabilityCode
-from zeromerma_api.modules.identity.application.security import TokenService
 from zeromerma_api.modules.identity.infrastructure.models import (
     Permission,
     Role,
@@ -45,6 +44,7 @@ from zeromerma_api.modules.outbox.infrastructure.models import OutboxEvent
 from zeromerma_api.modules.suppliers.infrastructure.models import Supplier
 from zeromerma_api.presentation.access_policy import ENDPOINT_POLICIES, install_access_policies
 from zeromerma_api.presentation.errors import install_error_handlers
+from zeromerma_api.testing.sessions import fixture_session_headers
 
 
 def _actor(
@@ -81,7 +81,12 @@ def _actor(
 
 
 def _headers(actor: AuthenticatedUser) -> dict[str, str]:
-    return {"Authorization": f"Bearer {TokenService().issue_access_token(actor.id)}"}
+    with SessionLocal() as session:
+        user = session.get(User, actor.id)
+        assert user is not None
+        headers = fixture_session_headers(session, user)
+        session.commit()
+        return headers
 
 
 def test_scoped_queries_filter_columns_aliases_aggregates_subqueries_and_cached_get() -> None:
@@ -246,9 +251,10 @@ def test_http_families_deny_missing_capability_and_view_does_not_grant_mutation(
         branch = session.scalars(select(Branch.id)).first()
         assert branch is not None
         actor = _actor(session, ("catalog.view",), [branch])
+    headers = _headers(actor)
+    with SessionLocal() as session:
         audit_count = session.scalar(select(func.count(AuditLog.id)))
         outbox_count = session.scalar(select(func.count(OutboxEvent.id)))
-    headers = _headers(actor)
     paths = [
         "inventory",
         "production",
@@ -595,17 +601,24 @@ def test_denial_audit_commits_only_after_all_flushed_business_writes_are_rolled_
     app = FastAPI()
     app.include_router(router)
     install_error_handlers(app)
-    with TestClient(app) as client:
+    headers = _headers(actor)
+    with SessionLocal() as session:
+        outbox_before = session.scalar(select(func.count(OutboxEvent.id)))
+        audit_before = session.scalar(select(func.count(AuditLog.id)))
+    with TestClient(app, base_url="https://testserver") as client:
         response = client.post(
             "/v1/admin/inventory/adjustments",
-            headers={**_headers(actor), "X-Request-ID": "denial-rollback-proof"},
+            headers={**headers, "X-Request-ID": "denial-rollback-proof"},
             json={"secret": "must-not-be-audited"},
         )
     assert response.status_code == 403
     with SessionLocal() as session:
         assert session.scalar(select(func.count(InventoryBalance.id))) == 0
-        assert session.scalar(select(func.count(OutboxEvent.id))) == 0
-        records = list(session.scalars(select(AuditLog)))
+        assert session.scalar(select(func.count(OutboxEvent.id))) == outbox_before
+        assert session.scalar(select(func.count(AuditLog.id))) == audit_before + 1
+        records = list(
+            session.scalars(select(AuditLog).where(AuditLog.action == "authorization.denied"))
+        )
         assert len(records) == 1
         record = records[0]
         assert record.action == "authorization.denied"

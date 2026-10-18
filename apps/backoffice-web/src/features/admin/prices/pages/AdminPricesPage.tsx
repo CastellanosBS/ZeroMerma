@@ -96,7 +96,7 @@ function priceKey(item: AdminPriceRow): string {
 }
 
 export function AdminPricesPage() {
-  const accessToken = useBackofficeAuthStore((state) => state.accessToken);
+  const isAuthenticated = useBackofficeAuthStore((state) => state.isAuthenticated);
   const queryClient = useQueryClient();
   const [filters, setFilters] = useState<AdminPriceListFilters>(initialFilters);
   const [selectedPrice, setSelectedPrice] = useState<AdminPriceRow | null>(null);
@@ -104,8 +104,8 @@ export function AdminPricesPage() {
   const [feedback, setFeedback] = useState<{ tone: "success" | "error"; message: string } | null>(null);
 
   const pricesQuery = useQuery({
-    enabled: Boolean(accessToken),
-    queryFn: () => fetchAdminPrices(accessToken ?? "", filters),
+    enabled: isAuthenticated,
+    queryFn: () => fetchAdminPrices(filters),
     queryKey: ["admin", "prices", "list", filters],
     retry: false,
   });
@@ -120,10 +120,9 @@ export function AdminPricesPage() {
   }, [priceList.items, selectedPrice]);
 
   const priceDetailQuery = useQuery({
-    enabled: Boolean(accessToken && selectedPricePreview),
+    enabled: Boolean(isAuthenticated && selectedPricePreview),
     queryFn: () =>
       fetchAdminPriceDetail(
-        accessToken ?? "",
         selectedPricePreview?.entityType ?? "",
         selectedPricePreview?.entityId ?? "",
       ),
@@ -133,7 +132,7 @@ export function AdminPricesPage() {
 
   const updatePriceMutation = useMutation({
     mutationFn: ({ payload, row }: { payload: AdminPriceUpdatePayload; row: AdminPriceRow }) =>
-      updateAdminPrice(accessToken ?? "", row, payload),
+      updateAdminPrice(row, payload),
     onError: (error) => {
       setFeedback({
         tone: "error",
@@ -187,7 +186,7 @@ export function AdminPricesPage() {
   }
 
   function handleSubmitPrice(payload: AdminPriceUpdatePayload) {
-    if (!accessToken || !editingPrice || updatePriceMutation.isPending) {
+    if (!isAuthenticated || !editingPrice || updatePriceMutation.isPending) {
       return;
     }
 

@@ -9,9 +9,8 @@ export function loginOperator(payload: LoginRequest): Promise<LoginResponse> {
   });
 }
 
-export function getCurrentOperator(accessToken: string): Promise<AuthenticatedUser> {
+export function getCurrentOperator(): Promise<AuthenticatedUser> {
   return requestJson<AuthenticatedUser>({
-    accessToken,
     path: "/v1/auth/me?surface=POS",
   });
 }

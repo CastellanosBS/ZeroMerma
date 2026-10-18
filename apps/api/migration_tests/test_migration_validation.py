@@ -49,7 +49,7 @@ from zeromerma_api.testing.database_safety import (
 REPO_ROOT = Path(__file__).resolve().parents[3]
 VERSIONS_DIR = REPO_ROOT / "apps" / "api" / "alembic" / "versions"
 ALEMBIC_INI = REPO_ROOT / "apps" / "api" / "alembic.ini"
-CANONICAL_HEAD = "20260912_0040_authorization"
+CANONICAL_HEAD = "20261018_0041_auth_sessions"
 EXPECTED_POSTGRES_MAJOR = 16
 TEST_CONTAINER_VARIABLE = "ZEROMERMA_TEST_CONTAINER_NAME"
 
@@ -58,7 +58,7 @@ KNOWN_NAMING_ONLY = "KNOWN_NAMING_ONLY"
 KNOWN_MODEL_OBJECT = "KNOWN_MODEL_OBJECT"
 REAL_SCHEMA_DRIFT = "REAL_SCHEMA_DRIFT"
 UNKNOWN_SCHEMA_DRIFT = "UNKNOWN_SCHEMA_DRIFT"
-DRIFT_BASELINE_VERSION = "2026-09-01.zm-fin-006.1"
+DRIFT_BASELINE_VERSION = "2026-10-18.zm-fin-023.1"
 
 
 @dataclass(frozen=True, order=True, slots=True)
@@ -97,6 +97,39 @@ class ModelCheckFingerprint:
     database_name: str
     model_expression: str
     database_expression: str
+
+
+@dataclass(frozen=True, order=True, slots=True)
+class ModelIndexFingerprint:
+    model: IndexFingerprint
+    database: IndexFingerprint
+
+
+# PostgreSQL expands the partial predicate into casts and ANY during reflection.
+# Both complete fingerprints are pinned; changed predicates never inherit this equivalence.
+KNOWN_MODEL_INDEXES: frozenset[ModelIndexFingerprint] = frozenset(
+    {
+        ModelIndexFingerprint(
+            IndexFingerprint(
+                "public",
+                "auth_sessions",
+                "uq_auth_sessions_pos_slot",
+                True,
+                ("column:user_id", "column:workstation_id"),
+                "audience='POS' AND status IN ('ACTIVE','LOCKED')",
+            ),
+            IndexFingerprint(
+                "public",
+                "auth_sessions",
+                "uq_auth_sessions_pos_slot",
+                True,
+                ("column:user_id", "column:workstation_id"),
+                "(((audience)::text = 'POS'::text) AND ((status)::text = ANY "
+                "((ARRAY['ACTIVE'::character varying, 'LOCKED'::character varying])::text[])))",
+            ),
+        ),
+    }
+)
 
 
 # This baseline is populated only from reviewed canonical-head evidence. It must never be
@@ -830,6 +863,47 @@ KNOWN_DB_ONLY_CHECKS: frozenset[CheckConstraintFingerprint] = frozenset(
 )
 KNOWN_MODEL_CHECKS: frozenset[ModelCheckFingerprint] = frozenset(
     {
+        ModelCheckFingerprint(
+            "public",
+            "auth_sessions",
+            "ck_auth_sessions_auth_session_expiry",
+            "ck_auth_sessions_auth_session_expiry",
+            "ck_auth_sessions_auth_session_expiry",
+            "idle_expires_at <= absolute_expires_at",
+            "idle_expires_at <= absolute_expires_at",
+        ),
+        ModelCheckFingerprint(
+            "public",
+            "auth_sessions",
+            "ck_auth_sessions_auth_session_status",
+            "ck_auth_sessions_auth_session_status",
+            "ck_auth_sessions_auth_session_status",
+            "status IN ('ACTIVE','LOCKED','REVOKED','EXPIRED')",
+            "status::text = ANY (ARRAY['ACTIVE'::character varying, 'LOCKED'::character varying, "
+            "'REVOKED'::character varying, 'EXPIRED'::character varying]::text[])",
+        ),
+        ModelCheckFingerprint(
+            "public",
+            "auth_sessions",
+            "ck_auth_sessions_auth_session_audience",
+            "ck_auth_sessions_auth_session_audience",
+            "ck_auth_sessions_auth_session_audience",
+            "audience IN ('POS', 'BACKOFFICE')",
+            "audience::text = ANY (ARRAY['POS'::character varying, "
+            "'BACKOFFICE'::character varying]::text[])",
+        ),
+        ModelCheckFingerprint(
+            "public",
+            "auth_sessions",
+            "ck_auth_sessions_auth_session_binding",
+            "ck_auth_sessions_auth_session_binding",
+            "ck_auth_sessions_auth_session_binding",
+            "(audience='POS' AND workstation_id IS NOT NULL) OR "
+            "(audience='BACKOFFICE' AND workstation_id IS NULL AND cash_session_id IS NULL)",
+            "audience::text = 'POS'::text AND workstation_id IS NOT NULL OR "
+            "audience::text = 'BACKOFFICE'::text AND workstation_id IS NULL "
+            "AND cash_session_id IS NULL",
+        ),
         ModelCheckFingerprint(
             "public",
             "user_role_assignments",
@@ -4436,6 +4510,13 @@ def _classify_model_check(
     return KNOWN_MODEL_OBJECT
 
 
+def _reflected_model_index(index: IndexFingerprint) -> IndexFingerprint:
+    for known in KNOWN_MODEL_INDEXES:
+        if known.model == index:
+            return known.database
+    return index
+
+
 def _fingerprint_record(fingerprint: object) -> dict[str, object]:
     if isinstance(
         fingerprint,
@@ -4615,7 +4696,10 @@ def _verify_schema_objects(
                     f"model_only={sorted(unmatched_model_checks)}"
                 )
 
-            expected_indexes = {_index_fingerprint_from_alembic(index) for index in table.indexes}
+            expected_indexes = {
+                _reflected_model_index(_index_fingerprint_from_alembic(index))
+                for index in table.indexes
+            }
             actual_indexes = {
                 _index_fingerprint_from_inspector(table_name, item)
                 for item in inspector.get_indexes(table_name)
@@ -4771,7 +4855,8 @@ def test_drift_classifier_accepts_only_exact_known_fingerprints() -> None:
     assert len(KNOWN_DB_ONLY_INDEXES) == 75
     assert len(KNOWN_DB_ONLY_DEFAULTS) == 51
     assert len(KNOWN_DB_ONLY_CHECKS) == 6
-    assert len(KNOWN_MODEL_CHECKS) == 185
+    assert len(KNOWN_MODEL_CHECKS) == 189
+    assert len(KNOWN_MODEL_INDEXES) == 1
     assert (
         sum(item.expected_database_name != item.database_name for item in KNOWN_MODEL_CHECKS) == 87
     )
@@ -4796,6 +4881,24 @@ def test_drift_classifier_accepts_only_exact_known_fingerprints() -> None:
         == KNOWN_INTENTIONAL_DB_ONLY
     )
     assert _classify_model_check(known_naming) == KNOWN_NAMING_ONLY
+
+
+def test_partial_index_equivalence_requires_both_exact_fingerprints() -> None:
+    known = next(iter(KNOWN_MODEL_INDEXES))
+    assert _reflected_model_index(known.model) == known.database
+    for change in (
+        {"predicate": "audience='POS'"},
+        {"expressions": ("column:user_id",)},
+        {"unique": False},
+        {"table": "other_sessions"},
+        {"index_name": "other_slot"},
+    ):
+        values = asdict(known.model) | change
+        changed = IndexFingerprint(**values)
+        assert _reflected_model_index(changed) == changed
+        assert _reflected_model_index(changed) != known.database
+        reflected_change = IndexFingerprint(**(asdict(known.database) | change))
+        assert _reflected_model_index(known.model) != reflected_change
 
 
 def test_drift_classifier_rejects_unknown_or_changed_fingerprints() -> None:
@@ -5097,14 +5200,102 @@ def test_authorization_transition_preserves_evidence_without_implicit_global() -
                 )
 
 
+def test_session_transition_preserves_data_and_starts_without_legacy_sessions() -> None:
+    with _root_runtime() as (root_config, root_engine):
+        with _temporary_database(root_engine, root_config, "sessions") as (config, engine):
+            _upgrade(engine, config, "20260912_0040_authorization")
+            preserved_tables = (
+                "users",
+                "branches",
+                "workstations",
+                "user_branch_assignments",
+                "cash_sessions",
+                "audit_log",
+                "outbox_events",
+            )
+            with engine.begin() as connection:
+                assert_authorized_destructive_connection(connection, config)
+                identity = _insert_identity(connection, "session-transition")
+                before = {
+                    table: connection.execute(
+                        text(f"SELECT row_to_json(t) FROM {table} t ORDER BY id")
+                    )
+                    .scalars()
+                    .all()
+                    for table in preserved_tables
+                }
+            _upgrade(engine, config, "20261018_0041_auth_sessions")
+            with engine.begin() as connection:
+                assert_authorized_destructive_connection(connection, config)
+                after = {
+                    table: connection.execute(
+                        text(f"SELECT row_to_json(t) FROM {table} t ORDER BY id")
+                    )
+                    .scalars()
+                    .all()
+                    for table in preserved_tables
+                }
+                assert after == before
+                for table in ("auth_sessions", "auth_login_limits", "password_reset_credentials"):
+                    assert connection.scalar(text(f"SELECT count(*) FROM {table}")) == 0
+                now = datetime.now(UTC)
+                session_id = uuid.uuid4()
+                _insert_row(
+                    connection,
+                    "auth_sessions",
+                    {
+                        "id": session_id,
+                        "credential_hash": "a" * 64,
+                        "csrf_hash": "b" * 64,
+                        "user_id": identity["user"],
+                        "audience": "POS",
+                        "status": "ACTIVE",
+                        "created_at": now,
+                        "last_activity_at": now,
+                        "idle_expires_at": now + timedelta(minutes=5),
+                        "absolute_expires_at": now + timedelta(hours=12),
+                        "workstation_id": identity["workstation"],
+                        "cash_session_id": identity["cash_session"],
+                    },
+                )
+                connection.execute(
+                    text("UPDATE cash_sessions SET status='CLOSED', closed_at=:now WHERE id=:id"),
+                    {"id": identity["cash_session"], "now": now},
+                )
+                row = connection.execute(
+                    text("SELECT status,revocation_reason FROM auth_sessions WHERE id=:id"),
+                    {"id": session_id},
+                ).one()
+                assert tuple(row) == ("REVOKED", "CASH_SESSION_CLOSED")
+                events = connection.execute(
+                    text(
+                        "SELECT action,metadata FROM audit_log "
+                        "WHERE resource_id=:id ORDER BY action"
+                    ),
+                    {"id": str(session_id)},
+                ).all()
+                assert [event.action for event in events] == ["session.created", "session.revoked"]
+                assert all(
+                    "credential_hash" not in event.metadata and "csrf_hash" not in event.metadata
+                    for event in events
+                )
+                assert (
+                    connection.scalar(
+                        text("SELECT count(*) FROM outbox_events WHERE aggregate_id=:id"),
+                        {"id": str(session_id)},
+                    )
+                    == 2
+                )
+
+
 def test_static_graph() -> None:
     inventory = _revision_inventory()
     graph = _graph(inventory)
     for row in inventory:
         _emit("REVISION", row)
     _emit("GRAPH", graph)
-    assert graph["revision_count"] == 40
-    assert graph["unique_revision_count"] == 40
+    assert graph["revision_count"] == 41
+    assert graph["unique_revision_count"] == 41
     assert graph["duplicate_revisions"] == []
     assert graph["roots"] == ["0001_foundation_schema"]
     assert graph["heads"] == [CANONICAL_HEAD]
@@ -5113,7 +5304,7 @@ def test_static_graph() -> None:
     assert graph["unreachable"] == []
     assert graph["branches"] == {}
     assert graph["merge_revisions"] == []
-    assert len(_topological_revisions(inventory)) == 40
+    assert len(_topological_revisions(inventory)) == 41
 
 
 def test_fresh_schema_drift_and_seed() -> None:

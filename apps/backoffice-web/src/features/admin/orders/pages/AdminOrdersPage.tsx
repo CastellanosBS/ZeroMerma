@@ -131,7 +131,7 @@ function AdminOrdersMetricStrip({
 type OrderMutationKind = "cancel" | "deliver" | "markReady";
 
 export function AdminOrdersPage() {
-  const accessToken = useBackofficeAuthStore((state) => state.accessToken);
+  const isAuthenticated = useBackofficeAuthStore((state) => state.isAuthenticated);
   const queryClient = useQueryClient();
   const [filters, setFilters] = useState<AdminOrderListFilters>(initialFilters);
   const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null);
@@ -140,8 +140,8 @@ export function AdminOrdersPage() {
   );
 
   const ordersQuery = useQuery({
-    enabled: Boolean(accessToken),
-    queryFn: () => fetchAdminOrders(accessToken ?? "", filters),
+    enabled: isAuthenticated,
+    queryFn: () => fetchAdminOrders(filters),
     queryKey: ["admin", "orders", "list", filters],
     retry: false,
   });
@@ -153,8 +153,8 @@ export function AdminOrdersPage() {
   );
 
   const detailQuery = useQuery({
-    enabled: Boolean(accessToken && selectedOrderId),
-    queryFn: () => fetchAdminOrderDetail(accessToken ?? "", selectedOrderId ?? ""),
+    enabled: Boolean(isAuthenticated && selectedOrderId),
+    queryFn: () => fetchAdminOrderDetail(selectedOrderId ?? ""),
     queryKey: ["admin", "orders", "detail", selectedOrderId],
     retry: false,
   });
@@ -162,12 +162,12 @@ export function AdminOrdersPage() {
   const actionMutation = useMutation({
     mutationFn: ({ kind, orderId }: { kind: OrderMutationKind; orderId: string }) => {
       if (kind === "markReady") {
-        return markAdminOrderReady(accessToken ?? "", orderId);
+        return markAdminOrderReady(orderId);
       }
       if (kind === "deliver") {
-        return deliverAdminOrder(accessToken ?? "", orderId);
+        return deliverAdminOrder(orderId);
       }
-      return cancelAdminOrder(accessToken ?? "", orderId);
+      return cancelAdminOrder(orderId);
     },
     onError: (error) => {
       setFeedback({

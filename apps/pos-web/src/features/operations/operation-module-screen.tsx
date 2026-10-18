@@ -941,7 +941,7 @@ function WasteTraceabilitySection({
 export function OperationModuleScreen({ variant }: { variant: OperationModuleVariant }) {
   const config = operationModuleConfig[variant];
   const queryClient = useQueryClient();
-  const accessToken = usePosAuthStore((state) => state.accessToken);
+  const isAuthenticated = usePosAuthStore((state) => state.isAuthenticated);
   const showError = useStatusMessageStore((state) => state.showError);
   const showSuccess = useStatusMessageStore((state) => state.showSuccess);
   const showWarning = useStatusMessageStore((state) => state.showWarning);
@@ -1687,7 +1687,7 @@ export function OperationModuleScreen({ variant }: { variant: OperationModuleVar
 
   const commitMutation = useMutation({
     mutationFn: async () => {
-      if (accessToken === null || operationsBootstrapQuery.data === undefined) {
+      if (!isAuthenticated || operationsBootstrapQuery.data === undefined) {
         throw new Error("Se requiere autenticacion y contexto de estacion.");
       }
 
@@ -1698,7 +1698,7 @@ export function OperationModuleScreen({ variant }: { variant: OperationModuleVar
           lines,
           notes: null,
         };
-        return commitCounterTransfer(accessToken, payload);
+        return commitCounterTransfer(payload);
       }
 
       const payload: WasteCommitRequest = {
@@ -1711,7 +1711,7 @@ export function OperationModuleScreen({ variant }: { variant: OperationModuleVar
         lines,
         notes: notes.trim().length > 0 ? notes.trim() : null,
       };
-      return commitWasteRecord(accessToken, payload);
+      return commitWasteRecord(payload);
     },
     onSuccess: (document) => {
       const wasteAlertRequested = variant === "waste" && isWasteHighImpact;
@@ -3514,7 +3514,7 @@ export function OperationModuleScreen({ variant }: { variant: OperationModuleVar
                       ],
                       value: counterTransferHistoryUserId,
                     },
-                  ]}                  
+                  ]}
                   title="Movimientos del mostrador"
                 />
               }
@@ -4215,5 +4215,3 @@ export function OperationModuleScreen({ variant }: { variant: OperationModuleVar
     </>
   );
 }
-
-

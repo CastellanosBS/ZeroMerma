@@ -14,12 +14,11 @@ from zeromerma_api.modules.configuration.infrastructure.models import (
     SystemSettingHistory,
 )
 from zeromerma_api.testing.authorization import owner_headers
+from zeromerma_api.testing.sessions import login_headers
 
 
-def _login(client: TestClient, *, email: str, password: str) -> str:
-    response = client.post("/v1/auth/login", json={"email": email, "password": password})
-    assert response.status_code == 200
-    return str(response.json()["access_token"])
+def _login(client: TestClient, *, email: str, password: str) -> dict[str, str]:
+    return login_headers(client, email=email, password=password, audience="POS")
 
 
 def _admin_headers(client: TestClient) -> dict[str, str]:
@@ -28,7 +27,7 @@ def _admin_headers(client: TestClient) -> dict[str, str]:
 
 def _cashier_headers(client: TestClient) -> dict[str, str]:
     token = _login(client, email=SEED_USER_EMAIL, password=SEED_USER_PASSWORD)
-    return {"Authorization": f"Bearer {token}"}
+    return token
 
 
 def test_admin_settings_list_registry_metrics_and_filters(client: TestClient) -> None:

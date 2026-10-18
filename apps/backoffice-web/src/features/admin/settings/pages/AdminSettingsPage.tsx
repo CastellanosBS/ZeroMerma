@@ -133,7 +133,7 @@ function SettingsMetricStrip({
 }
 
 export function AdminSettingsPage() {
-  const accessToken = useBackofficeAuthStore((state) => state.accessToken);
+  const isAuthenticated = useBackofficeAuthStore((state) => state.isAuthenticated);
   const queryClient = useQueryClient();
   const [filters, setFilters] = useState<AdminSettingsFilterState>(initialFilters);
   const [selectedSettingKey, setSelectedSettingKey] = useState<string | null>(null);
@@ -145,8 +145,8 @@ export function AdminSettingsPage() {
   );
 
   const settingsQuery = useQuery({
-    enabled: Boolean(accessToken),
-    queryFn: () => fetchAdminSettings(accessToken ?? "", filters),
+    enabled: isAuthenticated,
+    queryFn: () => fetchAdminSettings(filters),
     queryKey: ["admin", "settings", "list", filters],
     retry: false,
   });
@@ -158,8 +158,8 @@ export function AdminSettingsPage() {
   );
 
   const detailQuery = useQuery({
-    enabled: Boolean(accessToken && selectedSettingKey),
-    queryFn: () => fetchAdminSettingDetail(accessToken ?? "", selectedSettingKey ?? ""),
+    enabled: Boolean(isAuthenticated && selectedSettingKey),
+    queryFn: () => fetchAdminSettingDetail(selectedSettingKey ?? ""),
     queryKey: ["admin", "settings", "detail", selectedSettingKey],
     retry: false,
   });
@@ -177,7 +177,7 @@ export function AdminSettingsPage() {
       if (!detailQuery.data) {
         throw new Error("Selecciona una configuracion primero.");
       }
-      return updateAdminSetting(accessToken ?? "", detailQuery.data.definition.key, {
+      return updateAdminSetting(detailQuery.data.definition.key, {
         changeNote: changeNote || null,
         confirmSensitive,
         value: buildUpdateValue(detailQuery.data.definition, editorValue),
@@ -204,7 +204,7 @@ export function AdminSettingsPage() {
       if (!detailQuery.data) {
         throw new Error("Selecciona una configuracion primero.");
       }
-      return resetAdminSetting(accessToken ?? "", detailQuery.data.definition.key, {
+      return resetAdminSetting(detailQuery.data.definition.key, {
         changeNote: changeNote || null,
         confirmSensitive,
       });

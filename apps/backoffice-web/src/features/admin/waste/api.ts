@@ -268,23 +268,20 @@ export function buildAdminWasteListPath(filters: AdminWasteListFilters): string 
   return `/v1/admin/waste?${params.toString()}`;
 }
 
-export function fetchAdminWaste(accessToken: string, filters: AdminWasteListFilters): Promise<AdminWasteListResponse> {
+export function fetchAdminWaste(filters: AdminWasteListFilters): Promise<AdminWasteListResponse> {
   return requestJson<ApiWasteListResponse>({
-    accessToken,
     path: buildAdminWasteListPath(filters),
   }).then(mapWasteListFromApi);
 }
 
-export function fetchAdminWasteDetail(accessToken: string, wasteId: string): Promise<AdminWasteDetail> {
+export function fetchAdminWasteDetail(wasteId: string): Promise<AdminWasteDetail> {
   return requestJson<ApiWasteDetail>({
-    accessToken,
     path: `/v1/admin/waste/${wasteId}`,
   }).then(mapAdminWasteDetailFromApi);
 }
 
-export function createAdminWaste(accessToken: string, payload: AdminWasteCreatePayload): Promise<AdminWasteDetail> {
+export function createAdminWaste(payload: AdminWasteCreatePayload): Promise<AdminWasteDetail> {
   return requestJson<ApiWasteDetail>({
-    accessToken,
     body: toCreateApiPayload(payload),
     method: "POST",
     path: "/v1/admin/waste",

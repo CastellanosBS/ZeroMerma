@@ -117,7 +117,7 @@ function RoleMetricStrip({
 }
 
 export function AdminRolesPermissionsPage() {
-  const accessToken = useBackofficeAuthStore((state) => state.accessToken);
+  const isAuthenticated = useBackofficeAuthStore((state) => state.isAuthenticated);
   const queryClient = useQueryClient();
   const [filters, setFilters] = useState<AdminRoleListFilters>(initialFilters);
   const [selectedRoleId, setSelectedRoleId] = useState<string | null>(null);
@@ -127,15 +127,15 @@ export function AdminRolesPermissionsPage() {
   );
 
   const rolesQuery = useQuery({
-    enabled: Boolean(accessToken),
-    queryFn: () => fetchAdminRoles(accessToken ?? "", filters),
+    enabled: isAuthenticated,
+    queryFn: () => fetchAdminRoles(filters),
     queryKey: ["admin", "roles", "list", filters],
     retry: false,
   });
 
   const permissionsQuery = useQuery({
-    enabled: Boolean(accessToken),
-    queryFn: () => fetchAdminRolePermissions(accessToken ?? ""),
+    enabled: isAuthenticated,
+    queryFn: () => fetchAdminRolePermissions(),
     queryKey: ["admin", "roles", "permissions"],
     retry: false,
   });
@@ -148,14 +148,14 @@ export function AdminRolesPermissionsPage() {
   );
 
   const detailQuery = useQuery({
-    enabled: Boolean(accessToken && selectedRoleId),
-    queryFn: () => fetchAdminRoleDetail(accessToken ?? "", selectedRoleId ?? ""),
+    enabled: Boolean(isAuthenticated && selectedRoleId),
+    queryFn: () => fetchAdminRoleDetail(selectedRoleId ?? ""),
     queryKey: ["admin", "roles", "detail", selectedRoleId],
     retry: false,
   });
 
   const createMutation = useMutation({
-    mutationFn: (payload: AdminRoleCreatePayload) => createAdminRole(accessToken ?? "", payload),
+    mutationFn: (payload: AdminRoleCreatePayload) => createAdminRole(payload),
     onError: (error) => {
       setFeedback({
         tone: "error",
@@ -172,7 +172,7 @@ export function AdminRolesPermissionsPage() {
 
   const updateMutation = useMutation({
     mutationFn: ({ payload, roleId }: { payload: AdminRoleUpdatePayload; roleId: string }) =>
-      updateAdminRole(accessToken ?? "", roleId, payload),
+      updateAdminRole(roleId, payload),
     onError: (error) => {
       setFeedback({
         tone: "error",
@@ -196,7 +196,7 @@ export function AdminRolesPermissionsPage() {
       confirmedHighRiskChange: boolean;
       isActive: boolean;
       roleId: string;
-    }) => changeAdminRoleStatus(accessToken ?? "", roleId, isActive, confirmedHighRiskChange),
+    }) => changeAdminRoleStatus(roleId, isActive, confirmedHighRiskChange),
     onError: (error) => {
       setFeedback({
         tone: "error",
@@ -212,7 +212,7 @@ export function AdminRolesPermissionsPage() {
 
   const removeUserMutation = useMutation({
     mutationFn: ({ roleId, userId }: { roleId: string; userId: string }) =>
-      removeAdminRoleFromUser(accessToken ?? "", roleId, userId),
+      removeAdminRoleFromUser(roleId, userId),
     onError: (error) => {
       setFeedback({
         tone: "error",

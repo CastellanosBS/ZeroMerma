@@ -312,10 +312,10 @@ describe("admin returns corrections api", () => {
       .mockResolvedValueOnce(jsonResponse(returnDetailPayload))
       .mockResolvedValueOnce(jsonResponse(correctionDetailPayload));
 
-    const returns = await fetchAdminReturns("token", returnFilters);
-    const corrections = await fetchAdminCorrections("token", correctionFilters);
-    const returnDetail = await fetchAdminReturnDetail("token", "return-1");
-    const correctionDetail = await fetchAdminCorrectionDetail("token", "correction-1");
+    const returns = await fetchAdminReturns(returnFilters);
+    const corrections = await fetchAdminCorrections(correctionFilters);
+    const returnDetail = await fetchAdminReturnDetail("return-1");
+    const correctionDetail = await fetchAdminCorrectionDetail("correction-1");
 
     expect(returns.items[0]?.folio).toBe("DEV-123");
     expect(corrections.items[0]?.folio).toBe("COR-123");

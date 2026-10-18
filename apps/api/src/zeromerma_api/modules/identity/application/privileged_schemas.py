@@ -11,6 +11,7 @@ PrivilegedOperation = Literal[
     "USER_STATUS",
     "USER_LOCK",
     "USER_UNLOCK",
+    "USER_PASSWORD_RESET",
     "USER_BRANCH_ASSIGNMENT",
     "USER_BRANCH_REMOVAL",
     "USER_BRANCH_DEFAULT",
@@ -24,6 +25,11 @@ PrivilegedOperation = Literal[
 class PrivilegedBranchTargetRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
     branch_id: UUID
+
+
+class PrivilegedPasswordResetRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    reason: str = Field(min_length=8, max_length=1000)
 
 
 class PrivilegedChangeCreateRequest(BaseModel):

@@ -16,13 +16,13 @@ export function pendingInboundTransfersQueryKey(workstationCode: string) {
 }
 
 export function usePendingInboundTransfersQuery(enabled = true) {
-  const accessToken = usePosAuthStore((state) => state.accessToken);
+  const isAuthenticated = usePosAuthStore((state) => state.isAuthenticated);
 
   return useQuery({
     queryKey: pendingInboundTransfersQueryKey(appEnv.VITE_POS_WORKSTATION_CODE),
     queryFn: () =>
-      getPendingInboundTransfers(accessToken!, appEnv.VITE_POS_WORKSTATION_CODE),
-    enabled: accessToken !== null && enabled,
+      getPendingInboundTransfers(appEnv.VITE_POS_WORKSTATION_CODE),
+    enabled: isAuthenticated && enabled,
   });
 }
 
@@ -31,7 +31,7 @@ export function transferDetailQueryKey(workstationCode: string, transferId: stri
 }
 
 export function useTransferDetailQuery(transferId: string | null) {
-  const accessToken = usePosAuthStore((state) => state.accessToken);
+  const isAuthenticated = usePosAuthStore((state) => state.isAuthenticated);
 
   return useQuery({
     queryKey: transferDetailQueryKey(
@@ -40,11 +40,10 @@ export function useTransferDetailQuery(transferId: string | null) {
     ),
     queryFn: () =>
       getTransferDetail(
-        accessToken!,
         appEnv.VITE_POS_WORKSTATION_CODE,
         transferId!,
       ),
-    enabled: accessToken !== null && transferId !== null,
+    enabled: isAuthenticated && transferId !== null,
   });
 }
 
@@ -65,17 +64,16 @@ export function useTransferDispatchHistoryQuery(
   filters: TransferDispatchHistoryFilters,
   enabled = true,
 ) {
-  const accessToken = usePosAuthStore((state) => state.accessToken);
+  const isAuthenticated = usePosAuthStore((state) => state.isAuthenticated);
 
   return useQuery({
     queryKey: transferDispatchHistoryQueryKey(appEnv.VITE_POS_WORKSTATION_CODE, filters),
     queryFn: () =>
       getTransferDispatchHistory(
-        accessToken!,
         appEnv.VITE_POS_WORKSTATION_CODE,
         filters,
       ),
-    enabled: accessToken !== null && enabled,
+    enabled: isAuthenticated && enabled,
   });
 }
 
@@ -97,16 +95,15 @@ export function useTransferReceiptHistoryQuery(
   filters: TransferReceiptHistoryFilters,
   enabled = true,
 ) {
-  const accessToken = usePosAuthStore((state) => state.accessToken);
+  const isAuthenticated = usePosAuthStore((state) => state.isAuthenticated);
 
   return useQuery({
     queryKey: transferReceiptHistoryQueryKey(appEnv.VITE_POS_WORKSTATION_CODE, filters),
     queryFn: () =>
       getTransferReceiptHistory(
-        accessToken!,
         appEnv.VITE_POS_WORKSTATION_CODE,
         filters,
       ),
-    enabled: accessToken !== null && enabled,
+    enabled: isAuthenticated && enabled,
   });
 }

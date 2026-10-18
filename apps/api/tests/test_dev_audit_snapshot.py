@@ -21,21 +21,17 @@ from zeromerma_api.modules.cash.infrastructure.models import CashSession
 from zeromerma_api.modules.catalog.infrastructure.models import ProductClass
 from zeromerma_api.modules.identity.infrastructure.models import User
 from zeromerma_api.modules.sales.infrastructure.models import Sale
+from zeromerma_api.testing.sessions import login_headers
 
 DEV_AUDIT_TOKEN = "change-me-dev-audit-token"
 
 
-def _login(client: TestClient) -> str:
-    response = client.post(
-        "/v1/auth/login",
-        json={"email": SEED_USER_EMAIL, "password": SEED_USER_PASSWORD},
-    )
-    assert response.status_code == 200
-    return str(response.json()["access_token"])
+def _login(client: TestClient) -> dict[str, str]:
+    return login_headers(client, email=SEED_USER_EMAIL, password=SEED_USER_PASSWORD, audience="POS")
 
 
 def _authorization_header(client: TestClient) -> dict[str, str]:
-    return {"Authorization": f"Bearer {_login(client)}"}
+    return _login(client)
 
 
 def _open_cash_session(client: TestClient, workstation_code: str = SEED_WORKSTATION_CODE) -> None:

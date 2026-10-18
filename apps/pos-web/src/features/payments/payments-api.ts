@@ -22,17 +22,14 @@ function buildQueryString(params: Record<string, string | undefined>): string {
 }
 
 export function getPaymentsBootstrap(
-  accessToken: string,
   workstationCode: string,
 ): Promise<PaymentsBootstrapResponse> {
   return requestJson<PaymentsBootstrapResponse>({
-    accessToken,
     path: `/v1/payments/bootstrap?workstation_code=${encodeURIComponent(workstationCode)}`,
   });
 }
 
 export function listPayments({
-  accessToken,
   category,
   createdByUserId,
   paymentMethod,
@@ -40,7 +37,7 @@ export function listPayments({
   scope,
   workstationCode,
 }: {
-  accessToken: string;
+
   category?: string;
   createdByUserId?: string;
   paymentMethod?: string;
@@ -49,7 +46,6 @@ export function listPayments({
   workstationCode: string;
 }): Promise<PaymentsListResponse> {
   return requestJson<PaymentsListResponse>({
-    accessToken,
     path: `/v1/payments${buildQueryString({
       workstation_code: workstationCode,
       scope,
@@ -62,31 +58,27 @@ export function listPayments({
 }
 
 export function getPaymentDetail({
-  accessToken,
   paymentId,
   workstationCode,
 }: {
-  accessToken: string;
+
   paymentId: string;
   workstationCode: string;
 }): Promise<OperationalPaymentDetailResponse> {
   return requestJson<OperationalPaymentDetailResponse>({
-    accessToken,
     path: `/v1/payments/${encodeURIComponent(paymentId)}?workstation_code=${encodeURIComponent(workstationCode)}`,
   });
 }
 
 export function createPayment({
-  accessToken,
   payload,
   requestId,
 }: {
-  accessToken: string;
+
   payload: CreateOperationalPaymentRequest;
   requestId: string;
 }): Promise<OperationalPaymentDetailResponse> {
   return requestJson<OperationalPaymentDetailResponse>({
-    accessToken,
     body: payload,
     method: "POST",
     path: "/v1/payments",

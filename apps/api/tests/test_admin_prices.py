@@ -6,8 +6,6 @@ from fastapi.testclient import TestClient
 from sqlalchemy import select
 
 from zeromerma_api.bootstrap.seed_local import (
-    SEED_ADMIN_EMAIL,
-    SEED_ADMIN_PASSWORD,
     SEED_BRAND_EL_MEJOR_PAN_CODE,
     SEED_PRODUCT_CLASS_PAN_DULCE_CODE,
     SEED_PRODUCT_COCA_355_CODE,
@@ -18,18 +16,6 @@ from zeromerma_api.modules.branches.infrastructure.models import Brand
 from zeromerma_api.modules.catalog.domain.constants import CATALOG_CAPTURE_MODE_CLASS_CAPTURE
 from zeromerma_api.modules.catalog.infrastructure.models import Product, ProductClass
 from zeromerma_api.testing.authorization import owner_headers
-
-
-def _login_admin(client: TestClient) -> str:
-    response = client.post(
-        "/v1/auth/login",
-        json={"email": SEED_ADMIN_EMAIL, "password": SEED_ADMIN_PASSWORD},
-    )
-
-    assert response.status_code == 200
-    payload = response.json()
-    assert payload["user"]["email"] == SEED_ADMIN_EMAIL
-    return str(payload["access_token"])
 
 
 def _admin_headers(client: TestClient) -> dict[str, str]:

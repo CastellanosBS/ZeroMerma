@@ -189,7 +189,7 @@ describe("admin suppliers API boundary", () => {
       }),
     );
 
-    const response = await fetchAdminSuppliers("token-1", filters);
+    const response = await fetchAdminSuppliers(filters);
 
     expect(fetchSpy).toHaveBeenCalledWith(
       expect.stringContaining("/v1/admin/suppliers?page=1&page_size=25"),
@@ -204,7 +204,7 @@ describe("admin suppliers API boundary", () => {
   it("loads supplier detail", async () => {
     const fetchSpy = vi.spyOn(globalThis, "fetch").mockImplementation(() => mockJsonResponse(apiSupplierDetail));
 
-    const detail = await fetchAdminSupplierDetail("token-1", "supplier-1");
+    const detail = await fetchAdminSupplierDetail("supplier-1");
 
     expect(fetchSpy).toHaveBeenCalledWith(
       expect.stringContaining("/v1/admin/suppliers/supplier-1"),
@@ -218,7 +218,7 @@ describe("admin suppliers API boundary", () => {
   it("creates supplier and changes supplier status through backend endpoints", async () => {
     const fetchSpy = vi.spyOn(globalThis, "fetch").mockImplementation(() => mockJsonResponse(apiSupplierDetail, 201));
 
-    await createAdminSupplier("token-1", {
+    await createAdminSupplier({
       branchIds: ["branch-1"],
       category: "RAW_MATERIALS",
       code: "SUP-HARINA",
@@ -243,7 +243,7 @@ describe("admin suppliers API boundary", () => {
       }),
     );
 
-    await changeAdminSupplierStatus("token-1", "supplier-1", { notes: "Bloqueo operativo", status: "BLOCKED" });
+    await changeAdminSupplierStatus("supplier-1", { notes: "Bloqueo operativo", status: "BLOCKED" });
     expect(fetchSpy).toHaveBeenLastCalledWith(
       expect.stringContaining("/v1/admin/suppliers/supplier-1/status"),
       expect.objectContaining({

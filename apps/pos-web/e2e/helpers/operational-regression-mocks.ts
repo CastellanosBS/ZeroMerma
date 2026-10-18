@@ -1,3 +1,4 @@
+import { installMockCookieSession } from "./session-mocks";
 import type { Page, Route } from "@playwright/test";
 
 const branch = {
@@ -532,17 +533,7 @@ async function fulfillJson(route: Route, body: unknown, status = 200) {
 }
 
 export async function installAuthenticatedOperatorSession(page: Page) {
-  await page.addInitScript(() => {
-    window.localStorage.setItem(
-      "zeromerma-pos-auth",
-      JSON.stringify({
-        state: {
-          accessToken: "test-access-token",
-        },
-        version: 0,
-      }),
-    );
-  });
+  await installMockCookieSession(page, true);
 }
 
 export async function installOperationalRegressionApiMocks(page: Page) {
@@ -551,13 +542,7 @@ export async function installOperationalRegressionApiMocks(page: Page) {
     const url = new URL(request.url());
     const pathname = url.pathname;
 
-    if (pathname === "/v1/auth/login") {
-      await fulfillJson(route, {
-        access_token: "test-access-token",
-        token_type: "bearer",
-      });
-      return;
-    }
+    if (pathname.startsWith("/v1/auth/")) { await route.fallback(); return; }
 
     if (pathname === "/v1/pos/bootstrap") {
       await fulfillJson(route, {

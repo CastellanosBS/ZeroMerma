@@ -131,7 +131,7 @@ function AdminSupplierMetricStrip({
 }
 
 export function AdminSuppliersPage() {
-  const accessToken = useBackofficeAuthStore((state) => state.accessToken);
+  const isAuthenticated = useBackofficeAuthStore((state) => state.isAuthenticated);
   const queryClient = useQueryClient();
   const [filters, setFilters] = useState<AdminSupplierListFilters>(getInitialFilters);
   const [selectedSupplierId, setSelectedSupplierId] = useState<string | null>(null);
@@ -142,8 +142,8 @@ export function AdminSuppliersPage() {
   );
 
   const suppliersQuery = useQuery({
-    enabled: Boolean(accessToken),
-    queryFn: () => fetchAdminSuppliers(accessToken ?? "", filters),
+    enabled: isAuthenticated,
+    queryFn: () => fetchAdminSuppliers(filters),
     queryKey: ["admin", "suppliers", "list", filters],
     retry: false,
   });
@@ -155,14 +155,14 @@ export function AdminSuppliersPage() {
   );
 
   const supplierDetailQuery = useQuery({
-    enabled: Boolean(accessToken && selectedSupplierId),
-    queryFn: () => fetchAdminSupplierDetail(accessToken ?? "", selectedSupplierId ?? ""),
+    enabled: Boolean(isAuthenticated && selectedSupplierId),
+    queryFn: () => fetchAdminSupplierDetail(selectedSupplierId ?? ""),
     queryKey: ["admin", "suppliers", "detail", selectedSupplierId],
     retry: false,
   });
 
   const createMutation = useMutation({
-    mutationFn: (payload: AdminSupplierPayload) => createAdminSupplier(accessToken ?? "", payload),
+    mutationFn: (payload: AdminSupplierPayload) => createAdminSupplier(payload),
     onError: (error) => {
       setFeedback({
         tone: "error",
@@ -180,7 +180,7 @@ export function AdminSuppliersPage() {
 
   const updateMutation = useMutation({
     mutationFn: ({ payload, supplierId }: { payload: AdminSupplierPayload; supplierId: string }) =>
-      updateAdminSupplier(accessToken ?? "", supplierId, payload),
+      updateAdminSupplier(supplierId, payload),
     onError: (error) => {
       setFeedback({
         tone: "error",
@@ -198,7 +198,7 @@ export function AdminSuppliersPage() {
 
   const statusMutation = useMutation({
     mutationFn: ({ status, supplierId }: { status: AdminSupplierStatus; supplierId: string }) =>
-      changeAdminSupplierStatus(accessToken ?? "", supplierId, { notes: null, status }),
+      changeAdminSupplierStatus(supplierId, { notes: null, status }),
     onError: (error) => {
       setFeedback({
         tone: "error",
@@ -239,7 +239,7 @@ export function AdminSuppliersPage() {
   }
 
   function handleSubmit(payload: AdminSupplierPayload) {
-    if (!accessToken || isSubmitting) {
+    if (!isAuthenticated || isSubmitting) {
       return;
     }
     setFeedback(null);
@@ -251,7 +251,7 @@ export function AdminSuppliersPage() {
   }
 
   function handleChangeStatus(supplierId: string, status: AdminSupplierStatus) {
-    if (!accessToken || isSubmitting) {
+    if (!isAuthenticated || isSubmitting) {
       return;
     }
     setFeedback(null);

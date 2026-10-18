@@ -245,8 +245,8 @@ describe("admin equipment maintenance API boundary", () => {
       });
     });
 
-    const list = await fetchAdminEquipment("token-1", filters);
-    const detail = await fetchAdminEquipmentDetail("token-1", apiItem.id);
+    const list = await fetchAdminEquipment(filters);
+    const detail = await fetchAdminEquipmentDetail(apiItem.id);
 
     expect(fetchSpy).toHaveBeenCalledWith(
       expect.stringContaining("/v1/admin/equipment-maintenance/equipment?page=1&page_size=25"),
@@ -264,7 +264,7 @@ describe("admin equipment maintenance API boundary", () => {
       .spyOn(globalThis, "fetch")
       .mockImplementation(() => mockJsonResponse(apiDetail, 201));
 
-    await createAdminEquipment("token-1", {
+    await createAdminEquipment({
       areaName: "Produccion",
       areaType: "PRODUCTION",
       branchId: "11111111-1111-4111-8111-111111111111",
@@ -293,7 +293,7 @@ describe("admin equipment maintenance API boundary", () => {
       }),
     );
 
-    await updateAdminEquipmentStatus("token-1", apiItem.id, {
+    await updateAdminEquipmentStatus(apiItem.id, {
       operationalStatus: "OUT_OF_SERVICE",
       reason: "Falla de motor.",
     });
@@ -306,7 +306,7 @@ describe("admin equipment maintenance API boundary", () => {
       }),
     );
 
-    await createAdminMaintenance("token-1", {
+    await createAdminMaintenance({
       description: "Revision correctiva por ruido.",
       equipmentId: apiItem.id,
       expectedCost: "1000",
@@ -335,13 +335,13 @@ describe("admin equipment maintenance API boundary", () => {
       .spyOn(globalThis, "fetch")
       .mockImplementation(() => mockJsonResponse(apiDetail, 200));
 
-    await startAdminMaintenance("token-1", apiMaintenance.id);
+    await startAdminMaintenance(apiMaintenance.id);
     expect(fetchSpy).toHaveBeenLastCalledWith(
       expect.stringContaining(`/v1/admin/equipment-maintenance/maintenance/${apiMaintenance.id}/start`),
       expect.objectContaining({ method: "POST" }),
     );
 
-    await completeAdminMaintenance("token-1", apiMaintenance.id, {
+    await completeAdminMaintenance(apiMaintenance.id, {
       completedAt: "2026-05-21T18:00:00Z",
       cost: "1200.50",
       equipmentStatusAfterService: "OPERATIONAL",

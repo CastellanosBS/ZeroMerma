@@ -126,33 +126,27 @@ export function buildAdminPricesListPath(filters: AdminPriceListFilters): string
 }
 
 export function fetchAdminPrices(
-  accessToken: string,
   filters: AdminPriceListFilters,
 ): Promise<AdminPriceListResponse> {
   return requestJson<ApiPricesListResponse>({
-    accessToken,
     path: buildAdminPricesListPath(filters),
   }).then(mapListFromApi);
 }
 
 export function fetchAdminPriceDetail(
-  accessToken: string,
   entityType: string,
   entityId: string,
 ): Promise<AdminPriceDetail> {
   return requestJson<ApiPriceDetail>({
-    accessToken,
     path: `/v1/admin/prices/${entityType}/${entityId}`,
   }).then(mapDetailFromApi);
 }
 
 export function updateAdminPrice(
-  accessToken: string,
   row: AdminPriceRow,
   payload: AdminPriceUpdatePayload,
 ): Promise<AdminPriceDetail> {
   return requestJson<ApiPriceDetail>({
-    accessToken,
     body: toUpdateApiPayload(payload),
     method: "PATCH",
     path: `/v1/admin/prices/${row.entityType}/${row.entityId}`,

@@ -6,7 +6,6 @@ import os
 
 from sqlalchemy.orm import Session
 
-from zeromerma_api.modules.identity.application.security import TokenService
 from zeromerma_api.modules.identity.infrastructure.models import User
 from zeromerma_api.modules.identity.infrastructure.privileged_models import IdentityPrivilegeState
 from zeromerma_api.testing.database_safety import (
@@ -44,10 +43,32 @@ def provision_test_owner(session: Session) -> User:
 
 
 def owner_headers() -> dict[str, str]:
+    """Provision an authorized fixture session without exercising the HTTP login route.
+
+    Login and password/rate-limit behavior are covered by dedicated HTTP tests.
+    Functional owner tests still use persisted sessions, canonical authorization,
+    session lifecycle events and the production cookie/CSRF request boundary.
+    """
+    load_destructive_test_database_config(os.environ)
+
     from zeromerma_api.db.session import SessionLocal
+    from zeromerma_api.modules.identity.application.security import csrf_for_credential
+    from zeromerma_api.modules.identity.application.session_services import (
+        COOKIE_NAMES,
+        SessionService,
+        set_audit_context,
+    )
+    from zeromerma_api.testing.sessions import surface_origin
 
     with SessionLocal() as session:
         owner = provision_test_owner(session)
-        token = TokenService().issue_access_token(owner.id)
+        set_audit_context(session, owner.id, "isolated-owner-session-fixture")
+        authentication = SessionService().create_session(session, user=owner, audience="BACKOFFICE")
+        headers = {
+            "Cookie": f"{COOKIE_NAMES['BACKOFFICE']}={authentication.credential}",
+            "X-CSRF-Token": csrf_for_credential(authentication.credential),
+            "X-ZeroMerma-Surface": "BACKOFFICE",
+            "Origin": surface_origin("BACKOFFICE"),
+        }
         session.commit()
-    return {"Authorization": f"Bearer {token}"}
+        return headers

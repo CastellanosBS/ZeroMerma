@@ -23,19 +23,15 @@ from zeromerma_api.modules.discounts.infrastructure.models import (
 from zeromerma_api.modules.identity.infrastructure.models import User, UserBranchAssignment
 from zeromerma_api.modules.outbox.infrastructure.models import OutboxEvent
 from zeromerma_api.modules.sales.infrastructure.models import CashMovement
+from zeromerma_api.testing.sessions import login_headers
 
 
-def _login(client: TestClient) -> str:
-    response = client.post(
-        "/v1/auth/login",
-        json={"email": SEED_USER_EMAIL, "password": SEED_USER_PASSWORD},
-    )
-    assert response.status_code == 200
-    return str(response.json()["access_token"])
+def _login(client: TestClient) -> dict[str, str]:
+    return login_headers(client, email=SEED_USER_EMAIL, password=SEED_USER_PASSWORD, audience="POS")
 
 
 def _authorization_header(client: TestClient) -> dict[str, str]:
-    return {"Authorization": f"Bearer {_login(client)}"}
+    return _login(client)
 
 
 def _open_cash_session(client: TestClient) -> None:

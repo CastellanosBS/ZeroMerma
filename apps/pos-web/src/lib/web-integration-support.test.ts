@@ -7,8 +7,8 @@ afterEach(() => vi.unstubAllEnvs());
 function isolatedEnvironment() {
   vi.stubEnv("ZM_WEB_INTEGRATION_ISOLATED", "1");
   vi.stubEnv("ZM_E2E_RUN_ID", "guard-unit-test");
-  vi.stubEnv("ZM_E2E_API_URL", "http://127.0.0.1:41201");
-  vi.stubEnv("ZM_E2E_POS_URL", "http://127.0.0.1:41202");
+  vi.stubEnv("ZM_E2E_API_URL", "https://127.0.0.1:41201");
+  vi.stubEnv("ZM_E2E_POS_URL", "https://127.0.0.1:41202");
   vi.stubEnv("ZM_E2E_POS_EMAIL", "synthetic@example.test");
   vi.stubEnv("ZM_E2E_PASSWORD", "unit-only-password");
   vi.stubEnv("ZM_E2E_ARTIFACT_DIR", ".tmp/unit-web-guard");
@@ -23,10 +23,10 @@ describe("real browser integration safety", () => {
       "https://production.example.test",
       "http://localhost:8000",
       "http://user:secret@127.0.0.1:41201",
-      "http://127.0.0.1:41201?token=secret",
+      "https://127.0.0.1:41201?token=secret",
     ]) {
       vi.stubEnv("ZM_E2E_API_URL", url);
-      expect(() => realEnvironment("pos")).toThrow("dedicated HTTP origin");
+      expect(() => realEnvironment("pos")).toThrow("dedicated HTTPS origin");
     }
   });
 
@@ -41,11 +41,11 @@ describe("real browser integration safety", () => {
       routeFromHAR: vi.fn(),
     };
     const context = { on: vi.fn(), route: vi.fn(), routeFromHAR: vi.fn() };
-    const network = observeRealApi(context, page, "http://127.0.0.1:41201");
+    const network = observeRealApi(context, page, "https://127.0.0.1:41201");
     expect(() => page.route()).toThrow("interception is forbidden");
     expect(() => context.routeFromHAR()).toThrow("interception is forbidden");
     responseListener?.({
-      url: () => "http://127.0.0.1:41201/v1/admin/products?email=private&access_token=secret",
+      url: () => "https://127.0.0.1:41201/v1/admin/products?email=private&access_token=secret",
       status: () => 200,
       request: () => ({ method: () => "GET" }),
     });

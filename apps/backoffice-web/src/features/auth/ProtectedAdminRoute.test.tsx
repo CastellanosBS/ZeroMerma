@@ -4,9 +4,9 @@ import { renderToString } from "react-dom/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const authState = vi.hoisted(() => ({
-  accessToken: null as string | null,
+  isAuthenticated: false as boolean,
   clearSession: vi.fn(),
-  setAccessToken: vi.fn(),
+  setSession: vi.fn(),
 }));
 const getCurrentBackofficeUser = vi.hoisted(() => vi.fn());
 
@@ -43,9 +43,9 @@ function render(element: ReactElement) {
 
 describe("ProtectedAdminRoute URL credential policy", () => {
   beforeEach(() => {
-    authState.accessToken = null;
+    authState.isAuthenticated = false;
     authState.clearSession.mockClear();
-    authState.setAccessToken.mockClear();
+    authState.setSession.mockClear();
     getCurrentBackofficeUser.mockClear();
   });
 
@@ -62,7 +62,7 @@ describe("ProtectedAdminRoute URL credential policy", () => {
 
     expect(html).toContain('data-navigate-to="/login"');
     expect(getCurrentBackofficeUser).not.toHaveBeenCalled();
-    expect(authState.setAccessToken).not.toHaveBeenCalled();
+    expect(authState.setSession).not.toHaveBeenCalled();
   });
 
   it("keeps the normal independent backoffice login available", () => {

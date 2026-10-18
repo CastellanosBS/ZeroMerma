@@ -292,27 +292,22 @@ export function buildAdminReconciliationListPath(filters: AdminReconciliationLis
 }
 
 export function fetchAdminReconciliations(
-  accessToken: string,
   filters: AdminReconciliationListFilters,
 ): Promise<AdminReconciliationListResponse> {
   return requestJson<ApiListResponse>({
-    accessToken,
     path: buildAdminReconciliationListPath(filters),
   }).then(mapListFromApi);
 }
 
 export function fetchAdminReconciliationDetail(
-  accessToken: string,
   reconciliationId: string,
 ): Promise<AdminReconciliationDetail> {
   return requestJson<ApiDetail>({
-    accessToken,
     path: `/v1/admin/reconciliation/${reconciliationId}`,
   }).then(mapDetailFromApi);
 }
 
 export function createAdminReconciliation(
-  accessToken: string,
   payload: AdminReconciliationCreatePayload,
 ): Promise<AdminReconciliationDetail> {
   const body: ApiCreateRequest = {
@@ -325,7 +320,6 @@ export function createAdminReconciliation(
   };
 
   return requestJson<ApiDetail>({
-    accessToken,
     body,
     method: "POST",
     path: "/v1/admin/reconciliation",
@@ -333,7 +327,6 @@ export function createAdminReconciliation(
 }
 
 export function resolveAdminReconciliation(
-  accessToken: string,
   reconciliationId: string,
   payload: AdminReconciliationResolvePayload,
 ): Promise<AdminReconciliationDetail> {
@@ -344,7 +337,6 @@ export function resolveAdminReconciliation(
   };
 
   return requestJson<ApiDetail>({
-    accessToken,
     body,
     method: "POST",
     path: `/v1/admin/reconciliation/${reconciliationId}/resolve`,

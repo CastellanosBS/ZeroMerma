@@ -247,43 +247,37 @@ export function buildAdminOrdersListPath(filters: AdminOrderListFilters): string
 }
 
 export function fetchAdminOrders(
-  accessToken: string,
   filters: AdminOrderListFilters,
 ): Promise<AdminOrdersListResponse> {
   return requestJson<ApiOrderListResponse>({
-    accessToken,
     path: buildAdminOrdersListPath(filters),
   }).then(mapListFromApi);
 }
 
-export function fetchAdminOrderDetail(accessToken: string, orderId: string): Promise<AdminOrderDetail> {
+export function fetchAdminOrderDetail(orderId: string): Promise<AdminOrderDetail> {
   return requestJson<ApiOrderDetail>({
-    accessToken,
     path: `/v1/admin/orders/${orderId}`,
   }).then(mapDetailFromApi);
 }
 
-export function markAdminOrderReady(accessToken: string, orderId: string): Promise<AdminOrderDetail> {
+export function markAdminOrderReady(orderId: string): Promise<AdminOrderDetail> {
   return requestJson<ApiOrderDetail>({
-    accessToken,
     body: {},
     method: "POST",
     path: `/v1/admin/orders/${orderId}/mark-ready`,
   }).then(mapDetailFromApi);
 }
 
-export function deliverAdminOrder(accessToken: string, orderId: string): Promise<AdminOrderDetail> {
+export function deliverAdminOrder(orderId: string): Promise<AdminOrderDetail> {
   return requestJson<ApiOrderDetail>({
-    accessToken,
     body: {},
     method: "POST",
     path: `/v1/admin/orders/${orderId}/deliver`,
   }).then(mapDetailFromApi);
 }
 
-export function cancelAdminOrder(accessToken: string, orderId: string): Promise<AdminOrderDetail> {
+export function cancelAdminOrder(orderId: string): Promise<AdminOrderDetail> {
   return requestJson<ApiOrderDetail>({
-    accessToken,
     body: {},
     method: "POST",
     path: `/v1/admin/orders/${orderId}/cancel`,

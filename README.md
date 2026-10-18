@@ -95,44 +95,43 @@ corepack pnpm --filter @zeromerma/pos-web exec playwright install chromium
 
 ## Start Locally
 
-Start PostgreSQL, run migrations, and open separate terminals for the API, worker, POS web, and backoffice web:
+Use PowerShell 7 to start the development stack, including PostgreSQL, migrations,
+API, worker, POS and Backoffice:
 
 ```powershell
 .\scripts\dev\start-local.ps1
 ```
 
-The script runs the toolchain preflight, executes `uv sync --all-packages --dev --frozen`, installs Node dependencies with `corepack pnpm install --frozen-lockfile`, regenerates API contracts, starts PostgreSQL, applies Alembic migrations, and launches the four local processes.
-It also seeds the local cashier, branches, workstations, operational catalog products, waste reasons, correction reasons, and the cash close denomination catalog.
+The script runs the canonical toolchain preflight and prepares the local development
+database and seed. It launches background processes and records logs under
+`.tmp/validation/local`. This local stack uses the development database; automated
+validation uses the separate disposable harness described below.
 
 Local URLs:
 
-- API: `http://localhost:8000`
-- API docs: `http://localhost:8000/docs`
-- Health endpoint: `http://localhost:8000/health`
-- POS web: `http://localhost:5173`
-- POS web alternate loopback origin: `http://127.0.0.1:5173`
-- Backoffice web: `http://localhost:5174`
-- Backoffice web alternate loopback origin: `http://127.0.0.1:5174`
+- API: `https://127.0.0.1:8000`
+- Health endpoint: `https://127.0.0.1:8000/health`
+- POS web: `https://127.0.0.1:5173`
+- Backoffice web: `https://127.0.0.1:5174`
 
 Canonical local browser-to-API setup:
 
-- Keep the API on `http://localhost:8000`.
-- The backend CORS allowlist explicitly supports POS and backoffice browser origins on both `localhost` and `127.0.0.1` for ports `5173` and `5174`.
-- If you override `ZEROMERMA_API_CORS_ORIGINS`, keep it as an explicit JSON array in `.env`; do not use `*`.
+- The launcher creates temporary loopback TLS material without installing system trust.
+  An interactive browser may require approving that local certificate for each origin.
+- POS and Backoffice sign in separately with Secure, HttpOnly cookies. Session restore
+  uses the selected audience and does not create a session in the other application.
+- `ZEROMERMA_API_CORS_ORIGINS` is an exact JSON allowlist; separate
+  `SESSION_POS_ORIGINS` and `SESSION_BACKOFFICE_ORIGINS` lists select audience authority.
+- API docs are disabled by default. Local contract generation still uses OpenAPI;
+  staging and production expose neither interactive docs nor development endpoints.
 
 ## Manual Startup
 
-Use this when you want individual process control:
-
-```powershell
-docker compose -f infra\docker\docker-compose.yml up -d postgres
-uv run --project apps/api alembic -c apps/api/alembic.ini upgrade head
-uv run --project apps/api python scripts/bootstrap/seed-local-data.py
-uv run --project apps/api uvicorn zeromerma_api.main:create_app --factory --app-dir apps/api/src --reload --host 0.0.0.0 --port 8000
-uv run --project apps/worker python -m zeromerma_worker
-corepack pnpm --filter @zeromerma/pos-web dev
-corepack pnpm --filter @zeromerma/backoffice-web dev
-```
+For individual process control, use the explicit TLS, environment and process commands
+in `scripts/dev/start-local.ps1`. Preserve its audience origins, certificate paths and
+Uvicorn `--no-proxy-headers` setting. Plain HTTP cannot provide the required session
+cookie boundary. See [runtime security and secrets](docs/operations/runtime-secrets.md)
+for deployment configuration and private runtime files.
 
 ## Local Seed Data
 
@@ -145,7 +144,8 @@ The canonical local bootstrap seeds:
   - `POS-01` / `Front Register 01`
   - `POS-NORTE-01` / `North Register 01`
 - Cashier user: `cashier@zeromerma.local`
-- Password: `ChangeMe123!`
+- The disposable development password is defined by the local seed; it is not a
+  production account or an owner bootstrap credential.
 - Operational waste reasons:
   - `OLD_COUNTER`
   - `DAMAGED`
@@ -265,7 +265,7 @@ Validate the canonical Alembic chain through the same protected harness:
 # Fresh database, schema drift, constraints/indexes, and seed compatibility.
 .\scripts\dev\run-migration-validation.ps1 -Mode Fast
 
-# All 39 checkpoints plus data preservation, interruption, and dump/restore.
+# Every canonical checkpoint plus data preservation, interruption, and dump/restore.
 .\scripts\dev\run-migration-validation.ps1 -Mode Full
 ```
 
@@ -310,152 +310,18 @@ corepack pnpm test:e2e
 .\scripts\dev\run-web-integration.ps1 -Surface All
 ```
 
-The following historical manual checks use the explicitly started local development instance;
-they are not automated foundation validation and must not target operational or production data.
-
-Manual API validation for Phase 1A:
-
-```powershell
-$login = Invoke-RestMethod -Method Post -Uri http://localhost:8000/v1/auth/login -ContentType "application/json" -Body '{"email":"cashier@zeromerma.local","password":"ChangeMe123!"}'
-$token = $login.access_token
-$headers = @{ Authorization = "Bearer $token"; "X-Request-ID" = "manual-phase-1a-check" }
-Invoke-RestMethod -Uri http://localhost:8000/v1/auth/me -Headers $headers
-Invoke-RestMethod -Uri "http://localhost:8000/v1/pos/bootstrap?workstation_code=POS-01" -Headers $headers
-Invoke-RestMethod -Method Post -Uri http://localhost:8000/v1/cash-sessions/open -Headers $headers -ContentType "application/json" -Body '{"workstation_code":"POS-01","opening_amount":"150.00"}'
-Invoke-RestMethod -Uri "http://localhost:8000/v1/cash-sessions/current?workstation_code=POS-01" -Headers $headers
-```
-
-Manual API validation for Phase 3A operational modules:
-
-```powershell
-$login = Invoke-RestMethod -Method Post -Uri http://localhost:8000/v1/auth/login -ContentType "application/json" -Body '{"email":"cashier@zeromerma.local","password":"ChangeMe123!"}'
-$token = $login.access_token
-$headers = @{ Authorization = "Bearer $token"; "X-Request-ID" = "manual-phase-3a-check" }
-
-$operationsBootstrap = Invoke-RestMethod -Uri "http://localhost:8000/v1/operations/bootstrap?workstation_code=POS-01" -Headers $headers
-$operationsBootstrap.destination_branches
-
-$catalog = Invoke-RestMethod -Uri "http://localhost:8000/v1/operations/catalog?workstation_code=POS-01&module=COUNTER_TRANSFER" -Headers $headers
-$bolilloClassId = ($catalog.classes | Where-Object code -eq "BOLILLO").id
-$classProducts = Invoke-RestMethod -Uri "http://localhost:8000/v1/operations/classes/$bolilloClassId/products?workstation_code=POS-01&module=COUNTER_TRANSFER" -Headers $headers
-$bolilloProductId = ($classProducts.products | Where-Object code -eq "BOLILLO-STD").id
-$northBranchId = ($operationsBootstrap.destination_branches | Where-Object code -eq "NORTE").id
-
-$counterTransfer = Invoke-RestMethod -Method Post -Uri "http://localhost:8000/v1/operations/counter-transfer/commit" -Headers $headers -ContentType "application/json" -Body (@{
-  workstation_code = "POS-01"
-  lines = @(@{ product_id = $bolilloProductId; quantity = "3" })
-  notes = "Manual counter replenishment"
-} | ConvertTo-Json -Depth 5)
-
-$wasteRecord = Invoke-RestMethod -Method Post -Uri "http://localhost:8000/v1/operations/waste/commit" -Headers $headers -ContentType "application/json" -Body (@{
-  workstation_code = "POS-01"
-  source_bucket_code = "COUNTER"
-  reason_code = "DAMAGED"
-  lines = @(@{ product_id = $bolilloProductId; quantity = "1" })
-  notes = "Manual waste test"
-} | ConvertTo-Json -Depth 5)
-
-$dispatch = Invoke-RestMethod -Method Post -Uri "http://localhost:8000/v1/transfers/dispatch/commit" -Headers $headers -ContentType "application/json" -Body (@{
-  workstation_code = "POS-01"
-  destination_branch_id = $northBranchId
-  lines = @(@{ product_id = $bolilloProductId; quantity = "2" })
-  notes = "Manual transfer dispatch"
-} | ConvertTo-Json -Depth 5)
-
-$pending = Invoke-RestMethod -Uri "http://localhost:8000/v1/transfers/inbound/pending?workstation_code=POS-NORTE-01" -Headers $headers
-$transferId = $dispatch.shipment.id
-$detail = Invoke-RestMethod -Uri "http://localhost:8000/v1/transfers/$transferId?workstation_code=POS-NORTE-01" -Headers $headers
-$receive = Invoke-RestMethod -Method Post -Uri "http://localhost:8000/v1/transfers/$transferId/receive" -Headers $headers -ContentType "application/json" -Body (@{
-  workstation_code = "POS-NORTE-01"
-  lines = @(@{
-    shipment_line_id = $dispatch.shipment.lines[0].id
-    expected_quantity = "2"
-    received_quantity = "2"
-  })
-  notes = "Manual receipt"
-} | ConvertTo-Json -Depth 5)
-```
-
-Manual API validation for Phase 4A corrections:
-
-```powershell
-$login = Invoke-RestMethod -Method Post -Uri http://localhost:8000/v1/auth/login -ContentType "application/json" -Body '{"email":"cashier@zeromerma.local","password":"ChangeMe123!"}'
-$token = $login.access_token
-$headers = @{ Authorization = "Bearer $token"; "X-Request-ID" = "manual-phase-4a-correction" }
-
-$bootstrap = Invoke-RestMethod -Uri "http://localhost:8000/v1/corrections/bootstrap?workstation_code=POS-01" -Headers $headers
-$counterTransferCatalog = Invoke-RestMethod -Uri "http://localhost:8000/v1/operations/catalog?workstation_code=POS-01&module=COUNTER_TRANSFER" -Headers $headers
-$bolilloClassId = ($counterTransferCatalog.classes | Where-Object code -eq "BOLILLO").id
-$classProducts = Invoke-RestMethod -Uri "http://localhost:8000/v1/operations/classes/$bolilloClassId/products?workstation_code=POS-01&module=COUNTER_TRANSFER" -Headers $headers
-$bolilloProductId = ($classProducts.products | Where-Object code -eq "BOLILLO-STD").id
-
-$targetDocument = Invoke-RestMethod -Method Post -Uri "http://localhost:8000/v1/operations/counter-transfer/commit" -Headers $headers -ContentType "application/json" -Body (@{
-  workstation_code = "POS-01"
-  lines = @(@{ product_id = $bolilloProductId; quantity = "4" })
-  notes = "Manual correction target"
-} | ConvertTo-Json -Depth 5)
-
-$search = Invoke-RestMethod -Uri "http://localhost:8000/v1/corrections/search?workstation_code=POS-01&document_type=COUNTER_TRANSFER&query=Manual" -Headers $headers
-$detail = Invoke-RestMethod -Uri "http://localhost:8000/v1/corrections/$($targetDocument.id)?workstation_code=POS-01" -Headers $headers
-$correction = Invoke-RestMethod -Method Post -Uri "http://localhost:8000/v1/corrections/commit" -Headers $headers -ContentType "application/json" -Body (@{
-  workstation_code = "POS-01"
-  target_document_id = $targetDocument.id
-  reason_code = "WRONG_QUANTITY"
-  notes = "Should have been two fewer units"
-  lines = @(@{
-    product_id = $bolilloProductId
-    delta_quantity = "-2"
-    notes = "Manual delta correction"
-  })
-} | ConvertTo-Json -Depth 6)
-```
-
-Manual API validation for Phase 7A cash close preview:
-
-```powershell
-$login = Invoke-RestMethod -Method Post -Uri http://localhost:8000/v1/auth/login -ContentType "application/json" -Body '{"email":"cashier@zeromerma.local","password":"ChangeMe123!"}'
-$token = $login.access_token
-$headers = @{ Authorization = "Bearer $token"; "X-Request-ID" = "manual-phase-7a-close" }
-
-$open = Invoke-RestMethod -Method Post -Uri "http://localhost:8000/v1/cash-sessions/open" -Headers $headers -ContentType "application/json" -Body '{"workstation_code":"POS-01","opening_amount":"150.00"}'
-$sale = Invoke-RestMethod -Method Post -Uri "http://localhost:8000/v1/sales/confirm" -Headers $headers -ContentType "application/json" -Body (@{
-  workstation_code = "POS-01"
-  lines = @(
-    @{
-      capture_mode = "CLASS_CAPTURE"
-      product_class_id = (
-        (Invoke-RestMethod -Uri "http://localhost:8000/v1/pos/catalog?workstation_code=POS-01" -Headers $headers).classes |
-        Where-Object code -eq "PAN-DULCE"
-      ).id
-      quantity = "2"
-    }
-  )
-  payments = @(@{
-    payment_method_code = "CASH"
-    tendered_amount = "50.00"
-  })
-} | ConvertTo-Json -Depth 6)
-
-$bootstrap = Invoke-RestMethod -Uri "http://localhost:8000/v1/cash-close/bootstrap?workstation_code=POS-01" -Headers $headers
-$summary = Invoke-RestMethod -Uri "http://localhost:8000/v1/cash-close/summary?workstation_code=POS-01" -Headers $headers
-$preview = Invoke-RestMethod -Method Post -Uri "http://localhost:8000/v1/cash-close/preview" -Headers $headers -ContentType "application/json" -Body (@{
-  workstation_code = "POS-01"
-  denomination_counts = @(
-    @{ denomination_value = "100.00"; unit_count = 1 }
-    @{ denomination_value = "50.00"; unit_count = 1 }
-    @{ denomination_value = "20.00"; unit_count = 1 }
-    @{ denomination_value = "2.00"; unit_count = 2 }
-  )
-  notes = "Manual financial preview"
-} | ConvertTo-Json -Depth 6)
-```
+Session authentication uses audience-bound cookies and CSRF protection. Use the
+canonical isolated API/browser suites for mutation validation; those suites cover
+cash opening, sales, physical operations, corrections and close without manual
+credential-bearing command lines. The cookie/session contract is generated from
+backend OpenAPI; no bearer compatibility path exists.
 
 Manual POS validation for the Phase 2 corrective patch:
 
 1. Copy `apps\pos-web\.env.example` to `apps\pos-web\.env`.
 2. Start the stack with `.\scripts\dev\start-local.ps1`.
-3. Open `http://localhost:5173` or `http://127.0.0.1:5173`.
-4. Sign in with `cashier@zeromerma.local` / `ChangeMe123!`.
+3. Open `https://127.0.0.1:5173` and approve only the local temporary certificate if requested.
+4. Sign in with the local cashier credentials provisioned by the development seed.
 5. Confirm the desktop shell shows the top bar, left module rail, central sale area, and right checkout panel.
 6. Confirm the shell uses the `EL_MEJOR_PAN` theme for the `MAIN` branch.
 7. Confirm the search field is visible but does not receive initial focus.

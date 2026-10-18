@@ -16,7 +16,7 @@ import { currentCashSessionQueryKey, useCurrentCashSessionQuery } from "./querie
 
 export function CashSessionOpenScreen() {
   const navigate = useNavigate();
-  const accessToken = usePosAuthStore((state) => state.accessToken);
+  const isAuthenticated = usePosAuthStore((state) => state.isAuthenticated);
   const bootstrapQuery = usePosBootstrapQuery();
   const currentCashSessionQuery = useCurrentCashSessionQuery();
   const queryClient = useQueryClient();
@@ -36,7 +36,6 @@ export function CashSessionOpenScreen() {
   const openCashSessionMutation = useMutation({
     mutationFn: (payload: OpenCashSessionRequest) =>
       openCashSession({
-        accessToken: accessToken!,
         payload,
         requestId: createRequestId("cash-session-open"),
       }),
@@ -59,7 +58,7 @@ export function CashSessionOpenScreen() {
     },
   });
 
-  if (!accessToken) {
+  if (!isAuthenticated) {
     return <Navigate to="/login" />;
   }
 

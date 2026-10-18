@@ -48,6 +48,7 @@ def resolve_authorization(
             User.default_surface,
             User.is_active,
             User.is_locked,
+            User.password_reset_required,
         ).where(User.id == user.id)
     ).one_or_none()
     result = AuthenticatedUser.model_validate(identity if identity is not None else user)

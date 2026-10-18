@@ -6,6 +6,8 @@ import logging.config
 from datetime import UTC, datetime
 from typing import Any
 
+from zeromerma_worker.core.log_redaction import redact_log
+
 _BASE_RECORD_KEYS = set(
     logging.LogRecord(
         name="",
@@ -31,8 +33,8 @@ class JsonFormatter(logging.Formatter):
             if key not in _BASE_RECORD_KEYS:
                 payload[key] = value
         if record.exc_info:
-            payload["exception"] = self.formatException(record.exc_info)
-        return json.dumps(payload, separators=(",", ":"), default=str)
+            payload["exception_type"] = type(record.exc_info[1]).__name__
+        return json.dumps(redact_log(payload), separators=(",", ":"), default=str)
 
 
 def configure_logging(level: str) -> None:
@@ -50,6 +52,10 @@ def configure_logging(level: str) -> None:
             "root": {
                 "handlers": ["default"],
                 "level": level,
+            },
+            "loggers": {
+                name: {"handlers": ["default"], "level": level, "propagate": False}
+                for name in ("uvicorn", "uvicorn.error", "uvicorn.access", "httpx")
             },
         }
     )

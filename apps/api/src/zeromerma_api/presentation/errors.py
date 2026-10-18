@@ -20,9 +20,20 @@ ERROR_CODE_BY_STATUS = {
     404: "NOT_FOUND",
     409: "CONFLICT",
     422: "VALIDATION_ERROR",
+    423: "SESSION_LOCKED",
+    429: "LOGIN_RATE_LIMITED",
     500: "INTERNAL_SERVER_ERROR",
 }
 ERROR_STATUS_CODES = tuple(ERROR_CODE_BY_STATUS)
+DOMAIN_ERROR_STATUS = {
+    "SESSION_LOCKED": 423,
+    "SESSION_EXPIRED": 401,
+    "SESSION_REVOKED": 401,
+    "PASSWORD_RESET_REQUIRED": 403,
+    "CSRF_FAILED": 403,
+    "LOGIN_RATE_LIMITED": 429,
+    "INVALID_CREDENTIALS": 401,
+}
 _SENSITIVE_KEY = re.compile(r"(?:password|secret|token|authorization|cookie)", re.IGNORECASE)
 _REQUEST_ID_MAX_LENGTH = 128
 
@@ -92,9 +103,10 @@ def _response(
     details: dict[str, Any] | list[Any] | None = None,
     field_errors: list[ApiFieldError] | None = None,
     headers: Mapping[str, str] | None = None,
+    code: str | None = None,
 ) -> JSONResponse:
     payload = ApiErrorResponse(
-        code=ERROR_CODE_BY_STATUS.get(status_code, "REQUEST_FAILED"),
+        code=code or ERROR_CODE_BY_STATUS.get(status_code, "REQUEST_FAILED"),
         message=message,
         details=details,
         request_id=_request_id(request),
@@ -117,12 +129,20 @@ async def http_exception_handler(request: Request, exc: Exception) -> JSONRespon
             message="An unexpected error occurred.",
         )
     message, details = _safe_http_detail(exc.detail, exc.status_code)
+    candidate_code = exc.detail.get("code") if isinstance(exc.detail, Mapping) else None
+    code = (
+        candidate_code
+        if isinstance(candidate_code, str)
+        and DOMAIN_ERROR_STATUS.get(candidate_code) == exc.status_code
+        else None
+    )
     return _response(
         status_code=exc.status_code,
         request=request,
         message=message,
         details=details,
         headers=exc.headers,
+        code=code,
     )
 
 

@@ -242,7 +242,6 @@ function mapUpdatePayload(payload: AdminRoleUpdatePayload): ApiUpdate {
 }
 
 export async function fetchAdminRoles(
-  accessToken: string,
   filters: AdminRoleListFilters,
 ): Promise<AdminRoleListResponse> {
   const params = new URLSearchParams();
@@ -259,28 +258,22 @@ export async function fetchAdminRoles(
 
   const suffix = params.toString();
   const response = await requestJson<ApiListResponse>({
-    accessToken,
     path: `/v1/admin/roles${suffix ? `?${suffix}` : ""}`,
   });
   return mapListFromApi(response);
 }
 
 export async function fetchAdminRoleDetail(
-  accessToken: string,
   roleId: string,
 ): Promise<AdminRoleDetail> {
   const response = await requestJson<ApiDetail>({
-    accessToken,
     path: `/v1/admin/roles/${roleId}`,
   });
   return mapDetailFromApi(response);
 }
 
-export async function fetchAdminRolePermissions(
-  accessToken: string,
-): Promise<AdminPermissionsResponse> {
+export async function fetchAdminRolePermissions(): Promise<AdminPermissionsResponse> {
   const response = await requestJson<ApiPermissionsResponse>({
-    accessToken,
     path: "/v1/admin/roles/permissions",
   });
   return {
@@ -290,11 +283,9 @@ export async function fetchAdminRolePermissions(
 }
 
 export async function createAdminRole(
-  accessToken: string,
   payload: AdminRoleCreatePayload,
 ): Promise<AdminRoleDetail> {
   const response = await requestJson<ApiDetail>({
-    accessToken,
     body: mapCreatePayload(payload),
     method: "POST",
     path: "/v1/admin/roles",
@@ -303,12 +294,10 @@ export async function createAdminRole(
 }
 
 export async function updateAdminRole(
-  accessToken: string,
   roleId: string,
   payload: AdminRoleUpdatePayload,
 ): Promise<AdminRoleDetail> {
   const response = await requestJson<ApiDetail>({
-    accessToken,
     body: mapUpdatePayload(payload),
     method: "PATCH",
     path: `/v1/admin/roles/${roleId}`,
@@ -317,7 +306,6 @@ export async function updateAdminRole(
 }
 
 export async function changeAdminRoleStatus(
-  accessToken: string,
   roleId: string,
   isActive: boolean,
   confirmedHighRiskChange: boolean,
@@ -327,7 +315,6 @@ export async function changeAdminRoleStatus(
     is_active: isActive,
   };
   const response = await requestJson<ApiDetail>({
-    accessToken,
     body,
     method: "POST",
     path: `/v1/admin/roles/${roleId}/status`,
@@ -336,12 +323,10 @@ export async function changeAdminRoleStatus(
 }
 
 export async function removeAdminRoleFromUser(
-  accessToken: string,
   roleId: string,
   userId: string,
 ): Promise<AdminRoleDetail> {
   const response = await requestJson<ApiDetail>({
-    accessToken,
     method: "POST",
     path: `/v1/admin/roles/${roleId}/users/${userId}/remove`,
   });

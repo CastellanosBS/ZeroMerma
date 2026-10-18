@@ -6,8 +6,6 @@ from fastapi.testclient import TestClient
 from sqlalchemy import select
 
 from zeromerma_api.bootstrap.seed_local import (
-    SEED_ADMIN_EMAIL,
-    SEED_ADMIN_PASSWORD,
     SEED_BRAND_EL_MEJOR_PAN_CODE,
     SEED_BRAND_MERENNA_CODE,
     SEED_PRODUCT_CLASS_BEBIDAS_CODE,
@@ -24,30 +22,11 @@ from zeromerma_api.modules.branches.infrastructure.models import Brand
 from zeromerma_api.modules.catalog.infrastructure.models import Product, ProductClass
 from zeromerma_api.modules.outbox.infrastructure.models import OutboxEvent
 from zeromerma_api.testing.authorization import owner_headers
+from zeromerma_api.testing.sessions import login_headers
 
 
-def _login_admin(client: TestClient) -> str:
-    response = client.post(
-        "/v1/auth/login",
-        json={"email": SEED_ADMIN_EMAIL, "password": SEED_ADMIN_PASSWORD},
-    )
-
-    assert response.status_code == 200
-    payload = response.json()
-    assert payload["user"]["email"] == SEED_ADMIN_EMAIL
-    return str(payload["access_token"])
-
-
-def _login_cashier(client: TestClient) -> str:
-    response = client.post(
-        "/v1/auth/login",
-        json={"email": SEED_USER_EMAIL, "password": SEED_USER_PASSWORD},
-    )
-
-    assert response.status_code == 200
-    payload = response.json()
-    assert payload["user"]["email"] == SEED_USER_EMAIL
-    return str(payload["access_token"])
+def _login_cashier(client: TestClient) -> dict[str, str]:
+    return login_headers(client, email=SEED_USER_EMAIL, password=SEED_USER_PASSWORD, audience="POS")
 
 
 def _admin_headers(client: TestClient) -> dict[str, str]:
@@ -95,7 +74,7 @@ def test_admin_products_reject_pos_surface_user(client: TestClient) -> None:
     cashier_token = _login_cashier(client)
     response = client.get(
         "/v1/admin/products",
-        headers={"Authorization": f"Bearer {cashier_token}"},
+        headers=cashier_token,
     )
 
     assert response.status_code == 403

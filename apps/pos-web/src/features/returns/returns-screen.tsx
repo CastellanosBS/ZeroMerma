@@ -912,7 +912,7 @@ function ReturnHistoryDetailPanel({
 }
 
 export function ReturnsScreen() {
-  const accessToken = usePosAuthStore((state) => state.accessToken);
+  const isAuthenticated = usePosAuthStore((state) => state.isAuthenticated);
   const showError = useStatusMessageStore((state) => state.showError);
   const showSuccess = useStatusMessageStore((state) => state.showSuccess);
   const queryClient = useQueryClient();
@@ -1307,12 +1307,11 @@ export function ReturnsScreen() {
 
   const commitMutation = useMutation({
     mutationFn: async () => {
-      if (!accessToken || !selectedSaleId) {
+      if (!isAuthenticated || !selectedSaleId) {
         throw new Error("Selecciona una venta antes de registrar la devolucion.");
       }
 
       return commitSaleReturn({
-        accessToken,
         payload: {
           workstation_code: appEnv.VITE_POS_WORKSTATION_CODE,
           original_sale_id: selectedSaleId,

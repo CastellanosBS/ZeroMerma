@@ -159,31 +159,25 @@ export function buildAdminProductClassesListPath(filters: AdminProductClassListF
 }
 
 export function fetchAdminProductClasses(
-  accessToken: string,
   filters: AdminProductClassListFilters,
 ): Promise<AdminProductClassListResponse> {
   return requestJson<AdminProductClassesListApiResponse>({
-    accessToken,
     path: buildAdminProductClassesListPath(filters),
   }).then(mapAdminProductClassesListFromApi);
 }
 
 export function fetchAdminProductClassDetail(
-  accessToken: string,
   classId: string,
 ): Promise<AdminProductClass> {
   return requestJson<AdminProductClassApiView>({
-    accessToken,
     path: `/v1/admin/product-classes/${classId}`,
   }).then(mapAdminProductClassFromApi);
 }
 
 export function createAdminProductClass(
-  accessToken: string,
   payload: AdminProductClassCreatePayload,
 ): Promise<AdminProductClass> {
   return requestJson<AdminProductClassApiView>({
-    accessToken,
     body: toCreateApiPayload(payload),
     method: "POST",
     path: "/v1/admin/product-classes",
@@ -191,12 +185,10 @@ export function createAdminProductClass(
 }
 
 export function updateAdminProductClass(
-  accessToken: string,
   classId: string,
   payload: AdminProductClassUpdatePayload,
 ): Promise<AdminProductClass> {
   return requestJson<AdminProductClassApiView>({
-    accessToken,
     body: toUpdateApiPayload(payload),
     method: "PATCH",
     path: `/v1/admin/product-classes/${classId}`,

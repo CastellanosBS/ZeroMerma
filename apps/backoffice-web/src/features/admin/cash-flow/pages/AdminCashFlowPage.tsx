@@ -189,7 +189,7 @@ function CashFlowTrendPanel({ trend }: { trend: AdminCashFlowTrendPoint[] }) {
 }
 
 export function AdminCashFlowPage() {
-  const accessToken = useBackofficeAuthStore((state) => state.accessToken);
+  const isAuthenticated = useBackofficeAuthStore((state) => state.isAuthenticated);
   const [filters, setFilters] = useState<AdminCashFlowListFilters>(initialFilters);
   const [selectedMovementId, setSelectedMovementId] = useState<string | null>(null);
   const [feedback, setFeedback] = useState<{ tone: "success" | "error"; message: string } | null>(
@@ -197,8 +197,8 @@ export function AdminCashFlowPage() {
   );
 
   const cashFlowQuery = useQuery({
-    enabled: Boolean(accessToken),
-    queryFn: () => fetchAdminCashFlowMovements(accessToken ?? "", filters),
+    enabled: isAuthenticated,
+    queryFn: () => fetchAdminCashFlowMovements(filters),
     queryKey: ["admin", "cash-flow", "list", filters],
     retry: false,
   });
@@ -210,8 +210,8 @@ export function AdminCashFlowPage() {
   );
 
   const detailQuery = useQuery({
-    enabled: Boolean(accessToken && selectedMovementId),
-    queryFn: () => fetchAdminCashFlowMovementDetail(accessToken ?? "", selectedMovementId ?? ""),
+    enabled: Boolean(isAuthenticated && selectedMovementId),
+    queryFn: () => fetchAdminCashFlowMovementDetail(selectedMovementId ?? ""),
     queryKey: ["admin", "cash-flow", "detail", selectedMovementId],
     retry: false,
   });

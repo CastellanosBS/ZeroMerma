@@ -2,6 +2,8 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Navigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 
+import { logoutSession } from "./session-api";
+
 import { AdminLayout } from "../admin/layout/AdminLayout";
 import { ApiError, getCurrentBackofficeUser } from "../../lib/api";
 import {
@@ -18,13 +20,14 @@ import {
 import { useBackofficeAuthStore } from "./backoffice-auth-store";
 
 export function ProtectedAdminRoute() {
-  const accessToken = useBackofficeAuthStore((state) => state.accessToken);
+  const isAuthenticated = useBackofficeAuthStore((state) => state.isAuthenticated);
   const clearSession = useBackofficeAuthStore((state) => state.clearSession);
   const queryClient = useQueryClient();
+  const [logoutError, setLogoutError] = useState<string | null>(null);
   const [acceptedIdentity, setAcceptedIdentity] = useState<string | null>(null);
   const currentUserQuery = useQuery({
-    enabled: Boolean(accessToken),
-    queryFn: () => getCurrentBackofficeUser(accessToken ?? ""),
+    enabled: isAuthenticated,
+    queryFn: () => getCurrentBackofficeUser(),
     queryKey: backofficeAuthorizationQueryKey,
     retry: false,
     refetchInterval: 60_000,
@@ -62,7 +65,7 @@ export function ProtectedAdminRoute() {
     redirectToPos();
   }, [clearSession, currentUserQuery.data]);
 
-  if (!accessToken) {
+  if (!isAuthenticated) {
     return <Navigate to="/login" />;
   }
 
@@ -74,7 +77,8 @@ export function ProtectedAdminRoute() {
         <button type="button" onClick={() => void currentUserQuery.refetch()}>
           Reintentar
         </button>
-        <button type="button" onClick={clearSession}>
+        {logoutError ? <p role="alert">{logoutError}</p> : null}
+        <button type="button" onClick={() => void logoutSession().catch(() => setLogoutError("No se pudo cerrar la sesión. Reintenta."))}>
           Cerrar sesión
         </button>
       </main>

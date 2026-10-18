@@ -141,7 +141,7 @@ function AdminCashCutsMetricStrip({
 }
 
 export function AdminCashCutsPage() {
-  const accessToken = useBackofficeAuthStore((state) => state.accessToken);
+  const isAuthenticated = useBackofficeAuthStore((state) => state.isAuthenticated);
   const [filters, setFilters] = useState<AdminCashCutListFilters>(initialFilters);
   const [selectedCashSessionId, setSelectedCashSessionId] = useState<string | null>(null);
   const [feedback, setFeedback] = useState<{ tone: "success" | "error"; message: string } | null>(
@@ -149,8 +149,8 @@ export function AdminCashCutsPage() {
   );
 
   const cashCutsQuery = useQuery({
-    enabled: Boolean(accessToken),
-    queryFn: () => fetchAdminCashCuts(accessToken ?? "", filters),
+    enabled: isAuthenticated,
+    queryFn: () => fetchAdminCashCuts(filters),
     queryKey: ["admin", "cash-cuts", "list", filters],
     retry: false,
   });
@@ -162,8 +162,8 @@ export function AdminCashCutsPage() {
   );
 
   const detailQuery = useQuery({
-    enabled: Boolean(accessToken && selectedCashSessionId),
-    queryFn: () => fetchAdminCashCutDetail(accessToken ?? "", selectedCashSessionId ?? ""),
+    enabled: Boolean(isAuthenticated && selectedCashSessionId),
+    queryFn: () => fetchAdminCashCutDetail(selectedCashSessionId ?? ""),
     queryKey: ["admin", "cash-cuts", "detail", selectedCashSessionId],
     retry: false,
   });

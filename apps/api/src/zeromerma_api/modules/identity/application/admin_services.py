@@ -282,6 +282,7 @@ class AdminUserService:
             allowed_surfaces=surfaces,
             default_surface=default_surface,
             is_active=True,
+            password_reset_required=True,
             phone=command.phone,
             notes=command.notes,
         )
@@ -815,6 +816,11 @@ class AdminUserService:
         current_user: AuthenticatedUser,
     ) -> AdminUserDetailView:
         user = context.user
+        from zeromerma_api.modules.identity.application.privileged_access import (
+            has_superadmin_assignment,
+        )
+
+        reset_requires_approval = has_superadmin_assignment(session, user.id)
         warnings = self._build_warnings(context)
         surfaces = self._normalize_surfaces(user.allowed_surfaces)
         status_value = _user_status(user)
@@ -902,6 +908,14 @@ class AdminUserService:
                 missing_contract_note="",
             ),
             security_actions=AdminUserSecurityActionsView(
+                password_reset_requires_approval=reset_requires_approval,
+                can_revoke_sessions=can_manage,
+                can_send_password_reset=(
+                    can_manage
+                    and user.is_active
+                    and not user.is_locked
+                    and not reset_requires_approval
+                ),
                 can_lock=can_lock,
                 can_unlock=can_unlock,
                 can_activate=can_activate,

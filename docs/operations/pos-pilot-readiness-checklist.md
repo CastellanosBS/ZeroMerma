@@ -2,6 +2,10 @@
 
 Generado el 2026-04-23.
 
+Configuration/session section updated on 2026-10-18. The remaining historical
+pilot checklist is planning material, not evidence of release or pilot readiness.
+Current validation is limited to development and disposable test environments.
+
 Objetivo:
 - preparar un piloto real de panaderia con el POS de ZeroMerma
 - dejar claro que esta soportado hoy y que sigue bloqueado
@@ -34,23 +38,36 @@ Referencias del repo:
 - worker levantado contra la misma base de datos que la API
 - POS web apuntando al `VITE_API_BASE_URL` correcto
 - CORS configurado para la URL real del POS
-- secretos de autenticacion distintos a desarrollo local
+- credenciales DB privadas e independientes para API y worker; sin clave global de sesion
+- TLS valido en API/POS/Backoffice y origen explicito independiente para cada aplicacion
 
 ### Variables minimas
 
 Basadas en `.env.example`:
 
 ```env
-ZEROMERMA_API_ENVIRONMENT=production-or-staging
-ZEROMERMA_API_DATABASE_URL=postgresql+psycopg://...
-ZEROMERMA_API_AUTH_TOKEN_SECRET=...
-ZEROMERMA_API_AUTH_TOKEN_TTL_MINUTES=480
+ZEROMERMA_API_ENVIRONMENT=staging
+ZEROMERMA_API_DATABASE_URL_FILE=/private/runtime/api-database-url
+ZEROMERMA_API_ALLOWED_HOSTS=["api.site.example"]
+ZEROMERMA_API_CORS_ORIGINS=["https://pos.site.example","https://backoffice.site.example"]
+ZEROMERMA_API_SESSION_POS_ORIGINS=["https://pos.site.example"]
+ZEROMERMA_API_SESSION_BACKOFFICE_ORIGINS=["https://backoffice.site.example"]
+ZEROMERMA_API_SESSION_COOKIE_SAMESITE=lax
+ZEROMERMA_API_TRUSTED_PROXY_IPS=["127.0.0.1"]
 
-ZEROMERMA_WORKER_ENVIRONMENT=production-or-staging
-ZEROMERMA_WORKER_DATABASE_URL=postgresql+psycopg://...
+ZEROMERMA_WORKER_ENVIRONMENT=staging
+ZEROMERMA_WORKER_DATABASE_URL_FILE=/private/runtime/worker-database-url
 ZEROMERMA_WORKER_POLL_INTERVAL_SECONDS=5
 ZEROMERMA_WORKER_BATCH_SIZE=25
 ```
+
+The example hosts and paths must be replaced by explicitly approved deployment
+values; they are not installed infrastructure. `production` applies the same strict
+checks as `staging`. Session cookies are opaque, Secure and HttpOnly, with separate
+POS/Backoffice audiences and mandatory CSRF checks for mutations. No bearer token or
+shared signing secret is accepted. Run the API with `--no-proxy-headers`; configure
+only the actual proxy peer. See [runtime security and rotation](runtime-secrets.md)
+for private-file permissions, TLS, redaction, rotation and remaining deployment gates.
 
 ### Variables operativas sensibles que deben revisarse antes del piloto
 

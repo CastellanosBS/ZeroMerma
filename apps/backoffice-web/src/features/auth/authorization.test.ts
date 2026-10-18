@@ -24,6 +24,7 @@ describe("server-resolved authorization presentation", () => {
       ...authorizationUser(),
       email: "admin@zeromerma.local",
       is_superadministrator: true,
+      password_reset_required: false,
     };
     expect(hasEffectiveCapability(user, "users.manage")).toBe(false);
     expect(

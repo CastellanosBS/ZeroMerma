@@ -24,12 +24,12 @@ export function returnsBootstrapQueryKey(workstationCode: string) {
 }
 
 export function useReturnsBootstrapQuery() {
-  const accessToken = usePosAuthStore((state) => state.accessToken);
+  const isAuthenticated = usePosAuthStore((state) => state.isAuthenticated);
 
   return useQuery({
     queryKey: returnsBootstrapQueryKey(appEnv.VITE_POS_WORKSTATION_CODE),
-    queryFn: () => getReturnsBootstrap(accessToken!, appEnv.VITE_POS_WORKSTATION_CODE),
-    enabled: accessToken !== null,
+    queryFn: () => getReturnsBootstrap(appEnv.VITE_POS_WORKSTATION_CODE),
+    enabled: isAuthenticated,
   });
 }
 
@@ -57,7 +57,7 @@ export function useReturnSalesQuery(
   dateFrom: string,
   dateTo: string,
 ) {
-  const accessToken = usePosAuthStore((state) => state.accessToken);
+  const isAuthenticated = usePosAuthStore((state) => state.isAuthenticated);
   const normalizedQuery = normalizeQuery(query);
   const normalizedDateFrom = normalizeDate(dateFrom);
   const normalizedDateTo = normalizeDate(dateTo);
@@ -72,14 +72,13 @@ export function useReturnSalesQuery(
     ),
     queryFn: () =>
       searchReturnSales({
-        accessToken: accessToken!,
         workstationCode: appEnv.VITE_POS_WORKSTATION_CODE,
         scope,
         query: normalizedQuery.length > 0 ? normalizedQuery : undefined,
         dateFrom: normalizedDateFrom.length > 0 ? normalizedDateFrom : undefined,
         dateTo: normalizedDateTo.length > 0 ? normalizedDateTo : undefined,
       }),
-    enabled: accessToken !== null,
+    enabled: isAuthenticated,
   });
 }
 
@@ -88,7 +87,7 @@ export function returnSaleDetailQueryKey(workstationCode: string, saleId: string
 }
 
 export function useReturnSaleDetailQuery(saleId: string | null) {
-  const accessToken = usePosAuthStore((state) => state.accessToken);
+  const isAuthenticated = usePosAuthStore((state) => state.isAuthenticated);
 
   return useQuery({
     queryKey: returnSaleDetailQueryKey(
@@ -97,11 +96,10 @@ export function useReturnSaleDetailQuery(saleId: string | null) {
     ),
     queryFn: () =>
       getReturnSaleDetail({
-        accessToken: accessToken!,
         saleId: saleId!,
         workstationCode: appEnv.VITE_POS_WORKSTATION_CODE,
       }),
-    enabled: accessToken !== null && saleId !== null,
+    enabled: isAuthenticated && saleId !== null,
   });
 }
 
@@ -110,7 +108,7 @@ export function saleReturnDetailQueryKey(workstationCode: string, returnId: stri
 }
 
 export function useSaleReturnDetailQuery(returnId: string | null) {
-  const accessToken = usePosAuthStore((state) => state.accessToken);
+  const isAuthenticated = usePosAuthStore((state) => state.isAuthenticated);
 
   return useQuery({
     queryKey: saleReturnDetailQueryKey(
@@ -119,11 +117,10 @@ export function useSaleReturnDetailQuery(returnId: string | null) {
     ),
     queryFn: () =>
       getSaleReturnDetail({
-        accessToken: accessToken!,
         returnId: returnId!,
         workstationCode: appEnv.VITE_POS_WORKSTATION_CODE,
       }),
-    enabled: accessToken !== null && returnId !== null,
+    enabled: isAuthenticated && returnId !== null,
   });
 }
 
@@ -157,7 +154,7 @@ export function useReturnsHistoryQuery(
   createdByUserId: string,
   reasonCode: string,
 ) {
-  const accessToken = usePosAuthStore((state) => state.accessToken);
+  const isAuthenticated = usePosAuthStore((state) => state.isAuthenticated);
   const normalizedQuery = normalizeQuery(query);
   const normalizedDateFrom = normalizeDate(dateFrom);
   const normalizedDateTo = normalizeDate(dateTo);
@@ -176,7 +173,6 @@ export function useReturnsHistoryQuery(
     ),
     queryFn: () =>
       getReturnsHistory({
-        accessToken: accessToken!,
         workstationCode: appEnv.VITE_POS_WORKSTATION_CODE,
         scope,
         query: normalizedQuery.length > 0 ? normalizedQuery : undefined,
@@ -186,7 +182,7 @@ export function useReturnsHistoryQuery(
           normalizedCreatedByUserId.length > 0 ? normalizedCreatedByUserId : undefined,
         reasonCode: normalizedReasonCode.length > 0 ? normalizedReasonCode : undefined,
       }),
-    enabled: accessToken !== null,
+    enabled: isAuthenticated,
   });
 }
 
@@ -195,18 +191,17 @@ export function returnClassProductsQueryKey(workstationCode: string, classId: st
 }
 
 export function useReturnClassProductsQueries(classIds: string[]) {
-  const accessToken = usePosAuthStore((state) => state.accessToken);
+  const isAuthenticated = usePosAuthStore((state) => state.isAuthenticated);
 
   return useQueries({
     queries: classIds.map((classId) => ({
       queryKey: returnClassProductsQueryKey(appEnv.VITE_POS_WORKSTATION_CODE, classId),
       queryFn: () =>
         getReturnsClassProducts({
-          accessToken: accessToken!,
           classId,
           workstationCode: appEnv.VITE_POS_WORKSTATION_CODE,
         }),
-      enabled: accessToken !== null && classId.length > 0,
+      enabled: isAuthenticated && classId.length > 0,
     })),
   });
 }

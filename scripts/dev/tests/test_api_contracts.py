@@ -231,7 +231,7 @@ def test_collection_policy_covers_pagination_bounds_filters_and_order() -> None:
     entries = POLICY["collections"]["operations"]
     classifications = {entry["classification"] for entry in entries.values()}
 
-    assert len(entries) == 57
+    assert len(entries) == 59
     assert classifications == {
         "PAGINATION_REQUIRED",
         "BOUNDED_REFERENCE_LIST",

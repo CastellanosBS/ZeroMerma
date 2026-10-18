@@ -898,7 +898,7 @@ function TransferDetailRow({ label, value }: { label: string; value: string }) {
 
 export function TransferDispatchScreen() {
   const queryClient = useQueryClient();
-  const accessToken = usePosAuthStore((state) => state.accessToken);
+  const isAuthenticated = usePosAuthStore((state) => state.isAuthenticated);
   const showError = useStatusMessageStore((state) => state.showError);
   const showSuccess = useStatusMessageStore((state) => state.showSuccess);
   const quantityInputRef = useRef<HTMLInputElement>(null);
@@ -969,7 +969,7 @@ export function TransferDispatchScreen() {
 
   const commitMutation = useMutation({
     mutationFn: async () => {
-      if (accessToken === null || operationsBootstrapQuery.data === undefined) {
+      if (!isAuthenticated || operationsBootstrapQuery.data === undefined) {
         throw new Error("Se requiere autenticacion y contexto de estacion.");
       }
 
@@ -984,7 +984,7 @@ export function TransferDispatchScreen() {
         workstation_code: operationsBootstrapQuery.data.workstation.code,
       };
 
-      return commitTransferDispatch(accessToken, payload);
+      return commitTransferDispatch(payload);
     },
     onSuccess: (detail) => {
       setDraftState(createInitialOperationDraftState());

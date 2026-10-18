@@ -200,16 +200,16 @@ describe("admin orders API", () => {
       .mockResolvedValueOnce(jsonResponse(detailResponse))
       .mockResolvedValueOnce(jsonResponse(detailResponse));
 
-    const list = await fetchAdminOrders("token", {
+    const list = await fetchAdminOrders({
       page: 1,
       pageSize: 25,
       search: "",
       status: "all",
     });
-    const detail = await fetchAdminOrderDetail("token", "order-1");
-    await markAdminOrderReady("token", "order-1");
-    await deliverAdminOrder("token", "order-1");
-    await cancelAdminOrder("token", "order-1");
+    const detail = await fetchAdminOrderDetail("order-1");
+    await markAdminOrderReady("order-1");
+    await deliverAdminOrder("order-1");
+    await cancelAdminOrder("order-1");
 
     expect(list.total).toBe(1);
     expect(detail.lines[0].productName).toBe("Concha");

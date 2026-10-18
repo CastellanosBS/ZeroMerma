@@ -10,7 +10,7 @@ complete financial, inventory, authorization, hardware, or administrative featur
 | -------------------------- | ------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Unit/component             | `corepack pnpm --filter @zeromerma/pos-web --filter @zeromerma/backoffice-web test`                    | Vitest components, stores and API adapters use declared fixtures.                                                                                             |
 | Existing browser/component | App `test:e2e`                                                                                         | Explicit `playwright.config.ts`, `e2e/` only. POS intercepts API requests; Backoffice covers its public shell. These are not integration evidence.            |
-| Real browser integration   | `powershell -NoProfile -ExecutionPolicy Bypass -File scripts/dev/run-web-integration.ps1 -Surface All` | Fresh PostgreSQL, canonical migrations and disposable seed, API, worker readiness and separate web servers. Uses `playwright.real.config.ts` and `e2e-real/`. |
+| Real browser integration   | `pwsh -NoProfile -File scripts/dev/run-web-integration.ps1 -Surface All` | Fresh PostgreSQL, canonical migrations and disposable seed, API, worker readiness and separate web servers. Uses `playwright.real.config.ts` and `e2e-real/`. |
 
 The isolated harness also accepts `-Surface POS` or `-Surface Backoffice`. Run it with
 the canonical Node.js 22, pnpm 10.33.0, Python 3.12 and uv 0.11.4 toolchain and an
@@ -36,8 +36,13 @@ a future pickup date with explicit hour/minute fields.
 2. Real login reaches the mandatory opening form for the seeded workstation.
 3. Opening with `0.00` creates a disposable cash session through the API.
 4. Reload reads the persisted `OPEN` session and loads the real POS catalog.
-5. The test asserts that its only non-GET requests are login and zero-value opening.
-6. An unauthenticated API request returns 401; an invalid stored token returns to login.
+5. Human activity may call the session heartbeat; other business writes remain limited
+   to zero-value opening. The session checks also lock, reauthenticate and log out.
+6. Cookies are HttpOnly/Secure/SameSite=Lax; reload restores without browser-stored
+   credentials. A locked reload stays locked; reauthentication rotates CSRF while
+   preserving the session ID and absolute deadline. Logout is confirmed by the API.
+7. An unauthenticated API request returns 401; obsolete stored auth keys are removed
+   and cannot authenticate.
 
 No sale, order payment, refund, transfer, inventory operation or cash close is created.
 The zero-value session exists only inside the uniquely identified disposable database.
@@ -56,8 +61,10 @@ The harness cleanup removes that database and the servers after success or failu
 | Control                | `/admin/auditoria`   | `/v1/admin/audit`         |
 
 The smoke performs real administrative login, direct navigation, successful API reads,
-visible page headings and an authenticated reload. It asserts that login is its only
-non-GET request. Sales and incident collections may be empty; successful empty reads
+visible page headings and an authenticated reload. In addition to login, human activity
+may send session heartbeats; the family reads do not create business mutations. It
+also opens the paginated own-session panel and verifies that a Backoffice cookie
+cannot authenticate a POS request. Sales and incident collections may be empty; successful empty reads
 count as integration, not as proof that a create workflow is complete.
 
 The original foundation reader characterized surface access without an administrative
@@ -106,7 +113,7 @@ neither unhide nor complete them.
 Environment contract: `ZM_WEB_INTEGRATION_ISOLATED`, `ZM_E2E_RUN_ID`, `ZM_E2E_API_URL`,
 `ZM_E2E_POS_URL`, `ZM_E2E_BACKOFFICE_URL`, `ZM_E2E_POS_EMAIL`,
 `ZM_E2E_BACKOFFICE_EMAIL`, `ZM_E2E_PASSWORD`, `ZM_E2E_ARTIFACT_DIR` and
-`ZM_E2E_WORKSTATION_CODE`. The runner supplies these; invoking Playwright directly without
+`ZM_E2E_WORKSTATION_CODE`, `ZM_E2E_TLS_CERT_FILE` and `ZM_E2E_TLS_KEY_FILE`. The runner supplies these; invoking Playwright directly without
 them intentionally fails before a browser starts.
 
 ## Validation evidence
@@ -131,6 +138,46 @@ mutations in the main smoke were login and POS zero-value opening.
 Early executions revealed harness startup/ESM-loading issues and stale UI selectors;
 these were corrected before the successful real run. No application feature was changed
 to make the smoke pass. Test discovery by itself is not completion evidence.
+
+## Session lifecycle update (ZM-FIN-023–027)
+
+Validated locally on 2026-10-18 with the canonical toolchain. Both applications now
+restore independent server sessions through Secure, HttpOnly cookies, send the explicit
+surface header and keep CSRF tokens only in memory. No browser bearer credential or
+persisted authentication state remains; startup deletes the obsolete storage keys.
+Human keyboard, pointer and touch events drive throttled activity requests. Session
+reads, page reloads and background requests do not extend inactivity deadlines.
+
+The POS gates protected routes while locked or while a password change is required.
+Unlocking a locked temporary-password session still requires the password change.
+The client clears protected query data on lock, logout, revocation and actor changes,
+and ignores stale restoration responses after lock or logout. Backoffice includes
+paginated own-session management and capability-gated administrative session revocation
+and one-use password-reset issuance. Reset credentials are shown only in the active
+dialog; the UI does not claim to send email or SMS. Superadministrator reset approval
+continues to use the dedicated backend approval workflow.
+
+| Validation | Observed result |
+| ---------- | --------------- |
+| `pwsh -NoProfile -File scripts/dev/check-foundation.ps1 -Stage Web` | Pass: lint, typecheck, production builds, **478 unit tests** (POS 245, Backoffice 222, API client 8, shared UI 3), and **11 mocked browser tests** (POS 10, Backoffice 1). |
+| `pwsh -NoProfile -File scripts/dev/run-web-integration.ps1 -Surface All` | **8/8 real browser tests pass** (POS 2, Backoffice 6), with HTTPS, the real API, migration through 0041, worker readiness and disposable database cleanup. |
+| PowerShell parser check for `scripts/dev/start-local.ps1` | Pass. The persistent development database startup was not executed as part of this validation. |
+
+Foundation evidence is under
+`.tmp/validation/foundation/c63cc7f0b725441eabf4dc4a2a7b22f8/`.
+Real-browser evidence is under
+`.tmp/validation/web/460a7d8fc26c4cccb8289e2af2e8ad03/`; both surface `results.json`
+files record success. This run verifies POS lock/reload/unlock/logout, cookie properties,
+surface isolation, Backoffice own-session display, seven released read families and
+revocation of an already open session. Password-change, incorrect-unlock and stale
+response behavior also have focused mocked-browser or unit coverage. This does not
+claim full end-to-end coverage of every administration workflow.
+
+The local startup script now launches HTTPS loopback services with a disposable
+certificate, checks both API and worker database targets before migration, refuses busy
+ports and records owned process IDs and logs. It does not install OS certificate trust.
+The isolated browser runner validated the HTTPS Vite configuration; execution against
+the persistent development database remains a separate local operational check.
 
 ## Remaining scope
 

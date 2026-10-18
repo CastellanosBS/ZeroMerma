@@ -322,8 +322,8 @@ vi.mock("../../components/app-shell-right-panel", async () => {
 });
 
 vi.mock("../auth/auth-store", () => ({
-  usePosAuthStore: (selector: (state: { accessToken: string }) => unknown) =>
-    selector({ accessToken: "token" }),
+  usePosAuthStore: (selector: (state: { isAuthenticated: boolean }) => unknown) =>
+    selector({ isAuthenticated: true }),
 }));
 
 vi.mock("../cash-session-open/queries", () => ({
@@ -784,7 +784,7 @@ describe("CounterTransferScreen", () => {
     click(transferButton);
     await flush();
 
-    expect(commitCounterTransfer).toHaveBeenCalledWith("token", {
+    expect(commitCounterTransfer).toHaveBeenCalledWith({
       lines: [{ product_id: "product-1", quantity: "2" }],
       notes: "Salida de charola 3",
       workstation_code: "POS-01",
@@ -957,7 +957,6 @@ describe("CounterTransferScreen", () => {
     await flush();
 
     expect(commitCorrection).toHaveBeenCalledWith({
-      accessToken: "token",
       payload: {
         high_impact_acknowledged: false,
         lines: [

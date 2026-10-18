@@ -313,31 +313,25 @@ export function buildAdminPurchasesListPath(filters: AdminPurchaseListFilters): 
 }
 
 export function fetchAdminPurchases(
-  accessToken: string,
   filters: AdminPurchaseListFilters,
 ): Promise<AdminPurchaseListResponse> {
   return requestJson<ApiPurchaseListResponse>({
-    accessToken,
     path: buildAdminPurchasesListPath(filters),
   }).then(mapPurchaseListFromApi);
 }
 
 export function fetchAdminPurchaseDetail(
-  accessToken: string,
   purchaseId: string,
 ): Promise<AdminPurchaseDetail> {
   return requestJson<ApiPurchaseDetail>({
-    accessToken,
     path: `/v1/admin/purchases/${purchaseId}`,
   }).then(mapAdminPurchaseDetailFromApi);
 }
 
 export function createAdminPurchase(
-  accessToken: string,
   payload: AdminPurchasePayload,
 ): Promise<AdminPurchaseDetail> {
   return requestJson<ApiPurchaseDetail>({
-    accessToken,
     body: toPurchaseApiPayload(payload),
     method: "POST",
     path: "/v1/admin/purchases",
@@ -345,11 +339,9 @@ export function createAdminPurchase(
 }
 
 export function createAdminDirectEntry(
-  accessToken: string,
   payload: AdminDirectEntryPayload,
 ): Promise<AdminPurchaseDetail> {
   return requestJson<ApiPurchaseDetail>({
-    accessToken,
     body: toDirectEntryApiPayload(payload),
     method: "POST",
     path: "/v1/admin/purchases/direct-entry",
@@ -357,23 +349,19 @@ export function createAdminDirectEntry(
 }
 
 export function confirmAdminPurchase(
-  accessToken: string,
   purchaseId: string,
 ): Promise<AdminPurchaseDetail> {
   return requestJson<ApiPurchaseDetail>({
-    accessToken,
     method: "POST",
     path: `/v1/admin/purchases/${purchaseId}/confirm`,
   }).then(mapAdminPurchaseDetailFromApi);
 }
 
 export function receiveAdminPurchase(
-  accessToken: string,
   purchaseId: string,
   payload: AdminPurchaseReceiptPayload,
 ): Promise<AdminPurchaseDetail> {
   return requestJson<ApiPurchaseDetail>({
-    accessToken,
     body: toReceiptApiPayload(payload),
     method: "POST",
     path: `/v1/admin/purchases/${purchaseId}/receive`,
@@ -381,13 +369,11 @@ export function receiveAdminPurchase(
 }
 
 export function cancelAdminPurchase(
-  accessToken: string,
   purchaseId: string,
   payload: AdminPurchaseCancelPayload,
 ): Promise<AdminPurchaseDetail> {
   const body: ApiPurchaseCancelPayload = { reason: payload.reason ?? null };
   return requestJson<ApiPurchaseDetail>({
-    accessToken,
     body,
     method: "POST",
     path: `/v1/admin/purchases/${purchaseId}/cancel`,

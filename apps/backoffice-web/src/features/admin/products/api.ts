@@ -175,28 +175,23 @@ export function buildAdminProductsListPath(filters: AdminProductListFilters): st
 }
 
 export function fetchAdminProducts(
-  accessToken: string,
   filters: AdminProductListFilters,
 ): Promise<AdminProductListResponse> {
   return requestJson<AdminProductsListApiResponse>({
-    accessToken,
     path: buildAdminProductsListPath(filters),
   }).then(mapAdminProductsListFromApi);
 }
 
-export function fetchAdminProductDetail(accessToken: string, productId: string): Promise<AdminProduct> {
+export function fetchAdminProductDetail(productId: string): Promise<AdminProduct> {
   return requestJson<AdminProductApiView>({
-    accessToken,
     path: `/v1/admin/products/${productId}`,
   }).then(mapAdminProductFromApi);
 }
 
 export function createAdminProduct(
-  accessToken: string,
   payload: AdminProductCreatePayload,
 ): Promise<AdminProduct> {
   return requestJson<AdminProductApiView>({
-    accessToken,
     body: toCreateApiPayload(payload),
     method: "POST",
     path: "/v1/admin/products",
@@ -204,12 +199,10 @@ export function createAdminProduct(
 }
 
 export function updateAdminProduct(
-  accessToken: string,
   productId: string,
   payload: AdminProductUpdatePayload,
 ): Promise<AdminProduct> {
   return requestJson<AdminProductApiView>({
-    accessToken,
     body: toUpdateApiPayload(payload),
     method: "PATCH",
     path: `/v1/admin/products/${productId}`,

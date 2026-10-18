@@ -12,7 +12,7 @@ function required(name: string): string {
 function loopbackUrl(name: string): string {
   const url = new URL(required(name));
   if (
-    url.protocol !== "http:" ||
+    url.protocol !== "https:" ||
     url.hostname !== "127.0.0.1" ||
     !url.port ||
     url.username ||
@@ -21,7 +21,7 @@ function loopbackUrl(name: string): string {
     url.hash ||
     url.pathname !== "/"
   ) {
-    throw new Error(`${name} must be a dedicated HTTP origin on 127.0.0.1.`);
+    throw new Error(`${name} must be a dedicated HTTPS origin on 127.0.0.1.`);
   }
   return url.origin;
 }
@@ -57,6 +57,8 @@ export function realPlaywrightOptions(surface: WebSurface) {
     ],
     use: {
       baseURL: env.baseUrl,
+      // Only the guarded disposable harness uses a one-run self-signed certificate.
+      ignoreHTTPSErrors: true,
       viewport: { width: 1440, height: 1000 },
       trace: "off" as const,
       screenshot: "off" as const,
@@ -125,6 +127,8 @@ function sanitize(value: string): string {
   }
   return result
     .replace(/Bearer\s+[^\s"']+/gi, "Bearer [REDACTED]")
+    .replace(/(__Host-zm-(?:pos|backoffice)-session=)[^;\s"']+/gi, "$1[REDACTED]")
+    .replace(/("(?:csrf_token|credential|reset_token)"\s*:\s*")[^"]+/gi, "$1[REDACTED]")
     .replace(/eyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+/g, "[REDACTED JWT]");
 }
 

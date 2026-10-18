@@ -305,8 +305,8 @@ function AppShellRightPanelProbe() {
 }
 
 vi.mock("../auth/auth-store", () => ({
-  usePosAuthStore: (selector: (state: { accessToken: string }) => unknown) =>
-    selector({ accessToken: "token" }),
+  usePosAuthStore: (selector: (state: { isAuthenticated: boolean }) => unknown) =>
+    selector({ isAuthenticated: true }),
 }));
 
 vi.mock("../cash-session-open/queries", () => ({
@@ -645,7 +645,7 @@ describe("TransferReceiptScreen", () => {
     click(dialogConfirmButton ?? null);
     await flush();
 
-    expect(receiveTransfer).toHaveBeenCalledWith("token", "transfer-1", {
+    expect(receiveTransfer).toHaveBeenCalledWith("transfer-1", {
       lines: [
         {
           expected_quantity: "3",

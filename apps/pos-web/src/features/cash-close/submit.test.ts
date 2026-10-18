@@ -18,7 +18,7 @@ describe("cash close submit helpers", () => {
   it("allows attempting close without depending on preview freshness or blocker-free state", () => {
     expect(
       canAttemptCashCloseSubmit({
-        accessToken: "token",
+        isAuthenticated: true,
         hasOpenCashSession: true,
         isCommitPending: false,
       }),
@@ -28,21 +28,21 @@ describe("cash close submit helpers", () => {
   it("blocks submit attempts only for hard runtime constraints", () => {
     expect(
       canAttemptCashCloseSubmit({
-        accessToken: null,
+        isAuthenticated: false,
         hasOpenCashSession: true,
         isCommitPending: false,
       }),
     ).toBe(false);
     expect(
       canAttemptCashCloseSubmit({
-        accessToken: "token",
+        isAuthenticated: true,
         hasOpenCashSession: false,
         isCommitPending: false,
       }),
     ).toBe(false);
     expect(
       canAttemptCashCloseSubmit({
-        accessToken: "token",
+        isAuthenticated: true,
         hasOpenCashSession: true,
         isCommitPending: true,
       }),

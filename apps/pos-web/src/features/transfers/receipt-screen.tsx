@@ -902,7 +902,7 @@ function ReceiptDetailSurface({
 }
 
 export function TransferReceiptScreen() {
-  const accessToken = usePosAuthStore((state) => state.accessToken);
+  const isAuthenticated = usePosAuthStore((state) => state.isAuthenticated);
   const queryClient = useQueryClient();
   const showError = useStatusMessageStore((state) => state.showError);
   const showSuccess = useStatusMessageStore((state) => state.showSuccess);
@@ -1007,7 +1007,7 @@ export function TransferReceiptScreen() {
   const commitMutation = useMutation({
     mutationFn: async () => {
       if (
-        accessToken === null ||
+        !isAuthenticated ||
         operationsBootstrapQuery.data === undefined ||
         selectedTransferId === null
       ) {
@@ -1016,7 +1016,7 @@ export function TransferReceiptScreen() {
         );
       }
 
-      return receiveTransfer(accessToken, selectedTransferId, {
+      return receiveTransfer(selectedTransferId, {
         workstation_code: operationsBootstrapQuery.data.workstation.code,
         lines: buildTransferReceiveLines(receiptLines),
         notes: notes.trim().length > 0 ? notes.trim() : null,
@@ -1808,4 +1808,3 @@ export function TransferReceiptScreen() {
     </>
   );
 }
-

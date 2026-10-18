@@ -178,25 +178,21 @@ function buildReportSearchParams(filters: AdminReportCatalogFilters): URLSearchP
 }
 
 export async function fetchAdminReports(
-  accessToken: string,
   filters: AdminReportCatalogFilters,
 ): Promise<AdminReportDefinitionsResponse> {
   const params = buildReportSearchParams(filters);
   const suffix = params.toString();
   const response = await requestJson<ApiDefinitionsResponse>({
-    accessToken,
     path: `/v1/admin/reports${suffix ? `?${suffix}` : ""}`,
   });
   return mapDefinitionsResponse(response);
 }
 
 export async function previewAdminReport(
-  accessToken: string,
   reportCode: string,
   filters: Record<string, string>,
 ): Promise<AdminReportPreview> {
   const response = await requestJson<ApiPreviewResponse>({
-    accessToken,
     body: { filters },
     method: "POST",
     path: `/v1/admin/reports/${reportCode}/preview`,
@@ -205,13 +201,11 @@ export async function previewAdminReport(
 }
 
 export async function exportAdminReport(
-  accessToken: string,
   reportCode: string,
   filters: Record<string, string>,
   format = "json",
 ): Promise<AdminReportExportResponse> {
   const response = await requestJson<ApiExportResponse>({
-    accessToken,
     body: { filters, format },
     method: "POST",
     path: `/v1/admin/reports/${reportCode}/export`,

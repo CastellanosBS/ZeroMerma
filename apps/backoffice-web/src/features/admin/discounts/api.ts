@@ -154,28 +154,23 @@ export function buildAdminDiscountsListPath(filters: AdminDiscountListFilters): 
 }
 
 export function fetchAdminDiscounts(
-  accessToken: string,
   filters: AdminDiscountListFilters,
 ): Promise<AdminDiscountListResponse> {
   return requestJson<ApiDiscountListResponse>({
-    accessToken,
     path: buildAdminDiscountsListPath(filters),
   }).then(mapListFromApi);
 }
 
-export function fetchAdminDiscountDetail(accessToken: string, discountId: string): Promise<AdminDiscount> {
+export function fetchAdminDiscountDetail(discountId: string): Promise<AdminDiscount> {
   return requestJson<ApiDiscount>({
-    accessToken,
     path: `/v1/admin/discounts/${discountId}`,
   }).then(mapAdminDiscountFromApi);
 }
 
 export function createAdminDiscount(
-  accessToken: string,
   payload: AdminDiscountSavePayload,
 ): Promise<AdminDiscount> {
   return requestJson<ApiDiscount>({
-    accessToken,
     body: toSaveApiPayload(payload),
     method: "POST",
     path: "/v1/admin/discounts",
@@ -183,12 +178,10 @@ export function createAdminDiscount(
 }
 
 export function updateAdminDiscount(
-  accessToken: string,
   discountId: string,
   payload: AdminDiscountSavePayload,
 ): Promise<AdminDiscount> {
   return requestJson<ApiDiscount>({
-    accessToken,
     body: toUpdateApiPayload(payload),
     method: "PATCH",
     path: `/v1/admin/discounts/${discountId}`,
@@ -196,12 +189,10 @@ export function updateAdminDiscount(
 }
 
 export function duplicateAdminDiscount(
-  accessToken: string,
   discountId: string,
   payload: AdminDiscountDuplicatePayload,
 ): Promise<AdminDiscount> {
   return requestJson<ApiDiscount>({
-    accessToken,
     body: toDuplicateApiPayload(payload),
     method: "POST",
     path: `/v1/admin/discounts/${discountId}/duplicate`,

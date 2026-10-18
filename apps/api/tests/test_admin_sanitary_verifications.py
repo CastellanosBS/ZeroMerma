@@ -7,7 +7,6 @@ from sqlalchemy import select
 
 from zeromerma_api.bootstrap.seed_local import (
     SEED_ADMIN_EMAIL,
-    SEED_ADMIN_PASSWORD,
     SEED_BRANCH_CODE,
     SEED_USER_EMAIL,
     SEED_USER_PASSWORD,
@@ -25,26 +24,11 @@ from zeromerma_api.modules.quality.infrastructure.models import (
     SanitaryVerificationTemplateItem,
 )
 from zeromerma_api.testing.authorization import owner_headers
+from zeromerma_api.testing.sessions import login_headers
 
 
-def _login_admin(client: TestClient) -> str:
-    response = client.post(
-        "/v1/auth/login",
-        json={"email": SEED_ADMIN_EMAIL, "password": SEED_ADMIN_PASSWORD},
-    )
-
-    assert response.status_code == 200
-    return str(response.json()["access_token"])
-
-
-def _login_cashier(client: TestClient) -> str:
-    response = client.post(
-        "/v1/auth/login",
-        json={"email": SEED_USER_EMAIL, "password": SEED_USER_PASSWORD},
-    )
-
-    assert response.status_code == 200
-    return str(response.json()["access_token"])
+def _login_cashier(client: TestClient) -> dict[str, str]:
+    return login_headers(client, email=SEED_USER_EMAIL, password=SEED_USER_PASSWORD, audience="POS")
 
 
 def _admin_headers(client: TestClient) -> dict[str, str]:
@@ -191,10 +175,7 @@ def test_admin_sanitary_verifications_list_empty_templates_and_rejects_pos_user(
     assert payload["items"] == []
     assert payload["total"] == 0
     assert payload["is_backend_connected"] is True
-    assert (
-        payload["backend_contract"]["create_endpoint"]
-        == "POST /v1/admin/sanitary-verifications"
-    )
+    assert payload["backend_contract"]["create_endpoint"] == "POST /v1/admin/sanitary-verifications"
     assert payload["filter_options"]["statuses"]
 
     templates_response = client.get(
@@ -206,7 +187,7 @@ def test_admin_sanitary_verifications_list_empty_templates_and_rejects_pos_user(
 
     forbidden_response = client.get(
         "/v1/admin/sanitary-verifications",
-        headers={"Authorization": f"Bearer {_login_cashier(client)}"},
+        headers=_login_cashier(client),
     )
     assert forbidden_response.status_code == 403
 
@@ -268,8 +249,7 @@ def test_admin_sanitary_verification_create_persists_checklist_audit_and_outbox(
     )
     assert outbox_events[0].event_name == "sanitary_verification.created.v1"
     assert any(
-        event.event_name == "sanitary_verification.high_risk_alert.v1"
-        for event in outbox_events
+        event.event_name == "sanitary_verification.high_risk_alert.v1" for event in outbox_events
     )
 
 

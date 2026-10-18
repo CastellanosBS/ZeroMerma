@@ -13,18 +13,17 @@ export function posCatalogQueryKey(workstationCode: string, query: string) {
 }
 
 export function usePosCatalogQuery(query: string) {
-  const accessToken = usePosAuthStore((state) => state.accessToken);
+  const isAuthenticated = usePosAuthStore((state) => state.isAuthenticated);
   const normalizedQuery = normalizeQuery(query);
 
   return useQuery({
     queryKey: posCatalogQueryKey(appEnv.VITE_POS_WORKSTATION_CODE, normalizedQuery),
     queryFn: () =>
       getPosCatalog(
-        accessToken!,
         appEnv.VITE_POS_WORKSTATION_CODE,
         normalizedQuery.length > 0 ? normalizedQuery : undefined,
       ),
-    enabled: accessToken !== null,
+    enabled: isAuthenticated,
   });
 }
 
@@ -37,7 +36,7 @@ export function posClassProductsQueryKey(
 }
 
 export function usePosClassProductsQuery(classId: string | null, query: string) {
-  const accessToken = usePosAuthStore((state) => state.accessToken);
+  const isAuthenticated = usePosAuthStore((state) => state.isAuthenticated);
   const normalizedQuery = normalizeQuery(query);
 
   return useQuery({
@@ -48,11 +47,10 @@ export function usePosClassProductsQuery(classId: string | null, query: string) 
     ),
     queryFn: () =>
       getPosClassProducts(
-        accessToken!,
         appEnv.VITE_POS_WORKSTATION_CODE,
         classId!,
         normalizedQuery.length > 0 ? normalizedQuery : undefined,
       ),
-    enabled: accessToken !== null && classId !== null,
+    enabled: isAuthenticated && classId !== null,
   });
 }

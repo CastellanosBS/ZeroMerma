@@ -13,12 +13,12 @@ export function paymentsBootstrapQueryKey(workstationCode: string) {
 }
 
 export function usePaymentsBootstrapQuery() {
-  const accessToken = usePosAuthStore((state) => state.accessToken);
+  const isAuthenticated = usePosAuthStore((state) => state.isAuthenticated);
 
   return useQuery({
     queryKey: paymentsBootstrapQueryKey(appEnv.VITE_POS_WORKSTATION_CODE),
-    queryFn: () => getPaymentsBootstrap(accessToken!, appEnv.VITE_POS_WORKSTATION_CODE),
-    enabled: accessToken !== null,
+    queryFn: () => getPaymentsBootstrap(appEnv.VITE_POS_WORKSTATION_CODE),
+    enabled: isAuthenticated,
   });
 }
 
@@ -48,7 +48,7 @@ export function usePaymentsListQuery(
   paymentMethod: string,
   createdByUserId: string,
 ) {
-  const accessToken = usePosAuthStore((state) => state.accessToken);
+  const isAuthenticated = usePosAuthStore((state) => state.isAuthenticated);
   const normalizedQuery = normalizeQuery(query);
 
   return useQuery({
@@ -62,7 +62,6 @@ export function usePaymentsListQuery(
     ),
     queryFn: () =>
       listPayments({
-        accessToken: accessToken!,
         workstationCode: appEnv.VITE_POS_WORKSTATION_CODE,
         scope,
         query: normalizedQuery.length > 0 ? normalizedQuery : undefined,
@@ -70,7 +69,7 @@ export function usePaymentsListQuery(
         paymentMethod: paymentMethod.length > 0 ? paymentMethod : undefined,
         createdByUserId: createdByUserId.length > 0 ? createdByUserId : undefined,
       }),
-    enabled: accessToken !== null,
+    enabled: isAuthenticated,
   });
 }
 
@@ -79,16 +78,15 @@ export function paymentDetailQueryKey(workstationCode: string, paymentId: string
 }
 
 export function usePaymentDetailQuery(paymentId: string | null) {
-  const accessToken = usePosAuthStore((state) => state.accessToken);
+  const isAuthenticated = usePosAuthStore((state) => state.isAuthenticated);
 
   return useQuery({
     queryKey: paymentDetailQueryKey(appEnv.VITE_POS_WORKSTATION_CODE, paymentId ?? "none"),
     queryFn: () =>
       getPaymentDetail({
-        accessToken: accessToken!,
         paymentId: paymentId!,
         workstationCode: appEnv.VITE_POS_WORKSTATION_CODE,
       }),
-    enabled: accessToken !== null && paymentId !== null,
+    enabled: isAuthenticated && paymentId !== null,
   });
 }

@@ -54,7 +54,7 @@ All API errors use `ApiErrorResponse`:
 - `request_id`: the sanitized incoming `X-Request-ID`, when supplied;
 - `field_errors`: structured locations/messages/types for request validation.
 
-The contract covers 400, 401, 403, 404, 409, 422, and safe 500 responses. All consumers and
+The contract covers 400, 401, 403, 404, 409, 422, 423, 429, and safe 500 responses. All consumers and
 backend assertions use `message`; there is no legacy `detail` alias. POS and Backoffice
 consume the canonical fields through the shared transport.
 

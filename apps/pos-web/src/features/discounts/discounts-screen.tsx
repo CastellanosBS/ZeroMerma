@@ -1,4 +1,4 @@
-﻿import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Navigate } from "@tanstack/react-router";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
@@ -718,7 +718,7 @@ export function DiscountsRightPanel({
 }
 
 export function DiscountsScreen() {
-  const accessToken = usePosAuthStore((state) => state.accessToken);
+  const isAuthenticated = usePosAuthStore((state) => state.isAuthenticated);
   const showError = useStatusMessageStore((state) => state.showError);
   const showSuccess = useStatusMessageStore((state) => state.showSuccess);
   const queryClient = useQueryClient();
@@ -861,12 +861,11 @@ export function DiscountsScreen() {
 
   const createDiscountMutation = useMutation({
     mutationFn: async () => {
-      if (!accessToken) {
+      if (!isAuthenticated) {
         throw new Error("Necesitas iniciar sesion antes de registrar un descuento.");
       }
 
       return createDiscount({
-        accessToken,
         payload: buildCreateOperationalDiscountRequest(
           appEnv.VITE_POS_WORKSTATION_CODE,
           draftState,
@@ -1381,7 +1380,3 @@ export function DiscountsScreen() {
     </>
   );
 }
-
-
-
-

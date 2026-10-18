@@ -1,3 +1,4 @@
+import { AdminUserSecurityActions } from "./AdminUserSecurityActions";
 import { AdminActionButton } from "../../components/AdminActionButton";
 import type { ReactNode } from "react";
 
@@ -288,10 +289,7 @@ export function AdminUserDetailPanel({
               Activar
             </AdminActionButton>
           </div>
-          <p className="mt-2 text-xs text-slate-500">
-            Restablecimiento, invitaciones y revocacion de sesiones no estan soportados por el
-            contrato actual.
-          </p>
+          <AdminUserSecurityActions detail={detail} key={detail.overview.id} />
         </Section>
 
         <Section title="Contexto operativo">

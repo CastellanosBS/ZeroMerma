@@ -24,34 +24,32 @@ async function login(page: Page, email: string) {
   const result = await response;
   expect(result.status()).toBe(200);
   const body: components["schemas"]["LoginResponse"] = await result.json();
-  return body.access_token;
+  return body;
 }
 
 test("a Backoffice account without grants cannot read a protected route or API", async ({
   page,
-  request,
   network,
 }) => {
-  const token = await login(page, `denied-${environment.runId}@example.invalid`);
+  const session = await login(page, `denied-${environment.runId}@example.invalid`);
   await expect(page.getByRole("heading", { name: "Sin acceso autorizado" })).toBeVisible();
   await page.goto("/admin/productos");
   await expect(page.getByRole("heading", { name: "Sin acceso autorizado" })).toBeVisible();
   expect(network.some((entry) => entry.path.startsWith("/v1/admin/"))).toBe(false);
-  const response = await request.get(`${environment.apiUrl}/v1/admin/products`, {
-    headers: { Authorization: `Bearer ${token}` },
+  const response = await page.request.get(`${environment.apiUrl}/v1/admin/products`, {
+    headers: { "X-ZeroMerma-Surface": "BACKOFFICE", Origin: environment.baseUrl, "X-CSRF-Token": session.csrf_token },
   });
   expect(response.status()).toBe(403);
 });
 
 test("read grants expose only their branch and never enable management or export", async ({
   page,
-  request,
 }) => {
-  const token = await login(page, environment.email);
+  const session = await login(page, environment.email);
   await expect(page.getByRole("heading", { name: "Productos", exact: true })).toBeVisible();
   await expect(page.getByRole("button", { name: "Nuevo producto", exact: true })).toHaveCount(0);
-  const headers = { Authorization: `Bearer ${token}` };
-  const current = await request.get(`${environment.apiUrl}/v1/auth/me?surface=BACKOFFICE`, {
+  const headers = { "X-ZeroMerma-Surface": "BACKOFFICE", Origin: environment.baseUrl, "X-CSRF-Token": session.csrf_token };
+  const current = await page.request.get(`${environment.apiUrl}/v1/auth/me`, {
     headers,
   });
   expect(current.status()).toBe(200);
@@ -65,45 +63,42 @@ test("read grants expose only their branch and never enable management or export
   }
   expect(
     (
-      await request.get(`${environment.apiUrl}/v1/admin/branches/${scope.allowed_branch_id}`, {
+      await page.request.get(`${environment.apiUrl}/v1/admin/branches/${scope.allowed_branch_id}`, {
         headers,
       })
     ).status(),
   ).toBe(200);
   expect(
     (
-      await request.get(`${environment.apiUrl}/v1/admin/branches/${scope.other_branch_id}`, {
+      await page.request.get(`${environment.apiUrl}/v1/admin/branches/${scope.other_branch_id}`, {
         headers,
       })
     ).status(),
   ).toBe(404);
-  const branches = await request.get(`${environment.apiUrl}/v1/admin/branches`, { headers });
+  const branches = await page.request.get(`${environment.apiUrl}/v1/admin/branches`, { headers });
   expect(branches.status()).toBe(200);
   const branchList: components["schemas"]["AdminBranchesListResponse"] = await branches.json();
   expect(branchList.items.map((branch) => branch.id)).toEqual([scope.allowed_branch_id]);
   expect(branchList.total).toBe(1);
-  const cashCuts = await request.get(
+  const cashCuts = await page.request.get(
     `${environment.apiUrl}/v1/admin/cash-cuts?branch_id=${scope.other_branch_id}`,
     { headers },
   );
   expect(cashCuts.status()).toBe(403);
   expect(
-    (await request.get(`${environment.apiUrl}/v1/admin/audit/export`, { headers })).status(),
+    (await page.request.get(`${environment.apiUrl}/v1/admin/audit/export`, { headers })).status(),
   ).toBe(403);
   await page.goto("/admin/auditoria");
   await expect(page.getByRole("button", { name: /Exportar/ })).toBeDisabled();
 });
 
-test("revocation refreshes the open session and removes prior data without issuing a new token", async ({
+test("revocation signs out the open session and removes prior data", async ({
   page,
-  request,
 }) => {
-  const token = await login(page, environment.email);
+  const session = await login(page, environment.email);
   await expect(page.getByRole("heading", { name: "Productos", exact: true })).toBeVisible();
-  const headers = { Authorization: `Bearer ${token}` };
-  const before: CurrentUser = await (
-    await request.get(`${environment.apiUrl}/v1/auth/me?surface=BACKOFFICE`, { headers })
-  ).json();
+  const headers = { "X-ZeroMerma-Surface": "BACKOFFICE", Origin: environment.baseUrl, "X-CSRF-Token": session.csrf_token };
+
   execFileSync(
     "uv",
     ["run", "--frozen", "python", "scripts/dev/seed-web-integration.py", "--revoke-reader"],
@@ -117,13 +112,13 @@ test("revocation refreshes the open session and removes prior data without issui
     (response) => new URL(response.url()).pathname === "/v1/auth/me",
   );
   await page.evaluate(() => window.dispatchEvent(new Event("visibilitychange")));
-  const after: CurrentUser = await (await refresh).json();
-  expect(after.authorization_version === before.authorization_version).toBe(false);
-  expect(after.effective_grants).toEqual([]);
-  await expect(page.getByRole("heading", { name: "Sin acceso autorizado" })).toBeVisible();
+  expect((await refresh).status()).toBe(401);
+  await expect(page).toHaveURL(/\/login$/);
   await expect(page.getByRole("heading", { name: "Productos", exact: true })).toHaveCount(0);
   await expect(page.getByRole("table")).toHaveCount(0);
-  expect((await request.get(`${environment.apiUrl}/v1/admin/products`, { headers })).status()).toBe(
+  await login(page, environment.email);
+  await expect(page.getByRole("heading", { name: "Sin acceso autorizado" })).toBeVisible();
+  expect((await page.request.get(`${environment.apiUrl}/v1/admin/products`, { headers })).status()).toBe(
     403,
   );
 });

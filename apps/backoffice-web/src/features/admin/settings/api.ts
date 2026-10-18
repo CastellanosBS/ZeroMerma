@@ -198,31 +198,26 @@ function buildSearchParams(filters: AdminSettingsFilters): URLSearchParams {
 }
 
 export async function fetchAdminSettings(
-  accessToken: string,
   filters: AdminSettingsFilters,
 ): Promise<AdminSettingsListResponse> {
   const params = buildSearchParams(filters);
   const suffix = params.toString();
   const response = await requestJson<ApiListResponse>({
-    accessToken,
     path: `/v1/admin/settings${suffix ? `?${suffix}` : ""}`,
   });
   return mapListResponse(response);
 }
 
 export async function fetchAdminSettingDetail(
-  accessToken: string,
   settingKey: string,
 ): Promise<AdminSettingDetail> {
   const response = await requestJson<ApiDetail>({
-    accessToken,
     path: `/v1/admin/settings/${encodeURIComponent(settingKey)}`,
   });
   return mapDetail(response);
 }
 
 export async function updateAdminSetting(
-  accessToken: string,
   settingKey: string,
   payload: AdminSettingUpdatePayload,
 ): Promise<AdminSettingDetail> {
@@ -232,7 +227,6 @@ export async function updateAdminSetting(
     value: payload.value,
   };
   const response = await requestJson<ApiDetail>({
-    accessToken,
     body,
     method: "PATCH",
     path: `/v1/admin/settings/${encodeURIComponent(settingKey)}`,
@@ -241,12 +235,10 @@ export async function updateAdminSetting(
 }
 
 export async function resetAdminSetting(
-  accessToken: string,
   settingKey: string,
   payload: { changeNote?: string | null; confirmSensitive?: boolean },
 ): Promise<AdminSettingDetail> {
   const response = await requestJson<ApiDetail>({
-    accessToken,
     body: {
       change_note: payload.changeNote ?? null,
       confirm_sensitive: payload.confirmSensitive ?? false,

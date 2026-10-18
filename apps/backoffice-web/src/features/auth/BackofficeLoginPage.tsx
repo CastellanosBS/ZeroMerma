@@ -1,3 +1,4 @@
+import { PasswordResetForm } from "./PasswordResetForm";
 import { useMutation } from "@tanstack/react-query";
 import { Navigate, useNavigate } from "@tanstack/react-router";
 import type { FormEvent } from "react";
@@ -6,16 +7,14 @@ import { useEffect, useRef, useState } from "react";
 import { loginBackofficeUser, toBackofficeErrorMessage } from "../../lib/api";
 import {
   clearDisallowedAccessTokenFromCurrentUrl,
-  isBackofficeUser,
-  redirectToPos,
 } from "./auth-surfaces";
 import { useBackofficeAuthStore } from "./backoffice-auth-store";
 
 export function BackofficeLoginPage() {
   const navigate = useNavigate();
-  const accessToken = useBackofficeAuthStore((state) => state.accessToken);
-  const setAccessToken = useBackofficeAuthStore((state) => state.setAccessToken);
-  const [email, setEmail] = useState("admin@zeromerma.local");
+  const isAuthenticated = useBackofficeAuthStore((state) => state.isAuthenticated);
+  const setSession = useBackofficeAuthStore((state) => state.setSession);
+  const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [formError, setFormError] = useState<string | null>(null);
   const passwordInputRef = useRef<HTMLInputElement>(null);
@@ -23,12 +22,8 @@ export function BackofficeLoginPage() {
   const loginMutation = useMutation({
     mutationFn: loginBackofficeUser,
     onSuccess: async (response) => {
-      if (!isBackofficeUser(response.user)) {
-        redirectToPos();
-        return;
-      }
-
-      setAccessToken(response.access_token);
+      setPassword("");
+      setSession(response);
       await navigate({ to: "/admin" });
     },
   });
@@ -38,12 +33,12 @@ export function BackofficeLoginPage() {
   }, []);
 
   useEffect(() => {
-    if (!accessToken) {
+    if (!isAuthenticated) {
       passwordInputRef.current?.focus();
     }
-  }, [accessToken]);
+  }, [isAuthenticated]);
 
-  if (accessToken) {
+  if (isAuthenticated) {
     return <Navigate to="/admin" />;
   }
 
@@ -60,6 +55,7 @@ export function BackofficeLoginPage() {
 
     try {
       await loginMutation.mutateAsync({
+        audience: "BACKOFFICE",
         email: resolvedEmail,
         password,
       });
@@ -96,7 +92,7 @@ export function BackofficeLoginPage() {
               autoComplete="username"
               className="h-11 rounded-2xl border border-[var(--ui-color-border)] bg-white px-4 text-sm font-medium text-slate-950 outline-none transition focus:border-[var(--ui-color-info)] focus:ring-4 focus:ring-[var(--ui-color-ring)]"
               id="admin-email"
-              placeholder="admin@zeromerma.local"
+              placeholder="Tu correo"
               type="email"
               value={email}
               onChange={(event) => {
@@ -137,10 +133,9 @@ export function BackofficeLoginPage() {
             {loginMutation.isPending ? "Entrando..." : "Entrar al backoffice"}
           </button>
 
-          <p className="text-xs leading-5 text-slate-500">
-            Usuario local: admin@zeromerma.local. La contraseña se define en el seed de desarrollo.
-          </p>
+
         </form>
+        <PasswordResetForm />
       </section>
     </main>
   );

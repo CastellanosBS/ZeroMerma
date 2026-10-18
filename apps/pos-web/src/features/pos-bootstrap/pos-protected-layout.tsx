@@ -2,6 +2,9 @@ import { Navigate, useRouterState } from "@tanstack/react-router";
 import type { PropsWithChildren } from "react";
 import { useEffect } from "react";
 
+import { logoutSession, lockSession } from "../auth/session-api";
+import { useStatusMessageStore } from "../status-messages/store";
+
 import { AppShell } from "../../components/app-shell";
 import { OperationalStatus } from "../../components/operational-status";
 import { Button } from "../../components/ui/button";
@@ -15,7 +18,7 @@ import { usePosBootstrapQuery } from "./queries";
 import { resolvePosEntryRoute } from "./route-state";
 
 export function PosProtectedLayout({ children }: PropsWithChildren) {
-  const accessToken = usePosAuthStore((state) => state.accessToken);
+  const isAuthenticated = usePosAuthStore((state) => state.isAuthenticated);
   const clearSession = usePosAuthStore((state) => state.clearSession);
   const resetPosTerminal = usePosTerminalStore((state) => state.reset);
   const lastOperationalPath = usePosShellStore((state) => state.lastOperationalPath);
@@ -38,7 +41,7 @@ export function PosProtectedLayout({ children }: PropsWithChildren) {
     queryClient.clear();
   }, [clearSession, isUnauthorized, resetPosTerminal]);
 
-  if (!accessToken) {
+  if (!isAuthenticated) {
     return <Navigate to="/login" />;
   }
 
@@ -105,7 +108,7 @@ export function PosProtectedLayout({ children }: PropsWithChildren) {
   if (pathname === "/") {
     const nextRoute = resolvePosEntryRoute({
       hasActiveCashSession,
-      hasAccessToken: true,
+      isAuthenticated: true,
     });
 
     return <Navigate to={nextRoute === "/pos" ? resumePath : nextRoute} />;
@@ -117,11 +120,8 @@ export function PosProtectedLayout({ children }: PropsWithChildren) {
     <AppShell
       bootstrap={bootstrap}
       cashSession={currentCashSessionQuery.data}
-      onSignOut={() => {
-        clearSession();
-        resetPosTerminal();
-        queryClient.clear();
-      }}
+      onSignOut={() => void logoutSession().catch(() => useStatusMessageStore.getState().showError("No se pudo cerrar la sesión. Reintenta."))}
+      onLock={() => void lockSession().catch(() => useStatusMessageStore.getState().showError("No se pudo bloquear la sesión. Reintenta."))}
     >
       {children}
     </AppShell>

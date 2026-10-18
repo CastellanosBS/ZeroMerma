@@ -179,7 +179,7 @@ function AdminReturnsCorrectionsMetricStrip({
 }
 
 export function AdminReturnsCorrectionsPage() {
-  const accessToken = useBackofficeAuthStore((state) => state.accessToken);
+  const isAuthenticated = useBackofficeAuthStore((state) => state.isAuthenticated);
   const [activeTab, setActiveTab] = useState<AdminReturnsCorrectionsTab>("returns");
   const [returnFilters, setReturnFilters] = useState<AdminReturnListFilters>(initialReturnFilters);
   const [correctionFilters, setCorrectionFilters] =
@@ -191,15 +191,15 @@ export function AdminReturnsCorrectionsPage() {
   );
 
   const returnsQuery = useQuery({
-    enabled: Boolean(accessToken),
-    queryFn: () => fetchAdminReturns(accessToken ?? "", returnFilters),
+    enabled: isAuthenticated,
+    queryFn: () => fetchAdminReturns(returnFilters),
     queryKey: ["admin", "returns-corrections", "returns", returnFilters],
     retry: false,
   });
 
   const correctionsQuery = useQuery({
-    enabled: Boolean(accessToken),
-    queryFn: () => fetchAdminCorrections(accessToken ?? "", correctionFilters),
+    enabled: isAuthenticated,
+    queryFn: () => fetchAdminCorrections(correctionFilters),
     queryKey: ["admin", "returns-corrections", "corrections", correctionFilters],
     retry: false,
   });
@@ -220,15 +220,15 @@ export function AdminReturnsCorrectionsPage() {
   );
 
   const returnDetailQuery = useQuery({
-    enabled: Boolean(accessToken && activeTab === "returns" && selectedReturnId),
-    queryFn: () => fetchAdminReturnDetail(accessToken ?? "", selectedReturnId ?? ""),
+    enabled: Boolean(isAuthenticated && activeTab === "returns" && selectedReturnId),
+    queryFn: () => fetchAdminReturnDetail(selectedReturnId ?? ""),
     queryKey: ["admin", "returns-corrections", "returns", "detail", selectedReturnId],
     retry: false,
   });
 
   const correctionDetailQuery = useQuery({
-    enabled: Boolean(accessToken && activeTab === "corrections" && selectedCorrectionId),
-    queryFn: () => fetchAdminCorrectionDetail(accessToken ?? "", selectedCorrectionId ?? ""),
+    enabled: Boolean(isAuthenticated && activeTab === "corrections" && selectedCorrectionId),
+    queryFn: () => fetchAdminCorrectionDetail(selectedCorrectionId ?? ""),
     queryKey: ["admin", "returns-corrections", "corrections", "detail", selectedCorrectionId],
     retry: false,
   });

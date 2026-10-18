@@ -21,12 +21,11 @@ from zeromerma_api.modules.identity.domain.constants import (
 from zeromerma_api.modules.identity.infrastructure.models import User, UserBranchAssignment
 from zeromerma_api.modules.outbox.infrastructure.models import OutboxEvent
 from zeromerma_api.testing.authorization import TEST_OWNER_EMAIL, owner_headers
+from zeromerma_api.testing.sessions import login_headers
 
 
-def _login(client: TestClient, *, email: str, password: str) -> str:
-    response = client.post("/v1/auth/login", json={"email": email, "password": password})
-    assert response.status_code == 200
-    return str(response.json()["access_token"])
+def _login(client: TestClient, *, email: str, password: str) -> dict[str, str]:
+    return login_headers(client, email=email, password=password, audience="POS")
 
 
 def _admin_headers(client: TestClient) -> dict[str, str]:
@@ -35,7 +34,7 @@ def _admin_headers(client: TestClient) -> dict[str, str]:
 
 def _cashier_headers(client: TestClient) -> dict[str, str]:
     token = _login(client, email=SEED_USER_EMAIL, password=SEED_USER_PASSWORD)
-    return {"Authorization": f"Bearer {token}"}
+    return token
 
 
 def _get_branch_id(code: str = SEED_BRANCH_CODE) -> str:
@@ -60,7 +59,7 @@ def test_admin_users_list_returns_seeded_users_metrics_and_contract(client: Test
     assert SEED_USER_EMAIL in emails
     assert payload["is_backend_connected"] is True
     assert payload["backend_contract"]["role_assignment_supported"] is True
-    assert payload["backend_contract"]["password_reset_supported"] is False
+    assert payload["backend_contract"]["password_reset_supported"] is True
     assert payload["metrics"]["total_users"] >= 2
     assert payload["metrics"]["pos_users"] >= 1
     assert payload["metrics"]["backoffice_users"] >= 1
@@ -256,7 +255,12 @@ def test_admin_user_detail_update_status_and_lock_flow(client: TestClient) -> No
     assert (
         client.post(
             "/v1/auth/login",
-            json={"email": "security-flow@zeromerma.local", "password": "TempUser123!"},
+            headers={"Origin": "http://localhost:5174", "X-ZeroMerma-Surface": "BACKOFFICE"},
+            json={
+                "email": "security-flow@zeromerma.local",
+                "password": "TempUser123!",
+                "audience": "BACKOFFICE",
+            },
         ).status_code
         == 401
     )

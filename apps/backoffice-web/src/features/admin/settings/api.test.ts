@@ -115,7 +115,7 @@ describe("admin settings API boundary", () => {
       }),
     );
 
-    const response = await fetchAdminSettings("token-1", {
+    const response = await fetchAdminSettings({
       ...filters,
       category: "tickets",
       status: "ready",
@@ -132,7 +132,7 @@ describe("admin settings API boundary", () => {
   it("fetches setting detail", async () => {
     const fetchSpy = vi.spyOn(globalThis, "fetch").mockImplementation(() => mockJsonResponse(apiDetail));
 
-    const detail = await fetchAdminSettingDetail("token-1", "tickets.receipt_footer_text");
+    const detail = await fetchAdminSettingDetail("tickets.receipt_footer_text");
 
     expect(fetchSpy).toHaveBeenCalledWith(
       expect.stringContaining("/v1/admin/settings/tickets.receipt_footer_text"),
@@ -144,11 +144,11 @@ describe("admin settings API boundary", () => {
   it("updates and resets settings through backend", async () => {
     const fetchSpy = vi.spyOn(globalThis, "fetch").mockImplementation(() => mockJsonResponse(apiDetail));
 
-    await updateAdminSetting("token-1", "tickets.receipt_footer_text", {
+    await updateAdminSetting("tickets.receipt_footer_text", {
       changeNote: "Copy update",
       value: "Vuelve pronto",
     });
-    await resetAdminSetting("token-1", "tickets.receipt_footer_text", {
+    await resetAdminSetting("tickets.receipt_footer_text", {
       changeNote: "Default",
     });
 

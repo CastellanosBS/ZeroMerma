@@ -171,7 +171,7 @@ function hasOpenCashSession(
 }
 
 export function AdminWorkstationsPage() {
-  const accessToken = useBackofficeAuthStore((state) => state.accessToken);
+  const isAuthenticated = useBackofficeAuthStore((state) => state.isAuthenticated);
   const queryClient = useQueryClient();
   const [filters, setFilters] = useState<AdminWorkstationListFilters>(getInitialFilters);
   const [formMode, setFormMode] = useState<
@@ -184,8 +184,8 @@ export function AdminWorkstationsPage() {
   );
 
   const workstationsQuery = useQuery({
-    enabled: Boolean(accessToken),
-    queryFn: () => fetchAdminWorkstations(accessToken ?? "", filters),
+    enabled: isAuthenticated,
+    queryFn: () => fetchAdminWorkstations(filters),
     queryKey: ["admin", "workstations", "list", filters],
     retry: false,
   });
@@ -197,15 +197,15 @@ export function AdminWorkstationsPage() {
   );
 
   const workstationDetailQuery = useQuery({
-    enabled: Boolean(accessToken && selectedWorkstationId),
-    queryFn: () => fetchAdminWorkstationDetail(accessToken ?? "", selectedWorkstationId ?? ""),
+    enabled: Boolean(isAuthenticated && selectedWorkstationId),
+    queryFn: () => fetchAdminWorkstationDetail(selectedWorkstationId ?? ""),
     queryKey: ["admin", "workstations", "detail", selectedWorkstationId],
     retry: false,
   });
 
   const createWorkstationMutation = useMutation({
     mutationFn: (payload: AdminWorkstationCreatePayload) =>
-      createAdminWorkstation(accessToken ?? "", payload),
+      createAdminWorkstation(payload),
     onError: (error) => {
       setFeedback({
         tone: "error",
@@ -228,7 +228,7 @@ export function AdminWorkstationsPage() {
     }: {
       payload: AdminWorkstationUpdatePayload;
       workstationId: string;
-    }) => updateAdminWorkstation(accessToken ?? "", workstationId, payload),
+    }) => updateAdminWorkstation(workstationId, payload),
     onError: (error) => {
       setFeedback({
         tone: "error",
@@ -317,7 +317,7 @@ export function AdminWorkstationsPage() {
   function handleSubmitWorkstation(
     payload: AdminWorkstationCreatePayload | AdminWorkstationUpdatePayload,
   ) {
-    if (!accessToken || isSaving) {
+    if (!isAuthenticated || isSaving) {
       return;
     }
 
@@ -334,7 +334,7 @@ export function AdminWorkstationsPage() {
   }
 
   function handleToggleStatus(workstation: AdminWorkstationDetail | AdminWorkstationListItem) {
-    if (!accessToken || updateWorkstationMutation.isPending) {
+    if (!isAuthenticated || updateWorkstationMutation.isPending) {
       return;
     }
 

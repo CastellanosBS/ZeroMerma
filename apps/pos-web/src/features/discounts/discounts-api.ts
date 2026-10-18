@@ -22,17 +22,14 @@ function buildQueryString(params: Record<string, string | undefined>): string {
 }
 
 export function getDiscountsBootstrap(
-  accessToken: string,
   workstationCode: string,
 ): Promise<DiscountsBootstrapResponse> {
   return requestJson<DiscountsBootstrapResponse>({
-    accessToken,
     path: `/v1/discounts/bootstrap?workstation_code=${encodeURIComponent(workstationCode)}`,
   });
 }
 
 export function listDiscounts({
-  accessToken,
   category,
   createdByUserId,
   paymentMethod,
@@ -40,7 +37,7 @@ export function listDiscounts({
   scope,
   workstationCode,
 }: {
-  accessToken: string;
+
   category?: string;
   createdByUserId?: string;
   paymentMethod?: string;
@@ -49,7 +46,6 @@ export function listDiscounts({
   workstationCode: string;
 }): Promise<DiscountsListResponse> {
   return requestJson<DiscountsListResponse>({
-    accessToken,
     path: `/v1/discounts${buildQueryString({
       workstation_code: workstationCode,
       scope,
@@ -62,31 +58,27 @@ export function listDiscounts({
 }
 
 export function getDiscountDetail({
-  accessToken,
   discountId,
   workstationCode,
 }: {
-  accessToken: string;
+
   discountId: string;
   workstationCode: string;
 }): Promise<OperationalDiscountDetailResponse> {
   return requestJson<OperationalDiscountDetailResponse>({
-    accessToken,
     path: `/v1/discounts/${encodeURIComponent(discountId)}?workstation_code=${encodeURIComponent(workstationCode)}`,
   });
 }
 
 export function createDiscount({
-  accessToken,
   payload,
   requestId,
 }: {
-  accessToken: string;
+
   payload: CreateOperationalDiscountRequest;
   requestId: string;
 }): Promise<OperationalDiscountDetailResponse> {
   return requestJson<OperationalDiscountDetailResponse>({
-    accessToken,
     body: payload,
     method: "POST",
     path: "/v1/discounts",

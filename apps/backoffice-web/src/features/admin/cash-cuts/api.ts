@@ -306,21 +306,17 @@ export function buildAdminCashCutsListPath(filters: AdminCashCutListFilters): st
 }
 
 export function fetchAdminCashCuts(
-  accessToken: string,
   filters: AdminCashCutListFilters,
 ): Promise<AdminCashCutsListResponse> {
   return requestJson<ApiCashCutsListResponse>({
-    accessToken,
     path: buildAdminCashCutsListPath(filters),
   }).then(mapListFromApi);
 }
 
 export function fetchAdminCashCutDetail(
-  accessToken: string,
   cashSessionId: string,
 ): Promise<AdminCashCutDetail> {
   return requestJson<ApiCashCutDetail>({
-    accessToken,
     path: `/v1/admin/cash-cuts/${cashSessionId}`,
   }).then(mapDetailFromApi);
 }

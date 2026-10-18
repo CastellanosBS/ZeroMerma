@@ -25,8 +25,8 @@ class AdminUserBackendContractView(BaseModel):
     branch_assignment_endpoint: str = "POST /v1/admin/users/{id}/branch-assignments"
     role_assignment_supported: bool = True
     invitation_supported: bool = False
-    password_reset_supported: bool = False
-    session_revocation_supported: bool = False
+    password_reset_supported: bool = True
+    session_revocation_supported: bool = True
 
 
 class AdminUserFilterOptionView(BaseModel):
@@ -166,9 +166,10 @@ class AdminUserRoleAssignmentsView(BaseModel):
 
 class AdminUserSecurityActionsView(BaseModel):
     supports_locking: bool = True
-    supports_password_reset: bool = False
+    supports_password_reset: bool = True
     supports_invitation: bool = False
-    supports_session_revocation: bool = False
+    supports_session_revocation: bool = True
+    password_reset_requires_approval: bool = False
     can_lock: bool
     can_unlock: bool
     can_activate: bool
@@ -184,7 +185,7 @@ class AdminUserOperationalContextView(BaseModel):
     recent_backoffice_activity_count: int
     recently_operated_branches: list[str]
     last_workstation_used: str | None = None
-    active_sessions_supported: bool = False
+    active_sessions_supported: bool = True
 
 
 class AdminUserAuditTimelineEventView(BaseModel):

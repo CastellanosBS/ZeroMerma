@@ -284,28 +284,23 @@ export function buildAdminProductionListPath(filters: AdminProductionListFilters
 }
 
 export function fetchAdminProduction(
-  accessToken: string,
   filters: AdminProductionListFilters,
 ): Promise<AdminProductionListResponse> {
   return requestJson<ApiProductionListResponse>({
-    accessToken,
     path: buildAdminProductionListPath(filters),
   }).then(mapProductionListFromApi);
 }
 
-export function fetchAdminProductionDetail(accessToken: string, productionId: string): Promise<AdminProductionDetail> {
+export function fetchAdminProductionDetail(productionId: string): Promise<AdminProductionDetail> {
   return requestJson<ApiProductionDetail>({
-    accessToken,
     path: `/v1/admin/production/${productionId}`,
   }).then(mapAdminProductionDetailFromApi);
 }
 
 export function createAdminProduction(
-  accessToken: string,
   payload: AdminProductionCreatePayload,
 ): Promise<AdminProductionDetail> {
   return requestJson<ApiProductionDetail>({
-    accessToken,
     body: toCreateApiPayload(payload),
     method: "POST",
     path: "/v1/admin/production",
@@ -313,12 +308,10 @@ export function createAdminProduction(
 }
 
 export function updateAdminProduction(
-  accessToken: string,
   productionId: string,
   payload: AdminProductionUpdatePayload,
 ): Promise<AdminProductionDetail> {
   return requestJson<ApiProductionDetail>({
-    accessToken,
     body: toUpdateApiPayload(payload),
     method: "PATCH",
     path: `/v1/admin/production/${productionId}`,
@@ -326,12 +319,10 @@ export function updateAdminProduction(
 }
 
 export function startAdminProduction(
-  accessToken: string,
   productionId: string,
   notes?: string | null,
 ): Promise<AdminProductionDetail> {
   return requestJson<ApiProductionDetail>({
-    accessToken,
     body: { notes: notes ?? null },
     method: "POST",
     path: `/v1/admin/production/${productionId}/start`,
@@ -339,12 +330,10 @@ export function startAdminProduction(
 }
 
 export function completeAdminProduction(
-  accessToken: string,
   productionId: string,
   payload: AdminProductionCompletePayload,
 ): Promise<AdminProductionDetail> {
   return requestJson<ApiProductionDetail>({
-    accessToken,
     body: toCompleteApiPayload(payload),
     method: "POST",
     path: `/v1/admin/production/${productionId}/complete`,
@@ -352,12 +341,10 @@ export function completeAdminProduction(
 }
 
 export function cancelAdminProduction(
-  accessToken: string,
   productionId: string,
   reason?: string | null,
 ): Promise<AdminProductionDetail> {
   return requestJson<ApiProductionDetail>({
-    accessToken,
     body: { reason: reason ?? null },
     method: "POST",
     path: `/v1/admin/production/${productionId}/cancel`,

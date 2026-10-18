@@ -17,19 +17,15 @@ from zeromerma_api.modules.audit.infrastructure.models import AuditLog
 from zeromerma_api.modules.catalog.infrastructure.models import Product, ProductClass
 from zeromerma_api.modules.returns.infrastructure.models import SaleReturn
 from zeromerma_api.modules.sales.infrastructure.models import Sale
+from zeromerma_api.testing.sessions import login_headers
 
 
-def _login(client: TestClient) -> str:
-    response = client.post(
-        "/v1/auth/login",
-        json={"email": SEED_USER_EMAIL, "password": SEED_USER_PASSWORD},
-    )
-    assert response.status_code == 200
-    return str(response.json()["access_token"])
+def _login(client: TestClient) -> dict[str, str]:
+    return login_headers(client, email=SEED_USER_EMAIL, password=SEED_USER_PASSWORD, audience="POS")
 
 
 def _authorization_header(client: TestClient) -> dict[str, str]:
-    return {"Authorization": f"Bearer {_login(client)}"}
+    return _login(client)
 
 
 def _open_cash_session(client: TestClient) -> None:

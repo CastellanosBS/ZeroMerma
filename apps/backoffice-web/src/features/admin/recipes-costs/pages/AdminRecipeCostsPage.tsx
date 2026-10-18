@@ -113,7 +113,7 @@ function AdminRecipeCostMetricStrip({
 }
 
 export function AdminRecipeCostsPage() {
-  const accessToken = useBackofficeAuthStore((state) => state.accessToken);
+  const isAuthenticated = useBackofficeAuthStore((state) => state.isAuthenticated);
   const queryClient = useQueryClient();
   const [filters, setFilters] = useState<AdminRecipeCostListFilters>(initialFilters);
   const [selectedProductId, setSelectedProductId] = useState<string | null>(null);
@@ -123,8 +123,8 @@ export function AdminRecipeCostsPage() {
   );
 
   const listQuery = useQuery({
-    enabled: Boolean(accessToken),
-    queryFn: () => fetchAdminRecipeCosts(accessToken ?? "", filters),
+    enabled: isAuthenticated,
+    queryFn: () => fetchAdminRecipeCosts(filters),
     queryKey: ["admin", "recipes-costs", "list", filters],
     retry: false,
   });
@@ -136,15 +136,15 @@ export function AdminRecipeCostsPage() {
   );
 
   const detailQuery = useQuery({
-    enabled: Boolean(accessToken && selectedProductId),
-    queryFn: () => fetchAdminRecipeCostDetail(accessToken ?? "", selectedProductId ?? ""),
+    enabled: Boolean(isAuthenticated && selectedProductId),
+    queryFn: () => fetchAdminRecipeCostDetail(selectedProductId ?? ""),
     queryKey: ["admin", "recipes-costs", "detail", selectedProductId],
     retry: false,
   });
 
   const createMutation = useMutation({
     mutationFn: (payload: AdminRecipeCreatePayload) =>
-      createAdminRecipe(accessToken ?? "", payload),
+      createAdminRecipe(payload),
     onError: (error) => {
       setFeedback({
         tone: "error",
@@ -162,12 +162,12 @@ export function AdminRecipeCostsPage() {
   const actionMutation = useMutation({
     mutationFn: (action: { type: "activate" | "duplicate" | "apply"; recipe: AdminRecipe }) => {
       if (action.type === "activate") {
-        return activateAdminRecipe(accessToken ?? "", action.recipe.id);
+        return activateAdminRecipe(action.recipe.id);
       }
       if (action.type === "apply") {
-        return applyAdminRecipeStandardCost(accessToken ?? "", action.recipe.id);
+        return applyAdminRecipeStandardCost(action.recipe.id);
       }
-      return duplicateAdminRecipe(accessToken ?? "", action.recipe.id, {
+      return duplicateAdminRecipe(action.recipe.id, {
         activate: false,
         versionName: `Copia de ${action.recipe.versionName ?? "receta"}`,
       });
@@ -209,7 +209,7 @@ export function AdminRecipeCostsPage() {
   }
 
   function handleCreateRecipe(payload: AdminRecipeCreatePayload) {
-    if (!accessToken || createMutation.isPending) {
+    if (!isAuthenticated || createMutation.isPending) {
       return;
     }
 

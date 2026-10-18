@@ -14,12 +14,12 @@ export function cashCloseBootstrapQueryKey(workstationCode: string) {
 }
 
 export function useCashCloseBootstrapQuery() {
-  const accessToken = usePosAuthStore((state) => state.accessToken);
+  const isAuthenticated = usePosAuthStore((state) => state.isAuthenticated);
 
   return useQuery({
     queryKey: cashCloseBootstrapQueryKey(appEnv.VITE_POS_WORKSTATION_CODE),
-    queryFn: () => getCashCloseBootstrap(accessToken!, appEnv.VITE_POS_WORKSTATION_CODE),
-    enabled: accessToken !== null,
+    queryFn: () => getCashCloseBootstrap(appEnv.VITE_POS_WORKSTATION_CODE),
+    enabled: isAuthenticated,
   });
 }
 
@@ -28,12 +28,12 @@ export function cashCloseSummaryQueryKey(workstationCode: string) {
 }
 
 export function useCashCloseSummaryQuery(enabled: boolean) {
-  const accessToken = usePosAuthStore((state) => state.accessToken);
+  const isAuthenticated = usePosAuthStore((state) => state.isAuthenticated);
 
   return useQuery({
     queryKey: cashCloseSummaryQueryKey(appEnv.VITE_POS_WORKSTATION_CODE),
-    queryFn: () => getCashCloseSummary(accessToken!, appEnv.VITE_POS_WORKSTATION_CODE),
-    enabled: accessToken !== null && enabled,
+    queryFn: () => getCashCloseSummary(appEnv.VITE_POS_WORKSTATION_CODE),
+    enabled: isAuthenticated && enabled,
   });
 }
 
@@ -42,13 +42,13 @@ export function cashCloseReconciliationQueryKey(workstationCode: string) {
 }
 
 export function useCashCloseReconciliationQuery(enabled: boolean) {
-  const accessToken = usePosAuthStore((state) => state.accessToken);
+  const isAuthenticated = usePosAuthStore((state) => state.isAuthenticated);
 
   return useQuery({
     queryKey: cashCloseReconciliationQueryKey(appEnv.VITE_POS_WORKSTATION_CODE),
     queryFn: () =>
-      getCashCloseReconciliation(accessToken!, appEnv.VITE_POS_WORKSTATION_CODE),
-    enabled: accessToken !== null && enabled,
+      getCashCloseReconciliation(appEnv.VITE_POS_WORKSTATION_CODE),
+    enabled: isAuthenticated && enabled,
   });
 }
 
@@ -57,15 +57,14 @@ export function cashCloseDetailQueryKey(closeId: string) {
 }
 
 export function useCashCloseDetailQuery(closeId: string | null) {
-  const accessToken = usePosAuthStore((state) => state.accessToken);
+  const isAuthenticated = usePosAuthStore((state) => state.isAuthenticated);
 
   return useQuery({
     queryKey: cashCloseDetailQueryKey(closeId ?? "none"),
     queryFn: () =>
       getCashCloseDetail(
-        accessToken!,
         closeId!,
       ),
-    enabled: accessToken !== null && closeId !== null,
+    enabled: isAuthenticated && closeId !== null,
   });
 }

@@ -27,24 +27,21 @@ function buildQueryString(params: Record<string, string | undefined>): string {
 }
 
 export function getOrdersBootstrap(
-  accessToken: string,
   workstationCode: string,
 ): Promise<OrdersBootstrapResponse> {
   return requestJson<OrdersBootstrapResponse>({
-    accessToken,
     path: `/v1/orders/bootstrap?workstation_code=${encodeURIComponent(workstationCode)}`,
   });
 }
 
 export function listOrders({
-  accessToken,
   dateFrom,
   dateTo,
   query,
   status,
   workstationCode,
 }: {
-  accessToken: string;
+
   dateFrom?: string;
   dateTo?: string;
   query?: string;
@@ -52,7 +49,6 @@ export function listOrders({
   workstationCode: string;
 }): Promise<OrdersListResponse> {
   return requestJson<OrdersListResponse>({
-    accessToken,
     path: `/v1/orders${buildQueryString({
       workstation_code: workstationCode,
       status,
@@ -64,31 +60,27 @@ export function listOrders({
 }
 
 export function getOrderDetail({
-  accessToken,
   orderId,
   workstationCode,
 }: {
-  accessToken: string;
+
   orderId: string;
   workstationCode: string;
 }): Promise<CustomerOrderDetailResponse> {
   return requestJson<CustomerOrderDetailResponse>({
-    accessToken,
     path: `/v1/orders/${encodeURIComponent(orderId)}?workstation_code=${encodeURIComponent(workstationCode)}`,
   });
 }
 
 export function getOrdersCatalog({
-  accessToken,
   query,
   workstationCode,
 }: {
-  accessToken: string;
+
   query?: string;
   workstationCode: string;
 }): Promise<OrdersCatalogResponse> {
   return requestJson<OrdersCatalogResponse>({
-    accessToken,
     path: `/v1/orders/catalog${buildQueryString({
       workstation_code: workstationCode,
       query,
@@ -97,18 +89,16 @@ export function getOrdersCatalog({
 }
 
 export function getOrdersClassProducts({
-  accessToken,
   classId,
   query,
   workstationCode,
 }: {
-  accessToken: string;
+
   classId: string;
   query?: string;
   workstationCode: string;
 }): Promise<OrdersClassProductsResponse> {
   return requestJson<OrdersClassProductsResponse>({
-    accessToken,
     path: `/v1/orders/classes/${encodeURIComponent(classId)}/products${buildQueryString({
       workstation_code: workstationCode,
       query,
@@ -117,16 +107,14 @@ export function getOrdersClassProducts({
 }
 
 export function createOrder({
-  accessToken,
   payload,
   requestId,
 }: {
-  accessToken: string;
+
   payload: CreateCustomerOrderRequest;
   requestId: string;
 }): Promise<CustomerOrderDetailResponse> {
   return requestJson<CustomerOrderDetailResponse>({
-    accessToken,
     body: payload,
     method: "POST",
     path: "/v1/orders",
@@ -137,18 +125,16 @@ export function createOrder({
 }
 
 export function markOrderReady({
-  accessToken,
   orderId,
   payload,
   requestId,
 }: {
-  accessToken: string;
+
   orderId: string;
   payload: OrderActionRequest;
   requestId: string;
 }): Promise<CustomerOrderDetailResponse> {
   return requestJson<CustomerOrderDetailResponse>({
-    accessToken,
     body: payload,
     method: "POST",
     path: `/v1/orders/${encodeURIComponent(orderId)}/mark-ready`,
@@ -159,18 +145,16 @@ export function markOrderReady({
 }
 
 export function deliverOrder({
-  accessToken,
   orderId,
   payload,
   requestId,
 }: {
-  accessToken: string;
+
   orderId: string;
   payload: DeliverCustomerOrderRequest;
   requestId: string;
 }): Promise<CustomerOrderDetailResponse> {
   return requestJson<CustomerOrderDetailResponse>({
-    accessToken,
     body: payload,
     method: "POST",
     path: `/v1/orders/${encodeURIComponent(orderId)}/deliver`,
@@ -181,18 +165,16 @@ export function deliverOrder({
 }
 
 export function cancelOrder({
-  accessToken,
   orderId,
   payload,
   requestId,
 }: {
-  accessToken: string;
+
   orderId: string;
   payload: CancelCustomerOrderRequest;
   requestId: string;
 }): Promise<CustomerOrderDetailResponse> {
   return requestJson<CustomerOrderDetailResponse>({
-    accessToken,
     body: payload,
     method: "POST",
     path: `/v1/orders/${encodeURIComponent(orderId)}/cancel`,

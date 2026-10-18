@@ -18,26 +18,17 @@ from zeromerma_api.db.session import SessionLocal
 from zeromerma_api.modules.audit.infrastructure.models import AuditLog
 from zeromerma_api.modules.branches.infrastructure.models import Branch, Workstation
 from zeromerma_api.modules.outbox.infrastructure.models import OutboxEvent
+from zeromerma_api.testing.sessions import login_headers
 
 ALLOWED_POS_ORIGIN = "http://127.0.0.1:5173"
 
 
-def _login(client: TestClient) -> str:
-    response = client.post(
-        "/v1/auth/login",
-        json={"email": SEED_USER_EMAIL, "password": SEED_USER_PASSWORD},
-    )
-
-    assert response.status_code == 200
-    payload = response.json()
-    assert payload["token_type"] == "bearer"
-    assert payload["user"]["email"] == SEED_USER_EMAIL
-    assert payload["user"]["default_surface"] == "POS"
-    return str(payload["access_token"])
+def _login(client: TestClient) -> dict[str, str]:
+    return login_headers(client, email=SEED_USER_EMAIL, password=SEED_USER_PASSWORD, audience="POS")
 
 
 def _authorization_header(client: TestClient) -> dict[str, str]:
-    return {"Authorization": f"Bearer {_login(client)}"}
+    return _login(client)
 
 
 def test_login_and_auth_me_return_authenticated_user(client: TestClient) -> None:
@@ -45,7 +36,7 @@ def test_login_and_auth_me_return_authenticated_user(client: TestClient) -> None
 
     response = client.get(
         "/v1/auth/me",
-        headers={"Authorization": f"Bearer {token}"},
+        headers=token,
     )
 
     assert response.status_code == 200
@@ -57,16 +48,19 @@ def test_login_and_auth_me_return_authenticated_user(client: TestClient) -> None
 def test_seeded_admin_can_login_for_backoffice(client: TestClient) -> None:
     response = client.post(
         "/v1/auth/login",
-        json={"email": SEED_ADMIN_EMAIL, "password": SEED_ADMIN_PASSWORD},
+        headers={"Origin": "http://localhost:5174", "X-ZeroMerma-Surface": "BACKOFFICE"},
+        json={"email": SEED_ADMIN_EMAIL, "password": SEED_ADMIN_PASSWORD, "audience": "BACKOFFICE"},
     )
 
     assert response.status_code == 200
     payload = response.json()
-    assert payload["token_type"] == "bearer"
+    assert payload["session"]["audience"] == "BACKOFFICE"
+    assert payload["csrf_token"]
     assert payload["user"]["email"] == SEED_ADMIN_EMAIL
     assert payload["user"]["full_name"] == "ZeroMerma Admin"
     assert payload["user"]["default_surface"] == "BACKOFFICE"
-    assert payload["access_token"]
+    assert "access_token" not in payload
+    assert "__Host-zm-backoffice-session" in response.headers["set-cookie"]
 
 
 def test_login_cors_preflight_allows_supported_local_pos_origin(client: TestClient) -> None:
@@ -75,7 +69,7 @@ def test_login_cors_preflight_allows_supported_local_pos_origin(client: TestClie
         headers={
             "Origin": ALLOWED_POS_ORIGIN,
             "Access-Control-Request-Method": "POST",
-            "Access-Control-Request-Headers": "content-type,authorization",
+            "Access-Control-Request-Headers": "content-type,x-csrf-token,x-zeromerma-surface",
         },
     )
 
@@ -83,7 +77,8 @@ def test_login_cors_preflight_allows_supported_local_pos_origin(client: TestClie
     assert response.headers["access-control-allow-origin"] == ALLOWED_POS_ORIGIN
     assert response.headers["access-control-allow-credentials"] == "true"
     assert "content-type" in response.headers["access-control-allow-headers"].lower()
-    assert "authorization" in response.headers["access-control-allow-headers"].lower()
+    assert "x-csrf-token" in response.headers["access-control-allow-headers"].lower()
+    assert "x-zeromerma-surface" in response.headers["access-control-allow-headers"].lower()
 
 
 def test_login_response_includes_cors_headers_for_supported_local_pos_origin(
@@ -91,8 +86,13 @@ def test_login_response_includes_cors_headers_for_supported_local_pos_origin(
 ) -> None:
     response = client.post(
         "/v1/auth/login",
-        headers={"Origin": ALLOWED_POS_ORIGIN},
-        json={"email": SEED_USER_EMAIL, "password": SEED_USER_PASSWORD},
+        headers={"Origin": ALLOWED_POS_ORIGIN, "X-ZeroMerma-Surface": "POS"},
+        json={
+            "email": SEED_USER_EMAIL,
+            "password": SEED_USER_PASSWORD,
+            "audience": "POS",
+            "workstation_code": SEED_WORKSTATION_CODE,
+        },
     )
 
     assert response.status_code == 200
@@ -145,8 +145,12 @@ def test_open_cash_session_writes_audit_and_outbox_and_exposes_current_session(
     assert current_response.json()["id"] == payload["id"]
 
     with SessionLocal() as session:
-        audit_record = session.execute(select(AuditLog)).scalar_one()
-        outbox_event = session.execute(select(OutboxEvent)).scalar_one()
+        audit_record = session.execute(
+            select(AuditLog).where(AuditLog.action == "cash_session.opened")
+        ).scalar_one()
+        outbox_event = session.execute(
+            select(OutboxEvent).where(OutboxEvent.event_name == "cash.session.opened.v1")
+        ).scalar_one()
 
     assert audit_record.action == "cash_session.opened"
     assert audit_record.request_id == "phase-1a-open-session"
@@ -206,9 +210,16 @@ def test_opening_second_session_for_same_user_on_another_workstation_is_rejected
     )
     assert first_response.status_code == 201
 
+    second_station_headers = login_headers(
+        client,
+        email=SEED_USER_EMAIL,
+        password=SEED_USER_PASSWORD,
+        audience="POS",
+        workstation_code="POS-02",
+    )
     second_response = client.post(
         "/v1/cash-sessions/open",
-        headers=headers,
+        headers=second_station_headers,
         json={
             "workstation_code": "POS-02",
             "opening_amount": "90.00",

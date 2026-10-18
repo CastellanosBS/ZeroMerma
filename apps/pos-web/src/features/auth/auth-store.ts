@@ -1,22 +1,65 @@
 import { create } from "zustand";
-import { createJSONStorage, persist } from "zustand/middleware";
+import { removeLegacyAuthStorage, type AuthSessionView, type SessionResponse } from "@zeromerma/api-client";
+import { queryClient } from "../../lib/query-client";
+import { usePosTerminalStore } from "../pos-terminal/store";
 
+type SessionPhase = "restoring" | "ready" | "signedOut" | "locked" | "passwordChange";
 interface PosAuthState {
-  accessToken: string | null;
+  isAuthenticated: boolean;
+  csrfToken: string | null;
+  user: SessionResponse["user"] | null;
+  session: AuthSessionView | null;
+  phase: SessionPhase;
+  generation: number;
+  setSession: (response: SessionResponse) => void;
+  updateSession: (session: AuthSessionView) => void;
+  markLocked: () => void;
+  requirePasswordChange: () => void;
   clearSession: () => void;
-  setAccessToken: (accessToken: string) => void;
 }
-
-export const usePosAuthStore = create<PosAuthState>()(
-  persist(
-    (set) => ({
-      accessToken: null,
-      clearSession: () => set({ accessToken: null }),
-      setAccessToken: (accessToken) => set({ accessToken }),
-    }),
-    {
-      name: "zeromerma-pos-auth",
-      storage: createJSONStorage(() => localStorage),
-    },
-  ),
-);
+removeLegacyAuthStorage();
+export const usePosAuthStore = create<PosAuthState>()((set, get) => ({
+  isAuthenticated: false,
+  csrfToken: null,
+  user: null,
+  session: null,
+  phase: "restoring",
+  generation: 0,
+  setSession: (response) => {
+    const previous = get();
+    if (response.session.audience !== "POS" || (response.session.status !== "ACTIVE" && response.session.status !== "LOCKED")) {
+      get().clearSession(); return;
+    }
+    const phase = response.session.status === "LOCKED" ? "locked" :
+      response.user.password_reset_required ? "passwordChange" : "ready";
+    const identityChanged = previous.session?.id !== response.session.id ||
+      previous.user?.authorization_version !== response.user.authorization_version;
+    if (identityChanged || (phase !== "ready" && previous.phase === "ready")) {
+      void queryClient.cancelQueries();
+      queryClient.clear();
+      if (identityChanged) usePosTerminalStore.getState().reset();
+    }
+    set({ session: response.session, user: response.user, csrfToken: response.csrf_token,
+      phase, isAuthenticated: phase === "ready",
+      generation: previous.generation + (previous.csrfToken !== response.csrf_token || previous.phase !== phase ? 1 : 0) });
+  },
+  updateSession: (session) => set({ session }),
+  markLocked: () => {
+    void queryClient.cancelQueries();
+    queryClient.clear();
+    set({ phase: "locked", isAuthenticated: false, generation: get().generation + 1 });
+  },
+  requirePasswordChange: () => {
+    void queryClient.cancelQueries();
+    queryClient.clear();
+    set({ phase: "passwordChange", isAuthenticated: false, generation: get().generation + 1 });
+  },
+  clearSession: () => {
+    void queryClient.cancelQueries();
+    queryClient.clear();
+    usePosTerminalStore.getState().reset();
+    removeLegacyAuthStorage();
+    set({ isAuthenticated: false, csrfToken: null, user: null, session: null,
+      phase: "signedOut", generation: get().generation + 1 });
+  },
+}));

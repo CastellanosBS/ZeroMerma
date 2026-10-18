@@ -20,12 +20,12 @@ export function operationsBootstrapQueryKey(workstationCode: string) {
 }
 
 export function useOperationsBootstrapQuery() {
-  const accessToken = usePosAuthStore((state) => state.accessToken);
+  const isAuthenticated = usePosAuthStore((state) => state.isAuthenticated);
 
   return useQuery({
     queryKey: operationsBootstrapQueryKey(appEnv.VITE_POS_WORKSTATION_CODE),
-    queryFn: () => getOperationsBootstrap(accessToken!, appEnv.VITE_POS_WORKSTATION_CODE),
-    enabled: accessToken !== null,
+    queryFn: () => getOperationsBootstrap(appEnv.VITE_POS_WORKSTATION_CODE),
+    enabled: isAuthenticated,
   });
 }
 
@@ -38,7 +38,7 @@ export function operationsCatalogQueryKey(
 }
 
 export function useOperationsCatalogQuery(module: string, query: string) {
-  const accessToken = usePosAuthStore((state) => state.accessToken);
+  const isAuthenticated = usePosAuthStore((state) => state.isAuthenticated);
   const normalizedQuery = normalizeQuery(query);
 
   return useQuery({
@@ -49,12 +49,11 @@ export function useOperationsCatalogQuery(module: string, query: string) {
     ),
     queryFn: () =>
       getOperationsCatalog(
-        accessToken!,
         appEnv.VITE_POS_WORKSTATION_CODE,
         module,
         normalizedQuery.length > 0 ? normalizedQuery : undefined,
       ),
-    enabled: accessToken !== null,
+    enabled: isAuthenticated,
   });
 }
 
@@ -78,7 +77,7 @@ export function useOperationsClassProductsQuery(
   classId: string | null,
   query: string,
 ) {
-  const accessToken = usePosAuthStore((state) => state.accessToken);
+  const isAuthenticated = usePosAuthStore((state) => state.isAuthenticated);
   const normalizedQuery = normalizeQuery(query);
 
   return useQuery({
@@ -90,13 +89,12 @@ export function useOperationsClassProductsQuery(
     ),
     queryFn: () =>
       getOperationsClassProducts(
-        accessToken!,
         appEnv.VITE_POS_WORKSTATION_CODE,
         module,
         classId!,
         normalizedQuery.length > 0 ? normalizedQuery : undefined,
       ),
-    enabled: accessToken !== null && classId !== null,
+    enabled: isAuthenticated && classId !== null,
   });
 }
 
@@ -105,7 +103,7 @@ export function operationDocumentQueryKey(workstationCode: string, documentId: s
 }
 
 export function useOperationDocumentQuery(documentId: string | null) {
-  const accessToken = usePosAuthStore((state) => state.accessToken);
+  const isAuthenticated = usePosAuthStore((state) => state.isAuthenticated);
 
   return useQuery({
     queryKey: operationDocumentQueryKey(
@@ -114,11 +112,10 @@ export function useOperationDocumentQuery(documentId: string | null) {
     ),
     queryFn: () =>
       getOperationDocument(
-        accessToken!,
         appEnv.VITE_POS_WORKSTATION_CODE,
         documentId!,
       ),
-    enabled: accessToken !== null && documentId !== null,
+    enabled: isAuthenticated && documentId !== null,
   });
 }
 
@@ -145,7 +142,7 @@ export function useOperationHistoryQuery(
   filters: OperationHistoryFilters,
   enabled = true,
 ) {
-  const accessToken = usePosAuthStore((state) => state.accessToken);
+  const isAuthenticated = usePosAuthStore((state) => state.isAuthenticated);
 
   return useQuery({
     queryKey: operationHistoryQueryKey(
@@ -155,11 +152,10 @@ export function useOperationHistoryQuery(
     ),
     queryFn: () =>
       getOperationHistory(
-        accessToken!,
         appEnv.VITE_POS_WORKSTATION_CODE,
         documentType,
         filters,
       ),
-    enabled: accessToken !== null && enabled,
+    enabled: isAuthenticated && enabled,
   });
 }

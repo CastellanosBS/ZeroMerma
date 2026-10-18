@@ -13,12 +13,12 @@ export function ticketsBootstrapQueryKey(workstationCode: string) {
 }
 
 export function useTicketsBootstrapQuery() {
-  const accessToken = usePosAuthStore((state) => state.accessToken);
+  const isAuthenticated = usePosAuthStore((state) => state.isAuthenticated);
 
   return useQuery({
     queryKey: ticketsBootstrapQueryKey(appEnv.VITE_POS_WORKSTATION_CODE),
-    queryFn: () => getTicketsBootstrap(accessToken!, appEnv.VITE_POS_WORKSTATION_CODE),
-    enabled: accessToken !== null,
+    queryFn: () => getTicketsBootstrap(appEnv.VITE_POS_WORKSTATION_CODE),
+    enabled: isAuthenticated,
   });
 }
 
@@ -27,19 +27,18 @@ export function ticketsListQueryKey(workstationCode: string, scope: string, quer
 }
 
 export function useTicketsListQuery(scope: string, query: string) {
-  const accessToken = usePosAuthStore((state) => state.accessToken);
+  const isAuthenticated = usePosAuthStore((state) => state.isAuthenticated);
   const normalizedQuery = normalizeQuery(query);
 
   return useQuery({
     queryKey: ticketsListQueryKey(appEnv.VITE_POS_WORKSTATION_CODE, scope, normalizedQuery),
     queryFn: () =>
       listTickets({
-        accessToken: accessToken!,
         workstationCode: appEnv.VITE_POS_WORKSTATION_CODE,
         scope,
         query: normalizedQuery.length > 0 ? normalizedQuery : undefined,
       }),
-    enabled: accessToken !== null,
+    enabled: isAuthenticated,
   });
 }
 
@@ -48,16 +47,15 @@ export function ticketDetailQueryKey(workstationCode: string, ticketId: string) 
 }
 
 export function useTicketDetailQuery(ticketId: string | null) {
-  const accessToken = usePosAuthStore((state) => state.accessToken);
+  const isAuthenticated = usePosAuthStore((state) => state.isAuthenticated);
 
   return useQuery({
     queryKey: ticketDetailQueryKey(appEnv.VITE_POS_WORKSTATION_CODE, ticketId ?? "none"),
     queryFn: () =>
       getTicketDetail({
-        accessToken: accessToken!,
         ticketId: ticketId!,
         workstationCode: appEnv.VITE_POS_WORKSTATION_CODE,
       }),
-    enabled: accessToken !== null && ticketId !== null,
+    enabled: isAuthenticated && ticketId !== null,
   });
 }

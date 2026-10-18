@@ -211,7 +211,6 @@ function buildAuditSearchParams(filters: AdminAuditListFilters): URLSearchParams
 }
 
 export async function fetchAdminAuditEvents(
-  accessToken: string,
   filters: AdminAuditListFilters,
 ): Promise<AdminAuditListResponse> {
   const params = buildAuditSearchParams(filters);
@@ -220,31 +219,26 @@ export async function fetchAdminAuditEvents(
 
   const suffix = params.toString();
   const response = await requestJson<ApiListResponse>({
-    accessToken,
     path: `/v1/admin/audit${suffix ? `?${suffix}` : ""}`,
   });
   return mapListFromApi(response);
 }
 
 export async function fetchAdminAuditEventDetail(
-  accessToken: string,
   eventId: string,
 ): Promise<AdminAuditEventDetail> {
   const response = await requestJson<ApiDetail>({
-    accessToken,
     path: `/v1/admin/audit/${eventId}`,
   });
   return mapDetailFromApi(response);
 }
 
 export async function exportAdminAuditEvents(
-  accessToken: string,
   filters: AdminAuditListFilters,
 ): Promise<AdminAuditExportResponse> {
   const params = buildAuditSearchParams(filters);
   const suffix = params.toString();
   const response = await requestJson<ApiExport>({
-    accessToken,
     path: `/v1/admin/audit/export${suffix ? `?${suffix}` : ""}`,
   });
   return {

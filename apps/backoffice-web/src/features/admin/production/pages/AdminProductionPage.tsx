@@ -147,7 +147,7 @@ function AdminProductionMetricStrip({
 }
 
 export function AdminProductionPage() {
-  const accessToken = useBackofficeAuthStore((state) => state.accessToken);
+  const isAuthenticated = useBackofficeAuthStore((state) => state.isAuthenticated);
   const queryClient = useQueryClient();
   const [filters, setFilters] = useState<AdminProductionListFilters>(getInitialFilters);
   const [selectedProductionId, setSelectedProductionId] = useState<string | null>(null);
@@ -158,8 +158,8 @@ export function AdminProductionPage() {
   );
 
   const productionQuery = useQuery({
-    enabled: Boolean(accessToken),
-    queryFn: () => fetchAdminProduction(accessToken ?? "", filters),
+    enabled: isAuthenticated,
+    queryFn: () => fetchAdminProduction(filters),
     queryKey: ["admin", "production", "list", filters],
     retry: false,
   });
@@ -171,15 +171,15 @@ export function AdminProductionPage() {
   );
 
   const productionDetailQuery = useQuery({
-    enabled: Boolean(accessToken && selectedProductionId),
-    queryFn: () => fetchAdminProductionDetail(accessToken ?? "", selectedProductionId ?? ""),
+    enabled: Boolean(isAuthenticated && selectedProductionId),
+    queryFn: () => fetchAdminProductionDetail(selectedProductionId ?? ""),
     queryKey: ["admin", "production", "detail", selectedProductionId],
     retry: false,
   });
 
   const workflowProductionQuery = useQuery({
-    enabled: Boolean(accessToken && workflowProductionId),
-    queryFn: () => fetchAdminProductionDetail(accessToken ?? "", workflowProductionId ?? ""),
+    enabled: Boolean(isAuthenticated && workflowProductionId),
+    queryFn: () => fetchAdminProductionDetail(workflowProductionId ?? ""),
     queryKey: ["admin", "production", "workflow-detail", workflowProductionId],
     retry: false,
   });
@@ -192,11 +192,11 @@ export function AdminProductionPage() {
       payload: AdminProductionCreatePayload;
       startNow: boolean;
     }) => {
-      const created = await createAdminProduction(accessToken ?? "", payload);
+      const created = await createAdminProduction(payload);
       if (!startNow) {
         return created;
       }
-      return startAdminProduction(accessToken ?? "", created.overview.id, payload.notes ?? null);
+      return startAdminProduction(created.overview.id, payload.notes ?? null);
     },
     onError: (error) => {
       setFeedback({
@@ -220,7 +220,7 @@ export function AdminProductionPage() {
     }: {
       payload: AdminProductionUpdatePayload;
       productionId: string;
-    }) => updateAdminProduction(accessToken ?? "", productionId, payload),
+    }) => updateAdminProduction(productionId, payload),
     onError: (error) => {
       setFeedback({
         tone: "error",
@@ -238,7 +238,7 @@ export function AdminProductionPage() {
 
   const startMutation = useMutation({
     mutationFn: ({ notes, productionId }: { notes?: string | null; productionId: string }) =>
-      startAdminProduction(accessToken ?? "", productionId, notes),
+      startAdminProduction(productionId, notes),
     onError: (error) => {
       setFeedback({
         tone: "error",
@@ -261,7 +261,7 @@ export function AdminProductionPage() {
     }: {
       payload: AdminProductionCompletePayload;
       productionId: string;
-    }) => completeAdminProduction(accessToken ?? "", productionId, payload),
+    }) => completeAdminProduction(productionId, payload),
     onError: (error) => {
       setFeedback({
         tone: "error",
@@ -279,7 +279,7 @@ export function AdminProductionPage() {
 
   const cancelMutation = useMutation({
     mutationFn: ({ productionId, reason }: { productionId: string; reason?: string | null }) =>
-      cancelAdminProduction(accessToken ?? "", productionId, reason),
+      cancelAdminProduction(productionId, reason),
     onError: (error) => {
       setFeedback({
         tone: "error",
@@ -374,7 +374,7 @@ export function AdminProductionPage() {
   }
 
   function handleCreate(payload: AdminProductionCreatePayload, startNow: boolean) {
-    if (!accessToken || isSubmitting) {
+    if (!isAuthenticated || isSubmitting) {
       return;
     }
     setFeedback(null);
@@ -382,7 +382,7 @@ export function AdminProductionPage() {
   }
 
   function handleUpdate(payload: AdminProductionUpdatePayload) {
-    if (!accessToken || isSubmitting || !workflowProductionId) {
+    if (!isAuthenticated || isSubmitting || !workflowProductionId) {
       return;
     }
     setFeedback(null);
@@ -390,7 +390,7 @@ export function AdminProductionPage() {
   }
 
   function handleStart(notes?: string | null) {
-    if (!accessToken || isSubmitting || !workflowProductionId) {
+    if (!isAuthenticated || isSubmitting || !workflowProductionId) {
       return;
     }
     setFeedback(null);
@@ -398,7 +398,7 @@ export function AdminProductionPage() {
   }
 
   function handleComplete(payload: AdminProductionCompletePayload) {
-    if (!accessToken || isSubmitting || !workflowProductionId) {
+    if (!isAuthenticated || isSubmitting || !workflowProductionId) {
       return;
     }
     setFeedback(null);
@@ -406,7 +406,7 @@ export function AdminProductionPage() {
   }
 
   function handleCancelProduction(reason?: string | null) {
-    if (!accessToken || isSubmitting || !workflowProductionId) {
+    if (!isAuthenticated || isSubmitting || !workflowProductionId) {
       return;
     }
     setFeedback(null);

@@ -279,32 +279,28 @@ export function buildAdminSuppliersListPath(filters: AdminSupplierListFilters): 
   return `/v1/admin/suppliers?${params.toString()}`;
 }
 
-export function fetchAdminSuppliers(accessToken: string, filters: AdminSupplierListFilters): Promise<AdminSupplierListResponse> {
+export function fetchAdminSuppliers(filters: AdminSupplierListFilters): Promise<AdminSupplierListResponse> {
   return requestJson<ApiSupplierListResponse>({
-    accessToken,
     path: buildAdminSuppliersListPath(filters),
   }).then(mapSupplierListFromApi);
 }
 
-export function fetchAdminSupplierDetail(accessToken: string, supplierId: string): Promise<AdminSupplierDetail> {
+export function fetchAdminSupplierDetail(supplierId: string): Promise<AdminSupplierDetail> {
   return requestJson<ApiSupplierDetail>({
-    accessToken,
     path: `/v1/admin/suppliers/${supplierId}`,
   }).then(mapAdminSupplierDetailFromApi);
 }
 
-export function createAdminSupplier(accessToken: string, payload: AdminSupplierPayload): Promise<AdminSupplierDetail> {
+export function createAdminSupplier(payload: AdminSupplierPayload): Promise<AdminSupplierDetail> {
   return requestJson<ApiSupplierDetail>({
-    accessToken,
     body: toSupplierApiPayload(payload),
     method: "POST",
     path: "/v1/admin/suppliers",
   }).then(mapAdminSupplierDetailFromApi);
 }
 
-export function updateAdminSupplier(accessToken: string, supplierId: string, payload: AdminSupplierPayload): Promise<AdminSupplierDetail> {
+export function updateAdminSupplier(supplierId: string, payload: AdminSupplierPayload): Promise<AdminSupplierDetail> {
   return requestJson<ApiSupplierDetail>({
-    accessToken,
     body: toSupplierApiPayload(payload),
     method: "PATCH",
     path: `/v1/admin/suppliers/${supplierId}`,
@@ -312,7 +308,6 @@ export function updateAdminSupplier(accessToken: string, supplierId: string, pay
 }
 
 export function changeAdminSupplierStatus(
-  accessToken: string,
   supplierId: string,
   payload: AdminSupplierStatusPayload,
 ): Promise<AdminSupplierDetail> {
@@ -321,7 +316,6 @@ export function changeAdminSupplierStatus(
     status: payload.status,
   };
   return requestJson<ApiSupplierDetail>({
-    accessToken,
     body,
     method: "POST",
     path: `/v1/admin/suppliers/${supplierId}/status`,
@@ -329,12 +323,10 @@ export function changeAdminSupplierStatus(
 }
 
 export function addAdminSupplierContact(
-  accessToken: string,
   supplierId: string,
   payload: AdminSupplierContactPayload,
 ): Promise<AdminSupplierDetail> {
   return requestJson<ApiSupplierDetail>({
-    accessToken,
     body: toContactApiPayload(payload),
     method: "POST",
     path: `/v1/admin/suppliers/${supplierId}/contacts`,
@@ -342,12 +334,10 @@ export function addAdminSupplierContact(
 }
 
 export function addAdminSupplierProduct(
-  accessToken: string,
   supplierId: string,
   payload: AdminSupplierProductPayload,
 ): Promise<AdminSupplierDetail> {
   return requestJson<ApiSupplierDetail>({
-    accessToken,
     body: toProductApiPayload(payload),
     method: "POST",
     path: `/v1/admin/suppliers/${supplierId}/products`,

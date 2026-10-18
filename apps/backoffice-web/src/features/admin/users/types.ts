@@ -188,6 +188,7 @@ export interface AdminUserDetail {
     canUnlock: boolean;
     supportsInvitation: boolean;
     supportsLocking: boolean;
+    passwordResetRequiresApproval: boolean;
     supportsPasswordReset: boolean;
     supportsSessionRevocation: boolean;
   };

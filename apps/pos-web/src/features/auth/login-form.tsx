@@ -1,3 +1,5 @@
+import { PasswordResetForm } from "./PasswordResetForm";
+import { buildBackofficeLoginUrl } from "./auth-surfaces";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation } from "@tanstack/react-query";
 import { Navigate, useNavigate } from "@tanstack/react-router";
@@ -15,7 +17,7 @@ import { cn } from "../../lib/utils";
 import { useFocusFlow } from "../pos-shell/keyboard";
 import { posInputClass } from "../pos-theme/theme";
 import { loginOperator } from "./auth-api";
-import { buildBackofficeLoginUrl, shouldRouteToBackoffice } from "./auth-surfaces";
+
 import { usePosAuthStore } from "./auth-store";
 
 const loginSchema = z.object({
@@ -27,8 +29,8 @@ type LoginFormValues = z.infer<typeof loginSchema>;
 
 export function LoginForm() {
   const navigate = useNavigate();
-  const accessToken = usePosAuthStore((state) => state.accessToken);
-  const setAccessToken = usePosAuthStore((state) => state.setAccessToken);
+  const isAuthenticated = usePosAuthStore((state) => state.isAuthenticated);
+  const setSession = usePosAuthStore((state) => state.setSession);
   const [formError, setFormError] = useState<string | null>(null);
   const formRef = useRef<HTMLFormElement>(null);
   const passwordInputRef = useRef<HTMLInputElement | null>(null);
@@ -54,23 +56,18 @@ export function LoginForm() {
   const loginMutation = useMutation({
     mutationFn: (payload: LoginRequest) => loginOperator(payload),
     onSuccess: async (response) => {
-      if (shouldRouteToBackoffice(response.user)) {
-        window.location.assign(buildBackofficeLoginUrl(appEnv.VITE_BACKOFFICE_BASE_URL));
-        return;
-      }
-
-      setAccessToken(response.access_token);
+      setSession(response);
       await navigate({ to: "/" });
     },
   });
 
   useEffect(() => {
-    if (!accessToken) {
+    if (!isAuthenticated) {
       setFocus("email");
     }
-  }, [accessToken, setFocus]);
+  }, [isAuthenticated, setFocus]);
 
-  if (accessToken) {
+  if (isAuthenticated) {
     return <Navigate to="/" />;
   }
 
@@ -80,6 +77,8 @@ export function LoginForm() {
 
     try {
       await loginMutation.mutateAsync({
+        audience: "POS",
+        workstation_code: appEnv.VITE_POS_WORKSTATION_CODE,
         email: values.email.trim(),
         password: values.password,
       });
@@ -214,6 +213,8 @@ export function LoginForm() {
               {loginMutation.isPending ? "Entrando..." : "Entrar"}
             </PosButton>
           </form>
+          <PasswordResetForm />
+          <a className="block p-3 text-center text-sm underline" href={buildBackofficeLoginUrl(appEnv.VITE_BACKOFFICE_BASE_URL)}>Acceso administrativo</a>
         </PosPanel>
       </div>
     </section>

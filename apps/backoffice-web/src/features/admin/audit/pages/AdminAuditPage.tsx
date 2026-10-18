@@ -124,7 +124,7 @@ function downloadJson(filename: string, value: unknown) {
 }
 
 export function AdminAuditPage() {
-  const accessToken = useBackofficeAuthStore((state) => state.accessToken);
+  const isAuthenticated = useBackofficeAuthStore((state) => state.isAuthenticated);
   const [filters, setFilters] = useState<AdminAuditListFilters>(initialFilters);
   const [selectedEventId, setSelectedEventId] = useState<string | null>(null);
   const [feedback, setFeedback] = useState<{ tone: "success" | "error"; message: string } | null>(
@@ -132,8 +132,8 @@ export function AdminAuditPage() {
   );
 
   const auditQuery = useQuery({
-    enabled: Boolean(accessToken),
-    queryFn: () => fetchAdminAuditEvents(accessToken ?? "", filters),
+    enabled: isAuthenticated,
+    queryFn: () => fetchAdminAuditEvents(filters),
     queryKey: ["admin", "audit", "list", filters],
     retry: false,
   });
@@ -145,14 +145,14 @@ export function AdminAuditPage() {
   );
 
   const detailQuery = useQuery({
-    enabled: Boolean(accessToken && selectedEventId),
-    queryFn: () => fetchAdminAuditEventDetail(accessToken ?? "", selectedEventId ?? ""),
+    enabled: Boolean(isAuthenticated && selectedEventId),
+    queryFn: () => fetchAdminAuditEventDetail(selectedEventId ?? ""),
     queryKey: ["admin", "audit", "detail", selectedEventId],
     retry: false,
   });
 
   const exportMutation = useMutation({
-    mutationFn: () => exportAdminAuditEvents(accessToken ?? "", filters),
+    mutationFn: () => exportAdminAuditEvents(filters),
     onError: (error) => {
       setFeedback({
         tone: "error",

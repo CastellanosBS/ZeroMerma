@@ -181,7 +181,7 @@ describe("admin audit API boundary", () => {
       }),
     );
 
-    const response = await fetchAdminAuditEvents("token-1", {
+    const response = await fetchAdminAuditEvents({
       ...filters,
       module: "users",
       sensitive: "yes",
@@ -199,7 +199,7 @@ describe("admin audit API boundary", () => {
   it("loads detail with masked change summary", async () => {
     vi.spyOn(globalThis, "fetch").mockImplementation(() => mockJsonResponse(apiDetail));
 
-    const detail = await fetchAdminAuditEventDetail("token-1", "audit-1");
+    const detail = await fetchAdminAuditEventDetail("audit-1");
 
     expect(detail.overview.requestId).toBe("request-1");
     expect(detail.changeSummary[0]?.newValueMasked).toBe("[masked]");
@@ -233,7 +233,7 @@ describe("admin audit API boundary", () => {
       }),
     );
 
-    const response = await exportAdminAuditEvents("token-1", { ...filters, module: "users" });
+    const response = await exportAdminAuditEvents({ ...filters, module: "users" });
 
     expect(fetchSpy).toHaveBeenCalledWith(
       expect.stringContaining("/v1/admin/audit/export?"),

@@ -19,17 +19,14 @@ export interface OperationHistoryFilters {
 }
 
 export function getOperationsBootstrap(
-  accessToken: string,
   workstationCode: string,
 ): Promise<OperationsBootstrapResponse> {
   return requestJson<OperationsBootstrapResponse>({
-    accessToken,
     path: `/v1/operations/bootstrap?workstation_code=${encodeURIComponent(workstationCode)}`,
   });
 }
 
 export function getOperationsCatalog(
-  accessToken: string,
   workstationCode: string,
   module: string,
   query?: string,
@@ -44,13 +41,11 @@ export function getOperationsCatalog(
   }
 
   return requestJson<OperationsCatalogResponse>({
-    accessToken,
     path: `/v1/operations/catalog?${search.toString()}`,
   });
 }
 
 export function getOperationsClassProducts(
-  accessToken: string,
   workstationCode: string,
   module: string,
   classId: string,
@@ -66,17 +61,14 @@ export function getOperationsClassProducts(
   }
 
   return requestJson<OperationsClassProductsResponse>({
-    accessToken,
     path: `/v1/operations/classes/${encodeURIComponent(classId)}/products?${search.toString()}`,
   });
 }
 
 export function commitCounterTransfer(
-  accessToken: string,
   payload: CounterTransferCommitRequest,
 ): Promise<OperationDocumentView> {
   return requestJson<OperationDocumentView>({
-    accessToken,
     body: payload,
     method: "POST",
     path: "/v1/operations/counter-transfer/commit",
@@ -84,11 +76,9 @@ export function commitCounterTransfer(
 }
 
 export function commitWasteRecord(
-  accessToken: string,
   payload: WasteCommitRequest,
 ): Promise<OperationDocumentView> {
   return requestJson<OperationDocumentView>({
-    accessToken,
     body: payload,
     method: "POST",
     path: "/v1/operations/waste/commit",
@@ -96,18 +86,15 @@ export function commitWasteRecord(
 }
 
 export function getOperationDocument(
-  accessToken: string,
   workstationCode: string,
   documentId: string,
 ): Promise<OperationDocumentView> {
   return requestJson<OperationDocumentView>({
-    accessToken,
     path: `/v1/operations/${encodeURIComponent(documentId)}?workstation_code=${encodeURIComponent(workstationCode)}`,
   });
 }
 
 export function getOperationHistory(
-  accessToken: string,
   workstationCode: string,
   documentType: string,
   filters: OperationHistoryFilters,
@@ -137,7 +124,6 @@ export function getOperationHistory(
   }
 
   return requestJson<OperationHistoryResponse>({
-    accessToken,
     path: `/v1/operations/history?${search.toString()}`,
   });
 }

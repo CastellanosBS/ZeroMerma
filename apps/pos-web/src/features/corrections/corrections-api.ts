@@ -25,28 +25,24 @@ function buildQueryString(params: Record<string, string | undefined>): string {
 }
 
 export function getCorrectionsBootstrap(
-  accessToken: string,
   workstationCode: string,
 ): Promise<CorrectionBootstrapResponse> {
   return requestJson<CorrectionBootstrapResponse>({
-    accessToken,
     path: `/v1/corrections/bootstrap?workstation_code=${encodeURIComponent(workstationCode)}`,
   });
 }
 
 export function searchCorrectionTargets({
-  accessToken,
   documentType,
   query,
   workstationCode,
 }: {
-  accessToken: string;
+
   documentType?: string;
   query?: string;
   workstationCode: string;
 }): Promise<CorrectionSearchResponse> {
   return requestJson<CorrectionSearchResponse>({
-    accessToken,
     path: `/v1/corrections/search${buildQueryString({
       workstation_code: workstationCode,
       document_type: documentType,
@@ -56,22 +52,19 @@ export function searchCorrectionTargets({
 }
 
 export function getCorrectionTargetDetail({
-  accessToken,
   targetDocumentId,
   workstationCode,
 }: {
-  accessToken: string;
+
   targetDocumentId: string;
   workstationCode: string;
 }): Promise<CorrectionTargetDetailResponse> {
   return requestJson<CorrectionTargetDetailResponse>({
-    accessToken,
     path: `/v1/corrections/${encodeURIComponent(targetDocumentId)}?workstation_code=${encodeURIComponent(workstationCode)}`,
   });
 }
 
 export function getCorrectionsHistory({
-  accessToken,
   createdByUserId,
   query,
   reasonCode,
@@ -79,7 +72,7 @@ export function getCorrectionsHistory({
   targetDocumentType,
   workstationCode,
 }: {
-  accessToken: string;
+
   createdByUserId?: string;
   query?: string;
   reasonCode?: string;
@@ -88,7 +81,6 @@ export function getCorrectionsHistory({
   workstationCode: string;
 }): Promise<CorrectionsHistoryResponse> {
   return requestJson<CorrectionsHistoryResponse>({
-    accessToken,
     path: `/v1/corrections/history${buildQueryString({
       workstation_code: workstationCode,
       scope,
@@ -101,31 +93,27 @@ export function getCorrectionsHistory({
 }
 
 export function getCorrectionDocumentDetail({
-  accessToken,
   correctionId,
   workstationCode,
 }: {
-  accessToken: string;
+
   correctionId: string;
   workstationCode: string;
 }): Promise<CorrectionDocumentView> {
   return requestJson<CorrectionDocumentView>({
-    accessToken,
     path: `/v1/corrections/history/${encodeURIComponent(correctionId)}?workstation_code=${encodeURIComponent(workstationCode)}`,
   });
 }
 
 export function searchCorrectionProducts({
-  accessToken,
   query,
   workstationCode,
 }: {
-  accessToken: string;
+
   query?: string;
   workstationCode: string;
 }): Promise<CorrectionsProductsResponse> {
   return requestJson<CorrectionsProductsResponse>({
-    accessToken,
     path: `/v1/corrections/products${buildQueryString({
       workstation_code: workstationCode,
       query,
@@ -134,16 +122,14 @@ export function searchCorrectionProducts({
 }
 
 export function commitCorrection({
-  accessToken,
   payload,
   requestId,
 }: {
-  accessToken: string;
+
   payload: CorrectionCommitRequest;
   requestId: string;
 }): Promise<CorrectionDocumentView> {
   return requestJson<CorrectionDocumentView>({
-    accessToken,
     body: payload,
     method: "POST",
     path: "/v1/corrections/commit",

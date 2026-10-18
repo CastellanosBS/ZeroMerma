@@ -62,7 +62,36 @@ para revisarlas permanece dentro de la finalización posterior del módulo de us
 y roles. El worker actual conserva el contexto de outbox y sólo observa eventos; sus
 handlers ejecutores pertenecen a su fase posterior. Este registro no declara Security
 Ready, Feature Complete ni Production Ready. La siguiente tarea por dependencia es
-**ZM-FIN-023**, traspaso seguro de sesión POS–Backoffice.
+**ZM-FIN-023**, separación segura de sesión POS–Backoffice según DEC-05.
+
+### 0.3 Registro de ejecución — bloque ZM-FIN-023–027
+
+El bloque del 2026-10-18 implementa DEC-05 en
+`codex/zm-fin-023-027-session-security`. La decisión aprobada exige sesiones
+independientes y login Backoffice propio; sustituye la alternativa histórica de
+canjear una credencial entre superficies. El usuario confirmó que los datos
+actuales son exclusivamente de desarrollo y pruebas.
+
+| Tarea | Implementación y evidencia ejecutable |
+|---|---|
+| ZM-FIN-023 | Cookies opacas HttpOnly/Secure independientes, audiencias y orígenes separados, CSRF en memoria; retirada de bearer, URL y almacenamiento persistente de autenticación. |
+| ZM-FIN-024 | Persistencia de sesiones, bloqueo POS por inactividad, expiración absoluta, reautenticación con rotación, logout durable, listado/revocación y revocación transaccional ante cambios de autoridad y cierre de caja. |
+| ZM-FIN-025 | Contraseña inicial restringida, cambio propio, reset administrativo acotado por scope y doble aprobación privilegiada, credencial de un uso, límites persistentes de login y auditoría sin secretos. |
+| ZM-FIN-026 | Configuración productiva que rechaza valores inseguros, CORS por audiencia, hosts y proxies explícitos, headers de seguridad, endpoints de desarrollo deshabilitados y validación real de navegador con HTTPS. |
+| ZM-FIN-027 | Fuentes privadas de credenciales por entorno, generación/rotación, protección de archivos, redacción y pruebas de rotación PostgreSQL sin pérdida de datos. |
+
+La [arquitectura de sesiones](architecture/sessions.md) describe el comportamiento;
+el [registro de validación](implementation/session-security-validation.md) y el
+[procedimiento de secretos](operations/runtime-secrets.md) contienen pruebas y
+límites. La migración es `20261018_0041_auth_sessions`; requiere desplegar API y
+ambas aplicaciones coordinadamente y volver a iniciar sesión. Las validaciones
+de este bloque no alteran la base local normal.
+
+La aceptación exige las ocho etapas Foundation verdes para el commit entregado.
+La instalación real aún necesita hostnames LAN, certificados confiables,
+aprovisionamiento, respaldos y ensayos operativos de sus fases posteriores. Este
+registro no declara Security Ready ni Production Ready. La siguiente dependencia
+funcional es **ZM-FIN-028**, idempotencia de comandos.
 
 ## 1. Resumen ejecutivo
 
@@ -2445,14 +2474,14 @@ Actualizar ADR de aislamiento y matriz de relaciones por dominio.
 Al terminar, reporta: resumen técnico; archivos modificados; migraciones; cambios OpenAPI/cliente; pruebas y comandos con resultado exacto; evidencia por criterio de aceptación; riesgos pendientes; hallazgos fuera de alcance; y estado Git final.
 ```
 
-### ZM-FIN-023 — Implementar un traspaso seguro de sesión POS–Backoffice
+### ZM-FIN-023 — Implementar sesiones independientes POS–Backoffice según DEC-05
 
 **Épica:** Sesiones
 
 | Campo | Especificación |
 |---|---|
 | **1. ID único** | ZM-FIN-023 |
-| **2. Nombre de la tarea** | Implementar un traspaso seguro de sesión POS–Backoffice |
+| **2. Nombre de la tarea** | Implementar sesiones independientes POS–Backoffice según DEC-05 |
 | **3. Objetivo** | Eliminar el bearer persistente en URL y sustituirlo por un mecanismo efímero y de un solo uso o por la arquitectura de sesión aprobada. |
 | **4. Problema que resuelve** | POS envía token en fragmento; Backoffice acepta además query string; el bearer queda accesible a JavaScript. |
 | **5. Hallazgo relacionado** | ZM-SEC-008; ZMA-SEC-003. |
@@ -2464,10 +2493,10 @@ Al terminar, reporta: resumen técnico; archivos modificados; migraciones; cambi
 | **11. Decisiones a conservar** | Compatibilidad con la arquitectura vigente, la experiencia táctil del POS, el cliente generado y la trazabilidad por usuario, sucursal, caja, estación y turno. |
 | **12. Riesgos** | Romper navegación entre superficies o introducir CSRF/session fixation. |
 | **13. Posibles regresiones** | Usuarios quedan en bucle de login o sesiones válidas se pierden al recargar. |
-| **14. Pruebas requeridas** | Query rechazado; código de un solo uso replay; URL/history/referer limpios; navegación exitosa; sesión inválida/expirada. |
-| **15. Criterios de aceptación** | Ningún bearer aparece en query, fragmento persistente, logs o history; el traspaso sólo puede consumirse una vez y por el cliente esperado. |
-| **16. Definition of Done específica** | Ningún bearer aparece en query, fragmento persistente, logs o history; el traspaso sólo puede consumirse una vez y por el cliente esperado. Los cambios aplicables, pruebas y documentación quedan integrados; no existen cambios accidentales y la evidencia solicitada está adjunta. |
-| **17. Evidencia de terminación** | Trazas de navegación sin secretos, pruebas de replay y contrato generado. |
+| **14. Pruebas requeridas** | Bearer y query rechazados; cookies por audiencia, Origin y CSRF; URL/history/referer limpios; login Backoffice independiente; sesión inválida/expirada. |
+| **15. Criterios de aceptación** | Ningún bearer aparece en query, fragmento persistente, logs o history; las sesiones y sus credenciales no se comparten entre POS y Backoffice, conforme a DEC-05. |
+| **16. Definition of Done específica** | Ningún bearer aparece en query, fragmento persistente, logs o history; las sesiones y sus credenciales no se comparten entre POS y Backoffice, conforme a DEC-05. Los cambios aplicables, pruebas y documentación quedan integrados; no existen cambios accidentales y la evidencia solicitada está adjunta. |
+| **17. Evidencia de terminación** | Trazas de navegación sin secretos, pruebas de aislamiento de audiencias y contrato generado. |
 | **18. Requiere migración DB** | Posible |
 | **19. Requiere OpenAPI/cliente TS** | Sí |
 | **20. Requiere cambios POS** | Sí |
@@ -2478,7 +2507,7 @@ Al terminar, reporta: resumen técnico; archivos modificados; migraciones; cambi
 #### Prompt de Codex
 
 ```text
-Trabaja exclusivamente en la tarea **ZM-FIN-023 — Implementar un traspaso seguro de sesión POS–Backoffice**.
+Trabaja exclusivamente en la tarea **ZM-FIN-023 — Implementar sesiones independientes POS–Backoffice según DEC-05**.
 
 **Objetivo**
 Eliminar el bearer persistente en URL y sustituirlo por un mecanismo efímero y de un solo uso o por la arquitectura de sesión aprobada.
@@ -2518,14 +2547,14 @@ Probar dos intentos concurrentes de canjear el mismo código; sólo uno debe pro
 Migración de base de datos: Posible. Regenerar OpenAPI/cliente TypeScript: Sí. Cambios POS: Sí. Cambios Backoffice: Sí. Cambios de infraestructura: Sí. Si una migración es necesaria, debe ser compatible con la cadena vigente, probarse desde base vacía y desde las versiones soportadas, y contar con estrategia de roll-forward/restore.
 
 **Pruebas obligatorias**
-Query rechazado; código de un solo uso replay; URL/history/referer limpios; navegación exitosa; sesión inválida/expirada.
+Bearer y query rechazados; cookies por audiencia, Origin y CSRF; URL/history/referer limpios; login Backoffice independiente; sesión inválida/expirada.
 
 **Validación y comandos**
 Ejecuta pruebas API, frontend unitarias/E2E, escaneo de URL/logs y generación contractual. Ejecuta sólo contra entornos seguros y aislados. Incluye lint, typecheck, unitarias, integración, contract/E2E y build únicamente cuando correspondan al alcance. Registra el comando exacto y su resultado; no digas “pasa” sin salida verificable.
 
 **Criterios para considerar terminada la tarea**
-Ningún bearer aparece en query, fragmento persistente, logs o history; el traspaso sólo puede consumirse una vez y por el cliente esperado.
-Definition of Done específica: Ningún bearer aparece en query, fragmento persistente, logs o history; el traspaso sólo puede consumirse una vez y por el cliente esperado. Los cambios aplicables, pruebas y documentación quedan integrados; no existen cambios accidentales y la evidencia solicitada está adjunta.
+Ningún bearer aparece en query, fragmento persistente, logs o history; las sesiones y sus credenciales no se comparten entre POS y Backoffice, conforme a DEC-05.
+Definition of Done específica: Ningún bearer aparece en query, fragmento persistente, logs o history; las sesiones y sus credenciales no se comparten entre POS y Backoffice, conforme a DEC-05. Los cambios aplicables, pruebas y documentación quedan integrados; no existen cambios accidentales y la evidencia solicitada está adjunta.
 
 **Documentación**
 ADR de sesión y actualización de manuales de despliegue.

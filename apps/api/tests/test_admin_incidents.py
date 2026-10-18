@@ -7,7 +7,6 @@ from sqlalchemy import select
 
 from zeromerma_api.bootstrap.seed_local import (
     SEED_ADMIN_EMAIL,
-    SEED_ADMIN_PASSWORD,
     SEED_BRANCH_CODE,
     SEED_USER_EMAIL,
     SEED_USER_PASSWORD,
@@ -22,24 +21,11 @@ from zeromerma_api.modules.quality.infrastructure.models import (
     SanitaryVerification,
 )
 from zeromerma_api.testing.authorization import owner_headers
+from zeromerma_api.testing.sessions import login_headers
 
 
-def _login_admin(client: TestClient) -> str:
-    response = client.post(
-        "/v1/auth/login",
-        json={"email": SEED_ADMIN_EMAIL, "password": SEED_ADMIN_PASSWORD},
-    )
-    assert response.status_code == 200
-    return str(response.json()["access_token"])
-
-
-def _login_cashier(client: TestClient) -> str:
-    response = client.post(
-        "/v1/auth/login",
-        json={"email": SEED_USER_EMAIL, "password": SEED_USER_PASSWORD},
-    )
-    assert response.status_code == 200
-    return str(response.json()["access_token"])
+def _login_cashier(client: TestClient) -> dict[str, str]:
+    return login_headers(client, email=SEED_USER_EMAIL, password=SEED_USER_PASSWORD, audience="POS")
 
 
 def _admin_headers(client: TestClient) -> dict[str, str]:
@@ -128,7 +114,7 @@ def test_admin_incidents_list_empty_and_reject_pos_user(client: TestClient) -> N
     pos_token = _login_cashier(client)
     pos_response = client.get(
         "/v1/admin/incidents",
-        headers={"Authorization": f"Bearer {pos_token}"},
+        headers=pos_token,
     )
     assert pos_response.status_code == 403
 

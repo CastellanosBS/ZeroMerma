@@ -77,9 +77,19 @@ test("real administrative login and read-only route in every released family", a
   await page.reload();
   expect((await refresh).status()).toBe(200);
   await expect(page.getByRole("heading", { name: "Auditoria", exact: true })).toBeVisible();
-  expect(network.filter((entry) => entry.method !== "GET").map((entry) => entry.path)).toEqual([
+  expect(network.filter((entry) => entry.method !== "GET" && entry.path !== "/v1/auth/activity").map((entry) => entry.path)).toEqual([
     "/v1/auth/login",
   ]);
+  await page.getByRole("button", { name: "Mis sesiones", exact: true }).click();
+  await expect(page.getByRole("dialog", { name: "Mis sesiones" })).toBeVisible();
+  await expect(page.getByText("Administración · Esta sesión", { exact: true })).toBeVisible();
+  await page.getByRole("button", { name: "Cerrar", exact: true }).click();
+  expect(await page.evaluate(() => localStorage.getItem("zeromerma-backoffice-auth"))).toBeNull();
+  const posAttempt = await page.request.get(
+    environment.apiUrl + "/v1/pos/bootstrap?workstation_code=" + (process.env.ZM_E2E_WORKSTATION_CODE ?? "POS-01"),
+    { headers: { "X-ZeroMerma-Surface": "POS", Origin: new URL(process.env.ZM_E2E_POS_URL ?? "").origin } },
+  );
+  expect(posAttempt.status()).toBe(401);
   await testInfo.attach("route-coverage", {
     body: JSON.stringify(routes, null, 2),
     contentType: "application/json",
@@ -105,11 +115,11 @@ test("hidden placeholders redirect and never count as real family coverage", asy
   );
 });
 
-test("unauthenticated administrative reads are rejected and invalid session is cleared", async ({
+test("unauthenticated administrative reads are rejected and obsolete stored credential is cleared", async ({
   page,
   request,
 }) => {
-  expect((await request.get(`${environment.apiUrl}/v1/admin/products`)).status()).toBe(401);
+  expect((await request.get(`${environment.apiUrl}/v1/admin/products`, { headers: { "X-ZeroMerma-Surface": "BACKOFFICE", Origin: environment.baseUrl } })).status()).toBe(401);
   await page.goto("/login");
   await page.evaluate(() =>
     localStorage.setItem(
@@ -122,4 +132,5 @@ test("unauthenticated administrative reads are rejected and invalid session is c
   );
   await page.goto("/admin/productos");
   await expect(page).toHaveURL(/\/login$/);
+  expect(await page.evaluate(() => localStorage.getItem("zeromerma-backoffice-auth"))).toBeNull();
 });

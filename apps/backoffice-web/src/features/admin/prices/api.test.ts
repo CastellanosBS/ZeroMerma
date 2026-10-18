@@ -77,7 +77,7 @@ describe("admin prices api", () => {
       ),
     );
 
-    const response = await fetchAdminPrices("token", {
+    const response = await fetchAdminPrices({
       page: 1,
       pageSize: 25,
     });
@@ -134,7 +134,7 @@ describe("admin prices api", () => {
       warnings: { codes: [], messages: [] },
     };
 
-    await updateAdminPrice("token", row, { price: "19.50" });
+    await updateAdminPrice(row, { price: "19.50" });
 
     expect(fetchMock).toHaveBeenCalledWith(
       "http://localhost:8000/v1/admin/prices/product/product-1",

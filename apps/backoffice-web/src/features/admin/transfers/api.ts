@@ -280,28 +280,23 @@ export function buildAdminTransferListPath(filters: AdminTransferListFilters): s
 }
 
 export function fetchAdminTransfers(
-  accessToken: string,
   filters: AdminTransferListFilters,
 ): Promise<AdminTransferListResponse> {
   return requestJson<ApiTransferListResponse>({
-    accessToken,
     path: buildAdminTransferListPath(filters),
   }).then(mapTransferListFromApi);
 }
 
-export function fetchAdminTransferDetail(accessToken: string, transferId: string): Promise<AdminTransferDetail> {
+export function fetchAdminTransferDetail(transferId: string): Promise<AdminTransferDetail> {
   return requestJson<ApiTransferDetail>({
-    accessToken,
     path: `/v1/admin/transfers/${transferId}`,
   }).then(mapAdminTransferDetailFromApi);
 }
 
 export function createAdminTransfer(
-  accessToken: string,
   payload: AdminTransferCreatePayload,
 ): Promise<AdminTransferDetail> {
   return requestJson<ApiTransferDetail>({
-    accessToken,
     body: toCreateApiPayload(payload),
     method: "POST",
     path: "/v1/admin/transfers",
@@ -309,12 +304,10 @@ export function createAdminTransfer(
 }
 
 export function updateAdminTransfer(
-  accessToken: string,
   transferId: string,
   payload: AdminTransferUpdatePayload,
 ): Promise<AdminTransferDetail> {
   return requestJson<ApiTransferDetail>({
-    accessToken,
     body: toUpdateApiPayload(payload),
     method: "PATCH",
     path: `/v1/admin/transfers/${transferId}`,
@@ -322,12 +315,10 @@ export function updateAdminTransfer(
 }
 
 export function dispatchAdminTransfer(
-  accessToken: string,
   transferId: string,
   notes?: string | null,
 ): Promise<AdminTransferDetail> {
   return requestJson<ApiTransferDetail>({
-    accessToken,
     body: { notes: notes ?? null },
     method: "POST",
     path: `/v1/admin/transfers/${transferId}/dispatch`,
@@ -335,12 +326,10 @@ export function dispatchAdminTransfer(
 }
 
 export function receiveAdminTransfer(
-  accessToken: string,
   transferId: string,
   payload: AdminTransferReceivePayload,
 ): Promise<AdminTransferDetail> {
   return requestJson<ApiTransferDetail>({
-    accessToken,
     body: toReceiveApiPayload(payload),
     method: "POST",
     path: `/v1/admin/transfers/${transferId}/receive`,
@@ -348,12 +337,10 @@ export function receiveAdminTransfer(
 }
 
 export function cancelAdminTransfer(
-  accessToken: string,
   transferId: string,
   reason?: string | null,
 ): Promise<AdminTransferDetail> {
   return requestJson<ApiTransferDetail>({
-    accessToken,
     body: { reason: reason ?? null },
     method: "POST",
     path: `/v1/admin/transfers/${transferId}/cancel`,

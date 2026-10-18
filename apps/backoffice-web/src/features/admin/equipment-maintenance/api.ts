@@ -313,21 +313,17 @@ export function buildAdminEquipmentListPath(filters: AdminEquipmentListFilters):
 }
 
 export function fetchAdminEquipment(
-  accessToken: string,
   filters: AdminEquipmentListFilters,
 ): Promise<AdminEquipmentListResponse> {
   return requestJson<ApiListResponse>({
-    accessToken,
     path: buildAdminEquipmentListPath(filters),
   }).then(mapListFromApi);
 }
 
 export function fetchAdminEquipmentDetail(
-  accessToken: string,
   equipmentId: string,
 ): Promise<AdminEquipmentDetail> {
   return requestJson<ApiDetail>({
-    accessToken,
     path: `/v1/admin/equipment-maintenance/equipment/${equipmentId}`,
   }).then(mapDetailFromApi);
 }
@@ -356,11 +352,9 @@ function mapEquipmentPayload(payload: AdminEquipmentCreatePayload): ApiCreateEqu
 }
 
 export function createAdminEquipment(
-  accessToken: string,
   payload: AdminEquipmentCreatePayload,
 ): Promise<AdminEquipmentDetail> {
   return requestJson<ApiDetail>({
-    accessToken,
     body: mapEquipmentPayload(payload),
     method: "POST",
     path: "/v1/admin/equipment-maintenance/equipment",
@@ -368,12 +362,10 @@ export function createAdminEquipment(
 }
 
 export function updateAdminEquipmentStatus(
-  accessToken: string,
   equipmentId: string,
   payload: AdminEquipmentStatusPayload,
 ): Promise<AdminEquipmentDetail> {
   return requestJson<ApiDetail>({
-    accessToken,
     body: {
       operational_status: payload.operationalStatus,
       reason: payload.reason,
@@ -384,7 +376,6 @@ export function updateAdminEquipmentStatus(
 }
 
 export function createAdminMaintenance(
-  accessToken: string,
   payload: AdminMaintenanceCreatePayload,
 ): Promise<AdminEquipmentDetail> {
   const body: ApiMaintenanceCreate = {
@@ -402,7 +393,6 @@ export function createAdminMaintenance(
     technician_name: payload.technicianName,
   };
   return requestJson<ApiDetail>({
-    accessToken,
     body,
     method: "POST",
     path: "/v1/admin/equipment-maintenance/maintenance",
@@ -410,18 +400,15 @@ export function createAdminMaintenance(
 }
 
 export function startAdminMaintenance(
-  accessToken: string,
   maintenanceId: string,
 ): Promise<AdminEquipmentDetail> {
   return requestJson<ApiDetail>({
-    accessToken,
     method: "POST",
     path: `/v1/admin/equipment-maintenance/maintenance/${maintenanceId}/start`,
   }).then(mapDetailFromApi);
 }
 
 export function completeAdminMaintenance(
-  accessToken: string,
   maintenanceId: string,
   payload: AdminMaintenanceCompletePayload,
 ): Promise<AdminEquipmentDetail> {
@@ -435,7 +422,6 @@ export function completeAdminMaintenance(
     technician_name: payload.technicianName,
   };
   return requestJson<ApiDetail>({
-    accessToken,
     body,
     method: "POST",
     path: `/v1/admin/equipment-maintenance/maintenance/${maintenanceId}/complete`,

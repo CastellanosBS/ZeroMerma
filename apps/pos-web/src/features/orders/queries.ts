@@ -19,12 +19,12 @@ export function ordersBootstrapQueryKey(workstationCode: string) {
 }
 
 export function useOrdersBootstrapQuery() {
-  const accessToken = usePosAuthStore((state) => state.accessToken);
+  const isAuthenticated = usePosAuthStore((state) => state.isAuthenticated);
 
   return useQuery({
     queryKey: ordersBootstrapQueryKey(appEnv.VITE_POS_WORKSTATION_CODE),
-    queryFn: () => getOrdersBootstrap(accessToken!, appEnv.VITE_POS_WORKSTATION_CODE),
-    enabled: accessToken !== null,
+    queryFn: () => getOrdersBootstrap(appEnv.VITE_POS_WORKSTATION_CODE),
+    enabled: isAuthenticated,
   });
 }
 
@@ -52,7 +52,7 @@ export function useOrdersListQuery(
   dateTo: string,
   enabled = true,
 ) {
-  const accessToken = usePosAuthStore((state) => state.accessToken);
+  const isAuthenticated = usePosAuthStore((state) => state.isAuthenticated);
   const normalizedQuery = normalizeQuery(query);
   const normalizedDateFrom = normalizeQuery(dateFrom);
   const normalizedDateTo = normalizeQuery(dateTo);
@@ -67,14 +67,13 @@ export function useOrdersListQuery(
     ),
     queryFn: () =>
       listOrders({
-        accessToken: accessToken!,
         workstationCode: appEnv.VITE_POS_WORKSTATION_CODE,
         status,
         query: normalizedQuery.length > 0 ? normalizedQuery : undefined,
         dateFrom: normalizedDateFrom.length > 0 ? normalizedDateFrom : undefined,
         dateTo: normalizedDateTo.length > 0 ? normalizedDateTo : undefined,
       }),
-    enabled: accessToken !== null && enabled,
+    enabled: isAuthenticated && enabled,
   });
 }
 
@@ -83,17 +82,16 @@ export function orderDetailQueryKey(workstationCode: string, orderId: string) {
 }
 
 export function useOrderDetailQuery(orderId: string | null) {
-  const accessToken = usePosAuthStore((state) => state.accessToken);
+  const isAuthenticated = usePosAuthStore((state) => state.isAuthenticated);
 
   return useQuery({
     queryKey: orderDetailQueryKey(appEnv.VITE_POS_WORKSTATION_CODE, orderId ?? "none"),
     queryFn: () =>
       getOrderDetail({
-        accessToken: accessToken!,
         orderId: orderId!,
         workstationCode: appEnv.VITE_POS_WORKSTATION_CODE,
       }),
-    enabled: accessToken !== null && orderId !== null,
+    enabled: isAuthenticated && orderId !== null,
   });
 }
 
@@ -102,18 +100,17 @@ export function ordersCatalogQueryKey(workstationCode: string, query: string) {
 }
 
 export function useOrdersCatalogQuery(query: string, enabled = true) {
-  const accessToken = usePosAuthStore((state) => state.accessToken);
+  const isAuthenticated = usePosAuthStore((state) => state.isAuthenticated);
   const normalizedQuery = normalizeQuery(query);
 
   return useQuery({
     queryKey: ordersCatalogQueryKey(appEnv.VITE_POS_WORKSTATION_CODE, normalizedQuery),
     queryFn: () =>
       getOrdersCatalog({
-        accessToken: accessToken!,
         workstationCode: appEnv.VITE_POS_WORKSTATION_CODE,
         query: normalizedQuery.length > 0 ? normalizedQuery : undefined,
       }),
-    enabled: accessToken !== null && enabled,
+    enabled: isAuthenticated && enabled,
   });
 }
 
@@ -126,7 +123,7 @@ export function ordersClassProductsQueryKey(
 }
 
 export function useOrdersClassProductsQuery(classId: string | null, query: string, enabled = true) {
-  const accessToken = usePosAuthStore((state) => state.accessToken);
+  const isAuthenticated = usePosAuthStore((state) => state.isAuthenticated);
   const normalizedQuery = normalizeQuery(query);
 
   return useQuery({
@@ -137,11 +134,10 @@ export function useOrdersClassProductsQuery(classId: string | null, query: strin
     ),
     queryFn: () =>
       getOrdersClassProducts({
-        accessToken: accessToken!,
         workstationCode: appEnv.VITE_POS_WORKSTATION_CODE,
         classId: classId!,
         query: normalizedQuery.length > 0 ? normalizedQuery : undefined,
       }),
-    enabled: accessToken !== null && classId !== null && enabled,
+    enabled: isAuthenticated && classId !== null && enabled,
   });
 }

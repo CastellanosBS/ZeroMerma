@@ -50,6 +50,7 @@ interface AppShellProps extends PropsWithChildren {
   bootstrap: PosBootstrapResponse;
   cashSession: CashSessionView | null;
   onSignOut: () => void;
+  onLock: () => void;
 }
 
 interface CommandAction {
@@ -367,7 +368,7 @@ function getModulePathForResume(pathname: string): boolean {
   return pathname !== "/" && pathname !== "/cash-session/open" && pathname !== "/login" && pathname !== "/health";
 }
 
-function AppShellFrame({ bootstrap, cashSession, children, onSignOut }: AppShellProps) {
+function AppShellFrame({ bootstrap, cashSession, children, onSignOut, onLock }: AppShellProps) {
   const navigate = useNavigate();
   const branchTheme = getPosBranchTheme(bootstrap);
   const pathname = useRouterState({
@@ -735,6 +736,7 @@ function AppShellFrame({ bootstrap, cashSession, children, onSignOut }: AppShell
               <SearchIcon className="h-4 w-4" />
             </Button>
 
+            <Button onClick={onLock} type="button" variant="outline">Bloquear</Button>
             <Button
               aria-label="Cerrar sesion"
               className={cn(

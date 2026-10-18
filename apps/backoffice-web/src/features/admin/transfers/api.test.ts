@@ -184,7 +184,7 @@ describe("admin transfers API boundary", () => {
       }),
     );
 
-    const response = await fetchAdminTransfers("token-1", filters);
+    const response = await fetchAdminTransfers(filters);
 
     expect(fetchSpy).toHaveBeenCalledWith(
       expect.stringContaining("/v1/admin/transfers?page=1&page_size=25"),
@@ -201,7 +201,7 @@ describe("admin transfers API boundary", () => {
   it("loads transfer detail", async () => {
     const fetchSpy = vi.spyOn(globalThis, "fetch").mockImplementation(() => mockJsonResponse(apiTransferDetail));
 
-    const detail = await fetchAdminTransferDetail("token-1", "transfer-1");
+    const detail = await fetchAdminTransferDetail("transfer-1");
 
     expect(fetchSpy).toHaveBeenCalledWith(
       expect.stringContaining("/v1/admin/transfers/transfer-1"),
@@ -214,18 +214,18 @@ describe("admin transfers API boundary", () => {
   it("creates, dispatches, receives, and cancels through canonical endpoints", async () => {
     const fetchSpy = vi.spyOn(globalThis, "fetch").mockImplementation(() => mockJsonResponse(apiTransferDetail, 201));
 
-    await createAdminTransfer("token-1", {
+    await createAdminTransfer({
       destinationBranchId: "branch-2",
       lines: [{ notes: null, productId: "product-1", quantity: "10.000" }],
       notes: "Send today",
       originBranchId: "branch-1",
     });
-    await dispatchAdminTransfer("token-1", "transfer-1", "Dispatch");
-    await receiveAdminTransfer("token-1", "transfer-1", {
+    await dispatchAdminTransfer("transfer-1", "Dispatch");
+    await receiveAdminTransfer("transfer-1", {
       lines: [{ notes: null, receivedQuantity: "9.000", shipmentLineId: "line-1", varianceReason: "Missing item" }],
       notes: "Received",
     });
-    await cancelAdminTransfer("token-1", "transfer-1", "Not needed");
+    await cancelAdminTransfer("transfer-1", "Not needed");
 
     expect(fetchSpy).toHaveBeenNthCalledWith(
       1,

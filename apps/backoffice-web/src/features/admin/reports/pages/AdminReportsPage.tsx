@@ -144,7 +144,7 @@ function downloadJson(filename: string, value: unknown) {
 }
 
 export function AdminReportsPage() {
-  const accessToken = useBackofficeAuthStore((state) => state.accessToken);
+  const isAuthenticated = useBackofficeAuthStore((state) => state.isAuthenticated);
   const [catalogFilters, setCatalogFilters] =
     useState<AdminReportCatalogFilters>(initialCatalogFilters);
   const [selectedReportCode, setSelectedReportCode] = useState<string | null>(null);
@@ -155,8 +155,8 @@ export function AdminReportsPage() {
   );
 
   const reportsQuery = useQuery({
-    enabled: Boolean(accessToken),
-    queryFn: () => fetchAdminReports(accessToken ?? "", catalogFilters),
+    enabled: isAuthenticated,
+    queryFn: () => fetchAdminReports(catalogFilters),
     queryKey: ["admin", "reports", "catalog", catalogFilters],
     retry: false,
   });
@@ -169,7 +169,7 @@ export function AdminReportsPage() {
 
   const previewMutation = useMutation({
     mutationFn: ({ filters, reportCode }: { filters: Record<string, string>; reportCode: string }) =>
-      previewAdminReport(accessToken ?? "", reportCode, filters),
+      previewAdminReport(reportCode, filters),
     onError: (error) => {
       setFeedback({
         tone: "error",
@@ -187,7 +187,7 @@ export function AdminReportsPage() {
 
   const exportMutation = useMutation({
     mutationFn: ({ filters, reportCode }: { filters: Record<string, string>; reportCode: string }) =>
-      exportAdminReport(accessToken ?? "", reportCode, filters, "json"),
+      exportAdminReport(reportCode, filters, "json"),
     onError: (error) => {
       setFeedback({
         tone: "error",

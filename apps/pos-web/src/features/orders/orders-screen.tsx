@@ -1954,7 +1954,7 @@ export function OrderConsultationDetailSurface({
 }
 
 export function OrdersScreen() {
-  const accessToken = usePosAuthStore((state) => state.accessToken);
+  const isAuthenticated = usePosAuthStore((state) => state.isAuthenticated);
   const showError = useStatusMessageStore((state) => state.showError);
   const showSuccess = useStatusMessageStore((state) => state.showSuccess);
   const queryClient = useQueryClient();
@@ -2402,7 +2402,7 @@ export function OrdersScreen() {
 
   const createOrderMutation = useMutation({
     mutationFn: async () => {
-      if (accessToken === null || ordersBootstrapQuery.data === undefined) {
+      if (!isAuthenticated || ordersBootstrapQuery.data === undefined) {
         throw new Error("Se requiere autenticacion y contexto para registrar pedidos.");
       }
 
@@ -2440,7 +2440,6 @@ export function OrdersScreen() {
       };
 
       return createOrder({
-        accessToken,
         payload,
         requestId: createRequestId("orders-create"),
       });
@@ -2467,7 +2466,7 @@ export function OrdersScreen() {
   const markReadyMutation = useMutation({
     mutationFn: async () => {
       if (
-        accessToken === null ||
+        !isAuthenticated ||
         ordersBootstrapQuery.data === undefined ||
         selectedOrderId === null
       ) {
@@ -2479,7 +2478,6 @@ export function OrdersScreen() {
       };
 
       return markOrderReady({
-        accessToken,
         orderId: selectedOrderId,
         payload,
         requestId: createRequestId("orders-ready"),
@@ -2505,7 +2503,7 @@ export function OrdersScreen() {
   const deliverMutation = useMutation({
     mutationFn: async () => {
       if (
-        accessToken === null ||
+        !isAuthenticated ||
         ordersBootstrapQuery.data === undefined ||
         selectedOrderId === null ||
         orderDetailQuery.data === undefined
@@ -2514,7 +2512,6 @@ export function OrdersScreen() {
       }
 
       return deliverOrder({
-        accessToken,
         orderId: selectedOrderId,
         payload: {
           workstation_code: ordersBootstrapQuery.data.workstation.code,
@@ -2562,7 +2559,7 @@ export function OrdersScreen() {
   const cancelMutation = useMutation({
     mutationFn: async () => {
       if (
-        accessToken === null ||
+        !isAuthenticated ||
         ordersBootstrapQuery.data === undefined ||
         selectedOrderId === null
       ) {
@@ -2575,7 +2572,6 @@ export function OrdersScreen() {
       };
 
       return cancelOrder({
-        accessToken,
         orderId: selectedOrderId,
         payload,
         requestId: createRequestId("orders-cancel"),

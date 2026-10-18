@@ -214,8 +214,8 @@ function AppShellRightPanelProbe() {
 }
 
 vi.mock("../auth/auth-store", () => ({
-  usePosAuthStore: (selector: (state: { accessToken: string }) => unknown) =>
-    selector({ accessToken: "token" }),
+  usePosAuthStore: (selector: (state: { isAuthenticated: boolean }) => unknown) =>
+    selector({ isAuthenticated: true }),
 }));
 
 vi.mock("../cash-session-open/queries", () => ({
@@ -535,7 +535,7 @@ describe("TransferDispatchScreen", () => {
     click(confirmButton ?? null);
     await flush();
 
-    expect(commitTransferDispatch).toHaveBeenCalledWith("token", {
+    expect(commitTransferDispatch).toHaveBeenCalledWith({
       destination_branch_id: "branch-2",
       lines: [{ product_id: "product-1", quantity: "4" }],
       notes: null,

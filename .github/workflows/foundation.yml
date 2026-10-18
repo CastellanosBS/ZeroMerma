@@ -63,6 +63,8 @@ jobs:
           name: foundation-${{ matrix.stage }}-${{ github.run_id }}-${{ github.run_attempt }}
           path: |
             .tmp/validation/
+            !.tmp/validation/**/tls/**
+            !.tmp/validation/**/*.key.pem
             apps/*/playwright-report/
             apps/*/test-results/
           include-hidden-files: true

@@ -7,8 +7,9 @@ request.
 
 ## Session and navigation
 
-Backoffice obtains one current identity from `GET /v1/auth/me?surface=BACKOFFICE`.
-POS introspection requests `surface=POS`. A grant resolved for another surface cannot
+After cookie-session restoration, Backoffice obtains its current identity from
+`GET /v1/auth/me` with `X-ZeroMerma-Surface: BACKOFFICE`. POS requests declare
+`X-ZeroMerma-Surface: POS`. A grant resolved for another surface cannot
 enable Backoffice navigation, even when its capability code is shared by both apps.
 Neither a Backoffice surface, email address, role label nor the informational
 `is_superadministrator` flag creates a capability in the client.
@@ -21,7 +22,7 @@ remain in force, including the roles/settings modules.
 
 Current identity refreshes on window focus and every 60 seconds. A changed actor or
 authorization version first cancels and removes administrative queries and mutation
-results, then remounts administrative component state. Token replacement and logout
+results, then remounts administrative component state. Session replacement and logout
 clear the complete query cache. A protected API 403 removes administrative results and
 refreshes identity. A 401 clears the local session. Backend checks apply immediately
 on each request; the refresh interval is a presentation limit, not a revocation window
@@ -59,9 +60,10 @@ Component fixtures declare their required capabilities explicitly.
 
 The real isolated browser seed grants its reader seven view capabilities for one
 branch, creates a Backoffice account with no grants, and exports only disposable branch
-IDs as scope evidence. Real browser checks cover route denial, valid-token API 403,
-foreign branch rejection, disabled management/export and revocation while the original
-token and browser session remain open. Reader revocation runs through the same guarded
+IDs as scope evidence. Real browser checks cover route denial, authenticated API 403,
+foreign branch rejection and disabled management/export. Since ZM-FIN-023–027, grant
+revocation also revokes the server session: the open browser receives 401, clears its
+private state and returns to login; a new login has no grants and receives 403. Reader revocation runs through the same guarded
 disposable-database fixture script. The suite still prohibits API interception and
 credential-bearing traces, screenshots or storage state.
 

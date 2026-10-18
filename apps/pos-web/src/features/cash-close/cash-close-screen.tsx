@@ -583,7 +583,7 @@ function ClosingRightPanel({
 }
 
 export function CashCloseScreen() {
-  const accessToken = usePosAuthStore((state) => state.accessToken);
+  const isAuthenticated = usePosAuthStore((state) => state.isAuthenticated);
   const clearSession = usePosAuthStore((state) => state.clearSession);
   const resetPosTerminal = usePosTerminalStore((state) => state.reset);
   const showError = useStatusMessageStore((state) => state.showError);
@@ -791,7 +791,7 @@ export function CashCloseScreen() {
   const canSubmit =
     submitDisabledReason === null &&
     canAttemptCashCloseSubmit({
-      accessToken,
+      isAuthenticated,
       hasOpenCashSession: currentOpenCashSession !== null,
       isCommitPending: false,
     });
@@ -863,7 +863,7 @@ export function CashCloseScreen() {
   ]);
 
   useEffect(() => {
-    if (accessToken === null || currentOpenCashSession === null) {
+    if (!isAuthenticated || currentOpenCashSession === null) {
       setIsLivePreviewPending(false);
       setLivePreviewResult(null);
       return;
@@ -874,7 +874,7 @@ export function CashCloseScreen() {
     setIsLivePreviewPending(true);
 
     const timeoutId = window.setTimeout(() => {
-      void previewCashClose(accessToken, previewPayload)
+      void previewCashClose(previewPayload)
         .then((previewResult) => {
           if (livePreviewRequestRef.current !== currentRequestId) {
             return;
@@ -897,7 +897,7 @@ export function CashCloseScreen() {
     }, 320);
 
     return () => window.clearTimeout(timeoutId);
-  }, [accessToken, currentOpenCashSession, previewPayload]);
+  }, [isAuthenticated, currentOpenCashSession, previewPayload]);
 
   useEffect(() => {
     function handleKeyboard(event: KeyboardEvent) {
@@ -968,9 +968,9 @@ export function CashCloseScreen() {
   const closeMutation = useMutation({
     mutationFn: (payload: ReturnType<typeof buildCashClosePreviewRequest>) =>
       submitCashCloseAttempt({
-        commit: (validatedPayload) => commitCashClose(accessToken!, validatedPayload),
+        commit: (validatedPayload) => commitCashClose(validatedPayload),
         payload,
-        preview: (validatedPayload) => previewCashClose(accessToken!, validatedPayload),
+        preview: (validatedPayload) => previewCashClose(validatedPayload),
       }),
     onSuccess: async (result) => {
       setLivePreviewResult(result.preview);
@@ -1229,7 +1229,7 @@ export function CashCloseScreen() {
 
   useAppShellRightPanel(rightPanel);
 
-  if (accessToken === null) {
+  if (!isAuthenticated) {
     return <Navigate to="/login" />;
   }
 

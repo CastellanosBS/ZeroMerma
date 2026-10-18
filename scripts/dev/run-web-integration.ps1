@@ -7,6 +7,7 @@ param(
 Set-StrictMode -Version 3.0
 $ErrorActionPreference = "Stop"
 . (Join-Path $PSScriptRoot "..\powershell\ZeroMerma.TestDatabase.ps1")
+. (Join-Path $PSScriptRoot "..\powershell\ZeroMerma.Tls.ps1")
 
 function Get-FreeLoopbackPort {
   $listener = [System.Net.Sockets.TcpListener]::new([System.Net.IPAddress]::Loopback, 0)
@@ -36,7 +37,7 @@ function Wait-IntegrationServer {
   for ($attempt = 0; $attempt -lt 120; $attempt++) {
     if ($Process.HasExited) { throw "$Name exited before readiness; see isolated logs" }
     try {
-      $response = Invoke-WebRequest -Uri $Url -UseBasicParsing -TimeoutSec 2
+      $response = Invoke-WebRequest -Uri $Url -UseBasicParsing -TimeoutSec 2 -SkipCertificateCheck
       if ($response.StatusCode -eq 200) { return }
     }
     catch { }
@@ -56,6 +57,8 @@ function Protect-IntegrationArtifacts {
       }
     }
     $content = [regex]::Replace($content, '(?i)Bearer\s+[a-z0-9_.=-]+', 'Bearer [REDACTED]')
+    $content = [regex]::Replace($content, '(?i)(__Host-zm-(?:pos|backoffice)-session=)[^;\s"'']+', '$1[REDACTED]')
+    $content = [regex]::Replace($content, '(?i)("(?:csrf_token|credential|reset_token)"\s*:\s*")[^"]+', '$1[REDACTED]')
     $content = [regex]::Replace($content, 'eyJ[a-zA-Z0-9_-]+\.[a-zA-Z0-9_-]+\.[a-zA-Z0-9_-]+', '[REDACTED]')
     [System.IO.File]::WriteAllText($file.FullName, $content, [System.Text.UTF8Encoding]::new($false))
   }
@@ -70,9 +73,10 @@ Invoke-ZeroMermaIsolatedDatabase -RunId $RunId -Action {
   $apiPort = Get-FreeLoopbackPort
   do { $posPort = Get-FreeLoopbackPort } while ($posPort -eq $apiPort)
   do { $backofficePort = Get-FreeLoopbackPort } while ($backofficePort -in @($apiPort, $posPort))
-  $apiUrl = "http://127.0.0.1:$apiPort"
-  $posUrl = "http://127.0.0.1:$posPort"
-  $backofficeUrl = "http://127.0.0.1:$backofficePort"
+  $apiUrl = "https://127.0.0.1:$apiPort"
+  $posUrl = "https://127.0.0.1:$posPort"
+  $backofficeUrl = "https://127.0.0.1:$backofficePort"
+  $tls = New-ZeroMermaEphemeralTlsCertificate -OutputDirectory (Join-Path $artifactDirectory "tls")
   $environment = @{
     ZM_WEB_INTEGRATION_ISOLATED = "1"
     ZM_E2E_RUN_ID = $runIdentity
@@ -84,10 +88,13 @@ Invoke-ZeroMermaIsolatedDatabase -RunId $RunId -Action {
     ZM_E2E_PASSWORD = [Guid]::NewGuid().ToString("N")
     ZM_E2E_ARTIFACT_DIR = $artifactDirectory
     ZM_E2E_WORKSTATION_CODE = "POS-01"
+    ZM_E2E_TLS_CERT_FILE = $tls.CertificatePath
+    ZM_E2E_TLS_KEY_FILE = $tls.PrivateKeyPath
     ZEROMERMA_API_ENVIRONMENT = "test"
     ZEROMERMA_API_DATABASE_URL = $env:ZEROMERMA_TEST_DATABASE_URL
-    ZEROMERMA_API_AUTH_TOKEN_SECRET = [Guid]::NewGuid().ToString("N")
     ZEROMERMA_API_CORS_ORIGINS = (ConvertTo-Json -Compress @($posUrl, $backofficeUrl))
+    ZEROMERMA_API_SESSION_POS_ORIGINS = (ConvertTo-Json -Compress -AsArray $posUrl)
+    ZEROMERMA_API_SESSION_BACKOFFICE_ORIGINS = (ConvertTo-Json -Compress -AsArray $backofficeUrl)
     ZEROMERMA_API_TRAINING_MODE_ENABLED = "false"
     ZEROMERMA_API_ENABLE_DEV_AUDIT_ENDPOINT = "false"
     ZEROMERMA_WORKER_ENVIRONMENT = "test"
@@ -108,14 +115,19 @@ Invoke-ZeroMermaIsolatedDatabase -RunId $RunId -Action {
     if ($LASTEXITCODE -ne 0) { throw "Cannot resolve the repository Python runtime" }
     $nodePath = (Get-Command node -CommandType Application | Select-Object -First 1).Source
     $apiProcess = Start-IntegrationProcess -Name "api" -Executable $pythonPath -Directory $root -Arguments @(
-      "-m", "uvicorn", "zeromerma_api.main:create_app", "--factory",
-      "--app-dir", "apps/api/src", "--host", "127.0.0.1", "--port", "$apiPort"
+      "-m", "uvicorn", "zeromerma_api.main:create_app", "--factory", "--no-proxy-headers",
+      "--app-dir", "apps/api/src", "--host", "127.0.0.1", "--port", "$apiPort",
+      "--ssl-certfile", "`"$($tls.CertificatePath)`"", "--ssl-keyfile", "`"$($tls.PrivateKeyPath)`""
     )
     $processes.Add($apiProcess)
     Wait-IntegrationServer -Process $apiProcess -Url "$apiUrl/health" -Name "API"
     # Authenticate generated fixtures before any browser can run against an unrelated service.
-    $body = @{email = $env:ZM_E2E_POS_EMAIL; password = $env:ZM_E2E_PASSWORD} | ConvertTo-Json
-    $null = Invoke-RestMethod -Method Post -Uri "$apiUrl/v1/auth/login" -ContentType "application/json" -Body $body
+    $body = @{
+      email = $env:ZM_E2E_POS_EMAIL; password = $env:ZM_E2E_PASSWORD
+      audience = "POS"; workstation_code = $env:ZM_E2E_WORKSTATION_CODE
+    } | ConvertTo-Json
+    $null = Invoke-RestMethod -Method Post -Uri "$apiUrl/v1/auth/login" -ContentType "application/json" `
+      -Headers @{Origin = $posUrl; "X-ZeroMerma-Surface" = "POS"} -Body $body -SkipCertificateCheck
     Invoke-ZeroMermaUv run --frozen --project apps/worker python -m zeromerma_worker --once
 
     foreach ($app in @(
@@ -155,12 +167,21 @@ Invoke-ZeroMermaIsolatedDatabase -RunId $RunId -Action {
       }
       $dbPasswordMatch = [regex]::Match($env:ZEROMERMA_TEST_DATABASE_URL, '://[^:]+:(?<password>[^@]+)@')
       Protect-IntegrationArtifacts -Directory $artifactDirectory -Secrets @(
-        $env:ZM_E2E_PASSWORD, $env:ZEROMERMA_API_AUTH_TOKEN_SECRET,
+        $env:ZM_E2E_PASSWORD,
         $env:ZEROMERMA_TEST_DATABASE_URL, $dbPasswordMatch.Groups['password'].Value,
         $env:ZM_E2E_POS_EMAIL, $env:ZM_E2E_BACKOFFICE_EMAIL
       )
     }
     finally {
+      # Ephemeral TLS keys must never become validation artifacts, even after failure.
+      foreach ($tlsPath in @($tls.PrivateKeyPath, $tls.CertificatePath)) {
+        try {
+          if (Test-Path -LiteralPath $tlsPath -PathType Leaf) {
+            Remove-Item -LiteralPath $tlsPath -Force
+          }
+        }
+        catch { $cleanupErrors.Add("Failed to remove ephemeral integration TLS material") }
+      }
       foreach ($key in $previous.Keys) {
         [Environment]::SetEnvironmentVariable($key, $previous[$key], "Process")
       }

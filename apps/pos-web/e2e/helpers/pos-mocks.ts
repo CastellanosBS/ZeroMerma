@@ -1,3 +1,4 @@
+import { installMockCookieSession } from "./session-mocks";
 import type { Page, Route } from "@playwright/test";
 
 const bootstrapResponse = {
@@ -92,17 +93,12 @@ export async function installPosApiMocks(
   page: Page,
   options?: {
     hasActiveCashSession?: boolean;
+    authenticated?: boolean;
   },
 ) {
   let currentCashSession = options?.hasActiveCashSession ? activeCashSession : null;
 
-  await page.route("**/v1/auth/login", async (route) => {
-    await fulfillJson(route, {
-      access_token: "test-access-token",
-      token_type: "bearer",
-      user: bootstrapResponse.user,
-    });
-  });
+  await installMockCookieSession(page, options?.authenticated);
 
   await page.route("**/v1/pos/bootstrap**", async (route) => {
     await fulfillJson(route, bootstrapResponse);

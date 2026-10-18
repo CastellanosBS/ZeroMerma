@@ -110,7 +110,7 @@ function AdminDiscountMetricStrip({
 }
 
 export function AdminDiscountsPage() {
-  const accessToken = useBackofficeAuthStore((state) => state.accessToken);
+  const isAuthenticated = useBackofficeAuthStore((state) => state.isAuthenticated);
   const queryClient = useQueryClient();
   const [filters, setFilters] = useState<AdminDiscountListFilters>(initialFilters);
   const [selectedDiscountId, setSelectedDiscountId] = useState<string | null>(null);
@@ -122,8 +122,8 @@ export function AdminDiscountsPage() {
   );
 
   const discountsQuery = useQuery({
-    enabled: Boolean(accessToken),
-    queryFn: () => fetchAdminDiscounts(accessToken ?? "", filters),
+    enabled: isAuthenticated,
+    queryFn: () => fetchAdminDiscounts(filters),
     queryKey: ["admin", "discounts", "list", filters],
     retry: false,
   });
@@ -135,15 +135,15 @@ export function AdminDiscountsPage() {
   );
 
   const discountDetailQuery = useQuery({
-    enabled: Boolean(accessToken && selectedDiscountId),
-    queryFn: () => fetchAdminDiscountDetail(accessToken ?? "", selectedDiscountId ?? ""),
+    enabled: Boolean(isAuthenticated && selectedDiscountId),
+    queryFn: () => fetchAdminDiscountDetail(selectedDiscountId ?? ""),
     queryKey: ["admin", "discounts", "detail", selectedDiscountId],
     retry: false,
   });
 
   const createMutation = useMutation({
     mutationFn: (payload: AdminDiscountSavePayload) =>
-      createAdminDiscount(accessToken ?? "", payload),
+      createAdminDiscount(payload),
     onError: (error) => {
       setFeedback({
         tone: "error",
@@ -165,7 +165,7 @@ export function AdminDiscountsPage() {
     }: {
       discountId: string;
       payload: AdminDiscountSavePayload;
-    }) => updateAdminDiscount(accessToken ?? "", discountId, payload),
+    }) => updateAdminDiscount(discountId, payload),
     onError: (error) => {
       setFeedback({
         tone: "error",
@@ -182,7 +182,7 @@ export function AdminDiscountsPage() {
 
   const duplicateMutation = useMutation({
     mutationFn: (item: AdminDiscount) =>
-      duplicateAdminDiscount(accessToken ?? "", item.id, {
+      duplicateAdminDiscount(item.id, {
         code: item.code ? `${item.code}-COPY` : null,
         name: `${item.name} copia`,
       }),
@@ -237,7 +237,7 @@ export function AdminDiscountsPage() {
   }
 
   function handleSubmitDiscount(payload: AdminDiscountSavePayload) {
-    if (!accessToken || isSaving) {
+    if (!isAuthenticated || isSaving) {
       return;
     }
 
@@ -250,7 +250,7 @@ export function AdminDiscountsPage() {
   }
 
   function handleToggleStatus(item: AdminDiscount) {
-    if (!accessToken || updateMutation.isPending) {
+    if (!isAuthenticated || updateMutation.isPending) {
       return;
     }
     setFeedback(null);

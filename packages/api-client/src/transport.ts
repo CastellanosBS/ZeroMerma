@@ -3,7 +3,8 @@ import type { components } from "./generated/schema";
 export type ApiErrorResponse = components["schemas"]["ApiErrorResponse"];
 
 export interface ApiRequestOptions {
-  accessToken?: string | null;
+  csrfToken?: string | null;
+  surface: components["schemas"]["AuthenticatedUser"]["default_surface"];
   baseUrl: string;
   body?: unknown;
   headers?: HeadersInit;
@@ -58,7 +59,8 @@ export class ApiError extends Error {
 }
 
 export async function requestApiJson<TResponse>({
-  accessToken,
+  csrfToken,
+  surface,
   baseUrl,
   body,
   headers,
@@ -67,15 +69,18 @@ export async function requestApiJson<TResponse>({
 }: ApiRequestOptions): Promise<TResponse> {
   const requestHeaders = new Headers(headers);
 
-  if (accessToken) {
-    requestHeaders.set("Authorization", `Bearer ${accessToken}`);
-  }
+  if (requestHeaders.has("Authorization")) throw new Error("Bearer authentication is not supported.");
+  requestHeaders.set("X-ZeroMerma-Surface", surface);
+  requestHeaders.delete("X-CSRF-Token");
+  if (method !== "GET" && csrfToken) requestHeaders.set("X-CSRF-Token", csrfToken);
 
   if (body !== undefined) {
     requestHeaders.set("Content-Type", "application/json");
   }
 
   const response = await fetch(`${baseUrl}${path}`, {
+    credentials: "include",
+    cache: "no-store",
     method,
     headers: requestHeaders,
     body: body === undefined ? undefined : JSON.stringify(body),

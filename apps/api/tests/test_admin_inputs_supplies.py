@@ -7,8 +7,6 @@ from fastapi.testclient import TestClient
 from sqlalchemy import select
 
 from zeromerma_api.bootstrap.seed_local import (
-    SEED_ADMIN_EMAIL,
-    SEED_ADMIN_PASSWORD,
     SEED_BRANCH_CODE,
     SEED_PRODUCT_BOLILLO_STD_CODE,
     SEED_PRODUCT_CLASS_BOLILLO_CODE,
@@ -28,24 +26,11 @@ from zeromerma_api.modules.inventory.infrastructure.models import InventoryBalan
 from zeromerma_api.modules.outbox.infrastructure.models import OutboxEvent
 from zeromerma_api.modules.suppliers.infrastructure.models import SupplierProduct
 from zeromerma_api.testing.authorization import owner_headers
+from zeromerma_api.testing.sessions import login_headers
 
 
-def _login_admin(client: TestClient) -> str:
-    response = client.post(
-        "/v1/auth/login",
-        json={"email": SEED_ADMIN_EMAIL, "password": SEED_ADMIN_PASSWORD},
-    )
-    assert response.status_code == 200
-    return str(response.json()["access_token"])
-
-
-def _login_cashier(client: TestClient) -> str:
-    response = client.post(
-        "/v1/auth/login",
-        json={"email": SEED_USER_EMAIL, "password": SEED_USER_PASSWORD},
-    )
-    assert response.status_code == 200
-    return str(response.json()["access_token"])
+def _login_cashier(client: TestClient) -> dict[str, str]:
+    return login_headers(client, email=SEED_USER_EMAIL, password=SEED_USER_PASSWORD, audience="POS")
 
 
 def _admin_headers(client: TestClient) -> dict[str, str]:
@@ -165,7 +150,7 @@ def test_admin_inputs_supplies_list_empty_and_rejects_pos_user(client: TestClien
 
     forbidden_response = client.get(
         "/v1/admin/inputs-supplies",
-        headers={"Authorization": f"Bearer {_login_cashier(client)}"},
+        headers=_login_cashier(client),
     )
     assert forbidden_response.status_code == 403
 

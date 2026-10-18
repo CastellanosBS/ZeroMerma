@@ -22,6 +22,7 @@ from zeromerma_api.modules.identity.infrastructure import models as identity_mod
 from zeromerma_api.modules.identity.infrastructure import (
     privileged_models as identity_privileged_models,
 )
+from zeromerma_api.modules.identity.infrastructure import session_models as identity_session_models
 from zeromerma_api.modules.inventory.infrastructure import models as inventory_models
 from zeromerma_api.modules.operations.infrastructure import models as operations_models
 from zeromerma_api.modules.orders.infrastructure import models as orders_models
@@ -57,6 +58,7 @@ TEST_GUARD_VARIABLES = (
 )
 
 _ = (
+    identity_session_models,
     audit_models,
     branch_models,
     catalog_models,

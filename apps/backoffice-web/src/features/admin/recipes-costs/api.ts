@@ -189,31 +189,25 @@ export function buildAdminRecipeCostsListPath(filters: AdminRecipeCostListFilter
 }
 
 export function fetchAdminRecipeCosts(
-  accessToken: string,
   filters: AdminRecipeCostListFilters,
 ): Promise<AdminRecipeCostListResponse> {
   return requestJson<ApiRecipeCostListResponse>({
-    accessToken,
     path: buildAdminRecipeCostsListPath(filters),
   }).then(mapListFromApi);
 }
 
 export function fetchAdminRecipeCostDetail(
-  accessToken: string,
   productId: string,
 ): Promise<AdminRecipeCostDetail> {
   return requestJson<ApiRecipeCostDetail>({
-    accessToken,
     path: `/v1/admin/recipes-costs/products/${productId}`,
   }).then(mapDetailFromApi);
 }
 
 export function createAdminRecipe(
-  accessToken: string,
   payload: AdminRecipeCreatePayload,
 ): Promise<AdminRecipeCostDetail> {
   return requestJson<ApiRecipeCostDetail>({
-    accessToken,
     body: toCreatePayload(payload),
     method: "POST",
     path: "/v1/admin/recipes-costs/recipes",
@@ -221,32 +215,27 @@ export function createAdminRecipe(
 }
 
 export function duplicateAdminRecipe(
-  accessToken: string,
   recipeId: string,
   payload: AdminRecipeDuplicatePayload,
 ): Promise<AdminRecipeCostDetail> {
   return requestJson<ApiRecipeCostDetail>({
-    accessToken,
     body: toDuplicatePayload(payload),
     method: "POST",
     path: `/v1/admin/recipes-costs/recipes/${recipeId}/duplicate`,
   }).then(mapDetailFromApi);
 }
 
-export function activateAdminRecipe(accessToken: string, recipeId: string): Promise<AdminRecipeCostDetail> {
+export function activateAdminRecipe(recipeId: string): Promise<AdminRecipeCostDetail> {
   return requestJson<ApiRecipeCostDetail>({
-    accessToken,
     method: "POST",
     path: `/v1/admin/recipes-costs/recipes/${recipeId}/activate`,
   }).then(mapDetailFromApi);
 }
 
 export function applyAdminRecipeStandardCost(
-  accessToken: string,
   recipeId: string,
 ): Promise<AdminRecipeCostDetail> {
   return requestJson<ApiRecipeCostDetail>({
-    accessToken,
     method: "POST",
     path: `/v1/admin/recipes-costs/recipes/${recipeId}/apply-standard-cost`,
   }).then(mapDetailFromApi);

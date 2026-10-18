@@ -209,6 +209,7 @@ function mapDetailFromApi(response: ApiDetail): AdminUserDetail {
       canUnlock: response.security_actions.can_unlock,
       supportsInvitation: response.security_actions.supports_invitation,
       supportsLocking: response.security_actions.supports_locking,
+      passwordResetRequiresApproval: response.security_actions.password_reset_requires_approval,
       supportsPasswordReset: response.security_actions.supports_password_reset,
       supportsSessionRevocation: response.security_actions.supports_session_revocation,
     },
@@ -277,7 +278,6 @@ function mapUpdatePayload(payload: AdminUserUpdatePayload): ApiUpdate {
 }
 
 export async function fetchAdminUsers(
-  accessToken: string,
   filters: AdminUserListFilters,
 ): Promise<AdminUserListResponse> {
   const params = new URLSearchParams();
@@ -293,29 +293,24 @@ export async function fetchAdminUsers(
 
   const suffix = params.toString();
   const response = await requestJson<ApiListResponse>({
-    accessToken,
     path: `/v1/admin/users${suffix ? `?${suffix}` : ""}`,
   });
   return mapListFromApi(response);
 }
 
 export async function fetchAdminUserDetail(
-  accessToken: string,
   userId: string,
 ): Promise<AdminUserDetail> {
   const response = await requestJson<ApiDetail>({
-    accessToken,
     path: `/v1/admin/users/${userId}`,
   });
   return mapDetailFromApi(response);
 }
 
 export async function createAdminUser(
-  accessToken: string,
   payload: AdminUserCreatePayload,
 ): Promise<AdminUserDetail> {
   const response = await requestJson<ApiDetail>({
-    accessToken,
     body: mapCreatePayload(payload),
     method: "POST",
     path: "/v1/admin/users",
@@ -324,12 +319,10 @@ export async function createAdminUser(
 }
 
 export async function updateAdminUser(
-  accessToken: string,
   userId: string,
   payload: AdminUserUpdatePayload,
 ): Promise<AdminUserDetail> {
   const response = await requestJson<ApiDetail>({
-    accessToken,
     body: mapUpdatePayload(payload),
     method: "PATCH",
     path: `/v1/admin/users/${userId}`,
@@ -338,13 +331,11 @@ export async function updateAdminUser(
 }
 
 export async function changeAdminUserStatus(
-  accessToken: string,
   userId: string,
   payload: AdminUserStatusPayload,
 ): Promise<AdminUserDetail> {
   const body: ApiStatus = { is_active: payload.isActive };
   const response = await requestJson<ApiDetail>({
-    accessToken,
     body,
     method: "POST",
     path: `/v1/admin/users/${userId}/status`,
@@ -353,13 +344,11 @@ export async function changeAdminUserStatus(
 }
 
 export async function lockAdminUser(
-  accessToken: string,
   userId: string,
   payload: AdminUserLockPayload,
 ): Promise<AdminUserDetail> {
   const body: ApiLock = { reason: payload.reason };
   const response = await requestJson<ApiDetail>({
-    accessToken,
     body,
     method: "POST",
     path: `/v1/admin/users/${userId}/lock`,
@@ -368,11 +357,9 @@ export async function lockAdminUser(
 }
 
 export async function unlockAdminUser(
-  accessToken: string,
   userId: string,
 ): Promise<AdminUserDetail> {
   const response = await requestJson<ApiDetail>({
-    accessToken,
     method: "POST",
     path: `/v1/admin/users/${userId}/unlock`,
   });
@@ -380,13 +367,11 @@ export async function unlockAdminUser(
 }
 
 export async function addAdminUserBranchAssignment(
-  accessToken: string,
   userId: string,
   branchId: string,
   isDefault: boolean,
 ): Promise<AdminUserDetail> {
   const response = await requestJson<ApiDetail>({
-    accessToken,
     body: { branch_id: branchId, is_default: isDefault },
     method: "POST",
     path: `/v1/admin/users/${userId}/branch-assignments`,
@@ -395,12 +380,10 @@ export async function addAdminUserBranchAssignment(
 }
 
 export async function deactivateAdminUserBranchAssignment(
-  accessToken: string,
   userId: string,
   branchId: string,
 ): Promise<AdminUserDetail> {
   const response = await requestJson<ApiDetail>({
-    accessToken,
     method: "POST",
     path: `/v1/admin/users/${userId}/branch-assignments/${branchId}/deactivate`,
   });
@@ -408,13 +391,11 @@ export async function deactivateAdminUserBranchAssignment(
 }
 
 export async function assignAdminUserRole(
-  accessToken: string,
   userId: string,
   payload: AdminUserRoleAssignmentPayload,
 ): Promise<AdminUserDetail> {
   return mapDetailFromApi(
     await requestJson<ApiDetail>({
-      accessToken,
       path: `/v1/admin/users/${userId}/roles`,
       method: "POST",
       body: payload,
@@ -423,13 +404,11 @@ export async function assignAdminUserRole(
 }
 
 export async function removeAdminUserRole(
-  accessToken: string,
   userId: string,
   roleId: string,
 ): Promise<AdminUserDetail> {
   return mapDetailFromApi(
     await requestJson<ApiDetail>({
-      accessToken,
       path: `/v1/admin/users/${userId}/roles/${roleId}/remove`,
       method: "POST",
     }),

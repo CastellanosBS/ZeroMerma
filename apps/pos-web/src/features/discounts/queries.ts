@@ -13,12 +13,12 @@ export function discountsBootstrapQueryKey(workstationCode: string) {
 }
 
 export function useDiscountsBootstrapQuery() {
-  const accessToken = usePosAuthStore((state) => state.accessToken);
+  const isAuthenticated = usePosAuthStore((state) => state.isAuthenticated);
 
   return useQuery({
     queryKey: discountsBootstrapQueryKey(appEnv.VITE_POS_WORKSTATION_CODE),
-    queryFn: () => getDiscountsBootstrap(accessToken!, appEnv.VITE_POS_WORKSTATION_CODE),
-    enabled: accessToken !== null,
+    queryFn: () => getDiscountsBootstrap(appEnv.VITE_POS_WORKSTATION_CODE),
+    enabled: isAuthenticated,
   });
 }
 
@@ -48,7 +48,7 @@ export function useDiscountsListQuery(
   paymentMethod: string,
   createdByUserId: string,
 ) {
-  const accessToken = usePosAuthStore((state) => state.accessToken);
+  const isAuthenticated = usePosAuthStore((state) => state.isAuthenticated);
   const normalizedQuery = normalizeQuery(query);
 
   return useQuery({
@@ -62,7 +62,6 @@ export function useDiscountsListQuery(
     ),
     queryFn: () =>
       listDiscounts({
-        accessToken: accessToken!,
         workstationCode: appEnv.VITE_POS_WORKSTATION_CODE,
         scope,
         query: normalizedQuery.length > 0 ? normalizedQuery : undefined,
@@ -70,7 +69,7 @@ export function useDiscountsListQuery(
         paymentMethod: paymentMethod.length > 0 ? paymentMethod : undefined,
         createdByUserId: createdByUserId.length > 0 ? createdByUserId : undefined,
       }),
-    enabled: accessToken !== null,
+    enabled: isAuthenticated,
   });
 }
 
@@ -79,16 +78,15 @@ export function discountDetailQueryKey(workstationCode: string, discountId: stri
 }
 
 export function useDiscountDetailQuery(discountId: string | null) {
-  const accessToken = usePosAuthStore((state) => state.accessToken);
+  const isAuthenticated = usePosAuthStore((state) => state.isAuthenticated);
 
   return useQuery({
     queryKey: discountDetailQueryKey(appEnv.VITE_POS_WORKSTATION_CODE, discountId ?? "none"),
     queryFn: () =>
       getDiscountDetail({
-        accessToken: accessToken!,
         discountId: discountId!,
         workstationCode: appEnv.VITE_POS_WORKSTATION_CODE,
       }),
-    enabled: accessToken !== null && discountId !== null,
+    enabled: isAuthenticated && discountId !== null,
   });
 }

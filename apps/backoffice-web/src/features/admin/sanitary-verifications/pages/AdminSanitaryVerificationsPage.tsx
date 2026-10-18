@@ -121,7 +121,7 @@ function SanitaryMetricStrip({
 }
 
 export function AdminSanitaryVerificationsPage() {
-  const accessToken = useBackofficeAuthStore((state) => state.accessToken);
+  const isAuthenticated = useBackofficeAuthStore((state) => state.isAuthenticated);
   const queryClient = useQueryClient();
   const [filters, setFilters] = useState<AdminSanitaryListFilters>(initialFilters);
   const [selectedVerificationId, setSelectedVerificationId] = useState<string | null>(null);
@@ -131,15 +131,15 @@ export function AdminSanitaryVerificationsPage() {
   );
 
   const sanitaryQuery = useQuery({
-    enabled: Boolean(accessToken),
-    queryFn: () => fetchAdminSanitaryVerifications(accessToken ?? "", filters),
+    enabled: isAuthenticated,
+    queryFn: () => fetchAdminSanitaryVerifications(filters),
     queryKey: ["admin", "sanitary-verifications", "list", filters],
     retry: false,
   });
 
   const templatesQuery = useQuery({
-    enabled: Boolean(accessToken),
-    queryFn: () => fetchAdminSanitaryTemplates(accessToken ?? ""),
+    enabled: isAuthenticated,
+    queryFn: () => fetchAdminSanitaryTemplates(),
     queryKey: ["admin", "sanitary-verifications", "templates"],
     retry: false,
   });
@@ -151,16 +151,16 @@ export function AdminSanitaryVerificationsPage() {
   );
 
   const detailQuery = useQuery({
-    enabled: Boolean(accessToken && selectedVerificationId),
+    enabled: Boolean(isAuthenticated && selectedVerificationId),
     queryFn: () =>
-      fetchAdminSanitaryVerificationDetail(accessToken ?? "", selectedVerificationId ?? ""),
+      fetchAdminSanitaryVerificationDetail(selectedVerificationId ?? ""),
     queryKey: ["admin", "sanitary-verifications", "detail", selectedVerificationId],
     retry: false,
   });
 
   const createMutation = useMutation({
     mutationFn: (payload: AdminSanitaryCreatePayload) =>
-      createAdminSanitaryVerification(accessToken ?? "", payload),
+      createAdminSanitaryVerification(payload),
     onError: (error) => {
       setFeedback({
         tone: "error",
@@ -185,7 +185,7 @@ export function AdminSanitaryVerificationsPage() {
     }: {
       payload: AdminSanitaryCompletePayload;
       verificationId: string;
-    }) => completeAdminSanitaryVerification(accessToken ?? "", verificationId, payload),
+    }) => completeAdminSanitaryVerification(verificationId, payload),
     onError: (error) => {
       setFeedback({
         tone: "error",
@@ -205,7 +205,7 @@ export function AdminSanitaryVerificationsPage() {
 
   const startMutation = useMutation({
     mutationFn: (verificationId: string) =>
-      startAdminSanitaryVerification(accessToken ?? "", verificationId),
+      startAdminSanitaryVerification(verificationId),
     onError: (error) => {
       setFeedback({
         tone: "error",

@@ -1,0 +1,70 @@
+# Review-only LOCAL_FIRST deployment template. Render explicit host/certificate/root values.
+# No certificate, key, database credential or live deployment is included.
+# Run API on loopback with --no-proxy-headers and trust only this proxy's peer IP.
+events {}
+http {
+    include /etc/nginx/mime.types;
+    server_tokens off;
+    log_format sanitized '$remote_addr $request_method $uri $status';
+    access_log /var/log/nginx/access.log sanitized;
+    error_log /var/log/nginx/error.log warn;
+    ssl_protocols TLSv1.2 TLSv1.3;
+    ssl_certificate ${TLS_CERTIFICATE};
+    ssl_certificate_key ${TLS_PRIVATE_KEY};
+    ssl_session_tickets off;
+
+    server {
+        listen 80 default_server;
+        server_name _;
+        return 403;
+    }
+    server {
+        listen 443 ssl default_server;
+        server_name _;
+        return 403;
+    }
+    server {
+        listen 443 ssl;
+        server_name ${API_HOST};
+        add_header Strict-Transport-Security "max-age=31536000" always;
+        add_header X-Content-Type-Options nosniff always;
+        add_header X-Frame-Options DENY always;
+        add_header Referrer-Policy no-referrer always;
+        add_header Content-Security-Policy "default-src 'none'; frame-ancestors 'none'; base-uri 'none'; form-action 'none'" always;
+        location / {
+            proxy_pass http://127.0.0.1:8000;
+            proxy_set_header Host $host;
+            proxy_set_header X-Forwarded-Proto https;
+            proxy_set_header X-Forwarded-For $remote_addr;
+            proxy_set_header X-Forwarded-Host "";
+            proxy_set_header Forwarded "";
+            proxy_redirect off;
+        }
+    }
+    server {
+        listen 443 ssl;
+        server_name ${POS_HOST};
+        root ${POS_DIST_ROOT};
+        add_header Strict-Transport-Security "max-age=31536000" always;
+        add_header X-Content-Type-Options nosniff always;
+        add_header X-Frame-Options DENY always;
+        add_header Referrer-Policy no-referrer always;
+        add_header Permissions-Policy "camera=(), microphone=(), geolocation=(), payment=()" always;
+        add_header Content-Security-Policy "default-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'self' https://${API_HOST}; frame-ancestors 'none'; base-uri 'self'; form-action 'self'; object-src 'none'" always;
+        location /assets/ { expires 1y; try_files $uri =404; }
+        location / { expires -1; try_files $uri /index.html; }
+    }
+    server {
+        listen 443 ssl;
+        server_name ${BACKOFFICE_HOST};
+        root ${BACKOFFICE_DIST_ROOT};
+        add_header Strict-Transport-Security "max-age=31536000" always;
+        add_header X-Content-Type-Options nosniff always;
+        add_header X-Frame-Options DENY always;
+        add_header Referrer-Policy no-referrer always;
+        add_header Permissions-Policy "camera=(), microphone=(), geolocation=(), payment=()" always;
+        add_header Content-Security-Policy "default-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'self' https://${API_HOST}; frame-ancestors 'none'; base-uri 'self'; form-action 'self'; object-src 'none'" always;
+        location /assets/ { expires 1y; try_files $uri =404; }
+        location / { expires -1; try_files $uri /index.html; }
+    }
+}

@@ -118,7 +118,7 @@ function CleaningMetricStrip({
 }
 
 export function AdminCleaningLogsPage() {
-  const accessToken = useBackofficeAuthStore((state) => state.accessToken);
+  const isAuthenticated = useBackofficeAuthStore((state) => state.isAuthenticated);
   const queryClient = useQueryClient();
   const [filters, setFilters] = useState<AdminCleaningListFilters>(initialFilters);
   const [selectedCleaningLogId, setSelectedCleaningLogId] = useState<string | null>(null);
@@ -128,15 +128,15 @@ export function AdminCleaningLogsPage() {
   );
 
   const cleaningLogsQuery = useQuery({
-    enabled: Boolean(accessToken),
-    queryFn: () => fetchAdminCleaningLogs(accessToken ?? "", filters),
+    enabled: isAuthenticated,
+    queryFn: () => fetchAdminCleaningLogs(filters),
     queryKey: ["admin", "cleaning-logs", "list", filters],
     retry: false,
   });
 
   const templatesQuery = useQuery({
-    enabled: Boolean(accessToken),
-    queryFn: () => fetchAdminCleaningTemplates(accessToken ?? ""),
+    enabled: isAuthenticated,
+    queryFn: () => fetchAdminCleaningTemplates(),
     queryKey: ["admin", "cleaning-logs", "templates"],
     retry: false,
   });
@@ -148,15 +148,15 @@ export function AdminCleaningLogsPage() {
   );
 
   const detailQuery = useQuery({
-    enabled: Boolean(accessToken && selectedCleaningLogId),
-    queryFn: () => fetchAdminCleaningLogDetail(accessToken ?? "", selectedCleaningLogId ?? ""),
+    enabled: Boolean(isAuthenticated && selectedCleaningLogId),
+    queryFn: () => fetchAdminCleaningLogDetail(selectedCleaningLogId ?? ""),
     queryKey: ["admin", "cleaning-logs", "detail", selectedCleaningLogId],
     retry: false,
   });
 
   const createMutation = useMutation({
     mutationFn: (payload: AdminCleaningCreatePayload) =>
-      createAdminCleaningLog(accessToken ?? "", payload),
+      createAdminCleaningLog(payload),
     onError: (error) => {
       setFeedback({
         tone: "error",
@@ -178,7 +178,7 @@ export function AdminCleaningLogsPage() {
     }: {
       cleaningLogId: string;
       payload: AdminCleaningCompletePayload;
-    }) => completeAdminCleaningLog(accessToken ?? "", cleaningLogId, payload),
+    }) => completeAdminCleaningLog(cleaningLogId, payload),
     onError: (error) => {
       setFeedback({
         tone: "error",

@@ -205,7 +205,7 @@ describe("admin production API boundary", () => {
       }),
     );
 
-    const response = await fetchAdminProduction("token-1", filters);
+    const response = await fetchAdminProduction(filters);
 
     expect(fetchSpy).toHaveBeenCalledWith(
       expect.stringContaining("/v1/admin/production?page=1&page_size=25"),
@@ -222,7 +222,7 @@ describe("admin production API boundary", () => {
   it("loads production detail", async () => {
     const fetchSpy = vi.spyOn(globalThis, "fetch").mockImplementation(() => mockJsonResponse(apiProductionDetail));
 
-    const detail = await fetchAdminProductionDetail("token-1", "production-1");
+    const detail = await fetchAdminProductionDetail("production-1");
 
     expect(fetchSpy).toHaveBeenCalledWith(
       expect.stringContaining("/v1/admin/production/production-1"),
@@ -236,7 +236,7 @@ describe("admin production API boundary", () => {
   it("creates, starts, completes, and cancels through canonical endpoints", async () => {
     const fetchSpy = vi.spyOn(globalThis, "fetch").mockImplementation(() => mockJsonResponse(apiProductionDetail, 201));
 
-    await createAdminProduction("token-1", {
+    await createAdminProduction({
       branchId: "branch-1",
       notes: "Bake today",
       plannedAt: "2026-05-20T10:00:00Z",
@@ -244,13 +244,13 @@ describe("admin production API boundary", () => {
       productId: "product-1",
       recipeId: "recipe-1",
     });
-    await startAdminProduction("token-1", "production-1", "Start");
-    await completeAdminProduction("token-1", "production-1", {
+    await startAdminProduction("production-1", "Start");
+    await completeAdminProduction("production-1", {
       actualOutputQty: "18.000",
       notes: "Completed",
       varianceReason: "Shrinkage",
     });
-    await cancelAdminProduction("token-1", "production-1", "Not needed");
+    await cancelAdminProduction("production-1", "Not needed");
 
     expect(fetchSpy).toHaveBeenNthCalledWith(
       1,

@@ -35,6 +35,7 @@ class AuthenticatedUser(BaseModel):
     allowed_surfaces: list[IdentitySurface] = Field(default_factory=_default_surfaces)
     default_surface: IdentitySurface = Field(default=IDENTITY_SURFACE_POS)
     is_active: bool
+    password_reset_required: bool = False
     effective_grants: list[EffectiveGrant] = Field(default_factory=list)
     authorization_version: str = ""
     authorization_surface: IdentitySurface | None = None
@@ -57,11 +58,12 @@ class AuthenticatedUser(BaseModel):
 
 
 class LoginRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     email: str = Field(min_length=3, max_length=320)
-    password: str = Field(min_length=1, max_length=128)
+    password: str = Field(min_length=1, max_length=128, repr=False)
+    audience: IdentitySurface
+    workstation_code: str | None = Field(default=None, min_length=1, max_length=80)
 
 
-class LoginResponse(BaseModel):
-    access_token: str
-    token_type: str = "bearer"
-    user: AuthenticatedUser
+# Session response schemas live beside the lifecycle and import this identity schema.

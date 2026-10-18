@@ -174,7 +174,7 @@ describe("admin sales tickets api", () => {
       new Response(JSON.stringify(apiListPayload), { status: 200 }),
     );
 
-    const response = await fetchAdminSalesTickets("token", baseFilters);
+    const response = await fetchAdminSalesTickets(baseFilters);
 
     expect(fetchMock).toHaveBeenCalledWith(
       "http://localhost:8000/v1/admin/sales/tickets?page=1&page_size=25",
@@ -192,8 +192,8 @@ describe("admin sales tickets api", () => {
       .mockResolvedValueOnce(new Response(JSON.stringify(apiDetailPayload), { status: 200 }))
       .mockResolvedValueOnce(new Response(JSON.stringify(apiDetailPayload), { status: 200 }));
 
-    const detail = await fetchAdminSalesTicketDetail("token", "ticket-1");
-    await reprintAdminSalesTicket("token", "ticket-1");
+    const detail = await fetchAdminSalesTicketDetail("ticket-1");
+    await reprintAdminSalesTicket("ticket-1");
 
     expect(detail.overview.folio).toBe("TCK-123");
     expect(detail.lines[0]?.catalogName).toBe("Pan dulce");

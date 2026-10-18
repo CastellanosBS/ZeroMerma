@@ -256,9 +256,9 @@ describe("admin cleaning logs API boundary", () => {
       });
     });
 
-    const list = await fetchAdminCleaningLogs("token-1", filters);
-    const detail = await fetchAdminCleaningLogDetail("token-1", apiItem.id);
-    const templates = await fetchAdminCleaningTemplates("token-1");
+    const list = await fetchAdminCleaningLogs(filters);
+    const detail = await fetchAdminCleaningLogDetail(apiItem.id);
+    const templates = await fetchAdminCleaningTemplates();
 
     expect(fetchSpy).toHaveBeenCalledWith(
       expect.stringContaining("/v1/admin/cleaning-logs?page=1&page_size=25"),
@@ -276,7 +276,7 @@ describe("admin cleaning logs API boundary", () => {
       .spyOn(globalThis, "fetch")
       .mockImplementation(() => mockJsonResponse(apiDetail, 201));
 
-    await createAdminCleaningLog("token-1", {
+    await createAdminCleaningLog({
       areaName: "Cocina",
       areaType: "PRODUCTION_AREA",
       branchId: "11111111-1111-4111-8111-111111111111",
@@ -312,7 +312,7 @@ describe("admin cleaning logs API boundary", () => {
       }),
     );
 
-    await completeAdminCleaningLog("token-1", apiItem.id, {
+    await completeAdminCleaningLog(apiItem.id, {
       checklistItems: [
         {
           id: "44444444-4444-4444-8444-444444444444",

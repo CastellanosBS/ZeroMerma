@@ -22,7 +22,7 @@ const queryState = vi.hoisted(() => ({
 }));
 
 const authStoreMock = vi.hoisted(() => ({
-  accessToken: "token",
+  isAuthenticated: true,
 }));
 
 const statusMessageMocks = vi.hoisted(() => ({
@@ -42,8 +42,8 @@ vi.mock("@tanstack/react-router", () => ({
 }));
 
 vi.mock("../auth/auth-store", () => ({
-  usePosAuthStore: (selector: (state: { accessToken: string | null }) => unknown) =>
-    selector({ accessToken: authStoreMock.accessToken }),
+  usePosAuthStore: (selector: (state: { isAuthenticated: boolean }) => unknown) =>
+    selector({ isAuthenticated: authStoreMock.isAuthenticated }),
 }));
 
 vi.mock("../pos-bootstrap/queries", () => ({
@@ -132,6 +132,7 @@ const bootstrap = {
     authorization_surface: "POS" as const,
     authorization_version: "test-authorization-v1",
     is_superadministrator: false,
+      password_reset_required: false,
     default_surface: "POS",
     email: "cashier@zeromerma.local",
     full_name: "Main Branch Cashier",
@@ -177,7 +178,7 @@ beforeEach(() => {
     isPending: false,
     refetch: vi.fn(),
   };
-  authStoreMock.accessToken = "token";
+  authStoreMock.isAuthenticated = true;
   routerMocks.navigate.mockClear();
   statusMessageMocks.showSuccess.mockClear();
   vi.mocked(openCashSession).mockReset();
@@ -236,7 +237,6 @@ describe("CashSessionOpenScreen", () => {
     await flushAsync();
 
     expect(openCashSession).toHaveBeenCalledWith({
-      accessToken: "token",
       payload: {
         opening_amount: "250.00",
         workstation_code: "POS-01",

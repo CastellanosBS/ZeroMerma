@@ -33,7 +33,6 @@ import { openBrowserPrintWindow } from "../../lib/browser-print";
 import { formatCurrency } from "../../lib/formatters";
 import { isEditableTarget } from "../../lib/keyboard-shortcuts";
 import { cn } from "../../lib/utils";
-import { usePosAuthStore } from "../auth/auth-store";
 import { useStatusMessageStore } from "../status-messages/store";
 import { getTicketDetail } from "../tickets/tickets-api";
 import { writeTicketToPrintWindow } from "../tickets/print";
@@ -385,7 +384,6 @@ export function PosCheckoutPanel({
 }: {
   bootstrap: PosBootstrapResponse;
 }) {
-  const accessToken = usePosAuthStore((state) => state.accessToken);
   const showSuccess = useStatusMessageStore((state) => state.showSuccess);
   const showWarning = useStatusMessageStore((state) => state.showWarning);
   const primaryAmountInputRef = useRef<HTMLInputElement>(null);
@@ -420,7 +418,6 @@ export function PosCheckoutPanel({
   const confirmSaleMutation = useMutation({
     mutationFn: () =>
       confirmPosSale(
-        accessToken!,
         buildConfirmSaleRequest(bootstrap.workstation.code, cartLines, saleFlow.buildPaymentDraft()),
       ),
   });
@@ -636,7 +633,6 @@ export function PosCheckoutPanel({
   const printTicketForSale = useCallback(
     async (saleId: string, existingPrintWindow: Window | null) => {
       const ticket = await getTicketDetail({
-        accessToken: accessToken!,
         ticketId: saleId,
         workstationCode: bootstrap.workstation.code,
       });
@@ -650,7 +646,7 @@ export function PosCheckoutPanel({
       });
       return ticket;
     },
-    [accessToken, bootstrap.workstation.code],
+    [bootstrap.workstation.code],
   );
 
   const beginPaymentCapture = useCallback(
@@ -1503,4 +1499,3 @@ export function PosCheckoutPanel({
     </div>
   );
 }
-

@@ -9,11 +9,11 @@ export function currentCashSessionQueryKey(workstationCode: string) {
 }
 
 export function useCurrentCashSessionQuery() {
-  const accessToken = usePosAuthStore((state) => state.accessToken);
+  const isAuthenticated = usePosAuthStore((state) => state.isAuthenticated);
 
   return useQuery({
     queryKey: currentCashSessionQueryKey(appEnv.VITE_POS_WORKSTATION_CODE),
-    queryFn: () => getCurrentCashSession(accessToken!, appEnv.VITE_POS_WORKSTATION_CODE),
-    enabled: accessToken !== null,
+    queryFn: () => getCurrentCashSession(appEnv.VITE_POS_WORKSTATION_CODE),
+    enabled: isAuthenticated,
   });
 }

@@ -16,6 +16,7 @@ export function authorizationUser(grants: EffectiveGrant[] = []): AuthenticatedU
     authorization_version: "test-authorization-version",
     authorization_surface: "BACKOFFICE",
     is_superadministrator: false,
+    password_reset_required: false,
   };
 }
 

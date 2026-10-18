@@ -251,7 +251,7 @@ describe("admin inputs and supplies API boundary", () => {
       }),
     );
 
-    const response = await fetchAdminInputSupplies("token-1", filters);
+    const response = await fetchAdminInputSupplies(filters);
 
     expect(fetchSpy).toHaveBeenCalledWith(
       expect.stringContaining("/v1/admin/inputs-supplies?page=1&page_size=25"),
@@ -268,7 +268,7 @@ describe("admin inputs and supplies API boundary", () => {
       .spyOn(globalThis, "fetch")
       .mockImplementation(() => mockJsonResponse(apiInputDetail));
 
-    const detail = await fetchAdminInputSupplyDetail("token-1", "product-1");
+    const detail = await fetchAdminInputSupplyDetail("product-1");
 
     expect(fetchSpy).toHaveBeenCalledWith(
       expect.stringContaining("/v1/admin/inputs-supplies/product-1"),
@@ -285,7 +285,7 @@ describe("admin inputs and supplies API boundary", () => {
       .spyOn(globalThis, "fetch")
       .mockImplementation(() => mockJsonResponse(apiInputDetail, 201));
 
-    await createAdminInputSupply("token-1", {
+    await createAdminInputSupply({
       code: "HARINA-1KG",
       isActive: true,
       isInventoryTracked: true,
@@ -309,7 +309,7 @@ describe("admin inputs and supplies API boundary", () => {
       }),
     );
 
-    await addAdminInputSupplySupplierRelation("token-1", "product-1", {
+    await addAdminInputSupplySupplierRelation("product-1", {
       conversionFactor: "1.000",
       purchaseUom: "KG",
       supplierId: "supplier-1",
@@ -319,7 +319,7 @@ describe("admin inputs and supplies API boundary", () => {
       expect.objectContaining({ method: "POST" }),
     );
 
-    await changeAdminInputSupplyStatus("token-1", "product-1", {
+    await changeAdminInputSupplyStatus("product-1", {
       isActive: false,
       notes: "Fuera de compra.",
     });

@@ -124,7 +124,7 @@ function IncidentMetricStrip({
 }
 
 export function AdminIncidentsPage() {
-  const accessToken = useBackofficeAuthStore((state) => state.accessToken);
+  const isAuthenticated = useBackofficeAuthStore((state) => state.isAuthenticated);
   const queryClient = useQueryClient();
   const [filters, setFilters] = useState<AdminIncidentListFilters>(initialFilters);
   const [selectedIncidentId, setSelectedIncidentId] = useState<string | null>(null);
@@ -134,8 +134,8 @@ export function AdminIncidentsPage() {
   );
 
   const incidentsQuery = useQuery({
-    enabled: Boolean(accessToken),
-    queryFn: () => fetchAdminIncidents(accessToken ?? "", filters),
+    enabled: isAuthenticated,
+    queryFn: () => fetchAdminIncidents(filters),
     queryKey: ["admin", "incidents", "list", filters],
     retry: false,
   });
@@ -147,15 +147,15 @@ export function AdminIncidentsPage() {
   );
 
   const detailQuery = useQuery({
-    enabled: Boolean(accessToken && selectedIncidentId),
-    queryFn: () => fetchAdminIncidentDetail(accessToken ?? "", selectedIncidentId ?? ""),
+    enabled: Boolean(isAuthenticated && selectedIncidentId),
+    queryFn: () => fetchAdminIncidentDetail(selectedIncidentId ?? ""),
     queryKey: ["admin", "incidents", "detail", selectedIncidentId],
     retry: false,
   });
 
   const createMutation = useMutation({
     mutationFn: (payload: AdminIncidentCreatePayload) =>
-      createAdminIncident(accessToken ?? "", payload),
+      createAdminIncident(payload),
     onError: (error) => {
       setFeedback({
         tone: "error",
@@ -177,7 +177,7 @@ export function AdminIncidentsPage() {
     }: {
       incidentId: string;
       payload: AdminIncidentFollowUpPayload;
-    }) => addAdminIncidentFollowUp(accessToken ?? "", incidentId, payload),
+    }) => addAdminIncidentFollowUp(incidentId, payload),
     onError: (error) => {
       setFeedback({
         tone: "error",
@@ -205,7 +205,7 @@ export function AdminIncidentsPage() {
       note: string | null;
       status: "IN_PROGRESS";
     }) =>
-      changeAdminIncidentStatus(accessToken ?? "", incidentId, {
+      changeAdminIncidentStatus(incidentId, {
         cancellationReason: null,
         note,
         status,
@@ -230,7 +230,7 @@ export function AdminIncidentsPage() {
     }: {
       incidentId: string;
       payload: AdminIncidentResolvePayload;
-    }) => resolveAdminIncident(accessToken ?? "", incidentId, payload),
+    }) => resolveAdminIncident(incidentId, payload),
     onError: (error) => {
       setFeedback({
         tone: "error",
@@ -247,7 +247,7 @@ export function AdminIncidentsPage() {
 
   const reopenMutation = useMutation({
     mutationFn: ({ incidentId, note }: { incidentId: string; note: string }) =>
-      reopenAdminIncident(accessToken ?? "", incidentId, note),
+      reopenAdminIncident(incidentId, note),
     onError: (error) => {
       setFeedback({
         tone: "error",

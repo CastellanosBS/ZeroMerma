@@ -347,36 +347,28 @@ export function buildAdminSanitaryVerificationsListPath(
 }
 
 export function fetchAdminSanitaryVerifications(
-  accessToken: string,
   filters: AdminSanitaryListFilters,
 ): Promise<AdminSanitaryVerificationListResponse> {
   return requestJson<ApiListResponse>({
-    accessToken,
     path: buildAdminSanitaryVerificationsListPath(filters),
   }).then(mapListFromApi);
 }
 
-export function fetchAdminSanitaryTemplates(
-  accessToken: string,
-): Promise<AdminSanitaryTemplate[]> {
+export function fetchAdminSanitaryTemplates(): Promise<AdminSanitaryTemplate[]> {
   return requestJson<ApiTemplate[]>({
-    accessToken,
     path: "/v1/admin/sanitary-verifications/templates",
   }).then((response) => response.map(mapAdminSanitaryTemplateFromApi));
 }
 
 export function fetchAdminSanitaryVerificationDetail(
-  accessToken: string,
   verificationId: string,
 ): Promise<AdminSanitaryVerificationDetail> {
   return requestJson<ApiDetail>({
-    accessToken,
     path: `/v1/admin/sanitary-verifications/${verificationId}`,
   }).then(mapDetailFromApi);
 }
 
 export function createAdminSanitaryVerification(
-  accessToken: string,
   payload: AdminSanitaryCreatePayload,
 ): Promise<AdminSanitaryVerificationDetail> {
   const body: ApiCreateRequest = {
@@ -400,7 +392,6 @@ export function createAdminSanitaryVerification(
   };
 
   return requestJson<ApiDetail>({
-    accessToken,
     body,
     method: "POST",
     path: "/v1/admin/sanitary-verifications",
@@ -408,18 +399,15 @@ export function createAdminSanitaryVerification(
 }
 
 export function startAdminSanitaryVerification(
-  accessToken: string,
   verificationId: string,
 ): Promise<AdminSanitaryVerificationDetail> {
   return requestJson<ApiDetail>({
-    accessToken,
     method: "POST",
     path: `/v1/admin/sanitary-verifications/${verificationId}/start`,
   }).then(mapDetailFromApi);
 }
 
 export function completeAdminSanitaryVerification(
-  accessToken: string,
   verificationId: string,
   payload: AdminSanitaryCompletePayload,
 ): Promise<AdminSanitaryVerificationDetail> {
@@ -432,7 +420,6 @@ export function completeAdminSanitaryVerification(
   };
 
   return requestJson<ApiDetail>({
-    accessToken,
     body,
     method: "POST",
     path: `/v1/admin/sanitary-verifications/${verificationId}/complete`,
@@ -440,12 +427,10 @@ export function completeAdminSanitaryVerification(
 }
 
 export function cancelAdminSanitaryVerification(
-  accessToken: string,
   verificationId: string,
   payload: AdminSanitaryCancelPayload,
 ): Promise<AdminSanitaryVerificationDetail> {
   return requestJson<ApiDetail>({
-    accessToken,
     body: { reason: payload.reason },
     method: "POST",
     path: `/v1/admin/sanitary-verifications/${verificationId}/cancel`,

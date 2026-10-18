@@ -352,8 +352,8 @@ function AppShellRightPanelProbe() {
 }
 
 vi.mock("../auth/auth-store", () => ({
-  usePosAuthStore: (selector: (state: { accessToken: string }) => unknown) =>
-    selector({ accessToken: "token" }),
+  usePosAuthStore: (selector: (state: { isAuthenticated: boolean }) => unknown) =>
+    selector({ isAuthenticated: true }),
 }));
 
 vi.mock("../cash-session-open/queries", () => ({
@@ -746,7 +746,7 @@ describe("OperationModuleScreen counter transfer", () => {
     click(confirmButton ?? null);
     await flush();
 
-    expect(commitCounterTransfer).toHaveBeenCalledWith("token", {
+    expect(commitCounterTransfer).toHaveBeenCalledWith({
       lines: [{ product_id: "product-1", quantity: "2" }],
       notes: null,
       workstation_code: "POS-01",
@@ -813,7 +813,7 @@ describe("OperationModuleScreen counter transfer", () => {
     click(confirmButton ?? null);
     await flush();
 
-    expect(commitCounterTransfer).toHaveBeenCalledWith("token", {
+    expect(commitCounterTransfer).toHaveBeenCalledWith({
       lines: [{ product_id: "product-1", quantity: "5" }],
       notes: null,
       workstation_code: "POS-01",
@@ -1000,7 +1000,7 @@ describe("OperationModuleScreen waste", () => {
     await flush();
 
     expect(view.container.textContent).not.toContain("Confirmar merma");
-    expect(commitWasteRecord).toHaveBeenCalledWith("token", {
+    expect(commitWasteRecord).toHaveBeenCalledWith({
       high_impact_acknowledged: false,
       lines: [{ product_id: "product-1", quantity: "2" }],
       notes: null,
@@ -1022,7 +1022,7 @@ describe("OperationModuleScreen waste", () => {
     click(registerButton ?? null);
     await flush();
 
-    expect(commitWasteRecord).toHaveBeenCalledWith("token", {
+    expect(commitWasteRecord).toHaveBeenCalledWith({
       high_impact_acknowledged: false,
       lines: [{ product_id: "product-1", quantity: "2" }],
       notes: null,
@@ -1184,7 +1184,7 @@ describe("OperationModuleScreen waste", () => {
     click(registerButton ?? null);
     await flush();
 
-    expect(commitWasteRecord).toHaveBeenCalledWith("token", {
+    expect(commitWasteRecord).toHaveBeenCalledWith({
       high_impact_acknowledged: true,
       lines: [{ product_id: "product-1", quantity: "12" }],
       notes: "Large high-impact waste batch.",

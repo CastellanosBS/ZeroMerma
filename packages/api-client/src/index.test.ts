@@ -40,7 +40,7 @@ describe("api client package", () => {
       ),
     );
 
-    const result = requestApiJson({ baseUrl: "http://api.test", path: "/resource" });
+    const result = requestApiJson({ surface: "POS", baseUrl: "http://api.test", path: "/resource" });
 
     await expect(result).rejects.toBeInstanceOf(ApiError);
     await expect(result).rejects.toMatchObject({
@@ -59,7 +59,8 @@ describe("api client package", () => {
     vi.stubGlobal("fetch", fetchMock);
 
     const payload = await requestApiJson<{ status: string }>({
-      accessToken: "token-1",
+      surface: "POS",
+      csrfToken: "memory-csrf",
       baseUrl: "http://api.test",
       body: { value: "1.25" },
       headers: { "X-Request-ID": "request-1" },
@@ -70,7 +71,11 @@ describe("api client package", () => {
     expect(payload.status).toBe("ok");
     const [, init] = fetchMock.mock.calls[0] as [string, RequestInit];
     const headers = init.headers as Headers;
-    expect(headers.get("Authorization")).toBe("Bearer token-1");
+    expect(headers.has("Authorization")).toBe(false);
+    expect(headers.get("X-CSRF-Token")).toBe("memory-csrf");
+    expect(headers.get("X-ZeroMerma-Surface")).toBe("POS");
+    expect(init.credentials).toBe("include");
+    expect(init.cache).toBe("no-store");
     expect(headers.get("X-Request-ID")).toBe("request-1");
     expect(init.body).toBe('{"value":"1.25"}');
   });

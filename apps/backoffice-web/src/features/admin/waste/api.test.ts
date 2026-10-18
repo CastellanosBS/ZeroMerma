@@ -229,7 +229,7 @@ describe("admin waste API boundary", () => {
       }),
     );
 
-    const response = await fetchAdminWaste("token-1", filters);
+    const response = await fetchAdminWaste(filters);
 
     expect(fetchSpy).toHaveBeenCalledWith(
       expect.stringContaining("/v1/admin/waste?page=1&page_size=25"),
@@ -244,7 +244,7 @@ describe("admin waste API boundary", () => {
   it("loads waste detail", async () => {
     const fetchSpy = vi.spyOn(globalThis, "fetch").mockImplementation(() => mockJsonResponse(apiWasteDetail));
 
-    const detail = await fetchAdminWasteDetail("token-1", "waste-1");
+    const detail = await fetchAdminWasteDetail("waste-1");
 
     expect(fetchSpy).toHaveBeenCalledWith(
       expect.stringContaining("/v1/admin/waste/waste-1"),
@@ -258,7 +258,7 @@ describe("admin waste API boundary", () => {
   it("creates waste through canonical backend endpoint", async () => {
     const fetchSpy = vi.spyOn(globalThis, "fetch").mockImplementation(() => mockJsonResponse(apiWasteDetail, 201));
 
-    await createAdminWaste("token-1", {
+    await createAdminWaste({
       branchId: "branch-1",
       locationCode: "BACKROOM",
       notes: "Expired batch",

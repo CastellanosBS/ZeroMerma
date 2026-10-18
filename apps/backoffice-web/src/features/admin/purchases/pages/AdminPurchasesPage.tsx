@@ -148,7 +148,7 @@ function getPurchaseId(item: AdminPurchaseDetail | AdminPurchaseListItem): strin
 }
 
 export function AdminPurchasesPage() {
-  const accessToken = useBackofficeAuthStore((state) => state.accessToken);
+  const isAuthenticated = useBackofficeAuthStore((state) => state.isAuthenticated);
   const queryClient = useQueryClient();
   const [filters, setFilters] = useState<AdminPurchaseListFilters>(getInitialFilters);
   const [selectedPurchaseId, setSelectedPurchaseId] = useState<string | null>(null);
@@ -158,8 +158,8 @@ export function AdminPurchasesPage() {
   );
 
   const purchasesQuery = useQuery({
-    enabled: Boolean(accessToken),
-    queryFn: () => fetchAdminPurchases(accessToken ?? "", filters),
+    enabled: isAuthenticated,
+    queryFn: () => fetchAdminPurchases(filters),
     queryKey: ["admin", "purchases", "list", filters],
     retry: false,
   });
@@ -171,14 +171,14 @@ export function AdminPurchasesPage() {
   );
 
   const purchaseDetailQuery = useQuery({
-    enabled: Boolean(accessToken && selectedPurchaseId),
-    queryFn: () => fetchAdminPurchaseDetail(accessToken ?? "", selectedPurchaseId ?? ""),
+    enabled: Boolean(isAuthenticated && selectedPurchaseId),
+    queryFn: () => fetchAdminPurchaseDetail(selectedPurchaseId ?? ""),
     queryKey: ["admin", "purchases", "detail", selectedPurchaseId],
     retry: false,
   });
 
   const createPurchaseMutation = useMutation({
-    mutationFn: (payload: AdminPurchasePayload) => createAdminPurchase(accessToken ?? "", payload),
+    mutationFn: (payload: AdminPurchasePayload) => createAdminPurchase(payload),
     onError: (error) => {
       setFeedback({
         tone: "error",
@@ -195,7 +195,7 @@ export function AdminPurchasesPage() {
 
   const directEntryMutation = useMutation({
     mutationFn: (payload: AdminDirectEntryPayload) =>
-      createAdminDirectEntry(accessToken ?? "", payload),
+      createAdminDirectEntry(payload),
     onError: (error) => {
       setFeedback({
         tone: "error",
@@ -217,7 +217,7 @@ export function AdminPurchasesPage() {
     }: {
       payload: AdminPurchaseReceiptPayload;
       purchaseId: string;
-    }) => receiveAdminPurchase(accessToken ?? "", purchaseId, payload),
+    }) => receiveAdminPurchase(purchaseId, payload),
     onError: (error) => {
       setFeedback({
         tone: "error",
@@ -233,7 +233,7 @@ export function AdminPurchasesPage() {
   });
 
   const confirmMutation = useMutation({
-    mutationFn: (purchaseId: string) => confirmAdminPurchase(accessToken ?? "", purchaseId),
+    mutationFn: (purchaseId: string) => confirmAdminPurchase(purchaseId),
     onError: (error) => {
       setFeedback({
         tone: "error",
@@ -254,7 +254,7 @@ export function AdminPurchasesPage() {
     }: {
       payload: AdminPurchaseCancelPayload;
       purchaseId: string;
-    }) => cancelAdminPurchase(accessToken ?? "", purchaseId, payload),
+    }) => cancelAdminPurchase(purchaseId, payload),
     onError: (error) => {
       setFeedback({
         tone: "error",
@@ -312,7 +312,7 @@ export function AdminPurchasesPage() {
   }
 
   function handleConfirm(purchase: AdminPurchaseDetail | AdminPurchaseListItem) {
-    if (!accessToken || isSubmitting) {
+    if (!isAuthenticated || isSubmitting) {
       return;
     }
     setFeedback(null);
@@ -320,7 +320,7 @@ export function AdminPurchasesPage() {
   }
 
   function handleSubmitReceipt(payload: AdminPurchaseReceiptPayload) {
-    if (!accessToken || !selectedPurchaseId || isSubmitting) {
+    if (!isAuthenticated || !selectedPurchaseId || isSubmitting) {
       return;
     }
     setFeedback(null);
@@ -328,7 +328,7 @@ export function AdminPurchasesPage() {
   }
 
   function handleSubmitCancel(payload: AdminPurchaseCancelPayload) {
-    if (!accessToken || !selectedPurchaseId || isSubmitting) {
+    if (!isAuthenticated || !selectedPurchaseId || isSubmitting) {
       return;
     }
     setFeedback(null);
@@ -413,14 +413,14 @@ export function AdminPurchasesPage() {
             onClose={() => setWorkflowMode(null)}
             onSubmitCancel={handleSubmitCancel}
             onSubmitDirectEntry={(payload) => {
-              if (!accessToken || isSubmitting) {
+              if (!isAuthenticated || isSubmitting) {
                 return;
               }
               setFeedback(null);
               directEntryMutation.mutate(payload);
             }}
             onSubmitPurchase={(payload) => {
-              if (!accessToken || isSubmitting) {
+              if (!isAuthenticated || isSubmitting) {
                 return;
               }
               setFeedback(null);

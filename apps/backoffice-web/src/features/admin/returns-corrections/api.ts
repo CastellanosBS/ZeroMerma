@@ -368,38 +368,31 @@ export function buildAdminCorrectionsListPath(filters: AdminCorrectionListFilter
 }
 
 export function fetchAdminReturns(
-  accessToken: string,
   filters: AdminReturnListFilters,
 ): Promise<AdminReturnsListResponse> {
   return requestJson<ApiReturnsListResponse>({
-    accessToken,
     path: buildAdminReturnsListPath(filters),
   }).then(mapReturnsListFromApi);
 }
 
 export function fetchAdminCorrections(
-  accessToken: string,
   filters: AdminCorrectionListFilters,
 ): Promise<AdminCorrectionsListResponse> {
   return requestJson<ApiCorrectionsListResponse>({
-    accessToken,
     path: buildAdminCorrectionsListPath(filters),
   }).then(mapCorrectionsListFromApi);
 }
 
-export function fetchAdminReturnDetail(accessToken: string, returnId: string): Promise<AdminReturnDetail> {
+export function fetchAdminReturnDetail(returnId: string): Promise<AdminReturnDetail> {
   return requestJson<ApiReturnDetail>({
-    accessToken,
     path: `/v1/admin/returns-corrections/returns/${returnId}`,
   }).then(mapReturnDetailFromApi);
 }
 
 export function fetchAdminCorrectionDetail(
-  accessToken: string,
   correctionId: string,
 ): Promise<AdminCorrectionDetail> {
   return requestJson<ApiCorrectionDetail>({
-    accessToken,
     path: `/v1/admin/returns-corrections/corrections/${correctionId}`,
   }).then(mapCorrectionDetailFromApi);
 }

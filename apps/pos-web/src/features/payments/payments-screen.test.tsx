@@ -93,6 +93,7 @@ const bootstrapResponse = {
     authorization_surface: "POS" as const,
     authorization_version: "test-authorization-v1",
     is_superadministrator: false,
+      password_reset_required: false,
     default_surface: "POS",
     email: "cashier@zeromerma.local",
     full_name: "Main Branch Cashier",
@@ -174,8 +175,8 @@ vi.mock("../../components/app-shell-right-panel", () => ({
 }));
 
 vi.mock("../auth/auth-store", () => ({
-  usePosAuthStore: (selector: (state: { accessToken: string }) => unknown) =>
-    selector({ accessToken: "token" }),
+  usePosAuthStore: (selector: (state: { isAuthenticated: boolean }) => unknown) =>
+    selector({ isAuthenticated: true }),
 }));
 
 vi.mock("../cash-session-open/queries", () => ({

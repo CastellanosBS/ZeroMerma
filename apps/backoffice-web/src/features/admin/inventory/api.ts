@@ -233,33 +233,27 @@ export function buildAdminInventoryListPath(filters: AdminInventoryListFilters):
 }
 
 export function fetchAdminInventory(
-  accessToken: string,
   filters: AdminInventoryListFilters,
 ): Promise<AdminInventoryListResponse> {
   return requestJson<AdminInventoryApiListResponse>({
-    accessToken,
     path: buildAdminInventoryListPath(filters),
   }).then(mapAdminInventoryListFromApi);
 }
 
 export function fetchAdminInventoryDetail(
-  accessToken: string,
   balanceId: string,
 ): Promise<AdminInventoryDetail> {
   return requestJson<AdminInventoryApiDetail>({
-    accessToken,
     path: `/v1/admin/inventory/${balanceId}`,
   }).then(mapAdminInventoryDetailFromApi);
 }
 
 export function fetchAdminInventoryMovements(
-  accessToken: string,
   balanceId: string,
   page = 1,
   pageSize = 25,
 ): Promise<AdminInventoryMovementsResponse> {
   return requestJson<AdminInventoryApiMovementsResponse>({
-    accessToken,
     path: `/v1/admin/inventory/${balanceId}/movements?page=${page}&page_size=${pageSize}`,
   }).then((response) => ({
     items: response.items.map(mapAdminInventoryMovementFromApi),
@@ -270,11 +264,9 @@ export function fetchAdminInventoryMovements(
 }
 
 export function createAdminInventoryAdjustment(
-  accessToken: string,
   payload: AdminInventoryAdjustmentPayload,
 ): Promise<AdminInventoryAdjustment> {
   return requestJson<AdminInventoryApiAdjustment>({
-    accessToken,
     body: toAdjustmentApiPayload(payload),
     method: "POST",
     path: "/v1/admin/inventory/adjustments",

@@ -271,9 +271,9 @@ describe("admin sanitary verifications API boundary", () => {
       });
     });
 
-    const list = await fetchAdminSanitaryVerifications("token-1", filters);
-    const detail = await fetchAdminSanitaryVerificationDetail("token-1", apiItem.id);
-    const templates = await fetchAdminSanitaryTemplates("token-1");
+    const list = await fetchAdminSanitaryVerifications(filters);
+    const detail = await fetchAdminSanitaryVerificationDetail(apiItem.id);
+    const templates = await fetchAdminSanitaryTemplates();
 
     expect(fetchSpy).toHaveBeenCalledWith(
       expect.stringContaining("/v1/admin/sanitary-verifications?page=1&page_size=25"),
@@ -291,7 +291,7 @@ describe("admin sanitary verifications API boundary", () => {
       .spyOn(globalThis, "fetch")
       .mockImplementation(() => mockJsonResponse(apiDetail, 201));
 
-    await createAdminSanitaryVerification("token-1", {
+    await createAdminSanitaryVerification({
       areaName: "Cocina",
       areaType: "PRODUCTION_AREA",
       branchId: "11111111-1111-4111-8111-111111111111",
@@ -330,13 +330,13 @@ describe("admin sanitary verifications API boundary", () => {
       }),
     );
 
-    await startAdminSanitaryVerification("token-1", apiItem.id);
+    await startAdminSanitaryVerification(apiItem.id);
     expect(fetchSpy).toHaveBeenLastCalledWith(
       expect.stringContaining(`/v1/admin/sanitary-verifications/${apiItem.id}/start`),
       expect.objectContaining({ method: "POST" }),
     );
 
-    await completeAdminSanitaryVerification("token-1", apiItem.id, {
+    await completeAdminSanitaryVerification(apiItem.id, {
       checklistResults: [
         {
           evidenceRequiredOnFailure: false,

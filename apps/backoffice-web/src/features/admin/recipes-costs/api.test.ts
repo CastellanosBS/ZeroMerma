@@ -126,7 +126,7 @@ describe("admin recipe costs API boundary", () => {
       }),
     );
 
-    const response = await fetchAdminRecipeCosts("token-1", filters);
+    const response = await fetchAdminRecipeCosts(filters);
 
     expect(fetchSpy).toHaveBeenCalledWith(
       expect.stringContaining("/v1/admin/recipes-costs/products?page=1&page_size=25"),
@@ -146,7 +146,7 @@ describe("admin recipe costs API boundary", () => {
       }),
     );
 
-    const detail = await fetchAdminRecipeCostDetail("token-1", "product-1");
+    const detail = await fetchAdminRecipeCostDetail("product-1");
 
     expect(fetchSpy).toHaveBeenCalledWith(
       expect.stringContaining("/v1/admin/recipes-costs/products/product-1"),
@@ -164,7 +164,7 @@ describe("admin recipe costs API boundary", () => {
       }, 201),
     );
 
-    const detail = await createAdminRecipe("token-1", {
+    const detail = await createAdminRecipe({
       activate: true,
       inputs: [{ inputProductId: "raw-1", quantity: "2.000" }],
       productId: "product-1",

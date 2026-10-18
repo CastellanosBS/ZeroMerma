@@ -16,29 +16,31 @@ export type LoginRequest = components["schemas"]["LoginRequest"];
 export type LoginResponse = components["schemas"]["LoginResponse"];
 
 interface RequestJsonOptions {
-  accessToken?: string | null;
+
   body?: unknown;
-  method?: "GET" | "PATCH" | "POST";
+  method?: "DELETE" | "GET" | "PATCH" | "POST";
   path: string;
 }
 
 export async function requestJson<TResponse>({
-  accessToken,
   body,
   method = "GET",
   path,
 }: RequestJsonOptions): Promise<TResponse> {
+  const generation = useBackofficeAuthStore.getState().generation;
   try {
     return await requestApiJson<TResponse>({
-      accessToken,
+      surface: "BACKOFFICE",
+      csrfToken: useBackofficeAuthStore.getState().csrfToken,
       baseUrl: appEnv.VITE_API_BASE_URL,
       body,
       method,
       path,
     });
   } catch (error) {
-    if (accessToken && error instanceof ApiError) {
-      if (error.statusCode === 401) useBackofficeAuthStore.getState().clearSession();
+    if (error instanceof ApiError && useBackofficeAuthStore.getState().generation === generation && path !== "/v1/auth/login") {
+      if (error.statusCode === 401 && error.error?.code !== "INVALID_CREDENTIALS") useBackofficeAuthStore.getState().clearSession();
+      if (error.error?.code === "PASSWORD_RESET_REQUIRED") useBackofficeAuthStore.getState().requirePasswordChange();
       if (error.statusCode === 403 && path.split("?")[0] !== "/v1/auth/me") {
         void clearAdministrativeQueries(queryClient).then(() =>
           queryClient.invalidateQueries({ queryKey: backofficeAuthorizationQueryKey }),
@@ -61,10 +63,9 @@ export function loginBackofficeUser(payload: LoginRequest): Promise<LoginRespons
   });
 }
 
-export function getCurrentBackofficeUser(accessToken: string): Promise<AuthenticatedUser> {
+export function getCurrentBackofficeUser(): Promise<AuthenticatedUser> {
   return requestJson<AuthenticatedUser>({
-    accessToken,
-    path: "/v1/auth/me?surface=BACKOFFICE",
+    path: "/v1/auth/me",
   });
 }
 

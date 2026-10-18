@@ -222,7 +222,7 @@ describe("admin purchases API boundary", () => {
       }),
     );
 
-    const response = await fetchAdminPurchases("token-1", filters);
+    const response = await fetchAdminPurchases(filters);
 
     expect(fetchSpy).toHaveBeenCalledWith(
       expect.stringContaining("/v1/admin/purchases?page=1&page_size=25"),
@@ -237,7 +237,7 @@ describe("admin purchases API boundary", () => {
   it("loads purchase detail and inventory impact", async () => {
     const fetchSpy = vi.spyOn(globalThis, "fetch").mockImplementation(() => mockJsonResponse(apiPurchaseDetail));
 
-    const detail = await fetchAdminPurchaseDetail("token-1", "purchase-1");
+    const detail = await fetchAdminPurchaseDetail("purchase-1");
 
     expect(fetchSpy).toHaveBeenCalledWith(
       expect.stringContaining("/v1/admin/purchases/purchase-1"),
@@ -251,7 +251,7 @@ describe("admin purchases API boundary", () => {
   it("uses create, direct entry, receive, confirm and cancel endpoints", async () => {
     const fetchSpy = vi.spyOn(globalThis, "fetch").mockImplementation(() => mockJsonResponse(apiPurchaseDetail, 201));
 
-    await createAdminPurchase("token-1", {
+    await createAdminPurchase({
       branchId: "branch-1",
       confirmNow: true,
       externalDocumentNumber: "REM-100",
@@ -264,7 +264,7 @@ describe("admin purchases API boundary", () => {
       expect.objectContaining({ body: expect.stringContaining("\"confirm_now\":true"), method: "POST" }),
     );
 
-    await createAdminDirectEntry("token-1", {
+    await createAdminDirectEntry({
       branchId: "branch-1",
       lines: [{ productId: "product-1", receivedQuantity: "2.000", unitCost: "12.0000" }],
       supplierId: "supplier-1",
@@ -274,7 +274,7 @@ describe("admin purchases API boundary", () => {
       expect.objectContaining({ method: "POST" }),
     );
 
-    await receiveAdminPurchase("token-1", "purchase-1", {
+    await receiveAdminPurchase("purchase-1", {
       lines: [{ discrepancyReason: "Entrega parcial", purchaseLineId: "line-1", receivedQuantity: "2.000" }],
     });
     expect(fetchSpy).toHaveBeenLastCalledWith(
@@ -282,13 +282,13 @@ describe("admin purchases API boundary", () => {
       expect.objectContaining({ body: expect.stringContaining("\"discrepancy_reason\":\"Entrega parcial\"") }),
     );
 
-    await confirmAdminPurchase("token-1", "purchase-1");
+    await confirmAdminPurchase("purchase-1");
     expect(fetchSpy).toHaveBeenLastCalledWith(
       expect.stringContaining("/v1/admin/purchases/purchase-1/confirm"),
       expect.objectContaining({ method: "POST" }),
     );
 
-    await cancelAdminPurchase("token-1", "purchase-1", { reason: "Duplicada" });
+    await cancelAdminPurchase("purchase-1", { reason: "Duplicada" });
     expect(fetchSpy).toHaveBeenLastCalledWith(
       expect.stringContaining("/v1/admin/purchases/purchase-1/cancel"),
       expect.objectContaining({ body: JSON.stringify({ reason: "Duplicada" }), method: "POST" }),

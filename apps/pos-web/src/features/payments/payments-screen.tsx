@@ -676,7 +676,7 @@ export function PaymentsRightPanel({
 }
 
 export function PaymentsScreen() {
-  const accessToken = usePosAuthStore((state) => state.accessToken);
+  const isAuthenticated = usePosAuthStore((state) => state.isAuthenticated);
   const showError = useStatusMessageStore((state) => state.showError);
   const showSuccess = useStatusMessageStore((state) => state.showSuccess);
   const queryClient = useQueryClient();
@@ -809,12 +809,11 @@ export function PaymentsScreen() {
 
   const createPaymentMutation = useMutation({
     mutationFn: async () => {
-      if (!accessToken) {
+      if (!isAuthenticated) {
         throw new Error("Necesitas iniciar sesion antes de registrar un pago.");
       }
 
       return createPayment({
-        accessToken,
         payload: buildCreateOperationalPaymentRequest(
           appEnv.VITE_POS_WORKSTATION_CODE,
           draftState,

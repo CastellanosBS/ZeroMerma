@@ -204,31 +204,25 @@ export function buildAdminWorkstationsListPath(filters: AdminWorkstationListFilt
 }
 
 export function fetchAdminWorkstations(
-  accessToken: string,
   filters: AdminWorkstationListFilters,
 ): Promise<AdminWorkstationListResponse> {
   return requestJson<AdminWorkstationsApiListResponse>({
-    accessToken,
     path: buildAdminWorkstationsListPath(filters),
   }).then(mapAdminWorkstationsListFromApi);
 }
 
 export function fetchAdminWorkstationDetail(
-  accessToken: string,
   workstationId: string,
 ): Promise<AdminWorkstationDetail> {
   return requestJson<AdminWorkstationApiDetail>({
-    accessToken,
     path: `/v1/admin/workstations/${workstationId}`,
   }).then(mapAdminWorkstationDetailFromApi);
 }
 
 export function createAdminWorkstation(
-  accessToken: string,
   payload: AdminWorkstationCreatePayload,
 ): Promise<AdminWorkstationDetail> {
   return requestJson<AdminWorkstationApiDetail>({
-    accessToken,
     body: toCreateApiPayload(payload),
     method: "POST",
     path: "/v1/admin/workstations",
@@ -236,12 +230,10 @@ export function createAdminWorkstation(
 }
 
 export function updateAdminWorkstation(
-  accessToken: string,
   workstationId: string,
   payload: AdminWorkstationUpdatePayload,
 ): Promise<AdminWorkstationDetail> {
   return requestJson<AdminWorkstationApiDetail>({
-    accessToken,
     body: toUpdateApiPayload(payload),
     method: "PATCH",
     path: `/v1/admin/workstations/${workstationId}`,

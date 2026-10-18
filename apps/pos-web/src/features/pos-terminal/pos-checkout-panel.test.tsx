@@ -184,7 +184,7 @@ afterEach(() => {
 describe("PosCheckoutPanel", () => {
   it("keeps Recibe enabled and lets the cashier confirm without clicking Cobrar first", async () => {
     act(() => {
-      usePosAuthStore.getState().setAccessToken("token");
+      usePosAuthStore.setState({ isAuthenticated: true, phase: "ready" });
       seedTicket();
     });
 
@@ -222,7 +222,7 @@ describe("PosCheckoutPanel", () => {
 
   it("focuses Recibe after explicit payment entry", async () => {
     act(() => {
-      usePosAuthStore.getState().setAccessToken("token");
+      usePosAuthStore.setState({ isAuthenticated: true, phase: "ready" });
       seedTicket();
     });
 
@@ -249,7 +249,7 @@ describe("PosCheckoutPanel", () => {
 
   it("switches payment method with keyboard shortcuts inside payment capture", async () => {
     act(() => {
-      usePosAuthStore.getState().setAccessToken("token");
+      usePosAuthStore.setState({ isAuthenticated: true, phase: "ready" });
       seedTicket();
     });
 
@@ -285,7 +285,7 @@ describe("PosCheckoutPanel", () => {
 
   it("allows editing and deleting the selected ticket line from the keyboard", async () => {
     act(() => {
-      usePosAuthStore.getState().setAccessToken("token");
+      usePosAuthStore.setState({ isAuthenticated: true, phase: "ready" });
       seedTicket();
     });
 
@@ -322,7 +322,7 @@ describe("PosCheckoutPanel", () => {
 
   it("keeps the sale in amount capture when the amount is insufficient", async () => {
     act(() => {
-      usePosAuthStore.getState().setAccessToken("token");
+      usePosAuthStore.setState({ isAuthenticated: true, phase: "ready" });
       seedTicket();
     });
 
@@ -370,7 +370,7 @@ describe("PosCheckoutPanel", () => {
     getTicketDetailMock.mockResolvedValue(createTicketDetail());
 
     act(() => {
-      usePosAuthStore.getState().setAccessToken("token");
+      usePosAuthStore.setState({ isAuthenticated: true, phase: "ready" });
       seedTicket();
     });
 
@@ -448,7 +448,7 @@ describe("PosCheckoutPanel", () => {
     getTicketDetailMock.mockResolvedValue(createTicketDetail());
 
     act(() => {
-      usePosAuthStore.getState().setAccessToken("token");
+      usePosAuthStore.setState({ isAuthenticated: true, phase: "ready" });
       seedTicket();
     });
 
@@ -490,7 +490,7 @@ describe("PosCheckoutPanel", () => {
     });
 
     expect(confirmPosSaleMock).toHaveBeenCalledTimes(1);
-    expect(confirmPosSaleMock.mock.calls[0]?.[1]).toMatchObject({
+    expect(confirmPosSaleMock.mock.calls[0]?.[0]).toMatchObject({
       payments: [
         { payment_method_code: "CASH", tendered_amount: "1" },
         { payment_method_code: "CARD", tendered_amount: "2" },
@@ -509,7 +509,7 @@ describe("PosCheckoutPanel", () => {
     getTicketDetailMock.mockResolvedValue(createTicketDetail());
 
     act(() => {
-      usePosAuthStore.getState().setAccessToken("token");
+      usePosAuthStore.setState({ isAuthenticated: true, phase: "ready" });
       seedTicket();
     });
 
@@ -553,7 +553,7 @@ describe("PosCheckoutPanel", () => {
     confirmPosSaleMock.mockRejectedValue(new Error("network down"));
 
     act(() => {
-      usePosAuthStore.getState().setAccessToken("token");
+      usePosAuthStore.setState({ isAuthenticated: true, phase: "ready" });
       seedTicket();
     });
 
@@ -593,7 +593,7 @@ describe("PosCheckoutPanel", () => {
     getTicketDetailMock.mockResolvedValue(createTicketDetail());
 
     act(() => {
-      usePosAuthStore.getState().setAccessToken("token");
+      usePosAuthStore.setState({ isAuthenticated: true, phase: "ready" });
       seedTicket();
     });
 

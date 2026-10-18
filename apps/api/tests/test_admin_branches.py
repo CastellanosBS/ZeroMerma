@@ -9,7 +9,6 @@ from sqlalchemy import select, text
 
 from zeromerma_api.bootstrap.seed_local import (
     SEED_ADMIN_EMAIL,
-    SEED_ADMIN_PASSWORD,
     SEED_BRANCH_CODE,
     SEED_BRANCH_NAME,
     SEED_BRAND_EL_MEJOR_PAN_CODE,
@@ -26,26 +25,11 @@ from zeromerma_api.modules.identity.application.authorization import resolve_aut
 from zeromerma_api.modules.identity.infrastructure.models import User
 from zeromerma_api.modules.outbox.infrastructure.models import OutboxEvent
 from zeromerma_api.testing.authorization import owner_headers
+from zeromerma_api.testing.sessions import login_headers
 
 
-def _login_admin(client: TestClient) -> str:
-    response = client.post(
-        "/v1/auth/login",
-        json={"email": SEED_ADMIN_EMAIL, "password": SEED_ADMIN_PASSWORD},
-    )
-
-    assert response.status_code == 200
-    return str(response.json()["access_token"])
-
-
-def _login_cashier(client: TestClient) -> str:
-    response = client.post(
-        "/v1/auth/login",
-        json={"email": SEED_USER_EMAIL, "password": SEED_USER_PASSWORD},
-    )
-
-    assert response.status_code == 200
-    return str(response.json()["access_token"])
+def _login_cashier(client: TestClient) -> dict[str, str]:
+    return login_headers(client, email=SEED_USER_EMAIL, password=SEED_USER_PASSWORD, audience="POS")
 
 
 def _admin_headers(client: TestClient) -> dict[str, str]:
@@ -82,7 +66,7 @@ def test_admin_branches_list_returns_seeded_branches_and_metrics(client: TestCli
 def test_admin_branches_reject_pos_surface_user(client: TestClient) -> None:
     response = client.get(
         "/v1/admin/branches",
-        headers={"Authorization": f"Bearer {_login_cashier(client)}"},
+        headers=_login_cashier(client),
     )
 
     assert response.status_code == 403

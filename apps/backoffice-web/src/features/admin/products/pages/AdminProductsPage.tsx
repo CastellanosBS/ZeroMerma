@@ -128,7 +128,7 @@ function AdminProductsMetricStrip({
 }
 
 export function AdminProductsPage() {
-  const accessToken = useBackofficeAuthStore((state) => state.accessToken);
+  const isAuthenticated = useBackofficeAuthStore((state) => state.isAuthenticated);
   const queryClient = useQueryClient();
   const [filters, setFilters] = useState<AdminProductListFilters>(getInitialFilters);
   const [isCreating, setIsCreating] = useState(false);
@@ -138,8 +138,8 @@ export function AdminProductsPage() {
   );
 
   const productsQuery = useQuery({
-    enabled: Boolean(accessToken),
-    queryFn: () => fetchAdminProducts(accessToken ?? "", filters),
+    enabled: isAuthenticated,
+    queryFn: () => fetchAdminProducts(filters),
     queryKey: ["admin", "products", "list", filters],
     retry: false,
   });
@@ -151,15 +151,15 @@ export function AdminProductsPage() {
   );
 
   const productDetailQuery = useQuery({
-    enabled: Boolean(accessToken && selectedProductId),
-    queryFn: () => fetchAdminProductDetail(accessToken ?? "", selectedProductId ?? ""),
+    enabled: Boolean(isAuthenticated && selectedProductId),
+    queryFn: () => fetchAdminProductDetail(selectedProductId ?? ""),
     queryKey: ["admin", "products", "detail", selectedProductId],
     retry: false,
   });
 
   const createProductMutation = useMutation({
     mutationFn: (payload: AdminProductCreatePayload) =>
-      createAdminProduct(accessToken ?? "", payload),
+      createAdminProduct(payload),
     onError: (error) => {
       setFeedback({
         tone: "error",
@@ -214,7 +214,7 @@ export function AdminProductsPage() {
   }
 
   function handleCreateProduct(payload: AdminProductCreatePayload) {
-    if (!accessToken || createProductMutation.isPending) {
+    if (!isAuthenticated || createProductMutation.isPending) {
       return;
     }
 

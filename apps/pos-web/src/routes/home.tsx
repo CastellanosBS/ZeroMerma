@@ -5,12 +5,12 @@ import { useCurrentCashSessionQuery } from "../features/cash-session-open/querie
 import { resolvePosEntryRoute } from "../features/pos-bootstrap/route-state";
 
 export function HomePage() {
-  const accessToken = usePosAuthStore((state) => state.accessToken);
+  const isAuthenticated = usePosAuthStore((state) => state.isAuthenticated);
   const currentCashSessionQuery = useCurrentCashSessionQuery();
 
   const nextRoute = resolvePosEntryRoute({
     hasActiveCashSession: currentCashSessionQuery.data !== null,
-    hasAccessToken: accessToken !== null,
+    isAuthenticated: isAuthenticated,
   });
 
   return <Navigate to={nextRoute} />;

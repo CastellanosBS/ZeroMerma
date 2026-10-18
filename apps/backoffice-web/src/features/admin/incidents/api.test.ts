@@ -241,8 +241,8 @@ describe("admin incidents API boundary", () => {
       });
     });
 
-    const list = await fetchAdminIncidents("token-1", filters);
-    const detail = await fetchAdminIncidentDetail("token-1", apiItem.id);
+    const list = await fetchAdminIncidents(filters);
+    const detail = await fetchAdminIncidentDetail(apiItem.id);
 
     expect(fetchSpy).toHaveBeenCalledWith(
       expect.stringContaining("/v1/admin/incidents?page=1&page_size=25"),
@@ -259,7 +259,7 @@ describe("admin incidents API boundary", () => {
       .spyOn(globalThis, "fetch")
       .mockImplementation(() => mockJsonResponse(apiDetail, 201));
 
-    await createAdminIncident("token-1", {
+    await createAdminIncident({
       areaName: "Cocina",
       branchId: "11111111-1111-4111-8111-111111111111",
       correctiveAction: "Retirar insumo vencido.",
@@ -290,7 +290,7 @@ describe("admin incidents API boundary", () => {
       }),
     );
 
-    await addAdminIncidentFollowUp("token-1", apiItem.id, {
+    await addAdminIncidentFollowUp(apiItem.id, {
       note: "Seguimiento registrado.",
       statusChange: "IN_PROGRESS",
     });
@@ -299,7 +299,7 @@ describe("admin incidents API boundary", () => {
       expect.objectContaining({ method: "POST" }),
     );
 
-    await changeAdminIncidentStatus("token-1", apiItem.id, {
+    await changeAdminIncidentStatus(apiItem.id, {
       cancellationReason: null,
       note: "Cambio de estado.",
       status: "IN_PROGRESS",
@@ -309,7 +309,7 @@ describe("admin incidents API boundary", () => {
       expect.objectContaining({ method: "POST" }),
     );
 
-    await resolveAdminIncident("token-1", apiItem.id, {
+    await resolveAdminIncident(apiItem.id, {
       evidenceNote: "Foto final",
       resolutionNote: "Se repuso sanitizante.",
       resolvedAt: "2026-05-21T18:00:00Z",
@@ -320,7 +320,7 @@ describe("admin incidents API boundary", () => {
       expect.objectContaining({ method: "POST" }),
     );
 
-    await reopenAdminIncident("token-1", apiItem.id, "Reabrir seguimiento.");
+    await reopenAdminIncident(apiItem.id, "Reabrir seguimiento.");
     expect(fetchSpy).toHaveBeenLastCalledWith(
       expect.stringContaining(`/v1/admin/incidents/${apiItem.id}/reopen`),
       expect.objectContaining({ method: "POST" }),

@@ -18,12 +18,11 @@ from zeromerma_api.modules.identity.domain.constants import (
 from zeromerma_api.modules.identity.infrastructure.models import Role, User, UserRoleAssignment
 from zeromerma_api.modules.outbox.infrastructure.models import OutboxEvent
 from zeromerma_api.testing.authorization import owner_headers
+from zeromerma_api.testing.sessions import login_headers
 
 
-def _login(client: TestClient, *, email: str, password: str) -> str:
-    response = client.post("/v1/auth/login", json={"email": email, "password": password})
-    assert response.status_code == 200
-    return str(response.json()["access_token"])
+def _login(client: TestClient, *, email: str, password: str) -> dict[str, str]:
+    return login_headers(client, email=email, password=password, audience="POS")
 
 
 def _admin_headers(client: TestClient) -> dict[str, str]:
@@ -32,7 +31,7 @@ def _admin_headers(client: TestClient) -> dict[str, str]:
 
 def _cashier_headers(client: TestClient) -> dict[str, str]:
     token = _login(client, email=SEED_USER_EMAIL, password=SEED_USER_PASSWORD)
-    return {"Authorization": f"Bearer {token}"}
+    return token
 
 
 def _role_id(code: str) -> str:

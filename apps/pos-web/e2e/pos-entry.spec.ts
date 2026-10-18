@@ -3,6 +3,7 @@ import { expect, test } from "@playwright/test";
 import { installPosApiMocks } from "./helpers/pos-mocks";
 
 test("shows the cashier login screen for unauthenticated access", async ({ page }) => {
+  await installPosApiMocks(page);
   await page.goto("/");
 
   await expect(page.getByRole("heading", { name: "Acceso del cajero" })).toBeVisible();
@@ -68,19 +69,8 @@ test("sends an authenticated operator without an active session to the cash-sess
 });
 
 test("resumes POS from the cash-session gate when a session already exists", async ({ page }) => {
-  await installPosApiMocks(page, { hasActiveCashSession: true });
+  await installPosApiMocks(page, { hasActiveCashSession: true, authenticated: true });
 
-  await page.addInitScript(() => {
-    localStorage.setItem(
-      "zeromerma-pos-auth",
-      JSON.stringify({
-        state: {
-          accessToken: "test-access-token",
-        },
-        version: 0,
-      }),
-    );
-  });
 
   await page.goto("/cash-session/open");
 

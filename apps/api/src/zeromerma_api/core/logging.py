@@ -6,6 +6,8 @@ import logging.config
 from datetime import UTC, datetime
 from typing import Any
 
+from zeromerma_api.core.log_redaction import redact_log
+
 
 class JsonFormatter(logging.Formatter):
     def format(self, record: logging.LogRecord) -> str:
@@ -16,8 +18,8 @@ class JsonFormatter(logging.Formatter):
             "message": record.getMessage(),
         }
         if record.exc_info:
-            payload["exception"] = self.formatException(record.exc_info)
-        return json.dumps(payload, separators=(",", ":"))
+            payload["exception_type"] = type(record.exc_info[1]).__name__
+        return json.dumps(redact_log(payload), separators=(",", ":"))
 
 
 def configure_logging(level: str) -> None:
@@ -35,6 +37,10 @@ def configure_logging(level: str) -> None:
             "root": {
                 "handlers": ["default"],
                 "level": level,
+            },
+            "loggers": {
+                name: {"handlers": ["default"], "level": level, "propagate": False}
+                for name in ("uvicorn", "uvicorn.error", "uvicorn.access", "httpx")
             },
         }
     )

@@ -160,7 +160,7 @@ describe("admin branches API boundary", () => {
       }),
     );
 
-    const response = await fetchAdminBranches("token-1", filters);
+    const response = await fetchAdminBranches(filters);
 
     expect(fetchSpy).toHaveBeenCalledWith(
       expect.stringContaining("/v1/admin/branches?page=1&page_size=25"),
@@ -178,7 +178,7 @@ describe("admin branches API boundary", () => {
   it("loads branch detail by id", async () => {
     const fetchSpy = vi.spyOn(globalThis, "fetch").mockImplementation(() => mockJsonResponse(apiDetail));
 
-    const branch = await fetchAdminBranchDetail("token-1", "branch-1");
+    const branch = await fetchAdminBranchDetail("branch-1");
 
     expect(fetchSpy).toHaveBeenCalledWith(
       expect.stringContaining("/v1/admin/branches/branch-1"),
@@ -192,7 +192,7 @@ describe("admin branches API boundary", () => {
   it("submits new branches through the backend contract", async () => {
     const fetchSpy = vi.spyOn(globalThis, "fetch").mockImplementation(() => mockJsonResponse(apiDetail, 201));
 
-    const branch = await createAdminBranch("token-1", {
+    const branch = await createAdminBranch({
       brandId: "brand-1",
       code: "CENTRO",
       isActive: true,

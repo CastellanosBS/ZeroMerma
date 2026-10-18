@@ -139,6 +139,9 @@ IDENTITY_METADATA_TABLES = frozenset(
         "identity_privilege_state",
         "identity_privileged_changes",
         "identity_recovery_credentials",
+        "auth_sessions",
+        "auth_login_limits",
+        "password_reset_credentials",
     }
 )
 _BULK_DELETE_TABLES = frozenset(
@@ -560,6 +563,28 @@ def _validate_entity(
 ) -> None:
     table = _table(type(instance))
     name = table.name
+    from zeromerma_api.modules.identity.application.session_services import (
+        AUTH_CONTEXT_KEY,
+        SessionAuthentication,
+    )
+
+    authentication = session.info.get(AUTH_CONTEXT_KEY)
+    if isinstance(authentication, SessionAuthentication):
+        if name == "auth_sessions" and getattr(instance, "id", None) == authentication.record.id:
+            changed = {
+                attribute.key
+                for attribute in inspect(instance).attrs
+                if attribute.history.has_changes()
+            }
+            if changed <= {"last_activity_at", "idle_expires_at"}:
+                return
+        if authentication.record.audience == "POS" and "workstation_id" in table.c:
+            workstation_id = _value(instance, "workstation_id")
+            if (
+                workstation_id is not None
+                and workstation_id != authentication.record.workstation_id
+            ):
+                raise _deny("This POS session is bound to another workstation.")
     if name in IDENTITY_METADATA_TABLES:
         if not context.identity_mutation:
             raise _deny("Identity mutations require explicit identity authority.")

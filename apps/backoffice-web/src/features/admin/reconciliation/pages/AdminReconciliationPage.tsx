@@ -204,7 +204,7 @@ type WorkflowState =
   | { mode: "resolve"; reconciliation: AdminReconciliationListItem };
 
 export function AdminReconciliationPage() {
-  const accessToken = useBackofficeAuthStore((state) => state.accessToken);
+  const isAuthenticated = useBackofficeAuthStore((state) => state.isAuthenticated);
   const queryClient = useQueryClient();
   const [filters, setFilters] = useState<AdminReconciliationListFilters>(initialFilters);
   const [selectedReconciliationId, setSelectedReconciliationId] = useState<string | null>(null);
@@ -214,8 +214,8 @@ export function AdminReconciliationPage() {
   );
 
   const reconciliationsQuery = useQuery({
-    enabled: Boolean(accessToken),
-    queryFn: () => fetchAdminReconciliations(accessToken ?? "", filters),
+    enabled: isAuthenticated,
+    queryFn: () => fetchAdminReconciliations(filters),
     queryKey: ["admin", "reconciliation", "list", filters],
     retry: false,
   });
@@ -227,16 +227,16 @@ export function AdminReconciliationPage() {
   );
 
   const detailQuery = useQuery({
-    enabled: Boolean(accessToken && selectedReconciliationId),
+    enabled: Boolean(isAuthenticated && selectedReconciliationId),
     queryFn: () =>
-      fetchAdminReconciliationDetail(accessToken ?? "", selectedReconciliationId ?? ""),
+      fetchAdminReconciliationDetail(selectedReconciliationId ?? ""),
     queryKey: ["admin", "reconciliation", "detail", selectedReconciliationId],
     retry: false,
   });
 
   const createMutation = useMutation({
     mutationFn: (payload: AdminReconciliationCreatePayload) =>
-      createAdminReconciliation(accessToken ?? "", payload),
+      createAdminReconciliation(payload),
     onSuccess: async (detail) => {
       setFeedback({ tone: "success", message: `Conciliacion ${detail.overview.folio} guardada.` });
       setSelectedReconciliationId(detail.overview.id);
@@ -247,7 +247,7 @@ export function AdminReconciliationPage() {
 
   const resolveMutation = useMutation({
     mutationFn: ({ id, payload }: { id: string; payload: AdminReconciliationResolvePayload }) =>
-      resolveAdminReconciliation(accessToken ?? "", id, payload),
+      resolveAdminReconciliation(id, payload),
     onSuccess: async (detail) => {
       setFeedback({ tone: "success", message: `Conciliacion ${detail.overview.folio} resuelta.` });
       setSelectedReconciliationId(detail.overview.id);

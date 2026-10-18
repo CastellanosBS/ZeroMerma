@@ -172,7 +172,7 @@ describe("admin inventory API boundary", () => {
       }),
     );
 
-    const response = await fetchAdminInventory("token-1", filters);
+    const response = await fetchAdminInventory(filters);
 
     expect(fetchSpy).toHaveBeenCalledWith(
       expect.stringContaining("/v1/admin/inventory?page=1&page_size=25"),
@@ -200,8 +200,8 @@ describe("admin inventory API boundary", () => {
         }),
       );
 
-    const detail = await fetchAdminInventoryDetail("token-1", "balance-1");
-    const movements = await fetchAdminInventoryMovements("token-1", "balance-1");
+    const detail = await fetchAdminInventoryDetail("balance-1");
+    const movements = await fetchAdminInventoryMovements("balance-1");
 
     expect(fetchSpy).toHaveBeenNthCalledWith(
       1,
@@ -235,7 +235,7 @@ describe("admin inventory API boundary", () => {
       ),
     );
 
-    const adjustment = await createAdminInventoryAdjustment("token-1", {
+    const adjustment = await createAdminInventoryAdjustment({
       adjustmentType: "INCREASE",
       branchId: "branch-1",
       locationCode: "BACKROOM",

@@ -132,7 +132,7 @@ function getBalanceId(item: AdminInventoryDetail | AdminInventoryListItem): stri
 }
 
 export function AdminInventoryPage() {
-  const accessToken = useBackofficeAuthStore((state) => state.accessToken);
+  const isAuthenticated = useBackofficeAuthStore((state) => state.isAuthenticated);
   const queryClient = useQueryClient();
   const [filters, setFilters] = useState<AdminInventoryListFilters>(getInitialFilters);
   const [selectedBalanceId, setSelectedBalanceId] = useState<string | null>(null);
@@ -145,8 +145,8 @@ export function AdminInventoryPage() {
   );
 
   const inventoryQuery = useQuery({
-    enabled: Boolean(accessToken),
-    queryFn: () => fetchAdminInventory(accessToken ?? "", filters),
+    enabled: isAuthenticated,
+    queryFn: () => fetchAdminInventory(filters),
     queryKey: ["admin", "inventory", "list", filters],
     retry: false,
   });
@@ -158,15 +158,15 @@ export function AdminInventoryPage() {
   );
 
   const inventoryDetailQuery = useQuery({
-    enabled: Boolean(accessToken && selectedBalanceId),
-    queryFn: () => fetchAdminInventoryDetail(accessToken ?? "", selectedBalanceId ?? ""),
+    enabled: Boolean(isAuthenticated && selectedBalanceId),
+    queryFn: () => fetchAdminInventoryDetail(selectedBalanceId ?? ""),
     queryKey: ["admin", "inventory", "detail", selectedBalanceId],
     retry: false,
   });
 
   const adjustmentMutation = useMutation({
     mutationFn: (payload: AdminInventoryAdjustmentPayload) =>
-      createAdminInventoryAdjustment(accessToken ?? "", payload),
+      createAdminInventoryAdjustment(payload),
     onError: (error) => {
       setFeedback({
         tone: "error",
@@ -231,7 +231,7 @@ export function AdminInventoryPage() {
   }
 
   function handleSubmitAdjustment(payload: AdminInventoryAdjustmentPayload) {
-    if (!accessToken || adjustmentMutation.isPending) {
+    if (!isAuthenticated || adjustmentMutation.isPending) {
       return;
     }
 

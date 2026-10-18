@@ -48,8 +48,10 @@ import { AuthorizedAdminHome } from "./features/auth/AdminAccessDenied";
 import { HealthDemoPage } from "./routes/health-demo";
 import { HomePage } from "./routes/home";
 
+import { BackofficeSessionBoundary } from "./features/auth/BackofficeSessionBoundary";
+
 const rootRoute = createRootRoute({
-  component: Outlet,
+  component: () => <BackofficeSessionBoundary><Outlet /></BackofficeSessionBoundary>,
 });
 
 export function getBackofficeDevelopmentRouteRedirect(

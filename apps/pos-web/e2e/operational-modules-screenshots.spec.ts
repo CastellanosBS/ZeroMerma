@@ -1,3 +1,4 @@
+import { installMockCookieSession } from "./helpers/session-mocks";
 import { mkdirSync } from "node:fs";
 import path from "node:path";
 
@@ -409,17 +410,7 @@ async function fulfillJson(route: Route, body: unknown, status = 200) {
 }
 
 async function installAuthSession(page: Page) {
-  await page.addInitScript(() => {
-    window.localStorage.setItem(
-      "zeromerma-pos-auth",
-      JSON.stringify({
-        state: {
-          accessToken: "test-access-token",
-        },
-        version: 0,
-      }),
-    );
-  });
+  await installMockCookieSession(page, true);
 }
 
 async function installApiMocks(page: Page) {
@@ -427,6 +418,8 @@ async function installApiMocks(page: Page) {
     const request = route.request();
     const url = new URL(request.url());
     const pathname = url.pathname;
+
+    if (pathname.startsWith("/v1/auth/")) { await route.fallback(); return; }
 
     if (pathname === "/v1/pos/bootstrap") {
       await fulfillJson(route, posBootstrap);

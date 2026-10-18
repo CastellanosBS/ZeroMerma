@@ -100,7 +100,7 @@ function AdminClassesMetricStrip({
 }
 
 export function AdminClassesPage() {
-  const accessToken = useBackofficeAuthStore((state) => state.accessToken);
+  const isAuthenticated = useBackofficeAuthStore((state) => state.isAuthenticated);
   const queryClient = useQueryClient();
   const [filters, setFilters] = useState<AdminProductClassListFilters>(initialFilters);
   const [formMode, setFormMode] = useState<
@@ -112,8 +112,8 @@ export function AdminClassesPage() {
   );
 
   const classesQuery = useQuery({
-    enabled: Boolean(accessToken),
-    queryFn: () => fetchAdminProductClasses(accessToken ?? "", filters),
+    enabled: isAuthenticated,
+    queryFn: () => fetchAdminProductClasses(filters),
     queryKey: ["admin", "product-classes", "list", filters],
     retry: false,
   });
@@ -125,15 +125,15 @@ export function AdminClassesPage() {
   );
 
   const classDetailQuery = useQuery({
-    enabled: Boolean(accessToken && selectedClassId),
-    queryFn: () => fetchAdminProductClassDetail(accessToken ?? "", selectedClassId ?? ""),
+    enabled: Boolean(isAuthenticated && selectedClassId),
+    queryFn: () => fetchAdminProductClassDetail(selectedClassId ?? ""),
     queryKey: ["admin", "product-classes", "detail", selectedClassId],
     retry: false,
   });
 
   const createClassMutation = useMutation({
     mutationFn: (payload: AdminProductClassCreatePayload) =>
-      createAdminProductClass(accessToken ?? "", payload),
+      createAdminProductClass(payload),
     onError: (error) => {
       setFeedback({
         tone: "error",
@@ -155,7 +155,7 @@ export function AdminClassesPage() {
     }: {
       classId: string;
       payload: AdminProductClassUpdatePayload;
-    }) => updateAdminProductClass(accessToken ?? "", classId, payload),
+    }) => updateAdminProductClass(classId, payload),
     onError: (error) => {
       setFeedback({
         tone: "error",
@@ -212,7 +212,7 @@ export function AdminClassesPage() {
   }
 
   function handleSubmitClass(payload: AdminProductClassCreatePayload) {
-    if (!accessToken || isSaving) {
+    if (!isAuthenticated || isSaving) {
       return;
     }
 
@@ -229,7 +229,7 @@ export function AdminClassesPage() {
   }
 
   function handleToggleStatus(item: AdminProductClass) {
-    if (!accessToken || updateClassMutation.isPending) {
+    if (!isAuthenticated || updateClassMutation.isPending) {
       return;
     }
 
@@ -253,7 +253,7 @@ export function AdminClassesPage() {
   }
 
   function handleMoveClass(item: AdminProductClass, direction: "up" | "down") {
-    if (!accessToken || updateClassMutation.isPending) {
+    if (!isAuthenticated || updateClassMutation.isPending) {
       return;
     }
 

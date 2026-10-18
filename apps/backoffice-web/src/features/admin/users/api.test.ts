@@ -186,7 +186,7 @@ describe("admin users API boundary", () => {
       }),
     );
 
-    const response = await fetchAdminUsers("token-1", {
+    const response = await fetchAdminUsers({
       ...filters,
       appAccess: "BACKOFFICE",
       search: "admin",
@@ -206,7 +206,7 @@ describe("admin users API boundary", () => {
       .spyOn(globalThis, "fetch")
       .mockImplementation(() => mockJsonResponse(apiDetail));
 
-    const detail = await fetchAdminUserDetail("token-1", "user-1");
+    const detail = await fetchAdminUserDetail("user-1");
 
     expect(fetchSpy).toHaveBeenCalledWith(
       expect.stringContaining("/v1/admin/users/user-1"),
@@ -222,7 +222,7 @@ describe("admin users API boundary", () => {
       .spyOn(globalThis, "fetch")
       .mockImplementation(() => mockJsonResponse(apiDetail, 201));
 
-    await createAdminUser("token-1", {
+    await createAdminUser({
       allowedSurfaces: ["BACKOFFICE"],
       branchAssignments: [],
       defaultSurface: "BACKOFFICE",
@@ -243,7 +243,7 @@ describe("admin users API boundary", () => {
     );
     expect(JSON.parse(String(fetchSpy.mock.calls[0]?.[1]?.body))).not.toHaveProperty("role_ids");
 
-    await lockAdminUser("token-1", "user-1", { reason: "Security review" });
+    await lockAdminUser("user-1", { reason: "Security review" });
     expect(fetchSpy).toHaveBeenLastCalledWith(
       expect.stringContaining("/v1/admin/users/user-1/lock"),
       expect.objectContaining({
@@ -262,12 +262,12 @@ describe("admin users API boundary", () => {
       scope_type: "BRANCH_SET" as const,
       branch_ids: ["branch-1"],
     };
-    await assignAdminUserRole("token-1", "user-1", payload);
+    await assignAdminUserRole("user-1", payload);
     expect(fetchSpy).toHaveBeenLastCalledWith(
       expect.stringContaining("/v1/admin/users/user-1/roles"),
       expect.objectContaining({ method: "POST", body: JSON.stringify(payload) }),
     );
-    await removeAdminUserRole("token-1", "user-1", "role-1");
+    await removeAdminUserRole("user-1", "role-1");
     expect(fetchSpy).toHaveBeenLastCalledWith(
       expect.stringContaining("/v1/admin/users/user-1/roles/role-1/remove"),
       expect.objectContaining({ method: "POST", body: undefined }),

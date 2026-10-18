@@ -127,7 +127,7 @@ function AdminSalesTicketsMetricStrip({
 }
 
 export function AdminSalesTicketsPage() {
-  const accessToken = useBackofficeAuthStore((state) => state.accessToken);
+  const isAuthenticated = useBackofficeAuthStore((state) => state.isAuthenticated);
   const [filters, setFilters] = useState<AdminSalesTicketListFilters>(initialFilters);
   const [selectedTicketId, setSelectedTicketId] = useState<string | null>(null);
   const [feedback, setFeedback] = useState<{ tone: "success" | "error"; message: string } | null>(
@@ -135,8 +135,8 @@ export function AdminSalesTicketsPage() {
   );
 
   const ticketsQuery = useQuery({
-    enabled: Boolean(accessToken),
-    queryFn: () => fetchAdminSalesTickets(accessToken ?? "", filters),
+    enabled: isAuthenticated,
+    queryFn: () => fetchAdminSalesTickets(filters),
     queryKey: ["admin", "sales-tickets", "list", filters],
     retry: false,
   });
@@ -148,8 +148,8 @@ export function AdminSalesTicketsPage() {
   );
 
   const detailQuery = useQuery({
-    enabled: Boolean(accessToken && selectedTicketId),
-    queryFn: () => fetchAdminSalesTicketDetail(accessToken ?? "", selectedTicketId ?? ""),
+    enabled: Boolean(isAuthenticated && selectedTicketId),
+    queryFn: () => fetchAdminSalesTicketDetail(selectedTicketId ?? ""),
     queryKey: ["admin", "sales-tickets", "detail", selectedTicketId],
     retry: false,
   });

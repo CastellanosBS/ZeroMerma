@@ -111,7 +111,7 @@ describe("admin products API boundary", () => {
       }),
     );
 
-    const response = await fetchAdminProducts("token-1", filters);
+    const response = await fetchAdminProducts(filters);
 
     expect(fetchSpy).toHaveBeenCalledWith(
       expect.stringContaining("/v1/admin/products?page=1&page_size=25"),
@@ -131,7 +131,7 @@ describe("admin products API boundary", () => {
   it("loads product detail by id", async () => {
     const fetchSpy = vi.spyOn(globalThis, "fetch").mockImplementation(() => mockJsonResponse(apiProduct));
 
-    const product = await fetchAdminProductDetail("token-1", "product-1");
+    const product = await fetchAdminProductDetail("product-1");
 
     expect(fetchSpy).toHaveBeenCalledWith(
       expect.stringContaining("/v1/admin/products/product-1"),
@@ -144,7 +144,7 @@ describe("admin products API boundary", () => {
   it("submits new products through the backend contract", async () => {
     const fetchSpy = vi.spyOn(globalThis, "fetch").mockImplementation(() => mockJsonResponse(apiProduct, 201));
 
-    const product = await createAdminProduct("token-1", {
+    const product = await createAdminProduct({
       code: "CONCHA-VAN",
       name: "Concha vainilla",
       productClassId: "class-1",

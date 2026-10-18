@@ -342,31 +342,25 @@ export function buildAdminInputSuppliesListPath(filters: AdminInputSupplyListFil
 }
 
 export function fetchAdminInputSupplies(
-  accessToken: string,
   filters: AdminInputSupplyListFilters,
 ): Promise<AdminInputSupplyListResponse> {
   return requestJson<ApiListResponse>({
-    accessToken,
     path: buildAdminInputSuppliesListPath(filters),
   }).then(mapListResponseFromApi);
 }
 
 export function fetchAdminInputSupplyDetail(
-  accessToken: string,
   productId: string,
 ): Promise<AdminInputSupplyDetail> {
   return requestJson<ApiDetail>({
-    accessToken,
     path: `/v1/admin/inputs-supplies/${productId}`,
   }).then(mapAdminInputSupplyDetailFromApi);
 }
 
 export function createAdminInputSupply(
-  accessToken: string,
   payload: AdminInputSupplyPayload,
 ): Promise<AdminInputSupplyDetail> {
   return requestJson<ApiDetail>({
-    accessToken,
     body: toInputSupplyPayload(payload),
     method: "POST",
     path: "/v1/admin/inputs-supplies",
@@ -374,12 +368,10 @@ export function createAdminInputSupply(
 }
 
 export function updateAdminInputSupply(
-  accessToken: string,
   productId: string,
   payload: AdminInputSupplyPayload,
 ): Promise<AdminInputSupplyDetail> {
   return requestJson<ApiDetail>({
-    accessToken,
     body: toInputSupplyPayload(payload),
     method: "PATCH",
     path: `/v1/admin/inputs-supplies/${productId}`,
@@ -387,7 +379,6 @@ export function updateAdminInputSupply(
 }
 
 export function changeAdminInputSupplyStatus(
-  accessToken: string,
   productId: string,
   payload: AdminInputSupplyStatusPayload,
 ): Promise<AdminInputSupplyDetail> {
@@ -396,7 +387,6 @@ export function changeAdminInputSupplyStatus(
     notes: payload.notes ?? null,
   };
   return requestJson<ApiDetail>({
-    accessToken,
     body,
     method: "POST",
     path: `/v1/admin/inputs-supplies/${productId}/status`,
@@ -404,12 +394,10 @@ export function changeAdminInputSupplyStatus(
 }
 
 export function addAdminInputSupplySupplierRelation(
-  accessToken: string,
   productId: string,
   payload: AdminInputSupplySupplierRelationPayload,
 ): Promise<AdminInputSupplyDetail> {
   return requestJson<ApiDetail>({
-    accessToken,
     body: toSupplierRelationPayload(payload),
     method: "POST",
     path: `/v1/admin/inputs-supplies/${productId}/suppliers`,

@@ -39,6 +39,8 @@ def _test_app() -> FastAPI:
         (403, "FORBIDDEN"),
         (404, "NOT_FOUND"),
         (409, "CONFLICT"),
+        (423, "SESSION_LOCKED"),
+        (429, "LOGIN_RATE_LIMITED"),
     ],
 )
 def test_http_error_contract(status_code: int, expected_code: str) -> None:
@@ -97,7 +99,7 @@ def test_openapi_declares_the_canonical_error_envelope() -> None:
     schema = _test_app().openapi()
     responses = schema["paths"]["/validation"]["post"]["responses"]
 
-    assert {"400", "401", "403", "404", "409", "422", "500"} <= responses.keys()
+    assert {"400", "401", "403", "404", "409", "422", "423", "429", "500"} <= responses.keys()
     assert responses["422"]["content"]["application/json"]["schema"]["$ref"].endswith(
         "/ApiErrorResponse"
     )
@@ -115,6 +117,35 @@ def test_explicit_server_errors_are_safe_and_do_not_restore_legacy_alias() -> No
     assert response.json()["message"] == "An unexpected error occurred."
     assert "must-not-leak" not in response.text
     assert "detail" not in response.json()
+
+
+@pytest.mark.parametrize(
+    ("status_code", "requested_code", "expected_code"),
+    [
+        (401, "SESSION_REVOKED", "SESSION_REVOKED"),
+        (401, "SESSION_EXPIRED", "SESSION_EXPIRED"),
+        (403, "PASSWORD_RESET_REQUIRED", "PASSWORD_RESET_REQUIRED"),
+        (403, "CSRF_FAILED", "CSRF_FAILED"),
+        (403, "SESSION_REVOKED", "FORBIDDEN"),
+        (401, "unregistered-code", "AUTHENTICATION_REQUIRED"),
+    ],
+)
+def test_domain_error_codes_are_allowlisted_and_bound_to_status(
+    status_code: int, requested_code: str, expected_code: str
+) -> None:
+    app = _test_app()
+
+    @app.get("/domain-error", response_model=None)
+    def domain_error() -> NoReturn:
+        raise HTTPException(
+            status_code=status_code,
+            detail={"code": requested_code, "message": "Safe domain error", "token": "private"},
+        )
+
+    response = TestClient(app).get("/domain-error")
+    assert response.status_code == status_code
+    assert response.json()["code"] == expected_code
+    assert "private" not in response.text
 
 
 @pytest.mark.parametrize(

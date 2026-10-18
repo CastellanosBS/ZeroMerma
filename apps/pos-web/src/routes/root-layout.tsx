@@ -1,9 +1,11 @@
 import { Outlet, useRouterState } from "@tanstack/react-router";
 
+import { PosSessionBoundary } from "../features/auth/PosSessionBoundary";
+
 import { StatusMessagesViewport } from "../components/status-messages";
 import { PosProtectedLayout } from "../features/pos-bootstrap/pos-protected-layout";
 
-export function RootLayout() {
+function ContentLayout() {
   const pathname = useRouterState({
     select: (state) => state.location.pathname,
   });
@@ -26,4 +28,8 @@ export function RootLayout() {
       </PosProtectedLayout>
     </>
   );
+}
+
+export function RootLayout() {
+  return <PosSessionBoundary><ContentLayout /></PosSessionBoundary>;
 }

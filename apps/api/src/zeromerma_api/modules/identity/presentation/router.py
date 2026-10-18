@@ -1,9 +1,10 @@
 from __future__ import annotations
 
-from typing import Annotated
+from datetime import UTC, datetime
+from typing import Annotated, cast
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response, status
 from sqlalchemy.orm import Session
 
 from zeromerma_api.db.session import get_session
@@ -29,7 +30,6 @@ from zeromerma_api.modules.identity.application.admin_schemas import (
     AdminUserUpdateRequest,
 )
 from zeromerma_api.modules.identity.application.admin_services import AdminUserService
-from zeromerma_api.modules.identity.application.authorization import resolve_authorization
 from zeromerma_api.modules.identity.application.privileged_access import PrivilegedAccessService
 from zeromerma_api.modules.identity.application.privileged_schemas import (
     PrivilegedChangeConfirmationRequest,
@@ -40,12 +40,26 @@ from zeromerma_api.modules.identity.application.schemas import (
     AuthenticatedUser,
     IdentitySurface,
     LoginRequest,
-    LoginResponse,
 )
-from zeromerma_api.modules.identity.application.services import AuthService, user_can_access_surface
+from zeromerma_api.modules.identity.application.services import user_can_access_surface
+from zeromerma_api.modules.identity.application.session_schemas import (
+    AuthSessionsResponse,
+    AuthSessionView,
+    LoginResponse,
+    PasswordChangeRequest,
+    PasswordResetCredentialView,
+    PasswordResetIssueRequest,
+    PasswordResetRequest,
+    ReauthenticationRequest,
+)
+from zeromerma_api.modules.identity.application.session_services import (
+    COOKIE_NAMES,
+    SessionAuthentication,
+    SessionService,
+    auth_error,
+)
 from zeromerma_api.modules.identity.domain.constants import IDENTITY_SURFACE_BACKOFFICE
 from zeromerma_api.modules.identity.domain.exceptions import (
-    InvalidCredentialsError,
     RoleAdminError,
     RoleConflictError,
     RoleNotFoundError,
@@ -55,7 +69,12 @@ from zeromerma_api.modules.identity.domain.exceptions import (
     UserNotFoundError,
     UserValidationError,
 )
-from zeromerma_api.modules.identity.presentation.dependencies import get_current_user
+from zeromerma_api.modules.identity.presentation.dependencies import (
+    get_current_authentication,
+    get_current_user,
+    request_audience,
+    validate_origin,
+)
 
 router = APIRouter(prefix="/v1/auth", tags=["auth"])
 admin_router = APIRouter(prefix="/v1/admin/users", tags=["admin-users"])
@@ -93,34 +112,244 @@ def _to_role_admin_http_exception(error: RoleAdminError) -> HTTPException:
 @router.post("/login", response_model=LoginResponse)
 def login(
     payload: LoginRequest,
+    request: Request,
+    response: Response,
     session: Annotated[Session, Depends(get_session)],
 ) -> LoginResponse:
-    try:
-        access_token, user = AuthService().login(
-            session,
-            email=payload.email,
-            password=payload.password,
-        )
-    except InvalidCredentialsError as error:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail=str(error),
-            headers={"WWW-Authenticate": "Bearer"},
-        ) from error
-
-    return LoginResponse(access_token=access_token, user=user)
+    if request_audience(request) != payload.audience or request.headers.get("Authorization"):
+        raise auth_error(401, "AUTHENTICATION_REQUIRED", "The application audience is invalid.")
+    validate_origin(request, payload.audience)
+    authentication = SessionService().login(
+        session, payload, ip=_client_ip(request), request_id=request.headers.get("X-Request-ID")
+    )
+    _set_session_cookie(response, authentication)
+    return authentication.response()
 
 
 @router.get("/me", response_model=AuthenticatedUser)
 def me(
     current_user: Annotated[AuthenticatedUser, Depends(get_current_user)],
-    session: Annotated[Session, Depends(get_session)],
     surface: IdentitySurface | None = None,
 ) -> AuthenticatedUser:
-    chosen = surface or current_user.default_surface
-    if chosen not in current_user.allowed_surfaces:
-        raise HTTPException(status_code=403, detail="The requested surface is not allowed.")
-    return resolve_authorization(session, current_user, surface=chosen)
+    if surface is not None and surface != current_user.authorization_surface:
+        raise HTTPException(
+            status_code=403, detail="The requested audience does not match this session."
+        )
+    return current_user
+
+
+def _client_ip(request: Request) -> str:
+    return request.client.host if request.client else "unknown"
+
+
+def _set_session_cookie(response: Response, authentication: SessionAuthentication) -> None:
+    service = SessionService()
+    record = authentication.record
+    response.set_cookie(
+        COOKIE_NAMES[cast(IdentitySurface, record.audience)],
+        authentication.credential,
+        max_age=max(0, int((record.absolute_expires_at - datetime.now(UTC)).total_seconds())),
+        httponly=True,
+        secure=True,
+        samesite=service.settings.session_cookie_samesite,
+        path="/",
+    )
+    response.headers["Cache-Control"] = "no-store"
+
+
+def _clear_session_cookie(response: Response, audience: IdentitySurface) -> None:
+    response.delete_cookie(
+        COOKIE_NAMES[audience],
+        path="/",
+        secure=True,
+        httponly=True,
+        samesite=SessionService().settings.session_cookie_samesite,
+    )
+
+
+@router.get("/session", response_model=LoginResponse)
+def current_session(
+    authentication: Annotated[SessionAuthentication, Depends(get_current_authentication)],
+    session: Annotated[Session, Depends(get_session)],
+    response: Response,
+) -> LoginResponse:
+    response.headers["Cache-Control"] = "no-store"
+    session.commit()
+    return authentication.response()
+
+
+@router.post("/activity", response_model=AuthSessionView)
+def session_activity(
+    authentication: Annotated[SessionAuthentication, Depends(get_current_authentication)],
+    session: Annotated[Session, Depends(get_session)],
+) -> AuthSessionView:
+    result = SessionService().activity(session, authentication)
+    session.commit()
+    return result
+
+
+@router.post("/lock", response_model=AuthSessionView)
+def lock_session(
+    authentication: Annotated[SessionAuthentication, Depends(get_current_authentication)],
+    session: Annotated[Session, Depends(get_session)],
+) -> AuthSessionView:
+    return SessionService().lock(session, authentication)
+
+
+@router.post("/reauthenticate", response_model=LoginResponse)
+def reauthenticate_session(
+    payload: ReauthenticationRequest,
+    request: Request,
+    response: Response,
+    authentication: Annotated[SessionAuthentication, Depends(get_current_authentication)],
+    session: Annotated[Session, Depends(get_session)],
+) -> LoginResponse:
+    result = SessionService().reauthenticate(
+        session,
+        authentication,
+        password=payload.password,
+        ip=_client_ip(request),
+        request_id=request.headers.get("X-Request-ID"),
+    )
+    _set_session_cookie(response, result)
+    return result.response()
+
+
+@router.post("/logout", status_code=204)
+def logout_session(
+    request: Request,
+    response: Response,
+    authentication: Annotated[SessionAuthentication, Depends(get_current_authentication)],
+    session: Annotated[Session, Depends(get_session)],
+) -> None:
+    SessionService().logout(session, authentication, request.headers.get("X-Request-ID"))
+    _clear_session_cookie(response, cast(IdentitySurface, authentication.record.audience))
+
+
+@router.get("/sessions", response_model=AuthSessionsResponse)
+def list_own_sessions(
+    authentication: Annotated[SessionAuthentication, Depends(get_current_authentication)],
+    session: Annotated[Session, Depends(get_session)],
+    page: Annotated[int, Query(ge=1)] = 1,
+    page_size: Annotated[int, Query(ge=1, le=100)] = 25,
+) -> AuthSessionsResponse:
+    return SessionService().list_sessions(
+        session, authentication.user.id, page=page, page_size=page_size
+    )
+
+
+@router.delete("/sessions/{session_id}", status_code=204)
+def revoke_own_session(
+    session_id: UUID,
+    response: Response,
+    authentication: Annotated[SessionAuthentication, Depends(get_current_authentication)],
+    session: Annotated[Session, Depends(get_session)],
+) -> None:
+    SessionService().revoke_sessions(session, user_id=authentication.user.id, target_id=session_id)
+    session.commit()
+    if session_id == authentication.record.id:
+        _clear_session_cookie(response, cast(IdentitySurface, authentication.record.audience))
+
+
+@router.post("/sessions/revoke-others", status_code=204)
+def revoke_other_sessions(
+    authentication: Annotated[SessionAuthentication, Depends(get_current_authentication)],
+    session: Annotated[Session, Depends(get_session)],
+) -> None:
+    SessionService().revoke_sessions(
+        session, user_id=authentication.user.id, except_id=authentication.record.id
+    )
+    session.commit()
+
+
+@router.post("/password/change", status_code=204)
+def change_own_password(
+    payload: PasswordChangeRequest,
+    request: Request,
+    response: Response,
+    authentication: Annotated[SessionAuthentication, Depends(get_current_authentication)],
+    session: Annotated[Session, Depends(get_session)],
+) -> None:
+    SessionService().change_password(
+        session,
+        authentication,
+        current_password=payload.current_password,
+        new_password=payload.new_password,
+        request_id=request.headers.get("X-Request-ID"),
+        ip=_client_ip(request),
+    )
+    for audience in COOKIE_NAMES:
+        _clear_session_cookie(response, audience)
+
+
+@router.post("/password/reset", status_code=204)
+def complete_password_reset(
+    payload: PasswordResetRequest,
+    request: Request,
+    response: Response,
+    session: Annotated[Session, Depends(get_session)],
+) -> None:
+    validate_origin(request, request_audience(request))
+    SessionService().complete_password_reset(
+        session,
+        credential=payload.reset_token,
+        new_password=payload.new_password,
+        ip=_client_ip(request),
+        request_id=request.headers.get("X-Request-ID"),
+    )
+    for audience in COOKIE_NAMES:
+        _clear_session_cookie(response, audience)
+
+
+@admin_router.get("/{user_id}/sessions", response_model=AuthSessionsResponse)
+def list_user_sessions(
+    user_id: UUID,
+    current_user: Annotated[AuthenticatedUser, Depends(get_current_user)],
+    session: Annotated[Session, Depends(get_session)],
+    page: Annotated[int, Query(ge=1)] = 1,
+    page_size: Annotated[int, Query(ge=1, le=100)] = 25,
+) -> AuthSessionsResponse:
+    from zeromerma_api.modules.identity.application.privileged_access import require_user_scope
+
+    require_user_scope(session, current_user, "users.manage", user_id)
+    return SessionService().list_sessions(session, user_id, page=page, page_size=page_size)
+
+
+@admin_router.delete("/{user_id}/sessions/{session_id}", status_code=204)
+def revoke_user_session(
+    user_id: UUID,
+    session_id: UUID,
+    current_user: Annotated[AuthenticatedUser, Depends(get_current_user)],
+    session: Annotated[Session, Depends(get_session)],
+) -> None:
+    from zeromerma_api.modules.identity.application.privileged_access import require_user_scope
+
+    require_user_scope(session, current_user, "users.manage", user_id)
+    SessionService().revoke_sessions(
+        session, user_id=user_id, target_id=session_id, reason="ADMIN_REVOKED"
+    )
+    session.commit()
+
+
+@admin_router.post("/{user_id}/password-reset", response_model=PasswordResetCredentialView)
+def issue_user_password_reset(
+    user_id: UUID,
+    payload: PasswordResetIssueRequest,
+    request: Request,
+    response: Response,
+    current_user: Annotated[AuthenticatedUser, Depends(get_current_user)],
+    session: Annotated[Session, Depends(get_session)],
+) -> PasswordResetCredentialView:
+    response.headers["Cache-Control"] = "no-store"
+    return SessionService().issue_password_reset(
+        session,
+        actor=current_user,
+        user_id=user_id,
+        reason=payload.reason,
+        approval_id=payload.approval_id,
+        payload_sha256=payload.payload_sha256,
+        request_id=request.headers.get("X-Request-ID"),
+    )
 
 
 @admin_router.get("", response_model=AdminUsersListResponse)

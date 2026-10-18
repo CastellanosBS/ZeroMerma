@@ -22,11 +22,9 @@ export interface TransferReceiptHistoryFilters {
 }
 
 export function commitTransferDispatch(
-  accessToken: string,
   payload: TransferDispatchCommitRequest,
 ): Promise<TransferDetailResponse> {
   return requestJson<TransferDetailResponse>({
-    accessToken,
     body: payload,
     method: "POST",
     path: "/v1/transfers/dispatch/commit",
@@ -34,28 +32,23 @@ export function commitTransferDispatch(
 }
 
 export function getPendingInboundTransfers(
-  accessToken: string,
   workstationCode: string,
 ): Promise<PendingInboundTransfersResponse> {
   return requestJson<PendingInboundTransfersResponse>({
-    accessToken,
     path: `/v1/transfers/inbound/pending?workstation_code=${encodeURIComponent(workstationCode)}`,
   });
 }
 
 export function getTransferDetail(
-  accessToken: string,
   workstationCode: string,
   transferId: string,
 ): Promise<TransferDetailResponse> {
   return requestJson<TransferDetailResponse>({
-    accessToken,
     path: `/v1/transfers/${encodeURIComponent(transferId)}?workstation_code=${encodeURIComponent(workstationCode)}`,
   });
 }
 
 export function getTransferDispatchHistory(
-  accessToken: string,
   workstationCode: string,
   filters: TransferDispatchHistoryFilters,
 ): Promise<TransferDispatchHistoryResponse> {
@@ -74,13 +67,11 @@ export function getTransferDispatchHistory(
   }
 
   return requestJson<TransferDispatchHistoryResponse>({
-    accessToken,
     path: `/v1/transfers/outbound/history?${search.toString()}`,
   });
 }
 
 export function getTransferReceiptHistory(
-  accessToken: string,
   workstationCode: string,
   filters: TransferReceiptHistoryFilters,
 ): Promise<TransferReceiptHistoryResponse> {
@@ -102,18 +93,15 @@ export function getTransferReceiptHistory(
   }
 
   return requestJson<TransferReceiptHistoryResponse>({
-    accessToken,
     path: `/v1/transfers/inbound/history?${search.toString()}`,
   });
 }
 
 export function receiveTransfer(
-  accessToken: string,
   transferId: string,
   payload: TransferReceiveRequest,
 ): Promise<TransferDetailResponse> {
   return requestJson<TransferDetailResponse>({
-    accessToken,
     body: payload,
     method: "POST",
     path: `/v1/transfers/${encodeURIComponent(transferId)}/receive`,

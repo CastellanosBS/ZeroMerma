@@ -216,28 +216,23 @@ export function buildAdminBranchesListPath(filters: AdminBranchListFilters): str
 }
 
 export function fetchAdminBranches(
-  accessToken: string,
   filters: AdminBranchListFilters,
 ): Promise<AdminBranchListResponse> {
   return requestJson<AdminBranchesApiListResponse>({
-    accessToken,
     path: buildAdminBranchesListPath(filters),
   }).then(mapAdminBranchesListFromApi);
 }
 
-export function fetchAdminBranchDetail(accessToken: string, branchId: string): Promise<AdminBranchDetail> {
+export function fetchAdminBranchDetail(branchId: string): Promise<AdminBranchDetail> {
   return requestJson<AdminBranchApiDetail>({
-    accessToken,
     path: `/v1/admin/branches/${branchId}`,
   }).then(mapAdminBranchDetailFromApi);
 }
 
 export function createAdminBranch(
-  accessToken: string,
   payload: AdminBranchCreatePayload,
 ): Promise<AdminBranchDetail> {
   return requestJson<AdminBranchApiDetail>({
-    accessToken,
     body: toCreateApiPayload(payload),
     method: "POST",
     path: "/v1/admin/branches",
@@ -245,12 +240,10 @@ export function createAdminBranch(
 }
 
 export function updateAdminBranch(
-  accessToken: string,
   branchId: string,
   payload: AdminBranchUpdatePayload,
 ): Promise<AdminBranchDetail> {
   return requestJson<AdminBranchApiDetail>({
-    accessToken,
     body: toUpdateApiPayload(payload),
     method: "PATCH",
     path: `/v1/admin/branches/${branchId}`,

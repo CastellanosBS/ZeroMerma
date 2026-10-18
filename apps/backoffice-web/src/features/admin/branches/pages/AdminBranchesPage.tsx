@@ -158,7 +158,7 @@ function getInitialSelectedBranchId(): string | null {
 }
 
 export function AdminBranchesPage() {
-  const accessToken = useBackofficeAuthStore((state) => state.accessToken);
+  const isAuthenticated = useBackofficeAuthStore((state) => state.isAuthenticated);
   const queryClient = useQueryClient();
   const [filters, setFilters] = useState<AdminBranchListFilters>(initialFilters);
   const [formMode, setFormMode] = useState<
@@ -173,8 +173,8 @@ export function AdminBranchesPage() {
   );
 
   const branchesQuery = useQuery({
-    enabled: Boolean(accessToken),
-    queryFn: () => fetchAdminBranches(accessToken ?? "", filters),
+    enabled: isAuthenticated,
+    queryFn: () => fetchAdminBranches(filters),
     queryKey: ["admin", "branches", "list", filters],
     retry: false,
   });
@@ -186,15 +186,15 @@ export function AdminBranchesPage() {
   );
 
   const branchDetailQuery = useQuery({
-    enabled: Boolean(accessToken && selectedBranchId),
-    queryFn: () => fetchAdminBranchDetail(accessToken ?? "", selectedBranchId ?? ""),
+    enabled: Boolean(isAuthenticated && selectedBranchId),
+    queryFn: () => fetchAdminBranchDetail(selectedBranchId ?? ""),
     queryKey: ["admin", "branches", "detail", selectedBranchId],
     retry: false,
   });
 
   const createBranchMutation = useMutation({
     mutationFn: (payload: AdminBranchCreatePayload) =>
-      createAdminBranch(accessToken ?? "", payload),
+      createAdminBranch(payload),
     onError: (error) => {
       setFeedback({
         tone: "error",
@@ -211,7 +211,7 @@ export function AdminBranchesPage() {
 
   const updateBranchMutation = useMutation({
     mutationFn: ({ branchId, payload }: { branchId: string; payload: AdminBranchUpdatePayload }) =>
-      updateAdminBranch(accessToken ?? "", branchId, payload),
+      updateAdminBranch(branchId, payload),
     onError: (error) => {
       setFeedback({
         tone: "error",
@@ -294,7 +294,7 @@ export function AdminBranchesPage() {
   }
 
   function handleSubmitBranch(payload: AdminBranchCreatePayload | AdminBranchUpdatePayload) {
-    if (!accessToken || isSaving) {
+    if (!isAuthenticated || isSaving) {
       return;
     }
 
@@ -311,7 +311,7 @@ export function AdminBranchesPage() {
   }
 
   function handleToggleStatus(branch: AdminBranchDetail | AdminBranchListItem) {
-    if (!accessToken || updateBranchMutation.isPending) {
+    if (!isAuthenticated || updateBranchMutation.isPending) {
       return;
     }
 

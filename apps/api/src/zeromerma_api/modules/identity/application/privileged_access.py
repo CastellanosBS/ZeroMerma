@@ -45,6 +45,7 @@ from zeromerma_api.modules.identity.application.privileged_schemas import (
     PrivilegedChangeCreateRequest,
     PrivilegedChangeView,
     PrivilegedOperation,
+    PrivilegedPasswordResetRequest,
 )
 from zeromerma_api.modules.identity.application.schemas import AuthenticatedUser
 from zeromerma_api.modules.identity.application.security import PasswordHasher
@@ -128,6 +129,7 @@ _OPERATION_CAPABILITIES: dict[PrivilegedOperation, PermissionCode] = {
     "USER_STATUS": "users.manage",
     "USER_LOCK": "users.manage",
     "USER_UNLOCK": "users.manage",
+    "USER_PASSWORD_RESET": "users.manage",
     "USER_BRANCH_ASSIGNMENT": "role_assignments.manage",
     "USER_BRANCH_REMOVAL": "role_assignments.manage",
     "USER_BRANCH_DEFAULT": "role_assignments.manage",
@@ -141,6 +143,7 @@ _PAYLOAD_MODELS: dict[PrivilegedOperation, type[BaseModel] | None] = {
     "USER_STATUS": AdminUserStatusChangeRequest,
     "USER_LOCK": AdminUserLockRequest,
     "USER_UNLOCK": None,
+    "USER_PASSWORD_RESET": PrivilegedPasswordResetRequest,
     "USER_BRANCH_ASSIGNMENT": AdminUserBranchAssignmentCommand,
     "USER_BRANCH_REMOVAL": PrivilegedBranchTargetRequest,
     "USER_BRANCH_DEFAULT": PrivilegedBranchTargetRequest,
@@ -769,6 +772,11 @@ class PrivilegedAccessService:
         lock_privileged_lifecycle(session)
         change = self._get_change(session, change_id)
         self._verify_digest(change, payload_sha256)
+        if change.operation == "USER_PASSWORD_RESET":
+            raise HTTPException(
+                status_code=409,
+                detail="Use the user password-reset endpoint to receive the credential once.",
+            )
         if change.initiator_user_id != current_user.id:
             raise HTTPException(
                 status_code=403, detail="Only the original initiator can execute this change."

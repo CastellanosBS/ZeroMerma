@@ -1,11 +1,11 @@
 export function resolvePosEntryRoute({
   hasActiveCashSession = false,
-  hasAccessToken,
+  isAuthenticated,
 }: {
   hasActiveCashSession?: boolean;
-  hasAccessToken: boolean;
+  isAuthenticated: boolean;
 }): "/login" | "/cash-session/open" | "/pos" {
-  if (!hasAccessToken) {
+  if (!isAuthenticated) {
     return "/login";
   }
 

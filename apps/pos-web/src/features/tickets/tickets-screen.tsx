@@ -46,7 +46,7 @@ import { isEditableTarget } from "../../lib/keyboard-shortcuts";
 import { openBrowserPrintWindow } from "../../lib/browser-print";
 import { matchesScannerValue, normalizeScannerText, parseTicketScannerValue } from "../../lib/scanner";
 import { getDocumentActionAvailability } from "../../lib/document-actions";
-import { usePosAuthStore } from "../auth/auth-store";
+
 import { useCurrentCashSessionQuery } from "../cash-session-open/queries";
 import { posInputClass } from "../pos-theme/theme";
 import { useStatusMessageStore } from "../status-messages/store";
@@ -465,7 +465,7 @@ export function TicketSummaryPanel({
 }
 
 export function TicketsScreen() {
-  const accessToken = usePosAuthStore((state) => state.accessToken);
+
   const navigate = useNavigate();
   const showError = useStatusMessageStore((state) => state.showError);
   const showSuccess = useStatusMessageStore((state) => state.showSuccess);
@@ -600,7 +600,6 @@ export function TicketsScreen() {
       };
 
       return reprintTicket({
-        accessToken: accessToken!,
         payload,
         requestId: createRequestId("ticket-reprint"),
         ticketId,

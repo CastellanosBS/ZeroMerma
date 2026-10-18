@@ -253,21 +253,17 @@ export function buildAdminCashFlowListPath(filters: AdminCashFlowListFilters): s
 }
 
 export function fetchAdminCashFlowMovements(
-  accessToken: string,
   filters: AdminCashFlowListFilters,
 ): Promise<AdminCashFlowListResponse> {
   return requestJson<ApiListResponse>({
-    accessToken,
     path: buildAdminCashFlowListPath(filters),
   }).then(mapListFromApi);
 }
 
 export function fetchAdminCashFlowMovementDetail(
-  accessToken: string,
   movementId: string,
 ): Promise<AdminCashFlowMovementDetail> {
   return requestJson<ApiDetail>({
-    accessToken,
     path: `/v1/admin/cash-flow/${encodeURIComponent(movementId)}`,
   }).then(mapDetailFromApi);
 }

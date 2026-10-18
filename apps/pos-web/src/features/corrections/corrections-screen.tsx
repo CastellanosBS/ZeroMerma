@@ -1,4 +1,4 @@
-﻿import { useMutation, useQueries, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQueries, useQueryClient } from "@tanstack/react-query";
 import { Navigate } from "@tanstack/react-router";
 import { useEffect, useMemo, useRef, useState } from "react";
 
@@ -919,7 +919,7 @@ function CorrectionsHistorySummaryPanel({
 }
 
 export function CorrectionsScreen() {
-  const accessToken = usePosAuthStore((state) => state.accessToken);
+  const isAuthenticated = usePosAuthStore((state) => state.isAuthenticated);
   const showError = useStatusMessageStore((state) => state.showError);
   const showSuccess = useStatusMessageStore((state) => state.showSuccess);
   const queryClient = useQueryClient();
@@ -980,11 +980,10 @@ export function CorrectionsScreen() {
       queryKey: correctionTargetDetailQueryKey(appEnv.VITE_POS_WORKSTATION_CODE, document.id),
       queryFn: () =>
         getCorrectionTargetDetail({
-          accessToken: accessToken!,
           targetDocumentId: document.id,
           workstationCode: appEnv.VITE_POS_WORKSTATION_CODE,
         }),
-      enabled: accessToken !== null && document.id !== selectedTargetId,
+      enabled: isAuthenticated && document.id !== selectedTargetId,
       staleTime: 60_000,
     })),
   });
@@ -1201,12 +1200,11 @@ export function CorrectionsScreen() {
 
   const commitMutation = useMutation({
     mutationFn: async () => {
-      if (!accessToken || !selectedTargetId) {
+      if (!isAuthenticated || !selectedTargetId) {
         throw new Error("Selecciona un movimiento antes de guardar el ajuste.");
       }
 
       return commitCorrection({
-        accessToken,
         payload: {
           high_impact_acknowledged: isHighImpactAcknowledged,
           workstation_code: appEnv.VITE_POS_WORKSTATION_CODE,
@@ -1754,5 +1752,3 @@ export function CorrectionsScreen() {
     </CentralWorkspaceSheet>
   );
 }
-
-

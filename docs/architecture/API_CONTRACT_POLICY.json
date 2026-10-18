@@ -1038,6 +1038,30 @@
         ],
         "reason": "GET /v1/returns/search-sales returns a server-capped operational working set; it is not advertised as a complete export.",
         "stable_order": "Domain timestamp order with deterministic document identity tie-break required."
+      },
+      "list_own_sessions_v1_auth_sessions_get": {
+        "bound": "page_size defaults to 25 and is limited to 100; own user scope is enforced before pagination",
+        "classification": "PAGINATION_REQUIRED",
+        "evidence": "apps/api/src/zeromerma_api/modules/identity/presentation/router.py#list_own_sessions",
+        "expected_growth": "GROWING",
+        "query_parameters": [
+          "page",
+          "page_size"
+        ],
+        "reason": "GET /v1/auth/sessions lists durable session history scoped to its authorized user.",
+        "stable_order": "created_at descending, id descending; default page size 25, maximum 100."
+      },
+      "list_user_sessions_v1_admin_users__user_id__sessions_get": {
+        "bound": "page_size defaults to 25 and is limited to 100; users.manage target scope is enforced before pagination",
+        "classification": "PAGINATION_REQUIRED",
+        "evidence": "apps/api/src/zeromerma_api/modules/identity/presentation/router.py#list_user_sessions",
+        "expected_growth": "GROWING",
+        "query_parameters": [
+          "page",
+          "page_size"
+        ],
+        "reason": "GET /v1/admin/users/{user_id}/sessions lists durable session history scoped to its authorized user.",
+        "stable_order": "created_at descending, id descending; default page size 25, maximum 100."
       }
     }
   },
@@ -1080,6 +1104,8 @@
       404,
       409,
       422,
+      423,
+      429,
       500
     ]
   },

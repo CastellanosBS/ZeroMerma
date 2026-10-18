@@ -1,70 +1,19 @@
 from __future__ import annotations
 
-import logging
-from collections.abc import Iterable
-
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from zeromerma_api import __version__
 from zeromerma_api.core.config import ApiSettings, get_settings
 from zeromerma_api.core.logging import configure_logging
+from zeromerma_api.core.security import install_security_boundary
 from zeromerma_api.presentation.api import api_router
 from zeromerma_api.presentation.contracts import install_contract_openapi
 from zeromerma_api.presentation.errors import error_responses, install_error_handlers
 
-logger = logging.getLogger(__name__)
-
-
-def _normalize_origins(origins: str | Iterable[str] | None) -> list[str]:
-    """
-    Normalize CORS origins to avoid common mismatches:
-    - remove surrounding spaces
-    - remove trailing slash
-    - deduplicate while preserving order
-    """
-    if origins is None:
-        return []
-
-    if isinstance(origins, str):
-        raw_origins = origins.split(",")
-    else:
-        raw_origins = list(origins)
-
-    normalized: list[str] = []
-    seen: set[str] = set()
-
-    for origin in raw_origins:
-        value = str(origin).strip().rstrip("/")
-        if not value or value in seen:
-            continue
-        seen.add(value)
-        normalized.append(value)
-
-    return normalized
-
 
 def _build_allowed_origins(settings: ApiSettings) -> list[str]:
-    """
-    Merge configured origins with safe development defaults.
-    Important: these must be FRONTEND origins, not the API URL.
-    """
-    configured_origins = _normalize_origins(getattr(settings, "cors_origins", []))
-
-    development_origins = _normalize_origins(
-        [
-            "http://localhost:5173",
-            "http://localhost:5174",
-            "http://127.0.0.1:5173",
-            "http://127.0.0.1:5174",
-            "http://192.168.1.69:5173",
-            "http://192.168.1.69:5174",
-            "http://172.30.96.1:5173",
-            "http://172.30.96.1:5174",
-        ]
-    )
-
-    return _normalize_origins([*configured_origins, *development_origins])
+    return list(settings.cors_origins)
 
 
 def create_app() -> FastAPI:
@@ -72,14 +21,12 @@ def create_app() -> FastAPI:
     configure_logging(settings.log_level)
 
     allowed_origins = _build_allowed_origins(settings)
-    logger.info("CORS allowed origins: %s", allowed_origins)
-
     app = FastAPI(
         title="ZeroMerma API",
         version=__version__,
-        docs_url="/docs",
-        redoc_url="/redoc",
-        openapi_url="/openapi.json",
+        docs_url="/docs" if settings.enable_api_docs else None,
+        redoc_url="/redoc" if settings.enable_api_docs else None,
+        openapi_url="/openapi.json" if settings.environment in {"local", "test"} else None,
         responses=error_responses(),
     )
 
@@ -87,12 +34,19 @@ def create_app() -> FastAPI:
         CORSMiddleware,
         allow_origins=allowed_origins,
         allow_credentials=True,
-        allow_methods=["*"],
-        allow_headers=["*"],
+        allow_methods=["GET", "HEAD", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+        allow_headers=["Content-Type", "X-CSRF-Token", "X-ZeroMerma-Surface", "X-Request-ID"],
     )
 
     app.include_router(api_router)
+    if settings.environment in {"staging", "production"}:
+        app.router.routes[:] = [
+            route
+            for route in app.router.routes
+            if not getattr(route, "path", "").startswith("/dev/")
+        ]
     install_error_handlers(app)
+    install_security_boundary(app, settings)
     install_contract_openapi(app)
     return app
 

@@ -20,12 +20,12 @@ export function correctionsBootstrapQueryKey(workstationCode: string) {
 }
 
 export function useCorrectionsBootstrapQuery() {
-  const accessToken = usePosAuthStore((state) => state.accessToken);
+  const isAuthenticated = usePosAuthStore((state) => state.isAuthenticated);
 
   return useQuery({
     queryKey: correctionsBootstrapQueryKey(appEnv.VITE_POS_WORKSTATION_CODE),
-    queryFn: () => getCorrectionsBootstrap(accessToken!, appEnv.VITE_POS_WORKSTATION_CODE),
-    enabled: accessToken !== null,
+    queryFn: () => getCorrectionsBootstrap(appEnv.VITE_POS_WORKSTATION_CODE),
+    enabled: isAuthenticated,
   });
 }
 
@@ -38,7 +38,7 @@ export function correctionTargetsQueryKey(
 }
 
 export function useCorrectionTargetsQuery(documentType: string, query: string) {
-  const accessToken = usePosAuthStore((state) => state.accessToken);
+  const isAuthenticated = usePosAuthStore((state) => state.isAuthenticated);
   const normalizedQuery = normalizeQuery(query);
 
   return useQuery({
@@ -49,12 +49,11 @@ export function useCorrectionTargetsQuery(documentType: string, query: string) {
     ),
     queryFn: () =>
       searchCorrectionTargets({
-        accessToken: accessToken!,
         workstationCode: appEnv.VITE_POS_WORKSTATION_CODE,
         documentType: documentType.length > 0 ? documentType : undefined,
         query: normalizedQuery.length > 0 ? normalizedQuery : undefined,
       }),
-    enabled: accessToken !== null,
+    enabled: isAuthenticated,
   });
 }
 
@@ -63,7 +62,7 @@ export function correctionTargetDetailQueryKey(workstationCode: string, targetDo
 }
 
 export function useCorrectionTargetDetailQuery(targetDocumentId: string | null) {
-  const accessToken = usePosAuthStore((state) => state.accessToken);
+  const isAuthenticated = usePosAuthStore((state) => state.isAuthenticated);
 
   return useQuery({
     queryKey: correctionTargetDetailQueryKey(
@@ -72,11 +71,10 @@ export function useCorrectionTargetDetailQuery(targetDocumentId: string | null) 
     ),
     queryFn: () =>
       getCorrectionTargetDetail({
-        accessToken: accessToken!,
         targetDocumentId: targetDocumentId!,
         workstationCode: appEnv.VITE_POS_WORKSTATION_CODE,
       }),
-    enabled: accessToken !== null && targetDocumentId !== null,
+    enabled: isAuthenticated && targetDocumentId !== null,
   });
 }
 
@@ -85,18 +83,17 @@ export function correctionProductsQueryKey(workstationCode: string, query: strin
 }
 
 export function useCorrectionProductsQuery(query: string) {
-  const accessToken = usePosAuthStore((state) => state.accessToken);
+  const isAuthenticated = usePosAuthStore((state) => state.isAuthenticated);
   const normalizedQuery = normalizeQuery(query);
 
   return useQuery({
     queryKey: correctionProductsQueryKey(appEnv.VITE_POS_WORKSTATION_CODE, normalizedQuery),
     queryFn: () =>
       searchCorrectionProducts({
-        accessToken: accessToken!,
         workstationCode: appEnv.VITE_POS_WORKSTATION_CODE,
         query: normalizedQuery,
       }),
-    enabled: accessToken !== null && normalizedQuery.length > 0,
+    enabled: isAuthenticated && normalizedQuery.length > 0,
   });
 }
 
@@ -127,7 +124,7 @@ export function useCorrectionsHistoryQuery(
   targetDocumentType: string,
   reasonCode: string,
 ) {
-  const accessToken = usePosAuthStore((state) => state.accessToken);
+  const isAuthenticated = usePosAuthStore((state) => state.isAuthenticated);
   const normalizedQuery = normalizeQuery(query);
   const normalizedCreatedByUserId = createdByUserId.trim();
   const normalizedTargetDocumentType = targetDocumentType.trim();
@@ -144,7 +141,6 @@ export function useCorrectionsHistoryQuery(
     ),
     queryFn: () =>
       getCorrectionsHistory({
-        accessToken: accessToken!,
         workstationCode: appEnv.VITE_POS_WORKSTATION_CODE,
         scope,
         query: normalizedQuery.length > 0 ? normalizedQuery : undefined,
@@ -154,7 +150,7 @@ export function useCorrectionsHistoryQuery(
           normalizedTargetDocumentType.length > 0 ? normalizedTargetDocumentType : undefined,
         reasonCode: normalizedReasonCode.length > 0 ? normalizedReasonCode : undefined,
       }),
-    enabled: accessToken !== null,
+    enabled: isAuthenticated,
   });
 }
 
@@ -166,7 +162,7 @@ export function correctionDocumentDetailQueryKey(
 }
 
 export function useCorrectionDocumentDetailQuery(correctionId: string | null) {
-  const accessToken = usePosAuthStore((state) => state.accessToken);
+  const isAuthenticated = usePosAuthStore((state) => state.isAuthenticated);
 
   return useQuery({
     queryKey: correctionDocumentDetailQueryKey(
@@ -175,10 +171,9 @@ export function useCorrectionDocumentDetailQuery(correctionId: string | null) {
     ),
     queryFn: () =>
       getCorrectionDocumentDetail({
-        accessToken: accessToken!,
         correctionId: correctionId!,
         workstationCode: appEnv.VITE_POS_WORKSTATION_CODE,
       }),
-    enabled: accessToken !== null && correctionId !== null,
+    enabled: isAuthenticated && correctionId !== null,
   });
 }
