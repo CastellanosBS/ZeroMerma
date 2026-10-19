@@ -138,7 +138,9 @@ export function AdminOrdersPage() {
   const observedKey = useRef(intention.metadata?.key ?? null);
   const queryClient = useQueryClient();
   const [filters, setFilters] = useState<AdminOrderListFilters>(initialFilters);
-  const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null);
+  const [selectedOrderId, setSelectedOrderId] = useState<string | null>(() =>
+    typeof window === "undefined" ? null : new URLSearchParams(window.location.search).get("order"),
+  );
   const [feedback, setFeedback] = useState<{ tone: "success" | "error"; message: string } | null>(
     null,
   );

@@ -22,9 +22,10 @@ obligation explain those entries. Pending allocation and completed economic effe
 are different facts. Operation summaries are derived from the operation, its legs
 and explicit compensations.
 
-041 adds this foundation without admitting operational writes to it. Existing
-sales, orders, returns, cash commands, reports and cash close retain their current
-sources. The new tables start empty; migration does not interpret existing rows,
+041 added this foundation without admitting operational writes to it. ZM-FIN-042
+now adopts order payments and their cash-flow/close consumers as described below.
+Other producers retain their current sources. The new tables start empty;
+migration does not interpret existing rows,
 backfill demo data or turn on a second stream of production postings. There is no
 new POS/Backoffice workflow, provider adapter, general accounting system or bank
 integration in this task.
@@ -336,18 +337,26 @@ not an assertion that its current behavior already implements every decision.
 | Flow/source today | Remaining adoption and limit |
 |---|---|
 | `sales/infrastructure/models.py`: SalePayment and CashMovement; sale service writes a CASH movement | 043 maps actual sale legs and causal effects; 045 moves consumers/classification. Do not sum legacy and new representations. |
-| `orders/infrastructure/models.py`: CustomerOrderPayment; order service writes ADVANCE/SETTLEMENT/REFUND separately | 042 connects confirmed order effects to the canonical financial source/turn. Current omission from CashMovement remains open. |
+| `orders/infrastructure/models.py`: CustomerOrderPayment; order service writes ADVANCE/SETTLEMENT/REFUND separately | 042 admits one financial operation/confirmed entry per actual payment in the same transaction. Order consumers read these entries, without a mirrored CashMovement or a historical payment fallback. |
 | `payments/application/services.py`: OPERATIONAL_PAYMENT creates a CASH OUT movement | 043 preserves its outflow cause and actual method. This is not a sale discount. |
 | `discounts/application/services.py`: OPERATIONAL_DISCOUNT creates a CASH IN movement | 043 preserves the inspected internal collection semantics. CommercialDiscount remains a pricing rule; the hidden operational-discount UI is not enabled here. |
 | `returns/application/services.py`: cash refund and linked CashMovement | 044 implements the unified obligation/legs, partial settlement and causal compensation; provider refunds remain 046. |
-| `cash_close/application/services.py` and `admin_services.py`: totals read CashMovement; cash-flow uses existing module sources | 045 adopts the canonical source, confirmed-method totals, blockers and discrepancy explanation. 041 does not fix the audited 521-versus-527 order case in this consumer. |
+| `cash_close/application/services.py` and `admin_services.py`: non-order totals read CashMovement; cash-flow uses existing non-order module sources | 042 adds only canonical confirmed order entries and their causal compensations, with actual session attribution and separate order fields. The sources are disjoint. 045 retains full consumer adoption, method reconciliation and unresolved-effect blockers. |
 | Existing CARD rows | 046 implements provider evidence, UNKNOWN resolution, callbacks, terminal binding and reconciliation. Current CARD registration is not verified BBVA capture. |
 | Existing demo/test history and future legitimate cutover evidence | 047 supplies diagnosis, dry run, selective transformation and reconciliation. No historical financial backfill is part of 041. |
 
-042-047 remain separate work even though this foundation can represent their
+043-047 remain separate work even though this foundation can represent their
 required states and examples. Pricing/admission, physical ledgers, order workflow,
 provider capabilities, analytics and the production cutover retain their assigned
 tasks. No source gap is closed solely by adding these two tables.
+
+For the adopted order workflow, see the
+[order payments and cash-close manual](../operations/order-payments-and-cash-close.md)
+and [042 validation record](../implementation/order-cash-flow-validation.md).
+An order collection is funding at collection time, distinct from revenue at delivery.
+CARD is explicitly ACCOUNTING_ONLY with the operator's payment record as evidence;
+it is not provider capture. Existing command acknowledgement snapshots remain
+unchanged; financial references are exposed on authenticated detail GETs.
 
 ## Migration and productive-data boundary
 

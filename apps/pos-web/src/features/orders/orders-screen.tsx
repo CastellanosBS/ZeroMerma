@@ -15,6 +15,7 @@ import {
 import { useAppShellRightPanel } from "../../components/app-shell-right-panel";
 import { CapturedProductLineRow } from "../../components/captured-product-lines";
 import { CatalogSelectionCard } from "../../components/catalog-selection-card";
+import { OrderPaymentHistory } from "./order-payment-history";
 import { CatalogVisual } from "../../components/catalog-visual";
 import { OperationalStatus } from "../../components/operational-status";
 import { PosEmptyState, PosErrorState, PosLoadingState } from "../../components/pos-feedback";
@@ -1419,7 +1420,7 @@ function OrdersDecisionPanel({
         </div>
       </div>
 
-      <div className="grid min-h-0 content-start gap-1.5 overflow-hidden">
+      <div className="grid min-h-0 content-start gap-1.5 overflow-y-auto">
         <KeyValueGroup tone="muted">
           <div className="min-w-0">
             <p className="truncate text-sm font-semibold text-slate-950" title={orderDetail.folio}>
@@ -1679,6 +1680,7 @@ function OrdersDecisionPanel({
             </div>
           </div>
         </div>
+        <OrderPaymentHistory payments={orderDetail.payments} />
       </div>
 
       <div className="grid gap-1.5 border-t border-[var(--pos-shell-border)] pt-2">
@@ -2182,6 +2184,7 @@ export function OrdersScreen() {
       setMode("list");
       void queryClient.invalidateQueries({ queryKey: ["orders-list"] });
       void queryClient.invalidateQueries({ queryKey: ["order-detail"] });
+      void queryClient.invalidateQueries({ queryKey: ["cash-close-summary"] });
     }, [queryClient, resetCreateDraft]),
   );
 
@@ -2395,6 +2398,8 @@ export function OrdersScreen() {
   const refreshOrdersData = useCallback(
     async (orderId: string | null) => {
       await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["cash-close-summary"] }),
+        queryClient.invalidateQueries({ queryKey: ["cash-close-bootstrap"] }),
         queryClient.invalidateQueries({
           queryKey: ordersBootstrapQueryKey(appEnv.VITE_POS_WORKSTATION_CODE),
         }),

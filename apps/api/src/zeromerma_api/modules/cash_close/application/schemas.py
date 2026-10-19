@@ -79,6 +79,9 @@ class CashCloseSummaryResponse(BaseModel):
     opening_amount: Decimal
     total_cash_in: Decimal
     total_cash_out: Decimal
+    cash_order_collections_amount: Decimal
+    cash_order_refunds_amount: Decimal
+    cash_order_technical_reversal_amount: Decimal
     expected_cash_amount: Decimal
     movement_breakdown: list[CashCloseMovementBreakdownView]
     blockers: list[CashCloseIssueView]
@@ -279,6 +282,9 @@ class CashClosePreviewResponse(BaseModel):
     opening_amount: Decimal
     total_cash_in: Decimal
     total_cash_out: Decimal
+    cash_order_collections_amount: Decimal
+    cash_order_refunds_amount: Decimal
+    cash_order_technical_reversal_amount: Decimal
     expected_cash_amount: Decimal
     counted_cash_amount: Decimal | None = None
     cash_variance_amount: Decimal | None = None
@@ -313,6 +319,9 @@ class CashCloseDetailResponse(BaseModel):
     opening_amount: Decimal
     total_cash_in: Decimal
     total_cash_out: Decimal
+    cash_order_collections_amount: Decimal
+    cash_order_refunds_amount: Decimal
+    cash_order_technical_reversal_amount: Decimal
     expected_cash_amount: Decimal
     counted_cash_amount: Decimal | None = None
     cash_variance_amount: Decimal | None = None

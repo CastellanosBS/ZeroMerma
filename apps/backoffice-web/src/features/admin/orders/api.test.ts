@@ -144,6 +144,10 @@ const detailResponse = {
   },
   payments: [
     {
+      cash_session_id: "actual-turn-2",
+      workstation_id: "station-2",
+      financial_operation_id: "operation-42",
+      financial_entry_id: "entry-42",
       amount: "10.00",
       currency_code: "MXN",
       id: "payment-1",
@@ -213,6 +217,12 @@ describe("admin orders API", () => {
 
     expect(list.total).toBe(1);
     expect(detail.lines[0].productName).toBe("Concha");
+    expect(detail.payments[0]).toMatchObject({
+      cashSessionId: "actual-turn-2",
+      workstationId: "station-2",
+      financialOperationId: "operation-42",
+      financialEntryId: "entry-42",
+    });
     expect(fetchMock).toHaveBeenNthCalledWith(
       3,
       `${apiBase}/v1/admin/orders/order-1/mark-ready`,

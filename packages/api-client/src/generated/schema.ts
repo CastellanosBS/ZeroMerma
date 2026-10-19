@@ -4703,6 +4703,8 @@ export interface components {
             included_tickets: components["schemas"]["AdminCashCutTicketItemView"][];
             /** Operational Payments */
             operational_payments: components["schemas"]["AdminCashCutOperationalPaymentItemView"][];
+            /** Order Payments */
+            order_payments: components["schemas"]["AdminCashCutOrderPaymentItemView"][];
             overview: components["schemas"]["AdminCashCutOverviewView"];
             /** Payment Breakdown */
             payment_breakdown: components["schemas"]["AdminCashCutPaymentBreakdownView"][];
@@ -4720,6 +4722,12 @@ export interface components {
             cash_operational_discounts_amount: string;
             /** Cash Operational Payments Amount */
             cash_operational_payments_amount: string;
+            /** Cash Order Collections Amount */
+            cash_order_collections_amount: string;
+            /** Cash Order Refunds Amount */
+            cash_order_refunds_amount: string;
+            /** Cash Order Technical Reversal Amount */
+            cash_order_technical_reversal_amount: string;
             /** Cash Refunds Amount */
             cash_refunds_amount: string;
             /** Cash Sales Amount */
@@ -4882,6 +4890,64 @@ export interface components {
             /** Route Hint */
             route_hint: string;
         };
+        /** AdminCashCutOrderPaymentItemView */
+        AdminCashCutOrderPaymentItemView: {
+            /** Amount */
+            amount: string;
+            /**
+             * Cash Session Id
+             * Format: uuid
+             */
+            cash_session_id: string;
+            /** Currency Code */
+            currency_code: string;
+            /** Direction */
+            direction: string;
+            /**
+             * Financial Entry Id
+             * Format: uuid
+             */
+            financial_entry_id: string;
+            /**
+             * Financial Operation Id
+             * Format: uuid
+             */
+            financial_operation_id: string;
+            /**
+             * Occurred At
+             * Format: date-time
+             */
+            occurred_at: string;
+            /** Operator Id */
+            operator_id: string | null;
+            /** Operator Name */
+            operator_name: string;
+            /** Order Folio */
+            order_folio: string;
+            /**
+             * Order Id
+             * Format: uuid
+             */
+            order_id: string;
+            /**
+             * Order Payment Id
+             * Format: uuid
+             */
+            order_payment_id: string;
+            /** Payment Method Code */
+            payment_method_code: string;
+            /** Payment Type */
+            payment_type: string;
+            /** Route Hint */
+            route_hint: string;
+            /** Status */
+            status: string;
+            /**
+             * Workstation Id
+             * Format: uuid
+             */
+            workstation_id: string;
+        };
         /** AdminCashCutOverviewView */
         AdminCashCutOverviewView: {
             /** Branch Code */
@@ -4957,6 +5023,14 @@ export interface components {
             operational_discount_amount: string;
             /** Operational Payment Amount */
             operational_payment_amount: string;
+            /** Order Advance Amount */
+            order_advance_amount: string;
+            /** Order Refund Amount */
+            order_refund_amount: string;
+            /** Order Settlement Amount */
+            order_settlement_amount: string;
+            /** Order Technical Reversal Amount */
+            order_technical_reversal_amount: string;
             /** Payment Method Code */
             payment_method_code: string;
             /** Refund Amount */
@@ -5226,6 +5300,10 @@ export interface components {
             currency: string;
             /** Direction */
             direction: string;
+            /** Financial Entry Id */
+            financial_entry_id?: string | null;
+            /** Financial Operation Id */
+            financial_operation_id?: string | null;
             /** Id */
             id: string;
             /**
@@ -5237,6 +5315,10 @@ export interface components {
             operator_id?: string | null;
             /** Operator Name */
             operator_name: string;
+            /** Order Payment Id */
+            order_payment_id?: string | null;
+            /** Order Payment Type */
+            order_payment_type?: string | null;
             /** Payment Method */
             payment_method: string;
             /** Reconciliation Status */
@@ -5277,6 +5359,10 @@ export interface components {
             currency: string;
             /** Direction */
             direction: string;
+            /** Financial Entry Id */
+            financial_entry_id?: string | null;
+            /** Financial Operation Id */
+            financial_operation_id?: string | null;
             /** Id */
             id: string;
             /**
@@ -5288,6 +5374,10 @@ export interface components {
             operator_id?: string | null;
             /** Operator Name */
             operator_name: string;
+            /** Order Payment Id */
+            order_payment_id?: string | null;
+            /** Order Payment Type */
+            order_payment_type?: string | null;
             /** Payment Method */
             payment_method: string;
             /**
@@ -5361,8 +5451,18 @@ export interface components {
             difference_amount?: string | null;
             /** Expected Cash Amount */
             expected_cash_amount?: string | null;
+            /** Financial Entry Id */
+            financial_entry_id?: string | null;
+            /** Financial Operation Id */
+            financial_operation_id?: string | null;
             /** Note */
             note?: string | null;
+            /** Order Id */
+            order_id?: string | null;
+            /** Order Payment Id */
+            order_payment_id?: string | null;
+            /** Order Payment Type */
+            order_payment_type?: string | null;
             /** Original Ticket Folio */
             original_ticket_folio?: string | null;
             /** Source Payment Method */
@@ -5392,6 +5492,12 @@ export interface components {
             net_total: string;
             /** Operational Payments Total */
             operational_payments_total: string;
+            /** Order Collections Total */
+            order_collections_total: string;
+            /** Order Refunds Total */
+            order_refunds_total: string;
+            /** Order Technical Reversal Total */
+            order_technical_reversal_total: string;
             /** Outflows Total */
             outflows_total: string;
             /** Pending Reconciliation Total */
@@ -9088,8 +9194,17 @@ export interface components {
         AdminOrderPaymentView: {
             /** Amount */
             amount: string;
+            /**
+             * Cash Session Id
+             * Format: uuid
+             */
+            cash_session_id: string;
             /** Currency Code */
             currency_code: string;
+            /** Financial Entry Id */
+            financial_entry_id?: string | null;
+            /** Financial Operation Id */
+            financial_operation_id?: string | null;
             /**
              * Id
              * Format: uuid
@@ -9113,6 +9228,11 @@ export interface components {
             recorded_by_user_id: string;
             /** Sequence */
             sequence: number;
+            /**
+             * Workstation Id
+             * Format: uuid
+             */
+            workstation_id: string;
         };
         /** AdminOrderRelatedDocumentView */
         AdminOrderRelatedDocumentView: {
@@ -16545,6 +16665,12 @@ export interface components {
             branch: components["schemas"]["BranchSummary"];
             /** Branch Brand Key */
             branch_brand_key?: string | null;
+            /** Cash Order Collections Amount */
+            cash_order_collections_amount: string;
+            /** Cash Order Refunds Amount */
+            cash_order_refunds_amount: string;
+            /** Cash Order Technical Reversal Amount */
+            cash_order_technical_reversal_amount: string;
             cash_session: components["schemas"]["CashSessionView"];
             /** Cash Variance Amount */
             cash_variance_amount?: string | null;
@@ -16778,6 +16904,12 @@ export interface components {
             blockers: components["schemas"]["CashCloseIssueView"][];
             /** Can Start Close */
             can_start_close: boolean;
+            /** Cash Order Collections Amount */
+            cash_order_collections_amount: string;
+            /** Cash Order Refunds Amount */
+            cash_order_refunds_amount: string;
+            /** Cash Order Technical Reversal Amount */
+            cash_order_technical_reversal_amount: string;
             cash_session: components["schemas"]["CashSessionView"];
             /** Cash Variance Amount */
             cash_variance_amount?: string | null;
@@ -16875,6 +17007,12 @@ export interface components {
             blockers: components["schemas"]["CashCloseIssueView"][];
             /** Can Start Close */
             can_start_close: boolean;
+            /** Cash Order Collections Amount */
+            cash_order_collections_amount: string;
+            /** Cash Order Refunds Amount */
+            cash_order_refunds_amount: string;
+            /** Cash Order Technical Reversal Amount */
+            cash_order_technical_reversal_amount: string;
             cash_session: components["schemas"]["CashSessionView"];
             /** Currency Code */
             currency_code: string;
@@ -17714,8 +17852,17 @@ export interface components {
         CustomerOrderPaymentView: {
             /** Amount */
             amount: string;
+            /**
+             * Cash Session Id
+             * Format: uuid
+             */
+            cash_session_id: string;
             /** Currency Code */
             currency_code: string;
+            /** Financial Entry Id */
+            financial_entry_id?: string | null;
+            /** Financial Operation Id */
+            financial_operation_id?: string | null;
             /**
              * Id
              * Format: uuid
@@ -17739,6 +17886,11 @@ export interface components {
             recorded_by_user_id: string;
             /** Sequence */
             sequence: number;
+            /**
+             * Workstation Id
+             * Format: uuid
+             */
+            workstation_id: string;
         };
         /** DeliverCustomerOrderRequest */
         DeliverCustomerOrderRequest: {

@@ -238,6 +238,10 @@ class CustomerOrderPaymentView(BaseModel):
     payment_method_code: str
     amount: Decimal
     currency_code: str
+    cash_session_id: UUID
+    workstation_id: UUID
+    financial_operation_id: UUID | None = None
+    financial_entry_id: UUID | None = None
     recorded_at_utc: datetime
     recorded_by_user_id: UUID
     recorded_by_user_full_name: str

@@ -16,6 +16,11 @@ test("real order advance survives a lost creation response, reload and a duplica
     await page.getByRole("button", { name: "Abrir caja", exact: true }).click();
   }
   await expect(page).toHaveURL(/\/pos$/);
+  const headers = { Origin: new URL(environment.baseUrl).origin, "X-ZeroMerma-Surface": "POS" };
+  const summaryUrl = `${environment.apiUrl}/v1/cash-close/summary?workstation_code=${process.env.ZM_E2E_WORKSTATION_CODE!}`;
+  const beforeResponse = await page.request.get(summaryUrl, { headers });
+  expect(beforeResponse.status()).toBe(200);
+  const before = (await beforeResponse.json()) as components["schemas"]["CashCloseSummaryResponse"];
   await page.goto("/pedidos");
   const other = await page.context().newPage();
   await other.goto(`${environment.baseUrl}/pedidos`);
@@ -105,4 +110,67 @@ test("real order advance survives a lost creation response, reload and a duplica
   expect(readyResult.payments).toEqual(committed.payments);
   expect(readyResult.status).toBe("READY");
   await other.close();
+
+  const detailResponse = await page.request.get(
+    `${environment.apiUrl}/v1/orders/${committed.id}?workstation_code=${process.env.ZM_E2E_WORKSTATION_CODE!}`,
+    { headers },
+  );
+  expect(detailResponse.status()).toBe(200);
+  const detail =
+    (await detailResponse.json()) as components["schemas"]["CustomerOrderDetailResponse"];
+  expect(detail.payments).toHaveLength(1);
+  expect(detail.payments[0]!.id).toBe(committed.payments[0]!.id);
+  expect(detail.payments[0]!.financial_entry_id).toBeTruthy();
+  expect(detail.payments[0]!.financial_operation_id).toBeTruthy();
+  expect(detail.payments[0]!.cash_session_id).toBe(committed.payments[0]!.cash_session_id);
+  const afterResponse = await page.request.get(summaryUrl, { headers });
+  expect(afterResponse.status()).toBe(200);
+  const after = (await afterResponse.json()) as components["schemas"]["CashCloseSummaryResponse"];
+  const cents = (value: string) => Math.round(Number(value) * 100);
+  expect(cents(after.expected_cash_amount) - cents(before.expected_cash_amount)).toBe(
+    cents(committed.payments[0]!.amount),
+  );
+  expect(
+    cents(after.cash_order_collections_amount) - cents(before.cash_order_collections_amount),
+  ).toBe(cents(committed.payments[0]!.amount));
+
+  const decisionPanel = page.locator('[data-pos-shell-region="right"]');
+  await expect(
+    decisionPanel.getByRole("heading", { name: "Entrega y cobro", exact: true }),
+  ).toBeVisible();
+  await decisionPanel.getByText("Pagos registrados (1)", { exact: true }).click();
+  await decisionPanel.getByText("Referencias del pago y turno", { exact: true }).click();
+  await expect(
+    decisionPanel.getByText(`Asiento: ${detail.payments[0]!.financial_entry_id}`, { exact: true }),
+  ).toBeVisible();
+  await expect(
+    decisionPanel.getByRole("button", { name: "Entregar pedido", exact: true }),
+  ).toBeVisible();
+  await page.goto("/cerrar-turno");
+  await expect(page.getByRole("heading", { name: "Cierre de turno", exact: true })).toBeVisible();
+  await page.getByRole("button", { name: "No sobró pan", exact: true }).click();
+  await expect(page.getByLabel("Efectivo", { exact: true })).toBeVisible();
+  await page.getByLabel("Efectivo", { exact: true }).fill(after.expected_cash_amount);
+  const countedPreview = page.waitForResponse((response) => {
+    if (
+      new URL(response.url()).pathname !== "/v1/cash-close/preview" ||
+      response.request().method() !== "POST"
+    )
+      return false;
+    const body = response
+      .request()
+      .postDataJSON() as components["schemas"]["CashClosePreviewRequest"];
+    return (
+      body.counted_payment_methods?.some(
+        (row) => row.payment_method_code === "CARD" && row.counted_amount === "60.00",
+      ) ?? false
+    );
+  });
+  await page.getByLabel("Tarjeta", { exact: true }).fill("60.00");
+  const preview = await countedPreview;
+  expect(preview.status()).toBe(200);
+  expect((await preview.json()).cash_variance_amount).toBe("0.00");
+  await expect(page.getByText("Cobros de pedidos en efectivo", { exact: true })).toBeVisible();
+  const difference = page.getByText("Diferencia de efectivo", { exact: true }).locator("../..");
+  await expect(difference.getByText("$0.00", { exact: true })).toBeVisible();
 });

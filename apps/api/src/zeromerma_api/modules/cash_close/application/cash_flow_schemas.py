@@ -27,6 +27,9 @@ class AdminCashFlowSummaryView(BaseModel):
     card_total: Decimal
     operational_payments_total: Decimal
     refunds_total: Decimal
+    order_collections_total: Decimal
+    order_refunds_total: Decimal
+    order_technical_reversal_total: Decimal
     pending_reconciliation_total: Decimal
     difference_total: Decimal
 
@@ -68,6 +71,10 @@ class AdminCashFlowMovementListItemView(BaseModel):
     currency: str
     reconciliation_status: str
     warning_state: str
+    financial_operation_id: UUID | None = None
+    financial_entry_id: UUID | None = None
+    order_payment_id: UUID | None = None
+    order_payment_type: str | None = None
 
 
 class AdminCashFlowListResponse(BaseModel):
@@ -100,6 +107,10 @@ class AdminCashFlowMovementOverviewView(BaseModel):
     payment_method: str
     category: str | None = None
     warning_state: str
+    financial_operation_id: UUID | None = None
+    financial_entry_id: UUID | None = None
+    order_payment_id: UUID | None = None
+    order_payment_type: str | None = None
 
 
 class AdminCashFlowSourceContextView(BaseModel):
@@ -119,6 +130,11 @@ class AdminCashFlowSourceContextView(BaseModel):
     counted_cash_amount: Decimal | None = None
     difference_amount: Decimal | None = None
     note: str | None = None
+    financial_operation_id: UUID | None = None
+    financial_entry_id: UUID | None = None
+    order_id: UUID | None = None
+    order_payment_id: UUID | None = None
+    order_payment_type: str | None = None
 
 
 class AdminCashFlowFinancialClassificationView(BaseModel):

@@ -1,4 +1,5 @@
 import type { AdminCashFlowMovementListItem } from "../types";
+import { formatOrderPaymentType } from "../../orders/payment-labels";
 
 interface AdminCashFlowTableProps {
   errorMessage?: string | null;
@@ -25,6 +26,7 @@ const sourceLabels: Record<string, string> = {
   OPERATIONAL_PAYMENT: "Pago operativo",
   RETURN_REFUND: "Devolucion",
   SALE: "Venta",
+  ORDER_PAYMENT: "Pago de pedido",
 };
 
 function formatMoney(value: string) {
@@ -145,7 +147,9 @@ export function AdminCashFlowTable({
                     </span>
                   </td>
                   <td className="px-3 py-2 text-slate-700">
-                    {sourceLabels[movement.sourceType] ?? movement.sourceType}
+                    {movement.sourceType === "ORDER_PAYMENT" && movement.orderPaymentType
+                      ? formatOrderPaymentType(movement.orderPaymentType)
+                      : (sourceLabels[movement.sourceType] ?? movement.sourceType)}
                   </td>
                   <td className="px-3 py-2 font-semibold text-slate-950">
                     {movement.sourceReference}

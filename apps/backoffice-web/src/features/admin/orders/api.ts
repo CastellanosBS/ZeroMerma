@@ -221,6 +221,10 @@ function mapDetailFromApi(response: ApiOrderDetail): AdminOrderDetail {
       updatedAtUtc: response.overview.updated_at_utc,
     },
     payments: response.payments.map((payment) => ({
+      cashSessionId: payment.cash_session_id,
+      workstationId: payment.workstation_id,
+      financialOperationId: payment.financial_operation_id ?? null,
+      financialEntryId: payment.financial_entry_id ?? null,
       amount: String(payment.amount),
       currencyCode: payment.currency_code,
       id: payment.id,

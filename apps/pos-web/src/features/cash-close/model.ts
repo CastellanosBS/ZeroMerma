@@ -529,6 +529,16 @@ export function absoluteDecimalString(value: string): string {
   return value.startsWith("-") ? value.slice(1) : value;
 }
 
+export function parseExpectedCashCents(value: string): number | null {
+  const normalizedValue = value.trim();
+  const negative = normalizedValue.startsWith("-");
+  const magnitude = parseScaledDecimalToUnits(
+    negative ? normalizedValue.slice(1) : normalizedValue,
+    2,
+  );
+  return magnitude === null ? null : negative ? -magnitude : magnitude;
+}
+
 export function parseScaledDecimalToUnits(value: string, decimalPlaces: number): number | null {
   const normalizedValue = value.trim();
   if (normalizedValue.length === 0) {

@@ -143,7 +143,11 @@ function AdminCashCutsMetricStrip({
 export function AdminCashCutsPage() {
   const isAuthenticated = useBackofficeAuthStore((state) => state.isAuthenticated);
   const [filters, setFilters] = useState<AdminCashCutListFilters>(initialFilters);
-  const [selectedCashSessionId, setSelectedCashSessionId] = useState<string | null>(null);
+  const [selectedCashSessionId, setSelectedCashSessionId] = useState<string | null>(() =>
+    typeof window === "undefined"
+      ? null
+      : new URLSearchParams(window.location.search).get("cashSession"),
+  );
   const [feedback, setFeedback] = useState<{ tone: "success" | "error"; message: string } | null>(
     null,
   );

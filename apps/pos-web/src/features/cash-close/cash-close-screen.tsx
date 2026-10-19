@@ -70,9 +70,11 @@ import {
   buildCashClosePreviewRequest,
   createInitialCashCloseDraftState,
   getCashCloseCountValueState,
+  getDraftCountedCashCents,
   getDraftCountedTotalCents,
   goBackFromCashClosePhysicalState,
   hasCashClosePhysicalCounts,
+  parseExpectedCashCents,
   removeCashCloseCountedLine,
   sanitizeCashCloseObservation,
   sanitizeMoneyInput,
@@ -391,6 +393,9 @@ function ClosingRightPanel({
   onOpenNextShift,
   openedAtText,
   openingAmountText,
+  orderCollectionsText,
+  orderRefundsText,
+  orderTechnicalReversalText,
   otherPaymentRows,
   submitDisabledReason,
   submitErrorMessage,
@@ -417,6 +422,9 @@ function ClosingRightPanel({
   onOpenNextShift: () => void;
   openedAtText: string;
   openingAmountText: string;
+  orderCollectionsText: string;
+  orderRefundsText: string;
+  orderTechnicalReversalText: string;
   otherPaymentRows: CashClosePaymentMethodRowView[];
   submitDisabledReason: string | null;
   submitErrorMessage: string | null;
@@ -452,6 +460,15 @@ function ClosingRightPanel({
             <ReadOnlyAmountRow label="Apertura" value={openingAmountText} />
             <ReadOnlyAmountRow label="Entradas" value={totalCashInText} />
             <ReadOnlyAmountRow label="Salidas" value={totalCashOutText} />
+            <ReadOnlyAmountRow label="Cobros de pedidos en efectivo" value={orderCollectionsText} />
+            <ReadOnlyAmountRow label="Reembolsos de pedidos en efectivo" value={orderRefundsText} />
+            <ReadOnlyAmountRow
+              label="Compensaciones de pedidos en efectivo"
+              value={orderTechnicalReversalText}
+            />
+            <p className="text-xs text-slate-600">
+              Los pedidos ya están incluidos en las entradas y salidas.
+            </p>
             <ReadOnlyAmountRow label="Abierto" value={openedAtText} />
           </div>
         </RightPanelBlock>
@@ -494,17 +511,22 @@ function ClosingRightPanel({
           </PosPaymentInputCard>
           <PosPaymentValueCard
             icon={<MoneyIcon className="h-5 w-5" />}
-            label="Esperado"
+            label="Efectivo esperado"
             tone="fixed"
             value={expectedCashText}
           />
           <PosPaymentValueCard
             icon={<CheckCircleIcon className="h-5 w-5" />}
-            label="Diferencia"
+            label="Diferencia de efectivo"
             tone={differenceTone}
             value={cashDifferenceText}
           />
         </div>
+
+        <p className="text-xs text-slate-600">
+          La tarjeta se registra por separado y no forma parte del efectivo de caja. Este registro
+          no confirma una captura del proveedor.
+        </p>
 
         {otherPaymentRows.length > 0 ? (
           <RightPanelBlock title="Otros pagos" tone="muted">
@@ -727,13 +749,15 @@ export function CashCloseScreen() {
         : "--";
   const expectedCashCents =
     livePreviewResult?.expected_cash_amount !== undefined
-      ? Math.round(Number(livePreviewResult.expected_cash_amount) * 100)
+      ? parseExpectedCashCents(String(livePreviewResult.expected_cash_amount))
       : summaryQuery.data
-        ? Math.round(Number(summaryQuery.data.expected_cash_amount) * 100)
+        ? parseExpectedCashCents(String(summaryQuery.data.expected_cash_amount))
         : null;
   const cashDifferenceText =
-    expectedCashCents !== null
-      ? formatCurrency((countedTotalCents - expectedCashCents) / 100)
+    expectedCashCents !== null && countedCashState === "CAPTURED"
+      ? formatCurrency(
+          (getDraftCountedCashCents(draftState.countedPaymentAmounts) - expectedCashCents) / 100,
+        )
       : "--";
   const openingAmountText = summaryQuery.data
     ? formatCurrency(summaryQuery.data.opening_amount)
@@ -1254,6 +1278,18 @@ export function CashCloseScreen() {
         onOpenNextShift={handleOpenNextShift}
         openedAtText={openedAtText}
         openingAmountText={openingAmountText}
+        orderCollectionsText={formatMaybeCurrency(
+          validationResult?.cash_order_collections_amount ??
+            summaryQuery.data?.cash_order_collections_amount,
+        )}
+        orderRefundsText={formatMaybeCurrency(
+          validationResult?.cash_order_refunds_amount ??
+            summaryQuery.data?.cash_order_refunds_amount,
+        )}
+        orderTechnicalReversalText={formatMaybeCurrency(
+          validationResult?.cash_order_technical_reversal_amount ??
+            summaryQuery.data?.cash_order_technical_reversal_amount,
+        )}
         otherPaymentRows={otherPaymentRows}
         submitDisabledReason={submitDisabledReason}
         submitErrorMessage={submitErrorMessage}
@@ -1262,7 +1298,14 @@ export function CashCloseScreen() {
       />
     );
 
-  useAppShellRightPanel(rightPanel);
+  useAppShellRightPanel(
+    isAuthenticated &&
+      !bootstrapQuery.isPending &&
+      !bootstrapQuery.isError &&
+      currentOpenCashSession !== null
+      ? rightPanel
+      : null,
+  );
 
   if (!isAuthenticated) {
     return <Navigate to="/login" />;

@@ -22,6 +22,9 @@ export interface AdminCashFlowFilterOptions {
 }
 
 export interface AdminCashFlowSummary {
+  orderCollectionsTotal: string;
+  orderRefundsTotal: string;
+  orderTechnicalReversalTotal: string;
   cardTotal: string;
   cashTotal: string;
   differenceTotal: string;
@@ -59,6 +62,10 @@ export interface AdminCashFlowListFilters {
 }
 
 export interface AdminCashFlowMovementListItem {
+  financialOperationId?: string | null;
+  financialEntryId?: string | null;
+  orderPaymentId?: string | null;
+  orderPaymentType?: string | null;
   amount: string;
   branchId: string;
   branchName: string;
@@ -132,6 +139,11 @@ export interface AdminCashFlowMovementDetail {
     status: string;
   }>;
   sourceDocumentContext: {
+    orderId?: string | null;
+    financialOperationId?: string | null;
+    financialEntryId?: string | null;
+    orderPaymentId?: string | null;
+    orderPaymentType?: string | null;
     cashCutFolio: string | null;
     cashCutId: string | null;
     cashCutRouteHint: string | null;

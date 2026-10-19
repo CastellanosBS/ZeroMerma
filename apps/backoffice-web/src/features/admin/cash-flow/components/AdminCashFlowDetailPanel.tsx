@@ -1,4 +1,5 @@
 import type { AdminCashFlowMovementDetail, AdminCashFlowMovementListItem } from "../types";
+import { formatOrderPaymentType, recordedCardExplanation } from "../../orders/payment-labels";
 
 interface AdminCashFlowDetailPanelProps {
   detail: AdminCashFlowMovementDetail | null;
@@ -141,6 +142,12 @@ export function AdminCashFlowDetailPanel({
           <Field label="Concepto" value={detail.sourceDocumentContext.concept} />
           <Field label="Ticket original" value={detail.sourceDocumentContext.originalTicketFolio} />
           <Field label="Corte asociado" value={detail.sourceDocumentContext.cashCutFolio} />
+          {detail.sourceDocumentContext.orderPaymentType ? (
+            <Field
+              label="Movimiento del pedido"
+              value={formatOrderPaymentType(detail.sourceDocumentContext.orderPaymentType)}
+            />
+          ) : null}
         </div>
         {detail.sourceDocumentContext.note ? (
           <p className="mt-2 rounded-[14px] bg-slate-50 px-3 py-2 text-sm text-slate-600">
@@ -151,6 +158,17 @@ export function AdminCashFlowDetailPanel({
           <ActionLink href={detail.sourceDocumentContext.sourceRouteHint}>Abrir origen</ActionLink>
           <ActionLink href={detail.sourceDocumentContext.cashCutRouteHint}>Abrir corte</ActionLink>
         </div>
+        {detail.sourceDocumentContext.financialEntryId ? (
+          <details className="mt-2 text-xs text-slate-600">
+            <summary>Referencias financieras</summary>
+            <p className="break-all">Pago: {detail.sourceDocumentContext.orderPaymentId}</p>
+            <p className="break-all">
+              Operación: {detail.sourceDocumentContext.financialOperationId}
+            </p>
+            <p className="break-all">Asiento: {detail.sourceDocumentContext.financialEntryId}</p>
+            <p className="break-all">Turno: {detail.sourceDocumentContext.cashSessionId}</p>
+          </details>
+        ) : null}
       </section>
 
       <section>
@@ -177,6 +195,10 @@ export function AdminCashFlowDetailPanel({
           <p className="mt-2 rounded-[14px] bg-slate-50 px-3 py-2 text-sm text-slate-600">
             {detail.financialClassification.note}
           </p>
+        ) : null}
+        {detail.overview.sourceType === "ORDER_PAYMENT" &&
+        detail.overview.paymentMethod === "CARD" ? (
+          <p className="mt-2 text-xs text-slate-600">{recordedCardExplanation}</p>
         ) : null}
       </section>
 

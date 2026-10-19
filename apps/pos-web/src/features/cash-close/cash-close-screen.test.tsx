@@ -175,6 +175,11 @@ const committedCloseDetail = {
 } as const;
 
 let mockBootstrapResponse = buildBootstrapResponse(true);
+let mockBootstrapIsPending = false;
+let mockSummaryResponse = {
+  ...summaryResponse,
+  expected_cash_amount: String(summaryResponse.expected_cash_amount),
+};
 
 function buildBootstrapResponse(hasOpenSession: boolean) {
   return {
@@ -387,14 +392,14 @@ vi.mock("../operations/queries", () => ({
 
 vi.mock("./queries", () => ({
   useCashCloseBootstrapQuery: () => ({
-    data: mockBootstrapResponse,
+    data: mockBootstrapIsPending ? undefined : mockBootstrapResponse,
     error: null,
     isError: false,
-    isPending: false,
+    isPending: mockBootstrapIsPending,
     refetch: vi.fn(),
   }),
   useCashCloseSummaryQuery: () => ({
-    data: summaryResponse,
+    data: mockSummaryResponse,
     error: null,
     isError: false,
     isPending: false,
@@ -573,6 +578,8 @@ beforeEach(() => {
   vi.useFakeTimers();
   vi.setSystemTime(new Date("2026-04-22T19:30:00Z"));
   mockBootstrapResponse = buildBootstrapResponse(true);
+  mockBootstrapIsPending = false;
+  mockSummaryResponse = { ...summaryResponse };
   navigateMock.mockReset();
   showErrorMock.mockReset();
   showSuccessMock.mockReset();
@@ -594,6 +601,44 @@ afterEach(() => {
 });
 
 describe("cash close screen", () => {
+  it("does not expose close actions before the current cash session finishes loading", async () => {
+    mockBootstrapIsPending = true;
+    const view = renderUi(<CashCloseScreen />);
+    mountedRoots.push(view.unmount);
+    await flushAsync();
+    expect(view.container.textContent).toContain("Cargando cierre");
+    expect(getButtonByText(view.container, "No sobró pan")).toBeNull();
+    expect(getButtonByText(view.container, "Cerrar con conteo")).toBeNull();
+    expect(getInputByLabel(view.container, "Efectivo")).toBeNull();
+  });
+
+  it.each(["summary", "preview"])(
+    "shows a positive cash difference for zero counted and negative %s expected cash",
+    async (source) => {
+      if (source === "summary") {
+        mockSummaryResponse.expected_cash_amount = "-3.00";
+      }
+      previewCashCloseMock.mockImplementation(async (payload) => ({
+        ...buildPreviewResponse(payload),
+        expected_cash_amount: "-3.00",
+        cash_variance_amount: "3.00",
+      }));
+      const view = renderUi(<CashCloseScreen />);
+      mountedRoots.push(view.unmount);
+      await addPhysicalCountWithKeyboard(view.container);
+      click(getButtonByText(view.container, "Cerrar con conteo"));
+      await flushAsync();
+      const cashInput = getInputByLabel(view.container, "Efectivo");
+      if (!cashInput) throw new Error("Expected counted cash input to exist.");
+      setInputValue(cashInput, "0.00");
+      if (source === "preview") await advancePreview();
+      const label = Array.from(view.container.querySelectorAll("span")).find(
+        (element) => element.textContent === "Diferencia de efectivo",
+      );
+      expect(label?.parentElement?.parentElement?.querySelector("p")?.textContent).toBe("$3.00");
+    },
+  );
+
   it("shows a blocker when there is no open cash session", async () => {
     mockBootstrapResponse = buildBootstrapResponse(false);
 
@@ -827,7 +872,7 @@ describe("cash close screen", () => {
     expect(navigateMock).toHaveBeenCalledWith({ to: "/login" });
   });
 
-  it("calculates the difference and payload from efectivo plus tarjeta", async () => {
+  it("compares only counted cash with expected cash while preserving the separate card count", async () => {
     const view = renderUi(<CashCloseScreen />);
     mountedRoots.push(view.unmount);
 
@@ -842,10 +887,21 @@ describe("cash close screen", () => {
     }
 
     setInputValue(cardInput, "180.00");
-    expect(view.container.textContent).toContain("$0.00");
+    const differenceValue = () => {
+      const label = Array.from(view.container.querySelectorAll("span")).find(
+        (element) => element.textContent === "Diferencia de efectivo",
+      );
+      return label?.parentElement?.parentElement?.querySelector("p")?.textContent;
+    };
+    expect(differenceValue()).toBe("--");
 
     setInputValue(cashInput, "20.00");
-    expect(view.container.textContent).toContain("$20.00");
+    expect(differenceValue()).toBe("-$160.00");
+    setInputValue(cardInput, "60.00");
+    expect(differenceValue()).toBe("-$160.00");
+    setInputValue(cashInput, "180.00");
+    expect(differenceValue()).toBe("$0.00");
+    expect(view.container.textContent).toContain("no confirma una captura del proveedor");
 
     await advancePreview();
 
@@ -856,11 +912,11 @@ describe("cash close screen", () => {
 
     expect(commitCashCloseMock.mock.calls[0]?.[0].counted_payment_methods).toEqual([
       {
-        counted_amount: "20.00",
+        counted_amount: "180.00",
         payment_method_code: "CASH",
       },
       {
-        counted_amount: "180.00",
+        counted_amount: "60.00",
         payment_method_code: "CARD",
       },
     ]);

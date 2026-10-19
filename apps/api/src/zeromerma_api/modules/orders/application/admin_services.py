@@ -30,6 +30,9 @@ from zeromerma_api.modules.orders.application.admin_schemas import (
     AdminOrdersListResponse,
     AdminOrderTimelineEventView,
 )
+from zeromerma_api.modules.orders.application.financial_services import (
+    order_payment_financial_references,
+)
 from zeromerma_api.modules.orders.application.schemas import OrderCommandResultView
 from zeromerma_api.modules.orders.application.services import (
     ORDER_STATUS_SEQUENCE,
@@ -670,6 +673,9 @@ def _build_order_detail(session: Session, order: CustomerOrder) -> AdminOrderDet
     )
     now = datetime.now(tz=UTC)
     refund_amount = _get_cancellation_refund_amount(order, effective_at=now)
+    financial_references = order_payment_financial_references(
+        session, order_id=order.id, branch_id=order.branch_id
+    )
     payment_state = _derive_payment_state(
         status=order.status,
         advance_amount=_quantize_money(order.advance_amount),
@@ -744,6 +750,10 @@ def _build_order_detail(session: Session, order: CustomerOrder) -> AdminOrderDet
                 payment_method_code=payment.payment_method_code,
                 amount=_quantize_money(payment.amount),
                 currency_code=payment.currency_code,
+                cash_session_id=payment.cash_session_id,
+                workstation_id=payment.workstation_id,
+                financial_operation_id=financial_references.get(payment.id, (None, None))[0],
+                financial_entry_id=financial_references.get(payment.id, (None, None))[1],
                 recorded_at_utc=payment.recorded_at_utc,
                 recorded_by_user_id=payment.recorded_by_user_id,
                 recorded_by_user_full_name=recorded_by_full_name,

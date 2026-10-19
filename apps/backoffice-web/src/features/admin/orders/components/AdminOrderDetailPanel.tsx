@@ -1,6 +1,7 @@
 import { AdminActionButton } from "../../components/AdminActionButton";
 import { AdminEmptyState } from "../../components/AdminEmptyState";
 import type { AdminOrderDetail, AdminOrderListItem } from "../types";
+import { formatOrderPaymentType, recordedCardExplanation } from "../payment-labels";
 
 function formatMoney(value: string | null | undefined, currencyCode = "MXN"): string {
   if (!value) {
@@ -35,15 +36,6 @@ function formatStatus(value: string): string {
   return labels[value] ?? value;
 }
 
-function formatPaymentType(value: string): string {
-  const labels: Record<string, string> = {
-    ADVANCE: "Anticipo",
-    REFUND: "Reembolso",
-    SETTLEMENT: "Liquidacion",
-  };
-  return labels[value] ?? value;
-}
-
 function FieldRow({ label, value, title }: { label: string; title?: string; value: string }) {
   return (
     <div className="grid min-w-0 grid-cols-[7rem_minmax(0,1fr)] gap-2 text-sm">
@@ -74,7 +66,7 @@ export function AdminOrderDetailPanel({
   onMarkReady,
   selectedOrder,
 }: AdminOrderDetailPanelProps) {
-  if (!selectedOrder) {
+  if (!selectedOrder && !detail && !isLoading && !errorMessage) {
     return (
       <aside className="flex min-h-0 min-w-0 flex-col overflow-hidden rounded-[20px] border border-[var(--ui-color-border)] bg-white">
         <div className="border-b border-[var(--ui-color-border)] px-4 py-3">
@@ -101,7 +93,7 @@ export function AdminOrderDetailPanel({
             Detalle
           </p>
           <h3 className="mt-1 truncate text-lg font-semibold text-slate-950">
-            {selectedOrder.folio}
+            {selectedOrder?.folio ?? "Pedido solicitado"}
           </h3>
         </div>
         <div className="min-h-0 flex-1 p-4">
@@ -122,7 +114,7 @@ export function AdminOrderDetailPanel({
             Detalle
           </p>
           <h3 className="mt-1 truncate text-lg font-semibold text-slate-950">
-            {selectedOrder.folio}
+            {selectedOrder?.folio ?? "Pedido solicitado"}
           </h3>
         </div>
         <div className="min-h-0 flex-1 p-4">
@@ -268,7 +260,7 @@ export function AdminOrderDetailPanel({
                   key={payment.id}
                 >
                   <span className="truncate font-semibold text-slate-950">
-                    {formatPaymentType(payment.paymentType)} - {payment.paymentMethodCode}
+                    {formatOrderPaymentType(payment.paymentType)} - {payment.paymentMethodCode}
                   </span>
                   <span className="text-right font-semibold text-slate-950">
                     {formatMoney(payment.amount, payment.currencyCode)}
@@ -279,6 +271,26 @@ export function AdminOrderDetailPanel({
                   <span className="text-right text-xs text-slate-500">
                     {formatDateTime(payment.recordedAtUtc)}
                   </span>
+                  {payment.paymentMethodCode === "CARD" ? (
+                    <p className="col-span-2 text-xs text-slate-600">{recordedCardExplanation}</p>
+                  ) : null}
+                  <details className="col-span-2 text-xs text-slate-600">
+                    <summary>Referencias del pago y turno</summary>
+                    <p className="break-all">Pago: {payment.id}</p>
+                    <p className="break-all">Turno: {payment.cashSessionId}</p>
+                    <p className="break-all">Estación: {payment.workstationId}</p>
+                    {payment.financialEntryId ? (
+                      <>
+                        <p className="break-all">Operación: {payment.financialOperationId}</p>
+                        <p className="break-all">Asiento: {payment.financialEntryId}</p>
+                      </>
+                    ) : (
+                      <p>
+                        Registro anterior a la integración financiera; sin asiento financiero
+                        vinculado.
+                      </p>
+                    )}
+                  </details>
                 </div>
               ))
             ) : (

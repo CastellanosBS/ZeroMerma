@@ -422,6 +422,37 @@ La aceptación integrada se establece mediante las ocho etapas Foundation y
 la entrega. Este bloque no declara completada la integración financiera ni los
 gates Data Integrity Ready o Production Ready.
 
+### 0.14 Registro de ejecución — ZM-FIN-042
+
+Los anticipos, liquidaciones y reembolsos nuevos de pedidos generan una operación
+y una entrada financiera por componente real de pago, dentro de la transacción
+idempotente de pedido, auditoría y outbox. La fuente causal es el pago y el sujeto
+económico es el pedido. Se conserva la sesión, estación y cajero que efectivamente
+cobran o devuelven; no se duplica el importe en `CashMovement`.
+
+POS incluye esos efectos en resumen, preview y cierre. Flujo y cortes de
+Backoffice distinguen pedidos de ventas y enlazan sus identidades financieras.
+Sólo CASH modifica el efectivo esperado; el conteo CARD tampoco se suma a la
+diferencia de efectivo de la pantalla POS. CARD continúa como registro contable
+externo y no acredita captura BBVA ni liquidación bancaria. Los acuses persistidos
+de 030/032 conservan su contrato; se amplían los GET y se regenera OpenAPI/TypeScript.
+
+El [registro de validación de 042](implementation/order-cash-flow-validation.md)
+documenta las pruebas y sus resultados, y el
+[manual de pagos de pedidos y caja](operations/order-payments-and-cash-close.md)
+explica captura, reconocimiento y corte. La reproducción numérica exigida es
+500.00 de apertura + 21.00 de venta + 6.00 de pedido = 527.00, con conteo 527.00
+y diferencia 0.00. También se verifica que un cobro posterior pertenezca a su
+turno real y que pago-vs-cierre no deje un efecto confirmado fuera del corte.
+
+No hay nueva migración ni backfill de historia demo/test; la revisión sigue en
+0044. La política completa de cancelación/reembolso, CASH_FIRST, obligaciones
+parciales, integración del proveedor y adopción de los demás flujos conservan sus
+tareas 043–047 y del ciclo de pedidos. No se declaran completados Data Integrity
+Ready ni Production Ready. La aceptación integrada requiere ocho etapas
+Foundation y **Foundation required** del commit inmutable entregado; SHA y enlace
+acompañan la entrega.
+
 ## 1. Resumen ejecutivo
 
 ZeroMerma posee una base adecuada para evolucionar sin reescritura: monolito modular, FastAPI/SQLAlchemy/PostgreSQL, POS y Backoffice separados, OpenAPI generado, precisión decimal, auditoría y outbox transaccionales. La auditoría activa demostró que una parte importante de ventas, pagos, pedidos, documentos y administración es real. También demostró defectos sistémicos: el POS no alimenta el inventario canónico; el pago de pedido no entra en caja/corte; el worker no procesa eventos; la trazabilidad de identidad/origen es incorrecta; y varias superficies administrativas son simuladas o incompletas.

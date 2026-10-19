@@ -2,7 +2,7 @@
 
 Each competitor uses real persisted authority and a separate transaction. HTTP authenticates
 User/AuthSession first and serializes one user's requests; these tests deliberately exercise
-the business boundary itself. Order-payment admission is tested without claiming ledger 042.
+the business boundary itself, including order ledger admission and its cash-close effect.
 """
 
 from __future__ import annotations
@@ -46,6 +46,10 @@ from zeromerma_api.modules.catalog.infrastructure.models import Product, Product
 from zeromerma_api.modules.discounts.application.idempotency import OperationalDiscountCommitService
 from zeromerma_api.modules.discounts.application.schemas import CreateOperationalDiscountRequest
 from zeromerma_api.modules.discounts.infrastructure.models import OperationalDiscount
+from zeromerma_api.modules.financial_ledger.infrastructure.models import (
+    FinancialEntry,
+    FinancialOperation,
+)
 from zeromerma_api.modules.idempotency.application.schemas import IdempotencyResult
 from zeromerma_api.modules.idempotency.domain.exceptions import IdempotencyError
 from zeromerma_api.modules.idempotency.infrastructure.models import IdempotencyRecord
@@ -64,6 +68,7 @@ from zeromerma_api.modules.orders.application.schemas import (
     CreateCustomerOrderRequest,
     DeliverCustomerOrderRequest,
 )
+from zeromerma_api.modules.orders.domain.exceptions import OrderStateConflictError
 from zeromerma_api.modules.orders.infrastructure.models import CustomerOrderPayment
 from zeromerma_api.modules.outbox.application.service import OutboxWriter
 from zeromerma_api.modules.outbox.infrastructure.models import OutboxEvent
@@ -382,6 +387,8 @@ def _effect_counts() -> tuple[int, ...]:
                 IdempotencyRecord,
                 AuditLog,
                 OutboxEvent,
+                FinancialOperation,
+                FinancialEntry,
             )
         )
 
@@ -413,6 +420,7 @@ def test_financial_commands_and_close_share_exact_shift_boundary(
             )
         after = _effect_counts()
         assert after[:3] == before[:3]
+        assert after[-2:] == before[-2:]
     else:
         assert isinstance(waited, IdempotencyResult), repr(waited)
     with SessionLocal() as session:
@@ -430,8 +438,19 @@ def test_financial_commands_and_close_share_exact_shift_boundary(
             (amount if direction == "IN" else -amount for direction, amount in movements),
             Decimal("0"),
         )
+        order_entries = session.execute(
+            select(FinancialEntry.direction, FinancialEntry.amount).where(
+                FinancialEntry.cash_session_id == shift.id,
+                FinancialEntry.payment_method_code == "CASH",
+                FinancialEntry.state == "CONFIRMED",
+            )
+        ).all()
+        expected += sum(
+            (amount if direction == "IN" else -amount for direction, amount in order_entries),
+            Decimal("0"),
+        )
         assert closed.expected_cash_amount == expected
-        # Orders intentionally still use CustomerOrderPayment, not CashMovement (task 042).
+        # Each order effect has one canonical entry and no mirrored CashMovement.
         if kind in {"create", "deliver", "cancel"}:
             assert movements == []
             count = session.scalar(
@@ -440,6 +459,7 @@ def test_financial_commands_and_close_share_exact_shift_boundary(
                 .where(CustomerOrderPayment.cash_session_id == shift.id)
             )
             assert count == before[1] + (0 if close_first else 1)
+            assert len(order_entries) == count
     fresh = login_headers(
         client,
         email=transfer_cashier_email(command.body["workstation_code"]),
@@ -469,6 +489,7 @@ def test_rolled_back_financial_command_releases_close_without_partial_effects(
     assert isinstance(failed, RuntimeError) and "Injected rollback" in str(failed)
     assert isinstance(closed, IdempotencyResult), repr(closed)
     assert _effect_counts()[:3] == before[:3]
+    assert _effect_counts()[-2:] == before[-2:]
     with SessionLocal() as session:
         assert (
             session.scalar(
@@ -566,6 +587,52 @@ def test_two_distinct_sale_intentions_serialize_without_losing_either_effect(
     with SessionLocal() as session:
         assert session.scalar(select(func.count()).select_from(Sale)) == 2
         assert session.scalar(select(func.sum(CashMovement.amount))) == Decimal("72.00")
+
+
+def test_two_order_settlement_intentions_cannot_collect_the_same_remaining_balance(
+    client: TestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    first, _close = _setup(client, "deliver")
+    second = Command("deliver", first.body, first.headers, new_idempotency_key(), first.order_id)
+    paid, rejected = _contend(monkeypatch, first, second)
+    assert isinstance(paid, IdempotencyResult), repr(paid)
+    assert isinstance(rejected, OrderStateConflictError), repr(rejected)
+    with SessionLocal() as session:
+        payments = session.scalars(
+            select(CustomerOrderPayment).where(
+                CustomerOrderPayment.customer_order_id == UUID(first.order_id),
+                CustomerOrderPayment.payment_type == "SETTLEMENT",
+            )
+        ).all()
+        assert len(payments) == 1
+        assert payments[0].amount == Decimal("14.00")
+        entries = session.scalars(
+            select(FinancialEntry)
+            .join(FinancialOperation)
+            .where(FinancialOperation.kind == "ORDER_SETTLEMENT")
+        ).all()
+        assert len(entries) == 1 and entries[0].amount == Decimal("14.00")
+    before_replay = _effect_counts()
+    assert _run(first).replayed
+    assert _effect_counts() == before_replay
+
+
+@pytest.mark.parametrize("kind", ["create", "deliver", "cancel"])
+@pytest.mark.parametrize("close_first", [False, True])
+def test_card_order_effects_serialize_with_close_without_affecting_cash(
+    client: TestClient, monkeypatch: pytest.MonkeyPatch, kind: str, close_first: bool
+) -> None:
+    command, close = _setup(client, kind, payment="CARD")
+    before = _effect_counts()
+    first, second = _contend(monkeypatch, *((close, command) if close_first else (command, close)))
+    assert isinstance(first, IdempotencyResult), repr(first)
+    if close_first:
+        assert isinstance(second, IdempotencyError) and second.code == "CASH_SESSION_CLOSED"
+        assert _effect_counts()[-2:] == before[-2:]
+    else:
+        assert isinstance(second, IdempotencyResult), repr(second)
+        assert second.payload["expected_cash_amount"] == "1000.00"
+        assert _effect_counts()[-2:] == (before[-2] + 1, before[-1] + 1)
 
 
 def test_cash_lock_timeout_rolls_back_sale_identity_then_retries_same_intention(

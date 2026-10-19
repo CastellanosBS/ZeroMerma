@@ -1,3 +1,5 @@
+import type { components } from "@zeromerma/api-client";
+
 export interface AdminCashCutBackendContract {
   detailEndpoint: string;
   exportEndpoint: string | null;
@@ -108,6 +110,9 @@ export interface AdminCashCutOverview {
 }
 
 export interface AdminCashCutExpectedVsCounted {
+  cashOrderCollectionsAmount: string;
+  cashOrderRefundsAmount: string;
+  cashOrderTechnicalReversalAmount: string;
   openingAmount: string;
   cashSalesAmount: string;
   cashRefundsAmount: string;
@@ -123,6 +128,10 @@ export interface AdminCashCutExpectedVsCounted {
 }
 
 export interface AdminCashCutPaymentBreakdown {
+  orderAdvanceAmount: string;
+  orderSettlementAmount: string;
+  orderRefundAmount: string;
+  orderTechnicalReversalAmount: string;
   paymentMethodCode: string;
   currencyCode: string;
   salesAmount: string;
@@ -205,6 +214,7 @@ export interface AdminCashCutTimelineItem {
 }
 
 export interface AdminCashCutDetail {
+  orderPayments: components["schemas"]["AdminCashCutDetailView"]["order_payments"];
   availableActions: {
     canCopyFolio: boolean;
     canExportReport: boolean;

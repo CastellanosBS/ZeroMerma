@@ -172,6 +172,13 @@ function mapDetailFromApi(response: ApiCashCutDetail): AdminCashCutDetail {
           : String(response.denomination_count.total_counted),
     },
     expectedVsCounted: {
+      cashOrderCollectionsAmount: String(
+        response.expected_vs_counted.cash_order_collections_amount,
+      ),
+      cashOrderRefundsAmount: String(response.expected_vs_counted.cash_order_refunds_amount),
+      cashOrderTechnicalReversalAmount: String(
+        response.expected_vs_counted.cash_order_technical_reversal_amount,
+      ),
       cashAdjustmentsAmount: String(response.expected_vs_counted.cash_adjustments_amount),
       cashOperationalDiscountsAmount: String(
         response.expected_vs_counted.cash_operational_discounts_amount,
@@ -206,6 +213,7 @@ function mapDetailFromApi(response: ApiCashCutDetail): AdminCashCutDetail {
       ticketId: ticket.ticket_id,
       totalAmount: String(ticket.total_amount),
     })),
+    orderPayments: response.order_payments,
     operationalPayments: response.operational_payments.map((payment) => ({
       amount: String(payment.amount),
       cashAmount: String(payment.cash_amount),
@@ -241,6 +249,10 @@ function mapDetailFromApi(response: ApiCashCutDetail): AdminCashCutDetail {
       workstationName: response.overview.workstation_name,
     },
     paymentBreakdown: response.payment_breakdown.map((row) => ({
+      orderAdvanceAmount: String(row.order_advance_amount),
+      orderSettlementAmount: String(row.order_settlement_amount),
+      orderRefundAmount: String(row.order_refund_amount),
+      orderTechnicalReversalAmount: String(row.order_technical_reversal_amount),
       countedAmount: row.counted_amount == null ? null : String(row.counted_amount),
       currencyCode: row.currency_code,
       expectedAmount: row.expected_amount == null ? null : String(row.expected_amount),
@@ -313,9 +325,7 @@ export function fetchAdminCashCuts(
   }).then(mapListFromApi);
 }
 
-export function fetchAdminCashCutDetail(
-  cashSessionId: string,
-): Promise<AdminCashCutDetail> {
+export function fetchAdminCashCutDetail(cashSessionId: string): Promise<AdminCashCutDetail> {
   return requestJson<ApiCashCutDetail>({
     path: `/v1/admin/cash-cuts/${cashSessionId}`,
   }).then(mapDetailFromApi);

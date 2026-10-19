@@ -14,6 +14,8 @@ import {
   getCashCloseUiState,
   getDraftCountedTotalCents,
   hasCashCloseExpectedPaymentCounts,
+  parseExpectedCashCents,
+  parseScaledDecimalToUnits,
   selectClassForCashCloseCount,
   selectProductForCashCloseCount,
   setCashClosePendingQuantityText,
@@ -57,6 +59,16 @@ const bolilloProduct: OperationsCatalogProductView = {
 };
 
 describe("cash close model", () => {
+  it("accepts signed expected cash without allowing negative user counts", () => {
+    expect(parseExpectedCashCents("-3.00")).toBe(-300);
+    expect(parseExpectedCashCents("0.00")).toBe(0);
+    expect(parseExpectedCashCents("3.50")).toBe(350);
+    expect(parseExpectedCashCents("-0.01")).toBe(-1);
+    expect(parseExpectedCashCents("-3.001")).toBeNull();
+    expect(parseExpectedCashCents("--3.00")).toBeNull();
+    expect(parseScaledDecimalToUnits("-3.00", 2)).toBeNull();
+  });
+
   it("seeds counted payment slots from the payment method catalog", () => {
     const draft = syncCashCloseDraftState(createInitialCashCloseDraftState(), {
       paymentMethodCatalog,

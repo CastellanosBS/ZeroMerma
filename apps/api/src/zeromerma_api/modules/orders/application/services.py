@@ -28,6 +28,10 @@ from zeromerma_api.modules.catalog.infrastructure.models import Product, Product
 from zeromerma_api.modules.identity.application.schemas import AuthenticatedUser
 from zeromerma_api.modules.identity.infrastructure.models import User
 from zeromerma_api.modules.operations.domain.constants import BRANCH_BRAND_MAPPING
+from zeromerma_api.modules.orders.application.financial_services import (
+    order_payment_financial_references,
+    record_order_payment,
+)
 from zeromerma_api.modules.orders.application.schemas import (
     CancelCustomerOrderRequest,
     CreateCustomerOrderAdvancePaymentRequest,
@@ -605,19 +609,25 @@ class OrdersCommandService:
                 )
             )
 
+        financial_references = []
         for sequence, payment in enumerate(prepared_advance_payments, start=1):
-            session.add(
-                CustomerOrderPayment(
-                    customer_order_id=order.id,
-                    sequence=sequence,
-                    payment_type=ORDER_PAYMENT_TYPE_ADVANCE,
-                    payment_method_code=payment.payment_method_code,
-                    amount=payment.amount,
-                    currency_code=currency_code,
-                    workstation_id=context.workstation_id,
-                    cash_session_id=cash_session.id,
-                    recorded_by_user_id=current_user.id,
-                    recorded_at_utc=created_at,
+            financial_references.append(
+                record_order_payment(
+                    session,
+                    branch_id=context.branch_id,
+                    payment=CustomerOrderPayment(
+                        id=uuid.uuid4(),
+                        customer_order_id=order.id,
+                        sequence=sequence,
+                        payment_type=ORDER_PAYMENT_TYPE_ADVANCE,
+                        payment_method_code=payment.payment_method_code,
+                        amount=payment.amount,
+                        currency_code=currency_code,
+                        workstation_id=context.workstation_id,
+                        cash_session_id=cash_session.id,
+                        recorded_by_user_id=current_user.id,
+                        recorded_at_utc=created_at,
+                    ),
                 )
             )
 
@@ -641,6 +651,7 @@ class OrdersCommandService:
                 "advance_amount": str(advance_amount),
                 "advance_payment_method_code": advance_payment_method_code,
                 "advance_payment_count": len(prepared_advance_payments),
+                "financial_records": [item.trace_fields() for item in financial_references],
                 "remaining_balance_amount": str(remaining_balance_amount),
             },
         )
@@ -694,6 +705,7 @@ class OrdersCommandService:
                     for payment in prepared_advance_payments
                 ],
                 "created_at_utc": created_at.isoformat(),
+                "financial_records": [item.trace_fields() for item in financial_references],
             },
             headers={"request_id": resolved_request_id, **trace.metadata},
         )
@@ -800,6 +812,7 @@ class OrdersCommandService:
             command.settlement_payment_method_code
         )
         prepared_settlement_payments: list[PreparedOrderAdvancePayment] = []
+        financial_references = []
         next_sequence = (
             int(
                 session.execute(
@@ -823,18 +836,23 @@ class OrdersCommandService:
                 settlement_payments=command.settlement_payments,
             )
             for sequence_offset, payment in enumerate(prepared_settlement_payments):
-                session.add(
-                    CustomerOrderPayment(
-                        customer_order_id=order.id,
-                        sequence=next_sequence + sequence_offset,
-                        payment_type=ORDER_PAYMENT_TYPE_SETTLEMENT,
-                        payment_method_code=payment.payment_method_code,
-                        amount=payment.amount,
-                        currency_code=order.currency_code,
-                        workstation_id=context.workstation_id,
-                        cash_session_id=cash_session.id,
-                        recorded_by_user_id=current_user.id,
-                        recorded_at_utc=datetime.now(tz=UTC),
+                financial_references.append(
+                    record_order_payment(
+                        session,
+                        branch_id=context.branch_id,
+                        payment=CustomerOrderPayment(
+                            id=uuid.uuid4(),
+                            customer_order_id=order.id,
+                            sequence=next_sequence + sequence_offset,
+                            payment_type=ORDER_PAYMENT_TYPE_SETTLEMENT,
+                            payment_method_code=payment.payment_method_code,
+                            amount=payment.amount,
+                            currency_code=order.currency_code,
+                            workstation_id=context.workstation_id,
+                            cash_session_id=cash_session.id,
+                            recorded_by_user_id=current_user.id,
+                            recorded_at_utc=datetime.now(tz=UTC),
+                        ),
                     )
                 )
         elif (
@@ -871,6 +889,7 @@ class OrdersCommandService:
                 "settlement_amount": str(settlement_amount),
                 "settlement_payment_method_code": settlement_payment_method,
                 "settlement_payment_count": len(prepared_settlement_payments),
+                "financial_records": [item.trace_fields() for item in financial_references],
             },
         )
         self._outbox_writer.append(
@@ -897,6 +916,7 @@ class OrdersCommandService:
                     }
                     for payment in prepared_settlement_payments
                 ],
+                "financial_records": [item.trace_fields() for item in financial_references],
                 "delivered_at_utc": delivered_at.isoformat(),
             },
             headers={"request_id": resolved_request_id, **trace.metadata},
@@ -949,19 +969,25 @@ class OrdersCommandService:
             )
             + 1
         )
+        financial_references = []
         for sequence_offset, payment in enumerate(refund_payments):
-            session.add(
-                CustomerOrderPayment(
-                    customer_order_id=order.id,
-                    sequence=next_sequence + sequence_offset,
-                    payment_type=ORDER_PAYMENT_TYPE_REFUND,
-                    payment_method_code=payment.payment_method_code,
-                    amount=payment.amount,
-                    currency_code=order.currency_code,
-                    workstation_id=context.workstation_id,
-                    cash_session_id=cash_session.id,
-                    recorded_by_user_id=current_user.id,
-                    recorded_at_utc=canceled_at,
+            financial_references.append(
+                record_order_payment(
+                    session,
+                    branch_id=context.branch_id,
+                    payment=CustomerOrderPayment(
+                        id=uuid.uuid4(),
+                        customer_order_id=order.id,
+                        sequence=next_sequence + sequence_offset,
+                        payment_type=ORDER_PAYMENT_TYPE_REFUND,
+                        payment_method_code=payment.payment_method_code,
+                        amount=payment.amount,
+                        currency_code=order.currency_code,
+                        workstation_id=context.workstation_id,
+                        cash_session_id=cash_session.id,
+                        recorded_by_user_id=current_user.id,
+                        recorded_at_utc=canceled_at,
+                    ),
                 )
             )
 
@@ -995,6 +1021,7 @@ class OrdersCommandService:
                 "cancellation_refund_eligible": cancellation_refund_eligible,
                 "cancellation_refund_amount": str(cancellation_refund_amount),
                 "refund_payment_count": len(refund_payments),
+                "financial_records": [item.trace_fields() for item in financial_references],
             },
         )
         self._outbox_writer.append(
@@ -1022,6 +1049,7 @@ class OrdersCommandService:
                     }
                     for payment in refund_payments
                 ],
+                "financial_records": [item.trace_fields() for item in financial_references],
                 "canceled_at_utc": canceled_at.isoformat(),
             },
             headers={"request_id": resolved_request_id, **trace.metadata},
@@ -1164,6 +1192,9 @@ def _build_order_detail(session: Session, order: CustomerOrder) -> CustomerOrder
         .where(CustomerOrderPayment.customer_order_id == order.id)
         .order_by(CustomerOrderPayment.sequence)
     ).all()
+    financial_references = order_payment_financial_references(
+        session, order_id=order.id, branch_id=order.branch_id
+    )
 
     advance_amount = _quantize_money(order.advance_amount)
     remaining_balance_amount = _quantize_money(order.remaining_balance_amount)
@@ -1236,6 +1267,10 @@ def _build_order_detail(session: Session, order: CustomerOrder) -> CustomerOrder
                 payment_method_code=payment.payment_method_code,
                 amount=_quantize_money(payment.amount),
                 currency_code=payment.currency_code,
+                cash_session_id=payment.cash_session_id,
+                workstation_id=payment.workstation_id,
+                financial_operation_id=financial_references.get(payment.id, (None, None))[0],
+                financial_entry_id=financial_references.get(payment.id, (None, None))[1],
                 recorded_at_utc=payment.recorded_at_utc,
                 recorded_by_user_id=payment.recorded_by_user_id,
                 recorded_by_user_full_name=recorded_by_full_name,

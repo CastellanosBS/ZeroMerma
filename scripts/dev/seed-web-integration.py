@@ -204,6 +204,7 @@ def main(argv: Sequence[str] = ()) -> None:
             session.add_all([order_operator, order_role])
             session.flush()
             order_capabilities = {
+                "cash_finance.view",
                 "orders.view",
                 "orders.manage",
                 "orders.cancel",

@@ -67,6 +67,53 @@ test("real administrative transition recovers a lost response after reload witho
   });
   expect(created.status()).toBe(201);
   const order = (await created.json()) as components["schemas"]["OrderCommandResultView"];
+  const summaryResponse = await page.request.get(
+    `${environment.apiUrl}/v1/cash-close/summary?workstation_code=${station}`,
+    { headers },
+  );
+  expect(summaryResponse.status()).toBe(200);
+  const summary =
+    (await summaryResponse.json()) as components["schemas"]["CashCloseSummaryResponse"];
+  expect(summary.cash_order_collections_amount).toBe(order.payments[0]!.amount);
+  const reconciliationResponse = await page.request.get(
+    `${environment.apiUrl}/v1/cash-close/reconciliation?workstation_code=${station}`,
+    { headers },
+  );
+  expect(reconciliationResponse.status()).toBe(200);
+  const reconciliation =
+    (await reconciliationResponse.json()) as components["schemas"]["CashCloseReconciliationResponse"];
+  expect(reconciliation.pending_class_capture.has_pending_class_capture).toBe(false);
+  // This isolated fixture shares the branch's stock with earlier real scenarios.
+  // Preserve that stock using explicit counts and exercise the normal close validation.
+  const closeBody: components["schemas"]["CashCloseCommitRequest"] = {
+    workstation_code: station,
+    cash_session_id: cash!.id,
+    close_mode: "WITH_COUNT",
+    counter_empty_confirmed: reconciliation.relevant_products.length === 0,
+    counted_payment_methods: [
+      { payment_method_code: "CASH", counted_amount: summary.expected_cash_amount },
+    ],
+    counted_product_lines: reconciliation.relevant_products.map((line) => ({
+      product_id: line.product_id,
+      counted_quantity: line.expected_quantity_before_deferred_attr,
+    })),
+  };
+  const previewResponse = await page.request.post(`${environment.apiUrl}/v1/cash-close/preview`, {
+    headers,
+    data: closeBody,
+  });
+  expect(previewResponse.status()).toBe(200);
+  const preview =
+    (await previewResponse.json()) as components["schemas"]["CashClosePreviewResponse"];
+  expect(preview.blockers).toEqual([]);
+  expect(preview.reconciliation_status).toBe("READY");
+  const closing = await page.request.post(`${environment.apiUrl}/v1/cash-close/commit`, {
+    headers: { ...headers, "Idempotency-Key": createIdempotencyKey() },
+    data: closeBody,
+  });
+  expect(closing.status()).toBe(200);
+  const closed = (await closing.json()) as components["schemas"]["CashCloseCommitResultView"];
+  expect(closed.cash_variance_amount).toBe("0.00");
 
   await page.goto("/login");
   await page.getByLabel("Correo", { exact: true }).fill(process.env.ZM_E2E_ORDER_OPERATOR_EMAIL!);
@@ -117,4 +164,78 @@ test("real administrative transition recovers a lost response after reload witho
   expect(Object.keys(metadata[0]).sort()).toEqual(
     ["userId", "branchId", "orderId", "commandCode", "key", "payloadDigest", "status"].sort(),
   );
+
+  await page.goto("/admin/flujo-efectivo");
+  const flowRead = page.waitForResponse((response) => {
+    const url = new URL(response.url());
+    return url.pathname === "/v1/admin/cash-flow" && url.searchParams.get("search") === order.folio;
+  });
+  await page.getByPlaceholder("Buscar folio, documento, categoria u operador").fill(order.folio);
+  const flowResponse = await flowRead;
+  expect(flowResponse.status()).toBe(200);
+  const flow = (await flowResponse.json()) as components["schemas"]["AdminCashFlowListResponse"];
+  expect(flow.items).toHaveLength(1);
+  const movement = flow.items[0]!;
+  expect(movement.source_type).toBe("ORDER_PAYMENT");
+  expect(movement.order_payment_id).toBe(order.payments[0]!.id);
+  expect(movement.amount).toBe(order.payments[0]!.amount);
+  expect(flow.summary.order_collections_total).toBe(order.payments[0]!.amount);
+  const movementRow = page.getByRole("row").filter({ hasText: order.folio });
+  await expect(movementRow).toHaveCount(1);
+  await movementRow.click();
+  const flowDetail = page.getByRole("complementary").filter({
+    has: page.getByRole("heading", { name: order.folio, exact: true }),
+  });
+  const sourceContext = flowDetail.locator("section").filter({
+    has: page.getByRole("heading", { name: "Documento origen", exact: true }),
+  });
+  await sourceContext.getByText("Referencias financieras", { exact: true }).click();
+  await expect(
+    sourceContext.getByText(`Asiento: ${movement.financial_entry_id}`, { exact: true }),
+  ).toBeVisible();
+  await expect(sourceContext.getByText(`Turno: ${cash!.id}`, { exact: true })).toBeVisible();
+  await expect(
+    sourceContext.getByRole("link", { name: "Abrir origen", exact: true }),
+  ).toHaveAttribute("href", `/admin/pedidos?order=${order.id}`);
+  const cutRead = page.waitForResponse(
+    (response) => new URL(response.url()).pathname === `/v1/admin/cash-cuts/${cash!.id}`,
+  );
+  await sourceContext.getByRole("link", { name: "Abrir corte", exact: true }).click();
+  const cutResponse = await cutRead;
+  expect(cutResponse.status()).toBe(200);
+  const cut = (await cutResponse.json()) as components["schemas"]["AdminCashCutDetailView"];
+  expect(cut.expected_vs_counted.expected_cash_amount).toBe(summary.expected_cash_amount);
+  expect(cut.expected_vs_counted.cash_order_collections_amount).toBe(order.payments[0]!.amount);
+  expect(cut.expected_vs_counted.difference_amount).toBe("0.00");
+  expect(cut.order_payments).toHaveLength(1);
+  expect(cut.order_payments[0]!.financial_entry_id).toBe(movement.financial_entry_id);
+  const cutDetail = page.getByRole("complementary").filter({
+    has: page.getByRole("heading", { name: cut.overview.folio, exact: true }),
+  });
+  const orderMovements = cutDetail.locator("section").filter({
+    has: page.getByText("Movimientos de pedidos", { exact: true }),
+  });
+  await expect(orderMovements).toBeVisible();
+  await orderMovements.getByText("Referencias del movimiento", { exact: true }).click();
+  await expect(
+    orderMovements.getByText(`Asiento: ${movement.financial_entry_id}`, { exact: true }),
+  ).toBeVisible();
+  const sourceRead = page.waitForResponse(
+    (response) => new URL(response.url()).pathname === `/v1/admin/orders/${order.id}`,
+  );
+  await orderMovements.getByRole("link", { name: order.folio, exact: true }).click();
+  const sourceResponse = await sourceRead;
+  expect(sourceResponse.status()).toBe(200);
+  const source = (await sourceResponse.json()) as components["schemas"]["AdminOrderDetailView"];
+  expect(source.payments[0]!.financial_entry_id).toBe(movement.financial_entry_id);
+  const orderDetail = page.getByRole("complementary").filter({
+    has: page.getByRole("heading", { name: order.folio, exact: true }),
+  });
+  await orderDetail.getByText("Referencias del pago y turno", { exact: true }).click();
+  await expect(
+    orderDetail.getByText(`Pago: ${order.payments[0]!.id}`, { exact: true }),
+  ).toBeVisible();
+  await expect(
+    orderDetail.getByText(`Asiento: ${movement.financial_entry_id}`, { exact: true }),
+  ).toBeVisible();
 });

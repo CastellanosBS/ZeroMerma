@@ -78,6 +78,7 @@ const cashCut: AdminCashCutListItem = {
 };
 
 const cashCutDetail: AdminCashCutDetail = {
+  orderPayments: [],
   auditTimeline: [
     {
       actorName: "Admin",
@@ -122,6 +123,9 @@ const cashCutDetail: AdminCashCutDetail = {
     totalCounted: null,
   },
   expectedVsCounted: {
+    cashOrderCollectionsAmount: "0.00",
+    cashOrderRefundsAmount: "0.00",
+    cashOrderTechnicalReversalAmount: "0.00",
     cashAdjustmentsAmount: "0.00",
     cashOperationalDiscountsAmount: "0.00",
     cashOperationalPaymentsAmount: "50.00",
@@ -186,6 +190,10 @@ const cashCutDetail: AdminCashCutDetail = {
   },
   paymentBreakdown: [
     {
+      orderAdvanceAmount: "0.00",
+      orderSettlementAmount: "0.00",
+      orderRefundAmount: "0.00",
+      orderTechnicalReversalAmount: "0.00",
       countedAmount: "1125.00",
       currencyCode: "MXN",
       expectedAmount: "1120.00",
@@ -203,6 +211,10 @@ const cashCutDetail: AdminCashCutDetail = {
       currencyCode: "MXN",
       expectedAmount: null,
       isCountedSupported: false,
+      orderAdvanceAmount: "0.00",
+      orderSettlementAmount: "0.00",
+      orderRefundAmount: "0.00",
+      orderTechnicalReversalAmount: "0.00",
       netAmount: "100.00",
       operationalDiscountAmount: "0.00",
       operationalPaymentAmount: "0.00",
@@ -328,7 +340,7 @@ describe("admin cash cuts UI components", () => {
     );
 
     expect(html).toContain("Esperado vs contado");
-    expect(html).toContain("Metodos de pago");
+    expect(html).toContain("Métodos de pago");
     expect(html).toContain("Tickets incluidos");
     expect(html).toContain("Devoluciones");
     expect(html).toContain("Pagos operativos");
@@ -340,6 +352,61 @@ describe("admin cash cuts UI components", () => {
     expect(html).toContain("PAGO-100");
     expect(html).toContain("Exportar");
     expect(html).toContain("Imprimir");
+  });
+
+  it("shows order cash effects separately from sales and retains actual entry references", () => {
+    const detail: AdminCashCutDetail = {
+      ...cashCutDetail,
+      expectedVsCounted: {
+        ...cashCutDetail.expectedVsCounted,
+        cashOrderCollectionsAmount: "6.00",
+        cashOrderRefundsAmount: "2.00",
+        cashOrderTechnicalReversalAmount: "-1.00",
+      },
+      orderPayments: [
+        {
+          financial_entry_id: "ledger-entry-1",
+          financial_operation_id: "ledger-operation-1",
+          order_id: "order-1",
+          order_folio: "PED-042",
+          order_payment_id: "order-payment-1",
+          payment_type: "REFUND",
+          payment_method_code: "CASH",
+          direction: "OUT",
+          amount: "2.00",
+          currency_code: "MXN",
+          cash_session_id: "actual-turn-2",
+          workstation_id: "station-2",
+          operator_id: "actor-1",
+          operator_name: "Cashier",
+          occurred_at: "2026-10-19T18:00:00Z",
+          status: "CONFIRMED",
+          route_hint: "/admin/pedidos?order=order-1",
+        },
+      ],
+    };
+    const html = render(
+      <AdminCashCutDetailPanel
+        detail={detail}
+        selectedCashCut={cashCut}
+        onCopyFolio={() => undefined}
+      />,
+    );
+    for (const text of [
+      "Cobros pedidos",
+      "Reemb. pedidos",
+      "Comp. pedidos",
+      "-$1.00",
+      "Movimientos de pedidos",
+      "PED-042",
+      "Reembolso",
+      "ledger-entry-1",
+      "actual-turn-2",
+      "/admin/pedidos?order=order-1",
+      "no afecta el efectivo de caja ni confirma una captura del proveedor",
+    ]) {
+      expect(html).toContain(text);
+    }
   });
 
   it("renders the no selected cut empty state", () => {

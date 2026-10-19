@@ -126,6 +126,10 @@ export interface AdminOrderLine {
 }
 
 export interface AdminOrderPayment {
+  cashSessionId: string;
+  workstationId: string;
+  financialOperationId: string | null;
+  financialEntryId: string | null;
   amount: string;
   currencyCode: string;
   id: string;

@@ -104,6 +104,9 @@ class AdminCashCutExpectedVsCountedView(BaseModel):
     opening_amount: Decimal
     cash_sales_amount: Decimal
     cash_refunds_amount: Decimal
+    cash_order_collections_amount: Decimal
+    cash_order_refunds_amount: Decimal
+    cash_order_technical_reversal_amount: Decimal
     cash_operational_payments_amount: Decimal
     cash_operational_discounts_amount: Decimal
     cash_adjustments_amount: Decimal
@@ -122,11 +125,35 @@ class AdminCashCutPaymentBreakdownView(BaseModel):
     refund_amount: Decimal
     operational_payment_amount: Decimal
     operational_discount_amount: Decimal
+    order_advance_amount: Decimal
+    order_settlement_amount: Decimal
+    order_refund_amount: Decimal
+    order_technical_reversal_amount: Decimal
     expected_amount: Decimal | None = None
     counted_amount: Decimal | None = None
     variance_amount: Decimal | None = None
     net_amount: Decimal
     is_counted_supported: bool
+
+
+class AdminCashCutOrderPaymentItemView(BaseModel):
+    financial_entry_id: UUID
+    financial_operation_id: UUID
+    order_id: UUID
+    order_folio: str
+    order_payment_id: UUID
+    payment_type: str
+    payment_method_code: str
+    direction: str
+    amount: Decimal
+    currency_code: str
+    cash_session_id: UUID
+    workstation_id: UUID
+    operator_id: UUID | None
+    operator_name: str
+    occurred_at: datetime
+    status: str
+    route_hint: str
 
 
 class AdminCashCutTicketItemView(BaseModel):
@@ -239,6 +266,7 @@ class AdminCashCutDetailView(BaseModel):
     expected_vs_counted: AdminCashCutExpectedVsCountedView
     included_tickets: list[AdminCashCutTicketItemView]
     operational_payments: list[AdminCashCutOperationalPaymentItemView]
+    order_payments: list[AdminCashCutOrderPaymentItemView]
     overview: AdminCashCutOverviewView
     payment_breakdown: list[AdminCashCutPaymentBreakdownView]
     reconciliation_status: AdminCashCutReconciliationStatusView

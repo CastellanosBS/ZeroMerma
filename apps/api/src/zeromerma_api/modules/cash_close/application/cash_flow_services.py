@@ -48,6 +48,7 @@ from zeromerma_api.modules.discounts.infrastructure.models import (
     OperationalDiscountCategory,
 )
 from zeromerma_api.modules.identity.infrastructure.models import User
+from zeromerma_api.modules.orders.application.financial_queries import read_order_financial_entries
 from zeromerma_api.modules.payments.infrastructure.models import (
     OperationalPayment,
     OperationalPaymentCategory,
@@ -71,6 +72,7 @@ SOURCE_TYPE_OPERATIONAL_DISCOUNT = "OPERATIONAL_DISCOUNT"
 SOURCE_TYPE_OPERATIONAL_PAYMENT = "OPERATIONAL_PAYMENT"
 SOURCE_TYPE_RETURN_REFUND = "RETURN_REFUND"
 SOURCE_TYPE_SALE = "SALE"
+SOURCE_TYPE_ORDER_PAYMENT = "ORDER_PAYMENT"
 WARNING_STATE_CRITICAL = "critical"
 WARNING_STATE_OK = "ok"
 WARNING_STATE_PENDING_CUT = "pending_cut"
@@ -114,6 +116,10 @@ class CashFlowMovement:
     expected_cash_amount: Decimal | None = None
     counted_cash_amount: Decimal | None = None
     difference_amount: Decimal | None = None
+    financial_operation_id: uuid.UUID | None = None
+    financial_entry_id: uuid.UUID | None = None
+    order_payment_id: uuid.UUID | None = None
+    order_payment_type: str | None = None
 
 
 class AdminCashFlowService:
@@ -219,6 +225,10 @@ class AdminCashFlowService:
                 warning_state=_warning_state(movement),
                 workstation_id=movement.workstation_id,
                 workstation_name=movement.workstation_name,
+                financial_operation_id=movement.financial_operation_id,
+                financial_entry_id=movement.financial_entry_id,
+                order_payment_id=movement.order_payment_id,
+                order_payment_type=movement.order_payment_type,
             ),
             reconciliation=reconciliation,
             related_documents=related_documents,
@@ -232,10 +242,62 @@ class AdminCashFlowService:
             *self._return_movements(session),
             *self._operational_payment_movements(session),
             *self._operational_discount_movements(session),
+            *self._order_payment_movements(session),
             *self._cash_cut_difference_movements(
                 session,
                 reconciliations_by_close_id=reconciliations_by_close_id,
             ),
+        ]
+
+    def _order_payment_movements(self, session: Session) -> list[CashFlowMovement]:
+        labels = {
+            "ORDER_ADVANCE": "Anticipo de pedido",
+            "ORDER_SETTLEMENT": "Liquidación de pedido",
+            "ORDER_REFUND": "Reembolso de pedido",
+            "TECHNICAL_REVERSAL": "Reversa técnica de pedido",
+        }
+        return [
+            CashFlowMovement(
+                id=f"{SOURCE_TYPE_ORDER_PAYMENT}:{entry.financial_entry_id}",
+                occurred_at=entry.occurred_at,
+                branch_id=entry.branch_id,
+                branch_name=entry.branch_name,
+                workstation_id=entry.workstation_id,
+                workstation_name=entry.workstation_name,
+                operator_id=entry.operator_id,
+                operator_name=entry.operator_name,
+                direction=(
+                    MOVEMENT_DIRECTION_INFLOW
+                    if entry.direction == "IN"
+                    else MOVEMENT_DIRECTION_OUTFLOW
+                ),
+                source_type=SOURCE_TYPE_ORDER_PAYMENT,
+                source_document_id=entry.order_id,
+                source_reference=entry.order_folio,
+                source_status=entry.order_status,
+                category_code=entry.operation_kind,
+                category_label=labels[entry.operation_kind],
+                payment_method=entry.payment_method_code,
+                amount=entry.amount,
+                signed_effect=entry.signed_amount,
+                currency=entry.currency_code,
+                reconciliation_status=RECONCILIATION_STATUS_NOT_REQUIRED,
+                reconciliation_id=None,
+                reconciliation_folio=None,
+                reconciliation_reason_code=None,
+                cash_session_id=entry.cash_session_id,
+                cash_cut_id=entry.cash_cut_id,
+                cash_cut_folio=(
+                    _build_cash_cut_folio(entry.cash_cut_id)
+                    if entry.cash_cut_id is not None
+                    else None
+                ),
+                financial_operation_id=entry.financial_operation_id,
+                financial_entry_id=entry.financial_entry_id,
+                order_payment_id=entry.order_payment_id,
+                order_payment_type=entry.payment_type,
+            )
+            for entry in read_order_financial_entries(session)
         ]
 
     def _sale_payment_movements(self, session: Session) -> list[CashFlowMovement]:
@@ -770,6 +832,7 @@ class AdminCashFlowService:
                 ),
             ],
             source_types=[
+                AdminCashFlowFilterOptionView(id=SOURCE_TYPE_ORDER_PAYMENT, label="Pago de pedido"),
                 AdminCashFlowFilterOptionView(id=SOURCE_TYPE_SALE, label="Venta"),
                 AdminCashFlowFilterOptionView(id=SOURCE_TYPE_RETURN_REFUND, label="Devolucion"),
                 AdminCashFlowFilterOptionView(
@@ -828,6 +891,10 @@ def _to_list_item(movement: CashFlowMovement) -> AdminCashFlowMovementListItemVi
         warning_state=_warning_state(movement),
         workstation_id=movement.workstation_id,
         workstation_name=movement.workstation_name,
+        financial_operation_id=movement.financial_operation_id,
+        financial_entry_id=movement.financial_entry_id,
+        order_payment_id=movement.order_payment_id,
+        order_payment_type=movement.order_payment_type,
     )
 
 
@@ -864,6 +931,23 @@ def _build_summary(movements: list[CashFlowMovement]) -> AdminCashFlowSummaryVie
         ),
         refunds_total=_sum_money(
             m.amount for m in movements if m.source_type == SOURCE_TYPE_RETURN_REFUND
+        ),
+        order_collections_total=_sum_money(
+            m.amount
+            for m in movements
+            if m.source_type == SOURCE_TYPE_ORDER_PAYMENT
+            and m.order_payment_type in {"ADVANCE", "SETTLEMENT"}
+        ),
+        order_refunds_total=_sum_money(
+            m.amount
+            for m in movements
+            if m.source_type == SOURCE_TYPE_ORDER_PAYMENT and m.order_payment_type == "REFUND"
+        ),
+        order_technical_reversal_total=_sum_money(
+            m.signed_effect
+            for m in movements
+            if m.source_type == SOURCE_TYPE_ORDER_PAYMENT
+            and m.order_payment_type == "TECHNICAL_REVERSAL"
         ),
     )
 
@@ -912,6 +996,15 @@ def _source_context(movement: CashFlowMovement) -> AdminCashFlowSourceContextVie
         source_status=movement.source_status,
         source_total_amount=movement.amount,
         source_type=movement.source_type,
+        financial_operation_id=movement.financial_operation_id,
+        financial_entry_id=movement.financial_entry_id,
+        order_id=(
+            movement.source_document_id
+            if movement.source_type == SOURCE_TYPE_ORDER_PAYMENT
+            else None
+        ),
+        order_payment_id=movement.order_payment_id,
+        order_payment_type=movement.order_payment_type,
     )
 
 
@@ -921,7 +1014,7 @@ def _financial_classification(
     is_cash = movement.payment_method == SALE_PAYMENT_METHOD_CASH
     is_card = movement.payment_method == SALE_PAYMENT_METHOD_CARD
     return AdminCashFlowFinancialClassificationView(
-        affects_bank_settlement=is_card,
+        affects_bank_settlement=is_card and movement.source_type != SOURCE_TYPE_ORDER_PAYMENT,
         affects_cash_drawer=is_cash,
         card_impact=movement.signed_effect if is_card else ZERO_MONEY,
         cash_impact=movement.signed_effect if is_cash else ZERO_MONEY,
@@ -933,6 +1026,8 @@ def _financial_classification(
             "La diferencia de caja se muestra como contexto de conciliacion; "
             "no modifica el flujo neto."
             if movement.direction == MOVEMENT_DIRECTION_ADJUSTMENT
+            else "Registro contable externo; no acredita captura ni liquidación bancaria."
+            if is_card and movement.source_type == SOURCE_TYPE_ORDER_PAYMENT
             else None
         ),
         payment_method=movement.payment_method,
@@ -1020,6 +1115,8 @@ def _related_documents(movement: CashFlowMovement) -> list[AdminCashFlowRelatedD
 
 
 def _source_route_hint(movement: CashFlowMovement) -> str | None:
+    if movement.source_type == SOURCE_TYPE_ORDER_PAYMENT:
+        return f"/admin/pedidos?order={movement.source_document_id}"
     if movement.source_type == SOURCE_TYPE_SALE:
         return f"/admin/ventas?ticket={movement.source_document_id}"
     if movement.source_type == SOURCE_TYPE_RETURN_REFUND:
@@ -1034,6 +1131,8 @@ def _source_route_hint(movement: CashFlowMovement) -> str | None:
 
 
 def _source_note(movement: CashFlowMovement) -> str | None:
+    if movement.source_type == SOURCE_TYPE_ORDER_PAYMENT and movement.payment_method == "CARD":
+        return "Registro contable de tarjeta; no acredita captura o liquidación de un proveedor."
     if movement.source_type == SOURCE_TYPE_CASH_CUT_DIFFERENCE:
         return "Diferencia declarada al cerrar caja; la resolucion vive en Conciliacion."
     if movement.cash_cut_id is None:

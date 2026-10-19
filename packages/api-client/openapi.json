@@ -2759,6 +2759,13 @@
             "title": "Operational Payments",
             "type": "array"
           },
+          "order_payments": {
+            "items": {
+              "$ref": "#/components/schemas/AdminCashCutOrderPaymentItemView"
+            },
+            "title": "Order Payments",
+            "type": "array"
+          },
           "overview": {
             "$ref": "#/components/schemas/AdminCashCutOverviewView"
           },
@@ -2796,6 +2803,7 @@
           "expected_vs_counted",
           "included_tickets",
           "operational_payments",
+          "order_payments",
           "overview",
           "payment_breakdown",
           "reconciliation_status",
@@ -2822,6 +2830,24 @@
           "cash_operational_payments_amount": {
             "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
             "title": "Cash Operational Payments Amount",
+            "type": "string",
+            "x-zeromerma-decimal-representation": "JSON_STRING"
+          },
+          "cash_order_collections_amount": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Cash Order Collections Amount",
+            "type": "string",
+            "x-zeromerma-decimal-representation": "JSON_STRING"
+          },
+          "cash_order_refunds_amount": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Cash Order Refunds Amount",
+            "type": "string",
+            "x-zeromerma-decimal-representation": "JSON_STRING"
+          },
+          "cash_order_technical_reversal_amount": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Cash Order Technical Reversal Amount",
             "type": "string",
             "x-zeromerma-decimal-representation": "JSON_STRING"
           },
@@ -2899,6 +2925,9 @@
           "opening_amount",
           "cash_sales_amount",
           "cash_refunds_amount",
+          "cash_order_collections_amount",
+          "cash_order_refunds_amount",
+          "cash_order_technical_reversal_amount",
           "cash_operational_payments_amount",
           "cash_operational_discounts_amount",
           "cash_adjustments_amount",
@@ -3313,6 +3342,124 @@
         "title": "AdminCashCutOperationalPaymentItemView",
         "type": "object"
       },
+      "AdminCashCutOrderPaymentItemView": {
+        "properties": {
+          "amount": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Amount",
+            "type": "string",
+            "x-zeromerma-decimal-representation": "JSON_STRING"
+          },
+          "cash_session_id": {
+            "format": "uuid",
+            "title": "Cash Session Id",
+            "type": "string",
+            "x-zeromerma-id-representation": "JSON_STRING"
+          },
+          "currency_code": {
+            "title": "Currency Code",
+            "type": "string"
+          },
+          "direction": {
+            "title": "Direction",
+            "type": "string"
+          },
+          "financial_entry_id": {
+            "format": "uuid",
+            "title": "Financial Entry Id",
+            "type": "string",
+            "x-zeromerma-id-representation": "JSON_STRING"
+          },
+          "financial_operation_id": {
+            "format": "uuid",
+            "title": "Financial Operation Id",
+            "type": "string",
+            "x-zeromerma-id-representation": "JSON_STRING"
+          },
+          "occurred_at": {
+            "format": "date-time",
+            "title": "Occurred At",
+            "type": "string",
+            "x-zeromerma-instant-format": "ISO8601_DATETIME"
+          },
+          "operator_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string",
+                "x-zeromerma-id-representation": "JSON_STRING"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Operator Id"
+          },
+          "operator_name": {
+            "title": "Operator Name",
+            "type": "string"
+          },
+          "order_folio": {
+            "title": "Order Folio",
+            "type": "string"
+          },
+          "order_id": {
+            "format": "uuid",
+            "title": "Order Id",
+            "type": "string",
+            "x-zeromerma-id-representation": "JSON_STRING"
+          },
+          "order_payment_id": {
+            "format": "uuid",
+            "title": "Order Payment Id",
+            "type": "string",
+            "x-zeromerma-id-representation": "JSON_STRING"
+          },
+          "payment_method_code": {
+            "title": "Payment Method Code",
+            "type": "string"
+          },
+          "payment_type": {
+            "title": "Payment Type",
+            "type": "string"
+          },
+          "route_hint": {
+            "title": "Route Hint",
+            "type": "string"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          },
+          "workstation_id": {
+            "format": "uuid",
+            "title": "Workstation Id",
+            "type": "string",
+            "x-zeromerma-id-representation": "JSON_STRING"
+          }
+        },
+        "required": [
+          "financial_entry_id",
+          "financial_operation_id",
+          "order_id",
+          "order_folio",
+          "order_payment_id",
+          "payment_type",
+          "payment_method_code",
+          "direction",
+          "amount",
+          "currency_code",
+          "cash_session_id",
+          "workstation_id",
+          "operator_id",
+          "operator_name",
+          "occurred_at",
+          "status",
+          "route_hint"
+        ],
+        "title": "AdminCashCutOrderPaymentItemView",
+        "type": "object"
+      },
       "AdminCashCutOverviewView": {
         "properties": {
           "branch_code": {
@@ -3512,6 +3659,30 @@
             "type": "string",
             "x-zeromerma-decimal-representation": "JSON_STRING"
           },
+          "order_advance_amount": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Order Advance Amount",
+            "type": "string",
+            "x-zeromerma-decimal-representation": "JSON_STRING"
+          },
+          "order_refund_amount": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Order Refund Amount",
+            "type": "string",
+            "x-zeromerma-decimal-representation": "JSON_STRING"
+          },
+          "order_settlement_amount": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Order Settlement Amount",
+            "type": "string",
+            "x-zeromerma-decimal-representation": "JSON_STRING"
+          },
+          "order_technical_reversal_amount": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Order Technical Reversal Amount",
+            "type": "string",
+            "x-zeromerma-decimal-representation": "JSON_STRING"
+          },
           "payment_method_code": {
             "title": "Payment Method Code",
             "type": "string"
@@ -3549,6 +3720,10 @@
           "refund_amount",
           "operational_payment_amount",
           "operational_discount_amount",
+          "order_advance_amount",
+          "order_settlement_amount",
+          "order_refund_amount",
+          "order_technical_reversal_amount",
           "net_amount",
           "is_counted_supported"
         ],
@@ -4286,6 +4461,32 @@
             "title": "Direction",
             "type": "string"
           },
+          "financial_entry_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string",
+                "x-zeromerma-id-representation": "JSON_STRING"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Financial Entry Id"
+          },
+          "financial_operation_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string",
+                "x-zeromerma-id-representation": "JSON_STRING"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Financial Operation Id"
+          },
           "id": {
             "title": "Id",
             "type": "string"
@@ -4312,6 +4513,30 @@
           "operator_name": {
             "title": "Operator Name",
             "type": "string"
+          },
+          "order_payment_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string",
+                "x-zeromerma-id-representation": "JSON_STRING"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Order Payment Id"
+          },
+          "order_payment_type": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Order Payment Type"
           },
           "payment_method": {
             "title": "Payment Method",
@@ -4408,6 +4633,32 @@
             "title": "Direction",
             "type": "string"
           },
+          "financial_entry_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string",
+                "x-zeromerma-id-representation": "JSON_STRING"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Financial Entry Id"
+          },
+          "financial_operation_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string",
+                "x-zeromerma-id-representation": "JSON_STRING"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Financial Operation Id"
+          },
           "id": {
             "title": "Id",
             "type": "string"
@@ -4434,6 +4685,30 @@
           "operator_name": {
             "title": "Operator Name",
             "type": "string"
+          },
+          "order_payment_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string",
+                "x-zeromerma-id-representation": "JSON_STRING"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Order Payment Id"
+          },
+          "order_payment_type": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Order Payment Type"
           },
           "payment_method": {
             "title": "Payment Method",
@@ -4730,6 +5005,32 @@
             ],
             "title": "Expected Cash Amount"
           },
+          "financial_entry_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string",
+                "x-zeromerma-id-representation": "JSON_STRING"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Financial Entry Id"
+          },
+          "financial_operation_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string",
+                "x-zeromerma-id-representation": "JSON_STRING"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Financial Operation Id"
+          },
           "note": {
             "anyOf": [
               {
@@ -4740,6 +5041,43 @@
               }
             ],
             "title": "Note"
+          },
+          "order_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string",
+                "x-zeromerma-id-representation": "JSON_STRING"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Order Id"
+          },
+          "order_payment_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string",
+                "x-zeromerma-id-representation": "JSON_STRING"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Order Payment Id"
+          },
+          "order_payment_type": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Order Payment Type"
           },
           "original_ticket_folio": {
             "anyOf": [
@@ -4852,6 +5190,24 @@
             "type": "string",
             "x-zeromerma-decimal-representation": "JSON_STRING"
           },
+          "order_collections_total": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Order Collections Total",
+            "type": "string",
+            "x-zeromerma-decimal-representation": "JSON_STRING"
+          },
+          "order_refunds_total": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Order Refunds Total",
+            "type": "string",
+            "x-zeromerma-decimal-representation": "JSON_STRING"
+          },
+          "order_technical_reversal_total": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Order Technical Reversal Total",
+            "type": "string",
+            "x-zeromerma-decimal-representation": "JSON_STRING"
+          },
           "outflows_total": {
             "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
             "title": "Outflows Total",
@@ -4879,6 +5235,9 @@
           "card_total",
           "operational_payments_total",
           "refunds_total",
+          "order_collections_total",
+          "order_refunds_total",
+          "order_technical_reversal_total",
           "pending_reconciliation_total",
           "difference_total"
         ],
@@ -15487,9 +15846,41 @@
             "type": "string",
             "x-zeromerma-decimal-representation": "JSON_STRING"
           },
+          "cash_session_id": {
+            "format": "uuid",
+            "title": "Cash Session Id",
+            "type": "string",
+            "x-zeromerma-id-representation": "JSON_STRING"
+          },
           "currency_code": {
             "title": "Currency Code",
             "type": "string"
+          },
+          "financial_entry_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string",
+                "x-zeromerma-id-representation": "JSON_STRING"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Financial Entry Id"
+          },
+          "financial_operation_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string",
+                "x-zeromerma-id-representation": "JSON_STRING"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Financial Operation Id"
           },
           "id": {
             "format": "uuid",
@@ -15524,6 +15915,12 @@
           "sequence": {
             "title": "Sequence",
             "type": "integer"
+          },
+          "workstation_id": {
+            "format": "uuid",
+            "title": "Workstation Id",
+            "type": "string",
+            "x-zeromerma-id-representation": "JSON_STRING"
           }
         },
         "required": [
@@ -15533,6 +15930,8 @@
           "payment_method_code",
           "amount",
           "currency_code",
+          "cash_session_id",
+          "workstation_id",
           "recorded_at_utc",
           "recorded_by_user_id",
           "recorded_by_user_full_name"
@@ -36070,6 +36469,24 @@
             ],
             "title": "Branch Brand Key"
           },
+          "cash_order_collections_amount": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Cash Order Collections Amount",
+            "type": "string",
+            "x-zeromerma-decimal-representation": "JSON_STRING"
+          },
+          "cash_order_refunds_amount": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Cash Order Refunds Amount",
+            "type": "string",
+            "x-zeromerma-decimal-representation": "JSON_STRING"
+          },
+          "cash_order_technical_reversal_amount": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Cash Order Technical Reversal Amount",
+            "type": "string",
+            "x-zeromerma-decimal-representation": "JSON_STRING"
+          },
           "cash_session": {
             "$ref": "#/components/schemas/CashSessionView"
           },
@@ -36252,6 +36669,9 @@
           "opening_amount",
           "total_cash_in",
           "total_cash_out",
+          "cash_order_collections_amount",
+          "cash_order_refunds_amount",
+          "cash_order_technical_reversal_amount",
           "expected_cash_amount",
           "payment_method_rows",
           "movement_breakdown",
@@ -36780,6 +37200,24 @@
             "title": "Can Start Close",
             "type": "boolean"
           },
+          "cash_order_collections_amount": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Cash Order Collections Amount",
+            "type": "string",
+            "x-zeromerma-decimal-representation": "JSON_STRING"
+          },
+          "cash_order_refunds_amount": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Cash Order Refunds Amount",
+            "type": "string",
+            "x-zeromerma-decimal-representation": "JSON_STRING"
+          },
+          "cash_order_technical_reversal_amount": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Cash Order Technical Reversal Amount",
+            "type": "string",
+            "x-zeromerma-decimal-representation": "JSON_STRING"
+          },
           "cash_session": {
             "$ref": "#/components/schemas/CashSessionView"
           },
@@ -36921,6 +37359,9 @@
           "opening_amount",
           "total_cash_in",
           "total_cash_out",
+          "cash_order_collections_amount",
+          "cash_order_refunds_amount",
+          "cash_order_technical_reversal_amount",
           "expected_cash_amount",
           "payment_method_rows",
           "movement_breakdown",
@@ -37124,6 +37565,24 @@
             "title": "Can Start Close",
             "type": "boolean"
           },
+          "cash_order_collections_amount": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Cash Order Collections Amount",
+            "type": "string",
+            "x-zeromerma-decimal-representation": "JSON_STRING"
+          },
+          "cash_order_refunds_amount": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Cash Order Refunds Amount",
+            "type": "string",
+            "x-zeromerma-decimal-representation": "JSON_STRING"
+          },
+          "cash_order_technical_reversal_amount": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Cash Order Technical Reversal Amount",
+            "type": "string",
+            "x-zeromerma-decimal-representation": "JSON_STRING"
+          },
           "cash_session": {
             "$ref": "#/components/schemas/CashSessionView"
           },
@@ -37183,6 +37642,9 @@
           "opening_amount",
           "total_cash_in",
           "total_cash_out",
+          "cash_order_collections_amount",
+          "cash_order_refunds_amount",
+          "cash_order_technical_reversal_amount",
           "expected_cash_amount",
           "movement_breakdown",
           "blockers",
@@ -39538,9 +40000,41 @@
             "type": "string",
             "x-zeromerma-decimal-representation": "JSON_STRING"
           },
+          "cash_session_id": {
+            "format": "uuid",
+            "title": "Cash Session Id",
+            "type": "string",
+            "x-zeromerma-id-representation": "JSON_STRING"
+          },
           "currency_code": {
             "title": "Currency Code",
             "type": "string"
+          },
+          "financial_entry_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string",
+                "x-zeromerma-id-representation": "JSON_STRING"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Financial Entry Id"
+          },
+          "financial_operation_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string",
+                "x-zeromerma-id-representation": "JSON_STRING"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Financial Operation Id"
           },
           "id": {
             "format": "uuid",
@@ -39575,6 +40069,12 @@
           "sequence": {
             "title": "Sequence",
             "type": "integer"
+          },
+          "workstation_id": {
+            "format": "uuid",
+            "title": "Workstation Id",
+            "type": "string",
+            "x-zeromerma-id-representation": "JSON_STRING"
           }
         },
         "required": [
@@ -39584,6 +40084,8 @@
           "payment_method_code",
           "amount",
           "currency_code",
+          "cash_session_id",
+          "workstation_id",
           "recorded_at_utc",
           "recorded_by_user_id",
           "recorded_by_user_full_name"

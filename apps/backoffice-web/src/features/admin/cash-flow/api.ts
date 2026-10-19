@@ -64,6 +64,10 @@ function mapBackendContract(
 
 export function mapAdminCashFlowMovementFromApi(item: ApiListItem): AdminCashFlowMovementListItem {
   return {
+    financialOperationId: item.financial_operation_id ?? null,
+    financialEntryId: item.financial_entry_id ?? null,
+    orderPaymentId: item.order_payment_id ?? null,
+    orderPaymentType: item.order_payment_type ?? null,
     amount: String(item.amount),
     branchId: item.branch_id,
     branchName: item.branch_name,
@@ -99,6 +103,10 @@ function mapAdminCashFlowOverviewFromApi(
   reconciliationStatus: string,
 ): AdminCashFlowMovementListItem {
   return {
+    financialOperationId: overview.financial_operation_id ?? null,
+    financialEntryId: overview.financial_entry_id ?? null,
+    orderPaymentId: overview.order_payment_id ?? null,
+    orderPaymentType: overview.order_payment_type ?? null,
     amount: String(overview.amount),
     branchId: overview.branch_id,
     branchName: overview.branch_name,
@@ -138,6 +146,9 @@ function mapListFromApi(response: ApiListResponse): AdminCashFlowListResponse {
     page: response.page,
     pageSize: response.page_size,
     summary: {
+      orderCollectionsTotal: String(response.summary.order_collections_total),
+      orderRefundsTotal: String(response.summary.order_refunds_total),
+      orderTechnicalReversalTotal: String(response.summary.order_technical_reversal_total),
       cardTotal: String(response.summary.card_total),
       cashTotal: String(response.summary.cash_total),
       differenceTotal: String(response.summary.difference_total),
@@ -198,6 +209,11 @@ function mapDetailFromApi(response: ApiDetail): AdminCashFlowMovementDetail {
       status: document.status,
     })),
     sourceDocumentContext: {
+      orderId: response.source_document_context.order_id ?? null,
+      financialOperationId: response.source_document_context.financial_operation_id ?? null,
+      financialEntryId: response.source_document_context.financial_entry_id ?? null,
+      orderPaymentId: response.source_document_context.order_payment_id ?? null,
+      orderPaymentType: response.source_document_context.order_payment_type ?? null,
       cashCutFolio: response.source_document_context.cash_cut_folio ?? null,
       cashCutId: response.source_document_context.cash_cut_id ?? null,
       cashCutRouteHint: response.source_document_context.cash_cut_route_hint ?? null,

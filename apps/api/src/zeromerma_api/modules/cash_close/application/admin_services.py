@@ -30,6 +30,7 @@ from zeromerma_api.modules.cash_close.application.admin_schemas import (
     AdminCashCutListItemView,
     AdminCashCutMetricsView,
     AdminCashCutOperationalPaymentItemView,
+    AdminCashCutOrderPaymentItemView,
     AdminCashCutOverviewView,
     AdminCashCutPaymentBreakdownView,
     AdminCashCutReconciliationStatusView,
@@ -63,6 +64,11 @@ from zeromerma_api.modules.discounts.infrastructure.models import (
 from zeromerma_api.modules.identity.application.actions import restrict_actions
 from zeromerma_api.modules.identity.infrastructure.models import User
 from zeromerma_api.modules.operations.infrastructure.models import OperationDocument
+from zeromerma_api.modules.orders.application.financial_queries import (
+    order_cash_amounts,
+    order_financial_session_ids_statement,
+    read_order_financial_entries,
+)
 from zeromerma_api.modules.payments.infrastructure.models import (
     OperationalPayment,
     OperationalPaymentCategory,
@@ -266,6 +272,7 @@ class AdminCashCutService:
             session,
             cash_session_id=cash_session_id,
         )
+        order_entries = read_order_financial_entries(session, cash_session_ids=(cash_session_id,))
         included_tickets = self._get_included_tickets(
             session,
             cash_session_id=cash_session_id,
@@ -336,6 +343,11 @@ class AdminCashCutService:
                 opening_amount=_money(type_cast(Decimal, row["opening_amount"])),
                 cash_sales_amount=movement_amounts["cash_sales_amount"],
                 cash_refunds_amount=movement_amounts["cash_refunds_amount"],
+                cash_order_collections_amount=movement_amounts["cash_order_collections_amount"],
+                cash_order_refunds_amount=movement_amounts["cash_order_refunds_amount"],
+                cash_order_technical_reversal_amount=movement_amounts[
+                    "cash_order_technical_reversal_amount"
+                ],
                 cash_operational_payments_amount=movement_amounts[
                     "cash_operational_payments_amount"
                 ],
@@ -356,6 +368,28 @@ class AdminCashCutService:
             ),
             included_tickets=included_tickets,
             operational_payments=operational_payments,
+            order_payments=[
+                AdminCashCutOrderPaymentItemView(
+                    financial_entry_id=entry.financial_entry_id,
+                    financial_operation_id=entry.financial_operation_id,
+                    order_id=entry.order_id,
+                    order_folio=entry.order_folio,
+                    order_payment_id=entry.order_payment_id,
+                    payment_type=entry.payment_type,
+                    payment_method_code=entry.payment_method_code,
+                    direction=entry.direction,
+                    amount=entry.amount,
+                    currency_code=entry.currency_code,
+                    cash_session_id=entry.cash_session_id,
+                    workstation_id=entry.workstation_id,
+                    operator_id=entry.operator_id,
+                    operator_name=entry.operator_name,
+                    occurred_at=entry.occurred_at,
+                    status="CONFIRMED",
+                    route_hint=f"/admin/pedidos?order={entry.order_id}",
+                )
+                for entry in order_entries
+            ],
             overview=AdminCashCutOverviewView(
                 id=cash_session_id,
                 folio=folio,
@@ -549,6 +583,11 @@ class AdminCashCutService:
                 raise CashCloseValidationError("Unsupported payment method filter.")
             conditions.append(
                 or_(
+                    CashSession.id.in_(
+                        order_financial_session_ids_statement(
+                            payment_method=normalized_payment_method
+                        )
+                    ),
                     exists(
                         select(SalePayment.id)
                         .select_from(SalePayment)
@@ -570,8 +609,9 @@ class AdminCashCutService:
             )
 
         if has_refunds is not None:
-            refund_exists = exists(
-                select(SaleReturn.id).where(SaleReturn.cash_session_id == CashSession.id)
+            refund_exists = or_(
+                CashSession.id.in_(order_financial_session_ids_statement(refunds_only=True)),
+                exists(select(SaleReturn.id).where(SaleReturn.cash_session_id == CashSession.id)),
             )
             conditions.append(refund_exists if has_refunds else ~refund_exists)
         if has_operational_payments is not None:
@@ -768,6 +808,11 @@ class AdminCashCutService:
                 total_cash_in += amount
             elif row["direction"] == CASH_MOVEMENT_DIRECTION_OUT:
                 total_cash_out += amount
+        orders = order_cash_amounts(
+            read_order_financial_entries(session, cash_session_ids=(cash_session_id,))
+        )
+        total_cash_in += orders["total_cash_in"]
+        total_cash_out += orders["total_cash_out"]
         return {
             "expected_cash_amount": _money(opening_amount + total_cash_in - total_cash_out),
             "total_cash_in": _money(total_cash_in),
@@ -845,6 +890,9 @@ class AdminCashCutService:
             methods_by_session_id[type_cast(uuid.UUID, row["cash_session_id"])].append(
                 type_cast(str, row["payment_method_code"])
             )
+        for entry in read_order_financial_entries(session, cash_session_ids=cash_session_ids):
+            if entry.payment_method_code not in methods_by_session_id[entry.cash_session_id]:
+                methods_by_session_id[entry.cash_session_id].append(entry.payment_method_code)
         return {
             cash_session_id: _format_payment_methods(methods)
             for cash_session_id, methods in methods_by_session_id.items()
@@ -858,7 +906,11 @@ class AdminCashCutService:
     ) -> set[uuid.UUID]:
         if not cash_session_ids:
             return set()
-        return set(
+        return {
+            entry.cash_session_id
+            for entry in read_order_financial_entries(session, cash_session_ids=cash_session_ids)
+            if entry.operation_kind == "ORDER_REFUND"
+        } | set(
             session.execute(
                 select(SaleReturn.cash_session_id)
                 .where(SaleReturn.cash_session_id.in_(cash_session_ids))
@@ -958,6 +1010,15 @@ class AdminCashCutService:
                     result["cash_adjustments_amount"] += amount
                 else:
                     result["cash_adjustments_amount"] -= amount
+        orders = order_cash_amounts(
+            read_order_financial_entries(session, cash_session_ids=(cash_session_id,))
+        )
+        for key in (
+            "cash_order_collections_amount",
+            "cash_order_refunds_amount",
+            "cash_order_technical_reversal_amount",
+        ):
+            result[key] = orders[key]
         return {key: _money(value) for key, value in result.items()}
 
     def _get_payment_breakdown(
@@ -1051,6 +1112,7 @@ class AdminCashCutService:
         refunds_by_method = _amounts_by_method(refunds_rows)
         payments_by_method = _amounts_by_method(payment_rows)
         discounts_by_method = _amounts_by_method(discount_rows)
+        order_entries = read_order_financial_entries(session, cash_session_ids=(cash_session_id,))
 
         result: list[AdminCashCutPaymentBreakdownView] = []
         for method in [
@@ -1078,6 +1140,24 @@ class AdminCashCutService:
             refund_amount = refunds_by_method.get(method, ZERO_MONEY)
             operational_payment_amount = payments_by_method.get(method, ZERO_MONEY)
             operational_discount_amount = discounts_by_method.get(method, ZERO_MONEY)
+            order_amounts = {
+                kind: _money(
+                    sum(
+                        (
+                            entry.signed_amount if kind == "TECHNICAL_REVERSAL" else entry.amount
+                            for entry in order_entries
+                            if entry.payment_method_code == method and entry.operation_kind == kind
+                        ),
+                        ZERO_MONEY,
+                    )
+                )
+                for kind in (
+                    "ORDER_ADVANCE",
+                    "ORDER_SETTLEMENT",
+                    "ORDER_REFUND",
+                    "TECHNICAL_REVERSAL",
+                )
+            }
             result.append(
                 AdminCashCutPaymentBreakdownView(
                     payment_method_code=method,
@@ -1090,6 +1170,10 @@ class AdminCashCutService:
                     refund_amount=refund_amount,
                     operational_payment_amount=operational_payment_amount,
                     operational_discount_amount=operational_discount_amount,
+                    order_advance_amount=order_amounts["ORDER_ADVANCE"],
+                    order_settlement_amount=order_amounts["ORDER_SETTLEMENT"],
+                    order_refund_amount=order_amounts["ORDER_REFUND"],
+                    order_technical_reversal_amount=order_amounts["TECHNICAL_REVERSAL"],
                     expected_amount=expected_amount,
                     counted_amount=counted_amount,
                     variance_amount=variance_amount,
@@ -1098,6 +1182,10 @@ class AdminCashCutService:
                         - refund_amount
                         - operational_payment_amount
                         - operational_discount_amount
+                        + order_amounts["ORDER_ADVANCE"]
+                        + order_amounts["ORDER_SETTLEMENT"]
+                        - order_amounts["ORDER_REFUND"]
+                        + order_amounts["TECHNICAL_REVERSAL"]
                     ),
                     is_counted_supported=close_id is not None,
                 )

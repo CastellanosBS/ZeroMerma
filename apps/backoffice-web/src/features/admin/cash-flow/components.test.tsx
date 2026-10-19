@@ -237,6 +237,57 @@ describe("admin cash flow UI components", () => {
     expect(html).toContain("Este movimiento no requiere conciliacion.");
   });
 
+  it("shows an order card receipt as recorded external money with its causal references", () => {
+    const orderMovement: AdminCashFlowMovementListItem = {
+      ...movement,
+      sourceType: "ORDER_PAYMENT",
+      orderPaymentType: "SETTLEMENT",
+      paymentMethod: "CARD",
+      sourceReference: "PED-042",
+    };
+    const orderDetail: AdminCashFlowMovementDetail = {
+      ...detail,
+      overview: orderMovement,
+      sourceDocumentContext: {
+        ...detail.sourceDocumentContext,
+        sourceType: "ORDER_PAYMENT",
+        sourceReference: "PED-042",
+        sourceRouteHint: "/admin/pedidos?order=order-1",
+        orderId: "order-1",
+        orderPaymentId: "payment-42",
+        orderPaymentType: "SETTLEMENT",
+        financialEntryId: "entry-42",
+        financialOperationId: "operation-42",
+        cashSessionId: "actual-turn-2",
+      },
+      financialClassification: {
+        ...detail.financialClassification,
+        cashImpact: "0.00",
+        cardImpact: "6.00",
+        affectsCashDrawer: false,
+      },
+    };
+    const html = render(
+      <AdminCashFlowDetailPanel
+        detail={orderDetail}
+        selectedMovement={orderMovement}
+        onCopyReference={() => undefined}
+      />,
+    );
+    for (const text of [
+      "Liquidación",
+      "Referencias financieras",
+      "payment-42",
+      "entry-42",
+      "operation-42",
+      "actual-turn-2",
+      "/admin/pedidos?order=order-1",
+      "no afecta el efectivo de caja ni confirma una captura del proveedor",
+    ]) {
+      expect(html).toContain(text);
+    }
+  });
+
   it("renders no selected movement empty state", () => {
     const html = render(
       <AdminCashFlowDetailPanel

@@ -881,7 +881,10 @@
       "external_side_effect": "NONE_OBSERVED_STATICALLY",
       "reads_entities": [
         "cash_sessions",
-        "cash_movements"
+        "cash_movements",
+        "financial_operations",
+        "financial_entries",
+        "customer_order_payments"
       ],
       "writes_entities": [
         "NONE"
@@ -914,7 +917,8 @@
       ],
       "direct_tests": [
         "apps/api/tests/test_admin_cash_cuts.py",
-        "apps/api/tests/test_admin_reconciliation.py"
+        "apps/api/tests/test_admin_reconciliation.py",
+        "apps/api/tests/test_order_cash_flow.py"
       ],
       "indirect_tests": [
         "apps/api/tests/conftest.py",
@@ -945,7 +949,9 @@
         "apps/api/src/zeromerma_api/modules/cash_close/application/admin_services.py#class AdminCashCutService",
         "apps/api/src/zeromerma_api/presentation/access_policy.py#ENDPOINT_POLICIES",
         "apps/api/src/zeromerma_api/db/access_scope.py#bind_authorization_scope",
-        "docs/architecture/authorization.md"
+        "docs/architecture/authorization.md",
+        "docs/implementation/order-cash-flow-validation.md",
+        "apps/api/src/zeromerma_api/modules/orders/application/financial_queries.py"
       ]
     },
     {
@@ -994,7 +1000,10 @@
       "external_side_effect": "NONE_OBSERVED_STATICALLY",
       "reads_entities": [
         "cash_sessions",
-        "cash_movements"
+        "cash_movements",
+        "financial_operations",
+        "financial_entries",
+        "customer_order_payments"
       ],
       "writes_entities": [
         "NONE"
@@ -1027,7 +1036,8 @@
       ],
       "direct_tests": [
         "apps/api/tests/test_admin_cash_cuts.py",
-        "apps/api/tests/test_admin_reconciliation.py"
+        "apps/api/tests/test_admin_reconciliation.py",
+        "apps/api/tests/test_order_cash_flow.py"
       ],
       "indirect_tests": [
         "apps/api/tests/conftest.py",
@@ -1058,7 +1068,9 @@
         "apps/api/src/zeromerma_api/modules/cash_close/application/admin_services.py#class AdminCashCutService",
         "apps/api/src/zeromerma_api/presentation/access_policy.py#ENDPOINT_POLICIES",
         "apps/api/src/zeromerma_api/db/access_scope.py#bind_authorization_scope",
-        "docs/architecture/authorization.md"
+        "docs/architecture/authorization.md",
+        "docs/implementation/order-cash-flow-validation.md",
+        "apps/api/src/zeromerma_api/modules/orders/application/financial_queries.py"
       ]
     },
     {
@@ -1106,7 +1118,10 @@
       "persistence": "READ_ONLY",
       "external_side_effect": "NONE_OBSERVED_STATICALLY",
       "reads_entities": [
-        "cash_movements"
+        "cash_movements",
+        "financial_operations",
+        "financial_entries",
+        "customer_order_payments"
       ],
       "writes_entities": [
         "NONE"
@@ -1138,7 +1153,8 @@
         "NONE"
       ],
       "direct_tests": [
-        "apps/api/tests/test_admin_cash_flow.py"
+        "apps/api/tests/test_admin_cash_flow.py",
+        "apps/api/tests/test_order_cash_flow.py"
       ],
       "indirect_tests": [
         "apps/api/tests/conftest.py",
@@ -1169,7 +1185,9 @@
         "apps/api/src/zeromerma_api/modules/cash_close/application/cash_flow_services.py#class AdminCashFlowService",
         "apps/api/src/zeromerma_api/presentation/access_policy.py#ENDPOINT_POLICIES",
         "apps/api/src/zeromerma_api/db/access_scope.py#bind_authorization_scope",
-        "docs/architecture/authorization.md"
+        "docs/architecture/authorization.md",
+        "docs/implementation/order-cash-flow-validation.md",
+        "apps/api/src/zeromerma_api/modules/orders/application/financial_queries.py"
       ]
     },
     {
@@ -1217,7 +1235,10 @@
       "persistence": "READ_ONLY",
       "external_side_effect": "NONE_OBSERVED_STATICALLY",
       "reads_entities": [
-        "cash_movements"
+        "cash_movements",
+        "financial_operations",
+        "financial_entries",
+        "customer_order_payments"
       ],
       "writes_entities": [
         "NONE"
@@ -1249,7 +1270,8 @@
         "NONE"
       ],
       "direct_tests": [
-        "apps/api/tests/test_admin_cash_flow.py"
+        "apps/api/tests/test_admin_cash_flow.py",
+        "apps/api/tests/test_order_cash_flow.py"
       ],
       "indirect_tests": [
         "apps/api/tests/conftest.py",
@@ -1280,7 +1302,9 @@
         "apps/api/src/zeromerma_api/modules/cash_close/application/cash_flow_services.py#class AdminCashFlowService",
         "apps/api/src/zeromerma_api/presentation/access_policy.py#ENDPOINT_POLICIES",
         "apps/api/src/zeromerma_api/db/access_scope.py#bind_authorization_scope",
-        "docs/architecture/authorization.md"
+        "docs/architecture/authorization.md",
+        "docs/implementation/order-cash-flow-validation.md",
+        "apps/api/src/zeromerma_api/modules/orders/application/financial_queries.py"
       ]
     },
     {
@@ -3114,7 +3138,9 @@
       "external_side_effect": "NONE_OBSERVED_STATICALLY",
       "reads_entities": [
         "customer_orders",
-        "customer_order_payments"
+        "customer_order_payments",
+        "financial_operations",
+        "financial_entries"
       ],
       "writes_entities": [
         "NONE"
@@ -3144,7 +3170,9 @@
         "NONE"
       ],
       "direct_tests": [
-        "apps/api/tests/test_admin_orders.py"
+        "apps/api/tests/test_admin_orders.py",
+        "apps/api/tests/test_order_cash_flow.py",
+        "apps/api/tests/test_order_financial_entries.py"
       ],
       "indirect_tests": [
         "apps/api/tests/conftest.py",
@@ -3177,7 +3205,9 @@
         "apps/api/src/zeromerma_api/db/access_scope.py#bind_authorization_scope",
         "docs/architecture/authorization.md",
         "apps/backoffice-web/src/features/admin/orders/api.ts",
-        "docs/implementation/order-idempotency-validation.md"
+        "docs/implementation/order-idempotency-validation.md",
+        "docs/implementation/order-cash-flow-validation.md",
+        "apps/api/src/zeromerma_api/modules/orders/application/financial_services.py"
       ]
     },
     {
@@ -8287,7 +8317,10 @@
       "external_side_effect": "NONE_OBSERVED_STATICALLY",
       "reads_entities": [
         "cash_sessions",
-        "cash_movements"
+        "cash_movements",
+        "financial_operations",
+        "financial_entries",
+        "customer_order_payments"
       ],
       "writes_entities": [
         "NONE"
@@ -8321,7 +8354,8 @@
         "apps/api/tests/test_admin_cash_flow.py",
         "apps/api/tests/test_admin_reconciliation.py",
         "apps/api/tests/test_payments_module.py",
-        "apps/api/tests/test_phase_7a_cash_close.py"
+        "apps/api/tests/test_phase_7a_cash_close.py",
+        "apps/api/tests/test_order_cash_flow.py"
       ],
       "indirect_tests": [
         "apps/api/tests/conftest.py",
@@ -8353,7 +8387,9 @@
         "apps/api/src/zeromerma_api/modules/cash_close/application/services.py#class CashCloseQueryService",
         "apps/api/src/zeromerma_api/presentation/access_policy.py#ENDPOINT_POLICIES",
         "apps/api/src/zeromerma_api/db/access_scope.py#bind_authorization_scope",
-        "docs/architecture/authorization.md"
+        "docs/architecture/authorization.md",
+        "docs/implementation/order-cash-flow-validation.md",
+        "apps/api/src/zeromerma_api/modules/orders/application/financial_queries.py"
       ]
     },
     {
@@ -8402,7 +8438,10 @@
       "external_side_effect": "NONE_OBSERVED_STATICALLY",
       "reads_entities": [
         "cash_sessions",
-        "cash_movements"
+        "cash_movements",
+        "financial_operations",
+        "financial_entries",
+        "customer_order_payments"
       ],
       "writes_entities": [
         "NONE"
@@ -8437,7 +8476,8 @@
         "apps/api/tests/test_admin_reconciliation.py",
         "apps/api/tests/test_payments_module.py",
         "apps/api/tests/test_phase_7a_cash_close.py",
-        "apps/api/tests/test_phase_7b_cash_close.py"
+        "apps/api/tests/test_phase_7b_cash_close.py",
+        "apps/api/tests/test_order_cash_flow.py"
       ],
       "indirect_tests": [
         "apps/api/tests/conftest.py",
@@ -8469,7 +8509,9 @@
         "apps/api/src/zeromerma_api/modules/cash_close/application/services.py#class CashCloseQueryService",
         "apps/api/src/zeromerma_api/presentation/access_policy.py#ENDPOINT_POLICIES",
         "apps/api/src/zeromerma_api/db/access_scope.py#bind_authorization_scope",
-        "docs/architecture/authorization.md"
+        "docs/architecture/authorization.md",
+        "docs/implementation/order-cash-flow-validation.md",
+        "apps/api/src/zeromerma_api/modules/orders/application/financial_queries.py"
       ]
     },
     {
@@ -11103,7 +11145,9 @@
       "reads_entities": [
         "customer_orders",
         "customer_order_items",
-        "customer_order_payments"
+        "customer_order_payments",
+        "financial_operations",
+        "financial_entries"
       ],
       "writes_entities": [
         "NONE"
@@ -11133,7 +11177,9 @@
         "NONE"
       ],
       "direct_tests": [
-        "apps/api/tests/test_orders_module.py"
+        "apps/api/tests/test_orders_module.py",
+        "apps/api/tests/test_order_cash_flow.py",
+        "apps/api/tests/test_order_financial_entries.py"
       ],
       "indirect_tests": [
         "apps/api/tests/conftest.py",
@@ -11166,7 +11212,9 @@
         "apps/api/src/zeromerma_api/db/access_scope.py#bind_authorization_scope",
         "docs/architecture/authorization.md",
         "apps/pos-web/src/features/orders/orders-api.ts",
-        "docs/implementation/order-idempotency-validation.md"
+        "docs/implementation/order-idempotency-validation.md",
+        "docs/implementation/order-cash-flow-validation.md",
+        "apps/api/src/zeromerma_api/modules/orders/application/financial_services.py"
       ]
     },
     {
@@ -18603,12 +18651,11 @@
         "apps/api/tests/test_operation_authorization.py#test_all_scoped_families_support_mapped_reads_and_aggregate_subqueries"
       ],
       "missing_test_types": [
-        "FULL_DEC10_ORDER_WORKFLOW_AND_CANONICAL_CASH_LEDGER"
+        "FULL_DEC10_ORDER_WORKFLOW"
       ],
-      "approved_target_state": "Preserve verified durable replay while completing the separate canonical order payment/cash ledger in ZM-FIN-042 and the full approved order workflow in ZM-FIN-058 and ZM-FIN-078.",
+      "approved_target_state": "Preserve durable replay and the 042 order-payment ledger adoption while completing the full approved order workflow in ZM-FIN-058 and ZM-FIN-078. Cancellation policy, CASH_FIRST/partial refunds and provider execution remain ZM-FIN-044/046.",
       "feature_complete_blocker": true,
       "later_ZM_FIN_tasks": [
-        "ZM-FIN-042",
         "ZM-FIN-078"
       ],
       "decision_refs": [
@@ -18638,7 +18685,8 @@
         "apps/backoffice-web/src/features/admin/orders/api.ts",
         "docs/implementation/order-idempotency-validation.md",
         "apps/api/src/zeromerma_api/modules/orders/application/idempotency.py#class OrdersIdempotencyService",
-        "docs/architecture/idempotency.md"
+        "docs/architecture/idempotency.md",
+        "docs/implementation/order-cash-flow-validation.md"
       ]
     },
     {
@@ -18732,12 +18780,11 @@
         "apps/api/tests/test_operation_authorization.py#test_all_scoped_families_support_mapped_reads_and_aggregate_subqueries"
       ],
       "missing_test_types": [
-        "FULL_DEC10_ORDER_WORKFLOW_AND_CANONICAL_CASH_LEDGER"
+        "FULL_DEC10_ORDER_WORKFLOW"
       ],
-      "approved_target_state": "Preserve verified durable replay while completing the separate canonical order payment/cash ledger in ZM-FIN-042 and the full approved order workflow in ZM-FIN-058 and ZM-FIN-078.",
+      "approved_target_state": "Preserve durable replay and the 042 order-payment ledger adoption while completing the full approved order workflow in ZM-FIN-058 and ZM-FIN-078. Cancellation policy, CASH_FIRST/partial refunds and provider execution remain ZM-FIN-044/046.",
       "feature_complete_blocker": true,
       "later_ZM_FIN_tasks": [
-        "ZM-FIN-042",
         "ZM-FIN-078"
       ],
       "decision_refs": [
@@ -18767,7 +18814,8 @@
         "apps/backoffice-web/src/features/admin/orders/api.ts",
         "docs/implementation/order-idempotency-validation.md",
         "apps/api/src/zeromerma_api/modules/orders/application/idempotency.py#class OrdersIdempotencyService",
-        "docs/architecture/idempotency.md"
+        "docs/architecture/idempotency.md",
+        "docs/implementation/order-cash-flow-validation.md"
       ]
     },
     {
@@ -18861,12 +18909,11 @@
         "apps/api/tests/test_operation_authorization.py#test_all_scoped_families_support_mapped_reads_and_aggregate_subqueries"
       ],
       "missing_test_types": [
-        "FULL_DEC10_ORDER_WORKFLOW_AND_CANONICAL_CASH_LEDGER"
+        "FULL_DEC10_ORDER_WORKFLOW"
       ],
-      "approved_target_state": "Preserve verified durable replay while completing the separate canonical order payment/cash ledger in ZM-FIN-042 and the full approved order workflow in ZM-FIN-058 and ZM-FIN-078.",
+      "approved_target_state": "Preserve durable replay and the 042 order-payment ledger adoption while completing the full approved order workflow in ZM-FIN-058 and ZM-FIN-078. Cancellation policy, CASH_FIRST/partial refunds and provider execution remain ZM-FIN-044/046.",
       "feature_complete_blocker": true,
       "later_ZM_FIN_tasks": [
-        "ZM-FIN-042",
         "ZM-FIN-078"
       ],
       "decision_refs": [
@@ -18896,7 +18943,8 @@
         "apps/backoffice-web/src/features/admin/orders/api.ts",
         "docs/implementation/order-idempotency-validation.md",
         "apps/api/src/zeromerma_api/modules/orders/application/idempotency.py#class OrdersIdempotencyService",
-        "docs/architecture/idempotency.md"
+        "docs/architecture/idempotency.md",
+        "docs/implementation/order-cash-flow-validation.md"
       ]
     },
     {
@@ -25797,7 +25845,10 @@
         "sales",
         "sale_lines",
         "operation_documents",
-        "branch_counter_snapshots"
+        "branch_counter_snapshots",
+        "financial_operations",
+        "financial_entries",
+        "customer_order_payments"
       ],
       "writes_entities": [
         "cash_sessions",
@@ -25818,7 +25869,7 @@
         "outbox_events",
         "idempotency_records"
       ],
-      "locks_or_concurrency_control": "After the UUIDv7 reservation, the exact CashSession is locked FOR NO KEY UPDATE with populate_existing before dependent business rows or effects. Actor, branch, workstation and OPEN are revalidated under that lock; committed historical replay bypasses the action without requiring OPEN. Reservation FK KEY SHARE remains compatible. Final close recalculates the existing CashMovement projection while holding the boundary; preview does not reserve it. Existing order-ledger omission remains ZM-FIN-042.",
+      "locks_or_concurrency_control": "After the UUIDv7 reservation, the exact CashSession is locked FOR NO KEY UPDATE with populate_existing before dependent business rows or effects. Actor, branch, workstation and OPEN are revalidated under that lock; committed historical replay bypasses the action without requiring OPEN. Reservation FK KEY SHARE remains compatible. Final close recalculates existing CashMovement effects plus confirmed canonical order CASH entries while holding the boundary; CARD stays outside the drawer. Preview does not reserve the boundary. Committed expected/count/variance remain frozen.",
       "audit_required": true,
       "audit_actual": "ATOMIC",
       "audit_atomicity": "ATOMIC",
@@ -25849,7 +25900,8 @@
         "apps/api/tests/test_phase_7b_cash_close.py",
         "apps/api/tests/test_cash_idempotency.py",
         "apps/pos-web/e2e-real/aa-cash-command.spec.ts",
-        "apps/api/tests/test_cash_concurrency.py"
+        "apps/api/tests/test_cash_concurrency.py",
+        "apps/api/tests/test_order_cash_flow.py"
       ],
       "indirect_tests": [
         "apps/api/tests/conftest.py",
@@ -25891,7 +25943,9 @@
         "apps/api/src/zeromerma_api/modules/cash/application/command_context.py",
         "docs/implementation/cash-idempotency-validation.md",
         "docs/architecture/concurrency.md",
-        "docs/implementation/concurrency-validation.md"
+        "docs/implementation/concurrency-validation.md",
+        "docs/implementation/order-cash-flow-validation.md",
+        "apps/api/src/zeromerma_api/modules/orders/application/financial_queries.py"
       ],
       "verification_notes": "ZM-FIN-036/037 local evidence: 42 unique PostgreSQL cases passed across the 28-case cash-boundary and 14-case complementary runs (29 new cases, 3 adapted concurrency cases, 10 prior cash/FK cases). The final combined runner also passed all 49 cases (29 cash, 9 transient conflicts, 11 inventory). Same-user HTTP authentication may serialize earlier; domain races use separate real transactions. Exact-commit Foundation acceptance accompanies delivery."
     },
@@ -25941,7 +25995,10 @@
       "external_side_effect": "NONE_OBSERVED_STATICALLY",
       "reads_entities": [
         "cash_sessions",
-        "cash_movements"
+        "cash_movements",
+        "financial_operations",
+        "financial_entries",
+        "customer_order_payments"
       ],
       "writes_entities": [
         "NONE"
@@ -25972,7 +26029,8 @@
       ],
       "direct_tests": [
         "apps/api/tests/test_phase_7a_cash_close.py",
-        "apps/api/tests/test_phase_7b_cash_close.py"
+        "apps/api/tests/test_phase_7b_cash_close.py",
+        "apps/api/tests/test_order_cash_flow.py"
       ],
       "indirect_tests": [
         "apps/api/tests/conftest.py",
@@ -26004,7 +26062,9 @@
         "apps/api/src/zeromerma_api/modules/cash_close/application/services.py#class CashCloseQueryService",
         "apps/api/src/zeromerma_api/presentation/access_policy.py#ENDPOINT_POLICIES",
         "apps/api/src/zeromerma_api/db/access_scope.py#bind_authorization_scope",
-        "docs/architecture/authorization.md"
+        "docs/architecture/authorization.md",
+        "docs/implementation/order-cash-flow-validation.md",
+        "apps/api/src/zeromerma_api/modules/orders/application/financial_queries.py"
       ]
     },
     {
@@ -27081,7 +27141,7 @@
       "domain_or_use_case_symbol": "OrdersIdempotencyService.execute_pos",
       "router_business_logic_present": false,
       "transaction_owner": "zeromerma_api.modules.idempotency.application.service.IdempotencyExecutor.execute",
-      "transaction_boundary": "Executor-owned root transaction; action flushes without committing; order/items, existing payment legs, audit, outbox and terminal acknowledgement commit or roll back together",
+      "transaction_boundary": "Executor-owned root transaction and action savepoint; order/items, actual-method CustomerOrderPayment receipts, one FinancialOperation and confirmed FinancialEntry per payment, existing audit/outbox and terminal acknowledgement commit or roll back together.",
       "persistence": "WRITE",
       "external_side_effect": "NONE_OBSERVED_STATICALLY",
       "reads_entities": [
@@ -27099,10 +27159,12 @@
         "customer_orders",
         "customer_order_items",
         "customer_order_payments",
-        "audit_logs",
-        "outbox_events"
+        "audit_log",
+        "outbox_events",
+        "financial_operations",
+        "financial_entries"
       ],
-      "locks_or_concurrency_control": "After the UUIDv7 reservation, the exact CashSession is locked FOR NO KEY UPDATE with populate_existing before dependent business rows or effects. Actor, branch, workstation and OPEN are revalidated under that lock; committed historical replay bypasses the action without requiring OPEN. Reservation FK KEY SHARE remains compatible. Existing CustomerOrder transitions then acquire their document lock. This guarantees temporal admission only: CustomerOrderPayment-to-CashMovement integration remains ZM-FIN-042.",
+      "locks_or_concurrency_control": "After the UUIDv7 reservation, the exact CashSession is locked FOR NO KEY UPDATE with populate_existing before dependent business rows or effects. Actor, branch, workstation and OPEN are revalidated under that lock; committed historical replay bypasses the action without requiring OPEN. Reservation FK KEY SHARE remains compatible. Existing CustomerOrder transitions then acquire their document lock. Actual payment receipts and FinancialOperation/FinancialEntry facts share this locked admission boundary. There is no duplicate CashMovement write.",
       "audit_required": true,
       "audit_actual": "ATOMIC",
       "audit_atomicity": "ATOMIC",
@@ -27129,7 +27191,9 @@
       "direct_tests": [
         "apps/api/tests/test_orders_module.py",
         "apps/api/tests/test_order_idempotency.py",
-        "apps/api/tests/test_cash_concurrency.py"
+        "apps/api/tests/test_cash_concurrency.py",
+        "apps/api/tests/test_order_financial_entries.py",
+        "apps/api/tests/test_order_cash_flow.py"
       ],
       "indirect_tests": [
         "apps/api/tests/conftest.py",
@@ -27137,12 +27201,11 @@
         "apps/api/tests/test_operation_authorization.py#test_all_scoped_families_support_mapped_reads_and_aggregate_subqueries"
       ],
       "missing_test_types": [
-        "FULL_DEC10_ORDER_WORKFLOW_AND_CANONICAL_CASH_LEDGER"
+        "FULL_DEC10_ORDER_WORKFLOW"
       ],
-      "approved_target_state": "Preserve verified durable replay and common cash-session admission while completing the canonical order payment/cash ledger in ZM-FIN-042 and the full approved order workflow in ZM-FIN-058 and ZM-FIN-078.",
+      "approved_target_state": "Preserve durable replay and the 042 order-payment ledger adoption while completing the full approved order workflow in ZM-FIN-058 and ZM-FIN-078. Cancellation policy, CASH_FIRST/partial refunds and provider execution remain ZM-FIN-044/046.",
       "feature_complete_blocker": true,
       "later_ZM_FIN_tasks": [
-        "ZM-FIN-042",
         "ZM-FIN-058"
       ],
       "decision_refs": [
@@ -27175,9 +27238,11 @@
         "docs/architecture/idempotency.md",
         "apps/api/src/zeromerma_api/modules/cash/application/command_context.py",
         "docs/architecture/concurrency.md",
-        "docs/implementation/concurrency-validation.md"
+        "docs/implementation/concurrency-validation.md",
+        "docs/implementation/order-cash-flow-validation.md",
+        "apps/api/src/zeromerma_api/modules/orders/application/financial_services.py"
       ],
-      "verification_notes": "ZM-FIN-036/037 local evidence: 42 unique PostgreSQL cases passed across the 28-case cash-boundary and 14-case complementary runs (29 new cases, 3 adapted concurrency cases, 10 prior cash/FK cases). The final combined runner also passed all 49 cases (29 cash, 9 transient conflicts, 11 inventory). Same-user HTTP authentication may serialize earlier; domain races use separate real transactions. Exact-commit Foundation acceptance accompanies delivery."
+      "verification_notes": "ZM-FIN-036/037 local evidence: 42 unique PostgreSQL cases passed across the 28-case cash-boundary and 14-case complementary runs (29 new cases, 3 adapted concurrency cases, 10 prior cash/FK cases). The final combined runner also passed all 49 cases (29 cash, 9 transient conflicts, 11 inventory). Same-user HTTP authentication may serialize earlier; domain races use separate real transactions. Exact-commit Foundation acceptance accompanies delivery. 042 implementation adds CASH LOCAL and CARD ACCOUNTING_ONLY actual-method facts (MIXED is two real legs), actual receiving/refunding turn, no historical backfill and no duplicate cash movement. New 042 acceptance is tracked separately in order_financial_evidence; prior successful run counts above are unchanged."
     },
     {
       "operation_key": "API:POST:/v1/orders/{order_id}/cancel",
@@ -27221,7 +27286,7 @@
       "domain_or_use_case_symbol": "OrdersIdempotencyService.execute_pos",
       "router_business_logic_present": false,
       "transaction_owner": "zeromerma_api.modules.idempotency.application.service.IdempotencyExecutor.execute",
-      "transaction_boundary": "Executor-owned root transaction; action flushes without committing; order/items, existing payment legs, audit, outbox and terminal acknowledgement commit or roll back together",
+      "transaction_boundary": "Executor-owned root transaction and action savepoint; order/items, actual-method CustomerOrderPayment receipts, one FinancialOperation and confirmed FinancialEntry per payment, existing audit/outbox and terminal acknowledgement commit or roll back together.",
       "persistence": "WRITE",
       "external_side_effect": "NONE_OBSERVED_STATICALLY",
       "reads_entities": [
@@ -27236,10 +27301,12 @@
         "idempotency_records",
         "customer_orders",
         "customer_order_payments",
-        "audit_logs",
-        "outbox_events"
+        "audit_log",
+        "outbox_events",
+        "financial_operations",
+        "financial_entries"
       ],
-      "locks_or_concurrency_control": "After the UUIDv7 reservation, the exact CashSession is locked FOR NO KEY UPDATE with populate_existing before dependent business rows or effects. Actor, branch, workstation and OPEN are revalidated under that lock; committed historical replay bypasses the action without requiring OPEN. Reservation FK KEY SHARE remains compatible. Existing CustomerOrder transitions then acquire their document lock. This guarantees temporal admission only: CustomerOrderPayment-to-CashMovement integration remains ZM-FIN-042.",
+      "locks_or_concurrency_control": "After the UUIDv7 reservation, the exact CashSession is locked FOR NO KEY UPDATE with populate_existing before dependent business rows or effects. Actor, branch, workstation and OPEN are revalidated under that lock; committed historical replay bypasses the action without requiring OPEN. Reservation FK KEY SHARE remains compatible. Existing CustomerOrder transitions then acquire their document lock. Actual payment receipts and FinancialOperation/FinancialEntry facts share this locked admission boundary. There is no duplicate CashMovement write.",
       "audit_required": true,
       "audit_actual": "ATOMIC",
       "audit_atomicity": "ATOMIC",
@@ -27266,7 +27333,9 @@
       "direct_tests": [
         "apps/api/tests/test_orders_module.py",
         "apps/api/tests/test_order_idempotency.py",
-        "apps/api/tests/test_cash_concurrency.py"
+        "apps/api/tests/test_cash_concurrency.py",
+        "apps/api/tests/test_order_financial_entries.py",
+        "apps/api/tests/test_order_cash_flow.py"
       ],
       "indirect_tests": [
         "apps/api/tests/conftest.py",
@@ -27274,12 +27343,11 @@
         "apps/api/tests/test_operation_authorization.py#test_all_scoped_families_support_mapped_reads_and_aggregate_subqueries"
       ],
       "missing_test_types": [
-        "FULL_DEC10_ORDER_WORKFLOW_AND_CANONICAL_CASH_LEDGER"
+        "FULL_DEC10_ORDER_WORKFLOW"
       ],
-      "approved_target_state": "Preserve verified durable replay and common cash-session admission while completing the canonical order payment/cash ledger in ZM-FIN-042 and the full approved order workflow in ZM-FIN-058 and ZM-FIN-078.",
+      "approved_target_state": "Preserve durable replay and the 042 order-payment ledger adoption while completing the full approved order workflow in ZM-FIN-058 and ZM-FIN-078. Cancellation policy, CASH_FIRST/partial refunds and provider execution remain ZM-FIN-044/046.",
       "feature_complete_blocker": true,
       "later_ZM_FIN_tasks": [
-        "ZM-FIN-042",
         "ZM-FIN-058"
       ],
       "decision_refs": [
@@ -27312,9 +27380,11 @@
         "docs/architecture/idempotency.md",
         "apps/api/src/zeromerma_api/modules/cash/application/command_context.py",
         "docs/architecture/concurrency.md",
-        "docs/implementation/concurrency-validation.md"
+        "docs/implementation/concurrency-validation.md",
+        "docs/implementation/order-cash-flow-validation.md",
+        "apps/api/src/zeromerma_api/modules/orders/application/financial_services.py"
       ],
-      "verification_notes": "ZM-FIN-036/037 local evidence: 42 unique PostgreSQL cases passed across the 28-case cash-boundary and 14-case complementary runs (29 new cases, 3 adapted concurrency cases, 10 prior cash/FK cases). The final combined runner also passed all 49 cases (29 cash, 9 transient conflicts, 11 inventory). Same-user HTTP authentication may serialize earlier; domain races use separate real transactions. Exact-commit Foundation acceptance accompanies delivery."
+      "verification_notes": "ZM-FIN-036/037 local evidence: 42 unique PostgreSQL cases passed across the 28-case cash-boundary and 14-case complementary runs (29 new cases, 3 adapted concurrency cases, 10 prior cash/FK cases). The final combined runner also passed all 49 cases (29 cash, 9 transient conflicts, 11 inventory). Same-user HTTP authentication may serialize earlier; domain races use separate real transactions. Exact-commit Foundation acceptance accompanies delivery. 042 implementation adds CASH LOCAL and CARD ACCOUNTING_ONLY actual-method facts (MIXED is two real legs), actual receiving/refunding turn, no historical backfill and no duplicate cash movement. New 042 acceptance is tracked separately in order_financial_evidence; prior successful run counts above are unchanged."
     },
     {
       "operation_key": "API:POST:/v1/orders/{order_id}/deliver",
@@ -27358,7 +27428,7 @@
       "domain_or_use_case_symbol": "OrdersIdempotencyService.execute_pos",
       "router_business_logic_present": false,
       "transaction_owner": "zeromerma_api.modules.idempotency.application.service.IdempotencyExecutor.execute",
-      "transaction_boundary": "Executor-owned root transaction; action flushes without committing; order/items, existing payment legs, audit, outbox and terminal acknowledgement commit or roll back together",
+      "transaction_boundary": "Executor-owned root transaction and action savepoint; order/items, actual-method CustomerOrderPayment receipts, one FinancialOperation and confirmed FinancialEntry per payment, existing audit/outbox and terminal acknowledgement commit or roll back together.",
       "persistence": "WRITE",
       "external_side_effect": "NONE_OBSERVED_STATICALLY",
       "reads_entities": [
@@ -27373,10 +27443,12 @@
         "idempotency_records",
         "customer_orders",
         "customer_order_payments",
-        "audit_logs",
-        "outbox_events"
+        "audit_log",
+        "outbox_events",
+        "financial_operations",
+        "financial_entries"
       ],
-      "locks_or_concurrency_control": "After the UUIDv7 reservation, the exact CashSession is locked FOR NO KEY UPDATE with populate_existing before dependent business rows or effects. Actor, branch, workstation and OPEN are revalidated under that lock; committed historical replay bypasses the action without requiring OPEN. Reservation FK KEY SHARE remains compatible. Existing CustomerOrder transitions then acquire their document lock. This guarantees temporal admission only: CustomerOrderPayment-to-CashMovement integration remains ZM-FIN-042.",
+      "locks_or_concurrency_control": "After the UUIDv7 reservation, the exact CashSession is locked FOR NO KEY UPDATE with populate_existing before dependent business rows or effects. Actor, branch, workstation and OPEN are revalidated under that lock; committed historical replay bypasses the action without requiring OPEN. Reservation FK KEY SHARE remains compatible. Existing CustomerOrder transitions then acquire their document lock. Actual payment receipts and FinancialOperation/FinancialEntry facts share this locked admission boundary. There is no duplicate CashMovement write.",
       "audit_required": true,
       "audit_actual": "ATOMIC",
       "audit_atomicity": "ATOMIC",
@@ -27403,7 +27475,9 @@
       "direct_tests": [
         "apps/api/tests/test_orders_module.py",
         "apps/api/tests/test_order_idempotency.py",
-        "apps/api/tests/test_cash_concurrency.py"
+        "apps/api/tests/test_cash_concurrency.py",
+        "apps/api/tests/test_order_financial_entries.py",
+        "apps/api/tests/test_order_cash_flow.py"
       ],
       "indirect_tests": [
         "apps/api/tests/conftest.py",
@@ -27411,12 +27485,11 @@
         "apps/api/tests/test_operation_authorization.py#test_all_scoped_families_support_mapped_reads_and_aggregate_subqueries"
       ],
       "missing_test_types": [
-        "FULL_DEC10_ORDER_WORKFLOW_AND_CANONICAL_CASH_LEDGER"
+        "FULL_DEC10_ORDER_WORKFLOW"
       ],
-      "approved_target_state": "Preserve verified durable replay and common cash-session admission while completing the canonical order payment/cash ledger in ZM-FIN-042 and the full approved order workflow in ZM-FIN-058 and ZM-FIN-078.",
+      "approved_target_state": "Preserve durable replay and the 042 order-payment ledger adoption while completing the full approved order workflow in ZM-FIN-058 and ZM-FIN-078. Cancellation policy, CASH_FIRST/partial refunds and provider execution remain ZM-FIN-044/046.",
       "feature_complete_blocker": true,
       "later_ZM_FIN_tasks": [
-        "ZM-FIN-042",
         "ZM-FIN-058"
       ],
       "decision_refs": [
@@ -27449,9 +27522,11 @@
         "docs/architecture/idempotency.md",
         "apps/api/src/zeromerma_api/modules/cash/application/command_context.py",
         "docs/architecture/concurrency.md",
-        "docs/implementation/concurrency-validation.md"
+        "docs/implementation/concurrency-validation.md",
+        "docs/implementation/order-cash-flow-validation.md",
+        "apps/api/src/zeromerma_api/modules/orders/application/financial_services.py"
       ],
-      "verification_notes": "ZM-FIN-036/037 local evidence: 42 unique PostgreSQL cases passed across the 28-case cash-boundary and 14-case complementary runs (29 new cases, 3 adapted concurrency cases, 10 prior cash/FK cases). The final combined runner also passed all 49 cases (29 cash, 9 transient conflicts, 11 inventory). Same-user HTTP authentication may serialize earlier; domain races use separate real transactions. Exact-commit Foundation acceptance accompanies delivery."
+      "verification_notes": "ZM-FIN-036/037 local evidence: 42 unique PostgreSQL cases passed across the 28-case cash-boundary and 14-case complementary runs (29 new cases, 3 adapted concurrency cases, 10 prior cash/FK cases). The final combined runner also passed all 49 cases (29 cash, 9 transient conflicts, 11 inventory). Same-user HTTP authentication may serialize earlier; domain races use separate real transactions. Exact-commit Foundation acceptance accompanies delivery. 042 implementation adds CASH LOCAL and CARD ACCOUNTING_ONLY actual-method facts (MIXED is two real legs), actual receiving/refunding turn, no historical backfill and no duplicate cash movement. New 042 acceptance is tracked separately in order_financial_evidence; prior successful run counts above are unchanged."
     },
     {
       "operation_key": "API:POST:/v1/orders/{order_id}/mark-ready",
@@ -27512,7 +27587,7 @@
         "audit_logs",
         "outbox_events"
       ],
-      "locks_or_concurrency_control": "After the UUIDv7 reservation, the exact CashSession is locked FOR NO KEY UPDATE with populate_existing before dependent business rows or effects. Actor, branch, workstation and OPEN are revalidated under that lock; committed historical replay bypasses the action without requiring OPEN. Reservation FK KEY SHARE remains compatible. Existing CustomerOrder transitions then acquire their document lock. This guarantees temporal admission only: CustomerOrderPayment-to-CashMovement integration remains ZM-FIN-042.",
+      "locks_or_concurrency_control": "After the UUIDv7 reservation, the exact CashSession is locked FOR NO KEY UPDATE with populate_existing before dependent business rows or effects. Actor, branch, workstation and OPEN are revalidated under that lock; committed historical replay bypasses the action without requiring OPEN. Reservation FK KEY SHARE remains compatible. Existing CustomerOrder transitions then acquire their document lock. Actual payment receipts and FinancialOperation/FinancialEntry facts share this locked admission boundary. There is no duplicate CashMovement write.",
       "audit_required": true,
       "audit_actual": "ATOMIC",
       "audit_atomicity": "ATOMIC",
@@ -27546,12 +27621,11 @@
         "apps/api/tests/test_operation_authorization.py#test_all_scoped_families_support_mapped_reads_and_aggregate_subqueries"
       ],
       "missing_test_types": [
-        "FULL_DEC10_ORDER_WORKFLOW_AND_CANONICAL_CASH_LEDGER"
+        "FULL_DEC10_ORDER_WORKFLOW"
       ],
-      "approved_target_state": "Preserve verified durable replay and common cash-session admission while completing the canonical order payment/cash ledger in ZM-FIN-042 and the full approved order workflow in ZM-FIN-058 and ZM-FIN-078.",
+      "approved_target_state": "Preserve durable replay and the 042 order-payment ledger adoption while completing the full approved order workflow in ZM-FIN-058 and ZM-FIN-078. Cancellation policy, CASH_FIRST/partial refunds and provider execution remain ZM-FIN-044/046.",
       "feature_complete_blocker": true,
       "later_ZM_FIN_tasks": [
-        "ZM-FIN-042",
         "ZM-FIN-058"
       ],
       "decision_refs": [
@@ -27584,7 +27658,8 @@
         "docs/architecture/idempotency.md",
         "apps/api/src/zeromerma_api/modules/cash/application/command_context.py",
         "docs/architecture/concurrency.md",
-        "docs/implementation/concurrency-validation.md"
+        "docs/implementation/concurrency-validation.md",
+        "docs/implementation/order-cash-flow-validation.md"
       ],
       "verification_notes": "ZM-FIN-036/037 local evidence: 42 unique PostgreSQL cases passed across the 28-case cash-boundary and 14-case complementary runs (29 new cases, 3 adapted concurrency cases, 10 prior cash/FK cases). The final combined runner also passed all 49 cases (29 cash, 9 transient conflicts, 11 inventory). Same-user HTTP authentication may serialize earlier; domain races use separate real transactions. Exact-commit Foundation acceptance accompanies delivery."
     },
@@ -35512,8 +35587,8 @@
     "runtime_only": [],
     "tracked_only": [],
     "operation_id_drift": [],
-    "runtime_sha256_canonical_json": "b3ba085429609e6ca11518803f0c1ca796721d561068cb04506ee02943318622",
-    "tracked_sha256_canonical_json": "b3ba085429609e6ca11518803f0c1ca796721d561068cb04506ee02943318622",
+    "runtime_sha256_canonical_json": "b5692bf4cbaddb09bc8a09a457eb7d30cb8c312b3a4380f6e9ac227f8af93b6b",
+    "tracked_sha256_canonical_json": "b5692bf4cbaddb09bc8a09a457eb7d30cb8c312b3a4380f6e9ac227f8af93b6b",
     "schema_drift_suspected": false,
     "classification": "NO_DRIFT_OBSERVED"
   },
@@ -38167,7 +38242,7 @@
     "policy_source": "apps/api/src/zeromerma_api/presentation/access_policy.py#ENDPOINT_POLICIES",
     "domain_scope_source": "apps/api/src/zeromerma_api/db/access_scope.py#bind_authorization_scope",
     "identity_tests": "27 unique administrative/lifecycle tests passed locally, including explicit assignment grant/revoke with previous/current audit; dedicated approval UI remains077.",
-    "release_readiness": "Not asserted. ZM-FIN-033 through ZM-FIN-035 adopts DEC-07 for 23 assigned economic commands and nine read-only recovery routes. ZM-FIN-036 through ZM-FIN-038 verifies the common cash admission and inventory mutation boundaries, without completing order-payment ledger integration ZM-FIN-042 or declaring the data-integrity gate complete. The 19 administrative idempotency gaps assigned to ZM-FIN-077, ZM-FIN-080 and ZM-FIN-085 remain open, together with later transaction/workflow gaps (including product availability ZM-FIN-068), financial/physical ledger, reconciliation, worker, functional, deployment and product UI gaps, including purchase PATCH GAP-0991. ZM-FIN-039 verifies explicit ownership and failure cleanup locally; it does not complete those later gaps or product readiness.",
+    "release_readiness": "Not asserted. ZM-FIN-033 through ZM-FIN-035 adopts DEC-07 for 23 assigned economic commands and nine read-only recovery routes. ZM-FIN-036 through ZM-FIN-038 verifies the common cash admission and inventory mutation boundaries, without declaring the data-integrity gate complete. ZM-FIN-042 now implements order-payment ledger adoption; its validation and remaining boundaries are recorded separately. The 19 administrative idempotency gaps assigned to ZM-FIN-077, ZM-FIN-080 and ZM-FIN-085 remain open, together with later transaction/workflow gaps (including product availability ZM-FIN-068), financial/physical ledger, reconciliation, worker, functional, deployment and product UI gaps, including purchase PATCH GAP-0991. ZM-FIN-039 verifies explicit ownership and failure cleanup locally; it does not complete those later gaps or product readiness.",
     "policy_count_context": "The 228 policies record the historical ZM-FIN-015 through ZM-FIN-022 authorization acceptance, not the current endpoint count; current inventory is described by api_operations and openapi_comparison."
   },
   "transaction_boundary_evidence": {
@@ -38287,5 +38362,44 @@
       "mypy_source_files": 356,
       "runtime_security_tests": 51
     }
+  },
+  "order_financial_evidence": {
+    "task": "ZM-FIN-042",
+    "state": "IMPLEMENTED_LOCALLY_VALIDATED",
+    "validation_record": "docs/implementation/order-cash-flow-validation.md",
+    "scope": "Actual order advances, settlements and eligible cancellation refunds persist one immutable operation and confirmed actual-method entry per payment, atomically with the existing command. POS close and Backoffice cash projections consume confirmed entries once using their actual cash session and workstation.",
+    "producer_tests": "apps/api/tests/test_order_financial_entries.py",
+    "consumer_tests": "apps/api/tests/test_order_cash_flow.py",
+    "browser_evidence": {
+      "foundation_run_id": "1ede7b51110f4634a9c02947a93fff2c",
+      "isolated_runtime_run_id": "635505573ab04f66a7ee5b0cc11247d9",
+      "pos_passed": 8,
+      "backoffice_passed": 11,
+      "failed": 0,
+      "coverage": "Lost-response recovery, single cash delta, cash-only variance, actual-turn cut and flow-to-cut-to-order financial references."
+    },
+    "local_postgresql_evidence": {
+      "regression_run_id": "44e6b3bb4c96484a950a772421eb1dc2",
+      "regression_passed": 145,
+      "regression_failed": 1,
+      "regression_failure": "New read-scope test omitted mutation=False; fixed and revalidated in the complete consumer file.",
+      "producer_final_run_id": "91625e9824c344808d2d3332a8921ae6",
+      "producer_final_passed": 17,
+      "no_session_run_id": "21348bcc84b8427880e3312e933b9893",
+      "no_session_passed": 3,
+      "consumer_final_run_id": "c3081e3558334586a64809282f125082",
+      "consumer_final_passed": 13,
+      "distinct_passing_cases": 150,
+      "immutable_acceptance": "All eight Foundation stages and Foundation required must pass for the delivered SHA; exact run accompanies delivery."
+    },
+    "boundaries": [
+      "No migration, historical backfill or second CashMovement write",
+      "Existing 030 command acknowledgement and recovery snapshot remain unchanged",
+      "CASH affects drawer; CARD is operator external accounting recording, not provider capture or bank settlement",
+      "MIXED is represented by real CASH and CARD payment legs",
+      "No adoption of sale/return/operational producers assigned to 043-047",
+      "Existing cancellation eligibility and original-method split remain; full refund policy is 044 and provider flow is 046",
+      "Full order product workflows 058/078 and release readiness remain open"
+    ]
   }
 }

@@ -1,4 +1,5 @@
 import { AdminEmptyState } from "../../components/AdminEmptyState";
+import { formatOrderPaymentType, recordedCardExplanation } from "../../orders/payment-labels";
 import type {
   AdminCashCutDetail,
   AdminCashCutListItem,
@@ -151,7 +152,7 @@ export function AdminCashCutDetailPanel({
   onCopyFolio,
   selectedCashCut,
 }: AdminCashCutDetailPanelProps) {
-  if (!selectedCashCut) {
+  if (!selectedCashCut && !detail && !isLoading && !errorMessage) {
     return (
       <aside className="flex min-h-0 min-w-0 flex-col overflow-hidden rounded-[20px] border border-[var(--ui-color-border)] bg-white">
         <div className="border-b border-[var(--ui-color-border)] px-4 py-3">
@@ -178,7 +179,7 @@ export function AdminCashCutDetailPanel({
             Detalle
           </p>
           <h3 className="mt-1 truncate text-lg font-semibold text-slate-950">
-            {selectedCashCut.folio}
+            {selectedCashCut?.folio ?? "Corte solicitado"}
           </h3>
         </div>
         <div className="min-h-0 flex-1 p-4">
@@ -199,7 +200,7 @@ export function AdminCashCutDetailPanel({
             Detalle
           </p>
           <h3 className="mt-1 truncate text-lg font-semibold text-slate-950">
-            {selectedCashCut.folio}
+            {selectedCashCut?.folio ?? "Corte solicitado"}
           </h3>
         </div>
         <div className="min-h-0 flex-1 p-4">
@@ -277,6 +278,18 @@ export function AdminCashCutDetailPanel({
           <div className="mt-3 grid gap-2 rounded-[16px] border border-[var(--ui-color-border)] bg-white p-3">
             <FieldRow label="Monto inicial" value={formatMoney(difference.openingAmount)} />
             <FieldRow label="Ventas efectivo" value={formatMoney(difference.cashSalesAmount)} />
+            <FieldRow
+              label="Cobros pedidos"
+              value={formatMoney(difference.cashOrderCollectionsAmount)}
+            />
+            <FieldRow
+              label="Reemb. pedidos"
+              value={formatMoney(difference.cashOrderRefundsAmount)}
+            />
+            <FieldRow
+              label="Comp. pedidos"
+              value={formatMoney(difference.cashOrderTechnicalReversalAmount)}
+            />
             <FieldRow label="Devoluciones" value={formatMoney(difference.cashRefundsAmount)} />
             <FieldRow
               label="Pagos op."
@@ -298,7 +311,8 @@ export function AdminCashCutDetailPanel({
         </section>
 
         <section className="mt-3 rounded-[18px] border border-[var(--ui-color-border)] bg-white p-3">
-          <SectionTitle count={detail.paymentBreakdown.length} title="Metodos de pago" />
+          <SectionTitle count={detail.paymentBreakdown.length} title="Métodos de pago" />
+          <p className="mt-2 text-xs text-slate-600">{recordedCardExplanation}</p>
           <div className="mt-3 grid gap-1.5">
             {detail.paymentBreakdown.map((row) => (
               <div
@@ -323,8 +337,51 @@ export function AdminCashCutDetailPanel({
                   Var. {formatMoney(row.varianceAmount)}
                 </span>
                 <span className="text-right text-xs text-slate-500">{row.currencyCode}</span>
+                <div className="col-span-4 grid gap-1 border-t border-slate-200 pt-2">
+                  <FieldRow label="Anticipos" value={formatMoney(row.orderAdvanceAmount)} />
+                  <FieldRow label="Liquidaciones" value={formatMoney(row.orderSettlementAmount)} />
+                  <FieldRow label="Reemb. pedidos" value={formatMoney(row.orderRefundAmount)} />
+                  <FieldRow
+                    label="Comp. pedidos"
+                    value={formatMoney(row.orderTechnicalReversalAmount)}
+                  />
+                </div>
               </div>
             ))}
+          </div>
+        </section>
+
+        <section className="mt-3 rounded-[18px] border border-[var(--ui-color-border)] bg-white p-3">
+          <SectionTitle count={detail.orderPayments.length} title="Movimientos de pedidos" />
+          <div className="mt-3 grid gap-2">
+            {detail.orderPayments.map((payment) => (
+              <div
+                key={payment.financial_entry_id}
+                className="rounded-xl border border-slate-200 p-3 text-sm"
+              >
+                <a className="font-semibold underline" href={payment.route_hint}>
+                  {payment.order_folio}
+                </a>
+                <p>
+                  {formatOrderPaymentType(payment.payment_type)} · {payment.payment_method_code} ·{" "}
+                  {payment.direction === "IN" ? "Entrada" : "Salida"}
+                </p>
+                <p className="font-semibold">{formatMoney(String(payment.amount))}</p>
+                <p className="text-xs text-slate-600">
+                  {payment.operator_name} · {formatDateTime(payment.occurred_at)}
+                </p>
+                <details className="mt-2 text-xs text-slate-600">
+                  <summary>Referencias del movimiento</summary>
+                  <p className="break-all">Pago: {payment.order_payment_id}</p>
+                  <p className="break-all">Operación: {payment.financial_operation_id}</p>
+                  <p className="break-all">Asiento: {payment.financial_entry_id}</p>
+                  <p className="break-all">Turno: {payment.cash_session_id}</p>
+                </details>
+              </div>
+            ))}
+            {detail.orderPayments.length === 0 ? (
+              <p className="text-sm text-slate-600">Este corte no tiene movimientos de pedidos.</p>
+            ) : null}
           </div>
         </section>
 

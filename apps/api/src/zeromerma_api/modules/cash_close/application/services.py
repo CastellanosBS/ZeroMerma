@@ -141,6 +141,10 @@ from zeromerma_api.modules.operations.infrastructure.models import (
     OperationDocument,
     OperationDocumentLine,
 )
+from zeromerma_api.modules.orders.application.financial_queries import (
+    order_cash_amounts,
+    read_order_financial_entries,
+)
 from zeromerma_api.modules.outbox.application.service import OutboxWriter
 from zeromerma_api.modules.returns.domain.constants import (
     RETURN_DISPOSITION_RESTOCK_COUNTER,
@@ -193,6 +197,9 @@ class CashCloseFinancialSummary:
     currency_code: str
     total_cash_in: Decimal
     total_cash_out: Decimal
+    cash_order_collections_amount: Decimal
+    cash_order_refunds_amount: Decimal
+    cash_order_technical_reversal_amount: Decimal
     expected_cash_amount: Decimal
     movement_breakdown: list[CashCloseMovementBreakdownView]
 
@@ -449,6 +456,9 @@ class CashCloseQueryService:
             opening_amount=active_cash_session.opening_amount,
             total_cash_in=financial_summary.total_cash_in,
             total_cash_out=financial_summary.total_cash_out,
+            cash_order_collections_amount=financial_summary.cash_order_collections_amount,
+            cash_order_refunds_amount=financial_summary.cash_order_refunds_amount,
+            cash_order_technical_reversal_amount=financial_summary.cash_order_technical_reversal_amount,
             expected_cash_amount=financial_summary.expected_cash_amount,
             movement_breakdown=financial_summary.movement_breakdown,
             blockers=blockers,
@@ -544,6 +554,11 @@ class CashCloseQueryService:
             opening_amount=prepared.active_cash_session.opening_amount,
             total_cash_in=prepared.financial_summary.total_cash_in,
             total_cash_out=prepared.financial_summary.total_cash_out,
+            cash_order_collections_amount=prepared.financial_summary.cash_order_collections_amount,
+            cash_order_refunds_amount=prepared.financial_summary.cash_order_refunds_amount,
+            cash_order_technical_reversal_amount=(
+                prepared.financial_summary.cash_order_technical_reversal_amount
+            ),
             expected_cash_amount=prepared.financial_summary.expected_cash_amount,
             counted_cash_amount=prepared.counted_cash_amount,
             cash_variance_amount=prepared.cash_variance_amount,
@@ -782,6 +797,11 @@ class CashCloseQueryService:
             ),
         )
 
+        financial_summary = _get_financial_summary(
+            session,
+            cash_session_id=close_record.cash_session_id,
+            opening_amount=close_record.opening_amount,
+        )
         return CashCloseDetailResponse(
             id=close_record.id,
             cash_session=cash_session_view,
@@ -813,6 +833,9 @@ class CashCloseQueryService:
             opening_amount=close_record.opening_amount,
             total_cash_in=close_record.total_cash_in,
             total_cash_out=close_record.total_cash_out,
+            cash_order_collections_amount=financial_summary.cash_order_collections_amount,
+            cash_order_refunds_amount=financial_summary.cash_order_refunds_amount,
+            cash_order_technical_reversal_amount=financial_summary.cash_order_technical_reversal_amount,
             expected_cash_amount=close_record.expected_cash_amount,
             counted_cash_amount=close_record.counted_cash_amount,
             cash_variance_amount=close_record.cash_variance_amount,
@@ -820,11 +843,7 @@ class CashCloseQueryService:
                 payment_method_rows,
                 expected_cash_amount=close_record.expected_cash_amount,
             ),
-            movement_breakdown=_get_financial_summary(
-                session,
-                cash_session_id=close_record.cash_session_id,
-                opening_amount=close_record.opening_amount,
-            ).movement_breakdown,
+            movement_breakdown=financial_summary.movement_breakdown,
             pending_class_capture=pending_summary,
             reconciliation_status=close_record.reconciliation_status,
             counted_product_lines=[
@@ -1570,10 +1589,34 @@ def _get_financial_summary(
         elif record["direction"] == CASH_MOVEMENT_DIRECTION_OUT:
             total_cash_out += amount
 
+    order_entries = read_order_financial_entries(session, cash_session_ids=(cash_session_id,))
+    order_amounts = order_cash_amounts(order_entries)
+    order_breakdown: dict[tuple[str, str, str], tuple[int, Decimal]] = {}
+    for entry in order_entries:
+        if entry.payment_method_code != "CASH":
+            continue
+        key = (entry.operation_kind, entry.direction, entry.currency_code)
+        count, amount = order_breakdown.get(key, (0, ZERO_MONEY))
+        order_breakdown[key] = count + 1, amount + entry.amount
+    for (kind, direction, currency), (count, amount) in sorted(order_breakdown.items()):
+        movement_breakdown.append(
+            CashCloseMovementBreakdownView(
+                movement_type=kind,
+                direction=direction,
+                currency_code=currency,
+                movement_count=count,
+                total_amount=_quantize_money(amount),
+            )
+        )
+    total_cash_in += order_amounts["total_cash_in"]
+    total_cash_out += order_amounts["total_cash_out"]
     return CashCloseFinancialSummary(
         currency_code=currency_code,
         total_cash_in=_quantize_money(total_cash_in),
         total_cash_out=_quantize_money(total_cash_out),
+        cash_order_collections_amount=order_amounts["cash_order_collections_amount"],
+        cash_order_refunds_amount=order_amounts["cash_order_refunds_amount"],
+        cash_order_technical_reversal_amount=order_amounts["cash_order_technical_reversal_amount"],
         expected_cash_amount=_quantize_money(opening_amount + total_cash_in - total_cash_out),
         movement_breakdown=movement_breakdown,
     )

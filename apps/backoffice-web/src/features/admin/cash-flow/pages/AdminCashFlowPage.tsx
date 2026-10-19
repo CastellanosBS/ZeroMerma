@@ -57,6 +57,9 @@ const emptyCashFlowList: AdminCashFlowListResponse = {
   page: 1,
   pageSize: 25,
   summary: {
+    orderCollectionsTotal: "0.00",
+    orderRefundsTotal: "0.00",
+    orderTechnicalReversalTotal: "0.00",
     cardTotal: "0.00",
     cashTotal: "0.00",
     differenceTotal: "0.00",
@@ -95,6 +98,18 @@ function CashFlowMetricStrip({
     { label: "Flujo neto", value: loadingValue ?? formatMoney(summary.netTotal) },
     { label: "Efectivo", value: loadingValue ?? formatMoney(summary.cashTotal) },
     { label: "Tarjeta", value: loadingValue ?? formatMoney(summary.cardTotal) },
+    {
+      label: "Cobros de pedidos",
+      value: loadingValue ?? formatMoney(summary.orderCollectionsTotal),
+    },
+    {
+      label: "Reembolsos de pedidos",
+      value: loadingValue ?? formatMoney(summary.orderRefundsTotal),
+    },
+    {
+      label: "Compensaciones de pedidos",
+      value: loadingValue ?? formatMoney(summary.orderTechnicalReversalTotal),
+    },
     {
       label: "Pagos op.",
       value: loadingValue ?? formatMoney(summary.operationalPaymentsTotal),
