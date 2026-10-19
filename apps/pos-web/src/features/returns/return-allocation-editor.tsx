@@ -1,6 +1,6 @@
 import type { ReturnProductOptionView } from "../../lib/api-contracts";
 import { sanitizeQuantityInput } from "../pos-terminal/model";
-import type { ReturnAllocationDraft, ReturnDraftLine } from "./model";
+import type { ReturnAllocationDraft, ReturnAllocationUpdater, ReturnDraftLine } from "./model";
 
 const dispositions: { value: ReturnAllocationDraft["disposition_code"]; label: string }[] = [
   { value: "QUARANTINE", label: "Cuarentena: pendiente de inspección" },
@@ -17,7 +17,7 @@ export function ReturnAllocationEditor({
 }: {
   line: ReturnDraftLine;
   products: ReturnProductOptionView[];
-  onChange: (allocations: ReturnAllocationDraft[]) => void;
+  onChange: (updater: ReturnAllocationUpdater) => void;
 }) {
   const productOptions = new Map(products.map((product) => [product.id, product.name]));
   line.physicalOptions.forEach((option) =>
@@ -28,8 +28,8 @@ export function ReturnAllocationEditor({
       productOptions.set(allocation.exact_product_id, line.fixedProductName ?? line.lineName);
   });
   function update(key: string, patch: Partial<ReturnAllocationDraft>) {
-    onChange(
-      line.allocations.map((allocation) =>
+    onChange((current) =>
+      current.map((allocation) =>
         allocation.key === key ? { ...allocation, ...patch } : allocation,
       ),
     );
@@ -157,7 +157,11 @@ export function ReturnAllocationEditor({
                 type="button"
                 className="min-h-9 text-left text-red-700"
                 onClick={() =>
-                  onChange(line.allocations.filter((item) => item.key !== allocation.key))
+                  onChange((current) =>
+                    current.length > 1
+                      ? current.filter((item) => item.key !== allocation.key)
+                      : current,
+                  )
                 }
               >
                 Quitar disposición {index + 1}
@@ -169,19 +173,25 @@ export function ReturnAllocationEditor({
       <button
         type="button"
         className="min-h-10 rounded border px-2 text-sm"
-        onClick={() =>
-          onChange([
-            ...line.allocations,
-            {
-              key: crypto.randomUUID(),
-              exact_product_id: line.allocations[0]?.exact_product_id ?? "",
-              quantityText: "",
-              disposition_code: "QUARANTINE",
-              lot_id: null,
-              restock_safe_acknowledged: false,
-            },
-          ])
-        }
+        onClick={() => {
+          const key = crypto.randomUUID();
+          const anchorKey = line.allocations[0]?.key;
+          onChange((current) => {
+            // A delayed sidebar event must not edit a removed/recreated draft.
+            if (!current.some((allocation) => allocation.key === anchorKey)) return current;
+            return [
+              ...current,
+              {
+                key,
+                exact_product_id: current[0]?.exact_product_id ?? "",
+                quantityText: "",
+                disposition_code: "QUARANTINE",
+                lot_id: null,
+                restock_safe_acknowledged: false,
+              },
+            ];
+          });
+        }}
       >
         Dividir destino físico
       </button>

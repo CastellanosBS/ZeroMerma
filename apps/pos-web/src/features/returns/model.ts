@@ -17,6 +17,7 @@ export type ReturnAllocationDraft = Omit<
   components["schemas"]["ReturnDispositionAllocationRequest"],
   "quantity"
 > & { key: string; quantityText: string };
+export type ReturnAllocationUpdater = (current: ReturnAllocationDraft[]) => ReturnAllocationDraft[];
 
 export interface ReturnDraftLine {
   alreadyReturnedMilliUnits: number;
@@ -158,10 +159,16 @@ export function decrementReturnDraftLineQuantity(
 export function setReturnDraftLineAllocations(
   lines: ReturnDraftLine[],
   originalSaleLineId: string,
-  allocations: ReturnAllocationDraft[],
+  allocations: ReturnAllocationDraft[] | ReturnAllocationUpdater,
 ): ReturnDraftLine[] {
   return lines.map((line) =>
-    line.originalSaleLineId === originalSaleLineId ? { ...line, allocations } : line,
+    line.originalSaleLineId === originalSaleLineId
+      ? {
+          ...line,
+          allocations:
+            typeof allocations === "function" ? allocations(line.allocations) : allocations,
+        }
+      : line,
   );
 }
 

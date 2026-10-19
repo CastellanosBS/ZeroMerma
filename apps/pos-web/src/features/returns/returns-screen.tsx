@@ -64,7 +64,7 @@ import {
   decrementReturnDraftLineQuantity,
   setReturnDraftLineAllocations,
   getReturnAllocationError,
-  type ReturnAllocationDraft,
+  type ReturnAllocationUpdater,
   setReturnDraftLineQuantityText,
   type ReturnDraftLine,
   type ReturnDraftState,
@@ -551,7 +551,7 @@ function ReturnSummaryPanel({
   highRiskMessages: string[];
   isHighRiskAcknowledgementRequired: boolean;
   onCommit: () => void;
-  onAllocationsChangeSelectedLine: (value: ReturnAllocationDraft[]) => void;
+  onAllocationsChangeSelectedLine: (value: ReturnAllocationUpdater) => void;
   onHighRiskAcknowledgedChange: (value: boolean) => void;
   onNotesChange: (value: string) => void;
   onReasonChange: (value: string) => void;

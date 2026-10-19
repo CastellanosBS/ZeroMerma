@@ -11,6 +11,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { KeyboardShortcutRegistry } from "../pos-shell/keyboard";
 import { ReturnsScreen } from "./returns-screen";
+import { ReturnAllocationEditor } from "./return-allocation-editor";
+import { addReturnDraftLine, setReturnDraftLineAllocations } from "./model";
 
 (
   globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }
@@ -22,6 +24,8 @@ const showSuccessMock = vi.fn();
 const navigateMock = vi.fn();
 const commitSaleReturnMock = vi.fn();
 let publishRightPanel: ((node: React.ReactNode) => void) | null = null;
+let deferRightPanelPublication = false;
+let pendingRightPanelNode: React.ReactNode = null;
 
 let routerSearch: Record<string, unknown> = {};
 let returnDetailUnavailable = false;
@@ -398,8 +402,11 @@ vi.mock("@tanstack/react-router", () => ({
 vi.mock("../../components/app-shell-right-panel", () => ({
   useAppShellRightPanel: (content: React.ReactNode) => {
     React.useEffect(() => {
-      publishRightPanel?.(content);
-      return () => publishRightPanel?.(null);
+      pendingRightPanelNode = content;
+      if (!deferRightPanelPublication) publishRightPanel?.(content);
+      return () => {
+        if (!deferRightPanelPublication) publishRightPanel?.(null);
+      };
     }, [content]);
   },
 }));
@@ -630,6 +637,8 @@ function setSelectValue(select: HTMLSelectElement, value: string) {
 let mountedRoots: Array<() => void> = [];
 
 beforeEach(() => {
+  deferRightPanelPublication = false;
+  pendingRightPanelNode = null;
   returnDetailUnavailable = false;
   localStorage.clear();
   returnIntentions.forgetBodies();
@@ -879,6 +888,121 @@ async function prepareReturn() {
       )!,
   };
 }
+it("preserves a new disposition when the published sidebar still renders the previous draft", async () => {
+  const { view } = await prepareReturn();
+  const editor = () =>
+    view.container.querySelector<HTMLElement>('[aria-label="Disposiciones de Bolillo"]')!;
+  const quantity = (index: number) =>
+    [...editor().querySelectorAll("label")]
+      .find((label) => label.textContent?.trim() === `Cantidad de disposición ${index}`)
+      ?.querySelector<HTMLInputElement>("input");
+  const split = [...editor().querySelectorAll("button")].find(
+    (button) => button.textContent?.trim() === "Dividir destino físico",
+  )!;
+
+  // The shell publishes sidebar nodes in a passive effect; the old input can
+  // receive another event before that publication reaches the mounted panel.
+  deferRightPanelPublication = true;
+  act(() => split.click());
+  await flush();
+  setInputValue(quantity(1)!, "0.4");
+  await flush();
+  act(() => {
+    deferRightPanelPublication = false;
+    publishRightPanel?.(pendingRightPanelNode);
+  });
+  await flush();
+
+  expect(quantity(2)).toBeDefined();
+  expect(quantity(1)?.value).toBe("0.4");
+  setInputValue(quantity(2)!, "0.6");
+  setSelectValue(
+    editor().querySelector<HTMLSelectElement>('[aria-label="Destino de disposición 2"]')!,
+    "SEND_TO_WASTE",
+  );
+  await flush();
+  const commit = [...view.container.querySelectorAll("button")].find((button) =>
+    button.textContent?.includes("Confirmar devolucion"),
+  )!;
+  expect(commit.disabled).toBe(false);
+  await act(async () => {
+    commit.click();
+    await vi.waitFor(() => expect(commitSaleReturnMock).toHaveBeenCalledTimes(1));
+  });
+  expect(commitSaleReturnMock).toHaveBeenCalledWith(
+    expect.objectContaining({
+      payload: expect.objectContaining({
+        lines: [
+          expect.objectContaining({
+            returned_quantity: "1",
+            allocations: [
+              expect.objectContaining({ quantity: "0.4", disposition_code: "QUARANTINE" }),
+              expect.objectContaining({ quantity: "0.6", disposition_code: "SEND_TO_WASTE" }),
+            ],
+          }),
+        ],
+      }),
+    }),
+  );
+});
+it.each(["removed", "recreated", "other-sale"] as const)(
+  "ignores obsolete allocation events after the draft is %s",
+  async (replacement) => {
+    const original = saleDetailsById["sale-other"].lines[0];
+    const previous = addReturnDraftLine([], original)[0]!;
+    previous.allocations.push({ ...previous.allocations[0]!, key: "old-second" });
+    let current = [previous];
+    const view = renderUi(
+      <ReturnAllocationEditor
+        line={previous}
+        products={[]}
+        onChange={(updater) => {
+          current = setReturnDraftLineAllocations(current, previous.originalSaleLineId, updater);
+        }}
+      />,
+    );
+    mountedRoots.push(view.unmount);
+    current =
+      replacement === "removed"
+        ? []
+        : addReturnDraftLine([], {
+            ...original,
+            id: replacement === "other-sale" ? "other-sale-line" : original.id,
+          });
+    const before = structuredClone(current);
+    const input = view.container.querySelector<HTMLInputElement>('input[inputmode="decimal"]')!;
+    setInputValue(input, "0.4");
+    for (const label of ["Dividir destino físico", "Quitar disposición 1"]) {
+      const button = [...view.container.querySelectorAll("button")].find(
+        (item) => item.textContent?.trim() === label,
+      )!;
+      act(() => button.click());
+    }
+    expect(current).toEqual(before);
+  },
+);
+it("keeps the final disposition when two remove events use an old sidebar", () => {
+  const previous = addReturnDraftLine([], saleDetailsById["sale-other"].lines[0])[0]!;
+  previous.allocations.push({ ...previous.allocations[0]!, key: "second" });
+  let current = [previous];
+  const view = renderUi(
+    <ReturnAllocationEditor
+      line={previous}
+      products={[]}
+      onChange={(updater) => {
+        current = setReturnDraftLineAllocations(current, previous.originalSaleLineId, updater);
+      }}
+    />,
+  );
+  mountedRoots.push(view.unmount);
+  for (const label of ["Quitar disposición 2", "Quitar disposición 1"]) {
+    const button = [...view.container.querySelectorAll("button")].find(
+      (item) => item.textContent?.trim() === label,
+    )!;
+    act(() => button.click());
+  }
+  expect(current[0]!.allocations).toEqual([previous.allocations[0]!]);
+});
 it("preserves quantity and reason after a deterministic rejection so the operator can correct the refund", async () => {
   commitSaleReturnMock.mockRejectedValueOnce(
     new ApiError(400, "Correct the reason", {
