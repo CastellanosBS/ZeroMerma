@@ -11,6 +11,8 @@ from fastapi.responses import JSONResponse
 from pydantic import BaseModel, ConfigDict
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
+from zeromerma_api.db.concurrency import CommandConcurrencyConflict
+
 logger = logging.getLogger(__name__)
 
 ERROR_CODE_BY_STATUS = {
@@ -181,6 +183,19 @@ async def unhandled_exception_handler(request: Request, exc: Exception) -> JSONR
     )
 
 
+async def concurrency_exception_handler(request: Request, exc: Exception) -> JSONResponse:
+    if not isinstance(exc, CommandConcurrencyConflict):
+        raise TypeError("Concurrency handler received an incompatible exception")
+    return _response(
+        status_code=409,
+        request=request,
+        code=exc.code,
+        message=exc.message,
+        details={"retryable": True},
+        headers={"Cache-Control": "no-store", "Retry-After": "1"},
+    )
+
+
 def error_responses() -> dict[int | str, dict[str, Any]]:
     return {
         status_code: {
@@ -192,6 +207,7 @@ def error_responses() -> dict[int | str, dict[str, Any]]:
 
 
 def install_error_handlers(app: FastAPI) -> None:
+    app.add_exception_handler(CommandConcurrencyConflict, concurrency_exception_handler)
     app.add_exception_handler(StarletteHTTPException, http_exception_handler)
     app.add_exception_handler(RequestValidationError, validation_exception_handler)
     app.add_exception_handler(Exception, unhandled_exception_handler)

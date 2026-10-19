@@ -64,6 +64,7 @@ from zeromerma_api.modules.sales.infrastructure.models import (
 )
 from zeromerma_api.testing.idempotency import new_idempotency_key
 from zeromerma_api.testing.sessions import login_headers
+from zeromerma_api.testing.transfer_operators import transfer_cashier_email
 
 ENDPOINT = "/v1/sales/confirm"
 
@@ -78,16 +79,24 @@ def _login(client: TestClient, workstation: str = SEED_WORKSTATION_CODE) -> dict
     )
 
 
-def _setup(client: TestClient) -> tuple[dict[str, str], dict[str, Any]]:
-    headers = _login(client)
+def _setup(
+    client: TestClient, workstation: str = SEED_WORKSTATION_CODE
+) -> tuple[dict[str, str], dict[str, Any]]:
+    headers = login_headers(
+        client,
+        email=transfer_cashier_email(workstation),
+        password=SEED_USER_PASSWORD,
+        audience="POS",
+        workstation_code=workstation,
+    )
     opened = client.post(
         "/v1/cash-sessions/open",
         headers={**headers, "Idempotency-Key": new_idempotency_key()},
-        json={"workstation_code": SEED_WORKSTATION_CODE, "opening_amount": "100.00"},
+        json={"workstation_code": workstation, "opening_amount": "100.00"},
     )
     assert opened.status_code == 201
     with SessionLocal() as session:
-        cash_id = session.scalars(select(CashSession.id)).one()
+        cash_id = UUID(opened.json()["id"])
         product_id = session.scalars(
             select(Product.id).where(Product.code == SEED_PRODUCT_COCA_355_CODE)
         ).one()
@@ -95,7 +104,7 @@ def _setup(client: TestClient) -> tuple[dict[str, str], dict[str, Any]]:
             select(ProductClass.id).where(ProductClass.code == SEED_PRODUCT_CLASS_PAN_DULCE_CODE)
         ).one()
     return headers, {
-        "workstation_code": SEED_WORKSTATION_CODE,
+        "workstation_code": workstation,
         "cash_session_id": str(cash_id),
         "lines": [
             {"capture_mode": "CLASS_CAPTURE", "product_class_id": str(class_id), "quantity": "1"},
@@ -516,11 +525,14 @@ def test_concurrent_retries_and_recovery_while_uncommitted_converge(
     assert _counts()["sales"] == _counts()["idempotency_records"] == 1
 
 
-def test_distinct_keys_on_one_cash_session_execute_concurrently(
+def test_distinct_cash_sessions_execute_concurrently(
     client: TestClient, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """The sale/executor layer adds no lock serializing distinct keys on the same cash session."""
-    headers, body = _setup(client)
+    """The boundary is per shift; independent operators and cash sessions do not share it."""
+    contexts = [
+        _setup(client, station)
+        for station in (SEED_WORKSTATION_CODE, SEED_DESTINATION_WORKSTATION_CODE)
+    ]
     barrier = Barrier(2)
     original = OutboxWriter.append
 
@@ -534,7 +546,7 @@ def test_distinct_keys_on_one_cash_session_execute_concurrently(
         patch.setattr(OutboxWriter, "append", meet)
         calls = [
             pool.submit(_domain_confirmation, headers, body, new_idempotency_key())
-            for _ in range(2)
+            for headers, body in contexts
         ]
         results = [call.result(timeout=25) for call in calls]
     assert all(result.status_code == 201 and not result.replayed for result in results)

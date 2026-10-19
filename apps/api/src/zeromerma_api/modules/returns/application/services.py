@@ -25,6 +25,7 @@ from zeromerma_api.modules.branches.application.access import (
 )
 from zeromerma_api.modules.branches.application.schemas import BranchSummary, WorkstationSummary
 from zeromerma_api.modules.branches.infrastructure.models import Branch, Workstation
+from zeromerma_api.modules.cash.application.command_context import lock_cash_session
 from zeromerma_api.modules.cash.application.schemas import CashSessionView
 from zeromerma_api.modules.cash.application.services import CashSessionQueryService
 from zeromerma_api.modules.catalog.domain.constants import (
@@ -891,7 +892,14 @@ class ReturnsCommandService:
         operation_id: uuid.UUID,
         request_id: str | None,
     ) -> ReturnCommitResultView:
-        context, current_open_cash_session = prepared.context, prepared.cash_session
+        context = prepared.context
+        current_open_cash_session = lock_cash_session(
+            session,
+            current_user=current_user,
+            workstation_id=context.workstation_id,
+            branch_id=context.branch_id,
+            cash_session_id=prepared.cash_session.id,
+        )
         # The original sale serializes entitlement and refund budgets across all its lines.
         # Acquire this lock only after the executor has reserved the command identity.
         sale = session.scalar(

@@ -7,7 +7,6 @@ from decimal import Decimal
 
 from pydantic import TypeAdapter
 from sqlalchemy import select
-from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import InstrumentedAttribute, Session
 
 from zeromerma_api.modules.audit.application.service import AuditRecorder
@@ -25,13 +24,16 @@ from zeromerma_api.modules.identity.application.actions import restrict_actions
 from zeromerma_api.modules.identity.application.schemas import AuthenticatedUser
 from zeromerma_api.modules.identity.application.visibility import operational_user_predicate
 from zeromerma_api.modules.identity.infrastructure.models import User
+from zeromerma_api.modules.inventory.application.mutations import (
+    InventoryBalanceKey,
+    LockedInventoryBalances,
+    lock_inventory_balances,
+)
 from zeromerma_api.modules.inventory.domain.constants import (
     INVENTORY_LOCATION_BACKROOM,
-    INVENTORY_MOVEMENT_DIRECTION_IN,
     INVENTORY_MOVEMENT_TYPE_PURCHASE_RECEIPT,
 )
 from zeromerma_api.modules.inventory.infrastructure.models import (
-    InventoryBalance,
     InventoryMovement,
 )
 from zeromerma_api.modules.outbox.application.service import OutboxWriter
@@ -552,6 +554,18 @@ class AdminPurchaseService:
         session.flush()
 
         products = self._products_by_id(session, {line.product_id for line in lines})
+        balances = lock_inventory_balances(
+            session,
+            (
+                InventoryBalanceKey(
+                    branch.id,
+                    lines_by_id[line.purchase_line_id].product_id,
+                    INVENTORY_LOCATION_BACKROOM,
+                )
+                for line in command.lines
+                if line.received_quantity > ZERO
+            ),
+        )
         has_discrepancy = False
         for command_line in sorted(
             command.lines, key=lambda item: str(lines_by_id[item.purchase_line_id].product_id)
@@ -599,7 +613,7 @@ class AdminPurchaseService:
             product = products[purchase_line.product_id]
             if command_line.received_quantity > ZERO:
                 self._apply_receipt_inventory(
-                    session,
+                    balances,
                     branch=branch,
                     current_user=current_user,
                     line=purchase_line,
@@ -615,8 +629,7 @@ class AdminPurchaseService:
                     supplier=supplier,
                     unit_cost=unit_cost,
                 )
-            # A later line may lock and refresh the same balance. Preserve this line's
-            # stock and supplier relation before that read, within the command transaction.
+            # Preserve supplier relation updates before processing another product line.
             session.flush()
 
         receipt.has_discrepancy = has_discrepancy
@@ -644,7 +657,7 @@ class AdminPurchaseService:
 
     def _apply_receipt_inventory(
         self,
-        session: Session,
+        balances: LockedInventoryBalances,
         *,
         branch: Branch,
         current_user: AuthenticatedUser,
@@ -655,65 +668,17 @@ class AdminPurchaseService:
         reason: str | None,
         receipt: PurchaseReceipt,
     ) -> None:
-        balance = self._get_or_create_balance(
-            session,
-            branch_id=branch.id,
-            product_id=product.id,
+        balances.apply_delta(
+            InventoryBalanceKey(branch.id, product.id, INVENTORY_LOCATION_BACKROOM),
+            delta=quantity,
+            movement_type=INVENTORY_MOVEMENT_TYPE_PURCHASE_RECEIPT,
+            notes=notes,
+            operator_user_id=current_user.id,
+            reason=reason or "Supplier receipt",
+            source_document_id=receipt.id,
+            source_document_type=PURCHASE_RECEIPT_SOURCE_DOCUMENT_TYPE,
+            unit_of_measure=line.unit_of_measure,
         )
-        new_quantity = Decimal(balance.quantity_on_hand) + quantity
-        balance.quantity_on_hand = new_quantity
-        session.add(
-            InventoryMovement(
-                balance_after=new_quantity,
-                branch_id=branch.id,
-                direction=INVENTORY_MOVEMENT_DIRECTION_IN,
-                location_code=INVENTORY_LOCATION_BACKROOM,
-                movement_type=INVENTORY_MOVEMENT_TYPE_PURCHASE_RECEIPT,
-                notes=notes,
-                operator_user_id=current_user.id,
-                product_id=product.id,
-                quantity=quantity,
-                reason=reason or "Supplier receipt",
-                source_document_id=receipt.id,
-                source_document_type=PURCHASE_RECEIPT_SOURCE_DOCUMENT_TYPE,
-                unit_of_measure=line.unit_of_measure,
-            )
-        )
-
-    def _get_or_create_balance(
-        self, session: Session, *, branch_id: uuid.UUID, product_id: uuid.UUID
-    ) -> InventoryBalance:
-        query = (
-            select(InventoryBalance)
-            .where(
-                InventoryBalance.branch_id == branch_id,
-                InventoryBalance.product_id == product_id,
-                InventoryBalance.location_code == INVENTORY_LOCATION_BACKROOM,
-            )
-            .with_for_update()
-            .execution_options(populate_existing=True)
-        )
-        balance = session.scalar(query)
-        if balance is not None:
-            return balance
-        try:
-            # Keep ORM branch checks active; a competing first receipt may win this key.
-            with session.begin_nested():
-                balance = InventoryBalance(
-                    branch_id=branch_id,
-                    product_id=product_id,
-                    location_code=INVENTORY_LOCATION_BACKROOM,
-                    quantity_on_hand=ZERO,
-                )
-                session.add(balance)
-                session.flush()
-            return balance
-        except IntegrityError as error:
-            if getattr(getattr(error.orig, "diag", None), "constraint_name", None) != (
-                "uq_inventory_balances_product_branch_location"
-            ):
-                raise
-            return session.scalars(query).one()
 
     def _fetch_rows(
         self,

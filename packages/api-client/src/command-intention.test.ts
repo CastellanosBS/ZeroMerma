@@ -247,6 +247,48 @@ it("coordinates synchronous and independently instantiated clients under the sam
   expect(send).toHaveBeenCalledTimes(1);
 });
 
+it("retries a rolled-back concurrency conflict with its original key and frozen body", async () => {
+  const engine = coordinator();
+  const payload = { amount: "20", customer: "private" };
+  send.mockRejectedValueOnce(
+    new ApiError(409, "Retry the same intention.", {
+      code: "CONCURRENCY_RETRY",
+      message: "Retry the same intention.",
+      details: { retryable: true },
+      field_errors: null,
+      request_id: "conflict",
+    }),
+  );
+  await expect(engine.begin(context, payload, null)).rejects.toThrow("Retry the same intention");
+  const metadata = engine.read("station")!;
+  expect(metadata.status).toBe("UNKNOWN");
+  expect(engine.hasBody(metadata.key)).toBe(true);
+  expect(store.get("test-intent:station")).not.toMatch(/amount|customer|private/);
+  payload.amount = "999";
+  await expect(engine.begin(context, payload, metadata.key)).rejects.toThrow();
+  await engine.retry(context);
+  expect(send).toHaveBeenCalledTimes(2);
+  expect(send.mock.calls[1]!.slice(1)).toEqual(send.mock.calls[0]!.slice(1));
+  expect(engine.read("station")).toMatchObject({ key: metadata.key, status: "CONFIRMED" });
+});
+
+it("still resolves a definitive first-send business conflict as rejected", async () => {
+  const engine = coordinator();
+  send.mockRejectedValueOnce(
+    new ApiError(409, "Insufficient stock.", {
+      code: "CONFLICT",
+      message: "Insufficient stock.",
+      details: null,
+      field_errors: null,
+      request_id: null,
+    }),
+  );
+  await expect(engine.begin(context, { amount: "20", customer: "x" }, null)).rejects.toThrow();
+  const metadata = engine.read("station")!;
+  expect(metadata.status).toBe("REJECTED");
+  expect(engine.hasBody(metadata.key)).toBe(false);
+});
+
 it("resolves a verified durable rejection only during recovery and preserves the original error", async () => {
   const rejection = new Error("durable rejection");
   const predicate = vi.fn((_metadata: Context, error: unknown) => error === rejection);

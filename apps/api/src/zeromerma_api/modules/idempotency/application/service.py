@@ -11,6 +11,12 @@ from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.exc import DBAPIError
 from sqlalchemy.orm import Session
 
+from zeromerma_api.db.concurrency import (
+    CommandConcurrencyConflict,
+    is_retryable_transaction_error,
+    restore_command_lock_timeout,
+    set_command_lock_timeout,
+)
 from zeromerma_api.modules.idempotency.application.canonicalization import (
     canonical_fingerprint,
     parse_idempotency_key,
@@ -71,10 +77,15 @@ class IdempotencyExecutor:
     removes service-owned commits explicitly; it does not wrap unchanged committing services.
     """
 
-    def __init__(self, *, lock_timeout_ms: int = 1000) -> None:
+    def __init__(
+        self, *, lock_timeout_ms: int = 1000, command_lock_timeout_ms: int = 5000
+    ) -> None:
         if not 1 <= lock_timeout_ms <= 60000:
             raise ValueError("The key contention timeout must be between 1 and 60000 milliseconds.")
         self.lock_timeout_ms = lock_timeout_ms
+        if not 1 <= command_lock_timeout_ms <= 60000:
+            raise ValueError("The command lock timeout must be between 1 and 60000 milliseconds.")
+        self.command_lock_timeout_ms = command_lock_timeout_ms
 
     def recover(
         self,
@@ -93,6 +104,7 @@ class IdempotencyExecutor:
         owner = CommandExecution(session.get_transaction() or session.begin())
         try:
             with command_execution(session, owner):
+                previous_timeout = set_command_lock_timeout(session, self.command_lock_timeout_ms)
                 record = _lookup(session, parsed_key)
                 if record is None:
                     # A concurrent, uncommitted admission is indistinguishable from absence.
@@ -120,10 +132,13 @@ class IdempotencyExecutor:
                 result = self._replay(session, record, response_policy)
                 self._assert_transaction(session, owner)
                 owner.finalizing = True
+                restore_command_lock_timeout(session, previous_timeout)
                 session.commit()
                 return result
-        except BaseException:
+        except BaseException as error:
             session.rollback()
+            if is_retryable_transaction_error(error):
+                raise CommandConcurrencyConflict() from error
             raise
 
     def execute(
@@ -147,6 +162,7 @@ class IdempotencyExecutor:
         owner = CommandExecution(transaction)
         try:
             with command_execution(session, owner):
+                previous_timeout = set_command_lock_timeout(session, self.command_lock_timeout_ms)
                 record = _lookup(session, parsed_key)
                 context = resolve_context(session, _saved_context(record) if record else None)
                 self._assert_transaction(session, owner)
@@ -182,6 +198,7 @@ class IdempotencyExecutor:
                     result = self._replay(session, record, response_policy)
                     self._assert_transaction(session, owner)
                     owner.finalizing = True
+                    restore_command_lock_timeout(session, previous_timeout)
                     session.commit()
                     return result
 
@@ -206,10 +223,13 @@ class IdempotencyExecutor:
                 self._complete(record, outcome, response_policy, rejection)
                 result = self._result(record, record.response_payload, replayed=False)
                 owner.finalizing = True
+                restore_command_lock_timeout(session, previous_timeout)
                 session.commit()
                 return result
-        except BaseException:
+        except BaseException as error:
             session.rollback()
+            if is_retryable_transaction_error(error):
+                raise CommandConcurrencyConflict() from error
             raise
 
     @staticmethod

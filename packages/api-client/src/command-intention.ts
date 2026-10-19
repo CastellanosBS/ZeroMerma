@@ -121,11 +121,18 @@ export function createCommandIntentionCoordinator<C extends object, P, R>(option
     recoveredRejection = false,
   ) {
     const code = error instanceof ApiError ? error.error?.code : null;
+    const details = error instanceof ApiError ? error.error?.details : null;
+    const retryable =
+      details !== null &&
+      typeof details === "object" &&
+      !Array.isArray(details) &&
+      details.retryable === true;
     const rejected =
       recoveredRejection ||
       (firstKnownSend &&
         error instanceof ApiError &&
         error.error !== null &&
+        !retryable &&
         [400, 404, 409, 422].includes(error.statusCode) &&
         !code?.startsWith("IDEMPOTENCY_"));
     write({

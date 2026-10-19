@@ -18280,7 +18280,7 @@
         "outbox_events",
         "idempotency_records"
       ],
-      "locks_or_concurrency_control": "Fresh inventory-balance row lock serializes the existing adjustment and its movement with the saved command result.",
+      "locks_or_concurrency_control": "Shared lock_inventory_balances deduplicates the complete write set and locks fresh rows in branch/product/location order; missing rows use an ORM savepoint insert and recover only the known balance uniqueness violation. A transaction-local handle accumulates repeated deltas without refreshing pending changes, and persists each movement with its balance change. The single selected balance retains the existing explicit negative-adjustment behavior.",
       "audit_required": true,
       "audit_actual": "ATOMIC",
       "audit_atomicity": "ATOMIC",
@@ -18306,7 +18306,8 @@
         "NONE"
       ],
       "direct_tests": [
-        "apps/api/tests/test_operational_idempotency.py"
+        "apps/api/tests/test_operational_idempotency.py",
+        "apps/api/tests/test_inventory_concurrency.py"
       ],
       "indirect_tests": [
         "apps/api/tests/conftest.py",
@@ -18342,9 +18343,12 @@
         "apps/api/src/zeromerma_api/modules/idempotency/application/service.py#class IdempotencyExecutor",
         "apps/backoffice-web/src/features/admin/inventory/api.ts",
         "apps/backoffice-web/src/features/admin/physical-commands/physical-command-intent.ts",
-        "docs/implementation/operations-idempotency-validation.md"
+        "docs/implementation/operations-idempotency-validation.md",
+        "apps/api/src/zeromerma_api/modules/inventory/application/mutations.py",
+        "docs/architecture/concurrency.md",
+        "docs/implementation/concurrency-validation.md"
       ],
-      "verification_notes": "Local API evidence: the 51-case physical-command run produced 49 passes and two failed audit-count expectations. The two destination-authorization regressions passed in a separate rerun after a test-only correction requiring the two authorization.denied records and no new domain/outbox effects; runtime was unchanged. All 51 unique cases are covered by these split runs. This does not assert real-browser or exact-commit hosted CI acceptance."
+      "verification_notes": "ZM-FIN-038 local evidence: 11 dedicated inventory concurrency tests passed and were repeated in the final combined 49-test runner; all 124 tests across the eight existing writer/idempotency suites passed. Authorization guards, repeated-product receipt lines and existing physical boundaries are preserved. This does not close later ledger, reservation or full product-workflow gaps; exact-commit Foundation acceptance accompanies delivery."
     },
     {
       "operation_key": "API:GET:/v1/admin/inventory/adjustments/confirmations/{idempotency_key}",
@@ -19293,7 +19297,7 @@
         "outbox_events",
         "idempotency_records"
       ],
-      "locks_or_concurrency_control": "Per-batch FOR NO KEY UPDATE serializes transitions; completion locks all material/output balances in product UUID order with fresh ORM values and unique-key savepoint creation. Existing planned consumption and actual output semantics remain unchanged.",
+      "locks_or_concurrency_control": "The batch FOR NO KEY UPDATE lock serializes its transition. Shared lock_inventory_balances deduplicates the complete write set and locks fresh rows in branch/product/location order; missing rows use an ORM savepoint insert and recover only the known balance uniqueness violation. A transaction-local handle accumulates repeated deltas without refreshing pending changes, and persists each movement with its balance change. Planned input and actual output balances are locked together before consumption. No new reservation, WIP or costing semantics are introduced.",
       "audit_required": true,
       "audit_actual": "ATOMIC",
       "audit_atomicity": "ATOMIC",
@@ -19324,7 +19328,8 @@
       "indirect_tests": [
         "apps/api/tests/conftest.py",
         "apps/api/unit_tests/test_operation_policy.py#test_every_route_and_persisted_family_has_an_explicit_policy",
-        "apps/api/tests/test_operation_authorization.py#test_all_scoped_families_support_mapped_reads_and_aggregate_subqueries"
+        "apps/api/tests/test_operation_authorization.py#test_all_scoped_families_support_mapped_reads_and_aggregate_subqueries",
+        "apps/api/tests/test_inventory_concurrency.py"
       ],
       "missing_test_types": [
         "NONE"
@@ -19357,9 +19362,12 @@
         "apps/api/src/zeromerma_api/modules/idempotency/application/service.py#class IdempotencyExecutor",
         "apps/backoffice-web/src/features/admin/production/api.ts",
         "apps/backoffice-web/src/features/admin/production/production-command-intent.ts",
-        "docs/implementation/operations-idempotency-validation.md"
+        "docs/implementation/operations-idempotency-validation.md",
+        "apps/api/src/zeromerma_api/modules/inventory/application/mutations.py",
+        "docs/architecture/concurrency.md",
+        "docs/implementation/concurrency-validation.md"
       ],
-      "verification_notes": "Local API evidence: 49 unique PostgreSQL tests passed across the 48-test production run and the separate missing-branch regression. This does not assert real-browser or exact-commit hosted CI acceptance."
+      "verification_notes": "ZM-FIN-038 local evidence: 11 dedicated inventory concurrency tests passed and were repeated in the final combined 49-test runner; all 124 tests across the eight existing writer/idempotency suites passed. Authorization guards, repeated-product receipt lines and existing physical boundaries are preserved. This does not close later ledger, reservation or full product-workflow gaps; exact-commit Foundation acceptance accompanies delivery."
     },
     {
       "operation_key": "API:POST:/v1/admin/production/{production_id}/start",
@@ -20038,7 +20046,7 @@
         "outbox_events",
         "idempotency_records"
       ],
-      "locks_or_concurrency_control": "Document row lock serializes mutations; receipt balance locks follow product UUID order, with fresh values and unique-key savepoint creation for first balances. Cumulative receipts cannot exceed the remaining ordered quantity.",
+      "locks_or_concurrency_control": "The purchase document and receipt remain in one executor transaction. Shared lock_inventory_balances deduplicates the complete write set and locks fresh rows in branch/product/location order; missing rows use an ORM savepoint insert and recover only the known balance uniqueness violation. A transaction-local handle accumulates repeated deltas without refreshing pending changes, and persists each movement with its balance change. Receipt lines for the same product accumulate independently and preserve supplier relation updates.",
       "audit_required": true,
       "audit_actual": "ATOMIC",
       "audit_atomicity": "ATOMIC",
@@ -20069,7 +20077,8 @@
       "indirect_tests": [
         "apps/api/tests/conftest.py",
         "apps/api/unit_tests/test_operation_policy.py#test_every_route_and_persisted_family_has_an_explicit_policy",
-        "apps/api/tests/test_operation_authorization.py#test_all_scoped_families_support_mapped_reads_and_aggregate_subqueries"
+        "apps/api/tests/test_operation_authorization.py#test_all_scoped_families_support_mapped_reads_and_aggregate_subqueries",
+        "apps/api/tests/test_inventory_concurrency.py"
       ],
       "missing_test_types": [
         "NONE"
@@ -20099,9 +20108,12 @@
         "apps/api/src/zeromerma_api/modules/idempotency/application/service.py#class IdempotencyExecutor",
         "apps/backoffice-web/src/features/admin/purchases/api.ts",
         "apps/backoffice-web/src/features/admin/purchases/purchase-command-intent.ts",
-        "docs/implementation/operations-idempotency-validation.md"
+        "docs/implementation/operations-idempotency-validation.md",
+        "apps/api/src/zeromerma_api/modules/inventory/application/mutations.py",
+        "docs/architecture/concurrency.md",
+        "docs/implementation/concurrency-validation.md"
       ],
-      "verification_notes": "Local API evidence: the complete 40-test PostgreSQL purchase suite passed, including repeated-product receipt lines, supplier relations, missing branches, replay and recovery. This does not assert real-browser or exact-commit hosted CI acceptance."
+      "verification_notes": "ZM-FIN-038 local evidence: 11 dedicated inventory concurrency tests passed and were repeated in the final combined 49-test runner; all 124 tests across the eight existing writer/idempotency suites passed. Authorization guards, repeated-product receipt lines and existing physical boundaries are preserved. This does not close later ledger, reservation or full product-workflow gaps; exact-commit Foundation acceptance accompanies delivery."
     },
     {
       "operation_key": "API:POST:/v1/admin/purchases/{purchase_id}/cancel",
@@ -20429,7 +20441,7 @@
         "outbox_events",
         "idempotency_records"
       ],
-      "locks_or_concurrency_control": "Document row lock serializes mutations; receipt balance locks follow product UUID order, with fresh values and unique-key savepoint creation for first balances. Cumulative receipts cannot exceed the remaining ordered quantity.",
+      "locks_or_concurrency_control": "The purchase document lock protects cumulative remaining quantities. Shared lock_inventory_balances deduplicates the complete write set and locks fresh rows in branch/product/location order; missing rows use an ORM savepoint insert and recover only the known balance uniqueness violation. A transaction-local handle accumulates repeated deltas without refreshing pending changes, and persists each movement with its balance change. Receipt lines for the same product accumulate independently and preserve supplier relation updates.",
       "audit_required": true,
       "audit_actual": "ATOMIC",
       "audit_atomicity": "ATOMIC",
@@ -20460,7 +20472,8 @@
       "indirect_tests": [
         "apps/api/tests/conftest.py",
         "apps/api/unit_tests/test_operation_policy.py#test_every_route_and_persisted_family_has_an_explicit_policy",
-        "apps/api/tests/test_operation_authorization.py#test_all_scoped_families_support_mapped_reads_and_aggregate_subqueries"
+        "apps/api/tests/test_operation_authorization.py#test_all_scoped_families_support_mapped_reads_and_aggregate_subqueries",
+        "apps/api/tests/test_inventory_concurrency.py"
       ],
       "missing_test_types": [
         "NONE"
@@ -20490,9 +20503,12 @@
         "apps/api/src/zeromerma_api/modules/idempotency/application/service.py#class IdempotencyExecutor",
         "apps/backoffice-web/src/features/admin/purchases/api.ts",
         "apps/backoffice-web/src/features/admin/purchases/purchase-command-intent.ts",
-        "docs/implementation/operations-idempotency-validation.md"
+        "docs/implementation/operations-idempotency-validation.md",
+        "apps/api/src/zeromerma_api/modules/inventory/application/mutations.py",
+        "docs/architecture/concurrency.md",
+        "docs/implementation/concurrency-validation.md"
       ],
-      "verification_notes": "Local API evidence: the complete 40-test PostgreSQL purchase suite passed, including repeated-product receipt lines, supplier relations, missing branches, replay and recovery. This does not assert real-browser or exact-commit hosted CI acceptance."
+      "verification_notes": "ZM-FIN-038 local evidence: 11 dedicated inventory concurrency tests passed and were repeated in the final combined 49-test runner; all 124 tests across the eight existing writer/idempotency suites passed. Authorization guards, repeated-product receipt lines and existing physical boundaries are preserved. This does not close later ledger, reservation or full product-workflow gaps; exact-commit Foundation acceptance accompanies delivery."
     },
     {
       "operation_key": "API:GET:/v1/admin/purchases/commands/{command_code}/{idempotency_key}",
@@ -23902,7 +23918,7 @@
         "outbox_events",
         "idempotency_records"
       ],
-      "locks_or_concurrency_control": "Shared shipment FOR NO KEY UPDATE serializes POS and Backoffice transitions; cumulative receipts and pending quantities are recomputed while holding that lock, with source and destination authorization. Backoffice preserves its existing inventory movements; POS remains document-only until ledger adoption.",
+      "locks_or_concurrency_control": "The shared shipment FOR NO KEY UPDATE lock protects transitions. Shared lock_inventory_balances deduplicates the complete write set and locks fresh rows in branch/product/location order; missing rows use an ORM savepoint insert and recover only the known balance uniqueness violation. A transaction-local handle accumulates repeated deltas without refreshing pending changes, and persists each movement with its balance change. Source BACKROOM and destination IN_TRANSIT keys are ordered together, independent of transfer direction; source stock is revalidated before dispatch.",
       "audit_required": true,
       "audit_actual": "ATOMIC",
       "audit_atomicity": "ATOMIC",
@@ -23933,7 +23949,8 @@
       "indirect_tests": [
         "apps/api/tests/conftest.py",
         "apps/api/unit_tests/test_operation_policy.py#test_every_route_and_persisted_family_has_an_explicit_policy",
-        "apps/api/tests/test_operation_authorization.py#test_all_scoped_families_support_mapped_reads_and_aggregate_subqueries"
+        "apps/api/tests/test_operation_authorization.py#test_all_scoped_families_support_mapped_reads_and_aggregate_subqueries",
+        "apps/api/tests/test_inventory_concurrency.py"
       ],
       "missing_test_types": [
         "NONE"
@@ -23965,9 +23982,12 @@
         "apps/api/src/zeromerma_api/modules/idempotency/application/service.py#class IdempotencyExecutor",
         "apps/backoffice-web/src/features/admin/transfers/api.ts",
         "apps/backoffice-web/src/features/admin/transfers/transfer-command-intent.ts",
-        "docs/implementation/operations-idempotency-validation.md"
+        "docs/implementation/operations-idempotency-validation.md",
+        "apps/api/src/zeromerma_api/modules/inventory/application/mutations.py",
+        "docs/architecture/concurrency.md",
+        "docs/implementation/concurrency-validation.md"
       ],
-      "verification_notes": "Local API evidence: 54 unique transfer PostgreSQL tests passed; five shared cash-context regressions passed separately. This does not assert real-browser or exact-commit hosted CI acceptance."
+      "verification_notes": "ZM-FIN-038 local evidence: 11 dedicated inventory concurrency tests passed and were repeated in the final combined 49-test runner; all 124 tests across the eight existing writer/idempotency suites passed. Authorization guards, repeated-product receipt lines and existing physical boundaries are preserved. This does not close later ledger, reservation or full product-workflow gaps; exact-commit Foundation acceptance accompanies delivery."
     },
     {
       "operation_key": "API:POST:/v1/admin/transfers/{transfer_id}/receive",
@@ -24033,7 +24053,7 @@
         "outbox_events",
         "idempotency_records"
       ],
-      "locks_or_concurrency_control": "Shared shipment FOR NO KEY UPDATE serializes POS and Backoffice transitions; cumulative receipts and pending quantities are recomputed while holding that lock, with source and destination authorization. Backoffice preserves its existing inventory movements; POS remains document-only until ledger adoption.",
+      "locks_or_concurrency_control": "The shared shipment FOR NO KEY UPDATE lock protects cumulative receipts. Shared lock_inventory_balances deduplicates the complete write set and locks fresh rows in branch/product/location order; missing rows use an ORM savepoint insert and recover only the known balance uniqueness violation. A transaction-local handle accumulates repeated deltas without refreshing pending changes, and persists each movement with its balance change. Destination IN_TRANSIT and BACKROOM keys are ordered together. The existing negative IN_TRANSIT exception preserves receipt of documentary POS shipments; no missing POS dispatch ledger is invented.",
       "audit_required": true,
       "audit_actual": "ATOMIC",
       "audit_atomicity": "ATOMIC",
@@ -24064,7 +24084,8 @@
       "indirect_tests": [
         "apps/api/tests/conftest.py",
         "apps/api/unit_tests/test_operation_policy.py#test_every_route_and_persisted_family_has_an_explicit_policy",
-        "apps/api/tests/test_operation_authorization.py#test_all_scoped_families_support_mapped_reads_and_aggregate_subqueries"
+        "apps/api/tests/test_operation_authorization.py#test_all_scoped_families_support_mapped_reads_and_aggregate_subqueries",
+        "apps/api/tests/test_inventory_concurrency.py"
       ],
       "missing_test_types": [
         "NONE"
@@ -24096,9 +24117,12 @@
         "apps/api/src/zeromerma_api/modules/idempotency/application/service.py#class IdempotencyExecutor",
         "apps/backoffice-web/src/features/admin/transfers/api.ts",
         "apps/backoffice-web/src/features/admin/transfers/transfer-command-intent.ts",
-        "docs/implementation/operations-idempotency-validation.md"
+        "docs/implementation/operations-idempotency-validation.md",
+        "apps/api/src/zeromerma_api/modules/inventory/application/mutations.py",
+        "docs/architecture/concurrency.md",
+        "docs/implementation/concurrency-validation.md"
       ],
-      "verification_notes": "Local API evidence: 54 unique transfer PostgreSQL tests passed; five shared cash-context regressions passed separately. This does not assert real-browser or exact-commit hosted CI acceptance."
+      "verification_notes": "ZM-FIN-038 local evidence: 11 dedicated inventory concurrency tests passed and were repeated in the final combined 49-test runner; all 124 tests across the eight existing writer/idempotency suites passed. Authorization guards, repeated-product receipt lines and existing physical boundaries are preserved. This does not close later ledger, reservation or full product-workflow gaps; exact-commit Foundation acceptance accompanies delivery."
     },
     {
       "operation_key": "API:POST:/v1/admin/users",
@@ -25211,7 +25235,7 @@
         "outbox_events",
         "idempotency_records"
       ],
-      "locks_or_concurrency_control": "Global unique-key reservation serializes replays; the existing Backoffice waste document, inventory-balance decrement and movement commit atomically under the balance lock. This does not add physical ledger effects to POS waste.",
+      "locks_or_concurrency_control": "Shared lock_inventory_balances deduplicates the complete write set and locks fresh rows in branch/product/location order; missing rows use an ORM savepoint insert and recover only the known balance uniqueness violation. A transaction-local handle accumulates repeated deltas without refreshing pending changes, and persists each movement with its balance change. The selected source balance is validated under lock before decrement; insufficient stock rejects the waste. POS waste remains documentary.",
       "audit_required": true,
       "audit_actual": "ATOMIC",
       "audit_atomicity": "ATOMIC",
@@ -25242,7 +25266,8 @@
       "indirect_tests": [
         "apps/api/tests/conftest.py",
         "apps/api/unit_tests/test_operation_policy.py#test_every_route_and_persisted_family_has_an_explicit_policy",
-        "apps/api/tests/test_operation_authorization.py#test_all_scoped_families_support_mapped_reads_and_aggregate_subqueries"
+        "apps/api/tests/test_operation_authorization.py#test_all_scoped_families_support_mapped_reads_and_aggregate_subqueries",
+        "apps/api/tests/test_inventory_concurrency.py"
       ],
       "missing_test_types": [
         "NONE"
@@ -25273,9 +25298,12 @@
         "apps/api/src/zeromerma_api/modules/idempotency/application/service.py#class IdempotencyExecutor",
         "apps/backoffice-web/src/features/admin/waste/api.ts",
         "apps/backoffice-web/src/features/admin/physical-commands/physical-command-intent.ts",
-        "docs/implementation/operations-idempotency-validation.md"
+        "docs/implementation/operations-idempotency-validation.md",
+        "apps/api/src/zeromerma_api/modules/inventory/application/mutations.py",
+        "docs/architecture/concurrency.md",
+        "docs/implementation/concurrency-validation.md"
       ],
-      "verification_notes": "Local API evidence: the 51-case physical-command run produced 49 passes and two failed audit-count expectations. The two destination-authorization regressions passed in a separate rerun after a test-only correction requiring the two authorization.denied records and no new domain/outbox effects; runtime was unchanged. All 51 unique cases are covered by these split runs. This does not assert real-browser or exact-commit hosted CI acceptance."
+      "verification_notes": "ZM-FIN-038 local evidence: 11 dedicated inventory concurrency tests passed and were repeated in the final combined 49-test runner; all 124 tests across the eight existing writer/idempotency suites passed. Authorization guards, repeated-product receipt lines and existing physical boundaries are preserved. This does not close later ledger, reservation or full product-workflow gaps; exact-commit Foundation acceptance accompanies delivery."
     },
     {
       "operation_key": "API:GET:/v1/admin/waste/confirmations/{idempotency_key}",
@@ -25694,7 +25722,7 @@
         "outbox_events",
         "idempotency_records"
       ],
-      "locks_or_concurrency_control": "Global unique-key reservation followed by the exact CashSession FOR NO KEY UPDATE (compatible with reservation foreign-key KEY SHARE); state is refreshed after waiting. Different keys for a closed shift cannot create a new effect. Broader adoption by other economic commands remains ZM-FIN-037.",
+      "locks_or_concurrency_control": "After the UUIDv7 reservation, the exact CashSession is locked FOR NO KEY UPDATE with populate_existing before dependent business rows or effects. Actor, branch, workstation and OPEN are revalidated under that lock; committed historical replay bypasses the action without requiring OPEN. Reservation FK KEY SHARE remains compatible. Final close recalculates the existing CashMovement projection while holding the boundary; preview does not reserve it. Existing order-ledger omission remains ZM-FIN-042.",
       "audit_required": true,
       "audit_actual": "ATOMIC",
       "audit_atomicity": "ATOMIC",
@@ -25724,7 +25752,8 @@
         "apps/api/tests/test_admin_reconciliation.py",
         "apps/api/tests/test_phase_7b_cash_close.py",
         "apps/api/tests/test_cash_idempotency.py",
-        "apps/pos-web/e2e-real/aa-cash-command.spec.ts"
+        "apps/pos-web/e2e-real/aa-cash-command.spec.ts",
+        "apps/api/tests/test_cash_concurrency.py"
       ],
       "indirect_tests": [
         "apps/api/tests/conftest.py",
@@ -25734,10 +25763,9 @@
       "missing_test_types": [
         "NONE"
       ],
-      "approved_target_state": "Existing cash command is atomic and recoverable with one minimized result per approved intention; full ledger, other-command close races and complete product surface remain explicitly separate tasks.",
+      "approved_target_state": "Preserve atomic recoverable cash intentions and the verified common close-admission boundary while completing the separately assigned canonical ledger, financial projection and product workflow tasks.",
       "feature_complete_blocker": true,
       "later_ZM_FIN_tasks": [
-        "ZM-FIN-037",
         "ZM-FIN-043",
         "ZM-FIN-061"
       ],
@@ -25765,8 +25793,11 @@
         "docs/architecture/authorization.md",
         "apps/api/src/zeromerma_api/modules/cash_close/application/idempotency.py#class CashCloseCommitService",
         "apps/api/src/zeromerma_api/modules/cash/application/command_context.py",
-        "docs/implementation/cash-idempotency-validation.md"
-      ]
+        "docs/implementation/cash-idempotency-validation.md",
+        "docs/architecture/concurrency.md",
+        "docs/implementation/concurrency-validation.md"
+      ],
+      "verification_notes": "ZM-FIN-036/037 local evidence: 42 unique PostgreSQL cases passed across the 28-case cash-boundary and 14-case complementary runs (29 new cases, 3 adapted concurrency cases, 10 prior cash/FK cases). The final combined runner also passed all 49 cases (29 cash, 9 transient conflicts, 11 inventory). Same-user HTTP authentication may serialize earlier; domain races use separate real transactions. Exact-commit Foundation acceptance accompanies delivery."
     },
     {
       "operation_key": "API:POST:/v1/cash-close/preview",
@@ -25938,7 +25969,7 @@
         "outbox_events",
         "idempotency_records"
       ],
-      "locks_or_concurrency_control": "Global unique-key reservation; actor and workstation FOR NO KEY UPDATE row locks (compatible with reservation foreign-key KEY SHARE) preserve active user/workstation uniqueness, with branch-before-station ordering and existing unique partial indexes. No operation-wide lock.",
+      "locks_or_concurrency_control": "Opening retains its user/workstation FOR NO KEY UPDATE uniqueness boundary, compatible with reservation FK KEY SHARE. Existing cash commands now share one exact-shift lock after reservation; independent shifts have no global cash lock.",
       "audit_required": true,
       "audit_actual": "ATOMIC",
       "audit_atomicity": "ATOMIC",
@@ -25982,10 +26013,9 @@
       "missing_test_types": [
         "NONE"
       ],
-      "approved_target_state": "Existing cash command is atomic and recoverable with one minimized result per approved intention; full ledger, other-command close races and complete product surface remain explicitly separate tasks.",
+      "approved_target_state": "Preserve atomic recoverable cash intentions and the verified common close-admission boundary while completing the separately assigned canonical ledger, financial projection and product workflow tasks.",
       "feature_complete_blocker": true,
       "later_ZM_FIN_tasks": [
-        "ZM-FIN-037",
         "ZM-FIN-061"
       ],
       "decision_refs": [
@@ -26012,8 +26042,11 @@
         "docs/architecture/authorization.md",
         "apps/api/src/zeromerma_api/modules/cash/application/idempotency.py#class CashSessionOpenService",
         "apps/api/src/zeromerma_api/modules/cash/application/command_context.py",
-        "docs/implementation/cash-idempotency-validation.md"
-      ]
+        "docs/implementation/cash-idempotency-validation.md",
+        "docs/architecture/concurrency.md",
+        "docs/implementation/concurrency-validation.md"
+      ],
+      "verification_notes": "ZM-FIN-036/037 local evidence: 42 unique PostgreSQL cases passed across the 28-case cash-boundary and 14-case complementary runs (29 new cases, 3 adapted concurrency cases, 10 prior cash/FK cases). The final combined runner also passed all 49 cases (29 cash, 9 transient conflicts, 11 inventory). Same-user HTTP authentication may serialize earlier; domain races use separate real transactions. Exact-commit Foundation acceptance accompanies delivery."
     },
     {
       "operation_key": "API:POST:/v1/corrections/commit",
@@ -26329,7 +26362,7 @@
         "outbox_events",
         "idempotency_records"
       ],
-      "locks_or_concurrency_control": "Global unique-key reservation followed by the exact CashSession FOR NO KEY UPDATE (compatible with reservation foreign-key KEY SHARE); state is refreshed after waiting. Different keys for a closed shift cannot create a new effect. Broader adoption by other economic commands remains ZM-FIN-037.",
+      "locks_or_concurrency_control": "After the UUIDv7 reservation, the exact CashSession is locked FOR NO KEY UPDATE with populate_existing before dependent business rows or effects. Actor, branch, workstation and OPEN are revalidated under that lock; committed historical replay bypasses the action without requiring OPEN. Reservation FK KEY SHARE remains compatible. Both CASH inflows and existing CARD non-cash commands obey close admission.",
       "audit_required": true,
       "audit_actual": "ATOMIC",
       "audit_atomicity": "ATOMIC",
@@ -26356,7 +26389,8 @@
       "direct_tests": [
         "apps/api/tests/test_discounts_module.py",
         "apps/api/tests/test_cash_idempotency.py",
-        "apps/pos-web/e2e-real/aa-cash-command.spec.ts"
+        "apps/pos-web/e2e-real/aa-cash-command.spec.ts",
+        "apps/api/tests/test_cash_concurrency.py"
       ],
       "indirect_tests": [
         "apps/api/tests/conftest.py",
@@ -26366,10 +26400,9 @@
       "missing_test_types": [
         "NONE"
       ],
-      "approved_target_state": "Existing cash command is atomic and recoverable with one minimized result per approved intention; full ledger, other-command close races and complete product surface remain explicitly separate tasks.",
+      "approved_target_state": "Preserve atomic recoverable cash intentions and the verified common close-admission boundary while completing the separately assigned canonical ledger, financial projection and product workflow tasks.",
       "feature_complete_blocker": true,
       "later_ZM_FIN_tasks": [
-        "ZM-FIN-037",
         "ZM-FIN-043",
         "ZM-FIN-061"
       ],
@@ -26396,8 +26429,11 @@
         "docs/architecture/authorization.md",
         "apps/api/src/zeromerma_api/modules/discounts/application/idempotency.py#class OperationalDiscountCommitService",
         "apps/api/src/zeromerma_api/modules/cash/application/command_context.py",
-        "docs/implementation/cash-idempotency-validation.md"
-      ]
+        "docs/implementation/cash-idempotency-validation.md",
+        "docs/architecture/concurrency.md",
+        "docs/implementation/concurrency-validation.md"
+      ],
+      "verification_notes": "ZM-FIN-036/037 local evidence: 42 unique PostgreSQL cases passed across the 28-case cash-boundary and 14-case complementary runs (29 new cases, 3 adapted concurrency cases, 10 prior cash/FK cases). The final combined runner also passed all 49 cases (29 cash, 9 transient conflicts, 11 inventory). Same-user HTTP authentication may serialize earlier; domain races use separate real transactions. Exact-commit Foundation acceptance accompanies delivery."
     },
     {
       "operation_key": "API:POST:/v1/operations/counter-transfer/commit",
@@ -26970,7 +27006,7 @@
         "audit_logs",
         "outbox_events"
       ],
-      "locks_or_concurrency_control": "Global unique UUIDv7 reservation with bounded same-key contention; existing orders lock CustomerOrder FOR UPDATE before state/balance validation across POS and Backoffice; unrelated orders have no global order lock; authorization lifecycle lock remains shared",
+      "locks_or_concurrency_control": "After the UUIDv7 reservation, the exact CashSession is locked FOR NO KEY UPDATE with populate_existing before dependent business rows or effects. Actor, branch, workstation and OPEN are revalidated under that lock; committed historical replay bypasses the action without requiring OPEN. Reservation FK KEY SHARE remains compatible. Existing CustomerOrder transitions then acquire their document lock. This guarantees temporal admission only: CustomerOrderPayment-to-CashMovement integration remains ZM-FIN-042.",
       "audit_required": true,
       "audit_actual": "ATOMIC",
       "audit_atomicity": "ATOMIC",
@@ -26996,7 +27032,8 @@
       ],
       "direct_tests": [
         "apps/api/tests/test_orders_module.py",
-        "apps/api/tests/test_order_idempotency.py"
+        "apps/api/tests/test_order_idempotency.py",
+        "apps/api/tests/test_cash_concurrency.py"
       ],
       "indirect_tests": [
         "apps/api/tests/conftest.py",
@@ -27006,7 +27043,7 @@
       "missing_test_types": [
         "FULL_DEC10_ORDER_WORKFLOW_AND_CANONICAL_CASH_LEDGER"
       ],
-      "approved_target_state": "Preserve verified durable replay while completing the separate canonical order payment/cash ledger in ZM-FIN-042 and the full approved order workflow in ZM-FIN-058 and ZM-FIN-078.",
+      "approved_target_state": "Preserve verified durable replay and common cash-session admission while completing the canonical order payment/cash ledger in ZM-FIN-042 and the full approved order workflow in ZM-FIN-058 and ZM-FIN-078.",
       "feature_complete_blocker": true,
       "later_ZM_FIN_tasks": [
         "ZM-FIN-042",
@@ -27039,8 +27076,12 @@
         "apps/pos-web/src/features/orders/orders-api.ts",
         "docs/implementation/order-idempotency-validation.md",
         "apps/api/src/zeromerma_api/modules/orders/application/idempotency.py#class OrdersIdempotencyService",
-        "docs/architecture/idempotency.md"
-      ]
+        "docs/architecture/idempotency.md",
+        "apps/api/src/zeromerma_api/modules/cash/application/command_context.py",
+        "docs/architecture/concurrency.md",
+        "docs/implementation/concurrency-validation.md"
+      ],
+      "verification_notes": "ZM-FIN-036/037 local evidence: 42 unique PostgreSQL cases passed across the 28-case cash-boundary and 14-case complementary runs (29 new cases, 3 adapted concurrency cases, 10 prior cash/FK cases). The final combined runner also passed all 49 cases (29 cash, 9 transient conflicts, 11 inventory). Same-user HTTP authentication may serialize earlier; domain races use separate real transactions. Exact-commit Foundation acceptance accompanies delivery."
     },
     {
       "operation_key": "API:POST:/v1/orders/{order_id}/cancel",
@@ -27102,7 +27143,7 @@
         "audit_logs",
         "outbox_events"
       ],
-      "locks_or_concurrency_control": "Global unique UUIDv7 reservation with bounded same-key contention; existing orders lock CustomerOrder FOR UPDATE before state/balance validation across POS and Backoffice; unrelated orders have no global order lock; authorization lifecycle lock remains shared",
+      "locks_or_concurrency_control": "After the UUIDv7 reservation, the exact CashSession is locked FOR NO KEY UPDATE with populate_existing before dependent business rows or effects. Actor, branch, workstation and OPEN are revalidated under that lock; committed historical replay bypasses the action without requiring OPEN. Reservation FK KEY SHARE remains compatible. Existing CustomerOrder transitions then acquire their document lock. This guarantees temporal admission only: CustomerOrderPayment-to-CashMovement integration remains ZM-FIN-042.",
       "audit_required": true,
       "audit_actual": "ATOMIC",
       "audit_atomicity": "ATOMIC",
@@ -27128,7 +27169,8 @@
       ],
       "direct_tests": [
         "apps/api/tests/test_orders_module.py",
-        "apps/api/tests/test_order_idempotency.py"
+        "apps/api/tests/test_order_idempotency.py",
+        "apps/api/tests/test_cash_concurrency.py"
       ],
       "indirect_tests": [
         "apps/api/tests/conftest.py",
@@ -27138,7 +27180,7 @@
       "missing_test_types": [
         "FULL_DEC10_ORDER_WORKFLOW_AND_CANONICAL_CASH_LEDGER"
       ],
-      "approved_target_state": "Preserve verified durable replay while completing the separate canonical order payment/cash ledger in ZM-FIN-042 and the full approved order workflow in ZM-FIN-058 and ZM-FIN-078.",
+      "approved_target_state": "Preserve verified durable replay and common cash-session admission while completing the canonical order payment/cash ledger in ZM-FIN-042 and the full approved order workflow in ZM-FIN-058 and ZM-FIN-078.",
       "feature_complete_blocker": true,
       "later_ZM_FIN_tasks": [
         "ZM-FIN-042",
@@ -27171,8 +27213,12 @@
         "apps/pos-web/src/features/orders/orders-api.ts",
         "docs/implementation/order-idempotency-validation.md",
         "apps/api/src/zeromerma_api/modules/orders/application/idempotency.py#class OrdersIdempotencyService",
-        "docs/architecture/idempotency.md"
-      ]
+        "docs/architecture/idempotency.md",
+        "apps/api/src/zeromerma_api/modules/cash/application/command_context.py",
+        "docs/architecture/concurrency.md",
+        "docs/implementation/concurrency-validation.md"
+      ],
+      "verification_notes": "ZM-FIN-036/037 local evidence: 42 unique PostgreSQL cases passed across the 28-case cash-boundary and 14-case complementary runs (29 new cases, 3 adapted concurrency cases, 10 prior cash/FK cases). The final combined runner also passed all 49 cases (29 cash, 9 transient conflicts, 11 inventory). Same-user HTTP authentication may serialize earlier; domain races use separate real transactions. Exact-commit Foundation acceptance accompanies delivery."
     },
     {
       "operation_key": "API:POST:/v1/orders/{order_id}/deliver",
@@ -27234,7 +27280,7 @@
         "audit_logs",
         "outbox_events"
       ],
-      "locks_or_concurrency_control": "Global unique UUIDv7 reservation with bounded same-key contention; existing orders lock CustomerOrder FOR UPDATE before state/balance validation across POS and Backoffice; unrelated orders have no global order lock; authorization lifecycle lock remains shared",
+      "locks_or_concurrency_control": "After the UUIDv7 reservation, the exact CashSession is locked FOR NO KEY UPDATE with populate_existing before dependent business rows or effects. Actor, branch, workstation and OPEN are revalidated under that lock; committed historical replay bypasses the action without requiring OPEN. Reservation FK KEY SHARE remains compatible. Existing CustomerOrder transitions then acquire their document lock. This guarantees temporal admission only: CustomerOrderPayment-to-CashMovement integration remains ZM-FIN-042.",
       "audit_required": true,
       "audit_actual": "ATOMIC",
       "audit_atomicity": "ATOMIC",
@@ -27260,7 +27306,8 @@
       ],
       "direct_tests": [
         "apps/api/tests/test_orders_module.py",
-        "apps/api/tests/test_order_idempotency.py"
+        "apps/api/tests/test_order_idempotency.py",
+        "apps/api/tests/test_cash_concurrency.py"
       ],
       "indirect_tests": [
         "apps/api/tests/conftest.py",
@@ -27270,7 +27317,7 @@
       "missing_test_types": [
         "FULL_DEC10_ORDER_WORKFLOW_AND_CANONICAL_CASH_LEDGER"
       ],
-      "approved_target_state": "Preserve verified durable replay while completing the separate canonical order payment/cash ledger in ZM-FIN-042 and the full approved order workflow in ZM-FIN-058 and ZM-FIN-078.",
+      "approved_target_state": "Preserve verified durable replay and common cash-session admission while completing the canonical order payment/cash ledger in ZM-FIN-042 and the full approved order workflow in ZM-FIN-058 and ZM-FIN-078.",
       "feature_complete_blocker": true,
       "later_ZM_FIN_tasks": [
         "ZM-FIN-042",
@@ -27303,8 +27350,12 @@
         "apps/pos-web/src/features/orders/orders-api.ts",
         "docs/implementation/order-idempotency-validation.md",
         "apps/api/src/zeromerma_api/modules/orders/application/idempotency.py#class OrdersIdempotencyService",
-        "docs/architecture/idempotency.md"
-      ]
+        "docs/architecture/idempotency.md",
+        "apps/api/src/zeromerma_api/modules/cash/application/command_context.py",
+        "docs/architecture/concurrency.md",
+        "docs/implementation/concurrency-validation.md"
+      ],
+      "verification_notes": "ZM-FIN-036/037 local evidence: 42 unique PostgreSQL cases passed across the 28-case cash-boundary and 14-case complementary runs (29 new cases, 3 adapted concurrency cases, 10 prior cash/FK cases). The final combined runner also passed all 49 cases (29 cash, 9 transient conflicts, 11 inventory). Same-user HTTP authentication may serialize earlier; domain races use separate real transactions. Exact-commit Foundation acceptance accompanies delivery."
     },
     {
       "operation_key": "API:POST:/v1/orders/{order_id}/mark-ready",
@@ -27365,7 +27416,7 @@
         "audit_logs",
         "outbox_events"
       ],
-      "locks_or_concurrency_control": "Global unique UUIDv7 reservation with bounded same-key contention; existing orders lock CustomerOrder FOR UPDATE before state/balance validation across POS and Backoffice; unrelated orders have no global order lock; authorization lifecycle lock remains shared",
+      "locks_or_concurrency_control": "After the UUIDv7 reservation, the exact CashSession is locked FOR NO KEY UPDATE with populate_existing before dependent business rows or effects. Actor, branch, workstation and OPEN are revalidated under that lock; committed historical replay bypasses the action without requiring OPEN. Reservation FK KEY SHARE remains compatible. Existing CustomerOrder transitions then acquire their document lock. This guarantees temporal admission only: CustomerOrderPayment-to-CashMovement integration remains ZM-FIN-042.",
       "audit_required": true,
       "audit_actual": "ATOMIC",
       "audit_atomicity": "ATOMIC",
@@ -27401,7 +27452,7 @@
       "missing_test_types": [
         "FULL_DEC10_ORDER_WORKFLOW_AND_CANONICAL_CASH_LEDGER"
       ],
-      "approved_target_state": "Preserve verified durable replay while completing the separate canonical order payment/cash ledger in ZM-FIN-042 and the full approved order workflow in ZM-FIN-058 and ZM-FIN-078.",
+      "approved_target_state": "Preserve verified durable replay and common cash-session admission while completing the canonical order payment/cash ledger in ZM-FIN-042 and the full approved order workflow in ZM-FIN-058 and ZM-FIN-078.",
       "feature_complete_blocker": true,
       "later_ZM_FIN_tasks": [
         "ZM-FIN-042",
@@ -27434,8 +27485,12 @@
         "apps/pos-web/src/features/orders/orders-api.ts",
         "docs/implementation/order-idempotency-validation.md",
         "apps/api/src/zeromerma_api/modules/orders/application/idempotency.py#class OrdersIdempotencyService",
-        "docs/architecture/idempotency.md"
-      ]
+        "docs/architecture/idempotency.md",
+        "apps/api/src/zeromerma_api/modules/cash/application/command_context.py",
+        "docs/architecture/concurrency.md",
+        "docs/implementation/concurrency-validation.md"
+      ],
+      "verification_notes": "ZM-FIN-036/037 local evidence: 42 unique PostgreSQL cases passed across the 28-case cash-boundary and 14-case complementary runs (29 new cases, 3 adapted concurrency cases, 10 prior cash/FK cases). The final combined runner also passed all 49 cases (29 cash, 9 transient conflicts, 11 inventory). Same-user HTTP authentication may serialize earlier; domain races use separate real transactions. Exact-commit Foundation acceptance accompanies delivery."
     },
     {
       "operation_key": "API:POST:/v1/payments",
@@ -27496,7 +27551,7 @@
         "outbox_events",
         "idempotency_records"
       ],
-      "locks_or_concurrency_control": "Global unique-key reservation followed by the exact CashSession FOR NO KEY UPDATE (compatible with reservation foreign-key KEY SHARE); state is refreshed after waiting. Different keys for a closed shift cannot create a new effect. Broader adoption by other economic commands remains ZM-FIN-037.",
+      "locks_or_concurrency_control": "After the UUIDv7 reservation, the exact CashSession is locked FOR NO KEY UPDATE with populate_existing before dependent business rows or effects. Actor, branch, workstation and OPEN are revalidated under that lock; committed historical replay bypasses the action without requiring OPEN. Reservation FK KEY SHARE remains compatible. Both CASH outflows and existing CARD non-cash commands obey close admission.",
       "audit_required": true,
       "audit_actual": "ATOMIC",
       "audit_atomicity": "ATOMIC",
@@ -27525,7 +27580,8 @@
         "apps/api/tests/test_admin_cash_flow.py",
         "apps/api/tests/test_payments_module.py",
         "apps/api/tests/test_cash_idempotency.py",
-        "apps/pos-web/e2e-real/aa-cash-command.spec.ts"
+        "apps/pos-web/e2e-real/aa-cash-command.spec.ts",
+        "apps/api/tests/test_cash_concurrency.py"
       ],
       "indirect_tests": [
         "apps/api/tests/conftest.py",
@@ -27535,10 +27591,9 @@
       "missing_test_types": [
         "NONE"
       ],
-      "approved_target_state": "Existing cash command is atomic and recoverable with one minimized result per approved intention; full ledger, other-command close races and complete product surface remain explicitly separate tasks.",
+      "approved_target_state": "Preserve atomic recoverable cash intentions and the verified common close-admission boundary while completing the separately assigned canonical ledger, financial projection and product workflow tasks.",
       "feature_complete_blocker": true,
       "later_ZM_FIN_tasks": [
-        "ZM-FIN-037",
         "ZM-FIN-043",
         "ZM-FIN-057",
         "ZM-FIN-065"
@@ -27568,8 +27623,11 @@
         "docs/architecture/authorization.md",
         "apps/api/src/zeromerma_api/modules/payments/application/idempotency.py#class OperationalPaymentCommitService",
         "apps/api/src/zeromerma_api/modules/cash/application/command_context.py",
-        "docs/implementation/cash-idempotency-validation.md"
-      ]
+        "docs/implementation/cash-idempotency-validation.md",
+        "docs/architecture/concurrency.md",
+        "docs/implementation/concurrency-validation.md"
+      ],
+      "verification_notes": "ZM-FIN-036/037 local evidence: 42 unique PostgreSQL cases passed across the 28-case cash-boundary and 14-case complementary runs (29 new cases, 3 adapted concurrency cases, 10 prior cash/FK cases). The final combined runner also passed all 49 cases (29 cash, 9 transient conflicts, 11 inventory). Same-user HTTP authentication may serialize earlier; domain races use separate real transactions. Exact-commit Foundation acceptance accompanies delivery."
     },
     {
       "operation_key": "API:POST:/v1/returns/commit",
@@ -27637,7 +27695,7 @@
         "audit_log",
         "outbox_events"
       ],
-      "locks_or_concurrency_control": "Unique UUIDv7 reservation precedes original sales row FOR UPDATE; committed quantity/value budgets are recalculated under that sale-local lock. The shared identity authorization lock remains in place. CashSession-versus-close synchronization and inventory locking are later 037/050/051 work.",
+      "locks_or_concurrency_control": "After the UUIDv7 reservation, the exact CashSession is locked FOR NO KEY UPDATE with populate_existing before dependent business rows or effects. Actor, branch, workstation and OPEN are revalidated under that lock; committed historical replay bypasses the action without requiring OPEN. Reservation FK KEY SHARE remains compatible. The original Sale is locked only after CashSession, and remaining quantity/net-value budgets are recalculated under that sale-local lock.",
       "audit_required": true,
       "audit_actual": "ATOMIC",
       "audit_atomicity": "ATOMIC",
@@ -27669,7 +27727,8 @@
         "apps/api/tests/test_admin_sales_tickets.py",
         "apps/api/tests/test_returns_module.py",
         "apps/api/tests/test_tickets_module.py",
-        "apps/api/tests/test_return_idempotency.py"
+        "apps/api/tests/test_return_idempotency.py",
+        "apps/api/tests/test_cash_concurrency.py"
       ],
       "indirect_tests": [
         "apps/api/tests/conftest.py",
@@ -27679,10 +27738,9 @@
       "missing_test_types": [
         "NONE"
       ],
-      "approved_target_state": "The existing CASH return must replay once with serialized quantity and original net-value budgets, explicit causal cash linkage and safe recovery. Canonical financial settlement, cash-close concurrency, physical disposition and the complete POS flow remain separate later tasks.",
+      "approved_target_state": "Preserve the existing CASH return replay, sale-local quantity/net-value budgets, explicit causal cash linkage and common cash-close boundary. Canonical financial settlement, physical disposition and the complete POS flow remain separate later tasks.",
       "feature_complete_blocker": true,
       "later_ZM_FIN_tasks": [
-        "ZM-FIN-037",
         "ZM-FIN-044",
         "ZM-FIN-045",
         "ZM-FIN-050",
@@ -27716,8 +27774,12 @@
         "apps/api/src/zeromerma_api/modules/returns/application/idempotency.py#class ReturnCommitService",
         "apps/api/src/zeromerma_api/modules/returns/application/services.py#_calculate_refund_amount",
         "docs/implementation/return-idempotency-validation.md",
-        "docs/architecture/idempotency.md"
-      ]
+        "docs/architecture/idempotency.md",
+        "apps/api/src/zeromerma_api/modules/cash/application/command_context.py",
+        "docs/architecture/concurrency.md",
+        "docs/implementation/concurrency-validation.md"
+      ],
+      "verification_notes": "ZM-FIN-036/037 local evidence: 42 unique PostgreSQL cases passed across the 28-case cash-boundary and 14-case complementary runs (29 new cases, 3 adapted concurrency cases, 10 prior cash/FK cases). The final combined runner also passed all 49 cases (29 cash, 9 transient conflicts, 11 inventory). Same-user HTTP authentication may serialize earlier; domain races use separate real transactions. Exact-commit Foundation acceptance accompanies delivery."
     },
     {
       "operation_key": "API:POST:/v1/sales/confirm",
@@ -27784,7 +27846,7 @@
         "audit_logs",
         "outbox_events"
       ],
-      "locks_or_concurrency_control": "Global unique UUIDv7 identity with bounded same-key contention; authorization lifecycle shared lock; no operation-wide idempotency lock; sale-versus-close serialization remains ZM-FIN-036",
+      "locks_or_concurrency_control": "After the UUIDv7 reservation, the exact CashSession is locked FOR NO KEY UPDATE with populate_existing before dependent business rows or effects. Actor, branch, workstation and OPEN are revalidated under that lock; committed historical replay bypasses the action without requiring OPEN. Reservation FK KEY SHARE remains compatible. Cash collection effects commit before a later close recalculates its existing projection; a winning close rejects the later new sale.",
       "audit_required": true,
       "audit_actual": "ATOMIC",
       "audit_atomicity": "ATOMIC",
@@ -27822,7 +27884,8 @@
         "apps/api/tests/test_returns_module.py",
         "apps/api/tests/test_tickets_module.py",
         "apps/pos-web/src/features/pos-terminal/sale-confirmation-intent.test.ts",
-        "apps/pos-web/e2e-real/sale-confirmation.spec.ts"
+        "apps/pos-web/e2e-real/sale-confirmation.spec.ts",
+        "apps/api/tests/test_cash_concurrency.py"
       ],
       "indirect_tests": [
         "apps/api/tests/conftest.py",
@@ -27832,10 +27895,9 @@
       "missing_test_types": [
         "NONE"
       ],
-      "approved_target_state": "POS sale confirmation must preserve the accepted durable replay contract and complete the separate canonical inventory, sale-versus-close and integrated workflow requirements in ZM-FIN-036, ZM-FIN-049, ZM-FIN-050 and ZM-FIN-056.",
+      "approved_target_state": "Preserve accepted durable replay and verified sale-versus-close serialization while completing canonical inventory attribution and the integrated sale workflow in ZM-FIN-049, ZM-FIN-050 and ZM-FIN-056.",
       "feature_complete_blocker": true,
       "later_ZM_FIN_tasks": [
-        "ZM-FIN-036",
         "ZM-FIN-049",
         "ZM-FIN-050",
         "ZM-FIN-056"
@@ -27863,8 +27925,12 @@
         "apps/api/src/zeromerma_api/modules/sales/application/services.py#class SaleCommandService",
         "apps/api/src/zeromerma_api/modules/idempotency/application/service.py#class IdempotencyExecutor",
         "docs/architecture/idempotency.md",
-        "docs/implementation/sale-idempotency-validation.md"
-      ]
+        "docs/implementation/sale-idempotency-validation.md",
+        "apps/api/src/zeromerma_api/modules/cash/application/command_context.py",
+        "docs/architecture/concurrency.md",
+        "docs/implementation/concurrency-validation.md"
+      ],
+      "verification_notes": "ZM-FIN-036/037 local evidence: 42 unique PostgreSQL cases passed across the 28-case cash-boundary and 14-case complementary runs (29 new cases, 3 adapted concurrency cases, 10 prior cash/FK cases). The final combined runner also passed all 49 cases (29 cash, 9 transient conflicts, 11 inventory). Same-user HTTP authentication may serialize earlier; domain races use separate real transactions. Exact-commit Foundation acceptance accompanies delivery."
     },
     {
       "operation_key": "API:POST:/v1/tickets/{ticket_id}/reprint",
@@ -35025,6 +35091,62 @@
       ]
     },
     {
+      "operation_key": "INTERNAL:scripts.dev.run-concurrency-validation:command",
+      "trigger": "OPERATOR_COMMAND",
+      "symbol": "command",
+      "source_event_or_schedule": "Explicit local or CI invocation with Suite All, Commands, Cash or Inventory",
+      "reads": [
+        "Pinned repository toolchain",
+        "Selected command, cash and inventory PostgreSQL concurrency suites"
+      ],
+      "writes": [
+        "Disposable PostgreSQL test data only",
+        "Protected JUnit and result manifest in .tmp/validation-published/concurrency/<run_id>"
+      ],
+      "external_effect": "Guarded ephemeral PostgreSQL container lifecycle; normal development database is not used",
+      "idempotency": "Each invocation has a fresh isolated database and evidence run ID",
+      "claim_or_lease": "Canonical isolated-database guard and cleanup",
+      "retry": "Explicit rerun creates an independent disposable run and retains failed evidence",
+      "completion_state": "Original test exit status and published passed boolean; failures remain failures",
+      "audit": "NOT_REQUIRED",
+      "outbox": "NOT_REQUIRED",
+      "direct_tests": [
+        "NONE"
+      ],
+      "indirect_tests": [
+        "apps/api/tests/test_command_concurrency.py",
+        "apps/api/tests/test_cash_concurrency.py",
+        "apps/api/tests/test_inventory_concurrency.py"
+      ],
+      "implementation_state": "INTERNAL_ONLY",
+      "verification_state": "TESTED_IN_THIS_TASK",
+      "later_ZM_FIN_tasks": [
+        "ZM-FIN-039"
+      ],
+      "decision_refs": [
+        "DEC-06",
+        "DEC-07",
+        "DEC-08",
+        "DEC-17",
+        "DEC-18"
+      ],
+      "gate_refs": [
+        "G3",
+        "G5"
+      ],
+      "feature_complete_blocker": false,
+      "gap_ids": [
+        "NONE"
+      ],
+      "evidence": [
+        "scripts/dev/run-concurrency-validation.ps1",
+        "scripts/powershell/ZeroMerma.TestDatabase.ps1",
+        "scripts/powershell/ZeroMerma.ValidationArtifacts.ps1",
+        "docs/implementation/concurrency-validation.md"
+      ],
+      "verification_notes": "Final Suite All run 110b38d483174d748f555ac9df9325dc passed all 49 tests (29 cash, 9 command conflicts, 11 inventory), with 0 failures/errors/skips in 200.769 s. Protected JUnit retains 64 process/transaction probes and 31 observed lock waits. The manifest records an edited local tree, not immutable-commit acceptance. The reusable runner supports the subsequent ZM-FIN-039 transaction-boundary review."
+    },
+    {
       "operation_key": "INTERNAL:scripts.dev.run-migration-validation:command",
       "trigger": "OPERATOR_COMMAND",
       "symbol": "command",
@@ -35212,13 +35334,13 @@
       "pos": 16,
       "backoffice": 41,
       "worker": 3,
-      "internal": 14
+      "internal": 15
     },
     "implementation_state_counts": {
       "DEPRECATED": 4,
       "FRAMEWORK_ONLY": 6,
       "IMPLEMENTED_VERIFIED": 34,
-      "INTERNAL_ONLY": 15,
+      "INTERNAL_ONLY": 16,
       "PARTIAL": 269,
       "PLACEHOLDER": 4
     },
@@ -35227,7 +35349,7 @@
       "INDIRECT_TEST_ONLY": 1,
       "NOT_APPLICABLE": 12,
       "NO_TEST": 75,
-      "TESTED_IN_THIS_TASK": 133
+      "TESTED_IN_THIS_TASK": 134
     },
     "consumer_contract_state_counts": {
       "CLIENT_GENERATED_USED": 207,
@@ -35254,7 +35376,7 @@
     },
     "feature_complete_blocker_count": 273,
     "test_gap_count": 102,
-    "operation_count": 332
+    "operation_count": 333
   },
   "openapi_comparison": {
     "runtime_operation_count": 257,
@@ -38229,7 +38351,7 @@
     "policy_source": "apps/api/src/zeromerma_api/presentation/access_policy.py#ENDPOINT_POLICIES",
     "domain_scope_source": "apps/api/src/zeromerma_api/db/access_scope.py#bind_authorization_scope",
     "identity_tests": "27 unique administrative/lifecycle tests passed locally, including explicit assignment grant/revoke with previous/current audit; dedicated approval UI remains077.",
-    "release_readiness": "Not asserted. ZM-FIN-033 through ZM-FIN-035 adopts DEC-07 for its 23 assigned economic commands and nine read-only recovery routes. The 19 remaining administrative idempotency gaps assigned to ZM-FIN-077, ZM-FIN-080 and ZM-FIN-085 remain open, together with broader concurrency, physical ledger, worker, functional, deployment and product UI gaps.",
+    "release_readiness": "Not asserted. ZM-FIN-033 through ZM-FIN-035 adopts DEC-07 for 23 assigned economic commands and nine read-only recovery routes. ZM-FIN-036 through ZM-FIN-038 verifies the common cash admission and inventory mutation boundaries, without completing order-payment ledger integration ZM-FIN-042 or declaring the data-integrity gate complete. The 19 administrative idempotency gaps assigned to ZM-FIN-077, ZM-FIN-080 and ZM-FIN-085 remain open, together with transaction review, financial/physical ledger, reconciliation, worker, functional, deployment and product UI gaps, including purchase PATCH GAP-0991.",
     "policy_count_context": "The 228 policies record the historical ZM-FIN-015 through ZM-FIN-022 authorization acceptance, not the current endpoint count; current inventory is described by api_operations and openapi_comparison."
   }
 }

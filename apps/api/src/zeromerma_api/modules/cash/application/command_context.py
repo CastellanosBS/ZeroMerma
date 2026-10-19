@@ -96,7 +96,13 @@ def lock_cash_session(
     cash_session_id: UUID,
     require_open: bool = True,
 ) -> CashSession:
-    """Acquire the exact shift after reservation and refresh after any lock wait."""
+    """Lock the exact shift after reservation and before dependent business rows.
+
+    HTTP authentication precedes this boundary (identity, user, auth session).
+    Commands then lock CashSession before Sale, CustomerOrder, or physical documents.
+    NO KEY UPDATE serializes effects while remaining compatible with reservation FKs.
+    Replay deliberately does not acquire this boundary or require an OPEN shift.
+    """
     row = session.scalar(
         select(CashSession)
         .where(CashSession.id == cash_session_id)

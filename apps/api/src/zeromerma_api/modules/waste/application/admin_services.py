@@ -17,11 +17,14 @@ from zeromerma_api.modules.catalog.infrastructure.models import Product, Product
 from zeromerma_api.modules.identity.application.actions import restrict_actions
 from zeromerma_api.modules.identity.application.schemas import AuthenticatedUser
 from zeromerma_api.modules.identity.infrastructure.models import User
+from zeromerma_api.modules.inventory.application.mutations import (
+    InventoryBalanceKey,
+    lock_inventory_balances,
+)
 from zeromerma_api.modules.inventory.domain.constants import (
     INVENTORY_LOCATION_BACKROOM,
     INVENTORY_LOCATION_COUNTER,
     INVENTORY_LOCATION_IN_TRANSIT,
-    INVENTORY_MOVEMENT_DIRECTION_OUT,
     INVENTORY_MOVEMENT_TYPE_WASTE_RECORD,
 )
 from zeromerma_api.modules.inventory.infrastructure.models import (
@@ -268,20 +271,13 @@ class AdminWasteService:
         if notes_required and not _has_text(command.notes):
             raise WasteValidationError("Notes are required for this waste reason or impact level.")
 
-        balance = self._get_balance(
-            session,
-            branch_id=branch.id,
-            location_code=location_code,
-            product_id=resolved_product.product.id,
-            for_update=True,
-        )
-        if balance is None or Decimal(balance.quantity_on_hand) < quantity:
+        key = InventoryBalanceKey(branch.id, resolved_product.product.id, location_code)
+        balances = lock_inventory_balances(session, [key])
+        if balances.quantity(key) < quantity:
             raise WasteValidationError(
                 "Waste quantity exceeds available stock for selected branch and location."
             )
 
-        previous_quantity = _q3(Decimal(balance.quantity_on_hand))
-        new_quantity = _q3(previous_quantity - quantity)
         now = _utc_now()
         document = OperationDocument(
             committed_at_utc=now,
@@ -312,24 +308,17 @@ class AdminWasteService:
                 unit_of_measure_code=resolved_product.product.unit_of_measure,
             ),
         )
-        balance.quantity_on_hand = new_quantity
-        movement = InventoryMovement(
-            id=uuid.uuid4(),
-            balance_after=new_quantity,
-            branch_id=branch.id,
-            direction=INVENTORY_MOVEMENT_DIRECTION_OUT,
-            location_code=location_code,
+        movement = balances.apply_delta(
+            key,
+            delta=-quantity,
             movement_type=INVENTORY_MOVEMENT_TYPE_WASTE_RECORD,
             notes=command.notes,
             operator_user_id=current_user.id,
-            product_id=resolved_product.product.id,
-            quantity=quantity,
             reason=reason.code,
             source_document_id=document.id,
             source_document_type=ADMIN_WASTE_SOURCE_DOCUMENT_TYPE,
             unit_of_measure=resolved_product.product.unit_of_measure,
         )
-        session.add(movement)
         self._record_confirmed(
             session,
             branch=branch,
@@ -511,7 +500,6 @@ class AdminWasteService:
             branch_id=row.branch.id,
             location_code=row.document.source_bucket_code or INVENTORY_LOCATION_BACKROOM,
             product_id=primary.product.id,
-            for_update=False,
         )
         return AdminWasteDetailView(
             available_actions=restrict_actions(
@@ -934,7 +922,6 @@ class AdminWasteService:
         session: Session,
         *,
         branch_id: uuid.UUID,
-        for_update: bool,
         location_code: str,
         product_id: uuid.UUID,
     ) -> InventoryBalance | None:
@@ -943,8 +930,6 @@ class AdminWasteService:
             InventoryBalance.location_code == location_code,
             InventoryBalance.product_id == product_id,
         )
-        if for_update:
-            query = query.with_for_update()
         return session.execute(query).scalar_one_or_none()
 
     def _matches_search(self, row: _WasteRow, search: str) -> bool:

@@ -8,6 +8,7 @@ from sqlalchemy.orm import Session
 from zeromerma_api.db.access_scope import bind_authorization_scope
 from zeromerma_api.modules.branches.application.access import WorkstationAccessService
 from zeromerma_api.modules.branches.infrastructure.models import Workstation
+from zeromerma_api.modules.cash.application.command_context import lock_cash_session
 from zeromerma_api.modules.idempotency.application.context import execution
 from zeromerma_api.modules.idempotency.application.schemas import (
     CommandContext,
@@ -135,6 +136,20 @@ class OrdersIdempotencyService:
 
         def action(current: Session) -> CommandResult:
             trace = self._trace(current, command_code, key)
+            owner = execution(current)
+            if owner is None or owner.record is None:
+                raise IdempotencyBoundaryError("Order commands require their reserved context.")
+            context = owner.record
+            if context.workstation_id is None or context.branch_id is None:
+                raise IdempotencyBoundaryError("POS orders require a workstation and branch.")
+            # Reserve identity first, then serialize the shift before locking the order.
+            lock_cash_session(
+                current,
+                current_user=current_user,
+                workstation_id=context.workstation_id,
+                branch_id=context.branch_id,
+                cash_session_id=command.cash_session_id,
+            )
             if isinstance(command, CreateCustomerOrderRequest):
                 if prepared is None:
                     raise IdempotencyBoundaryError("Order creation requires validated preparation.")

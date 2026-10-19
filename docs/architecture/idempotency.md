@@ -208,8 +208,10 @@ a key or issues a refund. An unresolved result cannot justify a new intention;
 after reload, metadata without the in-memory body supports lookup only.
 
 This adoption does not create physical stock movements from the currently stored
-disposition codes, complete external/partial settlement, or solve the separate
-cash-close race boundary. Those remain 050–051, 044–046 and 037 respectively.
+disposition codes or complete external/partial settlement; those remain 050–051
+and 044–046. ZM-FIN-036–038 subsequently applies the shared cash-close boundary
+before the return's sale-local entitlement lock, as documented in
+[concurrency.md](concurrency.md).
 Existing CASH refunds of originally CARD/MIXED sales remain valid; unsupported
 refund methods do not become simulated bank reversals. The
 [return validation record](../implementation/return-idempotency-validation.md)

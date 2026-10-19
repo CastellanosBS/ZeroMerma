@@ -74,6 +74,7 @@ from zeromerma_api.modules.sales.infrastructure.models import CashMovement
 from zeromerma_api.testing.authorization import owner_headers
 from zeromerma_api.testing.idempotency import new_idempotency_key
 from zeromerma_api.testing.sessions import login_headers
+from zeromerma_api.testing.transfer_operators import transfer_cashier_email
 
 COMMANDS = [
     ("POS", "create"),
@@ -97,19 +98,27 @@ def _login(client: TestClient, workstation: str = SEED_WORKSTATION_CODE) -> dict
     )
 
 
-def _setup(client: TestClient) -> tuple[dict[str, str], dict[str, Any]]:
-    headers = _login(client)
+def _setup(
+    client: TestClient, workstation: str = SEED_WORKSTATION_CODE
+) -> tuple[dict[str, str], dict[str, Any]]:
+    headers = login_headers(
+        client,
+        email=transfer_cashier_email(workstation),
+        password=SEED_USER_PASSWORD,
+        audience="POS",
+        workstation_code=workstation,
+    )
     opened = client.post(
         "/v1/cash-sessions/open",
         headers={**headers, "Idempotency-Key": new_idempotency_key()},
-        json={"workstation_code": SEED_WORKSTATION_CODE, "opening_amount": "100.00"},
+        json={"workstation_code": workstation, "opening_amount": "100.00"},
     )
     assert opened.status_code == 201
     with SessionLocal() as session:
-        cash_id = session.scalars(select(CashSession.id)).one()
+        cash_id = UUID(opened.json()["id"])
         products = dict(session.execute(select(Product.code, Product.id)).all())
     return headers, {
-        "workstation_code": SEED_WORKSTATION_CODE,
+        "workstation_code": workstation,
         "cash_session_id": str(cash_id),
         "customer_name": "Private order customer",
         "customer_phone": "6621234567",
@@ -921,10 +930,13 @@ def test_order_lock_serializes_competing_payments_and_cross_surface_transitions(
 def test_unrelated_orders_do_not_share_a_command_lock(
     client: TestClient, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    headers, create = _setup(client)
+    contexts = [
+        _setup(client, station)
+        for station in (SEED_WORKSTATION_CODE, SEED_DESTINATION_WORKSTATION_CODE)
+    ]
     ids = [
         _post(client, headers, "create", create, new_idempotency_key()).json()["id"]
-        for _ in range(2)
+        for headers, create in contexts
     ]
     barrier, original = Barrier(2), OutboxWriter.append
 
@@ -945,7 +957,7 @@ def test_unrelated_orders_do_not_share_a_command_lock(
                 new_idempotency_key(),
                 order_id,
             )
-            for order_id in ids
+            for (headers, create), order_id in zip(contexts, ids, strict=True)
         ]
         results = [future.result(timeout=25) for future in futures]
     assert all(result.status_code == 200 and not result.replayed for result in results)

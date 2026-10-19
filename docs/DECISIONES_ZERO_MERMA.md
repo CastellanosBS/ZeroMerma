@@ -2007,13 +2007,23 @@ El orden canónico conceptual será:
 
 ```text
 1. IdempotencyRecord
-2. documento/estado de negocio
-3. CashSession cuando DEC-06 aplique
+2. CashSession cuando DEC-06 aplique
+3. documento/estado de negocio
 4. InventoryBalance ordenados determinísticamente
 5. Reservation/Obligation correspondientes
 6. efectos
 7. commit
 ```
+
+Precisión técnica de ZM-FIN-036–038: los comandos financieros adquieren la frontera
+de `CashSession` antes del documento dependiente (por ejemplo, `Sale` o
+`CustomerOrder`), conforme a la admisión de DEC-06. Los comandos físicos sin caja
+omiten ese paso y bloquean su documento antes de los balances. Los caminos que
+comparten una frontera no pueden invertir ese orden. Esta precisión elimina la
+ambigüedad de ejecución del orden conceptual; no cambia una regla de negocio ni
+constituye una nueva aprobación. La evidencia local concurrente del bloque está
+verificada y se registra en `docs/implementation/concurrency-validation.md`; la
+aceptación integrada exige CI del commit entregado.
 
 Los balances se ordenarán mediante una clave determinista equivalente a:
 

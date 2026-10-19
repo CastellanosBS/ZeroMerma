@@ -63,6 +63,7 @@ from zeromerma_api.modules.sales.infrastructure.models import CashMovement, Sale
 from zeromerma_api.testing.authorization import owner_headers
 from zeromerma_api.testing.idempotency import new_idempotency_key
 from zeromerma_api.testing.sessions import login_headers
+from zeromerma_api.testing.transfer_operators import transfer_cashier_email
 
 ENDPOINT = "/v1/returns/commit"
 DISPOSITIONS = ["RESTOCK_COUNTER", "RESTOCK_BACKROOM", "SEND_TO_WASTE"]
@@ -84,6 +85,7 @@ def _sale(
     cash_id: str,
     *,
     payment: str = "CASH",
+    workstation: str = SEED_WORKSTATION_CODE,
 ) -> dict[str, Any]:
     with SessionLocal() as session:
         product = session.scalar(
@@ -102,7 +104,7 @@ def _sale(
         "/v1/sales/confirm",
         headers={**headers, "Idempotency-Key": new_idempotency_key()},
         json={
-            "workstation_code": SEED_WORKSTATION_CODE,
+            "workstation_code": workstation,
             "cash_session_id": cash_id,
             "lines": [
                 {"capture_mode": "PRODUCT_DIRECT", "product_id": str(product), "quantity": "4"},
@@ -119,7 +121,7 @@ def _sale(
     detail = client.get(
         f"/v1/returns/sales/{response.json()['id']}",
         headers=headers,
-        params={"workstation_code": SEED_WORKSTATION_CODE},
+        params={"workstation_code": workstation},
     )
     assert detail.status_code == 200
     return detail.json()
@@ -128,17 +130,24 @@ def _sale(
 def _setup(
     client: TestClient,
     *,
+    workstation: str = SEED_WORKSTATION_CODE,
     capture: str = "PRODUCT_DIRECT",
     payment: str = "CASH",
 ) -> tuple[dict[str, str], dict[str, Any], dict[str, Any]]:
-    headers = _login(client)
+    headers = login_headers(
+        client,
+        email=transfer_cashier_email(workstation),
+        password=SEED_USER_PASSWORD,
+        audience="POS",
+        workstation_code=workstation,
+    )
     opening = client.post(
         "/v1/cash-sessions/open",
         headers={**headers, "Idempotency-Key": new_idempotency_key()},
-        json={"workstation_code": SEED_WORKSTATION_CODE, "opening_amount": "200.00"},
+        json={"workstation_code": workstation, "opening_amount": "200.00"},
     )
     assert opening.status_code == 201
-    sale = _sale(client, headers, opening.json()["id"], payment=payment)
+    sale = _sale(client, headers, opening.json()["id"], payment=payment, workstation=workstation)
     line = next(item for item in sale["lines"] if item["capture_mode"] == capture)
     with SessionLocal() as session:
         product = session.scalar(
@@ -147,7 +156,7 @@ def _setup(
     return (
         headers,
         {
-            "workstation_code": SEED_WORKSTATION_CODE,
+            "workstation_code": workstation,
             "cash_session_id": opening.json()["id"],
             "original_sale_id": sale["id"],
             "reason_code": "WRONG_ITEM",
@@ -816,13 +825,10 @@ def test_unrelated_sales_can_refund_without_a_global_command_lock(
     client: TestClient,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    headers, body, _ = _setup(client)
-    other_sale = _sale(client, headers, body["cash_session_id"])
-    other = deepcopy(body)
-    other["original_sale_id"] = other_sale["id"]
-    other["lines"][0]["original_sale_line_id"] = next(
-        line["id"] for line in other_sale["lines"] if line["capture_mode"] == "PRODUCT_DIRECT"
-    )
+    contexts = [
+        _setup(client, workstation=station)
+        for station in (SEED_WORKSTATION_CODE, SEED_DESTINATION_WORKSTATION_CODE)
+    ]
     barrier, append = Barrier(2), OutboxWriter.append
 
     def meet(self: OutboxWriter, session: Any, **kwargs: Any) -> Any:
@@ -835,7 +841,7 @@ def test_unrelated_sales_can_refund_without_a_global_command_lock(
         patch.setattr(OutboxWriter, "append", meet)
         futures = [
             pool.submit(_domain, headers, payload, new_idempotency_key())
-            for payload in (body, other)
+            for headers, payload, _sale_detail in contexts
         ]
         results = [future.result(timeout=25) for future in futures]
     assert all(result.status_code == 201 and not result.replayed for result in results)

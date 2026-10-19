@@ -45,6 +45,10 @@ from zeromerma_api.modules.inventory.application.admin_schemas import (
     AdminInventoryWarningSeverity,
     AdminInventoryWarningView,
 )
+from zeromerma_api.modules.inventory.application.mutations import (
+    InventoryBalanceKey,
+    lock_inventory_balances,
+)
 from zeromerma_api.modules.inventory.domain.constants import (
     INVENTORY_ADJUSTMENT_TYPE_DECREASE,
     INVENTORY_ADJUSTMENT_TYPE_INCREASE,
@@ -221,13 +225,10 @@ class AdminInventoryService:
         if command.location_code not in VALID_INVENTORY_LOCATION_CODES:
             raise InventoryValidationError("Inventory location is not supported.")
 
-        balance = self._get_or_create_balance(
-            session,
-            product_id=product.id,
-            branch_id=branch.id,
-            location_code=command.location_code,
-        )
-        previous_quantity = Decimal(balance.quantity_on_hand)
+        key = InventoryBalanceKey(branch.id, product.id, command.location_code)
+        balances = lock_inventory_balances(session, [key])
+        balance = balances.balance(key)
+        previous_quantity = balances.quantity(key)
         new_quantity = self._calculate_new_quantity(
             previous_quantity=previous_quantity,
             adjustment_type=command.adjustment_type,
@@ -236,12 +237,6 @@ class AdminInventoryService:
         movement_quantity = abs(new_quantity - previous_quantity)
         if movement_quantity <= 0:
             raise InventoryValidationError("Adjustment must change inventory quantity.")
-
-        direction = (
-            INVENTORY_MOVEMENT_DIRECTION_IN
-            if new_quantity > previous_quantity
-            else INVENTORY_MOVEMENT_DIRECTION_OUT
-        )
 
         adjustment = InventoryAdjustment(
             adjustment_type=command.adjustment_type,
@@ -258,24 +253,19 @@ class AdminInventoryService:
         session.add(adjustment)
         session.flush()
 
-        balance.quantity_on_hand = new_quantity
-        movement = InventoryMovement(
+        movement = balances.apply_delta(
+            key,
+            delta=new_quantity - previous_quantity,
             adjustment_id=adjustment.id,
-            balance_after=new_quantity,
-            branch_id=branch.id,
-            direction=direction,
-            location_code=command.location_code,
             movement_type=INVENTORY_MOVEMENT_TYPE_MANUAL_ADJUSTMENT,
             notes=command.notes,
             operator_user_id=current_user.id,
-            product_id=product.id,
-            quantity=movement_quantity,
             reason=command.reason,
             source_document_id=adjustment.id,
             source_document_type=INVENTORY_ADJUSTMENT_SOURCE_DOCUMENT_TYPE,
             unit_of_measure=product.unit_of_measure,
+            allow_negative=True,
         )
-        session.add(movement)
         session.flush()
 
         metadata = {
@@ -708,36 +698,6 @@ class AdminInventoryService:
             source_document_type=movement.source_document_type,
             unit_of_measure=movement.unit_of_measure,
         )
-
-    def _get_or_create_balance(
-        self,
-        session: Session,
-        *,
-        product_id: uuid.UUID,
-        branch_id: uuid.UUID,
-        location_code: str,
-    ) -> InventoryBalance:
-        balance = session.execute(
-            select(InventoryBalance)
-            .where(
-                InventoryBalance.product_id == product_id,
-                InventoryBalance.branch_id == branch_id,
-                InventoryBalance.location_code == location_code,
-            )
-            .with_for_update(),
-        ).scalar_one_or_none()
-        if balance is not None:
-            return balance
-
-        balance = InventoryBalance(
-            branch_id=branch_id,
-            location_code=location_code,
-            product_id=product_id,
-            quantity_on_hand=Decimal("0"),
-        )
-        session.add(balance)
-        session.flush()
-        return balance
 
     def _calculate_new_quantity(
         self,

@@ -277,6 +277,34 @@ ampliada conservan sus tareas posteriores; la matriz mantiene las brechas de
 idempotencia administrativa asignadas a 077/080/085. Este bloque no declara el producto listo
 para abrir. El siguiente paso planificado es **ZM-FIN-036**, concurrencia.
 
+### 0.10 Registro de ejecución — ZM-FIN-036–038
+
+El bloque parte de `9376bf126a97a13f72db17a630cd1d97509b60d5` en la rama
+`codex/zm-fin-036-038-concurrency`. Su alcance es la frontera transaccional común
+entre operaciones de caja y cierre, la actualización concurrente de balances y
+el reintento seguro tras conflictos transitorios de PostgreSQL. La implementación
+y la validación local del alcance están completadas: 49 casos concurrentes en la
+ejecución conjunta (29 de caja, 9 de conflictos y 11 de inventario) y 124 regresiones
+de escritores de inventario pasaron, sin fallos, errores ni casos omitidos. Las
+pruebas complementarias de caja cubren 42 casos únicos entre dos ejecuciones;
+incluyen los 29 casos que repite la suite conjunta y no se suman como casos nuevos.
+
+El [protocolo de concurrencia](architecture/concurrency.md) define los locks,
+su orden, la revalidación del turno y la creación de la primera fila de inventario.
+El [registro de validación](implementation/concurrency-validation.md) exige
+conexiones PostgreSQL independientes, espera observada, reconciliación final y
+evidencia protegida. La aceptación integrada requiere las ocho etapas Foundation
+y **Foundation required** sobre el SHA entregado.
+
+ZM-FIN-037 protege la admisión temporal de los pagos de pedidos frente al cierre;
+la integración pendiente de `CustomerOrderPayment` con `CashMovement` continúa en
+**ZM-FIN-042**. No se rehace la fórmula de totales. ZM-FIN-038 conserva los efectos
+físicos existentes y no introduce el ledger POS, reservas ni producción ampliada.
+Se mantienen las 19 brechas de idempotencia administrativa de 077/080/085,
+`GAP-0991` de la UI de edición de compras y las brechas de conciliación. Este bloque
+no declara el producto terminado ni listo para operar con datos reales. El
+siguiente paso planificado es **ZM-FIN-039**, revisión de límites transaccionales.
+
 ## 1. Resumen ejecutivo
 
 ZeroMerma posee una base adecuada para evolucionar sin reescritura: monolito modular, FastAPI/SQLAlchemy/PostgreSQL, POS y Backoffice separados, OpenAPI generado, precisión decimal, auditoría y outbox transaccionales. La auditoría activa demostró que una parte importante de ventas, pagos, pedidos, documentos y administración es real. También demostró defectos sistémicos: el POS no alimenta el inventario canónico; el pago de pedido no entra en caja/corte; el worker no procesa eventos; la trazabilidad de identidad/origen es incorrecta; y varias superficies administrativas son simuladas o incompletas.

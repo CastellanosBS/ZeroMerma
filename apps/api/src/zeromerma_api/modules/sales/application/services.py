@@ -15,6 +15,7 @@ from zeromerma_api.modules.branches.application.access import (
     WorkstationContext,
 )
 from zeromerma_api.modules.branches.infrastructure.models import Branch, Workstation
+from zeromerma_api.modules.cash.application.command_context import lock_cash_session
 from zeromerma_api.modules.cash.domain.constants import CASH_SESSION_STATUS_OPEN
 from zeromerma_api.modules.cash.infrastructure.models import CashSession
 from zeromerma_api.modules.catalog.infrastructure.models import Product, ProductClass
@@ -352,6 +353,13 @@ class SaleCommandService:
     ) -> SaleConfirmationView:
         """Write one prepared sale inside the caller-owned idempotent transaction."""
         context = prepared.context
+        lock_cash_session(
+            session,
+            current_user=current_user,
+            workstation_id=context.workstation_id,
+            branch_id=context.branch_id,
+            cash_session_id=prepared.cash_session_id,
+        )
         priced_lines = prepared.priced_lines
         prepared_payments = prepared.payments
         sale_currency = prepared.currency_code

@@ -15,11 +15,14 @@ from zeromerma_api.modules.catalog.infrastructure.models import Product, Product
 from zeromerma_api.modules.identity.application.actions import restrict_actions
 from zeromerma_api.modules.identity.application.schemas import AuthenticatedUser
 from zeromerma_api.modules.identity.infrastructure.models import User
+from zeromerma_api.modules.inventory.application.mutations import (
+    InventoryBalanceKey,
+    LockedInventoryBalances,
+    lock_inventory_balances,
+)
 from zeromerma_api.modules.inventory.domain.constants import (
     INVENTORY_LOCATION_BACKROOM,
     INVENTORY_LOCATION_IN_TRANSIT,
-    INVENTORY_MOVEMENT_DIRECTION_IN,
-    INVENTORY_MOVEMENT_DIRECTION_OUT,
     INVENTORY_MOVEMENT_TYPE_TRANSFER_DISPATCH,
     INVENTORY_MOVEMENT_TYPE_TRANSFER_RECEIPT,
 )
@@ -314,8 +317,23 @@ class AdminTransferService:
         if not shipment_lines:
             raise TransferValidationError("Transfer must contain at least one line.")
 
+        balances = lock_inventory_balances(
+            session,
+            (
+                key
+                for line in shipment_lines
+                for key in (
+                    InventoryBalanceKey(
+                        origin_branch.id, line.product_id, INVENTORY_LOCATION_BACKROOM
+                    ),
+                    InventoryBalanceKey(
+                        destination_branch.id, line.product_id, INVENTORY_LOCATION_IN_TRANSIT
+                    ),
+                )
+            ),
+        )
         self._validate_origin_stock(
-            session, shipment_lines=shipment_lines, origin_branch_id=origin_branch.id
+            balances, shipment_lines=shipment_lines, origin_branch_id=origin_branch.id
         )
         committed_at = datetime.now(tz=UTC)
         shipment.status = OPERATION_DOCUMENT_STATUS_IN_TRANSIT
@@ -324,7 +342,7 @@ class AdminTransferService:
             shipment.notes = command.notes
 
         self._apply_dispatch_inventory(
-            session,
+            balances,
             current_user=current_user,
             shipment=shipment,
             shipment_lines=shipment_lines,
@@ -457,8 +475,18 @@ class AdminTransferService:
         )
         if shipment.status != final_status:
             shipment.status = final_status
-        self._apply_receipt_inventory(
+        balances = lock_inventory_balances(
             session,
+            (
+                InventoryBalanceKey(destination_branch.id, line.product_id, location)
+                for line in shipment_lines
+                if line.id in receipt_by_line_id
+                and receipt_by_line_id[line.id].received_quantity > 0
+                for location in (INVENTORY_LOCATION_IN_TRANSIT, INVENTORY_LOCATION_BACKROOM)
+            ),
+        )
+        self._apply_receipt_inventory(
+            balances,
             current_user=current_user,
             shipment=shipment,
             receipt=receipt,
@@ -800,27 +828,23 @@ class AdminTransferService:
 
     def _validate_origin_stock(
         self,
-        session: Session,
+        balances: LockedInventoryBalances,
         *,
         shipment_lines: list[OperationDocumentLine],
         origin_branch_id: uuid.UUID,
     ) -> None:
         for line in shipment_lines:
-            balance = self._get_balance(
-                session,
-                product_id=line.product_id,
-                branch_id=origin_branch_id,
-                location_code=INVENTORY_LOCATION_BACKROOM,
-                for_update=True,
+            key = InventoryBalanceKey(
+                origin_branch_id, line.product_id, INVENTORY_LOCATION_BACKROOM
             )
-            if balance is None or balance.quantity_on_hand < line.quantity:
+            if balances.quantity(key) < line.quantity:
                 raise TransferValidationError(
                     f"Origin stock is insufficient for {line.product_code_snapshot}."
                 )
 
     def _apply_dispatch_inventory(
         self,
-        session: Session,
+        balances: LockedInventoryBalances,
         *,
         current_user: AuthenticatedUser,
         destination_branch_id: uuid.UUID,
@@ -829,7 +853,7 @@ class AdminTransferService:
     ) -> None:
         for line in shipment_lines:
             self._apply_stock_delta(
-                session,
+                balances,
                 branch_id=shipment.source_branch_id,
                 current_user=current_user,
                 delta=-line.quantity,
@@ -843,7 +867,7 @@ class AdminTransferService:
                 unit_of_measure=line.unit_of_measure_code,
             )
             self._apply_stock_delta(
-                session,
+                balances,
                 branch_id=destination_branch_id,
                 current_user=current_user,
                 delta=line.quantity,
@@ -859,7 +883,7 @@ class AdminTransferService:
 
     def _apply_receipt_inventory(
         self,
-        session: Session,
+        balances: LockedInventoryBalances,
         *,
         current_user: AuthenticatedUser,
         receipt: OperationDocument,
@@ -876,7 +900,7 @@ class AdminTransferService:
             if receipt_line.received_quantity == 0:
                 continue
             self._apply_stock_delta(
-                session,
+                balances,
                 branch_id=shipment.destination_branch_id,
                 current_user=current_user,
                 delta=-receipt_line.received_quantity,
@@ -892,7 +916,7 @@ class AdminTransferService:
             received_quantity = receipt_line.received_quantity
             if received_quantity > 0:
                 self._apply_stock_delta(
-                    session,
+                    balances,
                     branch_id=shipment.destination_branch_id,
                     current_user=current_user,
                     delta=received_quantity,
@@ -908,7 +932,7 @@ class AdminTransferService:
 
     def _apply_stock_delta(
         self,
-        session: Session,
+        balances: LockedInventoryBalances,
         *,
         branch_id: uuid.UUID,
         current_user: AuthenticatedUser,
@@ -924,34 +948,19 @@ class AdminTransferService:
     ) -> None:
         if delta == 0:
             return
-        balance = self._get_or_create_balance(
-            session,
-            product_id=product_id,
-            branch_id=branch_id,
-            location_code=location_code,
-        )
-        new_quantity = Decimal(balance.quantity_on_hand) + delta
-        direction = (
-            INVENTORY_MOVEMENT_DIRECTION_IN if delta > 0 else INVENTORY_MOVEMENT_DIRECTION_OUT
-        )
-        movement_quantity = abs(delta)
-        balance.quantity_on_hand = new_quantity
-        session.add(
-            InventoryMovement(
-                balance_after=new_quantity,
-                branch_id=branch_id,
-                direction=direction,
-                location_code=location_code,
-                movement_type=movement_type,
-                notes=notes,
-                operator_user_id=current_user.id,
-                product_id=product_id,
-                quantity=movement_quantity,
-                reason=reason,
-                source_document_id=source_document_id,
-                source_document_type=source_document_type,
-                unit_of_measure=unit_of_measure,
-            )
+        balances.apply_delta(
+            InventoryBalanceKey(branch_id, product_id, location_code),
+            delta=delta,
+            movement_type=movement_type,
+            notes=notes,
+            operator_user_id=current_user.id,
+            reason=reason,
+            source_document_id=source_document_id,
+            source_document_type=source_document_type,
+            unit_of_measure=unit_of_measure,
+            # POS dispatch is still documentary. Preserve mixed-surface receipt semantics
+            # until physical transfer unification; do not invent transit stock here.
+            allow_negative=location_code == INVENTORY_LOCATION_IN_TRANSIT,
         )
 
     def _get_balance(
@@ -959,7 +968,6 @@ class AdminTransferService:
         session: Session,
         *,
         branch_id: uuid.UUID,
-        for_update: bool = False,
         location_code: str,
         product_id: uuid.UUID,
     ) -> InventoryBalance | None:
@@ -968,36 +976,7 @@ class AdminTransferService:
             InventoryBalance.location_code == location_code,
             InventoryBalance.product_id == product_id,
         )
-        if for_update:
-            query = query.with_for_update()
         return session.execute(query).scalar_one_or_none()
-
-    def _get_or_create_balance(
-        self,
-        session: Session,
-        *,
-        branch_id: uuid.UUID,
-        location_code: str,
-        product_id: uuid.UUID,
-    ) -> InventoryBalance:
-        balance = self._get_balance(
-            session,
-            product_id=product_id,
-            branch_id=branch_id,
-            location_code=location_code,
-            for_update=True,
-        )
-        if balance is not None:
-            return balance
-        balance = InventoryBalance(
-            branch_id=branch_id,
-            location_code=location_code,
-            product_id=product_id,
-            quantity_on_hand=Decimal("0"),
-        )
-        session.add(balance)
-        session.flush()
-        return balance
 
     def _record_change(
         self,

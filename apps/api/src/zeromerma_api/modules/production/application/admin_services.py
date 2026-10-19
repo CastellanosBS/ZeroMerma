@@ -7,7 +7,6 @@ from decimal import ROUND_HALF_UP, Decimal
 
 from pydantic import TypeAdapter
 from sqlalchemy import String, cast, delete, or_, select
-from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from zeromerma_api.modules.audit.application.service import AuditRecorder
@@ -20,10 +19,12 @@ from zeromerma_api.modules.idempotency.infrastructure.models import IdempotencyR
 from zeromerma_api.modules.identity.application.actions import restrict_actions
 from zeromerma_api.modules.identity.application.schemas import AuthenticatedUser
 from zeromerma_api.modules.identity.infrastructure.models import User
+from zeromerma_api.modules.inventory.application.mutations import (
+    InventoryBalanceKey,
+    lock_inventory_balances,
+)
 from zeromerma_api.modules.inventory.domain.constants import (
     INVENTORY_LOCATION_BACKROOM,
-    INVENTORY_MOVEMENT_DIRECTION_IN,
-    INVENTORY_MOVEMENT_DIRECTION_OUT,
     INVENTORY_MOVEMENT_TYPE_PRODUCTION_CONSUMPTION,
     INVENTORY_MOVEMENT_TYPE_PRODUCTION_OUTPUT,
 )
@@ -354,69 +355,52 @@ class AdminProductionService:
         product_ids = {line.input_product_id for line in inputs}
         if actual_output > ZERO:
             product_ids.add(row.product.id)
-        balances = {
-            product_id: self._get_or_create_balance(
-                session,
-                branch_id=row.branch.id,
-                product_id=product_id,
-                location_code=INVENTORY_LOCATION_BACKROOM,
-            )
-            for product_id in sorted(product_ids, key=str)
-        }
+        balances = lock_inventory_balances(
+            session,
+            (
+                InventoryBalanceKey(row.branch.id, product_id, INVENTORY_LOCATION_BACKROOM)
+                for product_id in product_ids
+            ),
+        )
         now = _utc_now()
         for input_line in inputs:
             input_product = self._get_product(session, input_line.input_product_id)
-            balance = balances[input_line.input_product_id]
-            available = Decimal(balance.quantity_on_hand) if balance is not None else ZERO
+            key = InventoryBalanceKey(
+                row.branch.id, input_line.input_product_id, INVENTORY_LOCATION_BACKROOM
+            )
+            available = balances.quantity(key)
             required = Decimal(input_line.required_qty)
             if available < required:
                 raise ProductionValidationError(
                     "Raw material stock changed and is no longer sufficient."
                 )
-            assert balance is not None
-            balance.quantity_on_hand = _q3(available - required)
             input_line.consumed_qty = required
             input_line.available_qty_snapshot = available
             input_line.shortage_qty_snapshot = ZERO
             input_line.status = PRODUCTION_INPUT_STATUS_AVAILABLE
-            session.add(
-                InventoryMovement(
-                    balance_after=balance.quantity_on_hand,
-                    branch_id=row.branch.id,
-                    direction=INVENTORY_MOVEMENT_DIRECTION_OUT,
-                    location_code=INVENTORY_LOCATION_BACKROOM,
-                    movement_type=INVENTORY_MOVEMENT_TYPE_PRODUCTION_CONSUMPTION,
-                    notes=command.notes,
-                    operator_user_id=current_user.id,
-                    product_id=input_line.input_product_id,
-                    quantity=required,
-                    reason="Production raw material consumption",
-                    source_document_id=row.batch.id,
-                    source_document_type=PRODUCTION_SOURCE_DOCUMENT_TYPE,
-                    unit_of_measure=input_product.unit_of_measure,
-                ),
+            balances.apply_delta(
+                key,
+                delta=-required,
+                movement_type=INVENTORY_MOVEMENT_TYPE_PRODUCTION_CONSUMPTION,
+                notes=command.notes,
+                operator_user_id=current_user.id,
+                reason="Production raw material consumption",
+                source_document_id=row.batch.id,
+                source_document_type=PRODUCTION_SOURCE_DOCUMENT_TYPE,
+                unit_of_measure=input_product.unit_of_measure,
             )
 
         if actual_output > ZERO:
-            output_balance = balances[row.product.id]
-            previous_output = Decimal(output_balance.quantity_on_hand)
-            output_balance.quantity_on_hand = _q3(previous_output + actual_output)
-            session.add(
-                InventoryMovement(
-                    balance_after=output_balance.quantity_on_hand,
-                    branch_id=row.branch.id,
-                    direction=INVENTORY_MOVEMENT_DIRECTION_IN,
-                    location_code=INVENTORY_LOCATION_BACKROOM,
-                    movement_type=INVENTORY_MOVEMENT_TYPE_PRODUCTION_OUTPUT,
-                    notes=command.notes,
-                    operator_user_id=current_user.id,
-                    product_id=row.product.id,
-                    quantity=actual_output,
-                    reason="Production finished goods output",
-                    source_document_id=row.batch.id,
-                    source_document_type=PRODUCTION_SOURCE_DOCUMENT_TYPE,
-                    unit_of_measure=row.product.unit_of_measure,
-                ),
+            balances.apply_delta(
+                InventoryBalanceKey(row.branch.id, row.product.id, INVENTORY_LOCATION_BACKROOM),
+                delta=actual_output,
+                movement_type=INVENTORY_MOVEMENT_TYPE_PRODUCTION_OUTPUT,
+                notes=command.notes,
+                operator_user_id=current_user.id,
+                reason="Production finished goods output",
+                source_document_id=row.batch.id,
+                source_document_type=PRODUCTION_SOURCE_DOCUMENT_TYPE,
+                unit_of_measure=row.product.unit_of_measure,
             )
 
         row.batch.actual_output_qty = actual_output
@@ -758,7 +742,6 @@ class AdminProductionService:
                 product_id=input_product.id,
                 branch_id=branch.id,
                 location_code=INVENTORY_LOCATION_BACKROOM,
-                for_update=False,
             )
             available = _q3(Decimal(balance.quantity_on_hand)) if balance is not None else ZERO
             shortage = _q3(max(required - available, ZERO))
@@ -1085,7 +1068,6 @@ class AdminProductionService:
         session: Session,
         *,
         branch_id: uuid.UUID,
-        for_update: bool,
         location_code: str,
         product_id: uuid.UUID,
     ) -> InventoryBalance | None:
@@ -1094,53 +1076,7 @@ class AdminProductionService:
             InventoryBalance.location_code == location_code,
             InventoryBalance.product_id == product_id,
         )
-        if for_update:
-            query = query.with_for_update().execution_options(populate_existing=True)
         return session.execute(query).scalar_one_or_none()
-
-    def _get_or_create_balance(
-        self,
-        session: Session,
-        *,
-        branch_id: uuid.UUID,
-        location_code: str,
-        product_id: uuid.UUID,
-    ) -> InventoryBalance:
-        balance = self._get_balance(
-            session,
-            branch_id=branch_id,
-            location_code=location_code,
-            product_id=product_id,
-            for_update=True,
-        )
-        if balance is not None:
-            return balance
-        balance = InventoryBalance(
-            branch_id=branch_id,
-            location_code=location_code,
-            product_id=product_id,
-            quantity_on_hand=ZERO,
-        )
-        try:
-            with session.begin_nested():
-                session.add(balance)
-                session.flush()
-        except IntegrityError as error:
-            if getattr(getattr(error.orig, "diag", None), "constraint_name", None) != (
-                "uq_inventory_balances_product_branch_location"
-            ):
-                raise
-            existing = self._get_balance(
-                session,
-                branch_id=branch_id,
-                product_id=product_id,
-                location_code=location_code,
-                for_update=True,
-            )
-            if existing is None:
-                raise
-            return existing
-        return balance
 
     @staticmethod
     def _command_result(session: Session, batch: ProductionBatch) -> ProductionCommandResultView:
