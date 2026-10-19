@@ -2,11 +2,13 @@
 
 from __future__ import annotations
 
+from decimal import Decimal
 from typing import Any
 from uuid import UUID, uuid4
 
 import pytest
 from fastapi.testclient import TestClient
+from inventory_fixtures import stock_for_codes
 from sqlalchemy import func, select
 
 from zeromerma_api.bootstrap.seed_local import (
@@ -94,6 +96,12 @@ def _assert_unused_key(key: str) -> None:
 
 @pytest.mark.parametrize("kind", ["counter", "transfer"])
 def test_new_command_rejects_missing_cash_before_reservation(client: TestClient, kind: str) -> None:
+    stock_for_codes(
+        workstation_code=SEED_WORKSTATION_CODE,
+        quantities={SEED_PRODUCT_CONCHA_VAN_CODE: Decimal("1.000")},
+        location="BACKROOM",
+        reference=f"cash-command-context-valid-{kind}",
+    )
     headers = _login(client)
     cash_id = _open(client, headers, SEED_WORKSTATION_CODE)
     path, body = _command(kind, cash_id)

@@ -3,6 +3,7 @@ from __future__ import annotations
 import uuid
 from decimal import Decimal
 
+import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import select
 
@@ -50,6 +51,7 @@ def _create_raw_material(code: str, *, standard_cost: Decimal | None = Decimal("
             currency_code="MXN",
             is_active=True,
             is_sellable=False,
+            is_usable_as_input=True,
         )
         session.add(product)
         session.commit()
@@ -135,9 +137,21 @@ def test_admin_recipe_rejects_non_finished_good_target(client: TestClient) -> No
     assert "finished goods" in response.json()["message"]
 
 
-def test_admin_recipe_rejects_non_raw_material_input(client: TestClient) -> None:
+@pytest.mark.parametrize(
+    ("is_active", "is_usable_as_input"),
+    [(True, False), (False, True)],
+)
+def test_admin_recipe_rejects_inactive_or_disabled_input(
+    client: TestClient, is_active: bool, is_usable_as_input: bool
+) -> None:
     product_id = _get_product_id(SEED_PRODUCT_CONCHA_VAN_CODE)
     finished_input_id = _get_product_id(SEED_PRODUCT_COCA_355_CODE)
+    with SessionLocal() as session:
+        product = session.get(Product, uuid.UUID(finished_input_id))
+        assert product is not None
+        product.is_active = is_active
+        product.is_usable_as_input = is_usable_as_input
+        session.commit()
 
     response = client.post(
         "/v1/admin/recipes-costs/recipes",
@@ -153,7 +167,47 @@ def test_admin_recipe_rejects_non_raw_material_input(client: TestClient) -> None
     )
 
     assert response.status_code == 409
-    assert "RAW_MATERIAL" in response.json()["message"]
+    assert "active and usable as inputs" in response.json()["message"]
+    with SessionLocal() as session:
+        assert (
+            session.scalar(select(Recipe.id).where(Recipe.product_id == uuid.UUID(product_id)))
+            is None
+        )
+
+
+def test_admin_recipe_accepts_sellable_finished_good_enabled_as_input(client: TestClient) -> None:
+    product_id = _get_product_id(SEED_PRODUCT_CONCHA_VAN_CODE)
+    finished_input_id = _get_product_id(SEED_PRODUCT_COCA_355_CODE)
+    with SessionLocal() as session:
+        product = session.get(Product, uuid.UUID(finished_input_id))
+        assert product is not None and product.is_active and product.is_sellable
+        assert product.product_kind == "FINISHED_GOOD"
+        product.is_usable_as_input = True
+        session.commit()
+
+    response = client.post(
+        "/v1/admin/recipes-costs/recipes",
+        headers=_admin_headers(client),
+        json={
+            "product_id": product_id,
+            "version_name": "Dual-use input",
+            "yield_qty": "1.000",
+            "yield_uom": "piece",
+            "activate": True,
+            "inputs": [{"input_product_id": finished_input_id, "quantity": "1.000"}],
+        },
+    )
+
+    assert response.status_code == 201, response.json()
+    assert response.json()["active_recipe"]["inputs"][0]["input_product_id"] == finished_input_id
+    options = client.get("/v1/admin/recipes-costs/products", headers=_admin_headers(client))
+    assert options.status_code == 200
+    assert finished_input_id in {
+        item["id"] for item in options.json()["filter_options"]["raw_materials"]
+    }
+    with SessionLocal() as session:
+        product = session.get(Product, uuid.UUID(finished_input_id))
+        assert product is not None and product.is_sellable and product.is_usable_as_input
 
 
 def test_admin_recipe_rejects_duplicate_inputs_and_invalid_shape(client: TestClient) -> None:

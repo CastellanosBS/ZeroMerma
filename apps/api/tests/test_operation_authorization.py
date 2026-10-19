@@ -402,8 +402,17 @@ def test_authorized_branch_reader_can_open_all_declared_admin_list_families(
 ) -> None:
     with SessionLocal() as session:
         branch = session.scalars(select(Branch.id)).first()
+        product = session.scalars(select(Product.id)).first()
         assert branch is not None
+        assert product is not None
         actor = _actor(session, tuple(PERMISSION_CODES), [branch])
+    required_query_parameters = {
+        "/v1/admin/waste/stock": {
+            "branch_id": str(branch),
+            "product_id": str(product),
+            "location_code": "BACKROOM",
+        }
+    }
     for (method, path), policy in ENDPOINT_POLICIES.items():
         if (
             method != "GET"
@@ -412,7 +421,9 @@ def test_authorized_branch_reader_can_open_all_declared_admin_list_families(
             or not policy.capabilities
         ):
             continue
-        response = client.get(path, headers=_headers(actor))
+        response = client.get(
+            path, headers=_headers(actor), params=required_query_parameters.get(path, {})
+        )
         assert response.status_code == 200, (path, response.text)
 
 
