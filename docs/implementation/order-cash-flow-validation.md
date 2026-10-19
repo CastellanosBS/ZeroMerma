@@ -148,6 +148,20 @@ this failed attempt is retained separately from the final acceptance result.
 
 The final full Browser result above passes all scenarios after these corrections.
 
+The first immutable-commit Foundation run was
+`39232542968` for `050f7a04c12d26f4f7b27902080d6ca531fed397`.
+Seven stages passed; Backend passed 1,254 of 1,255 tests. Its only failure was the
+transaction inventory gate: `record_order_payment` and its three participant
+flushes had not been added to `TRANSACTION_BOUNDARY_MATRIX.json`. The correction
+declares the existing idempotent command owner and participant; it changes no
+transaction, business rule or test assertion. The final delivered commit requires
+its own complete successful Foundation run.
+
+After that inventory correction, the four transaction ownership gates passed in
+3.77 seconds. The complete `uv run --frozen pytest apps/api/unit_tests` suite also
+passed: 231 tests in 35.70 seconds, with sanitized JUnit at
+`.tmp/validation-published/042-architecture/unit.xml`.
+
 Integrated acceptance
 requires the eight Foundation stages and `Foundation required` for the immutable
 delivered SHA; the SHA and run URL accompany delivery. Edited-tree local evidence

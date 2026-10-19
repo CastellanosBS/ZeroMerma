@@ -2545,6 +2545,31 @@
       ]
     },
     {
+      "path": "apps/api/src/zeromerma_api/modules/orders/application/financial_services.py",
+      "symbol": "record_order_payment",
+      "calls": [
+        {
+          "method": "flush",
+          "receiver": "session",
+          "count": 3
+        }
+      ],
+      "role": "PARTICIPANT",
+      "owner": "group:IDEMPOTENT_COMMAND",
+      "ownership_group": "IDEMPOTENT_COMMAND",
+      "entry_points": [
+        "apps/api/src/zeromerma_api/modules/orders/application/financial_services.py#record_order_payment"
+      ],
+      "cleanup": {
+        "kind": "CALLER_OWNS_ROLLBACK",
+        "reference": "group:IDEMPOTENT_COMMAND"
+      },
+      "evidence_refs": [
+        "apps/api/unit_tests/test_transaction_ownership.py",
+        "apps/api/tests/test_order_financial_entries.py"
+      ]
+    },
+    {
       "path": "apps/api/src/zeromerma_api/modules/orders/application/services.py",
       "symbol": "OrdersCommandService.create_order",
       "calls": [
@@ -4348,6 +4373,7 @@
         "apps/api/src/zeromerma_api/modules/orders/application/admin_services.py#AdminOrdersService.cancel_order",
         "apps/api/src/zeromerma_api/modules/orders/application/admin_services.py#AdminOrdersService.deliver_order",
         "apps/api/src/zeromerma_api/modules/orders/application/admin_services.py#AdminOrdersService.mark_ready",
+        "apps/api/src/zeromerma_api/modules/orders/application/financial_services.py#record_order_payment",
         "apps/api/src/zeromerma_api/modules/orders/application/services.py#OrdersCommandService.cancel_order",
         "apps/api/src/zeromerma_api/modules/orders/application/services.py#OrdersCommandService.create_order",
         "apps/api/src/zeromerma_api/modules/orders/application/services.py#OrdersCommandService.deliver_order",
