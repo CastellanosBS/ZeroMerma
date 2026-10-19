@@ -49,6 +49,7 @@ for the exact delivered commit's Foundation checks.
 |043 producer replay, zero opening, CASH/CARD/MIXED, applied cash and rollback|24/24; `operation-context/043-producers/81c288df3dad46acb698350be51ab213/operation-context.xml`.|
 |044 settlement, later turn, concurrent intentions, rollback, source methods, reserved UNKNOWN budget, missing opening, authority and BO metrics|10/10; `operation-context/refunds044-canonical/b95e34784b4f4b90bc63dd14eee87696/operation-context.xml`.|
 |044 two operators/drawers contending on one obligation|1/1; run `57385ee723964c42850c924738c45aa5`; real `pg_blocking_pids` contention, one permitted settlement.|
+|044 related-document aggregation by actual turn|2/2; `operation-context/refund-related-documents/8f217c186b3d4298b7694a63b7ac6384/operation-context.xml`. Multiple deliveries retain separate entry details and one document with the turn's total and last delivery time.|
 |045 actual-method equations, CARD count null/zero/complete, mandatory CASH, three components/same-method/zero-applied-cash classification|7/7; `operation-context/canonical-close-seven/1d30ea1b0b3c472baa19b02d3f048e7a/operation-context.xml`.|
 |045 canonical close plus complete phase7a/7b regression, including exact cent compensation|18/18; `operation-context/canonical-close-regression-final/8e6c48a8bd604b76b1be17c5277477f4/operation-context.xml`.|
 |046 HTTP/provider boundary|23/23 first run `payment-terminal/d1afca508b3544fba0e62a4bebb477dc/acceptance.xml`; final changed-path group6/6 at `payment-terminal/4829a9c99b4b42a29bcd4fea4d8d10d6/acceptance.xml`, including fresh authority after provider contact.24 distinct PostgreSQL cases total,20 domain cases.|
@@ -58,6 +59,7 @@ for the exact delivered commit's Foundation checks.
 |POS refund components/intention/recovery|14/14, including global GET recovery after reload without an open drawer; Backoffice refund components7/7.|
 |Cash concurrency|36/36; `concurrency/c4430fc77e7342ffadfbd9be5b4b1854`, preserving real database contention and rollback assertions.|
 |Sale and cash idempotency|28/28; `operation-context/financial-idempotency-regressions/fa1d9929c97143449632ddf9fac78bb3/operation-context.xml`.|
+|Order CASH/CARD/MIXED settlement and cancellation replay|3/3; `financial-unexplored-tests/103839d4cb33478598d35fda3d3d7063/result.xml`, including canonical ledger snapshots and exact CASH_FIRST receipt links.|
 |Migration evidence preservation|9/9 final focused cases; `migration-review/39ed9d3d222544f28efffc620e002827`, including fresh metadata parity and eight guarded downgrade cases.|
 |Backend unit suite|267/267 in the integrated source check; exact-commit Foundation acceptance remains required.|
 

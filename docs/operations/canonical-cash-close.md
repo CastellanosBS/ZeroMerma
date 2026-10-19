@@ -45,6 +45,11 @@ A refund remainder without an admitted money leg remains a debt and can be paid
 in an authorized later turn; it does not permanently trap the original turn.
 See [refund settlement](refund-settlement.md) for safe resumption and recovery.
 
+The cash-cut refund detail keeps each confirmed delivery as a separate entry.
+Related documents list each return once: its amount is the sum of confirmed
+deliveries in the displayed turn, and its date is the latest of those deliveries.
+Deliveries in another turn are excluded from both that amount and that date.
+
 Example: opening100, CARD sale16, CASH applied20 (tender30/change10), operating
 receipt10 and payment5 gives expected CASH125 and CARD16. Cash count125 has zero
 variance. Missing CARD count has no variance; explicit CARD0 has variance-16.

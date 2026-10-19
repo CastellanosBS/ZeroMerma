@@ -1440,6 +1440,7 @@ class AdminCashCutService:
             )
         return sorted(items, key=lambda item: item.occurred_at)
 
+    @financial_calculation
     def _build_related_documents(
         self,
         *,
@@ -1472,18 +1473,23 @@ class AdminCashCutService:
             )
             for ticket in included_tickets[:5]
         )
-        result.extend(
-            AdminCashCutRelatedDocumentView(
-                id=str(refund.id),
-                document_type="return",
-                folio=refund.folio,
-                status=refund.status,
-                amount=refund.amount,
-                occurred_at=refund.occurred_at,
-                route_hint=refund.route_hint,
+        refunds_by_id: dict[uuid.UUID, list[AdminCashCutRefundItemView]] = defaultdict(list)
+        for refund in returns_refunds:
+            refunds_by_id[refund.id].append(refund)
+        for refund_legs in refunds_by_id.values():
+            refund = refund_legs[0]
+            result.append(
+                AdminCashCutRelatedDocumentView(
+                    id=str(refund.id),
+                    document_type="return",
+                    folio=refund.folio,
+                    status=refund.status,
+                    amount=sum((leg.amount for leg in refund_legs), ZERO_MONEY),
+                    # Related documents summarize only this turn's confirmed deliveries.
+                    occurred_at=max(leg.occurred_at for leg in refund_legs),
+                    route_hint=refund.route_hint,
+                )
             )
-            for refund in returns_refunds
-        )
         result.extend(
             AdminCashCutRelatedDocumentView(
                 id=str(payment.id),

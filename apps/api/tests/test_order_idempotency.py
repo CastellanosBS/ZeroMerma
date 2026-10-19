@@ -32,6 +32,10 @@ from zeromerma_api.modules.audit.infrastructure.models import AuditLog
 from zeromerma_api.modules.branches.infrastructure.models import Workstation
 from zeromerma_api.modules.cash.infrastructure.models import CashSession
 from zeromerma_api.modules.catalog.infrastructure.models import Product
+from zeromerma_api.modules.financial_ledger.infrastructure.models import (
+    FinancialEntry,
+    FinancialOperation,
+)
 from zeromerma_api.modules.idempotency.application.schemas import IdempotencyResult
 from zeromerma_api.modules.idempotency.domain.exceptions import (
     IdempotencyInProgress,
@@ -356,11 +360,61 @@ def test_advance_settlement_and_refund_legs_are_not_duplicated(
         result = _post(client, headers, final_action, payload, key, order_id)
         assert result.status_code == 200
         stable = _state()
+        ledger_query = (
+            select(
+                FinancialOperation.id,
+                FinancialOperation.kind,
+                FinancialOperation.amount_due,
+                FinancialEntry.id.label("entry_id"),
+                FinancialEntry.payment_method_code,
+                FinancialEntry.direction,
+                FinancialEntry.amount,
+                FinancialEntry.state,
+            )
+            .join(FinancialEntry, FinancialEntry.financial_operation_id == FinancialOperation.id)
+            .where(
+                FinancialOperation.subject_type == "ORDER",
+                FinancialOperation.subject_id == UUID(order_id),
+            )
+            .order_by(FinancialEntry.id)
+        )
+        with SessionLocal() as session:
+            stable_ledger = session.execute(ledger_query).all()
         assert _post(client, headers, final_action, payload, key, order_id).json() == result.json()
         assert _state() == stable
-        assert len(result.json()["payments"]) == legs * 2
+        with SessionLocal() as session:
+            assert session.execute(ledger_query).all() == stable_ledger
+        expected_receipts = legs * 2 if final_action == "deliver" else legs + 1
+        payments = result.json()["payments"]
+        assert len(payments) == expected_receipts
         assert Decimal(result.json()["remaining_balance_amount"]) == 0
-        assert len({payment_row["id"] for payment_row in result.json()["payments"]}) == legs * 2
+        assert len({payment_row["id"] for payment_row in payments}) == expected_receipts
+        methods = ("CASH", "CARD") if payment == "MIXED" else (payment,)
+        expected_legs = [
+            ("ORDER_ADVANCE", method, "IN", Decimal("20.00") / legs) for method in methods
+        ]
+        if final_action == "deliver":
+            expected_legs.extend(
+                ("ORDER_SETTLEMENT", method, "IN", Decimal("14.00") / legs) for method in methods
+            )
+        else:
+            expected_legs.append(("ORDER_REFUND", "CASH", "OUT", Decimal("20.00")))
+            refund_receipts = [row for row in payments if row["payment_type"] == "REFUND"]
+            assert [
+                (row["payment_method_code"], Decimal(row["amount"])) for row in refund_receipts
+            ] == [("CASH", Decimal("20.00"))]
+            refund_entries = [row for row in stable_ledger if row.kind == "ORDER_REFUND"]
+            assert len(refund_entries) == 1
+            with SessionLocal() as session:
+                refund_record = session.get(CustomerOrderPayment, UUID(refund_receipts[0]["id"]))
+                assert refund_record is not None
+                assert refund_record.financial_entry_id == refund_entries[0].entry_id
+        assert sorted(
+            (row.kind, row.payment_method_code, row.direction, row.amount) for row in stable_ledger
+        ) == sorted(expected_legs)
+        assert all(
+            row.state == "CONFIRMED" and row.amount_due == row.amount for row in stable_ledger
+        )
 
 
 def test_identical_create_payload_with_distinct_keys_is_two_intentions(client: TestClient) -> None:

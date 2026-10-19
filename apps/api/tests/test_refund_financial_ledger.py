@@ -127,6 +127,56 @@ def _resume(
     )
 
 
+def _assert_refund_cut_documents(
+    client: TestClient,
+    *,
+    cash_session_id: str,
+    return_id: str,
+    amount: Decimal,
+    entry_count: int,
+) -> None:
+    response = client.get(f"/v1/admin/cash-cuts/{cash_session_id}", headers=owner_headers())
+    assert response.status_code == 200
+    detail = response.json()
+    refund_legs = [row for row in detail["returns_refunds"] if row["id"] == return_id]
+    assert len(refund_legs) == entry_count
+    assert len({row["financial_entry_id"] for row in refund_legs}) == entry_count
+    assert sum((Decimal(row["amount"]) for row in refund_legs), Decimal("0.00")) == amount
+    documents = detail["related_documents"]
+    assert len({(row["document_type"], row["id"]) for row in documents}) == len(documents)
+    matching = [
+        row for row in documents if row["document_type"] == "return" and row["id"] == return_id
+    ]
+    assert len(matching) == 1
+    assert Decimal(matching[0]["amount"]) == amount
+    assert datetime.fromisoformat(matching[0]["occurred_at"]) == max(
+        datetime.fromisoformat(row["occurred_at"]) for row in refund_legs
+    )
+
+
+def test_partial_refund_and_remainder_in_same_turn_share_one_related_document(
+    client: TestClient,
+) -> None:
+    headers, body, receipt = _partial_return(client)
+    _movement(
+        client,
+        headers,
+        body,
+        Decimal(receipt["financial_refund"]["amount_pending"]),
+        incoming=True,
+    )
+    result = _resume(client, headers, body, receipt["id"])
+    assert result.status_code == 200
+    assert result.json()["state"] == "COMPLETED"
+    _assert_refund_cut_documents(
+        client,
+        cash_session_id=body["cash_session_id"],
+        return_id=receipt["id"],
+        amount=Decimal(receipt["total_refund_amount"]),
+        entry_count=2,
+    )
+
+
 @pytest.mark.parametrize("payment", ["CASH", "CARD", "MIXED"])
 def test_cash_first_refund_uses_actual_capacity_without_fabricating_card(
     client: TestClient, payment: str
@@ -193,6 +243,17 @@ def test_partial_refund_resumes_in_new_session_and_preserves_old_ack(client: Tes
     )
     assert recovery.status_code == 200 and recovery.json() == settled
     assert _resume(client, headers, body, receipt["id"]).json() == settled
+    for cash_id, amount in (
+        (old_cash_id, Decimal(before["amount_settled"])),
+        (body["cash_session_id"], Decimal(before["amount_pending"])),
+    ):
+        _assert_refund_cut_documents(
+            client,
+            cash_session_id=cash_id,
+            return_id=receipt["id"],
+            amount=amount,
+            entry_count=1,
+        )
 
 
 def test_two_continuations_cannot_repeat_completed_refund_leg(
