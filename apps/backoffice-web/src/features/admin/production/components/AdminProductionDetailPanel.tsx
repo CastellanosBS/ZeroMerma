@@ -14,7 +14,8 @@ function formatStatus(status: AdminProductionStatus): string {
     CANCELLED: "Cancelada",
     COMPLETED: "Completada",
     DRAFT: "Pendiente",
-    IN_PROGRESS: "En proceso",
+    RELEASED: "Plan liberado",
+    PENDING_RECONCILIATION: "Pendiente de conciliación",
   };
   return labels[status];
 }
@@ -116,6 +117,7 @@ function MovementRow({ movement }: { movement: AdminProductionInventoryMovement 
       <p className="truncate text-slate-500" title={movement.sourceDocumentId ?? "Sin documento"}>
         {movement.sourceDocumentType ?? "Sin documento"}
       </p>
+      <InfoRow label="Valor registrado" value={movement.totalCost ?? "No disponible"} />
     </li>
   );
 }
@@ -131,7 +133,7 @@ interface AdminProductionDetailPanelProps {
   onOpenInventory: (productId: string, branchId: string) => void;
   onOpenProduct: (productId: string) => void;
   onOpenRecipe: (productId: string) => void;
-  onStart: (detail: AdminProductionDetail) => void;
+  onRelease: (detail: AdminProductionDetail) => void;
   productionDetail?: AdminProductionDetail | null;
   productionPreview?: AdminProductionListItem | null;
 }
@@ -147,7 +149,7 @@ export function AdminProductionDetailPanel({
   onOpenInventory,
   onOpenProduct,
   onOpenRecipe,
-  onStart,
+  onRelease,
   productionDetail,
   productionPreview,
 }: AdminProductionDetailPanelProps) {
@@ -236,9 +238,9 @@ export function AdminProductionDetailPanel({
               }
             />
             <InfoRow
-              label="Inicio"
+              label="Plan liberado"
               value={formatDate(
-                productionDetail?.overview.startedAt ?? productionPreview?.startedAt,
+                productionDetail?.overview.releasedAt ?? productionPreview?.releasedAt,
               )}
             />
             <InfoRow
@@ -291,6 +293,20 @@ export function AdminProductionDetailPanel({
 
         {productionDetail ? (
           <>
+            <Section title="Plan y conciliación">
+              <InfoRow label="Plan" value={productionDetail.overview.planStatus} />
+              <InfoRow label="Ejecución" value={productionDetail.overview.runStatus} />
+              <InfoRow
+                label="Evidencia"
+                value={productionDetail.overview.reconciliationEvidence ?? "Pendiente de confirmar"}
+              />
+              {productionDetail.overview.status === "PENDING_RECONCILIATION" ? (
+                <p className="text-sm text-amber-800">
+                  Las cantidades declaradas están pendientes de conciliación. Las reservas siguen
+                  vigentes y aún no se han aplicado consumos ni salida.
+                </p>
+              ) : null}
+            </Section>
             <Section title="Insumos planeados">
               {productionDetail.plannedInputs.length > 0 ? (
                 <ul className="grid gap-1.5">
@@ -348,12 +364,18 @@ export function AdminProductionDetailPanel({
                         Esperado {line.expectedQty} - Consumido {line.consumedQty ?? "Pendiente"}{" "}
                         {line.uom}
                       </span>
+                      <span className="block text-slate-500">
+                        Sin usar {line.returnedQty ?? "Pendiente"} · Merma{" "}
+                        {line.wasteQty ?? "Pendiente"} · Sin explicar{" "}
+                        {line.remainderQty ?? "Pendiente"}
+                      </span>
+                      {line.reconciliationReason ? <p>{line.reconciliationReason}</p> : null}
                     </li>
                   ))}
                 </ul>
               ) : (
                 <p className="text-sm leading-6 text-slate-600">
-                  El consumo real se captura por backend al completar la produccion.
+                  Confirma el consumo real al conciliar la producción.
                 </p>
               )}
             </Section>
@@ -385,9 +407,8 @@ export function AdminProductionDetailPanel({
 
             <Section title="Merma / scrap">
               <p className="text-sm leading-6 text-slate-600">
-                {productionDetail.wasteScrap.integrationAvailable
-                  ? "Merma integrada con documentos dedicados."
-                  : productionDetail.wasteScrap.notes}
+                La merma corresponde al material declarado y sus movimientos a merma. La diferencia
+                de rendimiento no crea merma automáticamente.
               </p>
             </Section>
 
@@ -460,14 +481,14 @@ export function AdminProductionDetailPanel({
       </div>
 
       <div className="flex shrink-0 flex-wrap gap-2 border-t border-[var(--ui-color-border)] p-3 text-xs">
-        {productionDetail?.availableActions.canStart ? (
+        {productionDetail?.availableActions.canRelease ? (
           <AdminActionButton
             capability="production.execute"
             branchIds={[branchId]}
             className="rounded-full border border-[var(--ui-color-border)] bg-white px-3 py-1.5 font-semibold text-[var(--ui-color-info)] transition hover:bg-[var(--ui-color-surface-tint)] focus:outline-none focus:ring-4 focus:ring-[var(--ui-color-ring)] disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-400"
             disabled={isSubmitting}
             type="button"
-            onClick={() => onStart(productionDetail)}
+            onClick={() => onRelease(productionDetail)}
           >
             Iniciar
           </AdminActionButton>

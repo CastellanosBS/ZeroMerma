@@ -76,15 +76,15 @@ export function AdminProductionFilters({
 }: AdminProductionFiltersProps) {
   const hasActiveFilters = Boolean(
     filters.search ||
-      filters.branchId ||
-      filters.operatorUserId ||
-      filters.productId ||
-      filters.recipeId ||
-      filters.dateFrom ||
-      filters.dateTo ||
-      filters.status !== "all" ||
-      filters.varianceState !== "all" ||
-      filters.warningState !== "all",
+    filters.branchId ||
+    filters.operatorUserId ||
+    filters.productId ||
+    filters.recipeId ||
+    filters.dateFrom ||
+    filters.dateTo ||
+    filters.status !== "all" ||
+    filters.varianceState !== "all" ||
+    filters.warningState !== "all",
   );
 
   return (
@@ -110,7 +110,11 @@ export function AdminProductionFilters({
             value={filters.branchId ?? ""}
             onChange={(event) => onChange({ branchId: event.target.value || null, page: 1 })}
           >
-            {options.branches.length === 0 ? <option value="">Sucursales pendientes de API</option> : <option value="">Todas</option>}
+            {options.branches.length === 0 ? (
+              <option value="">Sucursales pendientes de API</option>
+            ) : (
+              <option value="">Todas</option>
+            )}
             {options.branches.map((option) => (
               <option key={option.id} title={option.label} value={option.id}>
                 {option.label}
@@ -140,7 +144,9 @@ export function AdminProductionFilters({
             className={inputClassName}
             id="admin-production-status"
             value={filters.status ?? "all"}
-            onChange={(event) => onChange({ page: 1, status: event.target.value as AdminProductionStatus | "all" })}
+            onChange={(event) =>
+              onChange({ page: 1, status: event.target.value as AdminProductionStatus | "all" })
+            }
           >
             <option value="all">Todos</option>
             {options.statuses.map((option) => (
@@ -215,7 +221,9 @@ export function AdminProductionFilters({
               className={`${inputClassName} truncate`}
               id="admin-production-operator"
               value={filters.operatorUserId ?? ""}
-              onChange={(event) => onChange({ operatorUserId: event.target.value || null, page: 1 })}
+              onChange={(event) =>
+                onChange({ operatorUserId: event.target.value || null, page: 1 })
+              }
             >
               <option value="">Todos</option>
               {options.operators.map((option) => (
@@ -232,7 +240,10 @@ export function AdminProductionFilters({
               id="admin-production-variance"
               value={filters.varianceState ?? "all"}
               onChange={(event) =>
-                onChange({ page: 1, varianceState: event.target.value as AdminProductionVarianceState | "all" })
+                onChange({
+                  page: 1,
+                  varianceState: event.target.value as AdminProductionVarianceState | "all",
+                })
               }
             >
               {varianceOptions.map((option) => (
@@ -249,7 +260,10 @@ export function AdminProductionFilters({
               id="admin-production-warning"
               value={filters.warningState ?? "all"}
               onChange={(event) =>
-                onChange({ page: 1, warningState: event.target.value as AdminProductionWarningSeverity | "all" })
+                onChange({
+                  page: 1,
+                  warningState: event.target.value as AdminProductionWarningSeverity | "all",
+                })
               }
             >
               {warningOptions.map((option) => (
@@ -273,7 +287,7 @@ export function AdminProductionFilters({
         <button
           className="rounded-full border border-[var(--ui-color-border)] bg-white px-3 py-1 font-semibold text-slate-600 transition hover:bg-slate-50 focus:outline-none focus:ring-4 focus:ring-[var(--ui-color-ring)]"
           type="button"
-          onClick={() => onChange({ page: 1, status: "IN_PROGRESS" })}
+          onClick={() => onChange({ page: 1, status: "RELEASED" })}
         >
           En proceso
         </button>

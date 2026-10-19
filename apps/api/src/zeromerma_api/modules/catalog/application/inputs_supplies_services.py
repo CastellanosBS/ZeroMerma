@@ -37,6 +37,7 @@ from zeromerma_api.modules.catalog.application.inputs_supplies_schemas import (
     AdminInputSupplyWarningState,
     AdminInputSupplyWarningView,
 )
+from zeromerma_api.modules.catalog.application.inventory_policy import inventory_policy_conflict
 from zeromerma_api.modules.catalog.domain.constants import (
     CATALOG_INPUT_PRODUCT_KINDS,
     CATALOG_PRODUCT_KIND_CONSUMABLE,
@@ -208,7 +209,10 @@ class AdminInputSupplyService:
             is_active=command.is_active,
             is_inventory_tracked=command.is_inventory_tracked,
             is_purchasable=command.is_purchasable,
-            is_sellable=False,
+            is_usable_as_input=command.is_usable_as_input,
+            lot_tracking_enabled=command.lot_tracking_enabled,
+            expiry_required=command.expiry_required,
+            is_sellable=command.is_sellable,
             minimum_stock=command.minimum_stock,
             name=command.name.strip(),
             preferred_order_quantity=command.preferred_order_quantity,
@@ -261,6 +265,16 @@ class AdminInputSupplyService:
     ) -> AdminInputSupplyDetailView:
         self._validate_command(session, command)
         product = self._get_product(session, product_id)
+        policy_error = inventory_policy_conflict(
+            session,
+            product,
+            unit_of_measure=command.unit_of_measure,
+            lot_tracking_enabled=command.lot_tracking_enabled,
+            expiry_required=command.expiry_required,
+            is_inventory_tracked=command.is_inventory_tracked,
+        )
+        if policy_error:
+            raise AdminInputSupplyValidationError(policy_error)
         product_class = self._get_product_class(session, command.product_class_id)
         if product.code != command.code.strip().upper():
             self._ensure_unique_code(session, command.code, product_id=product.id)
@@ -269,7 +283,10 @@ class AdminInputSupplyService:
         product.is_active = command.is_active
         product.is_inventory_tracked = command.is_inventory_tracked
         product.is_purchasable = command.is_purchasable
-        product.is_sellable = False
+        product.is_usable_as_input = command.is_usable_as_input
+        product.lot_tracking_enabled = command.lot_tracking_enabled
+        product.expiry_required = command.expiry_required
+        product.is_sellable = command.is_sellable
         product.minimum_stock = command.minimum_stock
         product.name = command.name.strip()
         product.preferred_order_quantity = command.preferred_order_quantity
@@ -624,6 +641,10 @@ class AdminInputSupplyService:
             is_active=context.product.is_active,
             is_inventory_tracked=context.product.is_inventory_tracked,
             is_purchasable=context.product.is_purchasable,
+            is_sellable=context.product.is_sellable,
+            is_usable_as_input=context.product.is_usable_as_input,
+            lot_tracking_enabled=context.product.lot_tracking_enabled,
+            expiry_required=context.product.expiry_required,
             last_movement_at=context.last_movement_at,
             last_purchase_cost=context.last_purchase_cost,
             name=context.product.name,
@@ -728,6 +749,10 @@ class AdminInputSupplyService:
                 is_active=context.product.is_active,
                 is_inventory_tracked=context.product.is_inventory_tracked,
                 is_purchasable=context.product.is_purchasable,
+                is_sellable=context.product.is_sellable,
+                is_usable_as_input=context.product.is_usable_as_input,
+                lot_tracking_enabled=context.product.lot_tracking_enabled,
+                expiry_required=context.product.expiry_required,
                 last_purchase_cost=context.last_purchase_cost,
                 name=context.product.name,
                 product_kind=context.product.product_kind,  # type: ignore[arg-type]
@@ -1027,6 +1052,8 @@ class AdminInputSupplyService:
         command: AdminInputSupplyCreateRequest | AdminInputSupplyUpdateRequest,
     ) -> None:
         _ = session
+        if command.expiry_required and not command.lot_tracking_enabled:
+            raise AdminInputSupplyValidationError("Required expiry needs lot tracking.")
         if command.product_kind not in CATALOG_INPUT_PRODUCT_KINDS:
             raise AdminInputSupplyValidationError(
                 "Only input and supply product kinds are supported."
@@ -1158,6 +1185,10 @@ class AdminInputSupplyService:
             "is_active": product.is_active,
             "is_inventory_tracked": product.is_inventory_tracked,
             "is_purchasable": product.is_purchasable,
+            "is_sellable": product.is_sellable,
+            "is_usable_as_input": product.is_usable_as_input,
+            "lot_tracking_enabled": product.lot_tracking_enabled,
+            "expiry_required": product.expiry_required,
             "product_id": str(product.id),
             "product_kind": product.product_kind,
         }

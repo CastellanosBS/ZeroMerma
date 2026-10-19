@@ -1,3 +1,4 @@
+import type { components } from "@zeromerma/api-client";
 import type {
   OperationDocumentLineView,
   OperationDocumentView,
@@ -76,6 +77,8 @@ export type TransferReceiptUiState =
   | "RECEIPT_ERROR";
 
 export interface TransferReceiptLineDraft {
+  lots?: components["schemas"]["TransferLotProgressView"][];
+  lotQuantities?: Record<string, string>;
   expectedQuantityText: string;
   lineNumber: number;
   productCode: string;
@@ -110,9 +113,16 @@ export function createTransferReceiptDraftState(
     controlState: TRANSFER_RECEIPT_STATE_DETAIL,
     selectedTransferId: shipment.id,
     lines: shipment.lines.flatMap((line) => {
-      const pending = progress.find((item) => item.shipment_line_id === line.id)?.pending_quantity;
+      const item = progress.find((item) => item.shipment_line_id === line.id);
+      const pending = item?.pending_quantity;
       return pending !== undefined && Number(pending) > 0
-        ? [createTransferReceiptLineDraft({ ...line, expected_quantity: pending })]
+        ? [
+            {
+              ...createTransferReceiptLineDraft({ ...line, expected_quantity: pending }),
+              lots: item?.lots ?? [],
+              lotQuantities: {},
+            },
+          ]
         : [];
     }),
     notes: "",
@@ -315,7 +325,33 @@ export function buildTransferReceiveLines(
       throw new Error(`Indica el motivo de la diferencia en ${line.productName}.`);
     }
 
+    const lots = (line.lots ?? []).filter((lot) => Number(lot.pending_quantity) > 0);
+    const lotAllocations = lots.flatMap((lot) => {
+      const text = line.lotQuantities?.[lot.lot_id]?.trim();
+      if (!text) return [];
+      const quantity = parseQuantityToMilliUnits(text);
+      const pending = parseQuantityToMilliUnits(lot.pending_quantity);
+      if (quantity === null || quantity <= 0 || pending === null || quantity > pending)
+        throw new Error("Revisa la cantidad recibida de cada lote.");
+      return [{ lot_id: lot.lot_id, quantity: text }];
+    });
+    if (
+      lotAllocations.length &&
+      lotAllocations.reduce(
+        (sum, lot) => sum + (parseQuantityToMilliUnits(lot.quantity) ?? 0),
+        0,
+      ) !== receivedMilli
+    )
+      throw new Error("Los lotes deben sumar la cantidad recibida.");
+    if (
+      lots.length > 1 &&
+      receivedMilli > 0 &&
+      receivedMilli !== expectedMilli &&
+      !lotAllocations.length
+    )
+      throw new Error("Identifica los lotes recibidos en esta recepcion parcial.");
     return {
+      ...(lotAllocations.length ? { lot_allocations: lotAllocations } : {}),
       shipment_line_id: line.shipmentLineId,
       expected_quantity: formatQuantityFromMilliUnits(expectedMilli),
       received_quantity: formatQuantityFromMilliUnits(receivedMilli),

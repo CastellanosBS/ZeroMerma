@@ -2172,7 +2172,7 @@ function CounterTransferMovementDetail({
             )}
           />
           <MovementDetailRow label="Cajero" value={document.created_by_user_full_name} />
-          <MovementDetailRow label="Estacion" value={document.workstation_name} />
+          <MovementDetailRow label="Estacion" value={document.workstation_name ?? "Administración"} />
           <MovementDetailRow label="Lineas" value={String(document.lines.length)} />
           <MovementDetailRow label="Unidades" value={totalUnitsText} />
         </div>

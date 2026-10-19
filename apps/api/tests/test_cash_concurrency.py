@@ -62,6 +62,7 @@ from zeromerma_api.modules.identity.application.session_services import (
 )
 from zeromerma_api.modules.identity.infrastructure.models import User
 from zeromerma_api.modules.identity.infrastructure.session_models import AuthSession
+from zeromerma_api.modules.inventory.infrastructure.models import InventoryBalance
 from zeromerma_api.modules.orders.application.idempotency import OrdersIdempotencyService
 from zeromerma_api.modules.orders.application.schemas import (
     CancelCustomerOrderRequest,
@@ -86,6 +87,7 @@ from zeromerma_api.testing.concurrency import (
     wait_until_blocked,
 )
 from zeromerma_api.testing.idempotency import new_idempotency_key
+from zeromerma_api.testing.inventory import seed_test_inventory
 from zeromerma_api.testing.sessions import login_headers
 from zeromerma_api.testing.transfer_operators import transfer_cashier_email
 
@@ -148,6 +150,25 @@ def _baseline(cash_id: str, product_code: str, quantity: int) -> tuple[str, str]
         )
         product_id, class_id = str(product.id), str(product_class.id)
         session.commit()
+        existing = session.scalar(
+            select(InventoryBalance.quantity_on_hand).where(
+                InventoryBalance.branch_id == shift.branch_id,
+                InventoryBalance.product_id == product.id,
+                InventoryBalance.location_code == "COUNTER",
+            )
+        ) or Decimal(0)
+        assert existing <= quantity, (
+            "A physical opening cannot silently remove previously seeded goods."
+        )
+        if existing < quantity:
+            seed_test_inventory(
+                session,
+                branch_id=shift.branch_id,
+                actor_user_id=shift.user_id,
+                product_quantities={product.id: Decimal(quantity) - existing},
+                location_code="COUNTER",
+                fixture_reference="cash-concurrency-physical-opening",
+            )
         return product_id, class_id
 
 
@@ -158,6 +179,26 @@ def _retain_unsold_stock(close: Command, sale: Command) -> None:
             {"product_id": sale.body["lines"][0]["product_id"], "counted_quantity": "2.000"}
         ],
     )
+
+
+def _retain_reserved_order_stock(close: Command) -> None:
+    with SessionLocal() as session:
+        shift = session.get(CashSession, UUID(close.body["cash_session_id"]))
+        assert shift is not None
+        rows = session.scalars(
+            select(InventoryBalance).where(
+                InventoryBalance.branch_id == shift.branch_id,
+                InventoryBalance.location_code == "COUNTER",
+                InventoryBalance.quantity_on_hand > 0,
+            )
+        ).all()
+        close.body.update(
+            counter_empty_confirmed=not rows,
+            counted_product_lines=[
+                {"product_id": str(row.product_id), "counted_quantity": str(row.quantity_on_hand)}
+                for row in rows
+            ],
+        )
 
 
 def _setup(
@@ -219,7 +260,14 @@ def _setup(
                 {
                     "original_sale_line_id": original["lines"][0]["id"],
                     "returned_quantity": "1.000",
-                    "disposition_code": "RESTOCK_BACKROOM",
+                    "allocations": [
+                        {
+                            "exact_product_id": original["lines"][0]["product_id"],
+                            "quantity": "1.000",
+                            "disposition_code": "RESTOCK_BACKROOM",
+                            "restock_safe_acknowledged": True,
+                        }
+                    ],
                 }
             ],
         }
@@ -240,6 +288,8 @@ def _setup(
             created = _post(client, headers, "/v1/orders", create)
             order_id = created["id"]
             if kind == "deliver":
+                _baseline(opened["id"], SEED_PRODUCT_BOLILLO_STD_CODE, 4)
+                _baseline(opened["id"], SEED_PRODUCT_CAFE_AMERICANO_CODE, 1)
                 _post(client, headers, f"/v1/orders/{order_id}/mark-ready", context)
                 body = {
                     **context,
@@ -401,6 +451,8 @@ def test_financial_commands_and_close_share_exact_shift_boundary(
     command, close = _setup(client, kind)
     if close_first and kind == "sale":
         _retain_unsold_stock(close, command)
+    if close_first and kind == "deliver":
+        _retain_reserved_order_stock(close)
     before = _effect_counts()
     first, second = (close, command) if close_first else (command, close)
     committed, waited = _contend(monkeypatch, first, second)
@@ -495,6 +547,8 @@ def test_rolled_back_financial_command_releases_close_without_partial_effects(
     command, close = _setup(client, kind)
     if kind == "sale":
         _retain_unsold_stock(close, command)
+    if kind == "deliver":
+        _retain_reserved_order_stock(close)
     before = _effect_counts()
     failed, closed = _contend(monkeypatch, command, close, abort_first=True)
     assert isinstance(failed, RuntimeError) and "Injected rollback" in str(failed)
@@ -562,6 +616,7 @@ def test_class_sale_is_attributed_only_when_it_precedes_the_locked_close(
     client: TestClient, monkeypatch: pytest.MonkeyPatch, close_first: bool
 ) -> None:
     sale, close = _setup(client, "sale")
+    unsold_product_id = sale.body["lines"][0]["product_id"]
     product_id, class_id = _baseline(sale.body["cash_session_id"], SEED_PRODUCT_CONCHA_VAN_CODE, 3)
     sale.body["lines"] = [
         {"capture_mode": "CLASS_CAPTURE", "product_class_id": class_id, "quantity": "1"}
@@ -570,7 +625,8 @@ def test_class_sale_is_attributed_only_when_it_precedes_the_locked_close(
     close.body.update(
         counter_empty_confirmed=False,
         counted_product_lines=[
-            {"product_id": product_id, "counted_quantity": "3.000" if close_first else "2.000"}
+            {"product_id": product_id, "counted_quantity": "3.000" if close_first else "2.000"},
+            {"product_id": unsold_product_id, "counted_quantity": "2.000"},
         ],
     )
     first, second = _contend(monkeypatch, *((close, sale) if close_first else (sale, close)))
@@ -591,6 +647,7 @@ def test_two_distinct_sale_intentions_serialize_without_losing_either_effect(
     client: TestClient, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     first, _close = _setup(client, "sale")
+    _baseline(first.body["cash_session_id"], SEED_PRODUCT_COCA_355_CODE, 4)
     second = Command("sale", first.body, first.headers, new_idempotency_key())
     a, b = _contend(monkeypatch, first, second)
     assert isinstance(a, IdempotencyResult) and isinstance(b, IdempotencyResult), repr((a, b))
@@ -647,6 +704,8 @@ def test_card_order_effects_and_cash_first_refunds_serialize_with_close(
     client: TestClient, monkeypatch: pytest.MonkeyPatch, kind: str, close_first: bool
 ) -> None:
     command, close = _setup(client, kind, payment="CARD")
+    if close_first and kind == "deliver":
+        _retain_reserved_order_stock(close)
     before = _effect_counts()
     first, second = _contend(monkeypatch, *((close, command) if close_first else (command, close)))
     assert isinstance(first, IdempotencyResult), repr(first)
@@ -672,6 +731,7 @@ def test_cash_lock_timeout_rolls_back_sale_identity_then_retries_same_intention(
     client: TestClient, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     first, _close = _setup(client, "sale")
+    _baseline(first.body["cash_session_id"], SEED_PRODUCT_COCA_355_CODE, 4)
     second = Command("sale", first.body, first.headers, new_idempotency_key())
     held, release, entered = Event(), Event(), Event()
     probes: dict[str, TransactionProbe] = {}

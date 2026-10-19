@@ -29,6 +29,7 @@ from zeromerma_api.modules.purchases.application.admin_schemas import (
     AdminPurchaseDirectEntryRequest,
     AdminPurchaseListResponse,
     AdminPurchaseReceiveRequest,
+    AdminPurchaseReverseReceiptRequest,
     AdminPurchaseUpdateRequest,
     PurchaseCommandCode,
     PurchaseCommandResultView,
@@ -297,6 +298,34 @@ def receive_admin_purchase(
             session,
             current_user=current_user,
             command_code="receive",
+            command=command,
+            key=key,
+            purchase_id=purchase_id,
+            request_id=request.headers.get("X-Request-ID"),
+        )
+        return idempotency_response(result, request)
+    except (PurchaseNotFoundError, PurchaseValidationError) as error:
+        raise _to_http_exception(error) from error
+
+
+@admin_router.post(
+    "/{purchase_id}/reverse-receipt",
+    response_model=PurchaseCommandResultView,
+    responses={200: _REPLAY_RESPONSE, 409: _REJECTION_RESPONSE},
+)
+def reverse_admin_purchase_receipt(
+    purchase_id: UUID,
+    command: AdminPurchaseReverseReceiptRequest,
+    request: Request,
+    current_user: Annotated[AuthenticatedUser, Depends(_require_backoffice_user)],
+    session: Annotated[Session, Depends(get_session)],
+    key: Annotated[UUID, Depends(require_idempotency_key)],
+) -> Response:
+    try:
+        result = PurchaseCommandService().execute(
+            session,
+            current_user=current_user,
+            command_code="reverse-receipt",
             command=command,
             key=key,
             purchase_id=purchase_id,

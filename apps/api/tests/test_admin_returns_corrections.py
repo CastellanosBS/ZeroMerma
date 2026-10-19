@@ -3,6 +3,7 @@ from __future__ import annotations
 from decimal import Decimal
 
 from fastapi.testclient import TestClient
+from return_fixtures import seed_return_stock
 from sqlalchemy import select
 
 from zeromerma_api.bootstrap.seed_local import (
@@ -56,6 +57,7 @@ def _get_product_id(code: str) -> str:
 
 
 def _confirm_sale(client: TestClient) -> dict[str, object]:
+    seed_return_stock()
     headers = _cashier_headers(client)
     cash_session_id = current_cash_session_id(
         client, headers=headers, workstation_code=SEED_WORKSTATION_CODE
@@ -117,7 +119,14 @@ def _commit_return(client: TestClient, sale_id: str) -> dict[str, object]:
                 {
                     "original_sale_line_id": direct_line["id"],
                     "returned_quantity": "1.000",
-                    "disposition_code": "RESTOCK_COUNTER",
+                    "allocations": [
+                        {
+                            "exact_product_id": direct_line["product_id"],
+                            "quantity": "1.000",
+                            "disposition_code": "RESTOCK_COUNTER",
+                            "restock_safe_acknowledged": True,
+                        }
+                    ],
                 }
             ],
         },
@@ -127,6 +136,7 @@ def _commit_return(client: TestClient, sale_id: str) -> dict[str, object]:
 
 
 def _commit_counter_transfer(client: TestClient) -> dict[str, object]:
+    seed_return_stock(location_code="BACKROOM")
     headers = _cashier_headers(client)
     cash_id = current_cash_session_id(
         client, headers=headers, workstation_code=SEED_WORKSTATION_CODE
@@ -213,7 +223,9 @@ def test_admin_returns_list_and_detail_use_real_return_records(client: TestClien
     assert detail["overview"]["folio"] == sale_return["folio"]
     assert detail["original_ticket"]["folio"].startswith("TCK-")
     assert detail["refund_impact"]["cash_impact_amount"] == "18.00"
-    assert detail["returned_lines"][0]["product_name"]
+    allocation = detail["returned_lines"][0]["allocations"][0]
+    assert allocation["returned_product_name_snapshot"]
+    assert allocation["inventory_movement_id"] is not None
     assert detail["related_documents"][0]["document_type"] == "ticket"
     assert detail["available_actions"]["can_create_from_backoffice"] is False
 

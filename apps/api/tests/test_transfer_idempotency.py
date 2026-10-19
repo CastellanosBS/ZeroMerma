@@ -41,12 +41,13 @@ from zeromerma_api.modules.inventory.infrastructure.models import (
 )
 from zeromerma_api.modules.operations.infrastructure.models import OperationDocument
 from zeromerma_api.modules.outbox.infrastructure.models import OutboxEvent
-from zeromerma_api.modules.transfers.application import admin_services
+from zeromerma_api.modules.transfers.application import physical_workflow
 from zeromerma_api.modules.transfers.application.admin_schemas import AdminTransferReceiveRequest
 from zeromerma_api.modules.transfers.application.idempotency import TransferCommandServiceWrapper
 from zeromerma_api.modules.transfers.domain.exceptions import TransferValidationError
 from zeromerma_api.testing.authorization import owner_headers
 from zeromerma_api.testing.idempotency import new_idempotency_key
+from zeromerma_api.testing.inventory import seed_test_inventory
 from zeromerma_api.testing.sessions import login_headers
 
 
@@ -60,15 +61,17 @@ def _setup() -> tuple[dict[str, str], dict[str, Any]]:
         product = session.scalar(
             select(Product.id).where(Product.code == SEED_PRODUCT_BOLILLO_STD_CODE)
         )
-        session.add(
-            InventoryBalance(
-                branch_id=origin,
-                product_id=product,
-                location_code="BACKROOM",
-                quantity_on_hand=Decimal(100),
-            )
+        actor = session.scalar(select(User.id).where(User.email == SEED_USER_EMAIL))
+        assert origin is not None and destination is not None and product is not None
+        assert actor is not None
+        seed_test_inventory(
+            session,
+            branch_id=origin,
+            actor_user_id=actor,
+            product_quantities={product: Decimal(100)},
+            location_code="BACKROOM",
+            fixture_reference="Transfer idempotency explicit origin stock",
         )
-        session.commit()
     return headers, {
         "origin_branch_id": str(origin),
         "destination_branch_id": str(destination),
@@ -370,13 +373,13 @@ def test_distinct_keys_serialize_cumulative_receipts_after_both_reservations(
     headers, _, shipment = _created(client)
     assert _send(client, headers, "dispatch", {}, transfer_id=shipment["id"]).status_code == 200
     barrier = Barrier(2)
-    original = admin_services.lock_shipment
+    original = physical_workflow.lock_shipment
 
     def synchronized(*args: Any, **kwargs: Any) -> Any:
         barrier.wait(timeout=15)
         return original(*args, **kwargs)
 
-    monkeypatch.setattr(admin_services, "lock_shipment", synchronized)
+    monkeypatch.setattr(physical_workflow, "lock_shipment", synchronized)
     with ThreadPoolExecutor(max_workers=2) as pool:
         futures = [
             pool.submit(
@@ -429,7 +432,6 @@ def test_transfer_outbox_failure_rolls_back_key_document_and_inventory(
 def test_pos_and_backoffice_receivers_share_one_cumulative_shipment_lock(
     client: TestClient, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    from zeromerma_api.modules.transfers.application import services
     from zeromerma_api.modules.transfers.application.schemas import TransferReceiveRequest
 
     admin, _, shipment = _created(client)
@@ -448,14 +450,13 @@ def test_pos_and_backoffice_receivers_share_one_cumulative_shipment_lock(
     )
     assert opened.status_code == 201, opened.text
     barrier = Barrier(2)
-    original = admin_services.lock_shipment
+    original = physical_workflow.lock_shipment
 
     def synchronized(*args: Any, **kwargs: Any) -> Any:
         barrier.wait(timeout=15)
         return original(*args, **kwargs)
 
-    monkeypatch.setattr(admin_services, "lock_shipment", synchronized)
-    monkeypatch.setattr(services, "lock_shipment", synchronized)
+    monkeypatch.setattr(physical_workflow, "lock_shipment", synchronized)
 
     def pos_receive() -> Any:
         cookies = SimpleCookie()

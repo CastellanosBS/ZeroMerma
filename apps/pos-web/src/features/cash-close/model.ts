@@ -54,6 +54,7 @@ export interface CashCloseCountedProductLine {
 }
 
 export interface CashCloseDraftState {
+  lotCountAmounts?: Record<string, Record<string, string>>;
   countedPaymentAmounts: Record<string, string>;
   countedProductDraftLines: CashCloseCountedProductLine[];
   observationText: string;
@@ -93,6 +94,7 @@ export type CashCloseCountValueState = "PENDING" | "CAPTURED";
 export function createInitialCashCloseDraftState(): CashCloseDraftState {
   return {
     countedPaymentAmounts: {},
+    lotCountAmounts: {},
     countedProductDraftLines: [],
     observationText: "",
     physicalControlState: CLOSE_PHYSICAL_STATE_CLASS_SELECTION,
@@ -273,6 +275,7 @@ export function syncCashCloseDraftState(
 ): CashCloseDraftState {
   const nextState: CashCloseDraftState = {
     countedPaymentAmounts: { ...currentState.countedPaymentAmounts },
+    lotCountAmounts: currentState.lotCountAmounts,
     countedProductDraftLines: [...currentState.countedProductDraftLines],
     observationText: currentState.observationText,
     physicalControlState: currentState.physicalControlState,
@@ -291,7 +294,7 @@ export function buildCashClosePreviewRequest(
   workstationCode: string,
   draftState: Pick<
     CashCloseDraftState,
-    "countedPaymentAmounts" | "countedProductDraftLines" | "observationText"
+    "countedPaymentAmounts" | "countedProductDraftLines" | "observationText" | "lotCountAmounts"
   >,
   options: {
     counterEmptyConfirmed?: boolean;
@@ -339,6 +342,12 @@ export function buildCashClosePreviewRequest(
           .map((row) => ({
             product_id: row.productId,
             counted_quantity: formatQuantityFromMilliUnits(row.quantityUnits),
+            ...(draftState.lotCountAmounts?.[row.productId] ? {
+              lot_counts: Object.entries(draftState.lotCountAmounts[row.productId]).map(([lotId, amount]) => ({
+                lot_id: lotId,
+                counted_quantity: amount || "0",
+              })),
+            } : {}),
           })),
     ...(notes.length > 0 ? { notes } : {}),
   };

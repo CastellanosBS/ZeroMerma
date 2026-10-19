@@ -101,10 +101,10 @@ class OperationDocument(Base):
     )
     source_bucket_code: Mapped[str | None] = mapped_column(String(32), nullable=True)
     destination_bucket_code: Mapped[str | None] = mapped_column(String(32), nullable=True)
-    workstation_id: Mapped[uuid.UUID] = mapped_column(
+    workstation_id: Mapped[uuid.UUID | None] = mapped_column(
         UUID(as_uuid=True),
         ForeignKey("workstations.id", ondelete="RESTRICT"),
-        nullable=False,
+        nullable=True,
     )
     created_by_user_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True),

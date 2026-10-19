@@ -14,6 +14,7 @@ from sqlalchemy import (
     String,
     Text,
     UniqueConstraint,
+    false,
 )
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column
@@ -87,6 +88,9 @@ class ProductClass(Base):
 class Product(Base):
     __tablename__ = "products"
     __table_args__ = (
+        CheckConstraint(
+            "NOT expiry_required OR lot_tracking_enabled", name="lot_expiry_policy_valid"
+        ),
         CheckConstraint("unit_price >= 0", name="ck_products_unit_price_non_negative"),
         CheckConstraint(
             "standard_cost IS NULL OR standard_cost >= 0",
@@ -162,6 +166,15 @@ class Product(Base):
     preferred_order_quantity: Mapped[Decimal | None] = mapped_column(Numeric(12, 3), nullable=True)
     procurement_notes: Mapped[str | None] = mapped_column(Text, nullable=True)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    is_usable_as_input: Mapped[bool] = mapped_column(
+        Boolean, default=False, server_default=false(), nullable=False
+    )
+    lot_tracking_enabled: Mapped[bool] = mapped_column(
+        Boolean, default=False, server_default=false(), nullable=False
+    )
+    expiry_required: Mapped[bool] = mapped_column(
+        Boolean, default=False, server_default=false(), nullable=False
+    )
     is_sellable: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),

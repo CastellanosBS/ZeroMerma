@@ -30,7 +30,7 @@ from zeromerma_api.modules.production.application.admin_schemas import (
     AdminProductionCancelRequest,
     AdminProductionCompleteRequest,
     AdminProductionCreateRequest,
-    AdminProductionStartRequest,
+    AdminProductionReleaseRequest,
     AdminProductionUpdateRequest,
 )
 from zeromerma_api.modules.production.application.admin_services import AdminProductionService
@@ -38,11 +38,12 @@ from zeromerma_api.modules.production.application.idempotency import ProductionI
 from zeromerma_api.modules.production.infrastructure.models import ProductionBatch
 from zeromerma_api.testing.authorization import TEST_OWNER_EMAIL, owner_headers
 from zeromerma_api.testing.idempotency import new_idempotency_key
+from zeromerma_api.testing.inventory import seed_test_inventory
 
-COMMANDS = ("create", "update", "start", "complete", "cancel")
+COMMANDS = ("create", "update", "release", "complete", "cancel")
 
 
-def _fixture() -> tuple[dict[str, str], dict[str, Any]]:
+def _fixture(*, initial_stock: Decimal = Decimal(100)) -> tuple[dict[str, str], dict[str, Any]]:
     headers = owner_headers()
     with SessionLocal() as session:
         branch = session.scalars(select(Branch).where(Branch.code == SEED_BRANCH_CODE)).one()
@@ -57,6 +58,7 @@ def _fixture() -> tuple[dict[str, str], dict[str, Any]]:
             product_kind="RAW_MATERIAL",
             is_active=True,
             is_sellable=False,
+            is_usable_as_input=True,
             unit_of_measure="kg",
             unit_price=Decimal(0),
             currency_code="MXN",
@@ -76,14 +78,6 @@ def _fixture() -> tuple[dict[str, str], dict[str, Any]]:
         session.add(recipe)
         session.flush()
         session.add(RecipeInput(recipe_id=recipe.id, input_product_id=raw.id, quantity=Decimal(2)))
-        session.add(
-            InventoryBalance(
-                product_id=raw.id,
-                branch_id=branch.id,
-                location_code="BACKROOM",
-                quantity_on_hand=Decimal(100),
-            )
-        )
         body = {
             "branch_id": str(branch.id),
             "product_id": str(output.id),
@@ -92,6 +86,17 @@ def _fixture() -> tuple[dict[str, str], dict[str, Any]]:
             "notes": "Private production memo not retained in the replay snapshot",
         }
         session.commit()
+        actor = session.scalar(select(User).where(User.email == TEST_OWNER_EMAIL))
+        assert actor is not None
+        if initial_stock > 0:
+            seed_test_inventory(
+                session,
+                branch_id=branch.id,
+                actor_user_id=actor.id,
+                product_quantities={raw.id: initial_stock},
+                location_code="BACKROOM",
+                fixture_reference="Production idempotency acceptance",
+            )
     return headers, body
 
 
@@ -116,8 +121,10 @@ def _send(
     )
 
 
-def _setup(client: TestClient, code: str) -> tuple[dict[str, str], dict[str, Any], str | None, str]:
-    headers, create_body = _fixture()
+def _setup(
+    client: TestClient, code: str, *, initial_stock: Decimal = Decimal(100)
+) -> tuple[dict[str, str], dict[str, Any], str | None, str]:
+    headers, create_body = _fixture(initial_stock=initial_stock)
     branch_id = create_body["branch_id"]
     if code == "create":
         return headers, create_body, None, branch_id
@@ -125,9 +132,9 @@ def _setup(client: TestClient, code: str) -> tuple[dict[str, str], dict[str, Any
     assert created.status_code == 201
     batch_id = created.json()["id"]
     if code == "complete":
-        started = _send(client, "start", headers, {}, new_idempotency_key(), batch_id)
+        started = _send(client, "release", headers, {}, new_idempotency_key(), batch_id)
         assert started.status_code == 200
-        body = {"actual_output_qty": "20.000"}
+        body = {"actual_output_qty": "20.000", "confirm_without_differences": True}
     elif code == "update":
         body = {"planned_output_qty": "30.000"}
     else:
@@ -270,27 +277,31 @@ def test_production_committed_result_survives_lost_response(
 def test_production_shortage_rejection_is_durable_and_retry_needs_new_intention(
     client: TestClient,
 ) -> None:
-    headers, body, batch_id, branch_id = _setup(client, "start")
-    with SessionLocal() as session:
-        balances = session.scalars(select(InventoryBalance)).all()
-        previous = [(balance.id, balance.quantity_on_hand) for balance in balances]
-        for balance in balances:
-            balance.quantity_on_hand = Decimal(0)
-        session.commit()
+    headers, body, batch_id, branch_id = _setup(client, "release", initial_stock=Decimal(0))
     key = new_idempotency_key()
-    rejected = _send(client, "start", headers, body, key, batch_id)
+    rejected = _send(client, "release", headers, body, key, batch_id)
     assert rejected.status_code == 409 and rejected.json()["code"] == "PRODUCTION_CONFLICT"
     with SessionLocal() as session:
-        for identity, quantity in previous:
-            session.get(InventoryBalance, identity).quantity_on_hand = quantity
-        session.commit()
-    replay = _send(client, "start", headers, body, key, batch_id)
+        raw = session.scalar(select(Product).where(Product.code == "IDEM-RAW"))
+        actor = session.scalar(select(User).where(User.email == TEST_OWNER_EMAIL))
+        assert raw is not None and actor is not None
+        seed_test_inventory(
+            session,
+            branch_id=UUID(branch_id),
+            actor_user_id=actor.id,
+            product_quantities={raw.id: Decimal(100)},
+            location_code="BACKROOM",
+            fixture_reference="Stock received after a rejected production release",
+        )
+    replay = _send(client, "release", headers, body, key, batch_id)
     assert replay.status_code == 409 and replay.headers["Idempotency-Replayed"] == "true"
     recovered = client.get(
-        f"/v1/admin/production/commands/start/{key}?branch_id={branch_id}", headers=headers
+        f"/v1/admin/production/commands/release/{key}?branch_id={branch_id}", headers=headers
     )
     assert recovered.status_code == 409 and recovered.json()["code"] == "PRODUCTION_CONFLICT"
-    assert _send(client, "start", headers, body, new_idempotency_key(), batch_id).status_code == 200
+    assert (
+        _send(client, "release", headers, body, new_idempotency_key(), batch_id).status_code == 200
+    )
 
 
 def test_production_update_distinguishes_absent_from_null(client: TestClient) -> None:
@@ -324,14 +335,14 @@ def test_production_recovery_unknown_context_and_current_authorization(client: T
 
 
 @pytest.mark.parametrize(
-    "pair", [("complete", "cancel"), ("complete", "complete"), ("start", "cancel")]
+    "pair", [("complete", "cancel"), ("complete", "complete"), ("release", "cancel")]
 )
 def test_production_different_keys_serialize_incompatible_transitions(
     client: TestClient,
     pair: tuple[str, str],
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    _, _, batch_id, _ = _setup(client, "complete" if pair[0] == "complete" else "start")
+    _, _, batch_id, _ = _setup(client, "complete" if pair[0] == "complete" else "release")
     barrier = Barrier(2, timeout=15)
     reserve = IdempotencyExecutor._reserve
 
@@ -345,11 +356,15 @@ def test_production_different_keys_serialize_incompatible_transitions(
             user = session.scalars(select(User).where(User.email == TEST_OWNER_EMAIL)).one()
             actor = resolve_authorization(session, user, surface="BACKOFFICE")
             command = (
-                AdminProductionCompleteRequest(actual_output_qty=Decimal(20))
+                AdminProductionCompleteRequest(
+                    actual_output_qty=Decimal(20), confirm_without_differences=True
+                )
                 if code == "complete"
-                else AdminProductionCancelRequest()
+                else AdminProductionCancelRequest(
+                    no_physical_effects_confirmed=True, reason="No physical effects"
+                )
                 if code == "cancel"
-                else AdminProductionStartRequest()
+                else AdminProductionReleaseRequest()
             )
             return ProductionIdempotencyService().execute(
                 session,
@@ -366,7 +381,7 @@ def test_production_different_keys_serialize_incompatible_transitions(
         futures = [pool.submit(execute, code) for code in pair]
         results = [future.result(timeout=25) for future in futures]
     codes = sorted(result.status_code for result in results)
-    assert codes == ([200, 200] if pair[0] == "start" and codes == [200, 200] else [200, 409])
+    assert codes == ([200, 200] if pair[0] == "release" and codes == [200, 200] else [200, 409])
     with SessionLocal() as session:
         batch = session.get(ProductionBatch, UUID(batch_id))
         count = session.scalar(
@@ -388,7 +403,8 @@ def test_production_two_lots_create_one_output_balance_without_lost_updates(
         created = _send(client, "create", headers, body, new_idempotency_key())
         identity = created.json()["id"]
         assert (
-            _send(client, "start", headers, {}, new_idempotency_key(), identity).status_code == 200
+            _send(client, "release", headers, {}, new_idempotency_key(), identity).status_code
+            == 200
         )
         ids.append(identity)
     barrier = Barrier(2, timeout=15)
@@ -406,7 +422,9 @@ def test_production_two_lots_create_one_output_balance_without_lost_updates(
                 session,
                 current_user=resolve_authorization(session, user, surface="BACKOFFICE"),
                 command_code="complete",
-                command=AdminProductionCompleteRequest(actual_output_qty=Decimal(20)),
+                command=AdminProductionCompleteRequest(
+                    actual_output_qty=Decimal(20), confirm_without_differences=True
+                ),
                 key=UUID(new_idempotency_key()),
                 production_id=UUID(identity),
                 request_id="two-lots",
@@ -436,7 +454,7 @@ def test_production_same_key_concurrency_has_one_action(client: TestClient, code
     model = {
         "create": AdminProductionCreateRequest,
         "update": AdminProductionUpdateRequest,
-        "start": AdminProductionStartRequest,
+        "release": AdminProductionReleaseRequest,
         "complete": AdminProductionCompleteRequest,
         "cancel": AdminProductionCancelRequest,
     }[code]
@@ -486,7 +504,22 @@ def test_production_zero_and_partial_output_have_exact_existing_effects(
 ) -> None:
     headers, _, batch_id, _ = _setup(client, "complete")
     key = new_idempotency_key()
-    body = {"actual_output_qty": output, "variance_reason": "Confirmed yield variance"}
+    detail = client.get(f"/v1/admin/production/{batch_id}", headers=headers)
+    assert detail.status_code == 200
+    body = {
+        "actual_output_qty": output,
+        "variance_reason": "Confirmed yield variance",
+        "inputs": [
+            {
+                "input_product_id": item["input_product_id"],
+                "consumed_qty": item["required_qty"],
+                "returned_qty": "0",
+                "waste_qty": "0",
+                "remainder_qty": "0",
+            }
+            for item in detail.json()["planned_inputs"]
+        ],
+    }
     result = _send(client, "complete", headers, body, key, batch_id)
     assert result.status_code == 200
     state = _state()
@@ -505,23 +538,25 @@ def test_production_zero_and_partial_output_have_exact_existing_effects(
         )
 
 
-def test_production_inactive_recipe_rejects_start(client: TestClient) -> None:
-    headers, body, batch_id, _ = _setup(client, "start")
+def test_production_inactive_recipe_rejects_release(client: TestClient) -> None:
+    headers, body, batch_id, _ = _setup(client, "release")
     with SessionLocal() as session:
         batch = session.get(ProductionBatch, UUID(batch_id))
         session.get(Recipe, batch.recipe_id).is_active = False
         session.commit()
-    assert _send(client, "start", headers, body, new_idempotency_key(), batch_id).status_code == 409
+    assert (
+        _send(client, "release", headers, body, new_idempotency_key(), batch_id).status_code == 409
+    )
 
 
-def test_production_update_replay_keeps_draft_snapshot_after_later_start(
+def test_production_update_replay_keeps_draft_snapshot_after_later_release(
     client: TestClient,
 ) -> None:
     headers, body, batch_id, _ = _setup(client, "update")
     key = new_idempotency_key()
     updated = _send(client, "update", headers, body, key, batch_id)
     assert updated.status_code == 200 and updated.json()["status"] == "DRAFT"
-    assert _send(client, "start", headers, {}, new_idempotency_key(), batch_id).status_code == 200
+    assert _send(client, "release", headers, {}, new_idempotency_key(), batch_id).status_code == 200
     state = _state()
     assert _send(client, "update", headers, body, key, batch_id).json() == updated.json()
     assert _state() == state

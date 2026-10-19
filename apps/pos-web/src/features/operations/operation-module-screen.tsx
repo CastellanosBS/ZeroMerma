@@ -97,6 +97,7 @@ import { useRovingFocusGrid } from "../pos-shell/keyboard";
 import { useStatusMessageStore } from "../status-messages/store";
 import {
   addPendingSelectionLine,
+  setPendingOperationLot,
   buildOperationCommitLines,
   CONTROL_STATE_CLASS_SELECTION,
   CONTROL_STATE_PRODUCT_SELECTION,
@@ -1262,7 +1263,7 @@ export function OperationModuleScreen({ variant }: { variant: OperationModuleVar
       }
 
       setLastCommittedDocument(null);
-      setSourceBucketCode(option.value);
+      changeWasteSource(option.value);
       if (reasonCode.trim().length > 0) {
         requestAnimationFrame(() => searchInputRef.current?.focus());
       }
@@ -1953,7 +1954,9 @@ export function OperationModuleScreen({ variant }: { variant: OperationModuleVar
     }
 
     try {
-      setDraftState((state) => addPendingSelectionLine(state));
+      setDraftState(
+        addPendingSelectionLine(draftState, variant === "waste" ? sourceBucketCode : undefined),
+      );
       setSelectionErrorMessage(null);
       setLastCommittedDocument(null);
     } catch (error) {
@@ -1964,6 +1967,18 @@ export function OperationModuleScreen({ variant }: { variant: OperationModuleVar
         ),
       );
     }
+  }
+
+  function changeWasteSource(value: string) {
+    if (value === sourceBucketCode) return;
+    if (draftState.lines.length > 0) {
+      setSelectionErrorMessage(
+        "Quita las líneas capturadas antes de cambiar su ubicación de origen.",
+      );
+      return;
+    }
+    setDraftState(createInitialOperationDraftState());
+    setSourceBucketCode(value);
   }
 
   function handleCounterTransferScannerSubmit() {
@@ -2457,7 +2472,9 @@ export function OperationModuleScreen({ variant }: { variant: OperationModuleVar
                         isEditing={editingCounterTransferDraftLineKey === line.key}
                         key={line.key}
                         isSelected={selectedCounterTransferDraftLineKey === line.key}
-                        name={line.productName}
+                        name={
+                          line.lotCode ? `${line.productName} · ${line.lotCode}` : line.productName
+                        }
                         onBeginEdit={() =>
                           beginCounterTransferInlineEdit(line.key, line.quantityText)
                         }
@@ -2857,7 +2874,7 @@ export function OperationModuleScreen({ variant }: { variant: OperationModuleVar
                   <CapturedProductLineRow
                     disabled={commitMutation.isPending || intentionBlocked}
                     key={line.key}
-                    name={line.productName}
+                    name={line.lotCode ? `${line.productName} · ${line.lotCode}` : line.productName}
                     onDecrement={() => {
                       setLastCommittedDocument(null);
                       setDraftState((state) => ({
@@ -3424,7 +3441,7 @@ export function OperationModuleScreen({ variant }: { variant: OperationModuleVar
                 }}
                 onSourceBucketChange={(value) => {
                   setLastCommittedDocument(null);
-                  setSourceBucketCode(value);
+                  changeWasteSource(value);
                   if (hasWasteReason) {
                     requestAnimationFrame(() => searchInputRef.current?.focus());
                   }
@@ -4137,6 +4154,33 @@ export function OperationModuleScreen({ variant }: { variant: OperationModuleVar
                       </div>
 
                       <div className="grid gap-2">
+                        {variant === "waste" && quantityProduct.lot_tracking_enabled ? (
+                          <label className="grid gap-1 text-sm font-semibold">
+                            Lote físico de merma
+                            <select
+                              aria-label="Lote físico de merma"
+                              className={posInputClass}
+                              value={quantitySelection.lotId ?? ""}
+                              onChange={(event) =>
+                                setDraftState((state) =>
+                                  setPendingOperationLot(state, event.target.value),
+                                )
+                              }
+                            >
+                              <option value="">Selecciona el lote físico</option>
+                              {(quantityProduct.inventory_lots ?? [])
+                                .filter((lot) => lot.location_code === sourceBucketCode)
+                                .map((lot) => (
+                                  <option key={lot.lot_id} value={lot.lot_id}>
+                                    {lot.lot_code} · Disponible {lot.available_quantity} ·{" "}
+                                    {lot.expires_at
+                                      ? `Caduca ${new Date(lot.expires_at).toLocaleString()}`
+                                      : "Sin caducidad"}
+                                  </option>
+                                ))}
+                            </select>
+                          </label>
+                        ) : null}
                         <input
                           aria-label="Cantidad"
                           className={cn(

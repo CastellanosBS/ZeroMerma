@@ -70,6 +70,10 @@ const ticketDetail: TicketDetailResponse = {
   lines: [
     {
       id: "line-1",
+      capture_mode: "PRODUCT_DIRECT",
+      remaining_attribution_quantity: "0.000",
+      attribution_options: [],
+      physical_attributions: [],
       line_total_amount: "120.00",
       name: "Caja de bolillo",
       quantity: "3.000",

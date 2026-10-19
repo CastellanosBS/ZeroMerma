@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from concurrent.futures import ThreadPoolExecutor
 from decimal import Decimal
 from queue import Queue
@@ -10,6 +11,7 @@ from uuid import UUID, uuid4
 
 import pytest
 from fastapi.testclient import TestClient
+from pydantic import BaseModel, ConfigDict
 from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
@@ -19,6 +21,12 @@ from zeromerma_api.db.session import SessionLocal
 from zeromerma_api.modules.audit.infrastructure.models import AuditLog
 from zeromerma_api.modules.branches.infrastructure.models import Branch
 from zeromerma_api.modules.catalog.infrastructure.models import Product
+from zeromerma_api.modules.idempotency.application.schemas import (
+    CommandContext,
+    CommandResult,
+    ResponsePolicy,
+)
+from zeromerma_api.modules.idempotency.application.service import IdempotencyExecutor
 from zeromerma_api.modules.identity.infrastructure.models import User
 from zeromerma_api.modules.inventory.application.mutations import (
     InventoryBalanceKey,
@@ -60,13 +68,17 @@ def _fixture() -> tuple[list[InventoryBalanceKey], UUID]:
 def _apply(
     balances: LockedInventoryBalances, key: InventoryBalanceKey, actor: UUID, quantity: str
 ) -> InventoryMovement:
+    source_id = uuid4()
+    product = balances._session.get(Product, key.product_id)
+    assert product is not None
     return balances.apply_delta(
         key,
         delta=Decimal(quantity),
         movement_type="MANUAL_ADJUSTMENT",
-        unit_of_measure="UNIT",
+        unit_of_measure=product.unit_of_measure,
         source_document_type="INVENTORY_CONCURRENCY_TEST",
-        source_document_id=uuid4(),
+        source_document_id=source_id,
+        causal_effect_code=f"concurrency:{source_id}",
         operator_user_id=actor,
         reason="Concurrency acceptance",
         notes=None,
@@ -101,6 +113,47 @@ def _assert_reconciled(key: InventoryBalanceKey, expected: str, count: int) -> N
         )
 
 
+class _Result(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    complete: bool = True
+
+
+def _command(
+    session: Session,
+    keys: list[InventoryBalanceKey],
+    actor: UUID,
+    action: Callable[[Session], None],
+) -> None:
+    def run(current: Session) -> CommandResult:
+        action(current)
+        return CommandResult(status_code=201, snapshot=_Result(complete=True))
+
+    IdempotencyExecutor(command_lock_timeout_ms=10000).execute(
+        session,
+        key=new_idempotency_key(),
+        operation_code="inventory.concurrency_test",
+        payload={},
+        resolve_context=lambda current, saved: CommandContext(
+            actor_user_id=actor,
+            surface="BACKOFFICE",
+            branch_id=keys[0].branch_id,
+            related_branch_ids=tuple(sorted({key.branch_id for key in keys})),
+        ),
+        authorize=lambda current, context: None,
+        action=run,
+        response_policy=ResponsePolicy(snapshot_model=_Result),
+    )
+
+
+def _seed(key: InventoryBalanceKey, actor: UUID, quantity: str) -> None:
+    with SessionLocal() as session:
+
+        def action(current: Session) -> None:
+            _apply(lock_inventory_balances(current, [key]), key, actor, quantity)
+
+        _command(session, [key], actor, action)
+
+
 @pytest.mark.parametrize("existing", [False, True])
 def test_two_entries_serialize_existing_or_first_balance(
     client: TestClient, existing: bool
@@ -108,38 +161,38 @@ def test_two_entries_serialize_existing_or_first_balance(
     keys, actor = _fixture()
     key = keys[0]
     if existing:
-        with SessionLocal() as session:
-            _apply(lock_inventory_balances(session, [key]), key, actor, "1")
-            session.commit()
+        _seed(key, actor, "1")
     probes: Queue[TransactionProbe] = Queue()
 
     def second() -> None:
         with SessionLocal() as session:
-            probes.put(transaction_probe(session))
-            _apply(lock_inventory_balances(session, [key]), key, actor, "3")
-            session.commit()
 
-    with ThreadPoolExecutor(max_workers=1) as pool, SessionLocal() as first:
-        first_probe = transaction_probe(first)
-        _apply(lock_inventory_balances(first, [key]), key, actor, "2")
-        first.flush()
-        future = pool.submit(second)
-        second_probe = probes.get(timeout=5)
-        assert second_probe.transaction_id != first_probe.transaction_id
-        try:
+            def action(current: Session) -> None:
+                probes.put(transaction_probe(current))
+                _apply(lock_inventory_balances(current, [key]), key, actor, "3")
+
+            _command(session, [key], actor, action)
+
+    with ThreadPoolExecutor(max_workers=1) as pool, SessionLocal() as session:
+        pending = []
+
+        def first(current: Session) -> None:
+            first_probe = transaction_probe(current)
+            _apply(lock_inventory_balances(current, [key]), key, actor, "2")
+            current.flush()
+            pending.append(pool.submit(second))
+            second_probe = probes.get(timeout=5)
+            assert second_probe.transaction_id != first_probe.transaction_id
             wait_until_blocked(second_probe.backend_pid, first_probe.backend_pid)
-        finally:
-            first.commit()
-        future.result(timeout=10)
+
+        _command(session, [key], actor, first)
+        pending[0].result(timeout=10)
     _assert_reconciled(key, "6" if existing else "5", 3 if existing else 2)
 
 
 @pytest.mark.parametrize(
     "initial,first_delta,second_delta,expected,rejected",
-    [
-        ("5", "2", "-3", "4", False),
-        ("5", "-3", "-3", "2", True),
-    ],
+    [("5", "2", "-3", "4", False), ("5", "-3", "-3", "2", True)],
 )
 def test_concurrent_deltas_refresh_preloaded_identity_and_check_stock(
     client: TestClient,
@@ -151,9 +204,7 @@ def test_concurrent_deltas_refresh_preloaded_identity_and_check_stock(
 ) -> None:
     keys, actor = _fixture()
     key = keys[0]
-    with SessionLocal() as session:
-        _apply(lock_inventory_balances(session, [key]), key, actor, initial)
-        session.commit()
+    _seed(key, actor, initial)
     probes: Queue[TransactionProbe] = Queue()
     start_lock = Event()
 
@@ -161,29 +212,32 @@ def test_concurrent_deltas_refresh_preloaded_identity_and_check_stock(
         with SessionLocal() as session:
             stale = session.scalars(select(InventoryBalance)).one()
             assert stale.quantity_on_hand == Decimal(initial)
-            probes.put(transaction_probe(session))
-            assert start_lock.wait(timeout=10)
-            try:
-                balances = lock_inventory_balances(session, [key])
+
+            def action(current: Session) -> None:
+                probes.put(transaction_probe(current))
+                assert start_lock.wait(timeout=10)
+                balances = lock_inventory_balances(current, [key])
                 assert balances.balance(key) is stale
                 _apply(balances, key, actor, second_delta)
-                session.commit()
+
+            try:
+                _command(session, [key], actor, action)
                 return False
             except InventoryValidationError:
-                session.rollback()
                 return True
 
-    with ThreadPoolExecutor(max_workers=1) as pool, SessionLocal() as first:
+    with ThreadPoolExecutor(max_workers=1) as pool, SessionLocal() as session:
         future = pool.submit(second)
         second_probe = probes.get(timeout=5)
-        first_probe = transaction_probe(first)
-        _apply(lock_inventory_balances(first, [key]), key, actor, first_delta)
-        first.flush()
-        start_lock.set()
-        try:
+
+        def first(current: Session) -> None:
+            first_probe = transaction_probe(current)
+            _apply(lock_inventory_balances(current, [key]), key, actor, first_delta)
+            current.flush()
+            start_lock.set()
             wait_until_blocked(second_probe.backend_pid, first_probe.backend_pid)
-        finally:
-            first.commit()
+
+        _command(session, [key], actor, first)
         assert future.result(timeout=10) is rejected
     _assert_reconciled(key, expected, 2 if rejected else 3)
 
@@ -192,44 +246,37 @@ def test_repeated_product_deltas_keep_all_pending_changes_without_flush(client: 
     keys, actor = _fixture()
     key = keys[0]
     with SessionLocal() as session:
-        balances = lock_inventory_balances(session, [key, key])
-        first = _apply(balances, key, actor, "2.125")
-        second = _apply(balances, key, actor, "3.500")
-        third = _apply(balances, key, actor, "-1.125")
-        assert [first.balance_after, second.balance_after, third.balance_after] == [
-            Decimal("2.125"),
-            Decimal("5.625"),
-            Decimal("4.500"),
-        ]
-        session.commit()
+
+        def action(current: Session) -> None:
+            balances = lock_inventory_balances(current, [key, key])
+            first = _apply(balances, key, actor, "2.125")
+            second = _apply(balances, key, actor, "3.500")
+            third = _apply(balances, key, actor, "-1.125")
+            assert [first.balance_after, second.balance_after, third.balance_after] == [
+                Decimal("2.125"),
+                Decimal("5.625"),
+                Decimal("4.500"),
+            ]
+
+        _command(session, [key], actor, action)
     _assert_reconciled(key, "4.500", 3)
 
 
 @pytest.mark.parametrize("other_index", [1, 2])
 def test_different_products_or_branches_progress_while_another_key_is_locked(
-    client: TestClient, other_index: int
+    client: TestClient,
+    other_index: int,
 ) -> None:
     keys, actor = _fixture()
-    with ThreadPoolExecutor(max_workers=1) as pool, SessionLocal() as first:
-        _apply(lock_inventory_balances(first, [keys[0]]), keys[0], actor, "2")
-        first.flush()
+    with ThreadPoolExecutor(max_workers=1) as pool, SessionLocal() as session:
 
-        def independent() -> None:
-            with SessionLocal() as session:
-                _apply(
-                    lock_inventory_balances(session, [keys[other_index]]),
-                    keys[other_index],
-                    actor,
-                    "3",
-                )
-                session.commit()
+        def first(current: Session) -> None:
+            _apply(lock_inventory_balances(current, [keys[0]]), keys[0], actor, "2")
+            current.flush()
+            # Independent command must commit while this command still holds its stock lock.
+            pool.submit(_seed, keys[other_index], actor, "3").result(timeout=5)
 
-        # This commit must finish while the first transaction still holds its stock lock.
-        future = pool.submit(independent)
-        try:
-            future.result(timeout=5)
-        finally:
-            first.rollback()
+        _command(session, [keys[0]], actor, first)
     _assert_reconciled(keys[other_index], "3", 1)
 
 
@@ -246,30 +293,37 @@ def test_opposite_input_orders_lock_the_same_complete_set_before_effects(
         ]
     )
     with SessionLocal() as session:
-        balances = lock_inventory_balances(session, keys)
-        for key in keys:
-            _apply(balances, key, actor, "1")
-        session.commit()
+
+        def prepare(current: Session) -> None:
+            balances = lock_inventory_balances(current, keys)
+            for key in keys:
+                _apply(balances, key, actor, "1")
+
+        _command(session, keys, actor, prepare)
     probes: Queue[TransactionProbe] = Queue()
 
     def second() -> None:
         with SessionLocal() as session:
-            probes.put(transaction_probe(session))
-            balances = lock_inventory_balances(session, reversed(keys))
-            for key in reversed(keys):
-                _apply(balances, key, actor, "3")
-            session.commit()
 
-    with ThreadPoolExecutor(max_workers=1) as pool, SessionLocal() as first:
-        first_probe = transaction_probe(first)
-        _apply(lock_inventory_balances(first, [keys[0]]), keys[0], actor, "2")
-        first.flush()
-        future = pool.submit(second)
-        second_probe = probes.get(timeout=5)
-        try:
+            def action(current: Session) -> None:
+                probes.put(transaction_probe(current))
+                balances = lock_inventory_balances(current, reversed(keys))
+                for key in reversed(keys):
+                    _apply(balances, key, actor, "3")
+
+            _command(session, keys, actor, action)
+
+    with ThreadPoolExecutor(max_workers=1) as pool, SessionLocal() as session:
+        pending = []
+
+        def first(current: Session) -> None:
+            first_probe = transaction_probe(current)
+            _apply(lock_inventory_balances(current, [keys[0]]), keys[0], actor, "2")
+            current.flush()
+            pending.append(pool.submit(second))
+            second_probe = probes.get(timeout=5)
             wait_until_blocked(second_probe.backend_pid, first_probe.backend_pid)
-            # The reversed caller must wait at the minimum key before locking any later row.
-            # An input-order implementation holds these rows and fails NOWAIT here.
+            # Reversed input must block at the minimum key, without locking any later row.
             with SessionLocal() as observer:
                 for key in keys[1:]:
                     assert (
@@ -284,10 +338,9 @@ def test_opposite_input_orders_lock_the_same_complete_set_before_effects(
                         )
                         is not None
                     )
-                observer.rollback()
-        finally:
-            first.commit()
-        future.result(timeout=10)
+
+        _command(session, [keys[0]], actor, first)
+        pending[0].result(timeout=10)
     _assert_reconciled(keys[0], "6", 3)
     for key in keys[1:]:
         _assert_reconciled(key, "4", 2)

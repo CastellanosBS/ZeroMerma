@@ -15,6 +15,7 @@ from uuid import UUID, uuid4
 
 import pytest
 from fastapi.testclient import TestClient
+from return_fixtures import seed_return_stock
 from sqlalchemy import func, select
 
 from zeromerma_api.bootstrap.seed_local import (
@@ -57,7 +58,10 @@ from zeromerma_api.modules.identity.infrastructure.models import (
     UserRoleAssignmentBranchScope,
 )
 from zeromerma_api.modules.identity.infrastructure.session_models import AuthSession
-from zeromerma_api.modules.inventory.infrastructure.models import InventoryMovement
+from zeromerma_api.modules.inventory.infrastructure.models import (
+    InventoryBalance,
+    InventoryMovement,
+)
 from zeromerma_api.modules.outbox.application.service import OutboxWriter
 from zeromerma_api.modules.outbox.infrastructure.models import OutboxEvent
 from zeromerma_api.modules.returns.application.idempotency import ReturnCommitService
@@ -93,6 +97,7 @@ def _sale(
     payment: str = "CASH",
     workstation: str = SEED_WORKSTATION_CODE,
 ) -> dict[str, Any]:
+    seed_return_stock(workstation_code=workstation)
     with SessionLocal() as session:
         product = session.scalar(
             select(Product.id).where(Product.code == SEED_PRODUCT_COCA_355_CODE)
@@ -172,8 +177,16 @@ def _setup(
                 {
                     "original_sale_line_id": line["id"],
                     "returned_quantity": "1.000",
-                    "disposition_code": "RESTOCK_COUNTER",
-                    "exact_product_id": str(product) if capture == "CLASS_CAPTURE" else None,
+                    "allocations": [
+                        {
+                            "exact_product_id": str(product)
+                            if capture == "CLASS_CAPTURE"
+                            else line["product_id"],
+                            "quantity": "1.000",
+                            "disposition_code": "RESTOCK_COUNTER",
+                            "restock_safe_acknowledged": True,
+                        }
+                    ],
                 }
             ],
         },
@@ -237,7 +250,20 @@ def _state() -> tuple[Any, ...]:
             )
             .order_by(FinancialEntry.id)
         ).all()
-    return _counts(), returns, lines, movements
+        physical_movements = session.execute(
+            select(
+                InventoryMovement.id, InventoryMovement.quantity, InventoryMovement.direction
+            ).order_by(InventoryMovement.id)
+        ).all()
+        balances = session.execute(
+            select(
+                InventoryBalance.id,
+                InventoryBalance.quantity_on_hand,
+                InventoryBalance.quantity_reserved,
+                InventoryBalance.inventory_value,
+            ).order_by(InventoryBalance.id)
+        ).all()
+    return _counts(), returns, lines, movements, physical_movements, balances
 
 
 @pytest.mark.parametrize("capture", ["PRODUCT_DIRECT", "CLASS_CAPTURE"])
@@ -253,9 +279,10 @@ def test_replay_preserves_return_refund_and_disposition_without_repeating_effect
     original = next(
         item for item in sale["lines"] if item["id"] == body["lines"][0]["original_sale_line_id"]
     )
-    body["lines"][0]["disposition_code"] = disposition
+    body["lines"][0]["allocations"][0]["disposition_code"] = disposition
     if full:
         body["lines"][0]["returned_quantity"] = original["quantity"]
+        body["lines"][0]["allocations"][0]["quantity"] = original["quantity"]
     key, before = new_idempotency_key(), _counts()
     first = _post(
         client, {**headers, "X-Request-ID": "81c07ab4-e624-5fce-81dc-4793d455993f"}, body, key
@@ -266,7 +293,7 @@ def test_replay_preserves_return_refund_and_disposition_without_repeating_effect
     assert receipt["status"] == "COMMITTED"
     assert receipt["refund_method_code"] == "CASH"
     assert receipt["original_sale_id"] == sale["id"]
-    assert receipt["lines"][0]["disposition_code"] == disposition
+    assert receipt["lines"][0]["allocations"][0]["disposition_code"] == disposition
     assert (
         not {"notes", "created_by", "operator_email", "operator_full_name", "audit_summary"}
         & receipt.keys()
@@ -293,8 +320,10 @@ def test_replay_preserves_return_refund_and_disposition_without_repeating_effect
         "idempotency_records",
     ):
         assert after[table] == before[table] + 1
-    # Dispositions are durable declarations; canonical physical materialization remains 051.
-    assert after["inventory_movements"] == before["inventory_movements"]
+    # A pending class return also attributes its original physical sale exactly once.
+    assert after["inventory_movements"] == before["inventory_movements"] + (
+        2 if capture == "CLASS_CAPTURE" else 1
+    )
     with SessionLocal() as session:
         movement = session.get(
             FinancialEntry, UUID(receipt["financial_refund"]["entries"][0]["id"])
@@ -355,8 +384,9 @@ def test_changed_payload_cannot_reuse_an_identity(client: TestClient, change: st
     before, changed = _state(), deepcopy(body)
     if change == "quantity":
         changed["lines"][0]["returned_quantity"] = "2.000"
+        changed["lines"][0]["allocations"][0]["quantity"] = "2.000"
     elif change == "disposition":
-        changed["lines"][0]["disposition_code"] = "SEND_TO_WASTE"
+        changed["lines"][0]["allocations"][0]["disposition_code"] = "SEND_TO_WASTE"
     else:
         field, value = {
             "notes": ("notes", "Changed instructions"),
@@ -430,6 +460,7 @@ def test_fractional_returns_conserve_net_cents_and_last_residual(client: TestCli
         )
         session.commit()
     body["lines"][0]["returned_quantity"] = "0.001"
+    body["lines"][0]["allocations"][0]["quantity"] = "0.001"
     results = [_post(client, headers, body, new_idempotency_key()) for _ in range(3)]
     assert all(result.status_code == 201 for result in results)
     amounts = [Decimal(result.json()["total_refund_amount"]) for result in results]
@@ -808,6 +839,7 @@ def test_competing_partial_returns_recalculate_remaining_right_under_real_postgr
     """Separate cash rows leave the shared sale entitlement as the contested boundary."""
     headers, body, _ = _setup(client)
     body["lines"][0]["returned_quantity"] = quantity
+    body["lines"][0]["allocations"][0]["quantity"] = quantity
     rival_station = "POS-RETURN-RACE-02"
     with SessionLocal() as session:
         first_cash = session.get(CashSession, UUID(body["cash_session_id"]))
@@ -945,6 +977,7 @@ def test_return_latency_is_observed_without_a_production_sla(
 ) -> None:
     headers, body, _ = _setup(client)
     body["lines"][0]["returned_quantity"] = "0.100"
+    body["lines"][0]["allocations"][0]["quantity"] = "0.100"
     timings: dict[str, list[float]] = {"new": [], "replay": []}
     for _ in range(5):
         key = new_idempotency_key()

@@ -1,3 +1,4 @@
+import { ReturnAllocationEditor } from "./return-allocation-editor";
 import { isCommandIntentionPending } from "@zeromerma/api-client";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Navigate, useNavigate, useRouterState } from "@tanstack/react-router";
@@ -60,11 +61,10 @@ import {
   getReturnDraftTotalRefundCents,
   incrementReturnDraftLineQuantity,
   removeReturnDraftLine,
-  RETURN_DISPOSITION_RESTOCK_BACKROOM,
-  RETURN_DISPOSITION_RESTOCK_COUNTER,
-  RETURN_DISPOSITION_SEND_TO_WASTE,
   decrementReturnDraftLineQuantity,
-  setReturnDraftLineExactProduct,
+  setReturnDraftLineAllocations,
+  getReturnAllocationError,
+  type ReturnAllocationDraft,
   setReturnDraftLineQuantityText,
   type ReturnDraftLine,
   type ReturnDraftState,
@@ -111,24 +111,6 @@ const RETURN_REFUND_METHODS_FALLBACK = [
     label: "Mixto",
     is_enabled: false,
     availability_note: "Reembolso mixto pendiente de integracion.",
-  },
-] as const;
-
-const RETURN_DISPOSITION_OPTIONS = [
-  {
-    hint: "Volvera a disponibilidad del mostrador.",
-    label: "Regresar a mostrador",
-    value: RETURN_DISPOSITION_RESTOCK_COUNTER,
-  },
-  {
-    hint: "Volvera a inventario del fondo.",
-    label: "Regresar a fondo",
-    value: RETURN_DISPOSITION_RESTOCK_BACKROOM,
-  },
-  {
-    hint: "No volvera a stock.",
-    label: "Registrar merma",
-    value: RETURN_DISPOSITION_SEND_TO_WASTE,
   },
 ] as const;
 
@@ -275,28 +257,11 @@ function getDraftLineErrorMessage(line: ReturnDraftLine): string | null {
   if (line.quantityMilliUnits > line.remainingReturnableMilliUnits) {
     return "La cantidad supera el maximo devolvible.";
   }
-  if (line.exactProductRequired && line.exactProductId.trim().length === 0) {
-    return "Selecciona el producto exacto requerido.";
-  }
-  if (line.dispositionCode.trim().length === 0) {
-    return "Define el destino fisico de la linea.";
-  }
-  return null;
+  return getReturnAllocationError(line);
 }
 
 function getReturnableRefundAmount(line: ReturnableSaleLineView): string {
   return formatCurrency(line.remaining_refundable_amount);
-}
-
-function applyDefaultReturnDisposition(lines: ReturnDraftLine[]): ReturnDraftLine[] {
-  return lines.map((line) =>
-    line.dispositionCode.trim().length > 0
-      ? line
-      : {
-          ...line,
-          dispositionCode: RETURN_DISPOSITION_RESTOCK_COUNTER,
-        },
-  );
 }
 
 function isSaleOlderThanThreshold(
@@ -563,8 +528,7 @@ function ReturnSummaryPanel({
   highRiskMessages,
   isHighRiskAcknowledgementRequired,
   onCommit,
-  onDispositionChangeAll,
-  onExactProductChangeSelectedLine,
+  onAllocationsChangeSelectedLine,
   onHighRiskAcknowledgedChange,
   onNotesChange,
   onReasonChange,
@@ -587,8 +551,7 @@ function ReturnSummaryPanel({
   highRiskMessages: string[];
   isHighRiskAcknowledgementRequired: boolean;
   onCommit: () => void;
-  onDispositionChangeAll: (value: string) => void;
-  onExactProductChangeSelectedLine: (value: string) => void;
+  onAllocationsChangeSelectedLine: (value: ReturnAllocationDraft[]) => void;
   onHighRiskAcknowledgedChange: (value: boolean) => void;
   onNotesChange: (value: string) => void;
   onReasonChange: (value: string) => void;
@@ -608,9 +571,6 @@ function ReturnSummaryPanel({
 }) {
   const [isNotesOpen, setNotesOpen] = useState(draftState.notes.trim().length > 0);
   const refundTotalText = formatRefundCurrency(getReturnDraftTotalRefundCents(draftState.lines));
-  const currentDispositionCode =
-    draftState.lines.find((line) => line.dispositionCode.trim().length > 0)?.dispositionCode ??
-    RETURN_DISPOSITION_RESTOCK_COUNTER;
   const selectedRefundMethod = refundMethodOptions.find(
     (method) => method.code === draftState.refundMethodCode,
   );
@@ -659,7 +619,7 @@ function ReturnSummaryPanel({
       }
       title="Devolucion"
     >
-      <div className="grid h-full min-h-0 gap-3 overflow-hidden">
+      <div className="grid h-full min-h-0 gap-3 overflow-y-auto">
         {commitError ? (
           <PosInlineValidationMessage tone="error">{commitError}</PosInlineValidationMessage>
         ) : null}
@@ -676,7 +636,7 @@ function ReturnSummaryPanel({
               <KeyValueRow label="Monto a devolver" value={refundTotalText} />
             </div>
 
-            {selectedDraftLine?.exactProductRequired ? (
+            {selectedDraftLine ? (
               <div className="grid gap-2 rounded-xl border border-[var(--pos-shell-border)] bg-white px-3 py-2.5">
                 <p
                   className="truncate text-sm font-semibold text-slate-950"
@@ -684,51 +644,25 @@ function ReturnSummaryPanel({
                 >
                   {selectedDraftLine.lineName}
                 </p>
-                {selectedDraftLine.exactProductRequired ? (
-                  <select
-                    className={`${posInputClass} h-9 px-2 text-sm`}
-                    disabled={exactProductsLoading}
-                    onChange={(event) => onExactProductChangeSelectedLine(event.target.value)}
-                    value={selectedDraftLine.exactProductId}
-                  >
-                    <option value="">
-                      {exactProductsLoading ? "Cargando productos..." : "Producto exacto"}
-                    </option>
-                    {exactProductOptions.map((product) => (
-                      <option key={product.id} value={product.id}>
-                        {product.name}
-                      </option>
-                    ))}
-                  </select>
+                <ReturnAllocationEditor
+                  line={selectedDraftLine}
+                  products={exactProductOptions}
+                  onChange={onAllocationsChangeSelectedLine}
+                />
+                {exactProductsLoading ? <p>Cargando productos...</p> : null}
+                {exactProductsError ? (
+                  <PosInlineValidationMessage tone="error">
+                    {exactProductsError}
+                  </PosInlineValidationMessage>
                 ) : null}
                 {selectedLineValidationMessage ? (
                   <PosInlineValidationMessage tone="warning">
                     {selectedLineValidationMessage}
                   </PosInlineValidationMessage>
                 ) : null}
-                {exactProductsError ? (
-                  <PosInlineValidationMessage tone="error">
-                    {exactProductsError}
-                  </PosInlineValidationMessage>
-                ) : null}
               </div>
             ) : null}
-
-            <div className="grid gap-2 rounded-xl border border-[var(--pos-shell-border)] bg-white px-3 py-2.5">
-              {draftState.lines.length > 0 ? (
-                <select
-                  aria-label="Destino fisico"
-                  className={`${posInputClass} h-9 px-2 text-sm`}
-                  onChange={(event) => onDispositionChangeAll(event.target.value)}
-                  value={currentDispositionCode}
-                >
-                  {RETURN_DISPOSITION_OPTIONS.map((option) => (
-                    <option key={option.value} value={option.value}>
-                      {option.label}
-                    </option>
-                  ))}
-                </select>
-              ) : null}
+            <div className="grid gap-2">
               <select
                 aria-label="Motivo de devolucion"
                 className={`${posInputClass} h-9 px-2 text-sm`}
@@ -925,6 +859,15 @@ function ReturnHistoryDetailPanel({
                 <span className="text-right text-sm font-semibold text-slate-950 [font-variant-numeric:tabular-nums]">
                   {formatCurrency(line.refund_line_total_amount)}
                 </span>
+                <div className="col-span-3 grid gap-1 text-xs text-slate-600">
+                  {line.allocations.map((allocation) => (
+                    <p key={allocation.id}>
+                      {formatQuantity(allocation.quantity)} /{" "}
+                      {allocation.returned_product_name_snapshot} / {allocation.disposition_code}
+                      {allocation.lot_id ? ` / Lote ${allocation.lot_id}` : ""}
+                    </p>
+                  ))}
+                </div>
               </div>
             ))}
           </ScrollPane>
@@ -1275,7 +1218,7 @@ export function ReturnsScreen() {
     try {
       updateDraftState((current) => ({
         ...current,
-        lines: applyDefaultReturnDisposition(addReturnDraftLine(current.lines, line)),
+        lines: addReturnDraftLine(current.lines, line),
       }));
       setSelectedDraftLineId(line.id);
       setCenterSection("lines");
@@ -1289,7 +1232,7 @@ export function ReturnsScreen() {
   const handleReturnableLineQuantityChange = (line: ReturnableSaleLineView, value: string) => {
     try {
       updateDraftState((current) => {
-        const nextLines = applyDefaultReturnDisposition(addReturnDraftLine(current.lines, line));
+        const nextLines = addReturnDraftLine(current.lines, line);
         return {
           ...current,
           lines: setReturnDraftLineQuantityText(nextLines, line.id, value),
@@ -1307,10 +1250,7 @@ export function ReturnsScreen() {
   const handleIncrementReturnableLineQuantity = (line: ReturnableSaleLineView) => {
     updateDraftState((current) => ({
       ...current,
-      lines: incrementReturnDraftLineQuantity(
-        applyDefaultReturnDisposition(addReturnDraftLine(current.lines, line)),
-        line.id,
-      ),
+      lines: incrementReturnDraftLineQuantity(addReturnDraftLine(current.lines, line), line.id),
     }));
     setSelectedDraftLineId(line.id);
   };
@@ -1318,10 +1258,7 @@ export function ReturnsScreen() {
   const handleDecrementReturnableLineQuantity = (line: ReturnableSaleLineView) => {
     updateDraftState((current) => ({
       ...current,
-      lines: decrementReturnDraftLineQuantity(
-        applyDefaultReturnDisposition(addReturnDraftLine(current.lines, line)),
-        line.id,
-      ),
+      lines: decrementReturnDraftLineQuantity(addReturnDraftLine(current.lines, line), line.id),
     }));
     setSelectedDraftLineId(line.id);
   };
@@ -1426,29 +1363,14 @@ export function ReturnsScreen() {
       onCommit={() => {
         commitMutation.mutate();
       }}
-      onDispositionChangeAll={(value) => {
+      onAllocationsChangeSelectedLine={(allocations) => {
+        if (!selectedDraftLine) return;
         updateDraftState((current) => ({
           ...current,
-          lines: current.lines.map((line) => ({
-            ...line,
-            dispositionCode: value,
-          })),
-        }));
-      }}
-      onExactProductChangeSelectedLine={(productId) => {
-        if (!selectedDraftLine) {
-          return;
-        }
-
-        const selectedProduct =
-          selectedDraftLineExactProductOptions.find((product) => product.id === productId) ?? null;
-        updateDraftState((current) => ({
-          ...current,
-          lines: setReturnDraftLineExactProduct(
+          lines: setReturnDraftLineAllocations(
             current.lines,
             selectedDraftLine.originalSaleLineId,
-            productId,
-            selectedProduct?.name ?? null,
+            allocations,
           ),
         }));
       }}

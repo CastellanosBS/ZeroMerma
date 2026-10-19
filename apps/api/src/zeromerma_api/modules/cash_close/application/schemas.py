@@ -108,10 +108,30 @@ class CashCloseCountedPaymentMethodRequest(BaseModel):
         return self
 
 
+class CashCloseLotCountRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    lot_id: UUID
+    counted_quantity: Decimal = Field(ge=0, max_digits=12, decimal_places=3)
+
+
 class CashCloseCountedProductLineRequest(BaseModel):
     product_id: UUID
     counted_quantity: Decimal = Field(ge=Decimal("0.000"), max_digits=12, decimal_places=3)
     notes: str | None = Field(default=None, max_length=1000)
+    lot_counts: list[CashCloseLotCountRequest] = Field(default_factory=list)
+
+    @model_validator(mode="after")
+    def validate_lot_counts(self) -> Self:
+        if len({line.lot_id for line in self.lot_counts}) != len(self.lot_counts):
+            raise ValueError("A counted product cannot repeat a lot.")
+        if (
+            self.lot_counts
+            and sum((line.counted_quantity for line in self.lot_counts), Decimal(0))
+            != self.counted_quantity
+        ):
+            raise ValueError("The lot count must equal the product count.")
+        return self
 
 
 class CashCloseManualReconciliationAttributionLineRequest(BaseModel):
@@ -197,6 +217,15 @@ class CashCloseAlreadyExistsView(BaseModel):
     details: None = None
 
 
+class CashCloseLotCountView(BaseModel):
+    lot_id: UUID
+    lot_code: str
+    expires_at: datetime | None
+    expected_quantity: Decimal
+    reserved_quantity: Decimal
+    counted_quantity: Decimal | None = None
+
+
 class CashCloseReconciliationProductView(BaseModel):
     product_id: UUID
     product_code: str
@@ -209,6 +238,8 @@ class CashCloseReconciliationProductView(BaseModel):
     final_expected_quantity: Decimal | None = None
     discrepancy_quantity: Decimal | None = None
     notes: str | None = None
+    lot_tracking_enabled: bool = False
+    lots: list[CashCloseLotCountView] = Field(default_factory=list)
 
 
 class CashCloseCounterClassAvailabilityView(BaseModel):

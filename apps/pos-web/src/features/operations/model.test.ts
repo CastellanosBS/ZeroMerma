@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
 
-import type { OperationsCatalogClassView, OperationsCatalogProductView } from "../../lib/api-contracts";
+import type {
+  OperationsCatalogClassView,
+  OperationsCatalogProductView,
+} from "../../lib/api-contracts";
 import {
   addPendingSelectionLine,
   buildOperationCommitLines,
@@ -19,6 +22,7 @@ import {
   selectClassForOperation,
   selectProductForOperation,
   setPendingQuantityText,
+  setPendingOperationLot,
   sortOperationalClasses,
 } from "./model";
 
@@ -42,6 +46,8 @@ function buildProduct(
     currency_code: "MXN",
     display_order: 10,
     id: "product-1",
+    lot_tracking_enabled: false,
+    inventory_lots: [],
     name: "Vanilla Concha",
     quick_name: "Concha",
     unit_price: "12.00",
@@ -50,6 +56,55 @@ function buildProduct(
 }
 
 describe("operations model", () => {
+  it("requires the physical waste lot, keeps different lots separate and checks its available stock", () => {
+    const product = buildProduct({
+      lot_tracking_enabled: true,
+      inventory_lots: [
+        {
+          lot_id: "expired",
+          lot_code: "EXPIRED",
+          expires_at: "2020-01-01T00:00:00Z",
+          unidentified: false,
+          location_code: "COUNTER",
+          quantity_on_hand: "2",
+          quantity_reserved: "1",
+          available_quantity: "1",
+        },
+        {
+          lot_id: "fresh",
+          lot_code: "FRESH",
+          expires_at: "2099-01-01T00:00:00Z",
+          unidentified: false,
+          location_code: "COUNTER",
+          quantity_on_hand: "3",
+          quantity_reserved: "0",
+          available_quantity: "3",
+        },
+      ],
+    });
+    const capture = (state = createInitialOperationDraftState()) =>
+      setPendingQuantityText(
+        selectProductForOperation(selectClassForOperation(state, buildClass({})), product),
+        "1",
+      );
+    expect(() => addPendingSelectionLine(capture(), "COUNTER")).toThrow(
+      "Selecciona el lote físico",
+    );
+    const expired = setPendingOperationLot(capture(), "expired");
+    expect(() => addPendingSelectionLine(expired, "BACKROOM")).toThrow("Selecciona el lote físico");
+    const first = addPendingSelectionLine(expired, "COUNTER");
+    expect(() =>
+      addPendingSelectionLine(setPendingOperationLot(capture(first), "expired"), "COUNTER"),
+    ).toThrow("supera el saldo");
+    const second = addPendingSelectionLine(
+      setPendingOperationLot(capture(first), "fresh"),
+      "COUNTER",
+    );
+    expect(buildOperationCommitLines(second.lines)).toEqual([
+      { product_id: product.id, quantity: "1", lot_id: "expired" },
+      { product_id: product.id, quantity: "1", lot_id: "fresh" },
+    ]);
+  });
   it("orders classes by display order and name only", () => {
     const sorted = sortOperationalClasses([
       buildClass({ id: "3", name: "Telera", display_order: 30 }),

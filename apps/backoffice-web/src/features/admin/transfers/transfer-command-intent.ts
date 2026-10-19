@@ -9,6 +9,7 @@ import {
   dispatchAdminTransfer,
   receiveAdminTransfer,
   cancelAdminTransfer,
+  resolveAdminTransferTransit,
   recoverAdminTransferCommand,
   type TransferCommandResultView,
   type TransferCommandCode,
@@ -17,6 +18,7 @@ import type {
   AdminTransferCreatePayload,
   AdminTransferUpdatePayload,
   AdminTransferReceivePayload,
+  AdminTransferResolvePayload,
 } from "./types";
 export interface TransferIntentionContext {
   userId: string;
@@ -29,6 +31,7 @@ export type TransferIntentionPayload =
   | { commandCode: "create"; body: AdminTransferCreatePayload }
   | { commandCode: "update"; body: AdminTransferUpdatePayload }
   | { commandCode: "receive"; body: AdminTransferReceivePayload }
+  | { commandCode: "resolve_return" | "resolve_waste"; body: AdminTransferResolvePayload }
   | { commandCode: "dispatch"; notes: string | null | undefined }
   | { commandCode: "cancel"; reason: string | null | undefined };
 export const TRANSFER_INTENTION_SCOPE = "transfers";
@@ -43,7 +46,15 @@ export const transferIntentions = createCommandIntentionCoordinator<
   nullableFields: ["transferId"],
   scope: () => TRANSFER_INTENTION_SCOPE,
   validateContext: (context) =>
-    ["create", "update", "dispatch", "receive", "cancel"].includes(context.commandCode) &&
+    [
+      "create",
+      "update",
+      "dispatch",
+      "receive",
+      "cancel",
+      "resolve_return",
+      "resolve_waste",
+    ].includes(context.commandCode) &&
     (context.commandCode === "create") === (context.transferId === null),
   send: (context, payload, key) => {
     if (payload.commandCode !== context.commandCode) throw new Error("El comando cambió.");
@@ -53,9 +64,13 @@ export const transferIntentions = createCommandIntentionCoordinator<
       return updateAdminTransfer(context.transferId, payload.body, key);
     if (payload.commandCode === "receive")
       return receiveAdminTransfer(context.transferId, payload.body, key);
+    if (payload.commandCode === "resolve_return" || payload.commandCode === "resolve_waste")
+      return resolveAdminTransferTransit(context.transferId, payload.body, key);
     if (payload.commandCode === "dispatch")
       return dispatchAdminTransfer(context.transferId, payload.notes, key);
-    return cancelAdminTransfer(context.transferId, payload.reason, key);
+    if (payload.commandCode === "cancel")
+      return cancelAdminTransfer(context.transferId, payload.reason, key);
+    throw new Error("Comando de transferencia no reconocido.");
   },
   recover: async (metadata) => {
     const result = await recoverAdminTransferCommand(

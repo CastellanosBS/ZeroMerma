@@ -32,6 +32,7 @@ from zeromerma_api.modules.financial_ledger.domain.constants import (
 from zeromerma_api.modules.financial_ledger.domain.money import FinancialModelError
 from zeromerma_api.modules.identity.application.schemas import AuthenticatedUser
 from zeromerma_api.modules.identity.infrastructure.models import User, UserBranchAssignment
+from zeromerma_api.modules.inventory.application.class_inventory import capture_sale_inventory
 from zeromerma_api.modules.outbox.application.service import OutboxWriter
 from zeromerma_api.modules.pricing.application.services import PricedSaleLine, SalePricingService
 from zeromerma_api.modules.sales.application.schemas import (
@@ -395,23 +396,26 @@ class SaleCommandService:
         session.add(sale)
         session.flush()
 
+        sale_lines: list[SaleLine] = []
         for sequence, priced_line in enumerate(priced_lines, start=1):
-            session.add(
-                SaleLine(
-                    sale_id=sale.id,
-                    sequence=sequence,
-                    capture_mode=priced_line.capture_mode,
-                    product_class_id=priced_line.product_class_id,
-                    product_id=priced_line.product_id,
-                    catalog_code_snapshot=priced_line.catalog_code_snapshot,
-                    catalog_name_snapshot=priced_line.catalog_name_snapshot,
-                    quantity=priced_line.quantity,
-                    unit_price=priced_line.unit_price,
-                    line_total_amount=priced_line.line_total_amount,
-                    physical_attribution_status=priced_line.physical_attribution_status,
-                )
+            sale_line = SaleLine(
+                id=uuid.uuid4(),
+                sale_id=sale.id,
+                sequence=sequence,
+                capture_mode=priced_line.capture_mode,
+                product_class_id=priced_line.product_class_id,
+                product_id=priced_line.product_id,
+                catalog_code_snapshot=priced_line.catalog_code_snapshot,
+                catalog_name_snapshot=priced_line.catalog_name_snapshot,
+                quantity=priced_line.quantity,
+                unit_price=priced_line.unit_price,
+                line_total_amount=priced_line.line_total_amount,
+                physical_attribution_status=priced_line.physical_attribution_status,
             )
-
+            session.add(sale_line)
+            sale_lines.append(sale_line)
+        session.flush()
+        inventory_movement_ids = capture_sale_inventory(session, sale=sale, lines=sale_lines)
         sale_payments: list[SalePayment] = []
         for sequence, payment in enumerate(prepared_payments, start=1):
             sale_payment = SalePayment(
@@ -471,6 +475,7 @@ class SaleCommandService:
                 "Sales require valid positive financial amounts in MXN."
             ) from error
         financial_trace = {
+            "inventory_movement_ids": [str(value) for value in inventory_movement_ids],
             "financial_operation_id": str(financial_operation.id),
             "financial_entry_ids": [str(entry.id) for entry in financial_entries],
         }

@@ -1,3 +1,4 @@
+import { InventoryDispositionRecoveryPanel } from "../../inventory-dispositions/InventoryDispositionRecoveryPanel";
 import { isCommandIntentionPending } from "@zeromerma/api-client";
 import {
   PHYSICAL_INTENTION_SCOPE,
@@ -282,6 +283,7 @@ export function AdminInventoryPage() {
       />
 
       <div className="flex min-h-0 min-w-0 flex-1 flex-col gap-2.5 overflow-hidden p-3">
+        <InventoryDispositionRecoveryPanel />
         <AdminInventoryFilters
           filters={filters}
           isBackendConnected={inventoryList.isBackendConnected}
@@ -318,7 +320,7 @@ export function AdminInventoryPage() {
           <AdminInventoryAdjustmentPanel
             branchOptions={inventoryList.filterOptions.branches}
             errorMessage={adjustmentErrorMessage}
-            initialInventory={adjustmentSource}
+            initialInventory={adjustmentSource && detailInventory?.balanceId === getBalanceId(adjustmentSource) ? detailInventory : adjustmentSource}
             isSubmitting={adjustmentMutation.isPending || intentionBlocked}
             locationOptions={inventoryList.filterOptions.locations}
             productOptions={inventoryList.filterOptions.products}

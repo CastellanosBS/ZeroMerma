@@ -3,9 +3,11 @@ from __future__ import annotations
 from uuid import UUID
 
 from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from zeromerma_api.db.access_scope import bind_authorization_scope
+from zeromerma_api.db.transactions import is_unique_violation
 from zeromerma_api.modules.branches.infrastructure.models import Branch
 from zeromerma_api.modules.idempotency.application.context import execution
 from zeromerma_api.modules.idempotency.application.schemas import (
@@ -25,11 +27,13 @@ from zeromerma_api.modules.identity.application.authorization import (
 )
 from zeromerma_api.modules.identity.application.schemas import AuthenticatedUser, CapabilityCode
 from zeromerma_api.modules.identity.application.session_services import auth_error
+from zeromerma_api.modules.inventory.domain.exceptions import InventoryValidationError
 from zeromerma_api.modules.purchases.application.admin_schemas import (
     AdminPurchaseCancelRequest,
     AdminPurchaseCreateRequest,
     AdminPurchaseDirectEntryRequest,
     AdminPurchaseReceiveRequest,
+    AdminPurchaseReverseReceiptRequest,
     AdminPurchaseUpdateRequest,
     PurchaseCommandCode,
     PurchaseCommandLineResultView,
@@ -49,6 +53,7 @@ PurchaseCommand = (
     | AdminPurchaseDirectEntryRequest
     | AdminPurchaseReceiveRequest
     | AdminPurchaseCancelRequest
+    | AdminPurchaseReverseReceiptRequest
 )
 PURCHASE_OPERATIONS: dict[PurchaseCommandCode, str] = {
     "create": "purchase.create",
@@ -57,6 +62,7 @@ PURCHASE_OPERATIONS: dict[PurchaseCommandCode, str] = {
     "confirm": "purchase.confirm",
     "receive": "purchase.receive",
     "cancel": "purchase.cancel",
+    "reverse-receipt": "purchase.reverse_receipt",
 }
 PURCHASE_RESPONSE_POLICY = ResponsePolicy(
     snapshot_model=PurchaseCommandResultView,
@@ -72,6 +78,7 @@ def _capability(code: PurchaseCommandCode) -> CapabilityCode:
         "confirm": "purchases.confirm",
         "receive": "purchases.receive",
         "cancel": "purchases.cancel",
+        "reverse-receipt": "purchases.cancel",
     }
     return capabilities[code]
 
@@ -98,6 +105,7 @@ class PurchaseCommandService:
             "confirm": type(None),
             "receive": AdminPurchaseReceiveRequest,
             "cancel": AdminPurchaseCancelRequest,
+            "reverse-receipt": AdminPurchaseReverseReceiptRequest,
         }[command_code]
         if type(command) is not expected or (command_code in {"create", "direct-entry"}) != (
             purchase_id is None
@@ -184,6 +192,14 @@ class PurchaseCommandService:
                             purchase_id=purchase_id,
                             request_id=request_id,
                         )
+                    elif isinstance(command, AdminPurchaseReverseReceiptRequest):
+                        detail = self._commands.reverse_receipt(
+                            current,
+                            command=command,
+                            current_user=current_user,
+                            purchase_id=purchase_id,
+                            request_id=request_id,
+                        )
                     elif isinstance(command, AdminPurchaseCancelRequest):
                         detail = self._commands.cancel_purchase(
                             current,
@@ -199,7 +215,18 @@ class PurchaseCommandService:
                             purchase_id=purchase_id,
                             request_id=request_id,
                         )
-            except PurchaseValidationError as error:
+            except IntegrityError as error:
+                if not is_unique_violation(error, "uq_purchase_supplier_invoice"):
+                    raise
+                raise DeterministicRejection(
+                    code="PURCHASE_COMMAND_REJECTED",
+                    status_code=409,
+                    message="The supplier invoice has already been registered.",
+                    snapshot=PurchaseCommandRejectionView(
+                        message="The supplier invoice has already been registered."
+                    ),
+                ) from error
+            except (PurchaseValidationError, InventoryValidationError) as error:
                 raise DeterministicRejection(
                     code="PURCHASE_COMMAND_REJECTED",
                     status_code=409,

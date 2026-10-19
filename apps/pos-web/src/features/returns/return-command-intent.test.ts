@@ -28,7 +28,14 @@ const body = () => ({
     {
       original_sale_line_id: "line",
       returned_quantity: "0.333",
-      disposition_code: "RESTOCK_COUNTER",
+      allocations: [
+        {
+          exact_product_id: "product",
+          quantity: "0.333",
+          disposition_code: "QUARANTINE" as const,
+          restock_safe_acknowledged: false,
+        },
+      ],
     },
   ],
 });

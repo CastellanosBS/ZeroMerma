@@ -13,8 +13,9 @@ from sqlalchemy import (
     String,
     Text,
     UniqueConstraint,
+    text,
 )
-from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
 from zeromerma_api.db.base import Base
@@ -185,6 +186,9 @@ class CashSessionCloseProductCount(Base):
     product_class_name_snapshot: Mapped[str] = mapped_column(String(160), nullable=False)
     quantity: Mapped[Decimal] = mapped_column(Numeric(12, 3), nullable=False)
     bucket_code: Mapped[str] = mapped_column(String(32), nullable=False)
+    lot_counts: Mapped[list[dict[str, str]]] = mapped_column(
+        JSONB, default=list, server_default=text("'[]'::jsonb"), nullable=False
+    )
     notes: Mapped[str | None] = mapped_column(Text, nullable=True)
 
 

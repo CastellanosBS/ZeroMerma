@@ -76,6 +76,7 @@ def _create_raw_material(code: str, *, standard_cost: Decimal | None = Decimal("
             display_order=900,
             is_active=True,
             is_sellable=False,
+            is_usable_as_input=True,
             name=f"Raw {code}",
             product_class_id=product_class.id,
             product_kind=CATALOG_PRODUCT_KIND_RAW_MATERIAL,
@@ -179,7 +180,7 @@ def _create_started_production(
     production_id = str(production["overview"]["id"])
 
     start_response = client.post(
-        f"/v1/admin/production/{production_id}/start",
+        f"/v1/admin/production/{production_id}/release",
         headers={
             **_production_headers(client),
             "X-Request-ID": "61b333e9-587e-532c-9911-e6ed53c6b744",
@@ -218,7 +219,7 @@ def test_admin_production_create_filters_detail_and_shortage_warning(client: Tes
     production_id = production["overview"]["id"]
 
     assert production["overview"]["status"] == "DRAFT"
-    assert production["available_actions"]["can_start"] is True
+    assert production["available_actions"]["can_release"] is True
     assert production["planned_inputs"][0]["input_product_name"] == "Raw RAW-PROD-SHORTAGE"
     assert Decimal(str(production["planned_inputs"][0]["required_qty"])) == Decimal("4.000")
     assert Decimal(str(production["planned_inputs"][0]["shortage_qty"])) == Decimal("4.000")
@@ -257,7 +258,8 @@ def test_admin_production_create_filters_detail_and_shortage_warning(client: Tes
     detail = detail_response.json()
     assert detail["overview"]["id"] == production_id
     assert detail["product_recipe"]["recipe_id"] == recipe_id
-    assert detail["waste_scrap"]["integration_available"] is False
+    assert detail["waste_scrap"]["integration_available"] is True
+    assert detail["waste_scrap"]["records"] == []
 
 
 def test_admin_production_validates_target_recipe_and_quantity(client: TestClient) -> None:
@@ -312,7 +314,7 @@ def test_admin_production_start_blocks_shortages_then_succeeds(client: TestClien
     production_id = str(production["overview"]["id"])
 
     blocked_response = client.post(
-        f"/v1/admin/production/{production_id}/start",
+        f"/v1/admin/production/{production_id}/release",
         headers=_production_headers(client),
         json={},
     )
@@ -321,14 +323,14 @@ def test_admin_production_start_blocks_shortages_then_succeeds(client: TestClien
 
     _seed_raw_stock(client, product_id=raw_material_id)
     start_response = client.post(
-        f"/v1/admin/production/{production_id}/start",
+        f"/v1/admin/production/{production_id}/release",
         headers=_production_headers(client),
         json={"notes": "Materials ready"},
     )
 
     assert start_response.status_code == 200
     payload = _detail(client, start_response.json()["id"])
-    assert payload["overview"]["status"] == "IN_PROGRESS"
+    assert payload["overview"]["status"] == "RELEASED"
     assert payload["available_actions"]["can_complete"] is True
     assert payload["planned_inputs"][0]["status"] == "available"
     assert payload["warnings"] == []
@@ -348,6 +350,16 @@ def test_admin_production_complete_writes_inventory_movements_audit_and_outbox(
         },
         json={
             "actual_output_qty": "18.000",
+            "inputs": [
+                {
+                    "input_product_id": line["input_product_id"],
+                    "consumed_qty": line["required_qty"],
+                    "returned_qty": "0.000",
+                    "waste_qty": "0.000",
+                    "remainder_qty": "0.000",
+                }
+                for line in started["planned_inputs"]
+            ],
             "notes": "Yield below plan after cooling",
             "variance_reason": "Shrinkage during bake",
         },
@@ -360,6 +372,11 @@ def test_admin_production_complete_writes_inventory_movements_audit_and_outbox(
     assert Decimal(str(payload["output_yield"]["variance_percent"])) == Decimal("-10.0000")
     assert payload["warnings"][0]["code"] == "yield_variance"
     assert len(payload["inventory_impact"]["movements"]) == 2
+    # An adjustment with no evidenced cost cannot turn the recipe's standard cost into valuation.
+    assert all(
+        movement["unit_cost"] is None and movement["total_cost"] is None
+        for movement in payload["inventory_impact"]["movements"]
+    )
 
     with SessionLocal() as session:
         batch = session.execute(
@@ -428,7 +445,7 @@ def test_admin_production_complete_validates_output_and_variance_reason(client: 
         json={"actual_output_qty": "0.000"},
     )
     assert zero_response.status_code == 409
-    assert "Zero output" in zero_response.json()["message"]
+    assert "yield variance" in zero_response.json()["message"]
 
 
 def test_admin_production_cancel_draft_and_blocks_completed_cancellation(
@@ -452,7 +469,7 @@ def test_admin_production_cancel_draft_and_blocks_completed_cancellation(
     complete_response = client.post(
         f"/v1/admin/production/{completed_id}/complete",
         headers=_production_headers(client),
-        json={"actual_output_qty": "20.000"},
+        json={"actual_output_qty": "20.000", "confirm_without_differences": True},
     )
     assert complete_response.status_code == 200
 

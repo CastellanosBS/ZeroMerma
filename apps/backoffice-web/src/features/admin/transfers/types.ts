@@ -1,3 +1,5 @@
+import type { components } from "@zeromerma/api-client";
+export type AdminTransferResolvePayload = components["schemas"]["AdminTransferResolveRequest"];
 export type AdminTransferStatus =
   | "DRAFT"
   | "IN_TRANSIT"
@@ -108,6 +110,7 @@ export interface AdminTransferBranch {
 }
 
 export interface AdminTransferLine {
+  lots?: components["schemas"]["TransferLotProgressView"][];
   difference?: string | null;
   lineStatus: string;
   notes?: string | null;
@@ -119,6 +122,8 @@ export interface AdminTransferLine {
   requestedQuantity: string;
   sentQuantity: string;
   pendingQuantity: string;
+  returnedQuantity?: string;
+  wasteQuantity?: string;
   shipmentLineId: string;
   unitOfMeasure: string;
   varianceReason?: string | null;
@@ -189,6 +194,7 @@ export interface AdminTransferAvailableActions {
 }
 
 export interface AdminTransferDetail {
+  resolutions?: components["schemas"]["TransferResolutionView"][];
   availableActions: AdminTransferAvailableActions;
   destination: AdminTransferBranch;
   inventoryImpact: AdminTransferInventoryImpact;
@@ -221,6 +227,7 @@ export interface AdminTransferUpdatePayload {
 }
 
 export interface AdminTransferReceiveLinePayload {
+  lotAllocations?: components["schemas"]["TransferLotAllocationRequest"][];
   notes?: string | null;
   receivedQuantity: string;
   shipmentLineId: string;

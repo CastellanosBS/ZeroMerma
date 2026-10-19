@@ -301,14 +301,24 @@ const returnDetailsById = {
     id: "return-1",
     lines: [
       {
-        disposition_code: "RESTOCK_COUNTER",
+        allocations: [
+          {
+            id: "allocation-1",
+            returned_product_id: "product-bolillo",
+            returned_product_code_snapshot: "BOLILLO",
+            returned_product_name_snapshot: "Bolillo",
+            quantity: "1.000",
+            disposition_code: "RESTOCK_COUNTER",
+            lot_id: null,
+            inventory_movement_id: null,
+          },
+        ],
         id: "return-line-1",
         line_number: 1,
         original_catalog_name_snapshot: "Bolillo",
         original_sale_line_id: "sale-line-1",
         refund_line_total_amount: "12.00",
         refund_unit_price: "12.00",
-        returned_product_name_snapshot: "Bolillo",
         returned_quantity: "1.000",
       },
     ],
@@ -343,14 +353,24 @@ const returnDetailsById = {
     id: "return-old",
     lines: [
       {
-        disposition_code: "SEND_TO_WASTE",
+        allocations: [
+          {
+            id: "allocation-1",
+            returned_product_id: "product-bolillo",
+            returned_product_code_snapshot: "BOLILLO",
+            returned_product_name_snapshot: "Bolillo",
+            quantity: "1.000",
+            disposition_code: "SEND_TO_WASTE",
+            lot_id: null,
+            inventory_movement_id: null,
+          },
+        ],
         id: "return-line-old",
         line_number: 1,
         original_catalog_name_snapshot: "Bolillo",
         original_sale_line_id: "sale-line-search",
         refund_line_total_amount: "10.00",
         refund_unit_price: "10.00",
-        returned_product_name_snapshot: "Bolillo",
         returned_quantity: "1.000",
       },
     ],
@@ -633,14 +653,24 @@ beforeEach(() => {
     id: "return-1",
     lines: [
       {
-        disposition_code: "RESTOCK_COUNTER",
+        allocations: [
+          {
+            id: "allocation-1",
+            returned_product_id: "product-bolillo",
+            returned_product_code_snapshot: "BOLILLO",
+            returned_product_name_snapshot: "Bolillo",
+            quantity: "1.000",
+            disposition_code: "RESTOCK_COUNTER",
+            lot_id: null,
+            inventory_movement_id: null,
+          },
+        ],
         id: "return-line-1",
         line_number: 1,
         original_catalog_name_snapshot: "Bolillo",
         original_sale_line_id: "sale-line-1",
         refund_line_total_amount: "12.00",
         refund_unit_price: "12.00",
-        returned_product_name_snapshot: "Bolillo",
         returned_quantity: "1.000",
       },
     ],
@@ -760,11 +790,12 @@ describe("ReturnsScreen", () => {
     ) as HTMLInputElement;
     setInputValue(quantityInput, "1");
 
-    const selects = Array.from(rightPanelHost.querySelectorAll("select")) as HTMLSelectElement[];
-    const dispositionSelect = selects[0]!;
-    const reasonSelect = selects[1]!;
-    const refundMethodSelect = selects[2]!;
-    setSelectValue(dispositionSelect, "RESTOCK_COUNTER");
+    const reasonSelect = rightPanelHost.querySelector(
+      'select[aria-label="Motivo de devolucion"]',
+    ) as HTMLSelectElement;
+    const refundMethodSelect = rightPanelHost.querySelector(
+      'select[aria-label="Metodo de reembolso"]',
+    ) as HTMLSelectElement;
     setSelectValue(reasonSelect, "WRONG_ITEM");
     setSelectValue(refundMethodSelect, "CASH");
     await flush();
@@ -795,7 +826,9 @@ describe("ReturnsScreen", () => {
           refund_method_code: "CASH",
           lines: [
             expect.objectContaining({
-              disposition_code: "RESTOCK_COUNTER",
+              allocations: [
+                expect.objectContaining({ disposition_code: "QUARANTINE", quantity: "1" }),
+              ],
               returned_quantity: "1",
             }),
           ],

@@ -53,11 +53,11 @@ from zeromerma_api.modules.catalog.application.admin_schemas import (
     AdminRecipeInputView,
     AdminRecipeView,
 )
+from zeromerma_api.modules.catalog.application.inventory_policy import inventory_policy_conflict
 from zeromerma_api.modules.catalog.domain.constants import (
     CATALOG_CAPTURE_MODE_CLASS_CAPTURE,
     CATALOG_CAPTURE_MODE_PRODUCT_DIRECT,
     CATALOG_PRODUCT_KIND_FINISHED_GOOD,
-    CATALOG_PRODUCT_KIND_RAW_MATERIAL,
 )
 from zeromerma_api.modules.catalog.domain.exceptions import (
     CatalogError,
@@ -225,6 +225,8 @@ class AdminProductCatalogService:
         product_class = self._get_product_class(session, command.product_class_id)
         self._validate_capture_mode(product_class, command.capture_mode)
         self._ensure_unique_code(session, command.code)
+        if command.expiry_required and not command.lot_tracking_enabled:
+            raise AdminProductValidationError("Required expiry needs lot tracking.")
 
         product = Product(
             product_class_id=product_class.id,
@@ -236,7 +238,10 @@ class AdminProductCatalogService:
             unit_price=command.unit_price,
             currency_code=product_class.currency_code,
             is_active=command.status == "active",
-            is_sellable=command.status == "active",
+            is_sellable=command.is_sellable,
+            is_usable_as_input=command.is_usable_as_input,
+            lot_tracking_enabled=command.lot_tracking_enabled,
+            expiry_required=command.expiry_required,
         )
 
         try:
@@ -281,6 +286,14 @@ class AdminProductCatalogService:
         row = self._get_product_row(session, product_id)
         product = row.product
         previous_snapshot = self._product_snapshot(product, row.product_class)
+        policy_error = inventory_policy_conflict(
+            session,
+            product,
+            lot_tracking_enabled=command.lot_tracking_enabled,
+            expiry_required=command.expiry_required,
+        )
+        if policy_error:
+            raise AdminProductValidationError(policy_error)
 
         if command.product_class_id is not None:
             product_class = self._get_product_class(session, command.product_class_id)
@@ -304,7 +317,16 @@ class AdminProductCatalogService:
             product.unit_price = command.unit_price
         if command.status is not None:
             product.is_active = command.status == "active"
-            product.is_sellable = command.status == "active"
+        if command.is_sellable is not None:
+            product.is_sellable = command.is_sellable
+        if command.lot_tracking_enabled is not None:
+            product.lot_tracking_enabled = command.lot_tracking_enabled
+        if command.expiry_required is not None:
+            product.expiry_required = command.expiry_required
+        if command.is_usable_as_input is not None:
+            product.is_usable_as_input = command.is_usable_as_input
+        if product.expiry_required and not product.lot_tracking_enabled:
+            raise AdminProductValidationError("Required expiry needs lot tracking.")
 
         try:
             session.flush()
@@ -352,11 +374,9 @@ class AdminProductCatalogService:
         )
         normalized_status = _normalize_optional(status_filter)
         if normalized_status == "active":
-            statement = statement.where(Product.is_active.is_(True), Product.is_sellable.is_(True))
+            statement = statement.where(Product.is_active.is_(True))
         elif normalized_status == "inactive":
-            statement = statement.where(
-                or_(Product.is_active.is_(False), Product.is_sellable.is_(False))
-            )
+            statement = statement.where(Product.is_active.is_(False))
         elif normalized_status not in (None, "all"):
             raise AdminProductValidationError("Unsupported product status filter.")
 
@@ -404,6 +424,10 @@ class AdminProductCatalogService:
         brand: Brand,
     ) -> AdminProductView:
         return AdminProductView(
+            is_sellable=product.is_sellable,
+            is_usable_as_input=product.is_usable_as_input,
+            lot_tracking_enabled=product.lot_tracking_enabled,
+            expiry_required=product.expiry_required,
             id=product.id,
             code=product.code,
             sku=product.code,
@@ -593,6 +617,10 @@ class AdminProductCatalogService:
             "brand_id": str(product_class.brand_id),
             "capture_mode": product_class.capture_mode_default,
             "status": _product_status(product),
+            "is_sellable": product.is_sellable,
+            "is_usable_as_input": product.is_usable_as_input,
+            "lot_tracking_enabled": product.lot_tracking_enabled,
+            "expiry_required": product.expiry_required,
             "unit_price": str(product.unit_price),
             "currency_code": product.currency_code,
             "quick_name": product.quick_name,
@@ -804,7 +832,6 @@ class AdminProductClassCatalogService:
             .where(
                 Product.product_class_id == ProductClass.id,
                 Product.is_active.is_(True),
-                Product.is_sellable.is_(True),
             )
             .correlate(ProductClass)
             .scalar_subquery()
@@ -813,7 +840,7 @@ class AdminProductClassCatalogService:
             select(func.count(Product.id))
             .where(
                 Product.product_class_id == ProductClass.id,
-                or_(Product.is_active.is_(False), Product.is_sellable.is_(False)),
+                Product.is_active.is_(False),
             )
             .correlate(ProductClass)
             .scalar_subquery()
@@ -2155,7 +2182,7 @@ class AdminRecipeCostCatalogService:
         raw_materials = session.execute(
             select(Product.id, Product.name)
             .where(
-                Product.product_kind == CATALOG_PRODUCT_KIND_RAW_MATERIAL,
+                Product.is_usable_as_input.is_(True),
                 Product.is_active.is_(True),
             )
             .order_by(Product.name.asc())
@@ -2218,8 +2245,10 @@ class AdminRecipeCostCatalogService:
             product = products_by_id.get(input_id)
             if product is None:
                 raise ProductNotFoundError("Recipe input product was not found.")
-            if product.product_kind != CATALOG_PRODUCT_KIND_RAW_MATERIAL:
-                raise AdminProductValidationError("Recipe inputs must be RAW_MATERIAL products.")
+            if not product.is_active or not product.is_usable_as_input:
+                raise AdminProductValidationError(
+                    "Recipe inputs must be active and usable as inputs."
+                )
 
     def _deactivate_other_recipes(self, session: Session, product_id: uuid.UUID) -> None:
         existing_recipes = session.execute(
@@ -2320,7 +2349,7 @@ def _build_class_warnings(row: _ProductClassRow) -> AdminProductClassWarningsVie
 
 
 def _product_status(product: Product) -> AdminProductStatus:
-    if product.is_active and product.is_sellable:
+    if product.is_active:
         return "active"
     return "inactive"
 

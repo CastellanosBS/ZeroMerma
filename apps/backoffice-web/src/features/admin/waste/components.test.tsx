@@ -178,7 +178,11 @@ const wasteDetail: AdminWasteDetail = {
 };
 
 function render(element: ReactElement) {
-  return renderToString(withCapabilities(element, ["waste.manage"]));
+  return renderToString(
+    <QueryClientProvider client={new QueryClient()}>
+      {withCapabilities(element, ["waste.manage"])}
+    </QueryClientProvider>,
+  );
 }
 
 describe("admin waste UI components", () => {

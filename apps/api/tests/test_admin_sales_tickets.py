@@ -3,6 +3,7 @@ from __future__ import annotations
 from decimal import Decimal
 
 from fastapi.testclient import TestClient
+from inventory_fixtures import stock_for_codes
 from sqlalchemy import select
 
 from zeromerma_api.bootstrap.seed_local import (
@@ -33,6 +34,12 @@ def _cashier_headers(client: TestClient) -> dict[str, str]:
 
 
 def _open_cash_session(client: TestClient) -> None:
+    stock_for_codes(
+        workstation_code=SEED_WORKSTATION_CODE,
+        quantities={SEED_PRODUCT_COCA_355_CODE: Decimal(10)},
+        location="COUNTER",
+        reference="admin-sale-ticket-physical-input",
+    )
     response = client.post(
         "/v1/cash-sessions/open",
         headers={**_cashier_headers(client), "Idempotency-Key": new_idempotency_key()},
@@ -179,7 +186,16 @@ def test_admin_sales_ticket_detail_reprint_and_related_returns(client: TestClien
                 {
                     "original_sale_line_id": product_direct_line_id,
                     "returned_quantity": "1.000",
-                    "disposition_code": "RESTOCK_COUNTER",
+                    "allocations": [
+                        {
+                            "exact_product_id": sale_return_source_response.json()["lines"][1][
+                                "product_id"
+                            ],
+                            "quantity": "1.000",
+                            "disposition_code": "RESTOCK_COUNTER",
+                            "restock_safe_acknowledged": True,
+                        }
+                    ],
                 }
             ],
         },

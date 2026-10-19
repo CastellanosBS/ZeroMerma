@@ -15,8 +15,9 @@ import {
 import { PosTerminalWorkspace } from "./pos-terminal-workspace";
 import { usePosTerminalStore } from "./store";
 
-(globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean })
-  .IS_REACT_ACT_ENVIRONMENT = true;
+(
+  globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }
+).IS_REACT_ACT_ENVIRONMENT = true;
 
 const catalogRefetch = vi.fn();
 const productsRefetch = vi.fn();
@@ -73,10 +74,7 @@ function dispatchKey(target: EventTarget, key: string, options?: KeyboardEventIn
 }
 
 function setInputValue(input: HTMLInputElement, value: string) {
-  const valueSetter = Object.getOwnPropertyDescriptor(
-    HTMLInputElement.prototype,
-    "value",
-  )?.set;
+  const valueSetter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")?.set;
 
   act(() => {
     valueSetter?.call(input, value);
@@ -122,6 +120,11 @@ const bebidasClass: PosCatalogClassView = {
 };
 
 const cocaProduct: PosCatalogProductView = {
+  is_inventory_tracked: true,
+  lot_tracking_enabled: false,
+  available_quantity: "100.000",
+  reserved_quantity: "0.000",
+  available_lots: [],
   code: "COCA-355",
   currency_code: "MXN",
   display_order: 10,
@@ -132,6 +135,11 @@ const cocaProduct: PosCatalogProductView = {
 };
 
 const aguaProduct: PosCatalogProductView = {
+  is_inventory_tracked: true,
+  lot_tracking_enabled: false,
+  available_quantity: "100.000",
+  reserved_quantity: "0.000",
+  available_lots: [],
   code: "AGUA-600",
   currency_code: "MXN",
   display_order: 20,
@@ -183,6 +191,42 @@ afterEach(() => {
 });
 
 describe("PosTerminalWorkspace", () => {
+  it("disables an exhausted SKU and prevents numeric keyboard selection while showing FEFO evidence", async () => {
+    productsQueryState = {
+      ...productsQueryState,
+      data: {
+        products: [
+          { ...cocaProduct, available_quantity: "0.000", reserved_quantity: "2.000" },
+          {
+            ...aguaProduct,
+            lot_tracking_enabled: true,
+            available_lots: [
+              {
+                lot_id: "lot",
+                lot_code: "SOON",
+                expires_at: "2026-12-01T00:00:00Z",
+                available_quantity: "2.000",
+              },
+            ],
+          },
+        ],
+      },
+    };
+    act(() => usePosTerminalStore.getState().selectClass(bebidasClass));
+    const view = renderUi(<PosTerminalWorkspace />);
+    mountedRoots.push(view.unmount);
+    const exhausted = Array.from(
+      view.container.querySelectorAll<HTMLButtonElement>("button[data-pos-catalog-card='true']"),
+    ).find((button) => button.textContent?.includes(cocaProduct.name))!;
+    expect(exhausted.disabled).toBe(true);
+    act(() => exhausted.click());
+    expect(usePosTerminalStore.getState().pendingSelection?.product).toBeNull();
+    dispatchKey(window, "1");
+    expect(usePosTerminalStore.getState().pendingSelection?.product).toBeNull();
+    expect(view.container.textContent).toContain("no tiene existencias");
+    expect(view.container.textContent).toContain("Reservado 2.000");
+    expect(view.container.textContent).toContain("Lote SOON");
+  });
   it("supports keyboard-only class selection with roving focus", async () => {
     const view = renderUi(<PosTerminalWorkspace />);
     mountedRoots.push(view.unmount);

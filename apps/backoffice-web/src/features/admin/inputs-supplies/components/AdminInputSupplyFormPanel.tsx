@@ -85,6 +85,16 @@ export function AdminInputSupplyFormPanel({
   const [isInventoryTracked, setIsInventoryTracked] = useState(
     initialInput?.overview.isInventoryTracked ?? true,
   );
+  const [isSellable, setIsSellable] = useState(initialInput?.overview.isSellable ?? false);
+  const [isUsableAsInput, setIsUsableAsInput] = useState(
+    initialInput?.overview.isUsableAsInput ?? true,
+  );
+  const [lotTrackingEnabled, setLotTrackingEnabled] = useState(
+    initialInput?.overview.lotTrackingEnabled ?? false,
+  );
+  const [expiryRequired, setExpiryRequired] = useState(
+    initialInput?.overview.expiryRequired ?? false,
+  );
   const [isPurchasable, setIsPurchasable] = useState(initialInput?.overview.isPurchasable ?? true);
   const [minimumStock, setMinimumStock] = useState(
     initialInput?.inventoryStatus.minimumStock ?? "",
@@ -122,6 +132,10 @@ export function AdminInputSupplyFormPanel({
     setIsActive(initialInput?.overview.isActive ?? true);
     setIsInventoryTracked(initialInput?.overview.isInventoryTracked ?? true);
     setIsPurchasable(initialInput?.overview.isPurchasable ?? true);
+    setIsSellable(initialInput?.overview.isSellable ?? false);
+    setIsUsableAsInput(initialInput?.overview.isUsableAsInput ?? true);
+    setLotTrackingEnabled(initialInput?.overview.lotTrackingEnabled ?? false);
+    setExpiryRequired(initialInput?.overview.expiryRequired ?? false);
     setMinimumStock(initialInput?.inventoryStatus.minimumStock ?? "");
     setName(initialInput?.overview.name ?? "");
     setPreferredOrderQuantity(initialInput?.inventoryStatus.preferredOrderQuantity ?? "");
@@ -249,6 +263,10 @@ export function AdminInputSupplyFormPanel({
       isActive,
       isInventoryTracked,
       isPurchasable,
+      isSellable,
+      isUsableAsInput,
+      lotTrackingEnabled,
+      expiryRequired,
       minimumStock: normalizeOptional(minimumStock),
       name: name.trim(),
       preferredOrderQuantity: normalizeOptional(preferredOrderQuantity),
@@ -278,6 +296,44 @@ export function AdminInputSupplyFormPanel({
 
   return (
     <section className="rounded-[20px] border border-[var(--ui-color-border)] bg-white p-4 shadow-[var(--ui-shadow-subtle)]">
+      <div className="grid gap-2 md:grid-cols-3">
+        <label>
+          <input
+            type="checkbox"
+            checked={isSellable}
+            onChange={(event) => setIsSellable(event.target.checked)}
+          />{" "}
+          Vendible
+        </label>
+        <label>
+          <input
+            type="checkbox"
+            checked={isUsableAsInput}
+            onChange={(event) => setIsUsableAsInput(event.target.checked)}
+          />{" "}
+          Usable como insumo
+        </label>
+        <label>
+          <input
+            type="checkbox"
+            checked={lotTrackingEnabled}
+            onChange={(event) => {
+              setLotTrackingEnabled(event.target.checked);
+              if (!event.target.checked) setExpiryRequired(false);
+            }}
+          />{" "}
+          Control por lote (FEFO)
+        </label>
+        <label>
+          <input
+            type="checkbox"
+            disabled={!lotTrackingEnabled}
+            checked={expiryRequired}
+            onChange={(event) => setExpiryRequired(event.target.checked)}
+          />{" "}
+          Caducidad obligatoria
+        </label>
+      </div>
       <div className="mb-3 flex items-start justify-between gap-3">
         <div className="min-w-0">
           <p className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">

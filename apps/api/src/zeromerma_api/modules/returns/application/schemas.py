@@ -141,7 +141,20 @@ class ReturnPaymentSummaryView(BaseModel):
     received_at: datetime
 
 
+class ReturnPhysicalOptionView(BaseModel):
+    product_id: UUID
+    product_code: str
+    product_name: str
+    lot_id: UUID | None
+    lot_code: str | None
+    expires_at: datetime | None
+    remaining_quantity: Decimal
+    is_inventory_tracked: bool
+    lot_tracking_enabled: bool
+
+
 class ReturnableSaleLineView(BaseModel):
+    physical_options: list[ReturnPhysicalOptionView] = Field(default_factory=list)
     id: UUID
     sequence: int
     capture_mode: str
@@ -185,19 +198,45 @@ class ReturnOriginalSaleDetailResponse(BaseModel):
     payments: list[ReturnPaymentSummaryView]
 
 
-class ReturnCommitLineRequest(BaseModel):
-    original_sale_line_id: UUID
-    returned_quantity: Decimal = Field(gt=Decimal("0.000"), max_digits=12, decimal_places=3)
-    disposition_code: str = Field(min_length=1, max_length=32)
-    exact_product_id: UUID | None = None
+ReturnDispositionCode = Literal[
+    "RESTOCK_COUNTER", "RESTOCK_BACKROOM", "QUARANTINE", "SEND_TO_WASTE", "NO_STOCK"
+]
 
-    @field_validator("disposition_code")
-    @classmethod
-    def normalize_disposition(cls, value: str) -> str:
-        return value.strip().upper()
+
+class ReturnDispositionAllocationRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    exact_product_id: UUID
+    quantity: Decimal = Field(gt=0, max_digits=12, decimal_places=3)
+    disposition_code: ReturnDispositionCode = "QUARANTINE"
+    lot_id: UUID | None = None
+    restock_safe_acknowledged: bool = False
+
+
+class ReturnDispositionAllocationView(BaseModel):
+    model_config = ConfigDict(extra="forbid", from_attributes=True)
+
+    id: UUID
+    returned_product_id: UUID
+    returned_product_code_snapshot: str
+    returned_product_name_snapshot: str
+    quantity: Decimal
+    disposition_code: ReturnDispositionCode
+    lot_id: UUID | None
+    inventory_movement_id: UUID | None
+
+
+class ReturnCommitLineRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    original_sale_line_id: UUID
+    returned_quantity: Decimal = Field(gt=0, max_digits=12, decimal_places=3)
+    allocations: list[ReturnDispositionAllocationRequest] = Field(min_length=1)
 
 
 class ReturnCommitRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     workstation_code: str = Field(min_length=1, max_length=64)
     cash_session_id: UUID
     original_sale_id: UUID
@@ -224,11 +263,10 @@ class ReturnCommitLineResultView(BaseModel):
     id: UUID
     line_number: int
     original_sale_line_id: UUID
-    returned_product_id: UUID
     returned_quantity: Decimal
     refund_unit_price: Decimal
     refund_line_total_amount: Decimal
-    disposition_code: Literal["RESTOCK_COUNTER", "RESTOCK_BACKROOM", "SEND_TO_WASTE"]
+    allocations: list[ReturnDispositionAllocationView]
 
 
 class ReturnCommitResultView(BaseModel):
@@ -256,11 +294,10 @@ class SaleReturnCommittedLineView(BaseModel):
     line_number: int
     original_sale_line_id: UUID
     original_catalog_name_snapshot: str
-    returned_product_name_snapshot: str
+    allocations: list[ReturnDispositionAllocationView]
     returned_quantity: Decimal
     refund_unit_price: Decimal
     refund_line_total_amount: Decimal
-    disposition_code: str
 
 
 class SaleReturnDetailResponse(BaseModel):

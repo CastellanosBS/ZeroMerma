@@ -11,6 +11,7 @@ import type {
   AdminTransferListItem,
   AdminTransferListResponse,
   AdminTransferReceivePayload,
+  AdminTransferResolvePayload,
   AdminTransferUpdatePayload,
   AdminTransferWarning,
 } from "./types";
@@ -123,6 +124,7 @@ export function mapAdminTransferListItemFromApi(item: ApiTransferListItem): Admi
 
 export function mapAdminTransferDetailFromApi(item: ApiTransferDetail): AdminTransferDetail {
   return {
+    resolutions: item.resolutions ?? [],
     availableActions: {
       canCancel: item.available_actions.can_cancel,
       canDispatch: item.available_actions.can_dispatch,
@@ -160,6 +162,9 @@ export function mapAdminTransferDetailFromApi(item: ApiTransferDetail): AdminTra
       requestedQuantity: line.requested_quantity,
       sentQuantity: line.sent_quantity,
       pendingQuantity: line.pending_quantity,
+      lots: line.lots ?? [],
+      returnedQuantity: line.returned_quantity ?? "0",
+      wasteQuantity: line.waste_quantity ?? "0",
       shipmentLineId: line.shipment_line_id,
       unitOfMeasure: line.unit_of_measure,
       varianceReason: line.variance_reason ?? null,
@@ -268,6 +273,7 @@ function toReceiveApiPayload(payload: AdminTransferReceivePayload): ApiTransferR
     lines: payload.lines.map((line) => ({
       notes: line.notes ?? null,
       received_quantity: line.receivedQuantity,
+      ...(line.lotAllocations ? { lot_allocations: line.lotAllocations } : {}),
       shipment_line_id: line.shipmentLineId,
       variance_reason: line.varianceReason ?? null,
     })),
@@ -381,5 +387,18 @@ export function recoverAdminTransferCommand(
 ): Promise<TransferCommandResultView> {
   return requestJson({
     path: `/v1/admin/transfers/commands/${commandCode}/confirmations/${encodeURIComponent(key)}?branch_id=${encodeURIComponent(branchId)}`,
+  });
+}
+
+export function resolveAdminTransferTransit(
+  transferId: string,
+  payload: AdminTransferResolvePayload,
+  idempotencyKey: string,
+): Promise<TransferCommandResultView> {
+  return requestJson({
+    path: `/v1/admin/transfers/${encodeURIComponent(transferId)}/resolve`,
+    method: "POST",
+    headers: { "Idempotency-Key": idempotencyKey },
+    body: payload,
   });
 }

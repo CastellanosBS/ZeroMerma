@@ -45,11 +45,17 @@ from zeromerma_api.modules.identity.application.schemas import AuthenticatedUser
 from zeromerma_api.modules.identity.infrastructure.models import User
 from zeromerma_api.modules.operations.domain.constants import BRANCH_BRAND_MAPPING
 from zeromerma_api.modules.outbox.application.service import OutboxWriter
+from zeromerma_api.modules.returns.application.physical_inventory import (
+    apply_return_inventory,
+    physical_return_options,
+)
 from zeromerma_api.modules.returns.application.schemas import (
     ReturnableSaleLineView,
     ReturnCommitRequest,
     ReturnCommitResultView,
     ReturnControlsView,
+    ReturnDispositionAllocationRequest,
+    ReturnDispositionAllocationView,
     ReturnFilterOptionView,
     ReturnHistoryListItemView,
     ReturnOriginalSaleDetailResponse,
@@ -87,7 +93,11 @@ from zeromerma_api.modules.returns.domain.exceptions import (
     SaleReturnNotFoundError,
     SaleReturnValidationError,
 )
-from zeromerma_api.modules.returns.infrastructure.models import SaleReturn, SaleReturnLine
+from zeromerma_api.modules.returns.infrastructure.models import (
+    ReturnDispositionAllocation,
+    SaleReturn,
+    SaleReturnLine,
+)
 from zeromerma_api.modules.sales.application.schemas import SaleLineView
 from zeromerma_api.modules.sales.application.services import SaleQueryService
 from zeromerma_api.modules.sales.domain.constants import (
@@ -131,21 +141,21 @@ class PreparedExactProduct:
 
 
 @dataclass(frozen=True)
+class PreparedReturnAllocation:
+    product: PreparedExactProduct
+    command: ReturnDispositionAllocationRequest
+
+
+@dataclass(frozen=True)
 class PreparedReturnLine:
     original_sale_line_id: uuid.UUID
     original_capture_mode: str
     original_catalog_code_snapshot: str
     original_catalog_name_snapshot: str
-    returned_product_id: uuid.UUID
-    returned_product_code_snapshot: str
-    returned_product_name_snapshot: str
-    returned_product_class_id: uuid.UUID
-    returned_product_class_code_snapshot: str
-    returned_product_class_name_snapshot: str
     returned_quantity: Decimal
     refund_unit_price: Decimal
     refund_line_total_amount: Decimal
-    disposition_code: str
+    allocations: list[PreparedReturnAllocation]
 
 
 @dataclass(frozen=True)
@@ -588,6 +598,7 @@ class ReturnsQueryService:
         returnable_lines = [
             _build_returnable_sale_line_view(
                 line,
+                session=session,
                 totals=returned_totals.get(line.id, ReturnedLineTotals()),
             )
             for line in sale_detail.lines
@@ -826,11 +837,10 @@ class ReturnsQueryService:
                     line_number=line.line_number,
                     original_sale_line_id=line.original_sale_line_id,
                     original_catalog_name_snapshot=line.original_catalog_name_snapshot,
-                    returned_product_name_snapshot=line.returned_product_name_snapshot,
+                    allocations=_allocation_views(session, line.id),
                     returned_quantity=_quantize_quantity(line.returned_quantity),
                     refund_unit_price=_quantize_money(line.refund_unit_price),
                     refund_line_total_amount=_quantize_money(line.refund_line_total_amount),
-                    disposition_code=line.disposition_code,
                 )
                 for line in line_rows
             ],
@@ -978,13 +988,25 @@ class ReturnsCommandService:
                     "La cantidad a devolver supera lo que aun se puede devolver en esa linea."
                 )
 
-            disposition_code = _validate_disposition_code(line_request.disposition_code)
-            exact_product = _resolve_exact_return_product(
-                session,
-                sale_line=original_line,
-                exact_product_id=line_request.exact_product_id,
-                disposition_code=disposition_code,
-            )
+            if (
+                sum((allocation.quantity for allocation in line_request.allocations), ZERO_QUANTITY)
+                != returned_quantity
+            ):
+                raise SaleReturnValidationError(
+                    "Physical allocation quantities must exactly equal the economic return line."
+                )
+            allocations = [
+                PreparedReturnAllocation(
+                    product=_resolve_exact_return_product(
+                        session,
+                        sale_line=original_line,
+                        exact_product_id=allocation.exact_product_id,
+                        disposition_code=_validate_disposition_code(allocation.disposition_code),
+                    ),
+                    command=allocation,
+                )
+                for allocation in line_request.allocations
+            ]
             refund_unit_price = _quantize_money(original_line.unit_price)
             prepared_lines.append(
                 PreparedReturnLine(
@@ -992,18 +1014,12 @@ class ReturnsCommandService:
                     original_capture_mode=original_line.capture_mode,
                     original_catalog_code_snapshot=original_line.catalog_code_snapshot,
                     original_catalog_name_snapshot=original_line.catalog_name_snapshot,
-                    returned_product_id=exact_product.product_id,
-                    returned_product_code_snapshot=exact_product.product_code,
-                    returned_product_name_snapshot=exact_product.product_name,
-                    returned_product_class_id=exact_product.product_class_id,
-                    returned_product_class_code_snapshot=exact_product.product_class_code,
-                    returned_product_class_name_snapshot=exact_product.product_class_name,
                     returned_quantity=returned_quantity,
                     refund_unit_price=refund_unit_price,
                     refund_line_total_amount=_calculate_refund_amount(
                         original_line, totals=totals, returned_quantity=returned_quantity
                     ),
-                    disposition_code=disposition_code,
+                    allocations=allocations,
                 )
             )
 
@@ -1055,7 +1071,7 @@ class ReturnsCommandService:
             created_at_utc=created_at,
         )
 
-        trace = {
+        trace: dict[str, object] = {
             "idempotency_key": str(idempotency_key),
             "operation_id": str(operation_id),
             "operation_code": "return.commit",
@@ -1064,27 +1080,45 @@ class ReturnsCommandService:
         session.add(sale_return)
         session.flush()
 
+        physical_allocations: list[
+            tuple[SaleReturnLine, ReturnDispositionAllocation, ReturnDispositionAllocationRequest]
+        ] = []
         for index, prepared_line in enumerate(prepared_lines, start=1):
-            session.add(
-                SaleReturnLine(
-                    sale_return_id=sale_return.id,
-                    line_number=index,
-                    original_sale_line_id=prepared_line.original_sale_line_id,
-                    original_capture_mode=prepared_line.original_capture_mode,
-                    original_catalog_code_snapshot=prepared_line.original_catalog_code_snapshot,
-                    original_catalog_name_snapshot=prepared_line.original_catalog_name_snapshot,
-                    returned_product_id=prepared_line.returned_product_id,
-                    returned_product_code_snapshot=prepared_line.returned_product_code_snapshot,
-                    returned_product_name_snapshot=prepared_line.returned_product_name_snapshot,
-                    returned_product_class_id=prepared_line.returned_product_class_id,
-                    returned_product_class_code_snapshot=prepared_line.returned_product_class_code_snapshot,
-                    returned_product_class_name_snapshot=prepared_line.returned_product_class_name_snapshot,
-                    returned_quantity=prepared_line.returned_quantity,
-                    refund_unit_price=prepared_line.refund_unit_price,
-                    refund_line_total_amount=prepared_line.refund_line_total_amount,
-                    disposition_code=prepared_line.disposition_code,
-                )
+            return_line = SaleReturnLine(
+                id=uuid.uuid4(),
+                sale_return_id=sale_return.id,
+                line_number=index,
+                original_sale_line_id=prepared_line.original_sale_line_id,
+                original_capture_mode=prepared_line.original_capture_mode,
+                original_catalog_code_snapshot=prepared_line.original_catalog_code_snapshot,
+                original_catalog_name_snapshot=prepared_line.original_catalog_name_snapshot,
+                returned_quantity=prepared_line.returned_quantity,
+                refund_unit_price=prepared_line.refund_unit_price,
+                refund_line_total_amount=prepared_line.refund_line_total_amount,
             )
+            session.add(return_line)
+            for sequence, allocation in enumerate(prepared_line.allocations, start=1):
+                exact = allocation.product
+                physical = ReturnDispositionAllocation(
+                    id=uuid.uuid4(),
+                    sale_return_line_id=return_line.id,
+                    sequence=sequence,
+                    returned_product_id=exact.product_id,
+                    returned_product_code_snapshot=exact.product_code,
+                    returned_product_name_snapshot=exact.product_name,
+                    returned_product_class_id=exact.product_class_id,
+                    returned_product_class_code_snapshot=exact.product_class_code,
+                    returned_product_class_name_snapshot=exact.product_class_name,
+                    quantity=allocation.command.quantity,
+                    disposition_code=allocation.command.disposition_code,
+                    lot_id=allocation.command.lot_id,
+                )
+                physical_allocations.append((return_line, physical, allocation.command))
+        session.flush()
+        inventory_movement_ids = apply_return_inventory(
+            session, sale_return=sale_return, allocations=physical_allocations
+        )
+        trace["inventory_movement_ids"] = [str(value) for value in inventory_movement_ids]
 
         try:
             financial_refund = admit_refund(
@@ -1181,18 +1215,23 @@ class ReturnsCommandService:
                 "lines": [
                     {
                         "original_sale_line_id": str(line.original_sale_line_id),
-                        "original_capture_mode": line.original_capture_mode,
-                        "returned_product_id": str(line.returned_product_id),
-                        "returned_product_code_snapshot": line.returned_product_code_snapshot,
-                        "returned_product_name_snapshot": line.returned_product_name_snapshot,
-                        "returned_product_class_id": str(line.returned_product_class_id),
                         "returned_quantity": str(line.returned_quantity),
-                        "refund_unit_price": str(line.refund_unit_price),
                         "refund_line_total_amount": str(line.refund_line_total_amount),
-                        "disposition_code": line.disposition_code,
+                        "allocations": [
+                            {
+                                "product_id": str(allocation.product.product_id),
+                                "quantity": str(allocation.command.quantity),
+                                "disposition_code": allocation.command.disposition_code,
+                                "lot_id": str(allocation.command.lot_id)
+                                if allocation.command.lot_id
+                                else None,
+                            }
+                            for allocation in line.allocations
+                        ],
                     }
                     for line in prepared_lines
                 ],
+                "inventory_movement_ids": [str(value) for value in inventory_movement_ids],
             },
             headers={"request_id": resolved_request_id, **trace},
         )
@@ -1283,6 +1322,7 @@ def _build_return_sale_search_item_view(
 def _build_returnable_sale_line_view(
     line: SaleLineView,
     *,
+    session: Session,
     totals: ReturnedLineTotals,
 ) -> ReturnableSaleLineView:
     if line.product_class_id is None:
@@ -1297,6 +1337,7 @@ def _build_returnable_sale_line_view(
     requires_exact_product_selection = line.capture_mode == CATALOG_CAPTURE_MODE_CLASS_CAPTURE
 
     return ReturnableSaleLineView(
+        physical_options=physical_return_options(session, line.id),
         id=line.id,
         sequence=line.sequence,
         capture_mode=line.capture_mode,
@@ -1393,17 +1434,18 @@ def _build_commit_result(
             "created_at_utc": sale_return.created_at_utc,
             "lines": [
                 {
-                    name: getattr(line, name)
-                    for name in (
-                        "id",
-                        "line_number",
-                        "original_sale_line_id",
-                        "returned_product_id",
-                        "returned_quantity",
-                        "refund_unit_price",
-                        "refund_line_total_amount",
-                        "disposition_code",
-                    )
+                    **{
+                        name: getattr(line, name)
+                        for name in (
+                            "id",
+                            "line_number",
+                            "original_sale_line_id",
+                            "returned_quantity",
+                            "refund_unit_price",
+                            "refund_line_total_amount",
+                        )
+                    },
+                    "allocations": _allocation_views(session, line.id),
                 }
                 for line in lines
             ],
@@ -1822,3 +1864,16 @@ def _quantize_optional_quantity(value: Decimal | int | None) -> Decimal:
     raw_value = ZERO_QUANTITY if value is None else Decimal(value)
     quantized = raw_value.quantize(QUANTITY_QUANTIZER, rounding=ROUND_HALF_UP)
     return quantized if quantized >= ZERO_QUANTITY else ZERO_QUANTITY
+
+
+def _allocation_views(
+    session: Session, line_id: uuid.UUID
+) -> list[ReturnDispositionAllocationView]:
+    return [
+        ReturnDispositionAllocationView.model_validate(row)
+        for row in session.scalars(
+            select(ReturnDispositionAllocation)
+            .where(ReturnDispositionAllocation.sale_return_line_id == line_id)
+            .order_by(ReturnDispositionAllocation.sequence)
+        )
+    ]

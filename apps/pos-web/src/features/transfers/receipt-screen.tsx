@@ -1,3 +1,4 @@
+import { TransitResolutionPanel } from "./transit-resolution-panel";
 import { isCommandIntentionPending } from "@zeromerma/api-client";
 import { transferIntentions } from "./transfer-command-intent";
 import { useTransferDraftIdentity, useTransferIntention } from "./use-transfer-intention";
@@ -390,12 +391,14 @@ function ReceiptLineRow({
   line,
   onReceivedQuantityChange,
   onVarianceReasonChange,
+  onLotQuantityChange,
 }: {
   focusToken: string | null;
   isPrimaryControl: boolean;
   line: TransferReceiptLineDraft;
   onReceivedQuantityChange: (shipmentLineId: string, quantityText: string) => void;
   onVarianceReasonChange: (shipmentLineId: string, varianceReason: string) => void;
+  onLotQuantityChange: (shipmentLineId: string, lotId: string, quantity: string) => void;
 }) {
   const inputRef = useRef<HTMLInputElement>(null);
   const didSelectRef = useRef(false);
@@ -481,6 +484,25 @@ function ReceiptLineRow({
       ) : (
         <span className="truncate text-sm text-slate-400">{EMPTY_VALUE_TEXT}</span>
       )}
+      <div className="col-span-full grid gap-2 text-xs">
+        {(line.lots ?? [])
+          .filter((lot) => Number(lot.pending_quantity) > 0)
+          .map((lot) => (
+            <label className="flex gap-3 items-center" key={lot.lot_id}>
+              Lote {lot.lot_code} / vence {lot.expires_at ?? "sin fecha"} / pendiente{" "}
+              {lot.pending_quantity}
+              <input
+                className="h-10 w-24 rounded border px-2"
+                aria-label={`Recibido lote ${lot.lot_code}`}
+                inputMode="decimal"
+                value={line.lotQuantities?.[lot.lot_id] ?? ""}
+                onChange={(event) =>
+                  onLotQuantityChange(line.shipmentLineId, lot.lot_id, event.target.value)
+                }
+              />
+            </label>
+          ))}
+      </div>
       <datalist id={`variance-reasons-${line.shipmentLineId}`}>
         {VARIANCE_REASON_SUGGESTIONS.map((reason) => (
           <option key={reason} value={reason} />
@@ -527,11 +549,11 @@ function ReceiptConfirmDialog({
       context={{
         branchName: detail.shipment.destination_branch_name,
         userName: detail.shipment.created_by_user_full_name,
-        workstationName: detail.shipment.workstation_name,
+        workstationName: detail.shipment.workstation_name ?? "Administracion",
       }}
       description={
         hasVariances
-          ? "Las lineas con diferencia se confirmaran con su motivo y el envio quedara cerrado con variaciones."
+          ? "Se registrara lo recibido. El remanente seguira en transito hasta su recepcion o disposicion fisica."
           : "La recepcion quedara confirmada y el envio se cerrara sin diferencias."
       }
       isOpen={isOpen}
@@ -751,6 +773,7 @@ function ReceiptDetailSurface({
   timezone,
   onReceivedQuantityChange,
   onVarianceReasonChange,
+  onLotQuantityChange,
   varianceLineCount,
 }: {
   detail: TransferDetailResponse | null;
@@ -763,6 +786,7 @@ function ReceiptDetailSurface({
   timezone: string;
   onReceivedQuantityChange: (shipmentLineId: string, quantityText: string) => void;
   onVarianceReasonChange: (shipmentLineId: string, varianceReason: string) => void;
+  onLotQuantityChange: (shipmentLineId: string, lotId: string, quantity: string) => void;
   varianceLineCount: number;
 }) {
   if (isLoading) {
@@ -854,6 +878,7 @@ function ReceiptDetailSurface({
           </div>
         </div>
         <ScrollPane className="h-full">
+          <TransitResolutionPanel key={detail.shipment.id} detail={detail} />
           <div className="min-w-[42rem]">
             <LineComparisonHeader />
             {lines.map((line, index) => (
@@ -864,6 +889,7 @@ function ReceiptDetailSurface({
                 line={line}
                 onReceivedQuantityChange={onReceivedQuantityChange}
                 onVarianceReasonChange={onVarianceReasonChange}
+                onLotQuantityChange={onLotQuantityChange}
               />
             ))}
           </div>
@@ -1308,7 +1334,7 @@ export function TransferReceiptScreen() {
               selectedHistoryReceipt.destination_branch_name ??
               operationsBootstrapQuery.data.branch.name,
             userName: selectedHistoryReceipt.created_by_user_full_name,
-            workstationName: selectedHistoryReceipt.workstation_name,
+            workstationName: selectedHistoryReceipt.workstation_name ?? "Administracion",
           }}
           description={`Origen ${selectedHistoryReceipt.source_branch_name}`}
           kind="branchReceipt"
@@ -1667,6 +1693,15 @@ export function TransferReceiptScreen() {
                   updateTransferReceiptLineVarianceReason(state, shipmentLineId, varianceReason),
                 );
               }}
+              onLotQuantityChange={(lineId, lotId, quantity) =>
+                setReceiptLines((state) =>
+                  state.map((line) =>
+                    line.shipmentLineId === lineId
+                      ? { ...line, lotQuantities: { ...line.lotQuantities, [lotId]: quantity } }
+                      : line,
+                  ),
+                )
+              }
               queryError={transferDetailQuery.error}
               timezone={activeTimezone}
               varianceLineCount={varianceLineCount}

@@ -31,6 +31,10 @@ from zeromerma_api.modules.catalog.domain.exceptions import (
 from zeromerma_api.modules.catalog.infrastructure.models import Product, ProductClass
 from zeromerma_api.modules.identity.application.schemas import AuthenticatedUser
 from zeromerma_api.modules.identity.infrastructure.models import User
+from zeromerma_api.modules.operations.application.lot_queries import operation_lot_choices
+from zeromerma_api.modules.operations.application.physical_inventory import (
+    apply_operation_inventory,
+)
 from zeromerma_api.modules.operations.application.results import build_operation_result
 from zeromerma_api.modules.operations.application.schemas import (
     CounterTransferCommitRequest,
@@ -282,7 +286,7 @@ class OperationsQueryService:
         module: str,
         query: str | None,
     ) -> OperationsClassProductsResponse:
-        self._workstation_access.resolve_context(
+        context = self._workstation_access.resolve_context(
             session,
             user_id=current_user.id,
             workstation_code=workstation_code,
@@ -308,6 +312,7 @@ class OperationsQueryService:
                 Product.display_order,
                 Product.unit_price,
                 Product.currency_code,
+                Product.lot_tracking_enabled,
             )
             .where(
                 Product.product_class_id == class_id,
@@ -343,6 +348,12 @@ class OperationsQueryService:
                     display_order=record["display_order"],
                     unit_price=record["unit_price"],
                     currency_code=record["currency_code"],
+                    lot_tracking_enabled=record["lot_tracking_enabled"],
+                    inventory_lots=operation_lot_choices(
+                        session, branch_id=context.branch_id, product_id=record["id"]
+                    )
+                    if record["lot_tracking_enabled"]
+                    else [],
                 )
                 for record in product_records
             ],
@@ -405,7 +416,7 @@ class OperationsQueryService:
             )
             .select_from(OperationDocument)
             .join(Branch, Branch.id == OperationDocument.source_branch_id)
-            .join(Workstation, Workstation.id == OperationDocument.workstation_id)
+            .outerjoin(Workstation, Workstation.id == OperationDocument.workstation_id)
             .join(User, User.id == OperationDocument.created_by_user_id)
             .outerjoin(WasteReason, WasteReason.code == OperationDocument.reason_code)
             .outerjoin(
@@ -707,7 +718,7 @@ class OperationsQueryService:
                     destination_branch,
                     destination_branch.id == OperationDocument.destination_branch_id,
                 )
-                .join(Workstation, Workstation.id == OperationDocument.workstation_id)
+                .outerjoin(Workstation, Workstation.id == OperationDocument.workstation_id)
                 .join(User, User.id == OperationDocument.created_by_user_id)
                 .outerjoin(WasteReason, WasteReason.code == OperationDocument.reason_code)
                 .where(OperationDocument.id == document_id)
@@ -854,7 +865,7 @@ class OperationsCommandService:
             branch_id=context.branch_id,
             cash_session_id=command.cash_session_id,
         )
-        trace = {
+        trace: dict[str, object] = {
             "idempotency_key": str(idempotency_key),
             "operation_id": str(operation_id),
             "operation_code": "counter_transfer.commit",
@@ -884,6 +895,16 @@ class OperationsCommandService:
             lines=command.lines,
             resolved_lines=resolved_lines,
         )
+        inventory_movement_ids = apply_operation_inventory(
+            session,
+            document,
+            line_lots={
+                number: line.lot_id
+                for number, line in enumerate(command.lines, start=1)
+                if line.lot_id is not None
+            },
+        )
+        trace["inventory_movement_ids"] = [str(value) for value in inventory_movement_ids]
         self._audit_recorder.record(
             session,
             actor_id=current_user.id,
@@ -927,7 +948,12 @@ class OperationsCommandService:
         )
         session.flush()
 
-        return build_operation_result(session, document, cash_session_id=command.cash_session_id)
+        return build_operation_result(
+            session,
+            document,
+            cash_session_id=command.cash_session_id,
+            inventory_movement_ids=inventory_movement_ids,
+        )
 
     def commit_waste_record(
         self,
@@ -951,7 +977,7 @@ class OperationsCommandService:
             branch_id=context.branch_id,
             cash_session_id=command.cash_session_id,
         )
-        trace = {
+        trace: dict[str, object] = {
             "idempotency_key": str(idempotency_key),
             "operation_id": str(operation_id),
             "operation_code": "waste.commit",
@@ -1001,6 +1027,16 @@ class OperationsCommandService:
             lines=command.lines,
             resolved_lines=resolved_lines,
         )
+        inventory_movement_ids = apply_operation_inventory(
+            session,
+            document,
+            line_lots={
+                number: line.lot_id
+                for number, line in enumerate(command.lines, start=1)
+                if line.lot_id is not None
+            },
+        )
+        trace["inventory_movement_ids"] = [str(value) for value in inventory_movement_ids]
         document_folio = _build_operation_document_folio(document.document_type, document.id)
         self._audit_recorder.record(
             session,
@@ -1108,7 +1144,12 @@ class OperationsCommandService:
             )
         session.flush()
 
-        return build_operation_result(session, document, cash_session_id=command.cash_session_id)
+        return build_operation_result(
+            session,
+            document,
+            cash_session_id=command.cash_session_id,
+            inventory_movement_ids=inventory_movement_ids,
+        )
 
 
 def _append_operation_lines(

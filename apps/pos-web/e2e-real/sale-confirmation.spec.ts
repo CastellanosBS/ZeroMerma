@@ -1,5 +1,8 @@
 import type { components } from "@zeromerma/api-client";
-import { dropNextSaleConfirmationResponse } from "../../../scripts/dev/web-integration-support.mjs";
+import {
+  dropNextSaleConfirmationResponse,
+  dropNextOperationalCommandResponse,
+} from "../../../scripts/dev/web-integration-support.mjs";
 import { environment, expect, test } from "./fixtures";
 
 test("lost committed sale response recovers after reload and another tab cannot repeat the checkout", async ({
@@ -120,4 +123,77 @@ test("lost committed sale response recovers after reload and another tab cannot 
   expect(nextResponse.request().headers()["idempotency-key"]).not.toBe(key);
   expect((await nextResponse.json()).id).not.toBe(committed.id);
   await otherTab.close();
+
+  await page.goto(`/tickets?ticketId=${committed.id}`);
+  const physical = page.getByRole("region", { name: "Atribucion fisica del ticket", exact: true });
+  await expect(physical).toContainText("Pendiente de atribuir: 1.000");
+  const product = physical.getByLabel("Producto y lote entregados", { exact: true });
+  await expect(product).toBeVisible();
+  await expect(product).toBeEnabled();
+  await expect(product.locator("option").nth(1)).toHaveAttribute("value", /.+/);
+  await product.selectOption({ index: 1 });
+  const selectedOption = await product.inputValue();
+  await physical.getByLabel("Cantidad a atribuir", { exact: true }).fill("0.4");
+  const attributionPath = `/v1/sales/${committed.id}/attribute-inventory`;
+  const attributionFault = await dropNextOperationalCommandResponse(
+    page,
+    environment.apiUrl,
+    network,
+    attributionPath,
+  );
+  await physical.getByRole("button", { name: "Confirmar producto entregado", exact: true }).click();
+  const attributed =
+    (await attributionFault.committed) as components["schemas"]["ClassAttributionResult"];
+  expect(attributed.sale_id).toBe(committed.id);
+  expect(Number(attributed.lines[0]!.quantity)).toBe(0.4);
+  expect(Number(attributed.lines[0]!.remaining_quantity)).toBe(0.6);
+  expect(attributed.lines[0]!.inventory_movement_id).toBeTruthy();
+  await expect(
+    page.getByRole("heading", { name: "Atribucion fisica pendiente de confirmar" }),
+  ).toBeVisible();
+  await page.reload();
+  await expect(page.getByRole("button", { name: "Reintentar la misma atribucion" })).toHaveCount(0);
+  const attributionRecovery = page.waitForResponse((response) =>
+    new URL(response.url()).pathname.startsWith(
+      `/v1/sales/${committed.id}/inventory-attributions/`,
+    ),
+  );
+  await page.getByRole("button", { name: "Consultar atribucion fisica", exact: true }).click();
+  expect(await (await attributionRecovery).json()).toEqual(attributed);
+  expect(
+    network.filter(
+      (entry) => entry.method === "POST" && entry.path === "/v1/sales/{id}/attribute-inventory",
+    ),
+  ).toHaveLength(1);
+  await expect(physical).toContainText("Pendiente de atribuir: 0.600");
+  await product.selectOption(selectedOption);
+  await physical.getByLabel("Cantidad a atribuir", { exact: true }).fill("0.6");
+  const completedAttribution = page.waitForResponse(
+    (response) =>
+      new URL(response.url()).pathname === attributionPath &&
+      response.request().method() === "POST",
+  );
+  await physical.getByRole("button", { name: "Confirmar producto entregado", exact: true }).click();
+  const completedResponse = await completedAttribution;
+  expect(completedResponse.status()).toBe(200);
+  const complete =
+    (await completedResponse.json()) as components["schemas"]["ClassAttributionResult"];
+  expect(complete.operation_id).not.toBe(attributed.operation_id);
+  expect(Number(complete.lines[0]!.quantity)).toBe(0.6);
+  expect(Number(complete.lines[0]!.remaining_quantity)).toBe(0);
+  await expect(physical).toContainText("Pendiente de atribuir: 0.000");
+  await expect(
+    physical.getByRole("button", { name: "Confirmar producto entregado", exact: true }),
+  ).toHaveCount(0);
+  const ticketResponse = await page.request.get(
+    `${environment.apiUrl}/v1/tickets/${committed.id}?workstation_code=${process.env.ZM_E2E_WORKSTATION_CODE ?? "POS-01"}`,
+    { headers: { Origin: new URL(environment.baseUrl).origin, "X-ZeroMerma-Surface": "POS" } },
+  );
+  expect(ticketResponse.status()).toBe(200);
+  const ticket = (await ticketResponse.json()) as components["schemas"]["TicketDetailResponse"];
+  expect(ticket.total_amount).toBe(committed.total_amount);
+  expect(ticket.lines[0]!.physical_attributions).toHaveLength(2);
+  expect(
+    network.filter((entry) => entry.method === "POST" && entry.path === "/v1/sales/confirm"),
+  ).toHaveLength(2);
 });

@@ -19,6 +19,7 @@ from fastapi import (
 from sqlalchemy.orm import Session
 
 from zeromerma_api.db.session import get_session
+from zeromerma_api.modules.catalog.infrastructure.models import Product
 from zeromerma_api.modules.idempotency.application.canonicalization import (
     IDEMPOTENCY_KEY_PATTERN,
     parse_idempotency_key,
@@ -31,12 +32,14 @@ from zeromerma_api.modules.identity.application.schemas import AuthenticatedUser
 from zeromerma_api.modules.identity.application.services import user_can_access_surface
 from zeromerma_api.modules.identity.domain.constants import IDENTITY_SURFACE_BACKOFFICE
 from zeromerma_api.modules.identity.presentation.dependencies import get_current_user
+from zeromerma_api.modules.operations.application.lot_queries import operation_lot_choices
 from zeromerma_api.modules.operations.application.schemas import OperationCommitResultView
 from zeromerma_api.modules.waste.application.admin_schemas import (
     AdminWasteCreateRequest,
     AdminWasteDetailView,
     AdminWasteListResponse,
     AdminWasteReasonView,
+    AdminWasteStockView,
 )
 from zeromerma_api.modules.waste.application.admin_services import AdminWasteService
 from zeromerma_api.modules.waste.application.idempotency import AdminWasteCommitService
@@ -139,6 +142,30 @@ def list_admin_waste_reasons(
 ) -> list[AdminWasteReasonView]:
     _ = current_user
     return AdminWasteService().list_reasons(session)
+
+
+@admin_router.get("/stock", response_model=AdminWasteStockView)
+def get_admin_waste_stock(
+    branch_id: UUID,
+    product_id: UUID,
+    location_code: str,
+    current_user: Annotated[AuthenticatedUser, Depends(_require_backoffice_user)],
+    session: Annotated[Session, Depends(get_session)],
+) -> AdminWasteStockView:
+    if location_code not in {"BACKROOM", "COUNTER", "QUARANTINE"}:
+        raise HTTPException(422, "Select an operable waste source location.")
+    product = session.get(Product, product_id)
+    if product is None:
+        raise HTTPException(404, "Product not found.")
+    return AdminWasteStockView(
+        product_id=product_id,
+        branch_id=branch_id,
+        location_code=location_code,
+        lot_tracking_enabled=product.lot_tracking_enabled,
+        lots=operation_lot_choices(
+            session, branch_id=branch_id, product_id=product_id, location_code=location_code
+        ),
+    )
 
 
 @admin_router.get("/{waste_id}", response_model=AdminWasteDetailView)

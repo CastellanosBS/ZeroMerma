@@ -64,18 +64,18 @@ export function AdminPurchasesFilters({
 }: AdminPurchasesFiltersProps) {
   const hasActiveFilters = Boolean(
     filters.amountMax ||
-      filters.amountMin ||
-      filters.branchId ||
-      filters.dateFrom ||
-      filters.dateTo ||
-      filters.operatorUserId ||
-      filters.productId ||
-      filters.search ||
-      filters.supplierId ||
-      filters.discrepancyState !== "all" ||
-      filters.productKind !== "all" ||
-      filters.status !== "all" ||
-      filters.warningState !== "all",
+    filters.amountMin ||
+    filters.branchId ||
+    filters.dateFrom ||
+    filters.dateTo ||
+    filters.operatorUserId ||
+    filters.productId ||
+    filters.search ||
+    filters.supplierId ||
+    filters.discrepancyState !== "all" ||
+    filters.productKind !== "all" ||
+    filters.status !== "all" ||
+    filters.warningState !== "all",
   );
 
   return (
@@ -205,7 +205,8 @@ export function AdminPurchasesFilters({
               value={filters.discrepancyState ?? "all"}
               onChange={(event) =>
                 onChange({
-                  discrepancyState: event.target.value as AdminPurchaseListFilters["discrepancyState"],
+                  discrepancyState: event.target
+                    .value as AdminPurchaseListFilters["discrepancyState"],
                   page: 1,
                 })
               }
@@ -221,7 +222,9 @@ export function AdminPurchasesFilters({
               className={`${inputClassName} truncate`}
               id="admin-purchases-operator"
               value={filters.operatorUserId ?? ""}
-              onChange={(event) => onChange({ operatorUserId: event.target.value || null, page: 1 })}
+              onChange={(event) =>
+                onChange({ operatorUserId: event.target.value || null, page: 1 })
+              }
             >
               <option value="">Todos</option>
               {options.operators.map((option) => (

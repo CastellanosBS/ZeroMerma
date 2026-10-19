@@ -129,7 +129,9 @@ describe("admin products API boundary", () => {
   });
 
   it("loads product detail by id", async () => {
-    const fetchSpy = vi.spyOn(globalThis, "fetch").mockImplementation(() => mockJsonResponse(apiProduct));
+    const fetchSpy = vi
+      .spyOn(globalThis, "fetch")
+      .mockImplementation(() => mockJsonResponse(apiProduct));
 
     const product = await fetchAdminProductDetail("product-1");
 
@@ -142,7 +144,9 @@ describe("admin products API boundary", () => {
   });
 
   it("submits new products through the backend contract", async () => {
-    const fetchSpy = vi.spyOn(globalThis, "fetch").mockImplementation(() => mockJsonResponse(apiProduct, 201));
+    const fetchSpy = vi
+      .spyOn(globalThis, "fetch")
+      .mockImplementation(() => mockJsonResponse(apiProduct, 201));
 
     const product = await createAdminProduct({
       code: "CONCHA-VAN",
@@ -164,6 +168,10 @@ describe("admin products API boundary", () => {
           quick_name: "Concha",
           search_aliases: null,
           status: "active",
+          is_sellable: true,
+          is_usable_as_input: false,
+          lot_tracking_enabled: false,
+          expiry_required: false,
           unit_price: "12.00",
         }),
         method: "POST",

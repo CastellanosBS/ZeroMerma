@@ -25,6 +25,41 @@ function isolatedEnvironment() {
 }
 
 describe("real browser integration safety", () => {
+  it("reports only a sanitized error message when a real operational command is rejected", async () => {
+    isolatedEnvironment();
+    const route = {
+      request: () => ({ method: () => "POST" }),
+      fetch: vi.fn(async () => ({
+        status: () => 400,
+        json: async () => ({
+          message: "Missing physical evidence for synthetic@example.test; unit-only-password",
+          details: { password: "must-not-be-reported" },
+        }),
+      })),
+      abort: vi.fn(async () => {}),
+    };
+    let handler: ((value: typeof route) => Promise<void>) | undefined;
+    const page = {
+      on: vi.fn(),
+      route: vi.fn(async (_url: string, callback: typeof handler) => {
+        handler = callback;
+      }),
+    };
+    const evidence = observeRealApi({ on: vi.fn() }, page, "https://127.0.0.1:41201");
+    const fault = await dropNextOperationalCommandResponse(
+      page,
+      "https://127.0.0.1:41201",
+      evidence,
+      "/v1/corrections/commit",
+    );
+    const outcome = expect(fault.committed).rejects.toThrow(
+      "received 400. Missing physical evidence for [REDACTED]; [REDACTED]",
+    );
+    await handler!(route);
+    await outcome;
+    expect(evidence).toEqual([]);
+    expect(route.abort).toHaveBeenCalledWith("failed");
+  });
   it("restricts operational response loss to explicit mutations and rejects query overrides", async () => {
     isolatedEnvironment();
     const page = { on: vi.fn(), route: vi.fn() };
@@ -33,6 +68,7 @@ describe("real browser integration safety", () => {
       "/v1/auth/login",
       "/v1/admin/purchases?override=true",
       "/v1/admin/inventory",
+      "/v1/admin/inventory-dispositions?override=true",
       "/v1/admin/production/invalid/complete",
       "/v1/admin/suppliers",
       "/v1/returns/invalid/refund-settlements",

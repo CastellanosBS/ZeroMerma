@@ -55,6 +55,10 @@ export function AdminProductCreationPanel({
   const [quickName, setQuickName] = useState("");
   const [searchAliases, setSearchAliases] = useState("");
   const [status, setStatus] = useState<AdminProductStatus>("active");
+  const [isSellable, setIsSellable] = useState(true);
+  const [isUsableAsInput, setIsUsableAsInput] = useState(false);
+  const [lotTrackingEnabled, setLotTrackingEnabled] = useState(false);
+  const [expiryRequired, setExpiryRequired] = useState(false);
   const [unitPrice, setUnitPrice] = useState("");
   const canSubmit = useMemo(
     () =>
@@ -90,6 +94,10 @@ export function AdminProductCreationPanel({
       searchAliases: searchAliases.trim() || null,
       status,
       unitPrice: unitPrice.trim(),
+      isSellable,
+      isUsableAsInput,
+      lotTrackingEnabled,
+      expiryRequired,
     });
   }
 
@@ -124,6 +132,44 @@ export function AdminProductCreationPanel({
         </button>
       </div>
 
+      <div className="mt-3 grid gap-2 md:grid-cols-2">
+        <label>
+          <input
+            type="checkbox"
+            checked={isSellable}
+            onChange={(event) => setIsSellable(event.target.checked)}
+          />{" "}
+          Vendible
+        </label>
+        <label>
+          <input
+            type="checkbox"
+            checked={isUsableAsInput}
+            onChange={(event) => setIsUsableAsInput(event.target.checked)}
+          />{" "}
+          Usable como insumo
+        </label>
+        <label>
+          <input
+            type="checkbox"
+            checked={lotTrackingEnabled}
+            onChange={(event) => {
+              setLotTrackingEnabled(event.target.checked);
+              if (!event.target.checked) setExpiryRequired(false);
+            }}
+          />{" "}
+          Control por lote (FEFO)
+        </label>
+        <label>
+          <input
+            type="checkbox"
+            disabled={!lotTrackingEnabled}
+            checked={expiryRequired}
+            onChange={(event) => setExpiryRequired(event.target.checked)}
+          />{" "}
+          Caducidad obligatoria
+        </label>
+      </div>
       <div className="mt-4 grid min-w-0 gap-3 md:grid-cols-2 xl:grid-cols-4">
         <Field className="md:col-span-2" id="admin-new-product-name" label="Nombre">
           <input

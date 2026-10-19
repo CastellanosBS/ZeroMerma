@@ -174,6 +174,10 @@ const ticketDetail = {
   lines: [
     {
       id: "ticket-line-1",
+      capture_mode: "PRODUCT_DIRECT",
+      remaining_attribution_quantity: "0.000",
+      attribution_options: [],
+      physical_attributions: [],
       line_total_amount: "72.00",
       name: "Concha vainilla",
       quantity: "3",
@@ -243,6 +247,7 @@ const returnSaleDetail = {
       product_name: "Concha vainilla",
       quantity: "6",
       remaining_returnable_quantity: "2",
+      physical_options: [],
       requires_exact_product_selection: false,
       sequence: 1,
       unit_price: "12.00",
@@ -585,6 +590,7 @@ export async function installOperationalRegressionApiMocks(page: Page) {
         ],
         local_timestamp: "2026-04-15T19:30:00Z",
         user,
+        workstation,
         waste_controls: {
           attachment_evidence_supported: false,
           high_impact_quantity_threshold: "10",
@@ -655,6 +661,7 @@ export async function installOperationalRegressionApiMocks(page: Page) {
 
     if (pathname === "/v1/tickets/bootstrap") {
       await fulfillJson(route, {
+        workstation,
         available_scopes: [
           { code: "CURRENT_SHIFT", label: "Turno actual" },
           { code: "TODAY", label: "Hoy" },

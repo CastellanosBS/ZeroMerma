@@ -34,6 +34,7 @@ from zeromerma_api.modules.orders.application.admin_schemas import (
 from zeromerma_api.modules.orders.application.financial_services import (
     order_payment_financial_references,
 )
+from zeromerma_api.modules.orders.application.inventory import apply_order_inventory
 from zeromerma_api.modules.orders.application.schemas import OrderCommandResultView
 from zeromerma_api.modules.orders.application.services import (
     ORDER_STATUS_SEQUENCE,
@@ -198,6 +199,7 @@ class AdminOrdersService:
                 "Solo los pedidos pendientes se pueden marcar como listos para entrega."
             )
         now = datetime.now(tz=UTC)
+        apply_order_inventory(session, order=order, actor_id=actor_id, action="reserve")
         order.status = ORDER_STATUS_READY
         order.updated_at_utc = now
         resolved_request_id = request_id or str(uuid.uuid4())
@@ -257,6 +259,7 @@ class AdminOrdersService:
                 "antes de entregarlo."
             )
         now = datetime.now(tz=UTC)
+        apply_order_inventory(session, order=order, actor_id=actor_id, action="consume")
         order.status = ORDER_STATUS_DELIVERED
         order.delivered_at = now
         order.delivered_by_user_id = actor_id
@@ -321,6 +324,7 @@ class AdminOrdersService:
                 "La cancelacion requiere reembolso de anticipo. "
                 "Procesa el reembolso desde una caja abierta."
             )
+        apply_order_inventory(session, order=order, actor_id=actor_id, action="release")
         order.status = ORDER_STATUS_CANCELED
         order.remaining_balance_amount = ZERO_MONEY
         order.canceled_at = now

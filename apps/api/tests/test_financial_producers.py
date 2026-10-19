@@ -8,6 +8,7 @@ from uuid import UUID, uuid4
 
 import pytest
 from fastapi.testclient import TestClient
+from inventory_fixtures import stock_for_codes
 from sqlalchemy import func, select
 
 from zeromerma_api.bootstrap.seed_local import (
@@ -80,6 +81,12 @@ def _setup(client: TestClient, kind: str) -> tuple[dict[str, str], dict[str, Any
     assert opening.status_code == 201
     body = {"workstation_code": SEED_WORKSTATION_CODE, "cash_session_id": opening.json()["id"]}
     if kind == "sale":
+        stock_for_codes(
+            workstation_code=SEED_WORKSTATION_CODE,
+            quantities={SEED_PRODUCT_COCA_355_CODE: Decimal(2)},
+            location="COUNTER",
+            reference="financial-sale-physical-input",
+        )
         with SessionLocal() as session:
             product_id = session.scalar(
                 select(Product.id).where(Product.code == SEED_PRODUCT_COCA_355_CODE)

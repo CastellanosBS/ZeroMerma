@@ -115,7 +115,8 @@ test("real inventory adjustment form and waste command recover lost acknowledgem
   );
   const wasted = (await wasteFault.committed) as components["schemas"]["OperationCommitResultView"];
   await sent;
-  expect(wasted.inventory_movement_ids).toHaveLength(1);
+  expect(wasted.inventory_movement_ids).toHaveLength(2);
+  expect(new Set(wasted.inventory_movement_ids).size).toBe(2);
   await page.reload();
   const recoveredWaste = page.waitForResponse(
     (response) =>
@@ -126,6 +127,44 @@ test("real inventory adjustment form and waste command recover lost acknowledgem
     .getByRole("button", { name: "Consultar resultado del movimiento", exact: true })
     .click();
   expect(await (await recoveredWaste).json()).toEqual(wasted);
+  const wasteDetailResponse = await page.request.get(
+    `${environment.apiUrl}/v1/admin/waste/${wasted.id}`,
+    { headers },
+  );
+  expect(wasteDetailResponse.status()).toBe(200);
+  const wasteDetail =
+    (await wasteDetailResponse.json()) as components["schemas"]["AdminWasteDetailView"];
+  const movements = wasteDetail.inventory_impact.movements;
+  expect(movements.map((movement) => movement.id).sort()).toEqual(
+    [...wasted.inventory_movement_ids].sort(),
+  );
+  expect(
+    movements.map((movement) => ({
+      direction: movement.direction,
+      location: movement.location_code,
+      productId: movement.product_id,
+      quantity: Number(movement.quantity),
+      sourceDocumentId: movement.source_document_id,
+    })),
+  ).toEqual(
+    expect.arrayContaining([
+      {
+        direction: "OUT",
+        location: "BACKROOM",
+        productId,
+        quantity: 1,
+        sourceDocumentId: wasted.id,
+      },
+      {
+        direction: "IN",
+        location: "WASTE",
+        productId,
+        quantity: 1,
+        sourceDocumentId: wasted.id,
+      },
+    ]),
+  );
+  const outboundMovement = movements.find((movement) => movement.direction === "OUT")!;
   const detail = await page.request.get(
     `${environment.apiUrl}/v1/admin/inventory/${adjusted.balance_id}`,
     { headers },
@@ -133,9 +172,9 @@ test("real inventory adjustment form and waste command recover lost acknowledgem
   expect(detail.status()).toBe(200);
   const balance = (await detail.json()) as components["schemas"]["AdminInventoryDetailView"];
   expect(Number(balance.stock_breakdown.quantity_on_hand)).toBe(Number(adjusted.new_quantity) - 1);
-  expect(
-    balance.movements.filter((movement) => movement.id === wasted.inventory_movement_ids[0]),
-  ).toHaveLength(1);
+  expect(balance.movements.filter((movement) => movement.id === outboundMovement.id)).toHaveLength(
+    1,
+  );
   const saved = await page.evaluate(() =>
     JSON.parse(localStorage.getItem("zeromerma-admin-physical-intention:physical-commands")!),
   );

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 
 from fastapi.testclient import TestClient
@@ -51,6 +52,7 @@ def _create_adjustment(
     adjustment_type: str = "INCREASE",
     quantity: str = "12.000",
     reason: str = "Initial physical count",
+    allow_negative: bool = False,
 ) -> dict[str, object]:
     response = client.post(
         "/v1/admin/inventory/adjustments",
@@ -65,6 +67,7 @@ def _create_adjustment(
             "product_id": _get_product_id(SEED_PRODUCT_CONCHA_VAN_CODE),
             "quantity": quantity,
             "reason": reason,
+            "allow_negative": allow_negative,
         },
     )
 
@@ -175,6 +178,7 @@ def test_admin_inventory_negative_stock_warning_and_movements(client: TestClient
         adjustment_type="DECREASE",
         quantity="5.000",
         reason="Count correction",
+        allow_negative=True,
     )
     balance_id = str(adjustment["balance_id"])
 
@@ -238,3 +242,78 @@ def test_admin_inventory_adjustment_validates_reason_quantity_product_and_branch
         json={**base_payload, "branch_id": "00000000-0000-0000-0000-000000000000"},
     )
     assert branch_response.status_code == 404
+
+
+def test_controlled_adjustment_requires_lot_and_zero_count_targets_only_selected_lot(
+    client: TestClient,
+) -> None:
+    headers = _admin_headers(client)
+    branch_id = _get_branch_id(SEED_BRANCH_CODE)
+    product_id = _get_product_id(SEED_PRODUCT_CONCHA_VAN_CODE)
+    with SessionLocal() as session:
+        product = session.get(Product, product_id)
+        assert product is not None
+        product.lot_tracking_enabled = True
+        product.expiry_required = True
+        session.commit()
+    body = {
+        "branch_id": branch_id,
+        "product_id": product_id,
+        "location_code": "BACKROOM",
+        "adjustment_type": "INCREASE",
+        "quantity": "3",
+        "reason": "Physical lot count",
+    }
+    missing = client.post(
+        "/v1/admin/inventory/adjustments",
+        headers={**headers, "Idempotency-Key": new_idempotency_key()},
+        json=body,
+    )
+    assert missing.status_code == 400
+    response = client.post(
+        "/v1/admin/inventory/adjustments",
+        headers={**headers, "Idempotency-Key": new_idempotency_key()},
+        json={
+            **body,
+            "lot_code": "ACTUAL-COUNT-1",
+            "expires_at": (datetime.now(UTC) + timedelta(days=5)).isoformat(),
+            "unit_cost": "2.00000000",
+            "cost_evidence_reference": "synthetic-invoice-1",
+        },
+    )
+    assert response.status_code == 201, response.text
+    balance_id = response.json()["balance_id"]
+    detail = client.get(f"/v1/admin/inventory/{balance_id}", headers=headers).json()
+    assert detail["product"]["lot_tracking_enabled"] and detail["product"]["expiry_required"]
+    assert Decimal(detail["stock_breakdown"]["estimated_value"]) == 6
+    lot_id = detail["lots"][0]["id"]
+    assert detail["lots"][0]["lot_code"] == "ACTUAL-COUNT-1"
+    zero = client.post(
+        "/v1/admin/inventory/adjustments",
+        headers={**headers, "Idempotency-Key": new_idempotency_key()},
+        json={**body, "adjustment_type": "SET_COUNTED", "quantity": "0", "lot_id": lot_id},
+    )
+    assert zero.status_code == 201, zero.text
+    assert Decimal(zero.json()["new_quantity"]) == 0
+    detail = client.get(f"/v1/admin/inventory/{balance_id}", headers=headers).json()
+    assert Decimal(detail["lots"][0]["quantity_on_hand"]) == 0
+    assert Decimal(detail["stock_breakdown"]["estimated_value"]) == 0
+
+
+def test_negative_adjustment_requires_explicit_opt_in(client: TestClient) -> None:
+    headers = _admin_headers(client)
+    response = client.post(
+        "/v1/admin/inventory/adjustments",
+        headers={**headers, "Idempotency-Key": new_idempotency_key()},
+        json={
+            "branch_id": _get_branch_id(SEED_BRANCH_CODE),
+            "product_id": _get_product_id(SEED_PRODUCT_CONCHA_VAN_CODE),
+            "location_code": "BACKROOM",
+            "adjustment_type": "DECREASE",
+            "quantity": "1",
+            "reason": "Negative stock needs explicit evidence",
+        },
+    )
+    assert response.status_code == 400
+    with SessionLocal() as session:
+        assert session.scalar(select(InventoryMovement.id)) is None

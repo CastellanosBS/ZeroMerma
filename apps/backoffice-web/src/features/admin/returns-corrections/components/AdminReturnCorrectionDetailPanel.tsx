@@ -1,3 +1,4 @@
+import { InventoryDispositionPanel } from "../../inventory-dispositions/InventoryDispositionPanel";
 import { AdminEmptyState } from "../../components/AdminEmptyState";
 import { FinancialRefundSummary } from "../../components/FinancialRefundSummary";
 import type {
@@ -16,7 +17,9 @@ function formatMoney(value: string | null | undefined, currencyCode = "MXN"): st
   if (!Number.isFinite(numericValue)) {
     return `${value} ${currencyCode}`;
   }
-  return new Intl.NumberFormat("es-MX", { currency: currencyCode, style: "currency" }).format(numericValue);
+  return new Intl.NumberFormat("es-MX", { currency: currencyCode, style: "currency" }).format(
+    numericValue,
+  );
 }
 
 function formatDateTime(value: string | null | undefined): string {
@@ -98,7 +101,9 @@ export function AdminReturnCorrectionDetailPanel({
     return (
       <aside className="flex min-h-0 min-w-0 flex-col overflow-hidden rounded-[20px] border border-[var(--ui-color-border)] bg-white">
         <div className="border-b border-[var(--ui-color-border)] px-4 py-3">
-          <p className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">Detalle</p>
+          <p className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">
+            Detalle
+          </p>
           <h3 className="mt-1 text-lg font-semibold text-slate-950">Sin documento seleccionado</h3>
         </div>
         <div className="min-h-0 flex-1 p-4">
@@ -115,11 +120,16 @@ export function AdminReturnCorrectionDetailPanel({
     return (
       <aside className="flex min-h-0 min-w-0 flex-col overflow-hidden rounded-[20px] border border-[var(--ui-color-border)] bg-white">
         <div className="border-b border-[var(--ui-color-border)] px-4 py-3">
-          <p className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">Detalle</p>
+          <p className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">
+            Detalle
+          </p>
           <h3 className="mt-1 truncate text-lg font-semibold text-slate-950">{selected.folio}</h3>
         </div>
         <div className="min-h-0 flex-1 p-4">
-          <AdminEmptyState description="Consultando detalle real del backend." title="Cargando documento" />
+          <AdminEmptyState
+            description="Consultando detalle real del backend."
+            title="Cargando documento"
+          />
         </div>
       </aside>
     );
@@ -129,7 +139,9 @@ export function AdminReturnCorrectionDetailPanel({
     return (
       <aside className="flex min-h-0 min-w-0 flex-col overflow-hidden rounded-[20px] border border-[var(--ui-color-border)] bg-white">
         <div className="border-b border-[var(--ui-color-border)] px-4 py-3">
-          <p className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">Detalle</p>
+          <p className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">
+            Detalle
+          </p>
           <h3 className="mt-1 truncate text-lg font-semibold text-slate-950">{selected.folio}</h3>
         </div>
         <div className="min-h-0 flex-1 p-4">
@@ -159,8 +171,13 @@ function ReturnDetailContent({ detail }: { detail: AdminReturnDetail }) {
       <div className="shrink-0 border-b border-[var(--ui-color-border)] px-4 py-3">
         <div className="flex min-w-0 items-start justify-between gap-3">
           <div className="min-w-0">
-            <p className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">Devolucion</p>
-            <h3 className="mt-1 truncate text-lg font-semibold text-slate-950" title={detail.overview.folio}>
+            <p className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">
+              Devolucion
+            </p>
+            <h3
+              className="mt-1 truncate text-lg font-semibold text-slate-950"
+              title={detail.overview.folio}
+            >
               {detail.overview.folio}
             </h3>
           </div>
@@ -174,7 +191,9 @@ function ReturnDetailContent({ detail }: { detail: AdminReturnDetail }) {
         <FinancialRefundSummary refund={detail.financialRefund} />
         <section className="rounded-[18px] border border-[var(--ui-color-border)] bg-slate-50/80 p-3">
           <div className="flex items-center justify-between gap-3">
-            <span className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">Reembolso</span>
+            <span className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">
+              Reembolso
+            </span>
             <strong className="text-xl font-semibold text-slate-950">
               {formatMoney(detail.refundImpact.refundAmount, detail.refundImpact.currencyCode)}
             </strong>
@@ -183,13 +202,18 @@ function ReturnDetailContent({ detail }: { detail: AdminReturnDetail }) {
             <FieldRow label="Metodo" value={detail.refundImpact.refundMethod} />
             <FieldRow label="Caja" value={detail.overview.workstationName} />
             <FieldRow label="Sesion" value={detail.refundImpact.cashSessionId} />
-            <FieldRow label="Movimiento" value={detail.refundImpact.linkedCashMovementId ?? "No disponible"} />
+            <FieldRow
+              label="Movimiento"
+              value={detail.refundImpact.linkedCashMovementId ?? "No disponible"}
+            />
           </div>
         </section>
 
         <section className="mt-3 rounded-[18px] border border-[var(--ui-color-border)] bg-white p-3">
           <div className="flex items-center justify-between gap-2">
-            <p className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">Ticket origen</p>
+            <p className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">
+              Ticket origen
+            </p>
             <DetailLink href="/admin/ventas" label="Abrir ventas" />
           </div>
           <div className="mt-3 grid gap-1.5">
@@ -202,7 +226,9 @@ function ReturnDetailContent({ detail }: { detail: AdminReturnDetail }) {
         </section>
 
         <section className="mt-3 rounded-[18px] border border-[var(--ui-color-border)] bg-white p-3">
-          <p className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">Motivo y contexto</p>
+          <p className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">
+            Motivo y contexto
+          </p>
           <div className="mt-3 grid gap-1.5">
             <FieldRow label="Motivo" value={detail.overview.reasonName} />
             <FieldRow label="Operador" value={detail.overview.operatorName} />
@@ -218,7 +244,9 @@ function ReturnDetailContent({ detail }: { detail: AdminReturnDetail }) {
 
         <section className="mt-3 rounded-[18px] border border-[var(--ui-color-border)] bg-white p-3">
           <div className="flex items-center justify-between gap-2">
-            <p className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">Lineas devueltas</p>
+            <p className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">
+              Lineas devueltas
+            </p>
             <span className="rounded-full border border-[var(--ui-color-border)] bg-white px-2.5 py-1 text-xs font-semibold text-slate-600">
               {detail.returnedLines.length} lineas
             </span>
@@ -230,29 +258,59 @@ function ReturnDetailContent({ detail }: { detail: AdminReturnDetail }) {
                 key={line.id}
               >
                 <div className="min-w-0">
-                  <p className="truncate font-semibold text-slate-950" title={line.productName}>
-                    {line.productName}
+                  <p
+                    className="truncate font-semibold text-slate-950"
+                    title={line.originalCatalogName}
+                  >
+                    {line.originalCatalogName}
                   </p>
-                  <p className="truncate text-xs text-slate-500" title={line.dispositionCode}>
-                    {line.productCode} - {line.dispositionCode}
-                  </p>
+                  {line.allocations.map((allocation) => (
+                    <div className="text-xs text-slate-500" key={allocation.id}>
+                      {allocation.quantity} / {allocation.returned_product_name_snapshot} /{" "}
+                      {allocation.disposition_code}
+                      {allocation.lot_id ? ` / Lote ${allocation.lot_id}` : ""}
+                      {allocation.inventory_movement_id &&
+                      allocation.disposition_code !== "NO_STOCK" &&
+                      allocation.disposition_code !== "SEND_TO_WASTE" ? (
+                        <InventoryDispositionPanel
+                          branchId={detail.overview.branchId}
+                          productId={allocation.returned_product_id}
+                          kind="RETURN_CORRECTION"
+                          returnAllocationId={allocation.id}
+                          availableQuantity={allocation.quantity}
+                          originalDisposition={allocation.disposition_code}
+                        />
+                      ) : null}
+                    </div>
+                  ))}
                 </div>
-                <span className="text-right font-semibold text-slate-700">{line.returnedQuantity}</span>
-                <span className="text-right font-semibold text-slate-950">{formatMoney(line.refundAmount)}</span>
+                <span className="text-right font-semibold text-slate-700">
+                  {line.returnedQuantity}
+                </span>
+                <span className="text-right font-semibold text-slate-950">
+                  {formatMoney(line.refundAmount)}
+                </span>
               </div>
             ))}
           </div>
         </section>
 
         <section className="mt-3 rounded-[18px] border border-[var(--ui-color-border)] bg-white p-3">
-          <p className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">Documentos relacionados</p>
+          <p className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">
+            Documentos relacionados
+          </p>
           <div className="mt-3 grid gap-1.5">
             {detail.relatedDocuments.length > 0 ? (
               detail.relatedDocuments.map((document) => (
-                <div className="rounded-[14px] border border-[var(--ui-color-border)] bg-slate-50 px-3 py-2 text-sm" key={document.id}>
+                <div
+                  className="rounded-[14px] border border-[var(--ui-color-border)] bg-slate-50 px-3 py-2 text-sm"
+                  key={document.id}
+                >
                   <div className="flex min-w-0 items-center justify-between gap-2">
                     <span className="truncate font-semibold text-slate-950">{document.folio}</span>
-                    <span className="shrink-0 text-xs font-semibold text-slate-500">{document.documentType}</span>
+                    <span className="shrink-0 text-xs font-semibold text-slate-500">
+                      {document.documentType}
+                    </span>
                   </div>
                   <DetailLink href={document.routeHint} label="Abrir modulo" />
                 </div>
@@ -281,8 +339,13 @@ function CorrectionDetailContent({ detail }: { detail: AdminCorrectionDetail }) 
       <div className="shrink-0 border-b border-[var(--ui-color-border)] px-4 py-3">
         <div className="flex min-w-0 items-start justify-between gap-3">
           <div className="min-w-0">
-            <p className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">Correccion</p>
-            <h3 className="mt-1 truncate text-lg font-semibold text-slate-950" title={detail.overview.folio}>
+            <p className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">
+              Correccion
+            </p>
+            <h3
+              className="mt-1 truncate text-lg font-semibold text-slate-950"
+              title={detail.overview.folio}
+            >
               {detail.overview.folio}
             </h3>
           </div>
@@ -295,8 +358,12 @@ function CorrectionDetailContent({ detail }: { detail: AdminCorrectionDetail }) 
       <div className="min-h-0 flex-1 overflow-y-auto p-3">
         <section className="rounded-[18px] border border-[var(--ui-color-border)] bg-slate-50/80 p-3">
           <div className="flex items-center justify-between gap-3">
-            <span className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">Efecto neto</span>
-            <strong className="text-xl font-semibold text-slate-950">{detail.netEffect.totalUnitsAffected}</strong>
+            <span className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">
+              Efecto neto
+            </span>
+            <strong className="text-xl font-semibold text-slate-950">
+              {detail.netEffect.totalUnitsAffected}
+            </strong>
           </div>
           <div className="mt-3 grid gap-1.5">
             <FieldRow label="Inventario" value={detail.netEffect.inventoryEffect} />
@@ -307,12 +374,17 @@ function CorrectionDetailContent({ detail }: { detail: AdminCorrectionDetail }) 
 
         <section className="mt-3 rounded-[18px] border border-[var(--ui-color-border)] bg-white p-3">
           <div className="flex items-center justify-between gap-2">
-            <p className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">Documento origen</p>
+            <p className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">
+              Documento origen
+            </p>
             <DetailLink href={detail.originalDocument.routeHint} label="Abrir origen" />
           </div>
           <div className="mt-3 grid gap-1.5">
             <FieldRow label="Folio" value={detail.originalDocument.folio} />
-            <FieldRow label="Tipo" value={formatDocumentType(detail.originalDocument.documentType)} />
+            <FieldRow
+              label="Tipo"
+              value={formatDocumentType(detail.originalDocument.documentType)}
+            />
             <FieldRow label="Fecha" value={formatDateTime(detail.originalDocument.occurredAt)} />
             <FieldRow label="Operador" value={detail.originalDocument.operatorName} />
             <FieldRow label="Sucursal" value={detail.originalDocument.branchName} />
@@ -335,7 +407,9 @@ function CorrectionDetailContent({ detail }: { detail: AdminCorrectionDetail }) 
 
         <section className="mt-3 rounded-[18px] border border-[var(--ui-color-border)] bg-white p-3">
           <div className="flex items-center justify-between gap-2">
-            <p className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">Antes / despues</p>
+            <p className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">
+              Antes / despues
+            </p>
             <span className="rounded-full border border-[var(--ui-color-border)] bg-white px-2.5 py-1 text-xs font-semibold text-slate-600">
               {detail.affectedLines.length} lineas
             </span>
@@ -373,14 +447,21 @@ function CorrectionDetailContent({ detail }: { detail: AdminCorrectionDetail }) 
         </section>
 
         <section className="mt-3 rounded-[18px] border border-[var(--ui-color-border)] bg-white p-3">
-          <p className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">Documentos relacionados</p>
+          <p className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">
+            Documentos relacionados
+          </p>
           <div className="mt-3 grid gap-1.5">
             {detail.relatedDocuments.length > 0 ? (
               detail.relatedDocuments.map((document) => (
-                <div className="rounded-[14px] border border-[var(--ui-color-border)] bg-slate-50 px-3 py-2 text-sm" key={document.id}>
+                <div
+                  className="rounded-[14px] border border-[var(--ui-color-border)] bg-slate-50 px-3 py-2 text-sm"
+                  key={document.id}
+                >
                   <div className="flex min-w-0 items-center justify-between gap-2">
                     <span className="truncate font-semibold text-slate-950">{document.folio}</span>
-                    <span className="shrink-0 text-xs font-semibold text-slate-500">{formatDocumentType(document.documentType)}</span>
+                    <span className="shrink-0 text-xs font-semibold text-slate-500">
+                      {formatDocumentType(document.documentType)}
+                    </span>
                   </div>
                   <DetailLink href={document.routeHint} label="Abrir modulo" />
                 </div>

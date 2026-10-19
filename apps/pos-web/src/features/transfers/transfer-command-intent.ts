@@ -1,3 +1,4 @@
+import type { components } from "@zeromerma/api-client";
 import { usePosAuthStore } from "../auth/auth-store";
 import {
   ApiError,
@@ -10,7 +11,12 @@ import type {
   TransferDispatchCommitRequest,
   TransferReceiveRequest,
 } from "../../lib/api-contracts";
-import { commitTransferDispatch, receiveTransfer, recoverTransferCommand } from "./transfers-api";
+import {
+  commitTransferDispatch,
+  receiveTransfer,
+  recoverTransferCommand,
+  resolveTransferTransit,
+} from "./transfers-api";
 export interface TransferIntentionContext {
   userId: string;
   branchId: string;
@@ -23,7 +29,9 @@ export interface TransferIntentionContext {
 export type TransferIntentionMetadata = CommandIntentionMetadata<TransferIntentionContext>;
 export const transferIntentions = createCommandIntentionCoordinator<
   TransferIntentionContext,
-  TransferDispatchCommitRequest | TransferReceiveRequest,
+  | TransferDispatchCommitRequest
+  | TransferReceiveRequest
+  | components["schemas"]["TransferResolveRequest"],
   TransferCommandResultView
 >({
   storagePrefix: "zeromerma-transfer-intention:",
@@ -42,11 +50,18 @@ export const transferIntentions = createCommandIntentionCoordinator<
   validateContext: (context) =>
     context.commandCode === "dispatch"
       ? context.transferId === null
-      : context.commandCode === "receive" && context.transferId !== null,
+      : ["receive", "resolve_return", "resolve_waste"].includes(context.commandCode) &&
+        context.transferId !== null,
   send: (context, payload, key) =>
     context.commandCode === "dispatch"
       ? commitTransferDispatch(payload as TransferDispatchCommitRequest, key)
-      : receiveTransfer(context.transferId!, payload as TransferReceiveRequest, key),
+      : context.commandCode === "receive"
+        ? receiveTransfer(context.transferId!, payload as TransferReceiveRequest, key)
+        : resolveTransferTransit(
+            context.transferId!,
+            payload as components["schemas"]["TransferResolveRequest"],
+            key,
+          ),
   recover: async (metadata) => {
     const result = await recoverTransferCommand(
       metadata.commandCode,

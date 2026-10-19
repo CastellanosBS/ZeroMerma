@@ -487,6 +487,19 @@ implementación, pruebas locales y aceptación Foundation del commit entregado.
 Incluye migraciones, contratos y manuales operativos. No equivale a Data Integrity
 Ready ni Production Ready. El bloque posterior del plan es inventario048–055.
 
+### 0.16 Inventory block execution — ZM-FIN-048–055
+
+The owner approved weighted average valuation combined with physical FEFO lot and
+expiry control on 2026-10-19. DEC-08 records this extension. Implementation is on
+`codex/zm-fin-048-055-inventory` with focused synthetic validation recorded.
+The [inventory block record](implementation/inventory-block-validation.md)
+separates implemented boundaries, verified focused evidence, remaining checks
+and operational prerequisites. Technical acceptance requires the delivery report
+to identify a successful Foundation run for the exact delivered commit, a clean
+checkout and verified artifacts; this entry does not substitute for that evidence
+or declare a production gate complete. No product shelf life or catalog enrollment
+is assumed.
+
 ## 1. Resumen ejecutivo
 
 ZeroMerma posee una base adecuada para evolucionar sin reescritura: monolito modular, FastAPI/SQLAlchemy/PostgreSQL, POS y Backoffice separados, OpenAPI generado, precisión decimal, auditoría y outbox transaccionales. La auditoría activa demostró que una parte importante de ventas, pagos, pedidos, documentos y administración es real. También demostró defectos sistémicos: el POS no alimenta el inventario canónico; el pago de pedido no entra en caja/corte; el worker no procesa eventos; la trazabilidad de identidad/origen es incorrecta; y varias superficies administrativas son simuladas o incompletas.

@@ -5964,7 +5964,8 @@
       "reads_entities": [
         "sales",
         "sale_lines",
-        "returns"
+        "returns",
+        "class_inventory_obligations"
       ],
       "writes_entities": [
         "NONE"
@@ -5995,7 +5996,8 @@
         "NONE"
       ],
       "direct_tests": [
-        "apps/api/tests/test_admin_sales_tickets.py"
+        "apps/api/tests/test_admin_sales_tickets.py",
+        "apps/api/tests/test_admin_ticket_attribution_report.py"
       ],
       "indirect_tests": [
         "apps/api/tests/conftest.py",
@@ -6107,7 +6109,8 @@
         "NONE"
       ],
       "direct_tests": [
-        "apps/api/tests/test_admin_sales_tickets.py"
+        "apps/api/tests/test_admin_sales_tickets.py",
+        "apps/api/tests/test_admin_ticket_attribution_report.py"
       ],
       "indirect_tests": [
         "apps/api/tests/conftest.py",
@@ -14763,7 +14766,7 @@
       "module_owner": "API:admin-production",
       "use_case": "update_admin_production",
       "implementation_state": "PARTIAL",
-      "verification_state": "TESTED_IN_THIS_TASK",
+      "verification_state": "DIRECT_TEST_EXISTS_NOT_RUN",
       "auth_requirement": "AUTHENTICATED",
       "actual_auth_dependency": [
         "fastapi.security.api_key:APIKeyCookie",
@@ -14812,7 +14815,7 @@
         "outbox_events",
         "idempotency_records"
       ],
-      "locks_or_concurrency_control": "Per-batch FOR NO KEY UPDATE serializes transitions; completion locks all material/output balances in product UUID order with fresh ORM values and unique-key savepoint creation. Existing planned consumption and actual output semantics remain unchanged.",
+      "locks_or_concurrency_control": "Admitted command and document lock precede aggregate balances in branch/product/location order, then lot identities and reservation evidence. Exact causal effects prevent duplicates; reservations reduce availability; ordinary issues use eligible FEFO lots and weighted-average valuation. No undocumented negative transfer is admitted.",
       "audit_required": true,
       "audit_actual": "ATOMIC",
       "audit_atomicity": "ATOMIC",
@@ -14848,10 +14851,9 @@
       "missing_test_types": [
         "NONE"
       ],
-      "approved_target_state": "Existing command effects are atomic and replayable per DEC-07. Full physical ledger, production planning/consumption redesign and complete Backoffice workflows remain separately tracked; idempotency is not a declaration of Feature Complete.",
+      "approved_target_state": "Canonical stock effects use immutable causal quantities, frozen conversion and cost evidence, ordered aggregate/lot locks and atomic audit/outbox. Full product workflow and production deployment acceptance remains separately tracked.",
       "feature_complete_blocker": true,
       "later_ZM_FIN_tasks": [
-        "ZM-FIN-054",
         "ZM-FIN-069",
         "ZM-FIN-070"
       ],
@@ -14878,7 +14880,7 @@
         "apps/backoffice-web/src/features/admin/production/production-command-intent.ts",
         "docs/implementation/operations-idempotency-validation.md"
       ],
-      "verification_notes": "Local API evidence: 49 unique PostgreSQL tests passed across the 48-test production run and the separate missing-branch regression. This does not assert real-browser or exact-commit hosted CI acceptance."
+      "verification_notes": "Physical block adoption supersedes the former documentary-only and negative-transit behavior. Current acceptance and exact hosted CI evidence accompany delivery; prior concurrency evidence remains historical."
     },
     {
       "operation_key": "API:PATCH:/v1/admin/products/{product_id}",
@@ -15006,7 +15008,7 @@
       "module_owner": "API:admin-purchases",
       "use_case": "update_admin_purchase",
       "implementation_state": "PARTIAL",
-      "verification_state": "TESTED_IN_THIS_TASK",
+      "verification_state": "DIRECT_TEST_EXISTS_NOT_RUN",
       "auth_requirement": "AUTHENTICATED",
       "actual_auth_dependency": [
         "fastapi.security.api_key:APIKeyCookie",
@@ -15054,7 +15056,7 @@
         "outbox_events",
         "idempotency_records"
       ],
-      "locks_or_concurrency_control": "Document row lock serializes mutations; receipt balance locks follow product UUID order, with fresh values and unique-key savepoint creation for first balances. Cumulative receipts cannot exceed the remaining ordered quantity.",
+      "locks_or_concurrency_control": "Admitted command and document lock precede aggregate balances in branch/product/location order, then lot identities and reservation evidence. Exact causal effects prevent duplicates; reservations reduce availability; ordinary issues use eligible FEFO lots and weighted-average valuation. No undocumented negative transfer is admitted.",
       "audit_required": true,
       "audit_actual": "ATOMIC",
       "audit_atomicity": "ATOMIC",
@@ -15089,7 +15091,7 @@
       "missing_test_types": [
         "NONE"
       ],
-      "approved_target_state": "Existing command effects are atomic and replayable per DEC-07. Full physical ledger, production planning/consumption redesign and complete Backoffice workflows remain separately tracked; idempotency is not a declaration of Feature Complete.",
+      "approved_target_state": "Canonical stock effects use immutable causal quantities, frozen conversion and cost evidence, ordered aggregate/lot locks and atomic audit/outbox. Full product workflow and production deployment acceptance remains separately tracked.",
       "feature_complete_blocker": true,
       "later_ZM_FIN_tasks": [
         "ZM-FIN-074"
@@ -15116,7 +15118,7 @@
         "apps/backoffice-web/src/features/admin/purchases/purchase-command-intent.ts",
         "docs/implementation/operations-idempotency-validation.md"
       ],
-      "verification_notes": "Local API evidence: the complete 40-test PostgreSQL purchase suite passed, including repeated-product receipt lines, supplier relations, missing branches, replay and recovery. This does not assert real-browser or exact-commit hosted CI acceptance."
+      "verification_notes": "Physical block adoption supersedes the former documentary-only and negative-transit behavior. Current acceptance and exact hosted CI evidence accompany delivery; prior concurrency evidence remains historical."
     },
     {
       "operation_key": "API:PATCH:/v1/admin/roles/{role_id}",
@@ -15717,7 +15719,7 @@
       "module_owner": "API:admin-transfers",
       "use_case": "update_admin_transfer",
       "implementation_state": "PARTIAL",
-      "verification_state": "TESTED_IN_THIS_TASK",
+      "verification_state": "DIRECT_TEST_EXISTS_NOT_RUN",
       "auth_requirement": "AUTHENTICATED",
       "actual_auth_dependency": [
         "fastapi.security.api_key:APIKeyCookie",
@@ -15762,7 +15764,7 @@
         "outbox_events",
         "idempotency_records"
       ],
-      "locks_or_concurrency_control": "Shared shipment FOR NO KEY UPDATE serializes POS and Backoffice transitions; cumulative receipts and pending quantities are recomputed while holding that lock, with source and destination authorization. Backoffice preserves its existing inventory movements; POS remains document-only until ledger adoption.",
+      "locks_or_concurrency_control": "Admitted command and document lock precede aggregate balances in branch/product/location order, then lot identities and reservation evidence. Exact causal effects prevent duplicates; reservations reduce availability; ordinary issues use eligible FEFO lots and weighted-average valuation. No undocumented negative transfer is admitted.",
       "audit_required": true,
       "audit_actual": "ATOMIC",
       "audit_atomicity": "ATOMIC",
@@ -15798,10 +15800,9 @@
       "missing_test_types": [
         "NONE"
       ],
-      "approved_target_state": "Existing command effects are atomic and replayable per DEC-07. Full physical ledger, production planning/consumption redesign and complete Backoffice workflows remain separately tracked; idempotency is not a declaration of Feature Complete.",
+      "approved_target_state": "Canonical stock effects use immutable causal quantities, frozen conversion and cost evidence, ordered aggregate/lot locks and atomic audit/outbox. Full product workflow and production deployment acceptance remains separately tracked.",
       "feature_complete_blocker": true,
       "later_ZM_FIN_tasks": [
-        "ZM-FIN-052",
         "ZM-FIN-062",
         "ZM-FIN-076"
       ],
@@ -15827,7 +15828,7 @@
         "apps/backoffice-web/src/features/admin/transfers/transfer-command-intent.ts",
         "docs/implementation/operations-idempotency-validation.md"
       ],
-      "verification_notes": "Local API evidence: 54 unique transfer PostgreSQL tests passed; five shared cash-context regressions passed separately. This does not assert real-browser or exact-commit hosted CI acceptance."
+      "verification_notes": "Physical block adoption supersedes the former documentary-only and negative-transit behavior. Current acceptance and exact hosted CI evidence accompany delivery; prior concurrency evidence remains historical."
     },
     {
       "operation_key": "API:PATCH:/v1/admin/users/{user_id}",
@@ -18325,7 +18326,7 @@
       "module_owner": "API:admin-inventory",
       "use_case": "create_admin_inventory_adjustment",
       "implementation_state": "PARTIAL",
-      "verification_state": "TESTED_IN_THIS_TASK",
+      "verification_state": "DIRECT_TEST_EXISTS_NOT_RUN",
       "auth_requirement": "AUTHENTICATED",
       "actual_auth_dependency": [
         "fastapi.security.api_key:APIKeyCookie",
@@ -18370,7 +18371,7 @@
         "outbox_events",
         "idempotency_records"
       ],
-      "locks_or_concurrency_control": "Shared lock_inventory_balances deduplicates the complete write set and locks fresh rows in branch/product/location order; missing rows use an ORM savepoint insert and recover only the known balance uniqueness violation. A transaction-local handle accumulates repeated deltas without refreshing pending changes, and persists each movement with its balance change. The single selected balance retains the existing explicit negative-adjustment behavior.",
+      "locks_or_concurrency_control": "Admitted command and document lock precede aggregate balances in branch/product/location order, then lot identities and reservation evidence. Exact causal effects prevent duplicates; reservations reduce availability; ordinary issues use eligible FEFO lots and weighted-average valuation. No undocumented negative transfer is admitted.",
       "audit_required": true,
       "audit_actual": "ATOMIC",
       "audit_atomicity": "ATOMIC",
@@ -18407,10 +18408,9 @@
       "missing_test_types": [
         "NONE"
       ],
-      "approved_target_state": "Existing command effects are atomic and replayable per DEC-07. Full physical ledger, production planning/consumption redesign and complete Backoffice workflows remain separately tracked; idempotency is not a declaration of Feature Complete.",
+      "approved_target_state": "Canonical stock effects use immutable causal quantities, frozen conversion and cost evidence, ordered aggregate/lot locks and atomic audit/outbox. Full product workflow and production deployment acceptance remains separately tracked.",
       "feature_complete_blocker": true,
       "later_ZM_FIN_tasks": [
-        "ZM-FIN-051",
         "ZM-FIN-075"
       ],
       "decision_refs": [
@@ -18438,7 +18438,7 @@
         "docs/architecture/concurrency.md",
         "docs/implementation/concurrency-validation.md"
       ],
-      "verification_notes": "ZM-FIN-038 local evidence: 11 dedicated inventory concurrency tests passed and were repeated in the final combined 49-test runner; all 124 tests across the eight existing writer/idempotency suites passed. Authorization guards, repeated-product receipt lines and existing physical boundaries are preserved. This does not close later ledger, reservation or full product-workflow gaps; exact-commit Foundation acceptance accompanies delivery."
+      "verification_notes": "Physical block adoption supersedes the former documentary-only and negative-transit behavior. Current acceptance and exact hosted CI evidence accompany delivery; prior concurrency evidence remains historical."
     },
     {
       "operation_key": "API:GET:/v1/admin/inventory/adjustments/confirmations/{idempotency_key}",
@@ -18704,7 +18704,7 @@
       "module_owner": "API:admin-orders",
       "use_case": "deliver_admin_order",
       "implementation_state": "PARTIAL",
-      "verification_state": "TESTED_IN_THIS_TASK",
+      "verification_state": "DIRECT_TEST_EXISTS_NOT_RUN",
       "auth_requirement": "AUTHENTICATED",
       "actual_auth_dependency": [
         "fastapi.security.api_key:APIKeyCookie",
@@ -18741,9 +18741,13 @@
         "customer_order_payments"
       ],
       "writes_entities": [
-        "idempotency_records",
-        "customer_orders",
         "audit_logs",
+        "customer_orders",
+        "idempotency_records",
+        "inventory_balances",
+        "inventory_lot_balances",
+        "inventory_movement_lot_allocations",
+        "inventory_movements",
         "outbox_events"
       ],
       "locks_or_concurrency_control": "Global unique UUIDv7 reservation with bounded same-key contention; existing orders lock CustomerOrder FOR UPDATE before state/balance validation across POS and Backoffice; unrelated orders have no global order lock; authorization lifecycle lock remains shared",
@@ -18772,7 +18776,8 @@
       ],
       "direct_tests": [
         "apps/api/tests/test_admin_orders.py",
-        "apps/api/tests/test_order_idempotency.py"
+        "apps/api/tests/test_order_idempotency.py",
+        "apps/api/tests/test_sale_physical_inventory.py"
       ],
       "indirect_tests": [
         "apps/api/tests/conftest.py",
@@ -18782,7 +18787,7 @@
       "missing_test_types": [
         "FULL_DEC10_ORDER_WORKFLOW"
       ],
-      "approved_target_state": "Preserve durable replay and the 042 order-payment ledger adoption while completing the full approved order workflow in ZM-FIN-058 and ZM-FIN-078. Cancellation policy, CASH_FIRST/partial refunds and provider execution remain ZM-FIN-044/046.",
+      "approved_target_state": "Backoffice delivery applies its actual stock outflow under the original idempotent delivery owner; it does not fabricate payment settlement. Broader product usability and deployment acceptance remain separately tracked.",
       "feature_complete_blocker": true,
       "later_ZM_FIN_tasks": [
         "ZM-FIN-078"
@@ -18816,7 +18821,8 @@
         "apps/api/src/zeromerma_api/modules/orders/application/idempotency.py#class OrdersIdempotencyService",
         "docs/architecture/idempotency.md",
         "docs/implementation/order-cash-flow-validation.md"
-      ]
+      ],
+      "verification_notes": "New physical adoption has targeted PostgreSQL coverage. Full block regression, browser acceptance and immutable-commit CI are recorded by delivery; previous task evidence remains historical."
     },
     {
       "operation_key": "API:POST:/v1/admin/orders/{order_id}/mark-ready",
@@ -19158,10 +19164,9 @@
       "missing_test_types": [
         "NONE"
       ],
-      "approved_target_state": "Existing command effects are atomic and replayable per DEC-07. Full physical ledger, production planning/consumption redesign and complete Backoffice workflows remain separately tracked; idempotency is not a declaration of Feature Complete.",
+      "approved_target_state": "Create a documentary plan with frozen units and source identity; release or dispatch performs the separately admitted physical effects. Full workflow/browser acceptance remains tracked.",
       "feature_complete_blocker": true,
       "later_ZM_FIN_tasks": [
-        "ZM-FIN-054",
         "ZM-FIN-069",
         "ZM-FIN-070"
       ],
@@ -19205,7 +19210,7 @@
       "module_owner": "API:admin-production",
       "use_case": "cancel_admin_production",
       "implementation_state": "PARTIAL",
-      "verification_state": "TESTED_IN_THIS_TASK",
+      "verification_state": "DIRECT_TEST_EXISTS_NOT_RUN",
       "auth_requirement": "AUTHENTICATED",
       "actual_auth_dependency": [
         "fastapi.security.api_key:APIKeyCookie",
@@ -19252,7 +19257,7 @@
         "outbox_events",
         "idempotency_records"
       ],
-      "locks_or_concurrency_control": "Per-batch FOR NO KEY UPDATE serializes transitions; completion locks all material/output balances in product UUID order with fresh ORM values and unique-key savepoint creation. Existing planned consumption and actual output semantics remain unchanged.",
+      "locks_or_concurrency_control": "Admitted command and document lock precede aggregate balances in branch/product/location order, then lot identities and reservation evidence. Exact causal effects prevent duplicates; reservations reduce availability; ordinary issues use eligible FEFO lots and weighted-average valuation. No undocumented negative transfer is admitted.",
       "audit_required": true,
       "audit_actual": "ATOMIC",
       "audit_atomicity": "ATOMIC",
@@ -19288,10 +19293,9 @@
       "missing_test_types": [
         "NONE"
       ],
-      "approved_target_state": "Existing command effects are atomic and replayable per DEC-07. Full physical ledger, production planning/consumption redesign and complete Backoffice workflows remain separately tracked; idempotency is not a declaration of Feature Complete.",
+      "approved_target_state": "Canonical stock effects use immutable causal quantities, frozen conversion and cost evidence, ordered aggregate/lot locks and atomic audit/outbox. Full product workflow and production deployment acceptance remains separately tracked.",
       "feature_complete_blocker": true,
       "later_ZM_FIN_tasks": [
-        "ZM-FIN-054",
         "ZM-FIN-069",
         "ZM-FIN-070"
       ],
@@ -19318,7 +19322,7 @@
         "apps/backoffice-web/src/features/admin/production/production-command-intent.ts",
         "docs/implementation/operations-idempotency-validation.md"
       ],
-      "verification_notes": "Local API evidence: 49 unique PostgreSQL tests passed across the 48-test production run and the separate missing-branch regression. This does not assert real-browser or exact-commit hosted CI acceptance."
+      "verification_notes": "Physical block adoption supersedes the former documentary-only and negative-transit behavior. Current acceptance and exact hosted CI evidence accompany delivery; prior concurrency evidence remains historical."
     },
     {
       "operation_key": "API:POST:/v1/admin/production/{production_id}/complete",
@@ -19335,7 +19339,7 @@
       "module_owner": "API:admin-production",
       "use_case": "complete_admin_production",
       "implementation_state": "PARTIAL",
-      "verification_state": "TESTED_IN_THIS_TASK",
+      "verification_state": "DIRECT_TEST_EXISTS_NOT_RUN",
       "auth_requirement": "AUTHENTICATED",
       "actual_auth_dependency": [
         "fastapi.security.api_key:APIKeyCookie",
@@ -19387,7 +19391,7 @@
         "outbox_events",
         "idempotency_records"
       ],
-      "locks_or_concurrency_control": "The batch FOR NO KEY UPDATE lock serializes its transition. Shared lock_inventory_balances deduplicates the complete write set and locks fresh rows in branch/product/location order; missing rows use an ORM savepoint insert and recover only the known balance uniqueness violation. A transaction-local handle accumulates repeated deltas without refreshing pending changes, and persists each movement with its balance change. Planned input and actual output balances are locked together before consumption. No new reservation, WIP or costing semantics are introduced.",
+      "locks_or_concurrency_control": "Admitted command and document lock precede aggregate balances in branch/product/location order, then lot identities and reservation evidence. Exact causal effects prevent duplicates; reservations reduce availability; ordinary issues use eligible FEFO lots and weighted-average valuation. No undocumented negative transfer is admitted.",
       "audit_required": true,
       "audit_actual": "ATOMIC",
       "audit_atomicity": "ATOMIC",
@@ -19424,10 +19428,9 @@
       "missing_test_types": [
         "NONE"
       ],
-      "approved_target_state": "Existing command effects are atomic and replayable per DEC-07. Full physical ledger, production planning/consumption redesign and complete Backoffice workflows remain separately tracked; idempotency is not a declaration of Feature Complete.",
+      "approved_target_state": "Canonical stock effects use immutable causal quantities, frozen conversion and cost evidence, ordered aggregate/lot locks and atomic audit/outbox. Full product workflow and production deployment acceptance remains separately tracked.",
       "feature_complete_blocker": true,
       "later_ZM_FIN_tasks": [
-        "ZM-FIN-054",
         "ZM-FIN-069",
         "ZM-FIN-070"
       ],
@@ -19457,139 +19460,7 @@
         "docs/architecture/concurrency.md",
         "docs/implementation/concurrency-validation.md"
       ],
-      "verification_notes": "ZM-FIN-038 local evidence: 11 dedicated inventory concurrency tests passed and were repeated in the final combined 49-test runner; all 124 tests across the eight existing writer/idempotency suites passed. Authorization guards, repeated-product receipt lines and existing physical boundaries are preserved. This does not close later ledger, reservation or full product-workflow gaps; exact-commit Foundation acceptance accompanies delivery."
-    },
-    {
-      "operation_key": "API:POST:/v1/admin/production/{production_id}/start",
-      "surface": "BACKOFFICE",
-      "method": "POST",
-      "path": "/v1/admin/production/{production_id}/start",
-      "operation_id": "start_admin_production_v1_admin_production__production_id__start_post",
-      "include_in_schema": true,
-      "tags": [
-        "admin-production"
-      ],
-      "router_file": "apps/api/src/zeromerma_api/modules/production/presentation/router.py",
-      "router_symbol": "start_admin_production",
-      "module_owner": "API:admin-production",
-      "use_case": "start_admin_production",
-      "implementation_state": "PARTIAL",
-      "verification_state": "TESTED_IN_THIS_TASK",
-      "auth_requirement": "AUTHENTICATED",
-      "actual_auth_dependency": [
-        "fastapi.security.api_key:APIKeyCookie",
-        "zeromerma_api.db.session:get_session",
-        "zeromerma_api.modules.idempotency.presentation.http:require_idempotency_key",
-        "zeromerma_api.modules.identity.presentation.dependencies:get_current_authentication",
-        "zeromerma_api.modules.identity.presentation.dependencies:get_current_user",
-        "zeromerma_api.modules.production.presentation.router:_require_backoffice_user",
-        "zeromerma_api.presentation.access_policy:enforce_operation_policy"
-      ],
-      "actual_surface_guard": "EXPLICIT_BACKOFFICE_POLICY_WITH_EFFECTIVE_GRANTS",
-      "required_capability": "production.execute",
-      "capability_enforcement_state": "CAPABILITY_ENFORCED",
-      "required_scope": "GLOBAL_OR_BRANCH_SET_PER_DEC04",
-      "scope_source": "SERVER_RESOLVED_ACTIVE_ROLE_ASSIGNMENT_SCOPES_INTERSECT_ACTIVE_USER_BRANCH_MEMBERSHIPS",
-      "scope_enforcement_state": "SCOPE_ENFORCED",
-      "request_schema": [
-        "AdminProductionStartRequest"
-      ],
-      "response_schema": "ProductionCommandResultView",
-      "error_contract_state": "CANONICAL_API_ERROR_RESPONSE",
-      "application_service": [
-        "zeromerma_api.modules.production.application.idempotency.ProductionIdempotencyService.execute"
-      ],
-      "domain_or_use_case_symbol": "ProductionIdempotencyService.execute",
-      "router_business_logic_present": false,
-      "transaction_owner": "zeromerma_api.modules.idempotency.application.service.IdempotencyExecutor.execute",
-      "transaction_boundary": "One executor-owned transaction commits domain effects, audit, outbox and durable acknowledgement; domain services may flush but cannot commit independently.",
-      "persistence": "WRITE",
-      "external_side_effect": "NONE_OBSERVED_STATICALLY",
-      "reads_entities": [
-        "idempotency_records",
-        "users",
-        "branches",
-        "production_batches",
-        "production_batch_inputs",
-        "products",
-        "recipes",
-        "recipe_inputs",
-        "inventory_balances"
-      ],
-      "writes_entities": [
-        "production_batches",
-        "production_batch_inputs",
-        "audit_log",
-        "outbox_events",
-        "idempotency_records"
-      ],
-      "locks_or_concurrency_control": "Per-batch FOR NO KEY UPDATE serializes transitions; completion locks all material/output balances in product UUID order with fresh ORM values and unique-key savepoint creation. Existing planned consumption and actual output semantics remain unchanged.",
-      "audit_required": true,
-      "audit_actual": "ATOMIC",
-      "audit_atomicity": "ATOMIC",
-      "outbox_required": true,
-      "outbox_actual": "ATOMIC",
-      "outbox_atomicity": "ATOMIC",
-      "idempotency_required": true,
-      "idempotency_actual": "DEC07_COMPLIANT",
-      "idempotency_business_identity": "Global UUIDv7 Idempotency-Key; operation=production.start; fingerprint binds actor, surface, branch and command target; POS additionally binds the original workstation and cash session",
-      "idempotency_replay_behavior": "Returns the original minimized immutable acknowledgement; current authorization and exact context are checked before exposing a result. Unknown is nonterminal 409; recovery never executes a domain action or creates a replacement key.",
-      "generated_client_operation": "start_admin_production_v1_admin_production__production_id__start_post",
-      "consumer_contract_state": "CLIENT_GENERATED_USED",
-      "consumer_disposition": "LOCAL_UI_PRESENT",
-      "consumer_reason": "Generated adapter and metadata-only intention coordinator preserve one key per command; reload queries the saved acknowledgement without reconstructing the body.",
-      "pos_consumers": [
-        "NONE"
-      ],
-      "backoffice_consumers": [
-        "apps/backoffice-web/src/features/admin/production/api.ts",
-        "apps/backoffice-web/src/features/admin/production/production-command-intent.ts"
-      ],
-      "other_consumers": [
-        "NONE"
-      ],
-      "direct_tests": [
-        "apps/api/tests/test_production_idempotency.py"
-      ],
-      "indirect_tests": [
-        "apps/api/tests/conftest.py",
-        "apps/api/unit_tests/test_operation_policy.py#test_every_route_and_persisted_family_has_an_explicit_policy",
-        "apps/api/tests/test_operation_authorization.py#test_all_scoped_families_support_mapped_reads_and_aggregate_subqueries"
-      ],
-      "missing_test_types": [
-        "NONE"
-      ],
-      "approved_target_state": "Existing command effects are atomic and replayable per DEC-07. Full physical ledger, production planning/consumption redesign and complete Backoffice workflows remain separately tracked; idempotency is not a declaration of Feature Complete.",
-      "feature_complete_blocker": true,
-      "later_ZM_FIN_tasks": [
-        "ZM-FIN-054",
-        "ZM-FIN-069",
-        "ZM-FIN-070"
-      ],
-      "decision_refs": [
-        "DEC-03",
-        "DEC-04",
-        "DEC-12",
-        "DEC-07",
-        "DEC-15",
-        "DEC-18"
-      ],
-      "gate_refs": [
-        "G1",
-        "G5"
-      ],
-      "gap_ids": [
-        "NONE"
-      ],
-      "evidence": [
-        "apps/api/src/zeromerma_api/modules/production/presentation/router.py#start_admin_production",
-        "apps/api/src/zeromerma_api/modules/production/application/idempotency.py#class ProductionIdempotencyService",
-        "apps/api/src/zeromerma_api/modules/idempotency/application/service.py#class IdempotencyExecutor",
-        "apps/backoffice-web/src/features/admin/production/api.ts",
-        "apps/backoffice-web/src/features/admin/production/production-command-intent.ts",
-        "docs/implementation/operations-idempotency-validation.md"
-      ],
-      "verification_notes": "Local API evidence: 49 unique PostgreSQL tests passed across the 48-test production run and the separate missing-branch regression. This does not assert real-browser or exact-commit hosted CI acceptance."
+      "verification_notes": "Physical block adoption supersedes the former documentary-only and negative-transit behavior. Current acceptance and exact hosted CI evidence accompany delivery; prior concurrency evidence remains historical."
     },
     {
       "operation_key": "API:GET:/v1/admin/production/commands/{command_code}/{idempotency_key}",
@@ -20079,7 +19950,7 @@
       "module_owner": "API:admin-purchases",
       "use_case": "create_admin_direct_entry",
       "implementation_state": "PARTIAL",
-      "verification_state": "TESTED_IN_THIS_TASK",
+      "verification_state": "DIRECT_TEST_EXISTS_NOT_RUN",
       "auth_requirement": "AUTHENTICATED",
       "actual_auth_dependency": [
         "fastapi.security.api_key:APIKeyCookie",
@@ -20136,7 +20007,7 @@
         "outbox_events",
         "idempotency_records"
       ],
-      "locks_or_concurrency_control": "The purchase document and receipt remain in one executor transaction. Shared lock_inventory_balances deduplicates the complete write set and locks fresh rows in branch/product/location order; missing rows use an ORM savepoint insert and recover only the known balance uniqueness violation. A transaction-local handle accumulates repeated deltas without refreshing pending changes, and persists each movement with its balance change. Receipt lines for the same product accumulate independently and preserve supplier relation updates.",
+      "locks_or_concurrency_control": "Admitted command and document lock precede aggregate balances in branch/product/location order, then lot identities and reservation evidence. Exact causal effects prevent duplicates; reservations reduce availability; ordinary issues use eligible FEFO lots and weighted-average valuation. No undocumented negative transfer is admitted.",
       "audit_required": true,
       "audit_actual": "ATOMIC",
       "audit_atomicity": "ATOMIC",
@@ -20173,7 +20044,7 @@
       "missing_test_types": [
         "NONE"
       ],
-      "approved_target_state": "Existing command effects are atomic and replayable per DEC-07. Full physical ledger, production planning/consumption redesign and complete Backoffice workflows remain separately tracked; idempotency is not a declaration of Feature Complete.",
+      "approved_target_state": "Canonical stock effects use immutable causal quantities, frozen conversion and cost evidence, ordered aggregate/lot locks and atomic audit/outbox. Full product workflow and production deployment acceptance remains separately tracked.",
       "feature_complete_blocker": true,
       "later_ZM_FIN_tasks": [
         "ZM-FIN-074"
@@ -20203,7 +20074,7 @@
         "docs/architecture/concurrency.md",
         "docs/implementation/concurrency-validation.md"
       ],
-      "verification_notes": "ZM-FIN-038 local evidence: 11 dedicated inventory concurrency tests passed and were repeated in the final combined 49-test runner; all 124 tests across the eight existing writer/idempotency suites passed. Authorization guards, repeated-product receipt lines and existing physical boundaries are preserved. This does not close later ledger, reservation or full product-workflow gaps; exact-commit Foundation acceptance accompanies delivery."
+      "verification_notes": "Physical block adoption supersedes the former documentary-only and negative-transit behavior. Current acceptance and exact hosted CI evidence accompany delivery; prior concurrency evidence remains historical."
     },
     {
       "operation_key": "API:POST:/v1/admin/purchases/{purchase_id}/cancel",
@@ -20220,7 +20091,7 @@
       "module_owner": "API:admin-purchases",
       "use_case": "cancel_admin_purchase",
       "implementation_state": "PARTIAL",
-      "verification_state": "TESTED_IN_THIS_TASK",
+      "verification_state": "DIRECT_TEST_EXISTS_NOT_RUN",
       "auth_requirement": "AUTHENTICATED",
       "actual_auth_dependency": [
         "fastapi.security.api_key:APIKeyCookie",
@@ -20267,7 +20138,7 @@
         "outbox_events",
         "idempotency_records"
       ],
-      "locks_or_concurrency_control": "Document row lock serializes mutations; receipt balance locks follow product UUID order, with fresh values and unique-key savepoint creation for first balances. Cumulative receipts cannot exceed the remaining ordered quantity.",
+      "locks_or_concurrency_control": "Admitted command and document lock precede aggregate balances in branch/product/location order, then lot identities and reservation evidence. Exact causal effects prevent duplicates; reservations reduce availability; ordinary issues use eligible FEFO lots and weighted-average valuation. No undocumented negative transfer is admitted.",
       "audit_required": true,
       "audit_actual": "ATOMIC",
       "audit_atomicity": "ATOMIC",
@@ -20303,7 +20174,7 @@
       "missing_test_types": [
         "NONE"
       ],
-      "approved_target_state": "Existing command effects are atomic and replayable per DEC-07. Full physical ledger, production planning/consumption redesign and complete Backoffice workflows remain separately tracked; idempotency is not a declaration of Feature Complete.",
+      "approved_target_state": "Canonical stock effects use immutable causal quantities, frozen conversion and cost evidence, ordered aggregate/lot locks and atomic audit/outbox. Full product workflow and production deployment acceptance remains separately tracked.",
       "feature_complete_blocker": true,
       "later_ZM_FIN_tasks": [
         "ZM-FIN-074"
@@ -20330,7 +20201,7 @@
         "apps/backoffice-web/src/features/admin/purchases/purchase-command-intent.ts",
         "docs/implementation/operations-idempotency-validation.md"
       ],
-      "verification_notes": "Local API evidence: the complete 40-test PostgreSQL purchase suite passed, including repeated-product receipt lines, supplier relations, missing branches, replay and recovery. This does not assert real-browser or exact-commit hosted CI acceptance."
+      "verification_notes": "Physical block adoption supersedes the former documentary-only and negative-transit behavior. Current acceptance and exact hosted CI evidence accompany delivery; prior concurrency evidence remains historical."
     },
     {
       "operation_key": "API:POST:/v1/admin/purchases/{purchase_id}/confirm",
@@ -20347,7 +20218,7 @@
       "module_owner": "API:admin-purchases",
       "use_case": "confirm_admin_purchase",
       "implementation_state": "PARTIAL",
-      "verification_state": "TESTED_IN_THIS_TASK",
+      "verification_state": "DIRECT_TEST_EXISTS_NOT_RUN",
       "auth_requirement": "AUTHENTICATED",
       "actual_auth_dependency": [
         "fastapi.security.api_key:APIKeyCookie",
@@ -20394,7 +20265,7 @@
         "outbox_events",
         "idempotency_records"
       ],
-      "locks_or_concurrency_control": "Document row lock serializes mutations; receipt balance locks follow product UUID order, with fresh values and unique-key savepoint creation for first balances. Cumulative receipts cannot exceed the remaining ordered quantity.",
+      "locks_or_concurrency_control": "Admitted command and document lock precede aggregate balances in branch/product/location order, then lot identities and reservation evidence. Exact causal effects prevent duplicates; reservations reduce availability; ordinary issues use eligible FEFO lots and weighted-average valuation. No undocumented negative transfer is admitted.",
       "audit_required": true,
       "audit_actual": "ATOMIC",
       "audit_atomicity": "ATOMIC",
@@ -20430,7 +20301,7 @@
       "missing_test_types": [
         "NONE"
       ],
-      "approved_target_state": "Existing command effects are atomic and replayable per DEC-07. Full physical ledger, production planning/consumption redesign and complete Backoffice workflows remain separately tracked; idempotency is not a declaration of Feature Complete.",
+      "approved_target_state": "Canonical stock effects use immutable causal quantities, frozen conversion and cost evidence, ordered aggregate/lot locks and atomic audit/outbox. Full product workflow and production deployment acceptance remains separately tracked.",
       "feature_complete_blocker": true,
       "later_ZM_FIN_tasks": [
         "ZM-FIN-074"
@@ -20457,7 +20328,7 @@
         "apps/backoffice-web/src/features/admin/purchases/purchase-command-intent.ts",
         "docs/implementation/operations-idempotency-validation.md"
       ],
-      "verification_notes": "Local API evidence: the complete 40-test PostgreSQL purchase suite passed, including repeated-product receipt lines, supplier relations, missing branches, replay and recovery. This does not assert real-browser or exact-commit hosted CI acceptance."
+      "verification_notes": "Physical block adoption supersedes the former documentary-only and negative-transit behavior. Current acceptance and exact hosted CI evidence accompany delivery; prior concurrency evidence remains historical."
     },
     {
       "operation_key": "API:POST:/v1/admin/purchases/{purchase_id}/receive",
@@ -20474,7 +20345,7 @@
       "module_owner": "API:admin-purchases",
       "use_case": "receive_admin_purchase",
       "implementation_state": "PARTIAL",
-      "verification_state": "TESTED_IN_THIS_TASK",
+      "verification_state": "DIRECT_TEST_EXISTS_NOT_RUN",
       "auth_requirement": "AUTHENTICATED",
       "actual_auth_dependency": [
         "fastapi.security.api_key:APIKeyCookie",
@@ -20531,7 +20402,7 @@
         "outbox_events",
         "idempotency_records"
       ],
-      "locks_or_concurrency_control": "The purchase document lock protects cumulative remaining quantities. Shared lock_inventory_balances deduplicates the complete write set and locks fresh rows in branch/product/location order; missing rows use an ORM savepoint insert and recover only the known balance uniqueness violation. A transaction-local handle accumulates repeated deltas without refreshing pending changes, and persists each movement with its balance change. Receipt lines for the same product accumulate independently and preserve supplier relation updates.",
+      "locks_or_concurrency_control": "Admitted command and document lock precede aggregate balances in branch/product/location order, then lot identities and reservation evidence. Exact causal effects prevent duplicates; reservations reduce availability; ordinary issues use eligible FEFO lots and weighted-average valuation. No undocumented negative transfer is admitted.",
       "audit_required": true,
       "audit_actual": "ATOMIC",
       "audit_atomicity": "ATOMIC",
@@ -20568,7 +20439,7 @@
       "missing_test_types": [
         "NONE"
       ],
-      "approved_target_state": "Existing command effects are atomic and replayable per DEC-07. Full physical ledger, production planning/consumption redesign and complete Backoffice workflows remain separately tracked; idempotency is not a declaration of Feature Complete.",
+      "approved_target_state": "Canonical stock effects use immutable causal quantities, frozen conversion and cost evidence, ordered aggregate/lot locks and atomic audit/outbox. Full product workflow and production deployment acceptance remains separately tracked.",
       "feature_complete_blocker": true,
       "later_ZM_FIN_tasks": [
         "ZM-FIN-074"
@@ -20598,7 +20469,7 @@
         "docs/architecture/concurrency.md",
         "docs/implementation/concurrency-validation.md"
       ],
-      "verification_notes": "ZM-FIN-038 local evidence: 11 dedicated inventory concurrency tests passed and were repeated in the final combined 49-test runner; all 124 tests across the eight existing writer/idempotency suites passed. Authorization guards, repeated-product receipt lines and existing physical boundaries are preserved. This does not close later ledger, reservation or full product-workflow gaps; exact-commit Foundation acceptance accompanies delivery."
+      "verification_notes": "Physical block adoption supersedes the former documentary-only and negative-transit behavior. Current acceptance and exact hosted CI evidence accompany delivery; prior concurrency evidence remains historical."
     },
     {
       "operation_key": "API:GET:/v1/admin/purchases/commands/{command_code}/{idempotency_key}",
@@ -23826,10 +23697,9 @@
       "missing_test_types": [
         "NONE"
       ],
-      "approved_target_state": "Existing command effects are atomic and replayable per DEC-07. Full physical ledger, production planning/consumption redesign and complete Backoffice workflows remain separately tracked; idempotency is not a declaration of Feature Complete.",
+      "approved_target_state": "Create a documentary plan with frozen units and source identity; release or dispatch performs the separately admitted physical effects. Full workflow/browser acceptance remains tracked.",
       "feature_complete_blocker": true,
       "later_ZM_FIN_tasks": [
-        "ZM-FIN-052",
         "ZM-FIN-062",
         "ZM-FIN-076"
       ],
@@ -23872,7 +23742,7 @@
       "module_owner": "API:admin-transfers",
       "use_case": "cancel_admin_transfer",
       "implementation_state": "PARTIAL",
-      "verification_state": "TESTED_IN_THIS_TASK",
+      "verification_state": "DIRECT_TEST_EXISTS_NOT_RUN",
       "auth_requirement": "AUTHENTICATED",
       "actual_auth_dependency": [
         "fastapi.security.api_key:APIKeyCookie",
@@ -23917,7 +23787,7 @@
         "outbox_events",
         "idempotency_records"
       ],
-      "locks_or_concurrency_control": "Shared shipment FOR NO KEY UPDATE serializes POS and Backoffice transitions; cumulative receipts and pending quantities are recomputed while holding that lock, with source and destination authorization. Backoffice preserves its existing inventory movements; POS remains document-only until ledger adoption.",
+      "locks_or_concurrency_control": "Admitted command and document lock precede aggregate balances in branch/product/location order, then lot identities and reservation evidence. Exact causal effects prevent duplicates; reservations reduce availability; ordinary issues use eligible FEFO lots and weighted-average valuation. No undocumented negative transfer is admitted.",
       "audit_required": true,
       "audit_actual": "ATOMIC",
       "audit_atomicity": "ATOMIC",
@@ -23953,10 +23823,9 @@
       "missing_test_types": [
         "NONE"
       ],
-      "approved_target_state": "Existing command effects are atomic and replayable per DEC-07. Full physical ledger, production planning/consumption redesign and complete Backoffice workflows remain separately tracked; idempotency is not a declaration of Feature Complete.",
+      "approved_target_state": "Canonical stock effects use immutable causal quantities, frozen conversion and cost evidence, ordered aggregate/lot locks and atomic audit/outbox. Full product workflow and production deployment acceptance remains separately tracked.",
       "feature_complete_blocker": true,
       "later_ZM_FIN_tasks": [
-        "ZM-FIN-052",
         "ZM-FIN-062",
         "ZM-FIN-076"
       ],
@@ -23982,7 +23851,7 @@
         "apps/backoffice-web/src/features/admin/transfers/transfer-command-intent.ts",
         "docs/implementation/operations-idempotency-validation.md"
       ],
-      "verification_notes": "Local API evidence: 54 unique transfer PostgreSQL tests passed; five shared cash-context regressions passed separately. This does not assert real-browser or exact-commit hosted CI acceptance."
+      "verification_notes": "Physical block adoption supersedes the former documentary-only and negative-transit behavior. Current acceptance and exact hosted CI evidence accompany delivery; prior concurrency evidence remains historical."
     },
     {
       "operation_key": "API:POST:/v1/admin/transfers/{transfer_id}/dispatch",
@@ -23999,7 +23868,7 @@
       "module_owner": "API:admin-transfers",
       "use_case": "dispatch_admin_transfer",
       "implementation_state": "PARTIAL",
-      "verification_state": "TESTED_IN_THIS_TASK",
+      "verification_state": "DIRECT_TEST_EXISTS_NOT_RUN",
       "auth_requirement": "AUTHENTICATED",
       "actual_auth_dependency": [
         "fastapi.security.api_key:APIKeyCookie",
@@ -24048,7 +23917,7 @@
         "outbox_events",
         "idempotency_records"
       ],
-      "locks_or_concurrency_control": "The shared shipment FOR NO KEY UPDATE lock protects transitions. Shared lock_inventory_balances deduplicates the complete write set and locks fresh rows in branch/product/location order; missing rows use an ORM savepoint insert and recover only the known balance uniqueness violation. A transaction-local handle accumulates repeated deltas without refreshing pending changes, and persists each movement with its balance change. Source BACKROOM and destination IN_TRANSIT keys are ordered together, independent of transfer direction; source stock is revalidated before dispatch.",
+      "locks_or_concurrency_control": "Admitted command and document lock precede aggregate balances in branch/product/location order, then lot identities and reservation evidence. Exact causal effects prevent duplicates; reservations reduce availability; ordinary issues use eligible FEFO lots and weighted-average valuation. No undocumented negative transfer is admitted.",
       "audit_required": true,
       "audit_actual": "ATOMIC",
       "audit_atomicity": "ATOMIC",
@@ -24085,10 +23954,9 @@
       "missing_test_types": [
         "NONE"
       ],
-      "approved_target_state": "Existing command effects are atomic and replayable per DEC-07. Full physical ledger, production planning/consumption redesign and complete Backoffice workflows remain separately tracked; idempotency is not a declaration of Feature Complete.",
+      "approved_target_state": "Canonical stock effects use immutable causal quantities, frozen conversion and cost evidence, ordered aggregate/lot locks and atomic audit/outbox. Full product workflow and production deployment acceptance remains separately tracked.",
       "feature_complete_blocker": true,
       "later_ZM_FIN_tasks": [
-        "ZM-FIN-052",
         "ZM-FIN-062",
         "ZM-FIN-076"
       ],
@@ -24117,7 +23985,7 @@
         "docs/architecture/concurrency.md",
         "docs/implementation/concurrency-validation.md"
       ],
-      "verification_notes": "ZM-FIN-038 local evidence: 11 dedicated inventory concurrency tests passed and were repeated in the final combined 49-test runner; all 124 tests across the eight existing writer/idempotency suites passed. Authorization guards, repeated-product receipt lines and existing physical boundaries are preserved. This does not close later ledger, reservation or full product-workflow gaps; exact-commit Foundation acceptance accompanies delivery."
+      "verification_notes": "Physical block adoption supersedes the former documentary-only and negative-transit behavior. Current acceptance and exact hosted CI evidence accompany delivery; prior concurrency evidence remains historical."
     },
     {
       "operation_key": "API:POST:/v1/admin/transfers/{transfer_id}/receive",
@@ -24134,7 +24002,7 @@
       "module_owner": "API:admin-transfers",
       "use_case": "receive_admin_transfer",
       "implementation_state": "PARTIAL",
-      "verification_state": "TESTED_IN_THIS_TASK",
+      "verification_state": "DIRECT_TEST_EXISTS_NOT_RUN",
       "auth_requirement": "AUTHENTICATED",
       "actual_auth_dependency": [
         "fastapi.security.api_key:APIKeyCookie",
@@ -24183,7 +24051,7 @@
         "outbox_events",
         "idempotency_records"
       ],
-      "locks_or_concurrency_control": "The shared shipment FOR NO KEY UPDATE lock protects cumulative receipts. Shared lock_inventory_balances deduplicates the complete write set and locks fresh rows in branch/product/location order; missing rows use an ORM savepoint insert and recover only the known balance uniqueness violation. A transaction-local handle accumulates repeated deltas without refreshing pending changes, and persists each movement with its balance change. Destination IN_TRANSIT and BACKROOM keys are ordered together. The existing negative IN_TRANSIT exception preserves receipt of documentary POS shipments; no missing POS dispatch ledger is invented.",
+      "locks_or_concurrency_control": "Admitted command and document lock precede aggregate balances in branch/product/location order, then lot identities and reservation evidence. Exact causal effects prevent duplicates; reservations reduce availability; ordinary issues use eligible FEFO lots and weighted-average valuation. No undocumented negative transfer is admitted.",
       "audit_required": true,
       "audit_actual": "ATOMIC",
       "audit_atomicity": "ATOMIC",
@@ -24220,10 +24088,9 @@
       "missing_test_types": [
         "NONE"
       ],
-      "approved_target_state": "Existing command effects are atomic and replayable per DEC-07. Full physical ledger, production planning/consumption redesign and complete Backoffice workflows remain separately tracked; idempotency is not a declaration of Feature Complete.",
+      "approved_target_state": "Canonical stock effects use immutable causal quantities, frozen conversion and cost evidence, ordered aggregate/lot locks and atomic audit/outbox. Full product workflow and production deployment acceptance remains separately tracked.",
       "feature_complete_blocker": true,
       "later_ZM_FIN_tasks": [
-        "ZM-FIN-052",
         "ZM-FIN-062",
         "ZM-FIN-076"
       ],
@@ -24252,7 +24119,7 @@
         "docs/architecture/concurrency.md",
         "docs/implementation/concurrency-validation.md"
       ],
-      "verification_notes": "ZM-FIN-038 local evidence: 11 dedicated inventory concurrency tests passed and were repeated in the final combined 49-test runner; all 124 tests across the eight existing writer/idempotency suites passed. Authorization guards, repeated-product receipt lines and existing physical boundaries are preserved. This does not close later ledger, reservation or full product-workflow gaps; exact-commit Foundation acceptance accompanies delivery."
+      "verification_notes": "Physical block adoption supersedes the former documentary-only and negative-transit behavior. Current acceptance and exact hosted CI evidence accompany delivery; prior concurrency evidence remains historical."
     },
     {
       "operation_key": "API:POST:/v1/admin/users",
@@ -25326,7 +25193,7 @@
       "module_owner": "API:admin-waste",
       "use_case": "create_admin_waste",
       "implementation_state": "PARTIAL",
-      "verification_state": "TESTED_IN_THIS_TASK",
+      "verification_state": "DIRECT_TEST_EXISTS_NOT_RUN",
       "auth_requirement": "AUTHENTICATED",
       "actual_auth_dependency": [
         "fastapi.security.api_key:APIKeyCookie",
@@ -25369,13 +25236,15 @@
         "waste_reasons"
       ],
       "writes_entities": [
-        "operation_documents",
-        "operation_document_lines",
-        "inventory_balances",
-        "inventory_movements",
         "audit_log",
-        "outbox_events",
-        "idempotency_records"
+        "idempotency_records",
+        "inventory_balances",
+        "inventory_lot_balances",
+        "inventory_movement_lot_allocations",
+        "inventory_movements",
+        "operation_document_lines",
+        "operation_documents",
+        "outbox_events"
       ],
       "locks_or_concurrency_control": "Shared lock_inventory_balances deduplicates the complete write set and locks fresh rows in branch/product/location order; missing rows use an ORM savepoint insert and recover only the known balance uniqueness violation. A transaction-local handle accumulates repeated deltas without refreshing pending changes, and persists each movement with its balance change. The selected source balance is validated under lock before decrement; insufficient stock rejects the waste. POS waste remains documentary.",
       "audit_required": true,
@@ -25403,7 +25272,8 @@
         "NONE"
       ],
       "direct_tests": [
-        "apps/api/tests/test_operational_idempotency.py"
+        "apps/api/tests/test_operational_idempotency.py",
+        "apps/api/tests/test_sale_physical_inventory.py"
       ],
       "indirect_tests": [
         "apps/api/tests/conftest.py",
@@ -25414,10 +25284,9 @@
       "missing_test_types": [
         "NONE"
       ],
-      "approved_target_state": "Existing command effects are atomic and replayable per DEC-07. Full physical ledger, production planning/consumption redesign and complete Backoffice workflows remain separately tracked; idempotency is not a declaration of Feature Complete.",
+      "approved_target_state": "Actual source stock moves to WASTE with explicit lot evidence for controlled products; both canonical legs and required audit/outbox commit atomically. Broader product usability and deployment acceptance remain separately tracked.",
       "feature_complete_blocker": true,
       "later_ZM_FIN_tasks": [
-        "ZM-FIN-051",
         "ZM-FIN-079"
       ],
       "decision_refs": [
@@ -25445,7 +25314,7 @@
         "docs/architecture/concurrency.md",
         "docs/implementation/concurrency-validation.md"
       ],
-      "verification_notes": "ZM-FIN-038 local evidence: 11 dedicated inventory concurrency tests passed and were repeated in the final combined 49-test runner; all 124 tests across the eight existing writer/idempotency suites passed. Authorization guards, repeated-product receipt lines and existing physical boundaries are preserved. This does not close later ledger, reservation or full product-workflow gaps; exact-commit Foundation acceptance accompanies delivery."
+      "verification_notes": "New physical adoption has targeted PostgreSQL coverage. Full block regression, browser acceptance and immutable-commit CI are recorded by delivery; previous task evidence remains historical."
     },
     {
       "operation_key": "API:GET:/v1/admin/waste/confirmations/{idempotency_key}",
@@ -25806,7 +25675,7 @@
       "module_owner": "API:cash-close",
       "use_case": "commit_cash_close",
       "implementation_state": "PARTIAL",
-      "verification_state": "TESTED_IN_THIS_TASK",
+      "verification_state": "DIRECT_TEST_EXISTS_NOT_RUN",
       "auth_requirement": "AUTHENTICATED",
       "actual_auth_dependency": [
         "fastapi.security.api_key:APIKeyCookie",
@@ -25851,23 +25720,29 @@
         "customer_order_payments"
       ],
       "writes_entities": [
-        "cash_sessions",
-        "cash_session_closes",
-        "cash_session_close_payment_method_counts",
-        "cash_session_close_product_counts",
+        "audit_log",
+        "auth_sessions",
+        "branch_counter_snapshot_lines",
+        "branch_counter_snapshots",
         "cash_session_close_class_reconciliations",
-        "cash_session_close_reconciliation_attributions",
         "cash_session_close_discrepancy_resolutions",
         "cash_session_close_issues",
-        "branch_counter_snapshots",
-        "branch_counter_snapshot_lines",
-        "sale_lines",
-        "operation_documents",
+        "cash_session_close_payment_method_counts",
+        "cash_session_close_product_counts",
+        "cash_session_close_reconciliation_attributions",
+        "cash_session_closes",
+        "cash_sessions",
+        "class_inventory_attributions",
+        "class_inventory_obligations",
+        "idempotency_records",
+        "inventory_balances",
+        "inventory_lot_balances",
+        "inventory_movement_lot_allocations",
+        "inventory_movements",
         "operation_document_lines",
-        "auth_sessions",
-        "audit_log",
+        "operation_documents",
         "outbox_events",
-        "idempotency_records"
+        "sale_lines"
       ],
       "locks_or_concurrency_control": "After the UUIDv7 reservation, the exact CashSession is locked FOR NO KEY UPDATE with populate_existing before dependent business rows or effects. Actor, branch, workstation and OPEN are revalidated under that lock; committed historical replay bypasses the action without requiring OPEN. Reservation FK KEY SHARE remains compatible. Final close recalculates existing CashMovement effects plus confirmed canonical order CASH entries while holding the boundary; CARD stays outside the drawer. Preview does not reserve the boundary. Committed expected/count/variance remain frozen.",
       "audit_required": true,
@@ -25901,7 +25776,8 @@
         "apps/api/tests/test_cash_idempotency.py",
         "apps/pos-web/e2e-real/aa-cash-command.spec.ts",
         "apps/api/tests/test_cash_concurrency.py",
-        "apps/api/tests/test_order_cash_flow.py"
+        "apps/api/tests/test_order_cash_flow.py",
+        "apps/api/tests/test_sale_physical_inventory.py"
       ],
       "indirect_tests": [
         "apps/api/tests/conftest.py",
@@ -25911,7 +25787,7 @@
       "missing_test_types": [
         "NONE"
       ],
-      "approved_target_state": "Preserve atomic recoverable cash intentions and the verified common close-admission boundary while completing the separately assigned canonical ledger, financial projection and product workflow tasks.",
+      "approved_target_state": "Close resolves remaining class obligations and freezes per-lot physical counts. Unresolved attribution or insufficient original-sale stock blocks close; existing financial snapshots are retained. Broader product usability and deployment acceptance remain separately tracked.",
       "feature_complete_blocker": true,
       "later_ZM_FIN_tasks": [
         "ZM-FIN-043",
@@ -25947,7 +25823,7 @@
         "docs/implementation/order-cash-flow-validation.md",
         "apps/api/src/zeromerma_api/modules/orders/application/financial_queries.py"
       ],
-      "verification_notes": "ZM-FIN-036/037 local evidence: 42 unique PostgreSQL cases passed across the 28-case cash-boundary and 14-case complementary runs (29 new cases, 3 adapted concurrency cases, 10 prior cash/FK cases). The final combined runner also passed all 49 cases (29 cash, 9 transient conflicts, 11 inventory). Same-user HTTP authentication may serialize earlier; domain races use separate real transactions. Exact-commit Foundation acceptance accompanies delivery."
+      "verification_notes": "New physical adoption has targeted PostgreSQL coverage. Full block regression, browser acceptance and immutable-commit CI are recorded by delivery; previous task evidence remains historical."
     },
     {
       "operation_key": "API:POST:/v1/cash-close/preview",
@@ -26222,7 +26098,7 @@
       "module_owner": "API:corrections",
       "use_case": "commit_correction",
       "implementation_state": "PARTIAL",
-      "verification_state": "TESTED_IN_THIS_TASK",
+      "verification_state": "DIRECT_TEST_EXISTS_NOT_RUN",
       "auth_requirement": "AUTHENTICATED",
       "actual_auth_dependency": [
         "fastapi.security.api_key:APIKeyCookie",
@@ -26266,11 +26142,15 @@
         "correction_reasons"
       ],
       "writes_entities": [
-        "correction_documents",
-        "correction_document_lines",
         "audit_log",
-        "outbox_events",
-        "idempotency_records"
+        "correction_document_lines",
+        "correction_documents",
+        "idempotency_records",
+        "inventory_balances",
+        "inventory_lot_balances",
+        "inventory_movement_lot_allocations",
+        "inventory_movements",
+        "outbox_events"
       ],
       "locks_or_concurrency_control": "Correction locks the original operation document and validates cumulative corrected quantities under that lock. Current document-only physical semantics remain pending ledger adoption.",
       "audit_required": true,
@@ -26298,7 +26178,8 @@
         "NONE"
       ],
       "direct_tests": [
-        "apps/api/tests/test_operational_idempotency.py"
+        "apps/api/tests/test_operational_idempotency.py",
+        "apps/api/tests/test_sale_physical_inventory.py"
       ],
       "indirect_tests": [
         "apps/api/tests/conftest.py",
@@ -26308,10 +26189,9 @@
       "missing_test_types": [
         "NONE"
       ],
-      "approved_target_state": "Existing command effects are atomic and replayable per DEC-07. Full physical ledger, production planning/consumption redesign and complete Backoffice workflows remain separately tracked; idempotency is not a declaration of Feature Complete.",
+      "approved_target_state": "Physical corrections create bounded causal compensation. Dispatched shipments require explicit transit resolution; waste corrections return to quarantine. Original documents and movements remain immutable. Broader product usability and deployment acceptance remain separately tracked.",
       "feature_complete_blocker": true,
       "later_ZM_FIN_tasks": [
-        "ZM-FIN-051",
         "ZM-FIN-063"
       ],
       "decision_refs": [
@@ -26338,7 +26218,7 @@
         "apps/pos-web/src/features/operation-commands/operation-command-intent.ts",
         "docs/implementation/operations-idempotency-validation.md"
       ],
-      "verification_notes": "Local API evidence: the 51-case physical-command run produced 49 passes and two failed audit-count expectations. The two destination-authorization regressions passed in a separate rerun after a test-only correction requiring the two authorization.denied records and no new domain/outbox effects; runtime was unchanged. All 51 unique cases are covered by these split runs. This does not assert real-browser or exact-commit hosted CI acceptance."
+      "verification_notes": "New physical adoption has targeted PostgreSQL coverage. Full block regression, browser acceptance and immutable-commit CI are recorded by delivery; previous task evidence remains historical."
     },
     {
       "operation_key": "API:GET:/v1/corrections/confirmations/{idempotency_key}",
@@ -26611,7 +26491,7 @@
       "module_owner": "API:operations",
       "use_case": "commit_counter_transfer",
       "implementation_state": "PARTIAL",
-      "verification_state": "TESTED_IN_THIS_TASK",
+      "verification_state": "DIRECT_TEST_EXISTS_NOT_RUN",
       "auth_requirement": "AUTHENTICATED",
       "actual_auth_dependency": [
         "fastapi.security.api_key:APIKeyCookie",
@@ -26653,11 +26533,15 @@
         "waste_reasons"
       ],
       "writes_entities": [
-        "operation_documents",
-        "operation_document_lines",
         "audit_log",
-        "outbox_events",
-        "idempotency_records"
+        "idempotency_records",
+        "inventory_balances",
+        "inventory_lot_balances",
+        "inventory_movement_lot_allocations",
+        "inventory_movements",
+        "operation_document_lines",
+        "operation_documents",
+        "outbox_events"
       ],
       "locks_or_concurrency_control": "Global unique-key reservation serializes replays; existing operation-document effects are atomic. Complete physical inventory effects and races among different intentions remain assigned to later tasks.",
       "audit_required": true,
@@ -26685,7 +26569,8 @@
         "NONE"
       ],
       "direct_tests": [
-        "apps/api/tests/test_operational_idempotency.py"
+        "apps/api/tests/test_operational_idempotency.py",
+        "apps/api/tests/test_sale_physical_inventory.py"
       ],
       "indirect_tests": [
         "apps/api/tests/conftest.py",
@@ -26695,11 +26580,9 @@
       "missing_test_types": [
         "NONE"
       ],
-      "approved_target_state": "Existing command effects are atomic and replayable per DEC-07. Full physical ledger, production planning/consumption redesign and complete Backoffice workflows remain separately tracked; idempotency is not a declaration of Feature Complete.",
+      "approved_target_state": "Paired BACKROOM outflow and COUNTER inflow preserve quantity, lot and value under one command. Broader product usability and deployment acceptance remain separately tracked.",
       "feature_complete_blocker": true,
       "later_ZM_FIN_tasks": [
-        "ZM-FIN-051",
-        "ZM-FIN-052",
         "ZM-FIN-056"
       ],
       "decision_refs": [
@@ -26726,7 +26609,7 @@
         "apps/pos-web/src/features/operation-commands/operation-command-intent.ts",
         "docs/implementation/operations-idempotency-validation.md"
       ],
-      "verification_notes": "Local API evidence: the 51-case physical-command run produced 49 passes and two failed audit-count expectations. The two destination-authorization regressions passed in a separate rerun after a test-only correction requiring the two authorization.denied records and no new domain/outbox effects; runtime was unchanged. All 51 unique cases are covered by these split runs. This does not assert real-browser or exact-commit hosted CI acceptance."
+      "verification_notes": "New physical adoption has targeted PostgreSQL coverage. Full block regression, browser acceptance and immutable-commit CI are recorded by delivery; previous task evidence remains historical."
     },
     {
       "operation_key": "API:POST:/v1/operations/waste/commit",
@@ -26743,7 +26626,7 @@
       "module_owner": "API:operations",
       "use_case": "commit_waste_record",
       "implementation_state": "PARTIAL",
-      "verification_state": "TESTED_IN_THIS_TASK",
+      "verification_state": "DIRECT_TEST_EXISTS_NOT_RUN",
       "auth_requirement": "AUTHENTICATED",
       "actual_auth_dependency": [
         "fastapi.security.api_key:APIKeyCookie",
@@ -26785,11 +26668,15 @@
         "waste_reasons"
       ],
       "writes_entities": [
-        "operation_documents",
-        "operation_document_lines",
         "audit_log",
-        "outbox_events",
-        "idempotency_records"
+        "idempotency_records",
+        "inventory_balances",
+        "inventory_lot_balances",
+        "inventory_movement_lot_allocations",
+        "inventory_movements",
+        "operation_document_lines",
+        "operation_documents",
+        "outbox_events"
       ],
       "locks_or_concurrency_control": "Global unique-key reservation serializes replays; existing operation-document effects are atomic. Complete physical inventory effects and races among different intentions remain assigned to later tasks.",
       "audit_required": true,
@@ -26817,7 +26704,8 @@
         "NONE"
       ],
       "direct_tests": [
-        "apps/api/tests/test_operational_idempotency.py"
+        "apps/api/tests/test_operational_idempotency.py",
+        "apps/api/tests/test_sale_physical_inventory.py"
       ],
       "indirect_tests": [
         "apps/api/tests/conftest.py",
@@ -26827,11 +26715,9 @@
       "missing_test_types": [
         "NONE"
       ],
-      "approved_target_state": "Existing command effects are atomic and replayable per DEC-07. Full physical ledger, production planning/consumption redesign and complete Backoffice workflows remain separately tracked; idempotency is not a declaration of Feature Complete.",
+      "approved_target_state": "Actual source stock moves to WASTE with explicit lot evidence for controlled products; expired physical disposal is allowed without making goods sellable. Broader product usability and deployment acceptance remain separately tracked.",
       "feature_complete_blocker": true,
       "later_ZM_FIN_tasks": [
-        "ZM-FIN-051",
-        "ZM-FIN-052",
         "ZM-FIN-056"
       ],
       "decision_refs": [
@@ -26858,7 +26744,7 @@
         "apps/pos-web/src/features/operation-commands/operation-command-intent.ts",
         "docs/implementation/operations-idempotency-validation.md"
       ],
-      "verification_notes": "Local API evidence: the 51-case physical-command run produced 49 passes and two failed audit-count expectations. The two destination-authorization regressions passed in a separate rerun after a test-only correction requiring the two authorization.denied records and no new domain/outbox effects; runtime was unchanged. All 51 unique cases are covered by these split runs. This does not assert real-browser or exact-commit hosted CI acceptance."
+      "verification_notes": "New physical adoption has targeted PostgreSQL coverage. Full block regression, browser acceptance and immutable-commit CI are recorded by delivery; previous task evidence remains historical."
     },
     {
       "operation_key": "API:GET:/v1/operations/counter-transfer/confirmations/{idempotency_key}",
@@ -27408,7 +27294,7 @@
       "module_owner": "API:orders",
       "use_case": "deliver_order",
       "implementation_state": "PARTIAL",
-      "verification_state": "TESTED_IN_THIS_TASK",
+      "verification_state": "DIRECT_TEST_EXISTS_NOT_RUN",
       "auth_requirement": "AUTHENTICATED",
       "actual_auth_dependency": [
         "fastapi.security.api_key:APIKeyCookie",
@@ -27447,13 +27333,17 @@
         "workstations"
       ],
       "writes_entities": [
-        "idempotency_records",
-        "customer_orders",
-        "customer_order_payments",
         "audit_log",
-        "outbox_events",
+        "customer_order_payments",
+        "customer_orders",
+        "financial_entries",
         "financial_operations",
-        "financial_entries"
+        "idempotency_records",
+        "inventory_balances",
+        "inventory_lot_balances",
+        "inventory_movement_lot_allocations",
+        "inventory_movements",
+        "outbox_events"
       ],
       "locks_or_concurrency_control": "After the UUIDv7 reservation, the exact CashSession is locked FOR NO KEY UPDATE with populate_existing before dependent business rows or effects. Actor, branch, workstation and OPEN are revalidated under that lock; committed historical replay bypasses the action without requiring OPEN. Reservation FK KEY SHARE remains compatible. Existing CustomerOrder transitions then acquire their document lock. Actual payment receipts and FinancialOperation/FinancialEntry facts share this locked admission boundary. There is no duplicate CashMovement write.",
       "audit_required": true,
@@ -27484,7 +27374,8 @@
         "apps/api/tests/test_order_idempotency.py",
         "apps/api/tests/test_cash_concurrency.py",
         "apps/api/tests/test_order_financial_entries.py",
-        "apps/api/tests/test_order_cash_flow.py"
+        "apps/api/tests/test_order_cash_flow.py",
+        "apps/api/tests/test_sale_physical_inventory.py"
       ],
       "indirect_tests": [
         "apps/api/tests/conftest.py",
@@ -27494,7 +27385,7 @@
       "missing_test_types": [
         "FULL_DEC10_ORDER_WORKFLOW"
       ],
-      "approved_target_state": "Preserve durable replay and the 042 order-payment ledger adoption while completing the full approved order workflow in ZM-FIN-058 and ZM-FIN-078. Cancellation policy, CASH_FIRST/partial refunds and provider execution remain ZM-FIN-044/046.",
+      "approved_target_state": "Order delivery applies its actual stock outflow under the original idempotent delivery owner alongside any real payment collection. Broader product usability and deployment acceptance remain separately tracked.",
       "feature_complete_blocker": true,
       "later_ZM_FIN_tasks": [
         "ZM-FIN-058"
@@ -27533,7 +27424,7 @@
         "docs/implementation/order-cash-flow-validation.md",
         "apps/api/src/zeromerma_api/modules/orders/application/financial_services.py"
       ],
-      "verification_notes": "ZM-FIN-036/037 local evidence: 42 unique PostgreSQL cases passed across the 28-case cash-boundary and 14-case complementary runs (29 new cases, 3 adapted concurrency cases, 10 prior cash/FK cases). The final combined runner also passed all 49 cases (29 cash, 9 transient conflicts, 11 inventory). Same-user HTTP authentication may serialize earlier; domain races use separate real transactions. Exact-commit Foundation acceptance accompanies delivery. 042 implementation adds CASH LOCAL and CARD ACCOUNTING_ONLY actual-method facts (MIXED is two real legs), actual receiving/refunding turn, no historical backfill and no duplicate cash movement. New 042 acceptance is tracked separately in order_financial_evidence; prior successful run counts above are unchanged."
+      "verification_notes": "New physical adoption has targeted PostgreSQL coverage. Full block regression, browser acceptance and immutable-commit CI are recorded by delivery; previous task evidence remains historical."
     },
     {
       "operation_key": "API:POST:/v1/orders/{order_id}/mark-ready",
@@ -27824,7 +27715,7 @@
       "module_owner": "API:returns",
       "use_case": "commit_sale_return",
       "implementation_state": "PARTIAL",
-      "verification_state": "TESTED_IN_THIS_TASK",
+      "verification_state": "DIRECT_TEST_EXISTS_NOT_RUN",
       "auth_requirement": "AUTHENTICATED",
       "actual_auth_dependency": [
         "fastapi.security.api_key:APIKeyCookie",
@@ -27868,13 +27759,20 @@
         "workstations"
       ],
       "writes_entities": [
-        "idempotency_records",
-        "sale_returns",
-        "sale_return_lines",
-        "audit_log",
-        "outbox_events",
+        "FinancialEntry",
         "FinancialOperation",
-        "FinancialEntry"
+        "audit_log",
+        "class_inventory_attributions",
+        "class_inventory_obligations",
+        "idempotency_records",
+        "inventory_balances",
+        "inventory_lot_balances",
+        "inventory_movement_lot_allocations",
+        "inventory_movements",
+        "outbox_events",
+        "return_disposition_allocations",
+        "sale_return_lines",
+        "sale_returns"
       ],
       "locks_or_concurrency_control": "After the UUIDv7 reservation, the exact CashSession is locked FOR NO KEY UPDATE with populate_existing before dependent business rows or effects. Actor, branch, workstation and OPEN are revalidated under that lock; committed historical replay bypasses the action without requiring OPEN. Reservation FK KEY SHARE remains compatible. The original Sale is locked only after CashSession, and remaining quantity/net-value budgets are recalculated under that sale-local lock.",
       "audit_required": true,
@@ -27909,7 +27807,8 @@
         "apps/api/tests/test_returns_module.py",
         "apps/api/tests/test_tickets_module.py",
         "apps/api/tests/test_return_idempotency.py",
-        "apps/api/tests/test_cash_concurrency.py"
+        "apps/api/tests/test_cash_concurrency.py",
+        "apps/api/tests/test_sale_physical_inventory.py"
       ],
       "indirect_tests": [
         "apps/api/tests/conftest.py",
@@ -27919,13 +27818,9 @@
       "missing_test_types": [
         "NONE"
       ],
-      "approved_target_state": "Preserve the existing CASH return replay, sale-local quantity/net-value budgets, explicit causal cash linkage and common cash-close boundary. Canonical financial settlement, physical disposition and the complete POS flow remain separate later tasks.",
+      "approved_target_state": "Refund entitlement remains financial; inspected per-product allocations independently restock, quarantine, waste or record no stock. Original financial and physical facts stay immutable. Broader product usability and deployment acceptance remain separately tracked.",
       "feature_complete_blocker": true,
       "later_ZM_FIN_tasks": [
-        "ZM-FIN-044",
-        "ZM-FIN-045",
-        "ZM-FIN-050",
-        "ZM-FIN-051",
         "ZM-FIN-063"
       ],
       "decision_refs": [
@@ -27961,7 +27856,7 @@
         "docs/implementation/concurrency-validation.md",
         "docs/implementation/financial-block-validation.md"
       ],
-      "verification_notes": "ZM-FIN-036/037 local evidence: 42 unique PostgreSQL cases passed across the 28-case cash-boundary and 14-case complementary runs (29 new cases, 3 adapted concurrency cases, 10 prior cash/FK cases). The final combined runner also passed all 49 cases (29 cash, 9 transient conflicts, 11 inventory). Same-user HTTP authentication may serialize earlier; domain races use separate real transactions. Exact-commit Foundation acceptance accompanies delivery."
+      "verification_notes": "New physical adoption has targeted PostgreSQL coverage. Full block regression, browser acceptance and immutable-commit CI are recorded by delivery; previous task evidence remains historical."
     },
     {
       "operation_key": "API:POST:/v1/sales/confirm",
@@ -27978,7 +27873,7 @@
       "module_owner": "API:sales",
       "use_case": "confirm_sale",
       "implementation_state": "PARTIAL",
-      "verification_state": "TESTED_IN_THIS_TASK",
+      "verification_state": "DIRECT_TEST_EXISTS_NOT_RUN",
       "auth_requirement": "AUTHENTICATED",
       "actual_auth_dependency": [
         "fastapi.security.api_key:APIKeyCookie",
@@ -28020,14 +27915,19 @@
         "cash_movements"
       ],
       "writes_entities": [
+        "FinancialEntry",
+        "FinancialOperation",
+        "audit_logs",
+        "class_inventory_obligations",
         "idempotency_records",
-        "sales",
+        "inventory_balances",
+        "inventory_lot_balances",
+        "inventory_movement_lot_allocations",
+        "inventory_movements",
+        "outbox_events",
         "sale_lines",
         "sale_payments",
-        "audit_logs",
-        "outbox_events",
-        "FinancialOperation",
-        "FinancialEntry"
+        "sales"
       ],
       "locks_or_concurrency_control": "After the UUIDv7 reservation, the exact CashSession is locked FOR NO KEY UPDATE with populate_existing before dependent business rows or effects. Actor, branch, workstation and OPEN are revalidated under that lock; committed historical replay bypasses the action without requiring OPEN. Reservation FK KEY SHARE remains compatible. Cash collection effects commit before a later close recalculates its existing projection; a winning close rejects the later new sale.",
       "audit_required": true,
@@ -28068,7 +27968,8 @@
         "apps/api/tests/test_tickets_module.py",
         "apps/pos-web/src/features/pos-terminal/sale-confirmation-intent.test.ts",
         "apps/pos-web/e2e-real/sale-confirmation.spec.ts",
-        "apps/api/tests/test_cash_concurrency.py"
+        "apps/api/tests/test_cash_concurrency.py",
+        "apps/api/tests/test_sale_physical_inventory.py"
       ],
       "indirect_tests": [
         "apps/api/tests/conftest.py",
@@ -28078,11 +27979,9 @@
       "missing_test_types": [
         "NONE"
       ],
-      "approved_target_state": "Preserve accepted durable replay and verified sale-versus-close serialization while completing canonical inventory attribution and the integrated sale workflow in ZM-FIN-049, ZM-FIN-050 and ZM-FIN-056.",
+      "approved_target_state": "Product-direct confirmation consumes exact COUNTER stock; class capture creates a durable deferred obligation while preserving immediate financial capture. Noninventoried products produce no stock movement. Broader product usability and deployment acceptance remain separately tracked.",
       "feature_complete_blocker": true,
       "later_ZM_FIN_tasks": [
-        "ZM-FIN-049",
-        "ZM-FIN-050",
         "ZM-FIN-056"
       ],
       "decision_refs": [
@@ -28114,7 +28013,7 @@
         "docs/implementation/concurrency-validation.md",
         "docs/implementation/financial-block-validation.md"
       ],
-      "verification_notes": "ZM-FIN-036/037 local evidence: 42 unique PostgreSQL cases passed across the 28-case cash-boundary and 14-case complementary runs (29 new cases, 3 adapted concurrency cases, 10 prior cash/FK cases). The final combined runner also passed all 49 cases (29 cash, 9 transient conflicts, 11 inventory). Same-user HTTP authentication may serialize earlier; domain races use separate real transactions. Exact-commit Foundation acceptance accompanies delivery."
+      "verification_notes": "New physical adoption has targeted PostgreSQL coverage. Full block regression, browser acceptance and immutable-commit CI are recorded by delivery; previous task evidence remains historical."
     },
     {
       "operation_key": "API:POST:/v1/tickets/{ticket_id}/reprint",
@@ -28251,7 +28150,7 @@
       "module_owner": "API:transfers",
       "use_case": "commit_transfer_dispatch",
       "implementation_state": "PARTIAL",
-      "verification_state": "TESTED_IN_THIS_TASK",
+      "verification_state": "DIRECT_TEST_EXISTS_NOT_RUN",
       "auth_requirement": "AUTHENTICATED",
       "actual_auth_dependency": [
         "fastapi.security.api_key:APIKeyCookie",
@@ -28298,7 +28197,7 @@
         "outbox_events",
         "idempotency_records"
       ],
-      "locks_or_concurrency_control": "Shared shipment FOR NO KEY UPDATE serializes POS and Backoffice transitions; cumulative receipts and pending quantities are recomputed while holding that lock, with source and destination authorization. Backoffice preserves its existing inventory movements; POS remains document-only until ledger adoption.",
+      "locks_or_concurrency_control": "Admitted command and document lock precede aggregate balances in branch/product/location order, then lot identities and reservation evidence. Exact causal effects prevent duplicates; reservations reduce availability; ordinary issues use eligible FEFO lots and weighted-average valuation. No undocumented negative transfer is admitted.",
       "audit_required": true,
       "audit_actual": "ATOMIC",
       "audit_atomicity": "ATOMIC",
@@ -28334,10 +28233,9 @@
       "missing_test_types": [
         "NONE"
       ],
-      "approved_target_state": "Existing command effects are atomic and replayable per DEC-07. Full physical ledger, production planning/consumption redesign and complete Backoffice workflows remain separately tracked; idempotency is not a declaration of Feature Complete.",
+      "approved_target_state": "Canonical stock effects use immutable causal quantities, frozen conversion and cost evidence, ordered aggregate/lot locks and atomic audit/outbox. Full product workflow and production deployment acceptance remains separately tracked.",
       "feature_complete_blocker": true,
       "later_ZM_FIN_tasks": [
-        "ZM-FIN-052",
         "ZM-FIN-062",
         "ZM-FIN-076"
       ],
@@ -28364,7 +28262,7 @@
         "apps/pos-web/src/features/transfers/transfer-command-intent.ts",
         "docs/implementation/operations-idempotency-validation.md"
       ],
-      "verification_notes": "Local API evidence: 54 unique transfer PostgreSQL tests passed; five shared cash-context regressions passed separately. This does not assert real-browser or exact-commit hosted CI acceptance."
+      "verification_notes": "Physical block adoption supersedes the former documentary-only and negative-transit behavior. Current acceptance and exact hosted CI evidence accompany delivery; prior concurrency evidence remains historical."
     },
     {
       "operation_key": "API:POST:/v1/transfers/{transfer_id}/receive",
@@ -28381,7 +28279,7 @@
       "module_owner": "API:transfers",
       "use_case": "receive_transfer",
       "implementation_state": "PARTIAL",
-      "verification_state": "TESTED_IN_THIS_TASK",
+      "verification_state": "DIRECT_TEST_EXISTS_NOT_RUN",
       "auth_requirement": "AUTHENTICATED",
       "actual_auth_dependency": [
         "fastapi.security.api_key:APIKeyCookie",
@@ -28428,7 +28326,7 @@
         "outbox_events",
         "idempotency_records"
       ],
-      "locks_or_concurrency_control": "Shared shipment FOR NO KEY UPDATE serializes POS and Backoffice transitions; cumulative receipts and pending quantities are recomputed while holding that lock, with source and destination authorization. Backoffice preserves its existing inventory movements; POS remains document-only until ledger adoption.",
+      "locks_or_concurrency_control": "Admitted command and document lock precede aggregate balances in branch/product/location order, then lot identities and reservation evidence. Exact causal effects prevent duplicates; reservations reduce availability; ordinary issues use eligible FEFO lots and weighted-average valuation. No undocumented negative transfer is admitted.",
       "audit_required": true,
       "audit_actual": "ATOMIC",
       "audit_atomicity": "ATOMIC",
@@ -28464,10 +28362,9 @@
       "missing_test_types": [
         "NONE"
       ],
-      "approved_target_state": "Existing command effects are atomic and replayable per DEC-07. Full physical ledger, production planning/consumption redesign and complete Backoffice workflows remain separately tracked; idempotency is not a declaration of Feature Complete.",
+      "approved_target_state": "Canonical stock effects use immutable causal quantities, frozen conversion and cost evidence, ordered aggregate/lot locks and atomic audit/outbox. Full product workflow and production deployment acceptance remains separately tracked.",
       "feature_complete_blocker": true,
       "later_ZM_FIN_tasks": [
-        "ZM-FIN-052",
         "ZM-FIN-062",
         "ZM-FIN-076"
       ],
@@ -28494,7 +28391,7 @@
         "apps/pos-web/src/features/transfers/transfer-command-intent.ts",
         "docs/implementation/operations-idempotency-validation.md"
       ],
-      "verification_notes": "Local API evidence: 54 unique transfer PostgreSQL tests passed; five shared cash-context regressions passed separately. This does not assert real-browser or exact-commit hosted CI acceptance."
+      "verification_notes": "Physical block adoption supersedes the former documentary-only and negative-transit behavior. Current acceptance and exact hosted CI evidence accompany delivery; prior concurrency evidence remains historical."
     },
     {
       "operation_key": "API:GET:/v1/admin/transfers/commands/{command_code}/confirmations/{idempotency_key}",
@@ -31204,6 +31101,1166 @@
         "docs/implementation/financial-block-validation.md"
       ],
       "verification_notes": "ZM-FIN-036/037 local evidence: 42 unique PostgreSQL cases passed across the 28-case cash-boundary and 14-case complementary runs (29 new cases, 3 adapted concurrency cases, 10 prior cash/FK cases). The final combined runner also passed all 49 cases (29 cash, 9 transient conflicts, 11 inventory). Same-user HTTP authentication may serialize earlier; domain races use separate real transactions. Exact-commit Foundation acceptance accompanies delivery."
+    },
+    {
+      "operation_key": "API:POST:/v1/admin/production/{production_id}/release",
+      "surface": "BACKOFFICE",
+      "method": "POST",
+      "path": "/v1/admin/production/{production_id}/release",
+      "operation_id": "release_admin_production_v1_admin_production__production_id__release_post",
+      "include_in_schema": true,
+      "tags": [
+        "admin-production"
+      ],
+      "router_file": "apps/api/src/zeromerma_api/modules/production/presentation/router.py",
+      "router_symbol": "release_admin_production",
+      "module_owner": "API:production",
+      "use_case": "release_admin_production",
+      "implementation_state": "PARTIAL",
+      "verification_state": "DIRECT_TEST_EXISTS_NOT_RUN",
+      "auth_requirement": "AUTHENTICATED",
+      "actual_auth_dependency": [
+        "fastapi.security.api_key:APIKeyCookie",
+        "zeromerma_api.db.session:get_session",
+        "zeromerma_api.modules.idempotency.presentation.http:require_idempotency_key",
+        "zeromerma_api.modules.identity.presentation.dependencies:get_current_authentication",
+        "zeromerma_api.modules.identity.presentation.dependencies:get_current_user",
+        "zeromerma_api.modules.production.presentation.router:_require_backoffice_user",
+        "zeromerma_api.presentation.access_policy:enforce_operation_policy"
+      ],
+      "actual_surface_guard": "EXPLICIT_BACKOFFICE_POLICY_WITH_EFFECTIVE_GRANTS",
+      "required_capability": "production.execute",
+      "capability_enforcement_state": "CAPABILITY_ENFORCED",
+      "required_scope": "GLOBAL_OR_BRANCH_SET_PER_DEC04",
+      "scope_source": "SERVER_RESOLVED_ACTIVE_ROLE_ASSIGNMENT_SCOPES_INTERSECT_ACTIVE_USER_BRANCH_MEMBERSHIPS",
+      "scope_enforcement_state": "SCOPE_ENFORCED",
+      "request_schema": [
+        "AdminProductionReleaseRequest"
+      ],
+      "response_schema": "ProductionCommandResultView",
+      "error_contract_state": "CANONICAL_API_ERROR_RESPONSE",
+      "application_service": [
+        "zeromerma_api.modules.production.application.idempotency.ProductionIdempotencyService.execute"
+      ],
+      "domain_or_use_case_symbol": "ProductionIdempotencyService.execute",
+      "router_business_logic_present": false,
+      "transaction_owner": "zeromerma_api.modules.idempotency.application.service.IdempotencyExecutor.execute",
+      "transaction_boundary": "One executor-owned transaction commits domain effects, audit, outbox and durable acknowledgement; domain services may flush but cannot commit independently.",
+      "persistence": "WRITE",
+      "external_side_effect": "NONE_OBSERVED_STATICALLY",
+      "reads_entities": [
+        "idempotency_records",
+        "users",
+        "branches",
+        "production_batches",
+        "production_batch_inputs",
+        "products",
+        "recipes",
+        "recipe_inputs",
+        "inventory_balances"
+      ],
+      "writes_entities": [
+        "audit_log",
+        "idempotency_records",
+        "inventory_balances",
+        "inventory_lot_balances",
+        "inventory_reservation_event_lots",
+        "inventory_reservation_events",
+        "inventory_reservation_lot_allocations",
+        "inventory_reservations",
+        "outbox_events",
+        "production_batch_inputs",
+        "production_batches"
+      ],
+      "locks_or_concurrency_control": "Admitted command and document lock precede aggregate balances in branch/product/location order, then lot identities and reservation evidence. Exact causal effects prevent duplicates; reservations reduce availability; ordinary issues use eligible FEFO lots and weighted-average valuation. No undocumented negative transfer is admitted.",
+      "audit_required": true,
+      "audit_actual": "ATOMIC",
+      "audit_atomicity": "ATOMIC",
+      "outbox_required": true,
+      "outbox_actual": "ATOMIC",
+      "outbox_atomicity": "ATOMIC",
+      "idempotency_required": true,
+      "idempotency_actual": "DEC07_COMPLIANT",
+      "idempotency_business_identity": "Original UUIDv7 intention and immutable actor/surface/branch/resource fingerprint; operation=production.release; replay never repeats physical effects.",
+      "idempotency_replay_behavior": "Returns the original minimized immutable acknowledgement; current authorization and exact context are checked before exposing a result. Unknown is nonterminal 409; recovery never executes a domain action or creates a replacement key.",
+      "generated_client_operation": "release_admin_production_v1_admin_production__production_id__release_post",
+      "consumer_contract_state": "CLIENT_GENERATED_USED",
+      "consumer_disposition": "LOCAL_UI_PRESENT",
+      "consumer_reason": "Generated adapter and metadata-only intention coordinator preserve one key per command; reload queries the saved acknowledgement without reconstructing the body.",
+      "pos_consumers": [
+        "NONE"
+      ],
+      "backoffice_consumers": [
+        "apps/backoffice-web/src/features/admin/production/api.ts",
+        "apps/backoffice-web/src/features/admin/production/production-command-intent.ts"
+      ],
+      "other_consumers": [
+        "NONE"
+      ],
+      "direct_tests": [
+        "apps/api/tests/test_purchase_production_inventory.py"
+      ],
+      "indirect_tests": [
+        "apps/api/tests/conftest.py",
+        "apps/api/unit_tests/test_operation_policy.py#test_every_route_and_persisted_family_has_an_explicit_policy",
+        "apps/api/tests/test_operation_authorization.py#test_all_scoped_families_support_mapped_reads_and_aggregate_subqueries"
+      ],
+      "missing_test_types": [
+        "NONE"
+      ],
+      "approved_target_state": "Canonical stock effects use immutable causal quantities, frozen conversion and cost evidence, ordered aggregate/lot locks and atomic audit/outbox. Full product workflow and production deployment acceptance remains separately tracked.",
+      "feature_complete_blocker": true,
+      "later_ZM_FIN_tasks": [
+        "ZM-FIN-069",
+        "ZM-FIN-070"
+      ],
+      "decision_refs": [
+        "DEC-03",
+        "DEC-04",
+        "DEC-07",
+        "DEC-08",
+        "DEC-12",
+        "DEC-15",
+        "DEC-18",
+        "DEC-19"
+      ],
+      "gate_refs": [
+        "G1",
+        "G5"
+      ],
+      "gap_ids": [
+        "NONE"
+      ],
+      "evidence": [
+        "apps/api/src/zeromerma_api/modules/production/presentation/router.py#release_admin_production",
+        "apps/api/tests/test_purchase_production_inventory.py",
+        "docs/operations/inventory-reconciliation.md"
+      ],
+      "verification_notes": "Physical block adoption supersedes the former documentary-only and negative-transit behavior. Current acceptance and exact hosted CI evidence accompany delivery; prior concurrency evidence remains historical."
+    },
+    {
+      "operation_key": "API:POST:/v1/admin/purchases/{purchase_id}/reverse-receipt",
+      "surface": "BACKOFFICE",
+      "method": "POST",
+      "path": "/v1/admin/purchases/{purchase_id}/reverse-receipt",
+      "operation_id": "reverse_admin_purchase_receipt_v1_admin_purchases__purchase_id__reverse_receipt_post",
+      "include_in_schema": true,
+      "tags": [
+        "admin-purchases"
+      ],
+      "router_file": "apps/api/src/zeromerma_api/modules/purchases/presentation/router.py",
+      "router_symbol": "reverse_admin_purchase_receipt",
+      "module_owner": "API:purchases",
+      "use_case": "reverse_admin_purchase_receipt",
+      "implementation_state": "PARTIAL",
+      "verification_state": "DIRECT_TEST_EXISTS_NOT_RUN",
+      "auth_requirement": "AUTHENTICATED",
+      "actual_auth_dependency": [
+        "fastapi.security.api_key:APIKeyCookie",
+        "zeromerma_api.db.session:get_session",
+        "zeromerma_api.modules.idempotency.presentation.http:require_idempotency_key",
+        "zeromerma_api.modules.identity.presentation.dependencies:get_current_authentication",
+        "zeromerma_api.modules.identity.presentation.dependencies:get_current_user",
+        "zeromerma_api.modules.purchases.presentation.router:_require_backoffice_user",
+        "zeromerma_api.presentation.access_policy:enforce_operation_policy"
+      ],
+      "actual_surface_guard": "EXPLICIT_BACKOFFICE_POLICY_WITH_EFFECTIVE_GRANTS",
+      "required_capability": "purchases.cancel",
+      "capability_enforcement_state": "CAPABILITY_ENFORCED",
+      "required_scope": "GLOBAL_OR_BRANCH_SET_PER_DEC04",
+      "scope_source": "SERVER_RESOLVED_ACTIVE_ROLE_ASSIGNMENT_SCOPES_INTERSECT_ACTIVE_USER_BRANCH_MEMBERSHIPS",
+      "scope_enforcement_state": "SCOPE_ENFORCED",
+      "request_schema": [
+        "AdminPurchaseReverseReceiptRequest"
+      ],
+      "response_schema": "PurchaseCommandResultView",
+      "error_contract_state": "CANONICAL_API_ERROR_RESPONSE",
+      "application_service": [
+        "zeromerma_api.modules.purchases.application.idempotency.PurchaseCommandService.execute"
+      ],
+      "domain_or_use_case_symbol": "PurchaseCommandService.execute",
+      "router_business_logic_present": false,
+      "transaction_owner": "zeromerma_api.modules.idempotency.application.service.IdempotencyExecutor.execute",
+      "transaction_boundary": "One executor-owned transaction commits domain effects, audit, outbox and durable acknowledgement; domain services may flush but cannot commit independently.",
+      "persistence": "WRITE",
+      "external_side_effect": "NONE_OBSERVED_STATICALLY",
+      "reads_entities": [
+        "idempotency_records",
+        "users",
+        "branches",
+        "purchase_documents",
+        "purchase_document_lines",
+        "purchase_receipts",
+        "purchase_receipt_lines",
+        "supplier_products",
+        "inventory_balances",
+        "inventory_movements",
+        "products",
+        "suppliers"
+      ],
+      "writes_entities": [
+        "audit_log",
+        "idempotency_records",
+        "inventory_balances",
+        "inventory_lot_balances",
+        "inventory_movement_lot_allocations",
+        "inventory_movements",
+        "outbox_events",
+        "purchase_document_lines",
+        "purchase_documents",
+        "purchase_receipt_lines",
+        "purchase_receipt_reversals",
+        "purchase_receipts",
+        "supplier_products"
+      ],
+      "locks_or_concurrency_control": "Admitted command and document lock precede aggregate balances in branch/product/location order, then lot identities and reservation evidence. Exact causal effects prevent duplicates; reservations reduce availability; ordinary issues use eligible FEFO lots and weighted-average valuation. No undocumented negative transfer is admitted.",
+      "audit_required": true,
+      "audit_actual": "ATOMIC",
+      "audit_atomicity": "ATOMIC",
+      "outbox_required": true,
+      "outbox_actual": "ATOMIC",
+      "outbox_atomicity": "ATOMIC",
+      "idempotency_required": true,
+      "idempotency_actual": "DEC07_COMPLIANT",
+      "idempotency_business_identity": "Original UUIDv7 intention and immutable actor/surface/branch/resource fingerprint; operation=purchase.reverse_receipt; replay never repeats physical effects.",
+      "idempotency_replay_behavior": "Returns the original minimized immutable acknowledgement; current authorization and exact context are checked before exposing a result. Unknown is nonterminal 409; recovery never executes a domain action or creates a replacement key.",
+      "generated_client_operation": "reverse_admin_purchase_receipt_v1_admin_purchases__purchase_id__reverse_receipt_post",
+      "consumer_contract_state": "CLIENT_GENERATED_USED",
+      "consumer_disposition": "LOCAL_UI_PRESENT",
+      "consumer_reason": "Generated adapter and metadata-only intention coordinator preserve one key per command; reload queries the saved acknowledgement without reconstructing the body.",
+      "pos_consumers": [
+        "NONE"
+      ],
+      "backoffice_consumers": [
+        "apps/backoffice-web/src/features/admin/purchases/api.ts",
+        "apps/backoffice-web/src/features/admin/purchases/purchase-command-intent.ts"
+      ],
+      "other_consumers": [
+        "NONE"
+      ],
+      "direct_tests": [
+        "apps/api/tests/test_purchase_production_inventory.py"
+      ],
+      "indirect_tests": [
+        "apps/api/tests/conftest.py",
+        "apps/api/unit_tests/test_operation_policy.py#test_every_route_and_persisted_family_has_an_explicit_policy",
+        "apps/api/tests/test_operation_authorization.py#test_all_scoped_families_support_mapped_reads_and_aggregate_subqueries",
+        "apps/api/tests/test_inventory_concurrency.py"
+      ],
+      "missing_test_types": [
+        "NONE"
+      ],
+      "approved_target_state": "Canonical stock effects use immutable causal quantities, frozen conversion and cost evidence, ordered aggregate/lot locks and atomic audit/outbox. Full product workflow and production deployment acceptance remains separately tracked.",
+      "feature_complete_blocker": true,
+      "later_ZM_FIN_tasks": [
+        "ZM-FIN-074"
+      ],
+      "decision_refs": [
+        "DEC-03",
+        "DEC-04",
+        "DEC-07",
+        "DEC-08",
+        "DEC-15",
+        "DEC-18",
+        "DEC-19"
+      ],
+      "gate_refs": [
+        "G1",
+        "G5"
+      ],
+      "gap_ids": [
+        "NONE"
+      ],
+      "evidence": [
+        "apps/api/src/zeromerma_api/modules/purchases/presentation/router.py#reverse_admin_purchase_receipt",
+        "apps/api/tests/test_purchase_production_inventory.py",
+        "docs/operations/inventory-reconciliation.md"
+      ],
+      "verification_notes": "Physical block adoption supersedes the former documentary-only and negative-transit behavior. Current acceptance and exact hosted CI evidence accompany delivery; prior concurrency evidence remains historical."
+    },
+    {
+      "operation_key": "API:POST:/v1/admin/transfers/{transfer_id}/resolve",
+      "surface": "BACKOFFICE",
+      "method": "POST",
+      "path": "/v1/admin/transfers/{transfer_id}/resolve",
+      "operation_id": "resolve_admin_transfer_v1_admin_transfers__transfer_id__resolve_post",
+      "include_in_schema": true,
+      "tags": [
+        "admin-transfers"
+      ],
+      "router_file": "apps/api/src/zeromerma_api/modules/transfers/presentation/router.py",
+      "router_symbol": "resolve_admin_transfer",
+      "module_owner": "API:transfers",
+      "use_case": "resolve_admin_transfer",
+      "implementation_state": "PARTIAL",
+      "verification_state": "DIRECT_TEST_EXISTS_NOT_RUN",
+      "auth_requirement": "AUTHENTICATED",
+      "actual_auth_dependency": [
+        "fastapi.security.api_key:APIKeyCookie",
+        "zeromerma_api.db.session:get_session",
+        "zeromerma_api.modules.idempotency.presentation.http:require_idempotency_key",
+        "zeromerma_api.modules.identity.presentation.dependencies:get_current_authentication",
+        "zeromerma_api.modules.identity.presentation.dependencies:get_current_user",
+        "zeromerma_api.presentation.access_policy:enforce_operation_policy"
+      ],
+      "actual_surface_guard": "EXPLICIT_BACKOFFICE_POLICY_WITH_EFFECTIVE_GRANTS",
+      "required_capability": "transfers.execute",
+      "capability_enforcement_state": "CAPABILITY_ENFORCED",
+      "required_scope": "GLOBAL_OR_BRANCH_SET_PER_DEC04",
+      "scope_source": "SERVER_RESOLVED_ACTIVE_ROLE_ASSIGNMENT_SCOPES_INTERSECT_ACTIVE_USER_BRANCH_MEMBERSHIPS",
+      "scope_enforcement_state": "SCOPE_ENFORCED",
+      "request_schema": [
+        "AdminTransferResolveRequest"
+      ],
+      "response_schema": "TransferCommandResultView",
+      "error_contract_state": "CANONICAL_API_ERROR_RESPONSE",
+      "application_service": [
+        "zeromerma_api.modules.transfers.application.idempotency.TransferCommandServiceWrapper.execute_admin"
+      ],
+      "domain_or_use_case_symbol": "TransferCommandServiceWrapper.execute_admin",
+      "router_business_logic_present": false,
+      "transaction_owner": "zeromerma_api.modules.idempotency.application.service.IdempotencyExecutor.execute",
+      "transaction_boundary": "One executor-owned transaction commits domain effects, audit, outbox and durable acknowledgement; domain services may flush but cannot commit independently.",
+      "persistence": "WRITE",
+      "external_side_effect": "NONE_OBSERVED_STATICALLY",
+      "reads_entities": [
+        "idempotency_records",
+        "users",
+        "branches",
+        "operation_documents",
+        "operation_document_lines",
+        "inventory_balances",
+        "inventory_movements",
+        "products"
+      ],
+      "writes_entities": [
+        "audit_log",
+        "idempotency_records",
+        "inventory_balances",
+        "inventory_lot_balances",
+        "inventory_movement_lot_allocations",
+        "inventory_movements",
+        "operation_document_lines",
+        "operation_documents",
+        "outbox_events",
+        "transfer_transit_resolution_lines",
+        "transfer_transit_resolutions"
+      ],
+      "locks_or_concurrency_control": "Admitted command and document lock precede aggregate balances in branch/product/location order, then lot identities and reservation evidence. Exact causal effects prevent duplicates; reservations reduce availability; ordinary issues use eligible FEFO lots and weighted-average valuation. No undocumented negative transfer is admitted.",
+      "audit_required": true,
+      "audit_actual": "ATOMIC",
+      "audit_atomicity": "ATOMIC",
+      "outbox_required": true,
+      "outbox_actual": "ATOMIC",
+      "outbox_atomicity": "ATOMIC",
+      "idempotency_required": true,
+      "idempotency_actual": "DEC07_COMPLIANT",
+      "idempotency_business_identity": "Original UUIDv7 intention and immutable actor/surface/branch/resource fingerprint; operation=transfer.resolve_return / transfer.resolve_waste; replay never repeats physical effects.",
+      "idempotency_replay_behavior": "Returns the original minimized immutable acknowledgement; current authorization and exact context are checked before exposing a result. Unknown is nonterminal 409; recovery never executes a domain action or creates a replacement key.",
+      "generated_client_operation": "resolve_admin_transfer_v1_admin_transfers__transfer_id__resolve_post",
+      "consumer_contract_state": "CLIENT_GENERATED_USED",
+      "consumer_disposition": "LOCAL_UI_PRESENT",
+      "consumer_reason": "Generated adapter and metadata-only intention coordinator preserve one key per command; reload queries the saved acknowledgement without reconstructing the body.",
+      "pos_consumers": [
+        "NONE"
+      ],
+      "backoffice_consumers": [
+        "apps/backoffice-web/src/features/admin/transfers/api.ts",
+        "apps/backoffice-web/src/features/admin/transfers/transfer-command-intent.ts"
+      ],
+      "other_consumers": [
+        "NONE"
+      ],
+      "direct_tests": [
+        "apps/api/tests/test_transfer_physical_workflow.py"
+      ],
+      "indirect_tests": [
+        "apps/api/tests/conftest.py",
+        "apps/api/unit_tests/test_operation_policy.py#test_every_route_and_persisted_family_has_an_explicit_policy",
+        "apps/api/tests/test_operation_authorization.py#test_all_scoped_families_support_mapped_reads_and_aggregate_subqueries",
+        "apps/api/tests/test_inventory_concurrency.py"
+      ],
+      "missing_test_types": [
+        "NONE"
+      ],
+      "approved_target_state": "Canonical stock effects use immutable causal quantities, frozen conversion and cost evidence, ordered aggregate/lot locks and atomic audit/outbox. Full product workflow and production deployment acceptance remains separately tracked.",
+      "feature_complete_blocker": true,
+      "later_ZM_FIN_tasks": [
+        "ZM-FIN-062",
+        "ZM-FIN-076"
+      ],
+      "decision_refs": [
+        "DEC-03",
+        "DEC-04",
+        "DEC-07",
+        "DEC-08",
+        "DEC-15",
+        "DEC-18",
+        "DEC-19"
+      ],
+      "gate_refs": [
+        "G1",
+        "G5"
+      ],
+      "gap_ids": [
+        "NONE"
+      ],
+      "evidence": [
+        "apps/api/src/zeromerma_api/modules/transfers/presentation/router.py#resolve_admin_transfer",
+        "apps/api/tests/test_transfer_physical_workflow.py",
+        "docs/operations/inventory-reconciliation.md"
+      ],
+      "verification_notes": "Physical block adoption supersedes the former documentary-only and negative-transit behavior. Current acceptance and exact hosted CI evidence accompany delivery; prior concurrency evidence remains historical."
+    },
+    {
+      "operation_key": "API:POST:/v1/transfers/{transfer_id}/resolve",
+      "surface": "POS",
+      "method": "POST",
+      "path": "/v1/transfers/{transfer_id}/resolve",
+      "operation_id": "resolve_pos_transfer_v1_transfers__transfer_id__resolve_post",
+      "include_in_schema": true,
+      "tags": [
+        "transfers"
+      ],
+      "router_file": "apps/api/src/zeromerma_api/modules/transfers/presentation/router.py",
+      "router_symbol": "resolve_pos_transfer",
+      "module_owner": "API:transfers",
+      "use_case": "resolve_pos_transfer",
+      "implementation_state": "PARTIAL",
+      "verification_state": "DIRECT_TEST_EXISTS_NOT_RUN",
+      "auth_requirement": "AUTHENTICATED",
+      "actual_auth_dependency": [
+        "fastapi.security.api_key:APIKeyCookie",
+        "zeromerma_api.db.session:get_session",
+        "zeromerma_api.modules.idempotency.presentation.http:require_idempotency_key",
+        "zeromerma_api.modules.identity.presentation.dependencies:get_current_authentication",
+        "zeromerma_api.modules.identity.presentation.dependencies:get_current_user",
+        "zeromerma_api.presentation.access_policy:enforce_operation_policy"
+      ],
+      "actual_surface_guard": "EXPLICIT_POS_POLICY_WITH_EFFECTIVE_GRANTS",
+      "required_capability": "transfers.execute",
+      "capability_enforcement_state": "CAPABILITY_ENFORCED",
+      "required_scope": "GLOBAL_OR_BRANCH_SET_PER_DEC04",
+      "scope_source": "SERVER_RESOLVED_ACTIVE_ROLE_ASSIGNMENT_SCOPES_INTERSECT_ACTIVE_USER_BRANCH_MEMBERSHIPS",
+      "scope_enforcement_state": "SCOPE_ENFORCED",
+      "request_schema": [
+        "TransferResolveRequest"
+      ],
+      "response_schema": "TransferCommandResultView",
+      "error_contract_state": "CANONICAL_API_ERROR_RESPONSE",
+      "application_service": [
+        "zeromerma_api.modules.transfers.application.idempotency.TransferCommandServiceWrapper.execute_pos"
+      ],
+      "domain_or_use_case_symbol": "TransferCommandServiceWrapper.execute_pos",
+      "router_business_logic_present": false,
+      "transaction_owner": "zeromerma_api.modules.idempotency.application.service.IdempotencyExecutor.execute",
+      "transaction_boundary": "One executor-owned transaction commits domain effects, audit, outbox and durable acknowledgement; domain services may flush but cannot commit independently.",
+      "persistence": "WRITE",
+      "external_side_effect": "NONE_OBSERVED_STATICALLY",
+      "reads_entities": [
+        "idempotency_records",
+        "users",
+        "branches",
+        "cash_sessions",
+        "workstations",
+        "operation_documents",
+        "operation_document_lines",
+        "products"
+      ],
+      "writes_entities": [
+        "audit_log",
+        "idempotency_records",
+        "inventory_lot_balances",
+        "inventory_movement_lot_allocations",
+        "operation_document_lines",
+        "operation_documents",
+        "outbox_events",
+        "transfer_transit_resolution_lines",
+        "transfer_transit_resolutions"
+      ],
+      "locks_or_concurrency_control": "Admitted command and document lock precede aggregate balances in branch/product/location order, then lot identities and reservation evidence. Exact causal effects prevent duplicates; reservations reduce availability; ordinary issues use eligible FEFO lots and weighted-average valuation. No undocumented negative transfer is admitted.",
+      "audit_required": true,
+      "audit_actual": "ATOMIC",
+      "audit_atomicity": "ATOMIC",
+      "outbox_required": true,
+      "outbox_actual": "ATOMIC",
+      "outbox_atomicity": "ATOMIC",
+      "idempotency_required": true,
+      "idempotency_actual": "DEC07_COMPLIANT",
+      "idempotency_business_identity": "Original UUIDv7 intention and immutable actor/surface/branch/resource fingerprint; operation=transfer.resolve_return / transfer.resolve_waste; replay never repeats physical effects.",
+      "idempotency_replay_behavior": "Returns the original minimized immutable acknowledgement; current authorization and exact context are checked before exposing a result. Unknown is nonterminal 409; recovery never executes a domain action or creates a replacement key.",
+      "generated_client_operation": "resolve_pos_transfer_v1_transfers__transfer_id__resolve_post",
+      "consumer_contract_state": "CLIENT_GENERATED_USED",
+      "consumer_disposition": "LOCAL_UI_PRESENT",
+      "consumer_reason": "Generated adapter and metadata-only intention coordinator preserve one key per command; reload queries the saved acknowledgement without reconstructing the body.",
+      "pos_consumers": [
+        "apps/pos-web/src/features/transfers/transfers-api.ts",
+        "apps/pos-web/src/features/transfers/transfer-command-intent.ts"
+      ],
+      "backoffice_consumers": [
+        "NONE"
+      ],
+      "other_consumers": [
+        "NONE"
+      ],
+      "direct_tests": [
+        "apps/api/tests/test_transfer_physical_workflow.py"
+      ],
+      "indirect_tests": [
+        "apps/api/tests/conftest.py",
+        "apps/api/unit_tests/test_operation_policy.py#test_every_route_and_persisted_family_has_an_explicit_policy",
+        "apps/api/tests/test_operation_authorization.py#test_all_scoped_families_support_mapped_reads_and_aggregate_subqueries"
+      ],
+      "missing_test_types": [
+        "NONE"
+      ],
+      "approved_target_state": "Canonical stock effects use immutable causal quantities, frozen conversion and cost evidence, ordered aggregate/lot locks and atomic audit/outbox. Full product workflow and production deployment acceptance remains separately tracked.",
+      "feature_complete_blocker": true,
+      "later_ZM_FIN_tasks": [
+        "ZM-FIN-062",
+        "ZM-FIN-076"
+      ],
+      "decision_refs": [
+        "DEC-03",
+        "DEC-04",
+        "DEC-07",
+        "DEC-08",
+        "DEC-15",
+        "DEC-18",
+        "DEC-19"
+      ],
+      "gate_refs": [
+        "G1",
+        "G5"
+      ],
+      "gap_ids": [
+        "NONE"
+      ],
+      "evidence": [
+        "apps/api/src/zeromerma_api/modules/transfers/presentation/router.py#resolve_pos_transfer",
+        "apps/api/tests/test_transfer_physical_workflow.py",
+        "docs/operations/inventory-reconciliation.md"
+      ],
+      "verification_notes": "Physical block adoption supersedes the former documentary-only and negative-transit behavior. Current acceptance and exact hosted CI evidence accompany delivery; prior concurrency evidence remains historical."
+    },
+    {
+      "operation_key": "API:POST:/v1/admin/inventory-dispositions",
+      "surface": "BACKOFFICE",
+      "method": "POST",
+      "path": "/v1/admin/inventory-dispositions",
+      "operation_id": "create_disposition_v1_admin_inventory_dispositions_post",
+      "include_in_schema": true,
+      "tags": [
+        "inventory-dispositions"
+      ],
+      "router_file": "apps/api/src/zeromerma_api/modules/inventory/presentation/disposition_router.py",
+      "router_symbol": "create_disposition",
+      "module_owner": "API:inventory",
+      "use_case": "create_disposition",
+      "implementation_state": "PARTIAL",
+      "verification_state": "DIRECT_TEST_EXISTS_NOT_RUN",
+      "auth_requirement": "AUTHENTICATED",
+      "actual_auth_dependency": [
+        "fastapi.security.api_key:APIKeyCookie",
+        "zeromerma_api.db.session:get_session",
+        "zeromerma_api.modules.idempotency.presentation.http:require_idempotency_key",
+        "zeromerma_api.modules.identity.presentation.dependencies:get_current_authentication",
+        "zeromerma_api.modules.identity.presentation.dependencies:get_current_user",
+        "zeromerma_api.presentation.access_policy:enforce_operation_policy"
+      ],
+      "actual_surface_guard": "EXPLICIT_BACKOFFICE_POLICY_WITH_EFFECTIVE_GRANTS",
+      "required_capability": "inventory.adjust / returns_corrections.manage by disposition kind",
+      "capability_enforcement_state": "CAPABILITY_ENFORCED",
+      "required_scope": "GLOBAL_OR_BRANCH_SET_PER_DEC04",
+      "scope_source": "SERVER_RESOLVED_ACTIVE_ROLE_ASSIGNMENT_SCOPES_INTERSECT_ACTIVE_USER_BRANCH_MEMBERSHIPS",
+      "scope_enforcement_state": "SCOPE_ENFORCED",
+      "request_schema": [
+        "InventoryDispositionRequest"
+      ],
+      "response_schema": "InventoryDispositionResult",
+      "error_contract_state": "CANONICAL_API_ERROR_RESPONSE",
+      "application_service": [
+        "zeromerma_api.modules.inventory.application.dispositions.commit_disposition"
+      ],
+      "domain_or_use_case_symbol": "commit_disposition",
+      "router_business_logic_present": false,
+      "transaction_owner": "zeromerma_api.modules.idempotency.application.service.IdempotencyExecutor.execute",
+      "transaction_boundary": "One executor-owned transaction commits domain effects, audit, outbox and durable acknowledgement; domain services may flush but cannot commit independently.",
+      "persistence": "WRITE",
+      "external_side_effect": "NONE_OBSERVED_STATICALLY",
+      "reads_entities": [
+        "idempotency_records",
+        "inventory_movements",
+        "inventory_balances",
+        "inventory_lots",
+        "inventory_lot_balances",
+        "class_inventory_obligations",
+        "return_disposition_allocations"
+      ],
+      "writes_entities": [
+        "audit_log",
+        "idempotency_records",
+        "inventory_balances",
+        "inventory_lot_balances",
+        "inventory_movement_lot_allocations",
+        "inventory_movements",
+        "outbox_events"
+      ],
+      "locks_or_concurrency_control": "Shared lock_inventory_balances deduplicates the complete write set and locks fresh rows in branch/product/location order; missing rows use an ORM savepoint insert and recover only the known balance uniqueness violation. A transaction-local handle accumulates repeated deltas without refreshing pending changes, and persists each movement with its balance change. The single selected balance retains the existing explicit negative-adjustment behavior.",
+      "audit_required": true,
+      "audit_actual": "ATOMIC",
+      "audit_atomicity": "ATOMIC",
+      "outbox_required": true,
+      "outbox_actual": "ATOMIC",
+      "outbox_atomicity": "ATOMIC",
+      "idempotency_required": true,
+      "idempotency_actual": "DEC07_COMPLIANT",
+      "idempotency_business_identity": "Original UUIDv7 intention and immutable actor/surface/branch/resource fingerprint; operation=inventory.quarantine_release / inventory.return_compensate; replay never repeats physical effects.",
+      "idempotency_replay_behavior": "Returns the original minimized immutable acknowledgement; current authorization and exact context are checked before exposing a result. Unknown is nonterminal 409; recovery never executes a domain action or creates a replacement key.",
+      "generated_client_operation": "create_disposition_v1_admin_inventory_dispositions_post",
+      "consumer_contract_state": "CLIENT_GENERATED_USED",
+      "consumer_disposition": "LOCAL_UI_PRESENT",
+      "consumer_reason": "Backoffice disposition coordinator persists command identity and recovers the immutable original result after reload.",
+      "pos_consumers": [
+        "NONE"
+      ],
+      "backoffice_consumers": [
+        "apps/backoffice-web/src/features/admin/inventory-dispositions/disposition-command-intent.ts"
+      ],
+      "other_consumers": [
+        "NONE"
+      ],
+      "direct_tests": [
+        "apps/api/tests/test_sale_physical_inventory.py"
+      ],
+      "indirect_tests": [
+        "apps/api/tests/conftest.py",
+        "apps/api/unit_tests/test_operation_policy.py#test_every_route_and_persisted_family_has_an_explicit_policy",
+        "apps/api/tests/test_operation_authorization.py#test_all_scoped_families_support_mapped_reads_and_aggregate_subqueries"
+      ],
+      "missing_test_types": [
+        "NONE"
+      ],
+      "approved_target_state": "Canonical causal stock and lot effects, exact quantities and weighted-average values commit atomically with audit/outbox and the original acknowledgement. Broader product workflows and deployment gates remain separately tracked.",
+      "feature_complete_blocker": true,
+      "later_ZM_FIN_tasks": [
+        "ZM-FIN-075"
+      ],
+      "decision_refs": [
+        "DEC-03",
+        "DEC-04",
+        "DEC-07",
+        "DEC-08",
+        "DEC-15",
+        "DEC-18",
+        "DEC-19"
+      ],
+      "gate_refs": [
+        "G1",
+        "G5"
+      ],
+      "gap_ids": [
+        "NONE"
+      ],
+      "evidence": [
+        "apps/api/src/zeromerma_api/modules/inventory/presentation/disposition_router.py#create_disposition",
+        "apps/api/tests/test_sale_physical_inventory.py",
+        "docs/operations/inventory-reconciliation.md"
+      ],
+      "verification_notes": "Physical block acceptance is in progress; direct tests exist. Exact immutable-commit gates accompany delivery."
+    },
+    {
+      "operation_key": "API:GET:/v1/admin/inventory-dispositions/confirmations/{idempotency_key}",
+      "surface": "BACKOFFICE",
+      "method": "GET",
+      "path": "/v1/admin/inventory-dispositions/confirmations/{idempotency_key}",
+      "operation_id": "recover_disposition_v1_admin_inventory_dispositions_confirmations__idempotency_key__get",
+      "include_in_schema": true,
+      "tags": [
+        "inventory-dispositions"
+      ],
+      "router_file": "apps/api/src/zeromerma_api/modules/inventory/presentation/disposition_router.py",
+      "router_symbol": "recover_disposition",
+      "module_owner": "API:inventory",
+      "use_case": "recover_disposition",
+      "implementation_state": "PARTIAL",
+      "verification_state": "DIRECT_TEST_EXISTS_NOT_RUN",
+      "auth_requirement": "AUTHENTICATED",
+      "actual_auth_dependency": [
+        "fastapi.security.api_key:APIKeyCookie",
+        "zeromerma_api.db.session:get_session",
+        "zeromerma_api.modules.identity.presentation.dependencies:get_current_authentication",
+        "zeromerma_api.modules.identity.presentation.dependencies:get_current_user",
+        "zeromerma_api.presentation.access_policy:enforce_operation_policy"
+      ],
+      "actual_surface_guard": "EXPLICIT_BACKOFFICE_POLICY_WITH_EFFECTIVE_GRANTS",
+      "required_capability": "inventory.adjust / returns_corrections.manage by disposition kind",
+      "capability_enforcement_state": "CAPABILITY_ENFORCED",
+      "required_scope": "GLOBAL_OR_BRANCH_SET_PER_DEC04",
+      "scope_source": "SERVER_RESOLVED_ACTIVE_ROLE_ASSIGNMENT_SCOPES_INTERSECT_ACTIVE_USER_BRANCH_MEMBERSHIPS",
+      "scope_enforcement_state": "SCOPE_ENFORCED",
+      "request_schema": [
+        "NONE"
+      ],
+      "response_schema": "InventoryDispositionResult",
+      "error_contract_state": "CANONICAL_API_ERROR_RESPONSE",
+      "application_service": [
+        "zeromerma_api.modules.idempotency.application.service.IdempotencyExecutor.recover"
+      ],
+      "domain_or_use_case_symbol": "IdempotencyExecutor.recover",
+      "router_business_logic_present": false,
+      "transaction_owner": "zeromerma_api.modules.idempotency.application.service.IdempotencyExecutor.recover",
+      "transaction_boundary": "Read-only lookup of the original disposition acknowledgement with current Backoffice capability and branch checks; no new physical effect is admitted.",
+      "persistence": "READ_ONLY",
+      "external_side_effect": "NONE_OBSERVED_STATICALLY",
+      "reads_entities": [
+        "idempotency_records",
+        "inventory_movements",
+        "inventory_balances",
+        "inventory_lots",
+        "inventory_lot_balances",
+        "class_inventory_obligations",
+        "return_disposition_allocations"
+      ],
+      "writes_entities": [
+        "NONE"
+      ],
+      "locks_or_concurrency_control": "Unique original idempotency identity and actor/branch/kind binding; no physical locks or domain mutation during recovery.",
+      "audit_required": false,
+      "audit_actual": "NOT_REQUIRED",
+      "audit_atomicity": "NOT_REQUIRED",
+      "outbox_required": false,
+      "outbox_actual": "NOT_REQUIRED",
+      "outbox_atomicity": "NOT_REQUIRED",
+      "idempotency_required": false,
+      "idempotency_actual": "NOT_REQUIRED",
+      "idempotency_business_identity": "Original UUIDv7 intention and immutable actor/surface/branch/resource fingerprint; operation=inventory.quarantine_release / inventory.return_compensate; replay never repeats physical effects.",
+      "idempotency_replay_behavior": "Returns the original immutable disposition result after current authorization; absent/unresolved identities remain nonterminal.",
+      "generated_client_operation": "recover_disposition_v1_admin_inventory_dispositions_confirmations__idempotency_key__get",
+      "consumer_contract_state": "CLIENT_GENERATED_USED",
+      "consumer_disposition": "LOCAL_UI_PRESENT",
+      "consumer_reason": "Backoffice disposition coordinator persists command identity and recovers the immutable original result after reload.",
+      "pos_consumers": [
+        "NONE"
+      ],
+      "backoffice_consumers": [
+        "apps/backoffice-web/src/features/admin/inventory-dispositions/disposition-command-intent.ts"
+      ],
+      "other_consumers": [
+        "NONE"
+      ],
+      "direct_tests": [
+        "apps/api/tests/test_sale_physical_inventory.py"
+      ],
+      "indirect_tests": [
+        "apps/api/tests/conftest.py",
+        "apps/api/unit_tests/test_operation_policy.py#test_every_route_and_persisted_family_has_an_explicit_policy",
+        "apps/api/tests/test_operation_authorization.py#test_all_scoped_families_support_mapped_reads_and_aggregate_subqueries"
+      ],
+      "missing_test_types": [
+        "NONE"
+      ],
+      "approved_target_state": "Canonical causal stock and lot effects, exact quantities and weighted-average values commit atomically with audit/outbox and the original acknowledgement. Broader product workflows and deployment gates remain separately tracked.",
+      "feature_complete_blocker": true,
+      "later_ZM_FIN_tasks": [
+        "ZM-FIN-108"
+      ],
+      "decision_refs": [
+        "DEC-03",
+        "DEC-04",
+        "DEC-05",
+        "DEC-07",
+        "DEC-08",
+        "DEC-15",
+        "DEC-16",
+        "DEC-19"
+      ],
+      "gate_refs": [
+        "G1",
+        "G5"
+      ],
+      "gap_ids": [
+        "NONE"
+      ],
+      "evidence": [
+        "apps/api/src/zeromerma_api/modules/inventory/presentation/disposition_router.py#recover_disposition",
+        "apps/api/tests/test_sale_physical_inventory.py",
+        "docs/operations/inventory-reconciliation.md"
+      ],
+      "verification_notes": "Physical block acceptance is in progress; direct tests exist. Exact immutable-commit gates accompany delivery."
+    },
+    {
+      "operation_key": "API:POST:/v1/sales/{sale_id}/attribute-inventory",
+      "surface": "POS",
+      "method": "POST",
+      "path": "/v1/sales/{sale_id}/attribute-inventory",
+      "operation_id": "attribute_inventory_v1_sales__sale_id__attribute_inventory_post",
+      "include_in_schema": true,
+      "tags": [
+        "inventory-attribution"
+      ],
+      "router_file": "apps/api/src/zeromerma_api/modules/inventory/presentation/attribution_router.py",
+      "router_symbol": "attribute_inventory",
+      "module_owner": "API:inventory",
+      "use_case": "attribute_inventory",
+      "implementation_state": "PARTIAL",
+      "verification_state": "DIRECT_TEST_EXISTS_NOT_RUN",
+      "auth_requirement": "AUTHENTICATED",
+      "actual_auth_dependency": [
+        "fastapi.security.api_key:APIKeyCookie",
+        "zeromerma_api.db.session:get_session",
+        "zeromerma_api.modules.idempotency.presentation.http:require_idempotency_key",
+        "zeromerma_api.modules.identity.presentation.dependencies:get_current_authentication",
+        "zeromerma_api.modules.identity.presentation.dependencies:get_current_user",
+        "zeromerma_api.presentation.access_policy:enforce_operation_policy"
+      ],
+      "actual_surface_guard": "EXPLICIT_POS_POLICY_WITH_EFFECTIVE_GRANTS",
+      "required_capability": "pos.operate",
+      "capability_enforcement_state": "CAPABILITY_ENFORCED",
+      "required_scope": "GLOBAL_OR_BRANCH_SET_PER_DEC04",
+      "scope_source": "SERVER_RESOLVED_ACTIVE_ROLE_ASSIGNMENT_SCOPES_INTERSECT_ACTIVE_USER_BRANCH_MEMBERSHIPS",
+      "scope_enforcement_state": "SCOPE_ENFORCED",
+      "request_schema": [
+        "ClassAttributionRequest"
+      ],
+      "response_schema": "ClassAttributionResult",
+      "error_contract_state": "CANONICAL_API_ERROR_RESPONSE",
+      "application_service": [
+        "zeromerma_api.modules.inventory.application.attribution_commands.commit_class_attribution"
+      ],
+      "domain_or_use_case_symbol": "commit_class_attribution",
+      "router_business_logic_present": false,
+      "transaction_owner": "zeromerma_api.modules.idempotency.application.service.IdempotencyExecutor.execute",
+      "transaction_boundary": "One executor-owned transaction commits domain effects, audit, outbox and durable acknowledgement; domain services may flush but cannot commit independently.",
+      "persistence": "WRITE",
+      "external_side_effect": "NONE_OBSERVED_STATICALLY",
+      "reads_entities": [
+        "idempotency_records",
+        "sales",
+        "sale_lines",
+        "products",
+        "inventory_movements",
+        "inventory_balances",
+        "inventory_lots",
+        "inventory_lot_balances",
+        "inventory_movement_lot_allocations",
+        "class_inventory_obligations"
+      ],
+      "writes_entities": [
+        "audit_log",
+        "class_inventory_attributions",
+        "class_inventory_obligations",
+        "idempotency_records",
+        "inventory_balances",
+        "inventory_lot_balances",
+        "inventory_movement_lot_allocations",
+        "inventory_movements",
+        "outbox_events"
+      ],
+      "locks_or_concurrency_control": "Current cash session and original sale are locked before canonical balance keys and the class obligation. Remaining physical quantity is revalidated under the obligation lock; historical capacity excludes later receipts and enforces original-sale lot eligibility.",
+      "audit_required": true,
+      "audit_actual": "ATOMIC",
+      "audit_atomicity": "ATOMIC",
+      "outbox_required": true,
+      "outbox_actual": "ATOMIC",
+      "outbox_atomicity": "ATOMIC",
+      "idempotency_required": true,
+      "idempotency_actual": "DEC07_COMPLIANT",
+      "idempotency_business_identity": "Original UUIDv7 intention and immutable actor/surface/branch/resource fingerprint; operation=inventory.class_attribute; replay never repeats physical effects.",
+      "idempotency_replay_behavior": "Returns the original minimized immutable acknowledgement; current authorization and exact context are checked before exposing a result. Unknown is nonterminal 409; recovery never executes a domain action or creates a replacement key.",
+      "generated_client_operation": "attribute_inventory_v1_sales__sale_id__attribute_inventory_post",
+      "consumer_contract_state": "CLIENT_GENERATED_USED",
+      "consumer_disposition": "LOCAL_UI_PRESENT",
+      "consumer_reason": "POS ticket detail provides partial exact-product/lot attribution and durable intention recovery with generated request/response types.",
+      "pos_consumers": [
+        "apps/pos-web/src/features/tickets/attribution-command-intent.ts",
+        "apps/pos-web/src/features/tickets/inventory-attribution-panel.tsx",
+        "apps/pos-web/src/features/tickets/attribution-recovery-panel.tsx"
+      ],
+      "backoffice_consumers": [
+        "NONE"
+      ],
+      "other_consumers": [
+        "NONE"
+      ],
+      "direct_tests": [
+        "apps/api/tests/test_sale_physical_inventory.py",
+        "apps/api/tests/test_ticket_inventory_attribution.py",
+        "apps/pos-web/src/features/tickets/attribution-command-intent.test.ts",
+        "apps/pos-web/src/features/tickets/inventory-attribution-panel.test.tsx"
+      ],
+      "indirect_tests": [
+        "apps/api/tests/conftest.py",
+        "apps/api/unit_tests/test_operation_policy.py#test_every_route_and_persisted_family_has_an_explicit_policy",
+        "apps/api/tests/test_operation_authorization.py#test_all_scoped_families_support_mapped_reads_and_aggregate_subqueries"
+      ],
+      "missing_test_types": [
+        "NONE"
+      ],
+      "approved_target_state": "Canonical causal stock and lot effects, exact quantities and weighted-average values commit atomically with audit/outbox and the original acknowledgement. Broader product workflows and deployment gates remain separately tracked.",
+      "feature_complete_blocker": true,
+      "later_ZM_FIN_tasks": [
+        "ZM-FIN-075"
+      ],
+      "decision_refs": [
+        "DEC-03",
+        "DEC-04",
+        "DEC-07",
+        "DEC-08",
+        "DEC-15",
+        "DEC-18",
+        "DEC-19"
+      ],
+      "gate_refs": [
+        "G1",
+        "G5"
+      ],
+      "gap_ids": [
+        "NONE"
+      ],
+      "evidence": [
+        "apps/api/src/zeromerma_api/modules/inventory/presentation/attribution_router.py#attribute_inventory",
+        "apps/api/tests/test_sale_physical_inventory.py",
+        "docs/operations/inventory-reconciliation.md"
+      ],
+      "verification_notes": "Local PostgreSQL original-sale projection, partial/replayed attribution, two-actor obligation contention and wrong-class rejection passed. Real POS Browser acceptance passed partial attribution, lost-response recovery after reload and completion without repeating effects. Full immutable-commit CI remains pending."
+    },
+    {
+      "operation_key": "API:GET:/v1/sales/{sale_id}/inventory-attributions/{idempotency_key}",
+      "surface": "POS",
+      "method": "GET",
+      "path": "/v1/sales/{sale_id}/inventory-attributions/{idempotency_key}",
+      "operation_id": "recover_attribution_v1_sales__sale_id__inventory_attributions__idempotency_key__get",
+      "include_in_schema": true,
+      "tags": [
+        "inventory-attribution"
+      ],
+      "router_file": "apps/api/src/zeromerma_api/modules/inventory/presentation/attribution_router.py",
+      "router_symbol": "recover_attribution",
+      "module_owner": "API:inventory",
+      "use_case": "recover_attribution",
+      "implementation_state": "PARTIAL",
+      "verification_state": "DIRECT_TEST_EXISTS_NOT_RUN",
+      "auth_requirement": "AUTHENTICATED",
+      "actual_auth_dependency": [
+        "fastapi.security.api_key:APIKeyCookie",
+        "zeromerma_api.db.session:get_session",
+        "zeromerma_api.modules.identity.presentation.dependencies:get_current_authentication",
+        "zeromerma_api.modules.identity.presentation.dependencies:get_current_user",
+        "zeromerma_api.presentation.access_policy:enforce_operation_policy"
+      ],
+      "actual_surface_guard": "EXPLICIT_POS_POLICY_WITH_EFFECTIVE_GRANTS",
+      "required_capability": "pos.operate",
+      "capability_enforcement_state": "CAPABILITY_ENFORCED",
+      "required_scope": "GLOBAL_OR_BRANCH_SET_PER_DEC04",
+      "scope_source": "SERVER_RESOLVED_ACTIVE_ROLE_ASSIGNMENT_SCOPES_INTERSECT_ACTIVE_USER_BRANCH_MEMBERSHIPS",
+      "scope_enforcement_state": "SCOPE_ENFORCED",
+      "request_schema": [
+        "NONE"
+      ],
+      "response_schema": "ClassAttributionResult",
+      "error_contract_state": "CANONICAL_API_ERROR_RESPONSE",
+      "application_service": [
+        "zeromerma_api.modules.idempotency.application.service.IdempotencyExecutor.recover"
+      ],
+      "domain_or_use_case_symbol": "IdempotencyExecutor.recover",
+      "router_business_logic_present": false,
+      "transaction_owner": "zeromerma_api.modules.idempotency.application.service.IdempotencyExecutor.recover",
+      "transaction_boundary": "Read-only command-result lookup; executor commits or rolls back its authorization/read transaction without reserving a key or running the sale action",
+      "persistence": "READ_ONLY",
+      "external_side_effect": "NONE_OBSERVED_STATICALLY",
+      "reads_entities": [
+        "idempotency_records",
+        "sales",
+        "sale_lines",
+        "products",
+        "inventory_movements",
+        "inventory_balances",
+        "inventory_lots",
+        "inventory_lot_balances",
+        "inventory_movement_lot_allocations",
+        "class_inventory_obligations"
+      ],
+      "writes_entities": [
+        "NONE"
+      ],
+      "locks_or_concurrency_control": "Indexed unique-key lookup with exact saved actor/context comparison and current POS capability/scope checks; unknown or uncommitted result remains HTTP 409",
+      "audit_required": false,
+      "audit_actual": "NOT_REQUIRED",
+      "audit_atomicity": "NOT_REQUIRED",
+      "outbox_required": false,
+      "outbox_actual": "NOT_REQUIRED",
+      "outbox_atomicity": "NOT_REQUIRED",
+      "idempotency_required": false,
+      "idempotency_actual": "NOT_REQUIRED",
+      "idempotency_business_identity": "Original UUIDv7 intention and immutable actor/surface/branch/resource fingerprint; operation=inventory.class_attribute; replay never repeats physical effects.",
+      "idempotency_replay_behavior": "HTTP 200 safe persisted confirmation snapshot for COMPLETED; unresolved/absent identity remains an explicit nonterminal error; no business effects or repricing",
+      "generated_client_operation": "recover_attribution_v1_sales__sale_id__inventory_attributions__idempotency_key__get",
+      "consumer_contract_state": "CLIENT_GENERATED_USED",
+      "consumer_disposition": "LOCAL_UI_PRESENT",
+      "consumer_reason": "POS ticket detail provides partial exact-product/lot attribution and durable intention recovery with generated request/response types.",
+      "pos_consumers": [
+        "apps/pos-web/src/features/tickets/attribution-command-intent.ts",
+        "apps/pos-web/src/features/tickets/inventory-attribution-panel.tsx",
+        "apps/pos-web/src/features/tickets/attribution-recovery-panel.tsx"
+      ],
+      "backoffice_consumers": [
+        "NONE"
+      ],
+      "other_consumers": [
+        "NONE"
+      ],
+      "direct_tests": [
+        "apps/api/tests/test_sale_physical_inventory.py",
+        "apps/api/tests/test_ticket_inventory_attribution.py",
+        "apps/pos-web/src/features/tickets/attribution-command-intent.test.ts",
+        "apps/pos-web/src/features/tickets/inventory-attribution-panel.test.tsx"
+      ],
+      "indirect_tests": [
+        "apps/api/tests/conftest.py",
+        "apps/api/unit_tests/test_operation_policy.py#test_every_route_and_persisted_family_has_an_explicit_policy",
+        "apps/api/tests/test_operation_authorization.py#test_all_scoped_families_support_mapped_reads_and_aggregate_subqueries"
+      ],
+      "missing_test_types": [
+        "NONE"
+      ],
+      "approved_target_state": "Canonical causal stock and lot effects, exact quantities and weighted-average values commit atomically with audit/outbox and the original acknowledgement. Broader product workflows and deployment gates remain separately tracked.",
+      "feature_complete_blocker": true,
+      "later_ZM_FIN_tasks": [
+        "ZM-FIN-108"
+      ],
+      "decision_refs": [
+        "DEC-03",
+        "DEC-04",
+        "DEC-05",
+        "DEC-07",
+        "DEC-08",
+        "DEC-15",
+        "DEC-16",
+        "DEC-19"
+      ],
+      "gate_refs": [
+        "G1",
+        "G5"
+      ],
+      "gap_ids": [
+        "NONE"
+      ],
+      "evidence": [
+        "apps/api/src/zeromerma_api/modules/inventory/presentation/attribution_router.py#recover_attribution",
+        "apps/api/tests/test_sale_physical_inventory.py",
+        "docs/operations/inventory-reconciliation.md"
+      ],
+      "verification_notes": "Ticket projection PostgreSQL acceptance passed for original-sale capacity and partial/replayed attribution; concurrent obligation and Browser acceptance are in progress. Local UI and recovery are mounted in ticket detail."
+    },
+    {
+      "operation_key": "API:GET:/v1/admin/waste/stock",
+      "surface": "BACKOFFICE",
+      "method": "GET",
+      "path": "/v1/admin/waste/stock",
+      "operation_id": "get_admin_waste_stock_v1_admin_waste_stock_get",
+      "include_in_schema": true,
+      "tags": [
+        "admin-waste"
+      ],
+      "router_file": "apps/api/src/zeromerma_api/modules/waste/presentation/router.py",
+      "router_symbol": "get_admin_waste_stock",
+      "module_owner": "API:admin-waste",
+      "use_case": "Read exact physical waste lot choices, including expired stock requiring disposal.",
+      "implementation_state": "PARTIAL",
+      "verification_state": "DIRECT_TEST_EXISTS_NOT_RUN",
+      "auth_requirement": "AUTHENTICATED",
+      "actual_auth_dependency": [
+        "fastapi.security.api_key:APIKeyCookie",
+        "zeromerma_api.db.session:get_session",
+        "zeromerma_api.modules.identity.presentation.dependencies:get_current_authentication",
+        "zeromerma_api.modules.identity.presentation.dependencies:get_current_user",
+        "zeromerma_api.modules.waste.presentation.router:_require_backoffice_user",
+        "zeromerma_api.presentation.access_policy:enforce_operation_policy"
+      ],
+      "actual_surface_guard": "EXPLICIT_BACKOFFICE_POLICY_WITH_EFFECTIVE_GRANTS",
+      "required_capability": "waste.view",
+      "capability_enforcement_state": "CAPABILITY_ENFORCED",
+      "required_scope": "GLOBAL_OR_BRANCH_SET_PER_DEC04",
+      "scope_source": "SERVER_RESOLVED_ACTIVE_ROLE_ASSIGNMENT_SCOPES_INTERSECT_ACTIVE_USER_BRANCH_MEMBERSHIPS",
+      "scope_enforcement_state": "SCOPE_ENFORCED",
+      "request_schema": [
+        "NONE"
+      ],
+      "response_schema": "AdminWasteStockView",
+      "error_contract_state": "CANONICAL_API_ERROR_RESPONSE",
+      "application_service": [
+        "zeromerma_api.modules.operations.application.lot_queries.operation_lot_choices"
+      ],
+      "domain_or_use_case_symbol": "operation_lot_choices",
+      "router_business_logic_present": true,
+      "transaction_owner": "zeromerma_api.modules.inventory.application.admin_services.AdminInventoryService.list_inventory",
+      "transaction_boundary": "commit=False;flush=False;rollback=False",
+      "persistence": "READ_ONLY",
+      "external_side_effect": "NONE_OBSERVED_STATICALLY",
+      "reads_entities": [
+        "products",
+        "inventory_lots",
+        "inventory_lot_balances",
+        "inventory_balances"
+      ],
+      "writes_entities": [
+        "NONE"
+      ],
+      "locks_or_concurrency_control": "NONE_OBSERVED",
+      "audit_required": false,
+      "audit_actual": "NOT_REQUIRED",
+      "audit_atomicity": "NOT_REQUIRED",
+      "outbox_required": false,
+      "outbox_actual": "NOT_REQUIRED",
+      "outbox_atomicity": "NOT_REQUIRED",
+      "idempotency_required": false,
+      "idempotency_actual": "NOT_REQUIRED",
+      "idempotency_business_identity": "NOT_APPLICABLE",
+      "idempotency_replay_behavior": "NOT_APPLICABLE",
+      "generated_client_operation": "get_admin_waste_stock_v1_admin_waste_stock_get",
+      "consumer_contract_state": "CLIENT_GENERATED_USED",
+      "consumer_disposition": "LOCAL_UI_PRESENT",
+      "consumer_reason": "The waste form loads actual lot quantities for the selected branch, product and source location; expiry does not hide physical disposal stock.",
+      "pos_consumers": [
+        "NONE"
+      ],
+      "backoffice_consumers": [
+        "apps/backoffice-web/src/features/admin/waste/api.ts"
+      ],
+      "other_consumers": [
+        "NONE"
+      ],
+      "direct_tests": [
+        "apps/api/tests/test_admin_waste.py"
+      ],
+      "indirect_tests": [
+        "apps/api/unit_tests/test_operation_policy.py"
+      ],
+      "missing_test_types": [
+        "NONE"
+      ],
+      "approved_target_state": "Read scoped physical lot choices and require explicit source lot on disposal; complete waste workflow acceptance is tracked independently.",
+      "feature_complete_blocker": true,
+      "later_ZM_FIN_tasks": [
+        "ZM-FIN-075"
+      ],
+      "decision_refs": [
+        "DEC-03",
+        "DEC-04"
+      ],
+      "gate_refs": [
+        "G1",
+        "G5"
+      ],
+      "gap_ids": [
+        "NONE"
+      ],
+      "evidence": [
+        "apps/api/src/zeromerma_api/modules/waste/presentation/router.py#get_admin_waste_stock",
+        "apps/api/src/zeromerma_api/modules/operations/application/lot_queries.py"
+      ],
+      "verification_notes": "Physical block browser and exact-commit acceptance are in progress."
     }
   ],
   "pos_routes": [
@@ -32565,7 +33622,7 @@
         "API:POST:/v1/admin/production",
         "API:POST:/v1/admin/production/{production_id}/cancel",
         "API:POST:/v1/admin/production/{production_id}/complete",
-        "API:POST:/v1/admin/production/{production_id}/start",
+        "API:POST:/v1/admin/production/{production_id}/release",
         "API:POST:/v1/admin/products",
         "API:POST:/v1/admin/products/{product_id}/availability",
         "API:POST:/v1/admin/purchases",
@@ -34621,7 +35678,7 @@
         "API:POST:/v1/admin/production",
         "API:POST:/v1/admin/production/{production_id}/cancel",
         "API:POST:/v1/admin/production/{production_id}/complete",
-        "API:POST:/v1/admin/production/{production_id}/start",
+        "API:POST:/v1/admin/production/{production_id}/release",
         "API:GET:/v1/admin/production/commands/{command_code}/{idempotency_key}"
       ],
       "queries": [
@@ -36602,39 +37659,91 @@
         "docs/operations/financial-reconciliation.md"
       ],
       "source_file": "scripts/dev/financial-reconciliation.py"
+    },
+    {
+      "operation_key": "INTERNAL:scripts.dev.inventory-reconciliation:command",
+      "trigger": "AUTHORIZED_LOCAL_OPERATOR_COMMAND",
+      "symbol": "command",
+      "source_event_or_schedule": "Explicit authorized local operator diagnosis, reviewed dry-run or controlled-window per-row application.",
+      "reads": [
+        "Canonical inventory movements, reservation events and lot allocations",
+        "Reviewed immutable physical count/rebuild manifest"
+      ],
+      "writes": [
+        "InventoryReconciliationManifest",
+        "InventoryReconciliationRow",
+        "InventoryMovement for evidenced openings only",
+        "InventoryBalance and InventoryLotBalance projections",
+        "AuditLog",
+        "OutboxEvent"
+      ],
+      "external_effect": "No automatic backfill, bank effect or production promotion; declaration authenticity requires independent operator verification.",
+      "idempotency": "Immutable manifest hash plus per-row original UUIDv7 identity; same reviewed row resumes without repeating stock effects.",
+      "claim_or_lease": "Owner finance authentication, explicit controlled window, no open/closing cash session, branch and aggregate/lot locks under IdempotencyExecutor.",
+      "retry": "Resume exactly the same approved manifest and row; changed hash, state or evidence rejects.",
+      "completion_state": "Recorded before/after ledger and projection hashes, exact quantity/value and causal evidence per applied row.",
+      "audit": "Atomic operator declaration with manifest and row hashes; no claim of external signature verification.",
+      "outbox": "Atomic inventory reconciliation event in the command transaction.",
+      "direct_tests": [
+        "apps/api/tests/test_inventory_reconciliation.py",
+        "apps/api/unit_tests/test_inventory_reconciliation_manifest.py"
+      ],
+      "indirect_tests": [
+        "NONE"
+      ],
+      "implementation_state": "INTERNAL_ONLY",
+      "verification_state": "TESTED_IN_THIS_TASK",
+      "later_ZM_FIN_tasks": [
+        "ZM-FIN-108"
+      ],
+      "decision_refs": [
+        "DEC-19"
+      ],
+      "gate_refs": [
+        "G4"
+      ],
+      "feature_complete_blocker": false,
+      "gap_ids": [
+        "NONE"
+      ],
+      "evidence": [
+        "scripts/dev/inventory-reconciliation.py",
+        "docs/operations/inventory-reconciliation.md"
+      ],
+      "source_file": "scripts/dev/inventory-reconciliation.py"
     }
   ],
   "module_summary": {
     "surface_counts": {
-      "api": 267,
+      "api": 275,
       "pos": 16,
       "backoffice": 41,
       "worker": 3,
-      "internal": 16
+      "internal": 17
     },
     "implementation_state_counts": {
       "DEPRECATED": 4,
       "FRAMEWORK_ONLY": 6,
       "IMPLEMENTED_VERIFIED": 38,
-      "INTERNAL_ONLY": 17,
-      "PARTIAL": 274,
+      "INTERNAL_ONLY": 18,
+      "PARTIAL": 282,
       "PLACEHOLDER": 4
     },
     "verification_state_counts": {
-      "DIRECT_TEST_EXISTS_NOT_RUN": 116,
+      "DIRECT_TEST_EXISTS_NOT_RUN": 149,
       "INDIRECT_TEST_ONLY": 1,
       "NOT_APPLICABLE": 12,
       "NO_TEST": 63,
-      "TESTED_IN_THIS_TASK": 151
+      "TESTED_IN_THIS_TASK": 127
     },
     "consumer_contract_state_counts": {
-      "CLIENT_GENERATED_USED": 211,
+      "CLIENT_GENERATED_USED": 219,
       "NOT_CONSUMED": 55,
       "NO_CLIENT_OPERATION": 1
     },
     "consumer_disposition_counts": {
       "FUTURE_CONSUMER_NOT_IMPLEMENTED": 9,
-      "LOCAL_UI_PRESENT": 211,
+      "LOCAL_UI_PRESENT": 219,
       "LOCAL_UI_REQUIRED_NOT_WIRED": 46,
       "NOT_APPLICABLE": 1
     },
@@ -36650,18 +37759,18 @@
       "UI_DISCONNECTED": 56,
       "WORKER_GAP": 2
     },
-    "feature_complete_blocker_count": 278,
+    "feature_complete_blocker_count": 286,
     "test_gap_count": 102,
-    "operation_count": 343
+    "operation_count": 352
   },
   "openapi_comparison": {
-    "runtime_operation_count": 266,
-    "tracked_operation_count": 266,
+    "runtime_operation_count": 274,
+    "tracked_operation_count": 274,
     "runtime_only": [],
     "tracked_only": [],
     "operation_id_drift": [],
-    "runtime_sha256_canonical_json": "7902126fd256792056bf4a9967b164a4003bfc6d9318b0eaed3d57fd1cd1e2ab",
-    "tracked_sha256_canonical_json": "7902126fd256792056bf4a9967b164a4003bfc6d9318b0eaed3d57fd1cd1e2ab",
+    "runtime_sha256_canonical_json": "99ab4eb7dd49ff47a235297c15cfbc86434ee2a64d002292b0e5727f3b585333",
+    "tracked_sha256_canonical_json": "99ab4eb7dd49ff47a235297c15cfbc86434ee2a64d002292b0e5727f3b585333",
     "schema_drift_suspected": false,
     "classification": "NO_DRIFT_OBSERVED"
   },
@@ -39552,5 +40661,99 @@
     "state": "IMPLEMENTED_LOCALLY_VALIDATED_WITH_046_EXTERNAL_GATE_OPEN",
     "provider_limit": "No real BBVA adapter, integrated source producer/UI or hardware/PCI certification; 046 remains partial and final pilot postponed",
     "history_limit": "Schema changes do not promote development/test history; 047 requires explicit legitimate evidence"
+  },
+  "physical_inventory_evidence": {
+    "tasks": [
+      "ZM-FIN-048",
+      "ZM-FIN-049",
+      "ZM-FIN-050",
+      "ZM-FIN-051",
+      "ZM-FIN-052",
+      "ZM-FIN-053",
+      "ZM-FIN-054",
+      "ZM-FIN-055"
+    ],
+    "state": "ACCEPTANCE_IN_PROGRESS",
+    "source_policy": "DEVELOPMENT_DEMO_TEST history is never admitted as real productive opening evidence.",
+    "valuation": "Weighted average per branch/product/location; unknown value stays unavailable.",
+    "physical_policy": "FEFO physical lots and reservations are independent from weighted-average financial valuation.",
+    "operation_context": "New physical effects require their admitted owner; source document/line, actor, branch, conversion and causal effect are immutable.",
+    "migration_evidence": {
+      "run_id": "a78c671c2ced40a7a22757f09a07a420",
+      "passed": 30,
+      "failed": 0,
+      "head": "20261019_0053_purchase_prod",
+      "checkpoints": 53,
+      "coverage": "Exact schema fingerprints; old transitions; guarded downgrades0049–0053; interruption rollback; dump/restore."
+    },
+    "ticket_attribution_evidence": {
+      "run_id": "c6f24a9a42494474a54794dd5b64a1f1",
+      "passed": 2,
+      "failed": 0,
+      "coverage": "Original-sale capacity with/without lots, future receipt exclusion, partial attribution, replay and bounded remaining quantity."
+    },
+    "reserved_expiry_evidence": {
+      "run_id": "80ba0873e08c432999cc399004b833c6",
+      "passed": 2,
+      "failed": 0,
+      "coverage": "Expired reserved input rejects productive consumption and allows explicit waste into the same lot; fresh stock stays untouched, replay is immutable, and product-UOM evidence rejects reinterpretation."
+    },
+    "class_obligation_contention_evidence": {
+      "run_id": "6a35ecc3de7740e7aa994ff48ae6511a",
+      "case": "test_two_operators_serialize_one_class_obligation_across_different_product_balances",
+      "passed": 1,
+      "coverage": "Different actors and different product balance locks contend on the same class obligation in real PostgreSQL; the second cannot over-attribute the remaining quantity.",
+      "run_limit": "This selected case passed in a broader diagnostic run with six failures resolved separately; the whole diagnostic run is not acceptance."
+    },
+    "temporal_close_and_value_evidence": {
+      "run_id": "697dc8bda0df4ae6b536e38622654ae8",
+      "selected_passed_cases": [
+        "test_close_attributes_an_older_lot_before_a_later_receipt_with_earlier_expiry",
+        "test_locked_historical_lot_capacity_includes_pending_outflow_and_reservations",
+        "test_returns_across_lots_preserve_the_entire_original_value",
+        "test_revoked_original_branch_session_cannot_replay_or_recover_correction",
+        "test_class_attribution_rejects_another_class_without_physical_effects"
+      ],
+      "coverage": "Historical lot eligibility includes pending physical effects and reservations without flushing; close skips later receipts, partial returns conserve exact original value, revoked sessions cannot recover results, and cross-class attribution has no effects.",
+      "run_limit": "These cases passed in an eight-case focused run with two stale expectations addressed separately; the whole run is not acceptance."
+    },
+    "pos_browser_evidence": {
+      "run_id": "bc7f8ca7cac1428c8e661049ad95e284",
+      "passed": 8,
+      "failed": 0,
+      "coverage": "Real POS/API/database flow includes partial class attribution, lost-response recovery after reload, completion with a new intention, and unchanged financial sale amount.",
+      "scope_limit": "POS results only; separate backoffice and immutable-commit CI evidence remains required."
+    },
+    "legacy_physical_regression_evidence": {
+      "baseline_run_id": "6a35ecc3de7740e7aa994ff48ae6511a",
+      "baseline_tests": 77,
+      "baseline_passed": 71,
+      "baseline_failures": 6,
+      "final_scope_run": {
+        "run_id": "6548930b730b45b5b2c0ef5e799fcba9",
+        "passed": 2,
+        "failed": 0
+      },
+      "receipt_audit_evidence": {
+        "run_id": "92b445750ef04f19b47d63e37d53520e",
+        "selected_passed_case": "test_transfer_receive_with_variance_marks_receipt_and_shipment"
+      },
+      "other_resolved_cases": [
+        {
+          "run_id": "80ba0873e08c432999cc399004b833c6",
+          "case": "test_correction_aggregates_duplicate_lines_and_preserves_frozen_product_units"
+        },
+        {
+          "run_id": "697dc8bda0df4ae6b536e38622654ae8",
+          "case": "test_revoked_original_branch_session_cannot_replay_or_recover_correction"
+        },
+        {
+          "run_id": "697dc8bda0df4ae6b536e38622654ae8",
+          "case": "test_class_attribution_rejects_another_class_without_physical_effects"
+        }
+      ],
+      "coverage": "All six baseline failures have passing targeted replacement evidence. Canonical receipt and audit/outbox references, immutable UOM, related-branch scope denial, revoked-session replay/recovery and wrong-class rejection preserve no-effect checks. Concurrent replay and two-actor obligation tests passed in the baseline.",
+      "source_limit": "Local working-tree evidence across targeted runs; this is not a single full 77-case acceptance run or delivered-commit CI."
+    }
   }
 }

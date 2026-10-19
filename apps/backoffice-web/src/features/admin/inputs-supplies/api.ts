@@ -101,6 +101,10 @@ export function mapAdminInputSupplyListItemFromApi(item: ApiListItem): AdminInpu
     isActive: item.is_active,
     isInventoryTracked: item.is_inventory_tracked,
     isPurchasable: item.is_purchasable,
+    isSellable: item.is_sellable,
+    isUsableAsInput: item.is_usable_as_input,
+    lotTrackingEnabled: item.lot_tracking_enabled,
+    expiryRequired: item.expiry_required,
     lastMovementAt: item.last_movement_at ?? null,
     lastPurchaseCost: item.last_purchase_cost == null ? null : String(item.last_purchase_cost),
     name: item.name,
@@ -186,6 +190,10 @@ export function mapAdminInputSupplyDetailFromApi(item: ApiDetail): AdminInputSup
       isActive: overview.is_active,
       isInventoryTracked: overview.is_inventory_tracked,
       isPurchasable: overview.is_purchasable,
+      isSellable: overview.is_sellable,
+      isUsableAsInput: overview.is_usable_as_input,
+      lotTrackingEnabled: overview.lot_tracking_enabled,
+      expiryRequired: overview.expiry_required,
       lastMovementAt: null,
       lastPurchaseCost:
         overview.last_purchase_cost == null ? null : String(overview.last_purchase_cost),
@@ -305,6 +313,10 @@ function toInputSupplyPayload(payload: AdminInputSupplyPayload): ApiPayload {
     is_active: payload.isActive,
     is_inventory_tracked: payload.isInventoryTracked,
     is_purchasable: payload.isPurchasable,
+    is_sellable: payload.isSellable ?? false,
+    is_usable_as_input: payload.isUsableAsInput ?? true,
+    lot_tracking_enabled: payload.lotTrackingEnabled ?? false,
+    expiry_required: payload.expiryRequired ?? false,
     minimum_stock: payload.minimumStock ?? null,
     name: payload.name,
     preferred_order_quantity: payload.preferredOrderQuantity ?? null,
@@ -349,9 +361,7 @@ export function fetchAdminInputSupplies(
   }).then(mapListResponseFromApi);
 }
 
-export function fetchAdminInputSupplyDetail(
-  productId: string,
-): Promise<AdminInputSupplyDetail> {
+export function fetchAdminInputSupplyDetail(productId: string): Promise<AdminInputSupplyDetail> {
   return requestJson<ApiDetail>({
     path: `/v1/admin/inputs-supplies/${productId}`,
   }).then(mapAdminInputSupplyDetailFromApi);

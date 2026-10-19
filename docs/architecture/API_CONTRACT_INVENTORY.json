@@ -1,6 +1,6 @@
 {
   "application_baseline_commit": "c020649885869cbf7e2987c39e9d14a16d5c3e89",
-  "operation_count": 266,
+  "operation_count": 274,
   "operations": [
     {
       "consumer_contract_state": "CLIENT_GENERATED_USED",
@@ -6147,6 +6147,176 @@
       "expected_growth": "NOT_APPLICABLE",
       "filter_class": [],
       "frontend_consumers": [
+        "apps/backoffice-web/src/features/admin/inventory-dispositions/disposition-command-intent.ts"
+      ],
+      "generated_client_symbol": "create_disposition_v1_admin_inventory_dispositions_post",
+      "id_fields": [
+        "$.request.parameters[1].schema"
+      ],
+      "method": "POST",
+      "nullable_fields": [],
+      "operation_id": "create_disposition_v1_admin_inventory_dispositions_post",
+      "operation_id_source": "FASTAPI_STABLE_GENERATED",
+      "operation_key": "API:POST:/v1/admin/inventory-dispositions",
+      "pagination_class": "NOT_APPLICABLE",
+      "path": "/v1/admin/inventory-dispositions",
+      "request_schema": {
+        "body_schema": {
+          "$ref": "#/components/schemas/InventoryDispositionRequest"
+        },
+        "parameters": [
+          {
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": true,
+            "schema": {
+              "description": "A globally unique UUIDv7 identifying this business intention.",
+              "maxLength": 36,
+              "minLength": 36,
+              "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-7[0-9a-fA-F]{3}-[89aAbB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$",
+              "title": "Idempotency-Key",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Request-ID",
+            "required": false,
+            "schema": {
+              "format": "uuid",
+              "type": "string",
+              "x-zeromerma-id-representation": "JSON_STRING"
+            }
+          }
+        ]
+      },
+      "stable_order": "NOT_APPLICABLE",
+      "success_response_schema": [
+        {
+          "schema": {
+            "$ref": "#/components/schemas/InventoryDispositionResult"
+          },
+          "status": "201"
+        }
+      ]
+    },
+    {
+      "consumer_contract_state": "CLIENT_GENERATED_USED",
+      "contract_gap": [],
+      "datetime_fields": [],
+      "decimal_fields": [],
+      "declared_error_responses": [
+        "400",
+        "401",
+        "403",
+        "404",
+        "409",
+        "422",
+        "423",
+        "429",
+        "500"
+      ],
+      "enum_fields": [
+        "$.request.parameters[2].schema"
+      ],
+      "expected_growth": "NOT_APPLICABLE",
+      "filter_class": [],
+      "frontend_consumers": [
+        "apps/backoffice-web/src/features/admin/inventory-dispositions/disposition-command-intent.ts"
+      ],
+      "generated_client_symbol": "recover_disposition_v1_admin_inventory_dispositions_confirmations__idempotency_key__get",
+      "id_fields": [
+        "$.request.parameters[0].schema",
+        "$.request.parameters[1].schema",
+        "$.request.parameters[3].schema"
+      ],
+      "method": "GET",
+      "nullable_fields": [],
+      "operation_id": "recover_disposition_v1_admin_inventory_dispositions_confirmations__idempotency_key__get",
+      "operation_id_source": "FASTAPI_STABLE_GENERATED",
+      "operation_key": "API:GET:/v1/admin/inventory-dispositions/confirmations/{idempotency_key}",
+      "pagination_class": "NOT_APPLICABLE",
+      "path": "/v1/admin/inventory-dispositions/confirmations/{idempotency_key}",
+      "request_schema": {
+        "body_schema": null,
+        "parameters": [
+          {
+            "in": "path",
+            "name": "idempotency_key",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Idempotency Key",
+              "type": "string",
+              "x-zeromerma-id-representation": "JSON_STRING"
+            }
+          },
+          {
+            "in": "query",
+            "name": "branch_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Branch Id",
+              "type": "string",
+              "x-zeromerma-id-representation": "JSON_STRING"
+            }
+          },
+          {
+            "in": "query",
+            "name": "kind",
+            "required": true,
+            "schema": {
+              "enum": [
+                "RETURN_CORRECTION",
+                "QUARANTINE_RELEASE"
+              ],
+              "title": "Kind",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Request-ID",
+            "required": false,
+            "schema": {
+              "format": "uuid",
+              "type": "string",
+              "x-zeromerma-id-representation": "JSON_STRING"
+            }
+          }
+        ]
+      },
+      "stable_order": "NOT_APPLICABLE",
+      "success_response_schema": [
+        {
+          "schema": {
+            "$ref": "#/components/schemas/InventoryDispositionResult"
+          },
+          "status": "200"
+        }
+      ]
+    },
+    {
+      "consumer_contract_state": "CLIENT_GENERATED_USED",
+      "contract_gap": [],
+      "datetime_fields": [],
+      "decimal_fields": [],
+      "declared_error_responses": [
+        "400",
+        "401",
+        "403",
+        "404",
+        "409",
+        "422",
+        "423",
+        "429",
+        "500"
+      ],
+      "enum_fields": [],
+      "expected_growth": "NOT_APPLICABLE",
+      "filter_class": [],
+      "frontend_consumers": [
         "apps/backoffice-web/src/features/admin/inventory/api.ts",
         "apps/backoffice-web/src/features/admin/physical-commands/physical-command-intent.ts"
       ],
@@ -8340,7 +8510,7 @@
               "enum": [
                 "create",
                 "update",
-                "start",
+                "release",
                 "complete",
                 "cancel"
               ],
@@ -8745,21 +8915,21 @@
         "apps/backoffice-web/src/features/admin/production/api.ts",
         "apps/backoffice-web/src/features/admin/production/production-command-intent.ts"
       ],
-      "generated_client_symbol": "start_admin_production_v1_admin_production__production_id__start_post",
+      "generated_client_symbol": "release_admin_production_v1_admin_production__production_id__release_post",
       "id_fields": [
         "$.request.parameters[0].schema",
         "$.request.parameters[2].schema"
       ],
       "method": "POST",
       "nullable_fields": [],
-      "operation_id": "start_admin_production_v1_admin_production__production_id__start_post",
+      "operation_id": "release_admin_production_v1_admin_production__production_id__release_post",
       "operation_id_source": "FASTAPI_STABLE_GENERATED",
-      "operation_key": "API:POST:/v1/admin/production/{production_id}/start",
+      "operation_key": "API:POST:/v1/admin/production/{production_id}/release",
       "pagination_class": "NOT_APPLICABLE",
-      "path": "/v1/admin/production/{production_id}/start",
+      "path": "/v1/admin/production/{production_id}/release",
       "request_schema": {
         "body_schema": {
-          "$ref": "#/components/schemas/AdminProductionStartRequest"
+          "$ref": "#/components/schemas/AdminProductionReleaseRequest"
         },
         "parameters": [
           {
@@ -9791,7 +9961,8 @@
                 "direct-entry",
                 "confirm",
                 "receive",
-                "cancel"
+                "cancel",
+                "reverse-receipt"
               ],
               "title": "Command Code",
               "type": "string"
@@ -10277,6 +10448,92 @@
       "request_schema": {
         "body_schema": {
           "$ref": "#/components/schemas/AdminPurchaseReceiveRequest"
+        },
+        "parameters": [
+          {
+            "in": "path",
+            "name": "purchase_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Purchase Id",
+              "type": "string",
+              "x-zeromerma-id-representation": "JSON_STRING"
+            }
+          },
+          {
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": true,
+            "schema": {
+              "description": "A globally unique UUIDv7 identifying this business intention.",
+              "maxLength": 36,
+              "minLength": 36,
+              "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-7[0-9a-fA-F]{3}-[89aAbB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$",
+              "title": "Idempotency-Key",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Request-ID",
+            "required": false,
+            "schema": {
+              "format": "uuid",
+              "type": "string",
+              "x-zeromerma-id-representation": "JSON_STRING"
+            }
+          }
+        ]
+      },
+      "stable_order": "NOT_APPLICABLE",
+      "success_response_schema": [
+        {
+          "schema": {
+            "$ref": "#/components/schemas/PurchaseCommandResultView"
+          },
+          "status": "200"
+        }
+      ]
+    },
+    {
+      "consumer_contract_state": "CLIENT_GENERATED_USED",
+      "contract_gap": [],
+      "datetime_fields": [],
+      "decimal_fields": [],
+      "declared_error_responses": [
+        "400",
+        "401",
+        "403",
+        "404",
+        "409",
+        "422",
+        "423",
+        "429",
+        "500"
+      ],
+      "enum_fields": [],
+      "expected_growth": "NOT_APPLICABLE",
+      "filter_class": [],
+      "frontend_consumers": [
+        "apps/backoffice-web/src/features/admin/purchases/api.ts",
+        "apps/backoffice-web/src/features/admin/purchases/purchase-command-intent.ts"
+      ],
+      "generated_client_symbol": "reverse_admin_purchase_receipt_v1_admin_purchases__purchase_id__reverse_receipt_post",
+      "id_fields": [
+        "$.request.parameters[0].schema",
+        "$.request.parameters[2].schema"
+      ],
+      "method": "POST",
+      "nullable_fields": [],
+      "operation_id": "reverse_admin_purchase_receipt_v1_admin_purchases__purchase_id__reverse_receipt_post",
+      "operation_id_source": "FASTAPI_STABLE_GENERATED",
+      "operation_key": "API:POST:/v1/admin/purchases/{purchase_id}/reverse-receipt",
+      "pagination_class": "NOT_APPLICABLE",
+      "path": "/v1/admin/purchases/{purchase_id}/reverse-receipt",
+      "request_schema": {
+        "body_schema": {
+          "$ref": "#/components/schemas/AdminPurchaseReverseReceiptRequest"
         },
         "parameters": [
           {
@@ -13725,6 +13982,7 @@
         "page",
         "page_size",
         "payment_method",
+        "pending_physical_only",
         "search",
         "status",
         "workstation_id"
@@ -13736,7 +13994,7 @@
       "generated_client_symbol": "list_admin_sales_tickets_v1_admin_sales_tickets_get",
       "id_fields": [
         "$.request.parameters[0].schema.anyOf[0]",
-        "$.request.parameters[12].schema",
+        "$.request.parameters[13].schema",
         "$.request.parameters[1].schema.anyOf[0]",
         "$.request.parameters[2].schema.anyOf[0]"
       ],
@@ -13967,6 +14225,16 @@
               "minimum": 1,
               "title": "Page Size",
               "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "pending_physical_only",
+            "required": false,
+            "schema": {
+              "default": false,
+              "title": "Pending Physical Only",
+              "type": "boolean"
             }
           },
           {
@@ -16561,7 +16829,9 @@
                 "update",
                 "dispatch",
                 "receive",
-                "cancel"
+                "cancel",
+                "resolve_return",
+                "resolve_waste"
               ],
               "title": "Command Code",
               "type": "string"
@@ -16977,6 +17247,92 @@
       "request_schema": {
         "body_schema": {
           "$ref": "#/components/schemas/AdminTransferReceiveRequest"
+        },
+        "parameters": [
+          {
+            "in": "path",
+            "name": "transfer_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Transfer Id",
+              "type": "string",
+              "x-zeromerma-id-representation": "JSON_STRING"
+            }
+          },
+          {
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": true,
+            "schema": {
+              "description": "A globally unique UUIDv7 identifying this business intention.",
+              "maxLength": 36,
+              "minLength": 36,
+              "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-7[0-9a-fA-F]{3}-[89aAbB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$",
+              "title": "Idempotency-Key",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Request-ID",
+            "required": false,
+            "schema": {
+              "format": "uuid",
+              "type": "string",
+              "x-zeromerma-id-representation": "JSON_STRING"
+            }
+          }
+        ]
+      },
+      "stable_order": "NOT_APPLICABLE",
+      "success_response_schema": [
+        {
+          "schema": {
+            "$ref": "#/components/schemas/TransferCommandResultView"
+          },
+          "status": "200"
+        }
+      ]
+    },
+    {
+      "consumer_contract_state": "CLIENT_GENERATED_USED",
+      "contract_gap": [],
+      "datetime_fields": [],
+      "decimal_fields": [],
+      "declared_error_responses": [
+        "400",
+        "401",
+        "403",
+        "404",
+        "409",
+        "422",
+        "423",
+        "429",
+        "500"
+      ],
+      "enum_fields": [],
+      "expected_growth": "NOT_APPLICABLE",
+      "filter_class": [],
+      "frontend_consumers": [
+        "apps/backoffice-web/src/features/admin/transfers/api.ts",
+        "apps/backoffice-web/src/features/admin/transfers/transfer-command-intent.ts"
+      ],
+      "generated_client_symbol": "resolve_admin_transfer_v1_admin_transfers__transfer_id__resolve_post",
+      "id_fields": [
+        "$.request.parameters[0].schema",
+        "$.request.parameters[2].schema"
+      ],
+      "method": "POST",
+      "nullable_fields": [],
+      "operation_id": "resolve_admin_transfer_v1_admin_transfers__transfer_id__resolve_post",
+      "operation_id_source": "FASTAPI_STABLE_GENERATED",
+      "operation_key": "API:POST:/v1/admin/transfers/{transfer_id}/resolve",
+      "pagination_class": "NOT_APPLICABLE",
+      "path": "/v1/admin/transfers/{transfer_id}/resolve",
+      "request_schema": {
+        "body_schema": {
+          "$ref": "#/components/schemas/AdminTransferResolveRequest"
         },
         "parameters": [
           {
@@ -18869,6 +19225,97 @@
             },
             "title": "Response List Admin Waste Reasons V1 Admin Waste Reasons Get",
             "type": "array"
+          },
+          "status": "200"
+        }
+      ]
+    },
+    {
+      "consumer_contract_state": "CLIENT_GENERATED_USED",
+      "contract_gap": [],
+      "datetime_fields": [],
+      "decimal_fields": [],
+      "declared_error_responses": [
+        "400",
+        "401",
+        "403",
+        "404",
+        "409",
+        "422",
+        "423",
+        "429",
+        "500"
+      ],
+      "enum_fields": [],
+      "expected_growth": "NOT_APPLICABLE",
+      "filter_class": [],
+      "frontend_consumers": [
+        "apps/backoffice-web/src/features/admin/waste/api.ts"
+      ],
+      "generated_client_symbol": "get_admin_waste_stock_v1_admin_waste_stock_get",
+      "id_fields": [
+        "$.request.parameters[0].schema",
+        "$.request.parameters[1].schema",
+        "$.request.parameters[3].schema"
+      ],
+      "method": "GET",
+      "nullable_fields": [],
+      "operation_id": "get_admin_waste_stock_v1_admin_waste_stock_get",
+      "operation_id_source": "FASTAPI_STABLE_GENERATED",
+      "operation_key": "API:GET:/v1/admin/waste/stock",
+      "pagination_class": "NOT_APPLICABLE",
+      "path": "/v1/admin/waste/stock",
+      "request_schema": {
+        "body_schema": null,
+        "parameters": [
+          {
+            "in": "query",
+            "name": "branch_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Branch Id",
+              "type": "string",
+              "x-zeromerma-id-representation": "JSON_STRING"
+            }
+          },
+          {
+            "in": "query",
+            "name": "product_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Product Id",
+              "type": "string",
+              "x-zeromerma-id-representation": "JSON_STRING"
+            }
+          },
+          {
+            "in": "query",
+            "name": "location_code",
+            "required": true,
+            "schema": {
+              "title": "Location Code",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Request-ID",
+            "required": false,
+            "schema": {
+              "format": "uuid",
+              "type": "string",
+              "x-zeromerma-id-representation": "JSON_STRING"
+            }
+          }
+        ]
+      },
+      "stable_order": "NOT_APPLICABLE",
+      "success_response_schema": [
+        {
+          "schema": {
+            "$ref": "#/components/schemas/AdminWasteStockView"
           },
           "status": "200"
         }
@@ -26434,6 +26881,198 @@
         "500"
       ],
       "enum_fields": [],
+      "expected_growth": "NOT_APPLICABLE",
+      "filter_class": [],
+      "frontend_consumers": [
+        "apps/pos-web/src/features/tickets/attribution-command-intent.ts",
+        "apps/pos-web/src/features/tickets/attribution-recovery-panel.tsx",
+        "apps/pos-web/src/features/tickets/inventory-attribution-panel.tsx"
+      ],
+      "generated_client_symbol": "attribute_inventory_v1_sales__sale_id__attribute_inventory_post",
+      "id_fields": [
+        "$.request.parameters[0].schema",
+        "$.request.parameters[2].schema"
+      ],
+      "method": "POST",
+      "nullable_fields": [],
+      "operation_id": "attribute_inventory_v1_sales__sale_id__attribute_inventory_post",
+      "operation_id_source": "FASTAPI_STABLE_GENERATED",
+      "operation_key": "API:POST:/v1/sales/{sale_id}/attribute-inventory",
+      "pagination_class": "NOT_APPLICABLE",
+      "path": "/v1/sales/{sale_id}/attribute-inventory",
+      "request_schema": {
+        "body_schema": {
+          "$ref": "#/components/schemas/ClassAttributionRequest"
+        },
+        "parameters": [
+          {
+            "in": "path",
+            "name": "sale_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Sale Id",
+              "type": "string",
+              "x-zeromerma-id-representation": "JSON_STRING"
+            }
+          },
+          {
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": true,
+            "schema": {
+              "description": "A globally unique UUIDv7 identifying this business intention.",
+              "maxLength": 36,
+              "minLength": 36,
+              "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-7[0-9a-fA-F]{3}-[89aAbB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$",
+              "title": "Idempotency-Key",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Request-ID",
+            "required": false,
+            "schema": {
+              "format": "uuid",
+              "type": "string",
+              "x-zeromerma-id-representation": "JSON_STRING"
+            }
+          }
+        ]
+      },
+      "stable_order": "NOT_APPLICABLE",
+      "success_response_schema": [
+        {
+          "schema": {
+            "$ref": "#/components/schemas/ClassAttributionResult"
+          },
+          "status": "200"
+        }
+      ]
+    },
+    {
+      "consumer_contract_state": "CLIENT_GENERATED_USED",
+      "contract_gap": [],
+      "datetime_fields": [],
+      "decimal_fields": [],
+      "declared_error_responses": [
+        "400",
+        "401",
+        "403",
+        "404",
+        "409",
+        "422",
+        "423",
+        "429",
+        "500"
+      ],
+      "enum_fields": [],
+      "expected_growth": "NOT_APPLICABLE",
+      "filter_class": [],
+      "frontend_consumers": [
+        "apps/pos-web/src/features/tickets/attribution-command-intent.ts",
+        "apps/pos-web/src/features/tickets/attribution-recovery-panel.tsx",
+        "apps/pos-web/src/features/tickets/inventory-attribution-panel.tsx"
+      ],
+      "generated_client_symbol": "recover_attribution_v1_sales__sale_id__inventory_attributions__idempotency_key__get",
+      "id_fields": [
+        "$.request.parameters[0].schema",
+        "$.request.parameters[1].schema",
+        "$.request.parameters[3].schema",
+        "$.request.parameters[4].schema"
+      ],
+      "method": "GET",
+      "nullable_fields": [],
+      "operation_id": "recover_attribution_v1_sales__sale_id__inventory_attributions__idempotency_key__get",
+      "operation_id_source": "FASTAPI_STABLE_GENERATED",
+      "operation_key": "API:GET:/v1/sales/{sale_id}/inventory-attributions/{idempotency_key}",
+      "pagination_class": "NOT_APPLICABLE",
+      "path": "/v1/sales/{sale_id}/inventory-attributions/{idempotency_key}",
+      "request_schema": {
+        "body_schema": null,
+        "parameters": [
+          {
+            "in": "path",
+            "name": "sale_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Sale Id",
+              "type": "string",
+              "x-zeromerma-id-representation": "JSON_STRING"
+            }
+          },
+          {
+            "in": "path",
+            "name": "idempotency_key",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Idempotency Key",
+              "type": "string",
+              "x-zeromerma-id-representation": "JSON_STRING"
+            }
+          },
+          {
+            "in": "query",
+            "name": "workstation_code",
+            "required": true,
+            "schema": {
+              "title": "Workstation Code",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "cash_session_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Cash Session Id",
+              "type": "string",
+              "x-zeromerma-id-representation": "JSON_STRING"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Request-ID",
+            "required": false,
+            "schema": {
+              "format": "uuid",
+              "type": "string",
+              "x-zeromerma-id-representation": "JSON_STRING"
+            }
+          }
+        ]
+      },
+      "stable_order": "NOT_APPLICABLE",
+      "success_response_schema": [
+        {
+          "schema": {
+            "$ref": "#/components/schemas/ClassAttributionResult"
+          },
+          "status": "200"
+        }
+      ]
+    },
+    {
+      "consumer_contract_state": "CLIENT_GENERATED_USED",
+      "contract_gap": [],
+      "datetime_fields": [],
+      "decimal_fields": [],
+      "declared_error_responses": [
+        "400",
+        "401",
+        "403",
+        "404",
+        "409",
+        "422",
+        "423",
+        "429",
+        "500"
+      ],
+      "enum_fields": [],
       "expected_growth": "GROWING",
       "filter_class": [
         "query",
@@ -26791,7 +27430,9 @@
             "schema": {
               "enum": [
                 "dispatch",
-                "receive"
+                "receive",
+                "resolve_return",
+                "resolve_waste"
               ],
               "title": "Command Code",
               "type": "string"
@@ -27392,6 +28033,92 @@
       "request_schema": {
         "body_schema": {
           "$ref": "#/components/schemas/TransferReceiveRequest"
+        },
+        "parameters": [
+          {
+            "in": "path",
+            "name": "transfer_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Transfer Id",
+              "type": "string",
+              "x-zeromerma-id-representation": "JSON_STRING"
+            }
+          },
+          {
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": true,
+            "schema": {
+              "description": "A globally unique UUIDv7 identifying this business intention.",
+              "maxLength": 36,
+              "minLength": 36,
+              "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-7[0-9a-fA-F]{3}-[89aAbB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$",
+              "title": "Idempotency-Key",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Request-ID",
+            "required": false,
+            "schema": {
+              "format": "uuid",
+              "type": "string",
+              "x-zeromerma-id-representation": "JSON_STRING"
+            }
+          }
+        ]
+      },
+      "stable_order": "NOT_APPLICABLE",
+      "success_response_schema": [
+        {
+          "schema": {
+            "$ref": "#/components/schemas/TransferCommandResultView"
+          },
+          "status": "200"
+        }
+      ]
+    },
+    {
+      "consumer_contract_state": "CLIENT_GENERATED_USED",
+      "contract_gap": [],
+      "datetime_fields": [],
+      "decimal_fields": [],
+      "declared_error_responses": [
+        "400",
+        "401",
+        "403",
+        "404",
+        "409",
+        "422",
+        "423",
+        "429",
+        "500"
+      ],
+      "enum_fields": [],
+      "expected_growth": "NOT_APPLICABLE",
+      "filter_class": [],
+      "frontend_consumers": [
+        "apps/pos-web/src/features/transfers/transfer-command-intent.ts",
+        "apps/pos-web/src/features/transfers/transfers-api.ts"
+      ],
+      "generated_client_symbol": "resolve_pos_transfer_v1_transfers__transfer_id__resolve_post",
+      "id_fields": [
+        "$.request.parameters[0].schema",
+        "$.request.parameters[2].schema"
+      ],
+      "method": "POST",
+      "nullable_fields": [],
+      "operation_id": "resolve_pos_transfer_v1_transfers__transfer_id__resolve_post",
+      "operation_id_source": "FASTAPI_STABLE_GENERATED",
+      "operation_key": "API:POST:/v1/transfers/{transfer_id}/resolve",
+      "pagination_class": "NOT_APPLICABLE",
+      "path": "/v1/transfers/{transfer_id}/resolve",
+      "request_schema": {
+        "body_schema": {
+          "$ref": "#/components/schemas/TransferResolveRequest"
         },
         "parameters": [
           {

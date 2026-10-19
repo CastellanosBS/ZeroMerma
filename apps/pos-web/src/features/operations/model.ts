@@ -38,12 +38,15 @@ export type WasteDocumentUiState =
   | "ERROR";
 
 export interface OperationPendingSelection {
+  lotId?: string | null;
   productClass: OperationsCatalogClassView;
   product: OperationsCatalogProductView | null;
   quantityText: string;
 }
 
 export interface OperationLine {
+  lotId?: string | null;
+  lotCode?: string | null;
   key: string;
   productClassCode: string;
   productClassId: string;
@@ -127,6 +130,7 @@ export function selectProductForOperation(
     pendingSelection: {
       ...state.pendingSelection,
       product,
+      lotId: null,
       quantityText: "",
     },
     searchText: "",
@@ -179,23 +183,16 @@ export function setPendingQuantityText(
   };
 }
 
-export function incrementPendingOperationQuantity(
-  state: OperationDraftState,
-): OperationDraftState {
+export function incrementPendingOperationQuantity(state: OperationDraftState): OperationDraftState {
   if (state.pendingSelection === null) {
     return state;
   }
 
   const currentQuantity = parseQuantityToMilliUnits(state.pendingSelection.quantityText) ?? 0;
-  return setPendingQuantityText(
-    state,
-    formatQuantityFromMilliUnits(currentQuantity + 1000),
-  );
+  return setPendingQuantityText(state, formatQuantityFromMilliUnits(currentQuantity + 1000));
 }
 
-export function decrementPendingOperationQuantity(
-  state: OperationDraftState,
-): OperationDraftState {
+export function decrementPendingOperationQuantity(state: OperationDraftState): OperationDraftState {
   if (state.pendingSelection === null) {
     return state;
   }
@@ -205,13 +202,25 @@ export function decrementPendingOperationQuantity(
     return setPendingQuantityText(state, "");
   }
 
-  return setPendingQuantityText(
-    state,
-    formatQuantityFromMilliUnits(currentQuantity - 1000),
-  );
+  return setPendingQuantityText(state, formatQuantityFromMilliUnits(currentQuantity - 1000));
 }
 
-export function addPendingSelectionLine(state: OperationDraftState): OperationDraftState {
+export function setPendingOperationLot(
+  state: OperationDraftState,
+  lotId: string,
+): OperationDraftState {
+  return state.pendingSelection
+    ? {
+        ...state,
+        pendingSelection: { ...state.pendingSelection, lotId: lotId || null },
+      }
+    : state;
+}
+
+export function addPendingSelectionLine(
+  state: OperationDraftState,
+  sourceBucketCode?: string,
+): OperationDraftState {
   if (state.pendingSelection === null || state.pendingSelection.product === null) {
     throw new Error("Selecciona el producto exacto antes de agregar la linea.");
   }
@@ -221,15 +230,30 @@ export function addPendingSelectionLine(state: OperationDraftState): OperationDr
     throw new Error("Captura una cantidad mayor que cero.");
   }
 
+  if (sourceBucketCode && state.pendingSelection.product.lot_tracking_enabled) {
+    const lot = state.pendingSelection.product.inventory_lots?.find(
+      (item) =>
+        item.lot_id === state.pendingSelection?.lotId && item.location_code === sourceBucketCode,
+    );
+    if (!lot) throw new Error("Selecciona el lote físico que vas a registrar como merma.");
+    const alreadyCaptured = state.lines
+      .filter(
+        (line) =>
+          line.productId === state.pendingSelection?.product?.id && line.lotId === lot.lot_id,
+      )
+      .reduce((total, line) => total + line.quantityMilliUnits, 0);
+    const available = parseQuantityToMilliUnits(String(lot.available_quantity)) ?? 0;
+    if (quantityMilliUnits + alreadyCaptured > available) {
+      throw new Error("La cantidad supera el saldo disponible del lote seleccionado.");
+    }
+  }
+
   const nextLine = buildOperationLine(state.pendingSelection, quantityMilliUnits);
   const existingLine = state.lines.find((line) => line.key === nextLine.key);
   const nextLines = existingLine
     ? state.lines.map((line) =>
         line.key === nextLine.key
-          ? updateOperationLineQuantity(
-              line,
-              line.quantityMilliUnits + nextLine.quantityMilliUnits,
-            )
+          ? updateOperationLineQuantity(line, line.quantityMilliUnits + nextLine.quantityMilliUnits)
           : line,
       )
     : [...state.lines, nextLine];
@@ -254,10 +278,7 @@ export function updateOperationLineQuantity(
   };
 }
 
-export function removeOperationLine(
-  lines: OperationLine[],
-  lineKey: string,
-): OperationLine[] {
+export function removeOperationLine(lines: OperationLine[], lineKey: string): OperationLine[] {
   return lines.filter((line) => line.key !== lineKey);
 }
 
@@ -449,14 +470,13 @@ export function getWasteDocumentBlockedReason(args: {
   return getWasteDocumentBlockingMessages(args)[0] ?? null;
 }
 
-export function buildOperationCommitLines(
-  lines: OperationLine[],
-): OperationCommitLineRequest[] {
+export function buildOperationCommitLines(lines: OperationLine[]): OperationCommitLineRequest[] {
   if (lines.length === 0) {
     throw new Error("Agrega al menos una linea antes de registrar el documento.");
   }
 
   return lines.map((line) => ({
+    ...(line.lotId ? { lot_id: line.lotId } : {}),
     product_id: line.productId,
     quantity: formatQuantityFromMilliUnits(line.quantityMilliUnits),
   }));
@@ -471,7 +491,18 @@ function buildOperationLine(
   }
 
   return {
-    key: pendingSelection.product.id,
+    key: pendingSelection.lotId
+      ? `${pendingSelection.product.id}:${pendingSelection.lotId}`
+      : pendingSelection.product.id,
+    ...(pendingSelection.lotId
+      ? {
+          lotId: pendingSelection.lotId,
+          lotCode:
+            pendingSelection.product.inventory_lots?.find(
+              (lot) => lot.lot_id === pendingSelection.lotId,
+            )?.lot_code ?? null,
+        }
+      : {}),
     productClassCode: pendingSelection.productClass.code,
     productClassId: pendingSelection.productClass.id,
     productClassName: pendingSelection.productClass.name,

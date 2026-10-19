@@ -10,6 +10,7 @@ from fastapi import HTTPException
 from sqlalchemy import Column, Delete, Select, Table, and_, event, false, inspect, or_, select
 from sqlalchemy.dialects.postgresql import JSONB, insert
 from sqlalchemy.orm import (
+    InstanceState,
     InstrumentedAttribute,
     Mapper,
     ORMExecuteState,
@@ -43,6 +44,7 @@ from zeromerma_api.modules.identity.infrastructure.models import User, UserBranc
 from zeromerma_api.modules.identity.infrastructure.privileged_models import IdentityPrivilegeState
 from zeromerma_api.modules.operations.infrastructure.models import OperationDocument
 from zeromerma_api.modules.outbox.infrastructure.models import OutboxEvent
+from zeromerma_api.modules.transfers.infrastructure.models import TransferTransitResolution
 
 AUTHORIZATION_METADATA_OPTION = "zeromerma_authorization_metadata"
 _CONTEXT_KEY = "zeromerma_authorization_scope"
@@ -78,6 +80,16 @@ DIRECT_SCOPE_COLUMNS: dict[str, tuple[str, ...]] = {
     "correction_documents": ("source_branch_id", "corrected_destination_branch_id"),
     "operational_discounts": ("branch_id",),
     "inventory_balances": ("branch_id",),
+    "inventory_reservations": ("branch_id",),
+    "inventory_reservation_events": ("branch_id",),
+    "inventory_lot_balances": ("branch_id",),
+    "inventory_movement_lot_allocations": ("branch_id",),
+    "inventory_reservation_lot_allocations": ("branch_id",),
+    "inventory_reservation_event_lots": ("branch_id",),
+    "inventory_reconciliation_manifests": ("branch_id",),
+    "inventory_reconciliation_rows": ("branch_id",),
+    "class_inventory_obligations": ("branch_id",),
+    "transfer_transit_resolutions": ("branch_id", "origin_branch_id", "destination_branch_id"),
     "inventory_adjustments": ("branch_id",),
     "inventory_movements": ("branch_id",),
     "operation_documents": ("source_branch_id", "destination_branch_id"),
@@ -116,12 +128,17 @@ PARENT_SCOPE_COLUMNS: dict[str, tuple[str, ...]] = {
     "equipment_maintenance_records": ("equipment_id",),
     "quality_incident_follow_ups": ("incident_id",),
     "sale_return_lines": ("sale_return_id",),
+    "return_disposition_allocations": ("sale_return_line_id",),
+    "class_inventory_attributions": ("obligation_id",),
+    "transfer_transit_resolution_lines": ("resolution_id",),
+    "purchase_receipt_reversals": ("purchase_receipt_id",),
     "sale_lines": ("sale_id",),
     "sale_payments": ("sale_id",),
 }
 SHARED_TABLES = frozenset(
     {
         "brands",
+        "inventory_lots",
         "product_classes",
         "products",
         "recipes",
@@ -171,9 +188,9 @@ COMMAND_METADATA_TABLES = frozenset({IdempotencyRecord.__tablename__})
 
 
 @dataclass
-class TransferReceiptCause:
+class TransferCompletionCause:
     shipment: OperationDocument
-    receipt: OperationDocument
+    evidence: OperationDocument | TransferTransitResolution
     transaction: SessionTransaction
     workstation_id: UUID
     actor_id: UUID
@@ -190,8 +207,12 @@ class AuthorizationScope:
     branch_ids: frozenset[UUID] | None
     identity_mutation: bool
     resource_branch_ids: set[UUID] = field(default_factory=set)
-    transfer_receipts: dict[OperationDocument, SessionTransaction] = field(default_factory=dict)
-    received_shipments: dict[OperationDocument, TransferReceiptCause] = field(default_factory=dict)
+    transfer_completions: dict[
+        OperationDocument | TransferTransitResolution, SessionTransaction
+    ] = field(default_factory=dict)
+    completed_shipments: dict[OperationDocument, TransferCompletionCause] = field(
+        default_factory=dict
+    )
     validating: bool = False
 
     @property
@@ -590,35 +611,66 @@ def _entity_branches(
     return branches
 
 
-def _has_live_transfer_receipt(session: Session, cause: TransferReceiptCause) -> bool:
-    shipment, receipt = cause.shipment, cause.receipt
-    shipment_state, receipt_state = inspect(shipment), inspect(receipt)
-    return (
+def _has_live_transfer_completion(session: Session, cause: TransferCompletionCause) -> bool:
+    shipment, evidence = cause.shipment, cause.evidence
+    shipment_state = inspect(shipment)
+    evidence_state = cast(InstanceState[Base], inspect(evidence))
+    if not (
         cause.transaction is session.get_transaction()
         and shipment_state.session is session
         and shipment_state.persistent
         and shipment not in session.deleted
-        and receipt_state.session is session
-        and receipt_state.persistent
-        and receipt not in session.deleted
+        and evidence_state.session is session
+        and evidence_state.persistent
+        and evidence not in session.deleted
         and shipment.document_type == "BRANCH_TRANSFER_SHIPMENT"
-        and shipment.status in {"RECEIVED", "RECEIVED_WITH_VARIANCE"}
-        and receipt.document_type == "BRANCH_TRANSFER_RECEIPT"
-        and receipt.reference_document_id == shipment.id
-        and receipt.source_branch_id == shipment.source_branch_id
-        and receipt.destination_branch_id == shipment.destination_branch_id
-        and receipt.workstation_id == cause.workstation_id
-        and receipt.created_by_user_id == cause.actor_id
-        and receipt.status == shipment.status
+        and shipment.status in {"RECEIVED", "RECEIVED_WITH_VARIANCE", "CANCELLED"}
+        and evidence.workstation_id == cause.workstation_id
+    ):
+        return False
+    if isinstance(evidence, OperationDocument):
+        return (
+            evidence.document_type == "BRANCH_TRANSFER_RECEIPT"
+            and evidence.reference_document_id == shipment.id
+            and evidence.source_branch_id == shipment.source_branch_id
+            and evidence.destination_branch_id == shipment.destination_branch_id
+            and evidence.created_by_user_id == cause.actor_id
+            and evidence.status in {"RECEIVED", "RECEIVED_WITH_VARIANCE"}
+            and shipment.status in {"RECEIVED", "RECEIVED_WITH_VARIANCE"}
+        )
+    from zeromerma_api.db.operation_context import get_operation_context
+    from zeromerma_api.modules.idempotency.application.context import execution
+
+    owner = execution(session)
+    command = get_operation_context(session)
+    return (
+        owner is not None
+        and owner.record is not None
+        and evidence.idempotency_record_id == owner.record.id == command.operation_id
+        and evidence.actor_id == cause.actor_id == owner.record.actor_user_id
+        and evidence.shipment_id == shipment.id
+        and evidence.origin_branch_id == shipment.source_branch_id
+        and evidence.destination_branch_id == shipment.destination_branch_id
+        and shipment.status
+        in (
+            {"RECEIVED_WITH_VARIANCE", "CANCELLED"}
+            if evidence.kind == "RETURN_TO_ORIGIN"
+            else {"RECEIVED_WITH_VARIANCE"}
+        )
+        and command.operation_code
+        == {
+            "RETURN_TO_ORIGIN": "transfer.resolve_return",
+            "SEND_TO_WASTE": "transfer.resolve_waste",
+        }.get(evidence.kind)
     )
 
 
-def _received_shipment_cause(
+def _shipment_completion_cause(
     session: Session,
     context: AuthorizationScope,
     instance: Base,
     workstation_id: UUID | None,
-) -> TransferReceiptCause | None:
+) -> TransferCompletionCause | None:
     if (
         not isinstance(instance, OperationDocument)
         or instance.document_type != "BRANCH_TRANSFER_SHIPMENT"
@@ -633,22 +685,83 @@ def _received_shipment_cause(
         not state.persistent
         or changed != {"status"}
         or list(state.attrs.status.history.deleted) != ["IN_TRANSIT"]
-        or instance.status not in {"RECEIVED", "RECEIVED_WITH_VARIANCE"}
+        or instance.status not in {"RECEIVED", "RECEIVED_WITH_VARIANCE", "CANCELLED"}
     ):
         return None
-    for receipt, transaction in context.transfer_receipts.items():
-        cause = TransferReceiptCause(
-            instance, receipt, transaction, workstation_id, context.user.id
+    for evidence, transaction in context.transfer_completions.items():
+        cause = TransferCompletionCause(
+            instance, evidence, transaction, workstation_id, context.user.id
         )
-        if _has_live_transfer_receipt(session, cause):
+        if _has_live_transfer_completion(session, cause):
             return cause
     return None
 
 
-def _validate_transfer_receipt_causes(session: Session, context: AuthorizationScope) -> None:
-    for cause in context.received_shipments.values():
-        if not _has_live_transfer_receipt(session, cause):
-            raise _deny("A received shipment requires its current-transaction receipt.")
+def _validate_transfer_completion_causes(session: Session, context: AuthorizationScope) -> None:
+    for cause in context.completed_shipments.values():
+        if not _has_live_transfer_completion(session, cause):
+            raise _deny("A completed shipment requires its current-transaction physical evidence.")
+
+
+def _inventory_command_reference(
+    session: Session, instance: Base, column_name: str, related_branches: set[UUID]
+) -> bool:
+    """A destination stock fact retains the actual origin command's cash/station context."""
+    from zeromerma_api.db.operation_context import get_operation_context
+    from zeromerma_api.modules.idempotency.application.context import execution
+
+    if (
+        _table(type(instance)).name != "inventory_movements"
+        or column_name not in {"workstation_id", "cash_session_id"}
+        or not inspect(instance).pending
+    ):
+        return False
+    owner = execution(session)
+    if owner is None or owner.record is None or not owner.action_running:
+        return False
+    command = get_operation_context(session)
+    return (
+        getattr(instance, "idempotency_record_id", None) == owner.record.id
+        and command.operation_id == owner.record.id
+        and getattr(instance, "operator_user_id", None) == owner.record.actor_user_id
+        and getattr(instance, column_name, None) == getattr(command, column_name)
+        and related_branches == {command.branch_id}
+        and getattr(instance, "branch_id", None) in command.related_branch_ids
+        and command.operation_code
+        in {
+            "transfer.dispatch",
+            "transfer.receive",
+            "transfer.resolve_return",
+            "transfer.resolve_waste",
+        }
+    )
+
+
+def _validate_new_inventory_lot(
+    session: Session, context: AuthorizationScope, instance: Base
+) -> None:
+    from zeromerma_api.db.operation_context import get_operation_context
+    from zeromerma_api.modules.idempotency.application.context import execution
+
+    owner = execution(session)
+    command = get_operation_context(session)
+    if (
+        not inspect(instance).pending
+        or owner is None
+        or owner.record is None
+        or not owner.action_running
+        or command.branch_id is None
+        or command.operation_id != owner.record.id
+        or getattr(instance, "idempotency_record_id", None) != owner.record.id
+        or getattr(instance, "operator_user_id", None) != owner.record.actor_user_id
+        or context.user.id != owner.record.actor_user_id
+    ):
+        raise _deny(
+            "A new lot requires the current branch command; existing lot identity is immutable."
+        )
+    for capability in context.capabilities:
+        require_branches(context.user, capability, [command.branch_id])
+    context.resource_branch_ids.add(command.branch_id)
 
 
 def _validate_entity(
@@ -666,7 +779,7 @@ def _validate_entity(
     )
 
     authentication = session.info.get(AUTH_CONTEXT_KEY)
-    receipt_cause = None
+    completion_cause = None
     if isinstance(authentication, SessionAuthentication):
         if name == "auth_sessions" and getattr(instance, "id", None) == authentication.record.id:
             changed = {
@@ -707,10 +820,10 @@ def _validate_entity(
                 )
             workstation_ids -= {None, authentication.record.workstation_id}
             if workstation_ids:
-                receipt_cause = _received_shipment_cause(
+                completion_cause = _shipment_completion_cause(
                     session, context, instance, authentication.record.workstation_id
                 )
-                if receipt_cause is None:
+                if completion_cause is None:
                     raise _deny("This POS session is bound to another workstation.")
     if name in IDENTITY_METADATA_TABLES:
         if not context.identity_mutation:
@@ -723,6 +836,9 @@ def _validate_entity(
             context.resource_branch_ids.add(instance.branch_id)
         return
     if name in SHARED_TABLES:
+        if name == "inventory_lots":
+            _validate_new_inventory_lot(session, context, instance)
+            return
         if context.branch_ids is not None:
             raise _deny("Shared master changes require explicit GLOBAL authority.")
         return
@@ -797,8 +913,11 @@ def _validate_entity(
                 related_branches = _entity_branches(session, parent, models)
             for capability in context.capabilities:
                 require_branches(context.user, capability, related_branches)
+            inventory_command_reference = _inventory_command_reference(
+                session, instance, column.key, related_branches
+            )
             if len(branches) == 1 and name not in {"operation_documents", "correction_documents"}:
-                if not related_branches.issubset(branches):
+                if not related_branches.issubset(branches) and not inventory_command_reference:
                     raise _deny("Related records must belong to the same authorized branch.")
             if column.key == "workstation_id":
                 expected = getattr(
@@ -809,7 +928,11 @@ def _validate_entity(
                     and getattr(instance, "document_type", None) == "BRANCH_TRANSFER_RECEIPT"
                 ):
                     expected = getattr(instance, "destination_branch_id", None)
-                if expected is not None and related_branches != {expected}:
+                if (
+                    expected is not None
+                    and related_branches != {expected}
+                    and not inventory_command_reference
+                ):
                     raise _deny("The workstation does not belong to the document branch.")
     cash_session_id = getattr(
         instance, "cash_session_id", getattr(instance, "active_cash_session_id", None)
@@ -819,17 +942,19 @@ def _validate_entity(
         cash_session = _reference(session, models["cash_sessions"], "id", cash_session_id)
         if _value(cash_session, "workstation_id") != workstation_id:
             raise _deny("The cash session and workstation do not match.")
-    if (
-        isinstance(instance, OperationDocument)
-        and instance.document_type == "BRANCH_TRANSFER_RECEIPT"
-        and inspect(instance).pending
+    if inspect(instance).pending and (
+        isinstance(instance, TransferTransitResolution)
+        or (
+            isinstance(instance, OperationDocument)
+            and instance.document_type == "BRANCH_TRANSFER_RECEIPT"
+        )
     ):
         transaction = session.get_transaction()
         if transaction is not None:
             # Only validated inserts in this transaction can authorize the source status update.
-            context.transfer_receipts[instance] = transaction
-    if receipt_cause is not None:
-        context.received_shipments[receipt_cause.shipment] = receipt_cause
+            context.transfer_completions[instance] = transaction
+    if completion_cause is not None:
+        context.completed_shipments[completion_cause.shipment] = completion_cause
 
 
 def _revalidate(session: Session, context: AuthorizationScope) -> None:
@@ -880,7 +1005,7 @@ def _before_flush(session: Session, flush_context: object, instances: object) ->
         for instance in changed:
             if isinstance(instance, Base):
                 _validate_entity(session, context, instance, models)
-        _validate_transfer_receipt_causes(session, context)
+        _validate_transfer_completion_causes(session, context)
         _stamp_traces(context, session.new)
     finally:
         context.validating = False
@@ -892,7 +1017,7 @@ def _before_commit(session: Session) -> None:
         context.validating = True
         try:
             _revalidate(session, context)
-            _validate_transfer_receipt_causes(session, context)
+            _validate_transfer_completion_causes(session, context)
         finally:
             context.validating = False
 
@@ -900,22 +1025,23 @@ def _before_commit(session: Session) -> None:
 def _after_transaction_end(session: Session, transaction: SessionTransaction) -> None:
     context = authorization_scope(session)
     if context is not None and transaction.parent is None:
-        context.transfer_receipts.clear()
-        context.received_shipments.clear()
+        context.transfer_completions.clear()
+        context.completed_shipments.clear()
 
 
 def _after_soft_rollback(session: Session, transaction: SessionTransaction) -> None:
     context = authorization_scope(session)
     if context is not None and transaction.nested and session.is_active:
-        context.transfer_receipts = {
-            receipt: owner
-            for receipt, owner in context.transfer_receipts.items()
-            if inspect(receipt).session is session and inspect(receipt).persistent
+        context.transfer_completions = {
+            evidence: owner
+            for evidence, owner in context.transfer_completions.items()
+            if cast(InstanceState[Base], inspect(evidence)).session is session
+            and cast(InstanceState[Base], inspect(evidence)).persistent
         }
-        context.received_shipments = {
+        context.completed_shipments = {
             shipment: cause
-            for shipment, cause in context.received_shipments.items()
-            if _has_live_transfer_receipt(session, cause)
+            for shipment, cause in context.completed_shipments.items()
+            if _has_live_transfer_completion(session, cause)
         }
 
 

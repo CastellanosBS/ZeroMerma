@@ -240,6 +240,7 @@ function mapWasteListFromApi(response: ApiWasteListResponse): AdminWasteListResp
 
 function toCreateApiPayload(payload: AdminWasteCreatePayload): ApiWasteCreatePayload {
   return {
+    lot_id: payload.lotId ?? null,
     branch_id: payload.branchId,
     location_code: payload.locationCode,
     notes: payload.notes ?? null,
@@ -247,6 +248,21 @@ function toCreateApiPayload(payload: AdminWasteCreatePayload): ApiWasteCreatePay
     quantity: payload.quantity,
     reason_code: payload.reasonCode,
   };
+}
+
+export function fetchAdminWasteStock(
+  branchId: string,
+  productId: string,
+  locationCode: string,
+): Promise<components["schemas"]["AdminWasteStockView"]> {
+  const params = new URLSearchParams({
+    branch_id: branchId,
+    product_id: productId,
+    location_code: locationCode,
+  });
+  return requestJson<components["schemas"]["AdminWasteStockView"]>({
+    path: `/v1/admin/waste/stock?${params.toString()}`,
+  });
 }
 
 export function buildAdminWasteListPath(filters: AdminWasteListFilters): string {

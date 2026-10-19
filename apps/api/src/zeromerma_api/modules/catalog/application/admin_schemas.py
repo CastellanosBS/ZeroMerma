@@ -77,6 +77,10 @@ class AdminProductReadinessView(BaseModel):
 
 
 class AdminProductView(BaseModel):
+    is_sellable: bool = True
+    is_usable_as_input: bool = False
+    lot_tracking_enabled: bool = False
+    expiry_required: bool = False
     id: UUID
     code: str
     sku: str | None = None
@@ -126,6 +130,10 @@ class AdminProductsListResponse(BaseModel):
 
 
 class AdminProductCreateRequest(BaseModel):
+    is_sellable: bool = True
+    is_usable_as_input: bool = False
+    lot_tracking_enabled: bool = False
+    expiry_required: bool = False
     code: str = Field(min_length=1, max_length=64)
     name: str = Field(min_length=1, max_length=160)
     product_class_id: UUID
@@ -145,6 +153,10 @@ class AdminProductCreateRequest(BaseModel):
 
 
 class AdminProductUpdateRequest(BaseModel):
+    is_sellable: bool | None = None
+    is_usable_as_input: bool | None = None
+    lot_tracking_enabled: bool | None = None
+    expiry_required: bool | None = None
     code: str | None = Field(default=None, min_length=1, max_length=64)
     name: str | None = Field(default=None, min_length=1, max_length=160)
     product_class_id: UUID | None = None

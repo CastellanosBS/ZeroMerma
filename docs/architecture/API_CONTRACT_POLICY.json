@@ -734,6 +734,7 @@
           "page",
           "page_size",
           "payment_method",
+          "pending_physical_only",
           "search",
           "status",
           "workstation_id"

@@ -1,3 +1,4 @@
+import type { components } from "@zeromerma/api-client";
 import type {
   PendingInboundTransfersResponse,
   TransferDetailResponse,
@@ -126,5 +127,18 @@ export function recoverTransferCommand(
   });
   return requestJson({
     path: `/v1/transfers/commands/${commandCode}/confirmations/${encodeURIComponent(key)}?${query}`,
+  });
+}
+
+export function resolveTransferTransit(
+  transferId: string,
+  payload: components["schemas"]["TransferResolveRequest"],
+  idempotencyKey: string,
+): Promise<TransferCommandResultView> {
+  return requestJson({
+    headers: { "Idempotency-Key": idempotencyKey },
+    body: payload,
+    method: "POST",
+    path: `/v1/transfers/${encodeURIComponent(transferId)}/resolve`,
   });
 }

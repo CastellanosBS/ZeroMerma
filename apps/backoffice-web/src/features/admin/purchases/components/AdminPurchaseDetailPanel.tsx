@@ -100,6 +100,7 @@ interface AdminPurchaseDetailPanelProps {
   onOpenBranch: (branchId: string) => void;
   onOpenProduct: (productId: string) => void;
   onOpenSupplier: (supplierId: string) => void;
+  onReverseReceipt?: (purchase: AdminPurchaseDetail) => void;
   onReceive: (purchase: AdminPurchaseDetail) => void;
   purchaseDetail?: AdminPurchaseDetail | null;
   purchasePreview?: AdminPurchaseListItem | null;
@@ -114,6 +115,7 @@ export function AdminPurchaseDetailPanel({
   onOpenProduct,
   onOpenSupplier,
   onReceive,
+  onReverseReceipt,
   purchaseDetail,
   purchasePreview,
 }: AdminPurchaseDetailPanelProps) {
@@ -254,11 +256,17 @@ export function AdminPurchaseDetailPanel({
                     <div className="grid min-w-0 grid-cols-2 gap-1.5 md:grid-cols-4">
                       <InfoRow
                         label="Ordenado"
-                        value={`${line.orderedQuantity} ${line.unitOfMeasure}`}
+                        value={`${line.orderedQuantity} ${line.sourceUnitOfMeasure ?? line.unitOfMeasure}`}
                       />
                       <InfoRow label="Recibido" value={line.receivedQuantity} />
                       <InfoRow label="Pendiente" value={line.pendingQuantity} />
                       <InfoRow label="Costo" value={line.unitCost} />
+                      <InfoRow label="Unidad base" value={line.unitOfMeasure} />
+                      <InfoRow label="Factor registrado" value={line.conversionFactor ?? "1"} />
+                      <InfoRow
+                        label="Cantidad base ordenada"
+                        value={line.orderedQuantityBase ?? line.orderedQuantity}
+                      />
                     </div>
                     {line.discrepancyReason ? (
                       <p
@@ -273,6 +281,42 @@ export function AdminPurchaseDetailPanel({
               </div>
             </Section>
 
+            <Section title="Recepciones y reversas">
+              {purchaseDetail.receipts?.map((receipt) => (
+                <div className="rounded-xl border p-2" key={receipt.id}>
+                  <InfoRow label="Recepción" value={receipt.folio} />
+                  <InfoRow label="Fecha" value={formatDate(receipt.received_at)} />
+                  <InfoRow label="Costo recibido" value={receipt.received_total} />
+                  <InfoRow
+                    label="Estado"
+                    value={receipt.reversal_id ? "Revertida" : "Confirmada"}
+                  />
+                  {receipt.reversal_reason ? <p>{receipt.reversal_reason}</p> : null}
+                  {receipt.lines?.map((line) => (
+                    <div className="mt-2 border-t pt-2" key={line.id}>
+                      <InfoRow
+                        label="Producto"
+                        value={
+                          purchaseDetail.lines.find((item) => item.productId === line.product_id)
+                            ?.productName ?? line.product_id
+                        }
+                      />
+                      <InfoRow
+                        label="Cantidad original"
+                        value={`${line.received_quantity} ${line.source_unit_of_measure}`}
+                      />
+                      <InfoRow
+                        label="Cantidad base"
+                        value={`${line.received_quantity_base} ${line.base_unit_of_measure}`}
+                      />
+                      <InfoRow label="Costo por unidad original" value={line.source_unit_cost} />
+                      <InfoRow label="Costo por unidad base" value={line.base_unit_cost} />
+                      <InfoRow label="Lote" value={line.lot_id ?? "Sin control de lote"} />
+                    </div>
+                  ))}
+                </div>
+              ))}
+            </Section>
             <Section title="Recepcion / discrepancias">
               <div className="grid gap-1.5">
                 <InfoRow label="Esperado" value={purchaseDetail.receipt.expectedQuantity} />
@@ -322,6 +366,10 @@ export function AdminPurchaseDetailPanel({
                         {movement.direction} - {movement.locationCode} - saldo{" "}
                         {movement.balanceAfter ?? "N/D"}
                       </p>
+                      <InfoRow
+                        label="Valor registrado"
+                        value={movement.totalCost ?? "No disponible"}
+                      />
                     </li>
                   ))}
                 </ul>
@@ -394,6 +442,16 @@ export function AdminPurchaseDetailPanel({
               onClick={() => onReceive(purchaseDetail)}
             >
               Recibir
+            </AdminActionButton>
+          ) : null}
+          {purchaseDetail.availableActions.canReverseReceipt && onReverseReceipt ? (
+            <AdminActionButton
+              capability="purchases.cancel"
+              branchIds={[purchaseDetail.receivingBranch.branchId]}
+              type="button"
+              onClick={() => onReverseReceipt(purchaseDetail)}
+            >
+              Revertir recepción
             </AdminActionButton>
           ) : null}
           {purchaseDetail.availableActions.canCancel ? (

@@ -34,6 +34,21 @@ class EndpointPolicy:
 # Each method/path is deliberate. Unlisted operations are denied, never inferred.
 # Shared masters have no branch owner: mutations require explicit GLOBAL (DEC-04).
 ENDPOINT_POLICIES: dict[tuple[str, str], EndpointPolicy] = {
+    ("POST", "/v1/admin/inventory-dispositions"): EndpointPolicy(
+        (),
+        "BACKOFFICE",
+        mutation=True,
+        exception_reason=(
+            "Typed disposition binds inventory or return correction authority before executing."
+        ),
+    ),
+    ("GET", "/v1/admin/inventory-dispositions/confirmations/{idempotency_key}"): EndpointPolicy(
+        (),
+        "BACKOFFICE",
+        exception_reason=(
+            "Disposition recovery rechecks the original operation capability and branch."
+        ),
+    ),
     ("POST", "/v1/returns/{return_id}/refund-settlements"): EndpointPolicy(
         ("returns_corrections.manage",), "POS", mutation=True
     ),
@@ -280,6 +295,7 @@ ENDPOINT_POLICIES: dict[tuple[str, str], EndpointPolicy] = {
     ("GET", "/v1/admin/users/{user_id}"): EndpointPolicy(("users.view",), "BACKOFFICE"),
     ("GET", "/v1/admin/waste"): EndpointPolicy(("waste.view",), "BACKOFFICE"),
     ("GET", "/v1/admin/waste/reasons"): EndpointPolicy(("waste.view",), "BACKOFFICE"),
+    ("GET", "/v1/admin/waste/stock"): EndpointPolicy(("waste.view",), "BACKOFFICE"),
     ("GET", "/v1/admin/waste/{waste_id}"): EndpointPolicy(("waste.view",), "BACKOFFICE"),
     ("GET", "/v1/admin/workstations"): EndpointPolicy(("workstations.view",), "BACKOFFICE"),
     ("GET", "/v1/admin/workstations/{workstation_id}"): EndpointPolicy(
@@ -563,7 +579,7 @@ ENDPOINT_POLICIES: dict[tuple[str, str], EndpointPolicy] = {
     ("POST", "/v1/admin/production/{production_id}/complete"): EndpointPolicy(
         ("production.execute",), "BACKOFFICE", mutation=True
     ),
-    ("POST", "/v1/admin/production/{production_id}/start"): EndpointPolicy(
+    ("POST", "/v1/admin/production/{production_id}/release"): EndpointPolicy(
         ("production.execute",), "BACKOFFICE", mutation=True
     ),
     ("POST", "/v1/admin/products"): EndpointPolicy(
@@ -583,6 +599,15 @@ ENDPOINT_POLICIES: dict[tuple[str, str], EndpointPolicy] = {
     ),
     ("POST", "/v1/admin/purchases/{purchase_id}/confirm"): EndpointPolicy(
         ("purchases.confirm",), "BACKOFFICE", mutation=True
+    ),
+    ("POST", "/v1/admin/purchases/{purchase_id}/reverse-receipt"): EndpointPolicy(
+        ("purchases.cancel",), "BACKOFFICE", mutation=True
+    ),
+    ("POST", "/v1/transfers/{transfer_id}/resolve"): EndpointPolicy(
+        ("transfers.execute",), "POS", mutation=True
+    ),
+    ("POST", "/v1/admin/transfers/{transfer_id}/resolve"): EndpointPolicy(
+        ("transfers.execute",), "BACKOFFICE", mutation=True
     ),
     ("POST", "/v1/admin/purchases/{purchase_id}/receive"): EndpointPolicy(
         ("purchases.receive",), "BACKOFFICE", mutation=True
@@ -699,6 +724,12 @@ ENDPOINT_POLICIES: dict[tuple[str, str], EndpointPolicy] = {
         (),
         None,
         exception_reason="Public authentication validates credentials without implicit authority.",
+    ),
+    ("POST", "/v1/sales/{sale_id}/attribute-inventory"): EndpointPolicy(
+        ("pos.operate",), "POS", mutation=True
+    ),
+    ("GET", "/v1/sales/{sale_id}/inventory-attributions/{idempotency_key}"): EndpointPolicy(
+        ("pos.operate",), "POS"
     ),
     ("POST", "/v1/cash-close/commit"): EndpointPolicy(("pos.operate",), "POS", mutation=True),
     ("POST", "/v1/cash-close/preview"): EndpointPolicy(("pos.operate",), "POS"),

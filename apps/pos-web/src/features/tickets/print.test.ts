@@ -41,6 +41,10 @@ const ticketFixture: TicketDetailResponse = {
   lines: [
     {
       id: "04354103-70bc-4a0b-86b6-a2af9d62862a",
+      capture_mode: "CLASS_CAPTURE",
+      remaining_attribution_quantity: "2.000",
+      attribution_options: [],
+      physical_attributions: [],
       sequence: 1,
       name: "Pan dulce",
       quantity: "2",

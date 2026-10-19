@@ -3,6 +3,7 @@ from __future__ import annotations
 from decimal import Decimal
 from uuid import UUID
 
+from pydantic import TypeAdapter
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
@@ -12,13 +13,24 @@ from zeromerma_api.modules.operations.infrastructure.models import (
     OperationDocument,
     OperationDocumentLine,
 )
+from zeromerma_api.modules.transfers.application.lot_queries import (
+    resolution_line_lots,
+    shipment_lot_progress,
+)
 from zeromerma_api.modules.transfers.application.schemas import (
     TransferCommandLineView,
     TransferCommandResultView,
+    TransferResolutionKind,
+    TransferResolutionLineView,
+    TransferResolutionView,
 )
 from zeromerma_api.modules.transfers.domain.exceptions import (
     TransferNotFoundError,
     TransferValidationError,
+)
+from zeromerma_api.modules.transfers.infrastructure.models import (
+    TransferTransitResolution,
+    TransferTransitResolutionLine,
 )
 
 
@@ -93,6 +105,8 @@ def received_quantities(session: Session, shipment_id: UUID) -> dict[int, Decima
 
 def progress(session: Session, shipment_id: UUID) -> list[TransferCommandLineView]:
     received = received_quantities(session, shipment_id)
+    resolved = resolution_quantities(session, shipment_id)
+    lots = shipment_lot_progress(session, shipment_id)
     lines = session.scalars(
         select(OperationDocumentLine)
         .where(OperationDocumentLine.operation_document_id == shipment_id)
@@ -104,14 +118,26 @@ def progress(session: Session, shipment_id: UUID) -> list[TransferCommandLineVie
             product_id=line.product_id,
             sent_quantity=line.quantity,
             received_quantity=received.get(line.line_number, Decimal(0)),
-            pending_quantity=line.quantity - received.get(line.line_number, Decimal(0)),
+            returned_quantity=resolved.get((line.id, "RETURN_TO_ORIGIN"), Decimal(0)),
+            waste_quantity=resolved.get((line.id, "SEND_TO_WASTE"), Decimal(0)),
+            lots=lots.get(line.id, []),
+            pending_quantity=(
+                line.quantity
+                - received.get(line.line_number, Decimal(0))
+                - resolved.get((line.id, "RETURN_TO_ORIGIN"), Decimal(0))
+                - resolved.get((line.id, "SEND_TO_WASTE"), Decimal(0))
+            ),
         )
         for line in lines
     ]
 
 
 def command_snapshot(
-    session: Session, shipment: OperationDocument, *, receipt_id: UUID | None = None
+    session: Session,
+    shipment: OperationDocument,
+    *,
+    receipt_id: UUID | None = None,
+    resolution_id: UUID | None = None,
 ) -> TransferCommandResultView:
     session.flush()
     if shipment.destination_branch_id is None:
@@ -126,6 +152,7 @@ def command_snapshot(
         origin_branch_id=shipment.source_branch_id,
         destination_branch_id=shipment.destination_branch_id,
         receipt_id=receipt_id,
+        resolution_id=resolution_id,
         cash_session_id=owner.record.cash_session_id,
         committed_at_utc=shipment.committed_at_utc,
         lines=progress(session, shipment.id),
@@ -141,3 +168,54 @@ def command_trace(session: Session) -> dict[str, str]:
         "operation_id": str(owner.record.id),
         "operation_code": owner.record.operation_code,
     }
+
+
+def resolution_quantities(session: Session, shipment_id: UUID) -> dict[tuple[UUID, str], Decimal]:
+    quantities: dict[tuple[UUID, str], Decimal] = {}
+    for resolution, line in session.execute(
+        select(TransferTransitResolution, TransferTransitResolutionLine)
+        .join(
+            TransferTransitResolutionLine,
+            TransferTransitResolutionLine.resolution_id == TransferTransitResolution.id,
+        )
+        .where(TransferTransitResolution.shipment_id == shipment_id)
+    ):
+        key = (line.shipment_line_id, resolution.kind)
+        quantities[key] = quantities.get(key, Decimal(0)) + line.quantity
+    return quantities
+
+
+def resolution_history(session: Session, shipment_id: UUID) -> list[TransferResolutionView]:
+    result = []
+    for resolution in session.scalars(
+        select(TransferTransitResolution)
+        .where(TransferTransitResolution.shipment_id == shipment_id)
+        .order_by(TransferTransitResolution.occurred_at, TransferTransitResolution.id)
+    ):
+        lines = session.scalars(
+            select(TransferTransitResolutionLine)
+            .where(TransferTransitResolutionLine.resolution_id == resolution.id)
+            .order_by(TransferTransitResolutionLine.shipment_line_id)
+        )
+        result.append(
+            TransferResolutionView(
+                id=resolution.id,
+                kind=TypeAdapter(TransferResolutionKind).validate_python(resolution.kind),
+                destination_location=resolution.destination_location,
+                branch_id=resolution.branch_id,
+                reason=resolution.reason,
+                actor_id=resolution.actor_id,
+                occurred_at=resolution.occurred_at,
+                lines=[
+                    TransferResolutionLineView(
+                        shipment_line_id=line.shipment_line_id,
+                        product_id=line.product_id,
+                        quantity=line.quantity,
+                        unit_of_measure=line.unit_of_measure,
+                        lots=resolution_line_lots(session, line.id),
+                    )
+                    for line in lines
+                ],
+            )
+        )
+    return result

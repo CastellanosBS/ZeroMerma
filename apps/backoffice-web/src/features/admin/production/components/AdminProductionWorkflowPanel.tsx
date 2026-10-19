@@ -15,18 +15,18 @@ import type {
 const inputClassName =
   "h-10 w-full min-w-0 rounded-2xl border border-[var(--ui-color-border)] bg-white px-3 text-sm font-medium text-slate-950 outline-none transition placeholder:text-slate-400 focus:border-[var(--ui-color-info)] focus:ring-4 focus:ring-[var(--ui-color-ring)] disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-500";
 
-type WorkflowMode = "cancel" | "complete" | "create" | "edit" | "start";
+type WorkflowMode = "cancel" | "complete" | "create" | "edit" | "release";
 
 interface AdminProductionWorkflowPanelProps {
   branchOptions: AdminProductionFilterOption[];
   errorMessage?: string | null;
   isSubmitting?: boolean;
   mode: WorkflowMode;
-  onCancelProduction: (reason: string | null) => void;
+  onCancelProduction: (reason: string | null, noPhysicalEffectsConfirmed: boolean) => void;
   onClose: () => void;
   onComplete: (payload: AdminProductionCompletePayload) => void;
-  onCreate: (payload: AdminProductionCreatePayload, startNow: boolean) => void;
-  onStart: (notes: string | null) => void;
+  onCreate: (payload: AdminProductionCreatePayload, releaseNow: boolean) => void;
+  onRelease: (notes: string | null) => void;
   onUpdate: (payload: AdminProductionUpdatePayload) => void;
   productOptions: AdminProductionFilterOption[];
   production?: AdminProductionDetail | null;
@@ -39,9 +39,15 @@ function getTitle(mode: WorkflowMode): string {
     complete: "Completar produccion",
     create: "Nueva produccion",
     edit: "Editar borrador",
-    start: "Iniciar produccion",
+    release: "Liberar plan",
   };
   return labels[mode];
+}
+
+function localDateTime(value: string | null | undefined): string {
+  if (!value) return "";
+  const date = new Date(value);
+  return new Date(date.getTime() - date.getTimezoneOffset() * 60_000).toISOString().slice(0, 23);
 }
 
 function getDescription(mode: WorkflowMode, production?: AdminProductionDetail | null): string {
@@ -53,10 +59,10 @@ function getDescription(mode: WorkflowMode, production?: AdminProductionDetail |
       ? `${production.overview.folio} - solo disponible en borrador.`
       : "Solo disponible en borrador.";
   }
-  if (mode === "start") {
+  if (mode === "release") {
     return production
-      ? `${production.overview.folio} validara insumos antes de iniciar.`
-      : "Valida insumos antes de iniciar.";
+      ? `${production.overview.folio} reservará insumos sin declarar un inicio físico.`
+      : "Reserva insumos sin consumirlos.";
   }
   if (mode === "complete") {
     return production
@@ -77,7 +83,7 @@ export function AdminProductionWorkflowPanel({
   onClose,
   onComplete,
   onCreate,
-  onStart,
+  onRelease,
   onUpdate,
   productOptions,
   production,
@@ -87,7 +93,7 @@ export function AdminProductionWorkflowPanel({
   const actionCapability: PermissionCode =
     mode === "cancel"
       ? "production.cancel"
-      : mode === "start" || mode === "complete"
+      : mode === "release" || mode === "complete"
         ? "production.execute"
         : "production.manage";
   const branchOptions = useMemo(
@@ -98,7 +104,7 @@ export function AdminProductionWorkflowPanel({
     [actor, actionCapability, allBranchOptions],
   );
   const [actualOutputQty, setActualOutputQty] = useState(
-    production?.overview.plannedOutputQty ?? "",
+    production?.overview.actualOutputQty ?? production?.overview.plannedOutputQty ?? "",
   );
   const [branchId, setBranchId] = useState(
     production?.overview.branchId || branchOptions[0]?.id || "",
@@ -114,6 +120,32 @@ export function AdminProductionWorkflowPanel({
   );
   const [reason, setReason] = useState("");
   const [recipeId, setRecipeId] = useState(production?.productRecipe.recipeId || "");
+  const [noPhysicalEffects, setNoPhysicalEffects] = useState(false);
+  const [withoutDifferences, setWithoutDifferences] = useState(
+    production?.overview.status !== "PENDING_RECONCILIATION",
+  );
+  const [finishAs, setFinishAs] = useState<"COMPLETED" | "CANCELLED">(
+    production?.overview.reconciliationFinishAs ?? "COMPLETED",
+  );
+  const [outputLotCode, setOutputLotCode] = useState(production?.overview.outputLotCode ?? "");
+  const [outputExpiresAt, setOutputExpiresAt] = useState(
+    localDateTime(production?.overview.outputExpiresAt),
+  );
+  const [inputReconciliation, setInputReconciliation] = useState(() =>
+    (production?.plannedInputs ?? []).map((line) => {
+      const actual = production?.actualConsumption.find(
+        (item) => item.inputProductId === line.inputProductId,
+      );
+      return {
+        input_product_id: line.inputProductId,
+        consumed_qty: actual?.consumedQty ?? line.requiredQty,
+        returned_qty: actual?.returnedQty ?? "0.000",
+        waste_qty: actual?.wasteQty ?? "0.000",
+        remainder_qty: actual?.remainderQty ?? "0.000",
+        reason: actual?.reconciliationReason ?? "",
+      };
+    }),
+  );
   const [varianceReason, setVarianceReason] = useState(production?.overview.varianceReason ?? "");
 
   useEffect(() => {
@@ -193,8 +225,8 @@ export function AdminProductionWorkflowPanel({
       return;
     }
 
-    if (mode === "start") {
-      onStart(notes.trim() || null);
+    if (mode === "release") {
+      onRelease(notes.trim() || null);
       return;
     }
 
@@ -204,16 +236,21 @@ export function AdminProductionWorkflowPanel({
       }
       onComplete({
         actualOutputQty,
+        confirmWithoutDifferences: withoutDifferences,
+        inputs: withoutDifferences ? [] : inputReconciliation,
+        finishAs,
+        outputLotCode: outputLotCode.trim() || null,
+        outputExpiresAt: outputExpiresAt ? new Date(outputExpiresAt).toISOString() : null,
         notes: notes.trim() || null,
         varianceReason: varianceReason.trim() || null,
       });
       return;
     }
 
-    onCancelProduction(reason.trim() || null);
+    onCancelProduction(reason.trim() || null, noPhysicalEffects);
   }
 
-  function handleCreateAndStart() {
+  function handleCreateAndRelease() {
     if (
       !hasEffectiveCapability(actor, "production.manage", [branchId]) ||
       !hasEffectiveCapability(actor, "production.execute", [branchId])
@@ -353,7 +390,10 @@ export function AdminProductionWorkflowPanel({
               step="0.001"
               type="number"
               value={actualOutputQty}
-              onChange={(event) => setActualOutputQty(event.target.value)}
+              onChange={(event) => {
+                setActualOutputQty(event.target.value);
+                setWithoutDifferences(false);
+              }}
             />
           </label>
           <label className="grid min-w-0 gap-1 text-xs font-semibold uppercase tracking-[0.1em] text-slate-500">
@@ -369,7 +409,7 @@ export function AdminProductionWorkflowPanel({
         </div>
       ) : null}
 
-      {production && (mode === "start" || mode === "complete") ? (
+      {production && (mode === "release" || mode === "complete") ? (
         <div className="grid gap-2 rounded-[18px] border border-[var(--ui-color-border)] bg-slate-50 p-2.5">
           <span className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">
             Insumos y advertencias
@@ -396,17 +436,124 @@ export function AdminProductionWorkflowPanel({
         </div>
       ) : null}
 
+      {mode === "complete" ? (
+        <section className="grid gap-3 rounded-2xl border p-3">
+          <label>
+            <input
+              type="checkbox"
+              checked={withoutDifferences}
+              onChange={(event) => setWithoutDifferences(event.target.checked)}
+            />{" "}
+            Confirmar sin diferencias
+          </label>
+          <p>
+            Confirmación manual del supervisor. Las diferencias de rendimiento no se registran como
+            merma automáticamente.
+          </p>
+          {!withoutDifferences
+            ? inputReconciliation.map((line, index) => (
+                <fieldset className="grid gap-2 md:grid-cols-3" key={line.input_product_id}>
+                  <legend>{production?.plannedInputs[index]?.inputProductName}</legend>
+                  {(["consumed_qty", "returned_qty", "waste_qty", "remainder_qty"] as const).map(
+                    (field) => (
+                      <label key={field}>
+                        {
+                          {
+                            consumed_qty: "Consumo real",
+                            returned_qty: "Sin usar / devolver",
+                            waste_qty: "Merma real",
+                            remainder_qty: "Por conciliar",
+                          }[field]
+                        }
+                        <input
+                          className={inputClassName}
+                          inputMode="decimal"
+                          value={line[field]}
+                          onChange={(event) =>
+                            setInputReconciliation((current) =>
+                              current.map((item, row) =>
+                                row === index ? { ...item, [field]: event.target.value } : item,
+                              ),
+                            )
+                          }
+                        />
+                      </label>
+                    ),
+                  )}
+                  <label>
+                    Motivo del insumo
+                    <input
+                      className={inputClassName}
+                      value={line.reason}
+                      onChange={(event) =>
+                        setInputReconciliation((current) =>
+                          current.map((item, row) =>
+                            row === index ? { ...item, reason: event.target.value } : item,
+                          ),
+                        )
+                      }
+                    />
+                  </label>
+                </fieldset>
+              ))
+            : null}
+          <label>
+            Resultado
+            <select
+              className={inputClassName}
+              value={finishAs}
+              onChange={(event) => {
+                setFinishAs(event.target.value as "COMPLETED" | "CANCELLED");
+                setWithoutDifferences(false);
+              }}
+            >
+              <option value="COMPLETED">Completar corrida</option>
+              <option value="CANCELLED">Cancelar después de conciliar</option>
+            </select>
+          </label>
+          <label>
+            Lote de salida
+            <input
+              className={inputClassName}
+              value={outputLotCode}
+              onChange={(event) => setOutputLotCode(event.target.value)}
+              placeholder="Se asignará el identificador de la corrida"
+            />
+          </label>
+          <label>
+            Caducidad de salida
+            <input
+              className={inputClassName}
+              type="datetime-local"
+              step="any"
+              value={outputExpiresAt}
+              onChange={(event) => setOutputExpiresAt(event.target.value)}
+            />
+          </label>
+        </section>
+      ) : null}
       {mode === "cancel" ? (
-        <label className="grid min-w-0 gap-1 text-xs font-semibold uppercase tracking-[0.1em] text-slate-500">
-          Motivo / notas
-          <textarea
-            className="min-h-20 w-full min-w-0 rounded-2xl border border-[var(--ui-color-border)] bg-white px-3 py-2 text-sm font-medium normal-case tracking-normal text-slate-950 outline-none transition placeholder:text-slate-400 focus:border-[var(--ui-color-info)] focus:ring-4 focus:ring-[var(--ui-color-ring)]"
-            maxLength={500}
-            placeholder="Contexto de cancelacion si aplica."
-            value={reason}
-            onChange={(event) => setReason(event.target.value)}
-          />
-        </label>
+        <>
+          <label>
+            <input
+              type="checkbox"
+              checked={noPhysicalEffects}
+              onChange={(event) => setNoPhysicalEffects(event.target.checked)}
+            />{" "}
+            Confirmo que no hubo efectos físicos
+          </label>
+          <p>Si hubo consumo, devolución o merma, la corrida quedará pendiente de conciliación.</p>
+          <label className="grid min-w-0 gap-1 text-xs font-semibold uppercase tracking-[0.1em] text-slate-500">
+            Motivo / notas
+            <textarea
+              className="min-h-20 w-full min-w-0 rounded-2xl border border-[var(--ui-color-border)] bg-white px-3 py-2 text-sm font-medium normal-case tracking-normal text-slate-950 outline-none transition placeholder:text-slate-400 focus:border-[var(--ui-color-info)] focus:ring-4 focus:ring-[var(--ui-color-ring)]"
+              maxLength={500}
+              placeholder="Contexto de cancelacion si aplica."
+              value={reason}
+              onChange={(event) => setReason(event.target.value)}
+            />
+          </label>
+        </>
       ) : null}
 
       {mode !== "cancel" ? (
@@ -443,9 +590,9 @@ export function AdminProductionWorkflowPanel({
             className="rounded-2xl border border-[var(--ui-color-border)] bg-white px-4 py-2 text-sm font-semibold text-[var(--ui-color-info)] transition hover:bg-[var(--ui-color-surface-tint)] focus:outline-none focus:ring-4 focus:ring-[var(--ui-color-ring)] disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-400"
             disabled={isSubmitting}
             type="button"
-            onClick={handleCreateAndStart}
+            onClick={handleCreateAndRelease}
           >
-            Guardar e iniciar
+            Guardar y liberar
           </AdminActionButton>
         ) : null}
         <AdminActionButton
@@ -461,8 +608,8 @@ export function AdminProductionWorkflowPanel({
               ? "Guardar borrador"
               : mode === "edit"
                 ? "Guardar cambios"
-                : mode === "start"
-                  ? "Iniciar produccion"
+                : mode === "release"
+                  ? "Liberar plan"
                   : mode === "complete"
                     ? "Completar produccion"
                     : "Cancelar produccion"}

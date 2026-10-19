@@ -14,7 +14,7 @@ from sqlalchemy import (
     Text,
     UniqueConstraint,
 )
-from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
 from zeromerma_api.db.base import Base
@@ -32,7 +32,7 @@ class ProductionBatch(Base):
     __tablename__ = "production_batches"
     __table_args__ = (
         CheckConstraint(
-            "status IN ('DRAFT', 'IN_PROGRESS', 'COMPLETED', 'CANCELLED')",
+            "status IN ('DRAFT', 'RELEASED', 'PENDING_RECONCILIATION', 'COMPLETED', 'CANCELLED')",
             name="ck_production_batches_status_valid",
         ),
         CheckConstraint(
@@ -61,12 +61,25 @@ class ProductionBatch(Base):
         nullable=False,
     )
     status: Mapped[str] = mapped_column(String(32), default=PRODUCTION_STATUS_DRAFT, nullable=False)
+    plan_status: Mapped[str] = mapped_column(
+        String(32), default="DRAFT", server_default="DRAFT", nullable=False
+    )
+    run_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), unique=True, nullable=True)
+    run_status: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    recipe_snapshot: Mapped[dict[str, object] | None] = mapped_column(JSONB, nullable=True)
+    reconciliation_evidence: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    reconciliation_reason: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    output_lot_code: Mapped[str | None] = mapped_column(String(120), nullable=True)
+    output_expires_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    reconciliation_finish_as: Mapped[str | None] = mapped_column(String(32), nullable=True)
     planned_output_qty: Mapped[Decimal] = mapped_column(Numeric(12, 3), nullable=False)
     actual_output_qty: Mapped[Decimal | None] = mapped_column(Numeric(12, 3), nullable=True)
     variance_qty: Mapped[Decimal | None] = mapped_column(Numeric(12, 3), nullable=True)
     variance_percent: Mapped[Decimal | None] = mapped_column(Numeric(12, 4), nullable=True)
     planned_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
-    started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    released_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     cancelled_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     created_by_user_id: Mapped[uuid.UUID] = mapped_column(
@@ -74,7 +87,7 @@ class ProductionBatch(Base):
         ForeignKey("users.id", ondelete="RESTRICT"),
         nullable=False,
     )
-    started_by_user_id: Mapped[uuid.UUID | None] = mapped_column(
+    released_by_user_id: Mapped[uuid.UUID | None] = mapped_column(
         UUID(as_uuid=True),
         ForeignKey("users.id", ondelete="SET NULL"),
         nullable=True,
@@ -136,6 +149,18 @@ class ProductionBatchInput(Base):
     )
     required_qty: Mapped[Decimal] = mapped_column(Numeric(12, 3), nullable=False)
     consumed_qty: Mapped[Decimal | None] = mapped_column(Numeric(12, 3), nullable=True)
+    returned_qty: Mapped[Decimal | None] = mapped_column(Numeric(12, 3), nullable=True)
+    waste_qty: Mapped[Decimal | None] = mapped_column(Numeric(12, 3), nullable=True)
+    remainder_qty: Mapped[Decimal | None] = mapped_column(Numeric(12, 3), nullable=True)
+    reconciliation_reason: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    reservation_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("inventory_reservations.id", ondelete="RESTRICT"),
+        nullable=True,
+    )
+    input_code_snapshot: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    input_name_snapshot: Mapped[str | None] = mapped_column(String(160), nullable=True)
+    recipe_input_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), nullable=True)
     available_qty_snapshot: Mapped[Decimal | None] = mapped_column(Numeric(12, 3), nullable=True)
     shortage_qty_snapshot: Mapped[Decimal | None] = mapped_column(Numeric(12, 3), nullable=True)
     unit_of_measure: Mapped[str] = mapped_column(String(32), nullable=False)

@@ -105,10 +105,6 @@ class SaleReturnLine(Base):
             "refund_line_total_amount >= 0",
             name="ck_sale_return_lines_refund_line_total_non_negative",
         ),
-        CheckConstraint(
-            "disposition_code IN ('RESTOCK_COUNTER', 'RESTOCK_BACKROOM', 'SEND_TO_WASTE')",
-            name="ck_sale_return_lines_disposition_valid",
-        ),
     )
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
@@ -126,6 +122,29 @@ class SaleReturnLine(Base):
     original_capture_mode: Mapped[str] = mapped_column(String(32), nullable=False)
     original_catalog_code_snapshot: Mapped[str] = mapped_column(String(64), nullable=False)
     original_catalog_name_snapshot: Mapped[str] = mapped_column(String(160), nullable=False)
+    returned_quantity: Mapped[Decimal] = mapped_column(Numeric(12, 3), nullable=False)
+    refund_unit_price: Mapped[Decimal] = mapped_column(Numeric(12, 2), nullable=False)
+    refund_line_total_amount: Mapped[Decimal] = mapped_column(Numeric(12, 2), nullable=False)
+
+
+class ReturnDispositionAllocation(Base):
+    __tablename__ = "return_disposition_allocations"
+    __table_args__ = (
+        CheckConstraint("quantity > 0", name="ck_return_allocation_quantity"),
+        CheckConstraint(
+            "disposition_code IN ('RESTOCK_COUNTER', 'RESTOCK_BACKROOM', "
+            "'QUARANTINE', 'SEND_TO_WASTE', 'NO_STOCK')",
+            name="ck_return_allocation_disposition",
+        ),
+        UniqueConstraint("sale_return_line_id", "sequence", name="uq_return_allocation_sequence"),
+        UniqueConstraint("inventory_movement_id", name="uq_return_allocation_movement"),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    sale_return_line_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("sale_return_lines.id", ondelete="RESTRICT"), nullable=False
+    )
+    sequence: Mapped[int] = mapped_column(Integer, nullable=False)
     returned_product_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True),
         ForeignKey("products.id", ondelete="RESTRICT"),
@@ -140,13 +159,13 @@ class SaleReturnLine(Base):
     )
     returned_product_class_code_snapshot: Mapped[str] = mapped_column(String(64), nullable=False)
     returned_product_class_name_snapshot: Mapped[str] = mapped_column(String(160), nullable=False)
-    returned_quantity: Mapped[Decimal] = mapped_column(Numeric(12, 3), nullable=False)
-    refund_unit_price: Mapped[Decimal] = mapped_column(Numeric(12, 2), nullable=False)
-    refund_line_total_amount: Mapped[Decimal] = mapped_column(Numeric(12, 2), nullable=False)
-    disposition_code: Mapped[str] = mapped_column(
-        String(32),
-        default=RETURN_DISPOSITION_RESTOCK_COUNTER,
-        nullable=False,
+    quantity: Mapped[Decimal] = mapped_column(Numeric(12, 3), nullable=False)
+    disposition_code: Mapped[str] = mapped_column(String(32), nullable=False)
+    lot_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("inventory_lots.id", ondelete="RESTRICT"), nullable=True
+    )
+    inventory_movement_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("inventory_movements.id", ondelete="RESTRICT"), nullable=True
     )
 
 

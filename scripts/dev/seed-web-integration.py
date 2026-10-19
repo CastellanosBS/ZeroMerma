@@ -7,6 +7,7 @@ import json
 import os
 import sys
 from collections.abc import Sequence
+from decimal import Decimal
 from pathlib import Path
 
 from alembic import command
@@ -67,6 +68,7 @@ def main(argv: Sequence[str] = ()) -> None:
             seed_local_data,
         )
         from zeromerma_api.modules.branches.infrastructure.models import Branch, Workstation
+        from zeromerma_api.modules.catalog.infrastructure.models import Product
         from zeromerma_api.modules.identity.application.security import PasswordHasher
         from zeromerma_api.modules.identity.infrastructure.models import (
             Permission,
@@ -77,6 +79,7 @@ def main(argv: Sequence[str] = ()) -> None:
             UserRoleAssignment,
             UserRoleAssignmentBranchScope,
         )
+        from zeromerma_api.testing.inventory import seed_test_inventory
 
         with Session(engine) as session:
             assert_authorized_destructive_connection(session.connection(), config)
@@ -313,6 +316,21 @@ def main(argv: Sequence[str] = ()) -> None:
                 )
             )
             session.commit()
+            # Browser tests explicitly opt into stock; ordinary seed_local_data stays stock-empty.
+            products = list(
+                session.scalars(select(Product).where(Product.is_inventory_tracked.is_(True)))
+            )
+            quantities = {product.id: Decimal("1000.000") for product in products}
+            for inventory_branch in (branch, other_branch):
+                for location in ("BACKROOM", "COUNTER"):
+                    seed_test_inventory(
+                        session,
+                        branch_id=inventory_branch.id,
+                        actor_user_id=operations_user.id,
+                        product_quantities=quantities,
+                        location_code=location,
+                        fixture_reference=f"Browser synthetic opening {config.run_id}",
+                    )
             artifact = Path(os.environ["ZM_E2E_ARTIFACT_DIR"]) / "fixture-scope.json"
             artifact.write_text(
                 json.dumps(

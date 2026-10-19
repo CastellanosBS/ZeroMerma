@@ -3,6 +3,7 @@ from __future__ import annotations
 from decimal import Decimal
 
 from fastapi.testclient import TestClient
+from inventory_fixtures import stock_for_codes
 from sqlalchemy import select
 
 from zeromerma_api.bootstrap.seed_local import (
@@ -44,6 +45,18 @@ def _authorization_header(
 def _open_cash_session(
     client: TestClient, *, workstation_code: str = SEED_WORKSTATION_CODE
 ) -> None:
+    stock_for_codes(
+        workstation_code=workstation_code,
+        quantities={SEED_PRODUCT_COCA_355_CODE: Decimal(1)},
+        location="COUNTER",
+        reference="cash-summary-direct-sale-stock",
+    )
+    stock_for_codes(
+        workstation_code=workstation_code,
+        quantities={SEED_PRODUCT_BOLILLO_STD_CODE: Decimal(3)},
+        location="BACKROOM",
+        reference="cash-summary-counter-transfer-stock",
+    )
     response = client.post(
         "/v1/cash-sessions/open",
         headers={
@@ -249,10 +262,7 @@ def test_cash_close_preview_rejects_duplicate_payment_methods(client: TestClient
     )
 
     assert response.status_code == 400
-    assert (
-        response.json()["message"]
-        == "No se puede repetir un metodo de pago en el conteo."
-    )
+    assert response.json()["message"] == "No se puede repetir un metodo de pago en el conteo."
 
 
 def test_cash_close_summary_exposes_inbound_and_outbound_transfer_warnings(
@@ -296,6 +306,12 @@ def test_cash_close_summary_exposes_inbound_and_outbound_transfer_warnings(
     )
     assert outbound_dispatch.status_code == 201
 
+    stock_for_codes(
+        workstation_code=SEED_DESTINATION_WORKSTATION_CODE,
+        quantities={SEED_PRODUCT_BOLILLO_STD_CODE: Decimal("1")},
+        location="BACKROOM",
+        reference="cash-close-inbound-dispatch",
+    )
     inbound_dispatch = client.post(
         "/v1/transfers/dispatch/commit",
         headers={**destination_headers, "Idempotency-Key": new_idempotency_key()},

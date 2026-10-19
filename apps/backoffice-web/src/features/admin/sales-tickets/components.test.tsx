@@ -3,6 +3,7 @@ import { describe, expect, it, vi } from "vitest";
 
 import { AdminSalesTicketDetailPanel } from "./components/AdminSalesTicketDetailPanel";
 import { AdminSalesTicketsTable } from "./components/AdminSalesTicketsTable";
+import { AdminSalesTicketsFilters } from "./components/AdminSalesTicketsFilters";
 import type { AdminSalesTicketDetail, AdminSalesTicketListItem } from "./types";
 
 const ticket: AdminSalesTicketListItem = {
@@ -15,6 +16,7 @@ const ticket: AdminSalesTicketListItem = {
   hasReturns: false,
   id: "ticket-1",
   itemCount: 1,
+  pendingAttributionLineCount: 0,
   occurredAt: "2026-05-20T10:00:00Z",
   paymentMethodsLabel: "CASH",
   paymentSummary: [{ amount: "25.00", currencyCode: "MXN", paymentMethodCode: "CASH" }],
@@ -39,6 +41,9 @@ const detail: AdminSalesTicketDetail = {
       id: "line-1",
       lineTotalAmount: "25.00",
       physicalAttributionStatus: "ATTRIBUTED",
+      attributedQuantity: null,
+      remainingAttributionQuantity: null,
+      physicalAttributions: [],
       productClassId: null,
       productId: "product-1",
       quantity: "1.000",
@@ -93,6 +98,58 @@ const detail: AdminSalesTicketDetail = {
 };
 
 describe("admin sales ticket visibility controls", () => {
+  it.each([false, true])(
+    "reports canonical class progress and actual attributions (complete=%s)",
+    (complete) => {
+      const line = {
+        ...detail.lines[0]!,
+        captureMode: "CLASS_CAPTURE",
+        attributedQuantity: complete ? "1.000" : "0.400",
+        remainingAttributionQuantity: complete ? "0.000" : "0.600",
+        physicalAttributionStatus: complete ? "RECONCILED" : "PENDING_RECONCILIATION",
+        physicalAttributions: [
+          {
+            id: "attribution-1",
+            product_id: "product-1",
+            product_code: "CONCHA-VAN",
+            product_name: "Concha vainilla",
+            quantity: complete ? "1.000" : "0.400",
+            inventory_movement_id: "movement-actual",
+            occurred_at: "2026-05-20T10:01:00Z",
+          },
+        ],
+      };
+      const html = renderToString(
+        <AdminSalesTicketDetailPanel
+          detail={{ ...detail, lines: [line] }}
+          selectedTicket={ticket}
+          onCopyFolio={() => undefined}
+        />,
+      );
+      const text = html.replace(/<!--.*?-->/g, "");
+      expect(text).toContain(
+        `Atribuido: ${line.attributedQuantity} · Pendiente: ${line.remainingAttributionQuantity}`,
+      );
+      expect(text).toContain(complete ? "Atribución completada" : "Pendiente de atribución");
+      expect(text).toContain("Concha vainilla (CONCHA-VAN)");
+      expect(text).toContain("Movimiento: movement-actual");
+      expect(text).not.toContain("Sin atribuciones físicas registradas");
+    },
+  );
+
+  it("makes the pending report discoverable without opening advanced filters", () => {
+    const html = renderToString(
+      <AdminSalesTicketsFilters
+        filters={{ page: 1, pageSize: 25, pendingPhysicalOnly: true }}
+        isBackendConnected
+        options={{ branches: [], cashiers: [], paymentMethods: [], statuses: [], workstations: [] }}
+        onChange={() => undefined}
+      />,
+    );
+    expect(html).toContain("Pendientes de atribución física");
+    expect(html).toMatch(/type="checkbox"[^>]*checked=""/);
+  });
+
   it("keeps the list and read actions while disabling reprint", () => {
     const copyFolio = vi.fn();
     const html = renderToString(
@@ -114,7 +171,9 @@ describe("admin sales ticket visibility controls", () => {
 
     expect(html).toContain("TCK-123");
     expect(html).toContain("Copiar");
-    expect(html).toMatch(/<button[^>]*disabled=""[^>]*title="Reimpresion no disponible en Backoffice"[^>]*>Reimprimir<\/button>/);
+    expect(html).toMatch(
+      /<button[^>]*disabled=""[^>]*title="Reimpresion no disponible en Backoffice"[^>]*>Reimprimir<\/button>/,
+    );
     expect(copyFolio).not.toHaveBeenCalled();
   });
 
@@ -131,7 +190,9 @@ describe("admin sales ticket visibility controls", () => {
     expect(html).toContain("TCK-123");
     expect(html).toContain("Pan dulce");
     expect(html).toContain("Copiar folio");
-    expect(html).toMatch(/<button[^>]*disabled=""[^>]*title="Reimpresion no disponible en Backoffice"[^>]*>Reimprimir<\/button>/);
+    expect(html).toMatch(
+      /<button[^>]*disabled=""[^>]*title="Reimpresion no disponible en Backoffice"[^>]*>Reimprimir<\/button>/,
+    );
     expect(copyFolio).not.toHaveBeenCalled();
   });
 });

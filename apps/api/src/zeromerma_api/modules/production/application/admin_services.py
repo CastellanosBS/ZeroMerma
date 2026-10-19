@@ -4,6 +4,7 @@ import uuid
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from decimal import ROUND_HALF_UP, Decimal
+from typing import Literal
 
 from pydantic import TypeAdapter
 from sqlalchemy import String, cast, delete, or_, select
@@ -21,12 +22,18 @@ from zeromerma_api.modules.identity.application.schemas import AuthenticatedUser
 from zeromerma_api.modules.identity.infrastructure.models import User
 from zeromerma_api.modules.inventory.application.mutations import (
     InventoryBalanceKey,
+    create_inventory_lot,
     lock_inventory_balances,
 )
 from zeromerma_api.modules.inventory.domain.constants import (
     INVENTORY_LOCATION_BACKROOM,
     INVENTORY_MOVEMENT_TYPE_PRODUCTION_CONSUMPTION,
     INVENTORY_MOVEMENT_TYPE_PRODUCTION_OUTPUT,
+)
+from zeromerma_api.modules.inventory.domain.quantities import (
+    InventoryLotQuantity,
+    exact_decimal,
+    inventory_calculation,
 )
 from zeromerma_api.modules.inventory.infrastructure.models import (
     InventoryBalance,
@@ -43,6 +50,7 @@ from zeromerma_api.modules.production.application.admin_schemas import (
     AdminProductionFilterOptionsView,
     AdminProductionFilterOptionView,
     AdminProductionInputLineView,
+    AdminProductionInputReconciliation,
     AdminProductionInputStatus,
     AdminProductionInventoryImpactView,
     AdminProductionInventoryMovementView,
@@ -53,24 +61,27 @@ from zeromerma_api.modules.production.application.admin_schemas import (
     AdminProductionOverviewView,
     AdminProductionProductRecipeView,
     AdminProductionRelatedDocumentView,
-    AdminProductionStartRequest,
+    AdminProductionReleaseRequest,
     AdminProductionStatus,
     AdminProductionUpdateRequest,
     AdminProductionWarningSeverity,
     AdminProductionWarningView,
     AdminProductionWasteScrapView,
     ProductionCommandResultView,
+    ProductionPlanStatus,
+    ProductionReconciliationEvidence,
+    ProductionRunStatus,
 )
 from zeromerma_api.modules.production.domain.constants import (
     AUDIT_ACTION_ADMIN_PRODUCTION_CANCELLED,
     AUDIT_ACTION_ADMIN_PRODUCTION_COMPLETED,
     AUDIT_ACTION_ADMIN_PRODUCTION_CREATED,
-    AUDIT_ACTION_ADMIN_PRODUCTION_STARTED,
+    AUDIT_ACTION_ADMIN_PRODUCTION_RELEASED,
     AUDIT_ACTION_ADMIN_PRODUCTION_UPDATED,
     OUTBOX_EVENT_ADMIN_PRODUCTION_CANCELLED_V1,
     OUTBOX_EVENT_ADMIN_PRODUCTION_COMPLETED_V1,
     OUTBOX_EVENT_ADMIN_PRODUCTION_CREATED_V1,
-    OUTBOX_EVENT_ADMIN_PRODUCTION_STARTED_V1,
+    OUTBOX_EVENT_ADMIN_PRODUCTION_RELEASED_V1,
     OUTBOX_EVENT_ADMIN_PRODUCTION_UPDATED_V1,
     PRODUCTION_INPUT_STATUS_AVAILABLE,
     PRODUCTION_INPUT_STATUS_INSUFFICIENT,
@@ -80,7 +91,8 @@ from zeromerma_api.modules.production.domain.constants import (
     PRODUCTION_STATUS_CANCELLED,
     PRODUCTION_STATUS_COMPLETED,
     PRODUCTION_STATUS_DRAFT,
-    PRODUCTION_STATUS_IN_PROGRESS,
+    PRODUCTION_STATUS_PENDING_RECONCILIATION,
+    PRODUCTION_STATUS_RELEASED,
 )
 from zeromerma_api.modules.production.domain.exceptions import (
     ProductionNotFoundError,
@@ -119,6 +131,7 @@ class _InputPlan:
     shortage_qty: Decimal
     status: str
     display_order: int
+    recipe_input_id: uuid.UUID
 
 
 class AdminProductionService:
@@ -165,7 +178,7 @@ class AdminProductionService:
                 if operator_user_id
                 in {
                     row.batch.created_by_user_id,
-                    row.batch.started_by_user_id,
+                    row.batch.released_by_user_id,
                     row.batch.completed_by_user_id,
                     row.batch.cancelled_by_user_id,
                 }
@@ -283,11 +296,12 @@ class AdminProductionService:
         )
         return self._command_result(session, row.batch)
 
-    def start_production(
+    @inventory_calculation
+    def release_production(
         self,
         session: Session,
         *,
-        command: AdminProductionStartRequest,
+        command: AdminProductionReleaseRequest,
         current_user: AuthenticatedUser,
         production_id: uuid.UUID,
         request_id: str | None,
@@ -295,37 +309,88 @@ class AdminProductionService:
         _require_command(session)
         row = self._get_row(session, production_id, lock=True)
         if row.batch.status != PRODUCTION_STATUS_DRAFT:
-            raise ProductionValidationError("Only draft production can be started.")
-        if not row.branch.is_active:
-            raise ProductionValidationError("Production branch is inactive.")
-        if not row.product.is_active:
-            raise ProductionValidationError("Production product is inactive.")
-        if not row.recipe.is_active:
-            raise ProductionValidationError("Production recipe is inactive.")
-
+            raise ProductionValidationError("Only a draft plan can be released.")
+        if not row.branch.is_active or not row.product.is_active or not row.recipe.is_active:
+            raise ProductionValidationError("The branch, output product and recipe must be active.")
+        # Freeze the selected version and every input before reserving its physical budget.
+        session.refresh(row.recipe, with_for_update=True)
         self._replace_input_plan(session, batch=row.batch, recipe=row.recipe, branch=row.branch)
-        shortages = self._list_inputs(session, row.batch.id)
-        if any((line.shortage_qty_snapshot or ZERO) > ZERO for line in shortages):
-            raise ProductionValidationError(
-                "Production cannot start while raw material shortages exist."
+        inputs = self._list_inputs(session, row.batch.id)
+        balances = lock_inventory_balances(
+            session,
+            (
+                InventoryBalanceKey(
+                    row.branch.id, line.input_product_id, INVENTORY_LOCATION_BACKROOM
+                )
+                for line in inputs
+            ),
+        )
+        for line in inputs:
+            key = InventoryBalanceKey(
+                row.branch.id, line.input_product_id, INVENTORY_LOCATION_BACKROOM
             )
-
-        row.batch.status = PRODUCTION_STATUS_IN_PROGRESS
-        row.batch.started_at = _utc_now()
-        row.batch.started_by_user_id = current_user.id
+            line.available_qty_snapshot = balances.available(key)
+            if balances.available(key) < line.required_qty:
+                raise ProductionValidationError(
+                    "Production cannot be released while input shortages exist."
+                )
+            reservation = balances.reserve(
+                key,
+                quantity=line.required_qty,
+                unit_of_measure=line.unit_of_measure,
+                source_document_type=PRODUCTION_SOURCE_DOCUMENT_TYPE,
+                source_document_id=row.batch.id,
+                source_line_id=line.id,
+                causal_effect_code=f"PRODUCTION_INPUT_RESERVED:{line.id}",
+                operator_user_id=current_user.id,
+                reason="Released production plan",
+                notes=command.notes,
+            )
+            line.reservation_id = reservation.id
+            line.shortage_qty_snapshot = ZERO
+            line.status = PRODUCTION_INPUT_STATUS_AVAILABLE
+        session.flush()
+        row.batch.recipe_snapshot = {
+            "recipe_id": str(row.recipe.id),
+            "version_name": _recipe_name(row.recipe),
+            "yield_qty": str(row.recipe.yield_qty),
+            "yield_uom": row.recipe.yield_uom,
+            "product_code": row.product.code,
+            "product_name": row.product.name,
+            "output_uom": row.product.unit_of_measure,
+            "inputs": [
+                {
+                    "id": str(line.input_product_id),
+                    "recipe_input_id": str(line.recipe_input_id),
+                    "quantity": str(line.required_qty),
+                    "uom": line.unit_of_measure,
+                    "standard_cost": str(line.standard_cost_snapshot)
+                    if line.standard_cost_snapshot is not None
+                    else None,
+                }
+                for line in inputs
+            ],
+        }
+        row.batch.plan_status = "RELEASED"
+        row.batch.run_id = uuid.uuid4()
+        row.batch.run_status = "OPEN"
+        row.batch.status = PRODUCTION_STATUS_RELEASED
+        row.batch.released_at = _utc_now()
+        row.batch.released_by_user_id = current_user.id
         if command.notes is not None:
             row.batch.notes = command.notes
         self._record_change(
             session,
-            action=AUDIT_ACTION_ADMIN_PRODUCTION_STARTED,
+            action=AUDIT_ACTION_ADMIN_PRODUCTION_RELEASED,
             batch=row.batch,
             current_user=current_user,
-            event_name=OUTBOX_EVENT_ADMIN_PRODUCTION_STARTED_V1,
-            metadata={},
+            event_name=OUTBOX_EVENT_ADMIN_PRODUCTION_RELEASED_V1,
+            metadata={"run_id": str(row.batch.run_id), "physical_start_asserted": False},
             request_id=request_id,
         )
         return self._command_result(session, row.batch)
 
+    @inventory_calculation
     def complete_production(
         self,
         session: Session,
@@ -337,80 +402,257 @@ class AdminProductionService:
     ) -> ProductionCommandResultView:
         _require_command(session)
         row = self._get_row(session, production_id, lock=True)
-        if row.batch.status != PRODUCTION_STATUS_IN_PROGRESS:
-            raise ProductionValidationError("Only in-progress production can be completed.")
-
-        actual_output = _q3(command.actual_output_qty)
-        variance_qty = _q3(actual_output - row.batch.planned_output_qty)
-        if actual_output == ZERO and command.variance_reason is None:
-            raise ProductionValidationError("Zero output requires a variance reason.")
-        if variance_qty != ZERO and command.variance_reason is None:
-            raise ProductionValidationError("Yield variance requires a reason.")
-
+        if row.batch.status not in {
+            PRODUCTION_STATUS_RELEASED,
+            PRODUCTION_STATUS_PENDING_RECONCILIATION,
+        }:
+            raise ProductionValidationError("Only a released run can be reconciled.")
+        if row.batch.recipe_snapshot is None or row.batch.run_id is None:
+            raise ProductionValidationError(
+                "The run requires its frozen plan before reconciliation."
+            )
+        actual_output = exact_decimal(command.actual_output_qty)
+        variance_qty = actual_output - row.batch.planned_output_qty
+        if (actual_output == ZERO or variance_qty != ZERO) and not command.variance_reason:
+            raise ProductionValidationError(
+                "A yield variance requires a reason; it does not imply waste."
+            )
         inputs = self._list_inputs(session, row.batch.id)
-        if not inputs:
-            raise ProductionValidationError("Production requires recipe inputs.")
-
-        # Every balance, including an absent output row, follows one deterministic lock order.
-        product_ids = {line.input_product_id for line in inputs}
-        if actual_output > ZERO:
-            product_ids.add(row.product.id)
-        balances = lock_inventory_balances(
-            session,
-            (
-                InventoryBalanceKey(row.branch.id, product_id, INVENTORY_LOCATION_BACKROOM)
-                for product_id in product_ids
-            ),
-        )
-        now = _utc_now()
-        for input_line in inputs:
-            input_product = self._get_product(session, input_line.input_product_id)
-            key = InventoryBalanceKey(
-                row.branch.id, input_line.input_product_id, INVENTORY_LOCATION_BACKROOM
-            )
-            available = balances.quantity(key)
-            required = Decimal(input_line.required_qty)
-            if available < required:
+        if command.confirm_without_differences:
+            if command.inputs or variance_qty != ZERO or command.finish_as != "COMPLETED":
                 raise ProductionValidationError(
-                    "Raw material stock changed and is no longer sufficient."
+                    "Confirmation without differences must match the released plan."
                 )
-            input_line.consumed_qty = required
-            input_line.available_qty_snapshot = available
-            input_line.shortage_qty_snapshot = ZERO
-            input_line.status = PRODUCTION_INPUT_STATUS_AVAILABLE
-            balances.apply_delta(
-                key,
-                delta=-required,
-                movement_type=INVENTORY_MOVEMENT_TYPE_PRODUCTION_CONSUMPTION,
-                notes=command.notes,
-                operator_user_id=current_user.id,
-                reason="Production raw material consumption",
-                source_document_id=row.batch.id,
-                source_document_type=PRODUCTION_SOURCE_DOCUMENT_TYPE,
-                unit_of_measure=input_product.unit_of_measure,
+            reconciled = {
+                line.input_product_id: AdminProductionInputReconciliation(
+                    input_product_id=line.input_product_id,
+                    consumed_qty=line.required_qty,
+                    returned_qty=ZERO,
+                    waste_qty=ZERO,
+                    remainder_qty=ZERO,
+                )
+                for line in inputs
+            }
+        else:
+            reconciled = {item.input_product_id: item for item in command.inputs}
+            if len(reconciled) != len(command.inputs) or set(reconciled) != {
+                line.input_product_id for line in inputs
+            }:
+                raise ProductionValidationError(
+                    "Reconciliation must identify every frozen input exactly once."
+                )
+        for line in inputs:
+            item = reconciled[line.input_product_id]
+            if (
+                item.consumed_qty + item.returned_qty + item.waste_qty + item.remainder_qty
+                < line.required_qty
+            ):
+                raise ProductionValidationError(
+                    "Consumed, returned, wasted and unresolved quantities "
+                    "must explain at least the released quantity."
+                )
+            if (
+                item.consumed_qty != line.required_qty
+                or item.waste_qty
+                or item.remainder_qty
+                or item.returned_qty
+            ) and not (item.reason or "").strip():
+                raise ProductionValidationError(
+                    "Input differences require an explicit reconciliation reason."
+                )
+        if any(item.remainder_qty > ZERO for item in reconciled.values()):
+            row.batch.run_status = "PENDING_RECONCILIATION"
+            row.batch.status = PRODUCTION_STATUS_PENDING_RECONCILIATION
+            row.batch.reconciliation_reason = command.variance_reason
+            row.batch.variance_reason = command.variance_reason
+            row.batch.output_lot_code = command.output_lot_code
+            row.batch.output_expires_at = command.output_expires_at
+            row.batch.reconciliation_finish_as = command.finish_as
+            row.batch.actual_output_qty = actual_output
+            row.batch.notes = command.notes
+            for line in inputs:
+                item = reconciled[line.input_product_id]
+                line.consumed_qty, line.returned_qty, line.waste_qty = (
+                    item.consumed_qty,
+                    item.returned_qty,
+                    item.waste_qty,
+                )
+                line.remainder_qty, line.reconciliation_reason = item.remainder_qty, item.reason
+            self._record_change(
+                session,
+                action="admin.production.reconciliation_pending",
+                batch=row.batch,
+                current_user=current_user,
+                event_name="admin.production.reconciliation_pending.v1",
+                metadata={
+                    "run_id": str(row.batch.run_id),
+                    "actual_output_qty": str(actual_output),
+                    "inputs": [item.model_dump(mode="json") for item in reconciled.values()],
+                    "inventory_effects_applied": False,
+                },
+                request_id=request_id,
             )
-
+            return self._command_result(session, row.batch)
+        keys = {
+            InventoryBalanceKey(row.branch.id, line.input_product_id, INVENTORY_LOCATION_BACKROOM)
+            for line in inputs
+        }
+        keys.update(
+            InventoryBalanceKey(row.branch.id, line.input_product_id, "WASTE")
+            for line in inputs
+            if reconciled[line.input_product_id].waste_qty > ZERO
+        )
         if actual_output > ZERO:
+            keys.add(
+                InventoryBalanceKey(row.branch.id, row.product.id, INVENTORY_LOCATION_BACKROOM)
+            )
+        balances = lock_inventory_balances(session, keys)
+        consumed_costs: list[Decimal | None] = []
+        for line in inputs:
+            if line.reservation_id is None:
+                raise ProductionValidationError("A released input is missing its reservation.")
+            item = reconciled[line.input_product_id]
+            quantities = [(line.reservation_id, line.required_qty)]
+            additional = item.consumed_qty + item.returned_qty + item.waste_qty - line.required_qty
+            if additional > ZERO:
+                extra = balances.reserve(
+                    InventoryBalanceKey(
+                        row.branch.id, line.input_product_id, INVENTORY_LOCATION_BACKROOM
+                    ),
+                    quantity=additional,
+                    unit_of_measure=line.unit_of_measure,
+                    source_document_type=PRODUCTION_SOURCE_DOCUMENT_TYPE,
+                    source_document_id=row.batch.id,
+                    source_line_id=line.id,
+                    causal_effect_code=f"PRODUCTION_ADDITIONAL_RESERVED:{line.id}",
+                    operator_user_id=current_user.id,
+                    reason=item.reason,
+                )
+                quantities.append((extra.id, additional))
+            remaining_consumption = item.consumed_qty
+            remaining_waste = item.waste_qty
+            for reservation_id, available in quantities:
+                consumed = min(remaining_consumption, available)
+                wasted = min(remaining_waste, available - consumed)
+                returned = available - consumed - wasted
+                remaining_consumption -= consumed
+                remaining_waste -= wasted
+                if consumed > ZERO:
+                    consumption = balances.consume(
+                        reservation_id,
+                        quantity=consumed,
+                        movement_type=INVENTORY_MOVEMENT_TYPE_PRODUCTION_CONSUMPTION,
+                        source_document_type=PRODUCTION_SOURCE_DOCUMENT_TYPE,
+                        source_document_id=row.batch.id,
+                        source_line_id=line.id,
+                        causal_effect_code=f"PRODUCTION_INPUT_CONSUMED:{reservation_id}",
+                        operator_user_id=current_user.id,
+                        reason=item.reason,
+                        notes=command.notes,
+                    )
+                    consumed_costs.append(consumption.total_cost)
+                if wasted > ZERO:
+                    waste = balances.consume(
+                        reservation_id,
+                        quantity=wasted,
+                        movement_type="PRODUCTION_WASTE",
+                        source_document_type=PRODUCTION_SOURCE_DOCUMENT_TYPE,
+                        source_document_id=row.batch.id,
+                        source_line_id=line.id,
+                        causal_effect_code=f"PRODUCTION_INPUT_WASTED:{reservation_id}",
+                        operator_user_id=current_user.id,
+                        reason=item.reason,
+                        notes=command.notes,
+                    )
+                    balances.apply_delta(
+                        InventoryBalanceKey(row.branch.id, line.input_product_id, "WASTE"),
+                        delta=wasted,
+                        movement_type="PRODUCTION_WASTE",
+                        unit_of_measure=line.unit_of_measure,
+                        source_document_type=PRODUCTION_SOURCE_DOCUMENT_TYPE,
+                        source_document_id=row.batch.id,
+                        source_line_id=line.id,
+                        causal_effect_code=f"PRODUCTION_WASTE_RECEIVED:{reservation_id}",
+                        total_cost=waste.total_cost,
+                        lot_allocations=[
+                            InventoryLotQuantity(item.lot_id, item.quantity)
+                            for item in waste.lot_allocations
+                        ]
+                        or None,
+                        cost_evidence_reference=f"inventory_movement:{waste.id}"
+                        if waste.total_cost is not None
+                        else None,
+                        operator_user_id=current_user.id,
+                        reason=item.reason,
+                        notes=command.notes,
+                    )
+                if returned > ZERO:
+                    # No physical WIP has been issued: unused material releases its reservation.
+                    balances.release(
+                        reservation_id,
+                        quantity=returned,
+                        causal_effect_code=f"PRODUCTION_UNUSED_RELEASED:{reservation_id}",
+                        reason=item.reason,
+                    )
+            line.consumed_qty, line.returned_qty, line.waste_qty = (
+                item.consumed_qty,
+                item.returned_qty,
+                item.waste_qty,
+            )
+            line.remainder_qty, line.reconciliation_reason = ZERO, item.reason
+        if actual_output > ZERO:
+            output_lot = None
+            output_cost = (
+                sum((cost for cost in consumed_costs if cost is not None), ZERO)
+                if consumed_costs and all(cost is not None for cost in consumed_costs)
+                else None
+            )
+            if row.product.lot_tracking_enabled:
+                output_lot = create_inventory_lot(
+                    session,
+                    product_id=row.product.id,
+                    lot_code=command.output_lot_code or f"RUN:{row.batch.run_id}",
+                    expires_at=command.output_expires_at,
+                    produced_at=_utc_now(),
+                    source_document_type=PRODUCTION_SOURCE_DOCUMENT_TYPE,
+                    source_document_id=row.batch.id,
+                    source_line_id=row.batch.run_id,
+                    branch_id=row.branch.id,
+                    operator_user_id=current_user.id,
+                )
             balances.apply_delta(
                 InventoryBalanceKey(row.branch.id, row.product.id, INVENTORY_LOCATION_BACKROOM),
                 delta=actual_output,
                 movement_type=INVENTORY_MOVEMENT_TYPE_PRODUCTION_OUTPUT,
-                notes=command.notes,
-                operator_user_id=current_user.id,
-                reason="Production finished goods output",
-                source_document_id=row.batch.id,
+                unit_of_measure=str(row.batch.recipe_snapshot["output_uom"]),
                 source_document_type=PRODUCTION_SOURCE_DOCUMENT_TYPE,
-                unit_of_measure=row.product.unit_of_measure,
+                source_document_id=row.batch.id,
+                source_line_id=row.batch.run_id,
+                causal_effect_code="PRODUCTION_OUTPUT_RECEIVED",
+                lot_allocations=[InventoryLotQuantity(output_lot.id, actual_output)]
+                if output_lot
+                else None,
+                total_cost=output_cost,
+                cost_evidence_reference=f"production_run:{row.batch.run_id}"
+                if output_cost is not None
+                else None,
+                operator_user_id=current_user.id,
+                reason="Confirmed production reconciliation",
+                notes=command.notes,
             )
-
         row.batch.actual_output_qty = actual_output
-        row.batch.completed_at = now
-        row.batch.completed_by_user_id = current_user.id
-        row.batch.notes = command.notes
-        row.batch.status = PRODUCTION_STATUS_COMPLETED
+        row.batch.completed_at, row.batch.completed_by_user_id = _utc_now(), current_user.id
+        row.batch.notes, row.batch.variance_reason = command.notes, command.variance_reason
+        row.batch.output_lot_code = command.output_lot_code
+        row.batch.output_expires_at = command.output_expires_at
+        row.batch.reconciliation_finish_as = command.finish_as
+        row.batch.status, row.batch.run_status = command.finish_as, command.finish_as
+        if command.finish_as == "CANCELLED":
+            row.batch.plan_status = "CANCELLED"
+            row.batch.cancelled_at, row.batch.cancelled_by_user_id = _utc_now(), current_user.id
+        row.batch.reconciliation_evidence = "MANUAL_CONFIRMED"
         row.batch.variance_qty = variance_qty
         row.batch.variance_percent = _variance_percent(variance_qty, row.batch.planned_output_qty)
-        row.batch.variance_reason = command.variance_reason
         self._record_change(
             session,
             action=AUDIT_ACTION_ADMIN_PRODUCTION_COMPLETED,
@@ -420,7 +662,9 @@ class AdminProductionService:
             metadata={
                 "actual_output_qty": str(actual_output),
                 "variance_qty": str(variance_qty),
-                "variance_reason": command.variance_reason,
+                "run_id": str(row.batch.run_id),
+                "evidence": "MANUAL_CONFIRMED",
+                "inputs": [item.model_dump(mode="json") for item in reconciled.values()],
             },
             request_id=request_id,
         )
@@ -437,25 +681,57 @@ class AdminProductionService:
     ) -> ProductionCommandResultView:
         _require_command(session)
         row = self._get_row(session, production_id, lock=True)
-        if row.batch.status == PRODUCTION_STATUS_COMPLETED:
-            raise ProductionValidationError(
-                "Completed production cannot be cancelled. "
-                "Use corrections or inventory adjustments."
-            )
-        if row.batch.status == PRODUCTION_STATUS_CANCELLED:
-            raise ProductionValidationError("Production is already cancelled.")
-        row.batch.status = PRODUCTION_STATUS_CANCELLED
-        row.batch.cancelled_at = _utc_now()
-        row.batch.cancelled_by_user_id = current_user.id
-        if command.reason:
-            row.batch.notes = command.reason
+        if row.batch.status in {PRODUCTION_STATUS_COMPLETED, PRODUCTION_STATUS_CANCELLED}:
+            raise ProductionValidationError("A terminal production run cannot be cancelled.")
+        if (
+            row.batch.status != PRODUCTION_STATUS_DRAFT
+            and not command.no_physical_effects_confirmed
+        ):
+            row.batch.status = PRODUCTION_STATUS_PENDING_RECONCILIATION
+            row.batch.run_status = "PENDING_RECONCILIATION"
+            row.batch.reconciliation_reason = command.reason
+        else:
+            if row.batch.run_id is not None:
+                if not (command.reason or "").strip():
+                    raise ProductionValidationError(
+                        "Cancelling a released plan requires a reason and a no-effects declaration."
+                    )
+                inputs = self._list_inputs(session, row.batch.id)
+                balances = lock_inventory_balances(
+                    session,
+                    (
+                        InventoryBalanceKey(
+                            row.branch.id, line.input_product_id, INVENTORY_LOCATION_BACKROOM
+                        )
+                        for line in inputs
+                    ),
+                )
+                for line in inputs:
+                    if line.reservation_id is None:
+                        raise ProductionValidationError(
+                            "The released input reservation is missing."
+                        )
+                    balances.release(
+                        line.reservation_id,
+                        quantity=line.required_qty,
+                        causal_effect_code=f"PRODUCTION_CANCELLED_RELEASED:{line.id}",
+                        reason=command.reason,
+                    )
+                row.batch.run_status = "CANCELLED"
+                row.batch.reconciliation_evidence = "MANUAL_CONFIRMED"
+            row.batch.status = PRODUCTION_STATUS_CANCELLED
+            row.batch.plan_status = "CANCELLED"
+            row.batch.cancelled_at, row.batch.cancelled_by_user_id = _utc_now(), current_user.id
         self._record_change(
             session,
             action=AUDIT_ACTION_ADMIN_PRODUCTION_CANCELLED,
             batch=row.batch,
             current_user=current_user,
             event_name=OUTBOX_EVENT_ADMIN_PRODUCTION_CANCELLED_V1,
-            metadata={"reason": command.reason},
+            metadata={
+                "reason": command.reason,
+                "no_physical_effects_confirmed": command.no_physical_effects_confirmed,
+            },
             request_id=request_id,
         )
         return self._command_result(session, row.batch)
@@ -546,8 +822,8 @@ class AdminProductionService:
         warnings = self._build_warnings(session, row)
         warning_state = self._warning_state_from_warnings(warnings)
         started_by = (
-            session.get(User, row.batch.started_by_user_id)
-            if row.batch.started_by_user_id
+            session.get(User, row.batch.released_by_user_id)
+            if row.batch.released_by_user_id
             else None
         )
         completed_by = (
@@ -559,15 +835,19 @@ class AdminProductionService:
             actual_consumption=[
                 AdminProductionActualConsumptionLineView(
                     consumed_qty=input_line.consumed_qty,
+                    returned_qty=input_line.returned_qty,
+                    waste_qty=input_line.waste_qty,
+                    remainder_qty=input_line.remainder_qty,
+                    reconciliation_reason=input_line.reconciliation_reason,
                     difference_qty=(
                         _q3(Decimal(input_line.consumed_qty) - Decimal(input_line.required_qty))
                         if input_line.consumed_qty is not None
                         else None
                     ),
                     expected_qty=input_line.required_qty,
-                    input_product_code=input_product.code,
+                    input_product_code=input_line.input_code_snapshot or input_product.code,
                     input_product_id=input_product.id,
-                    input_product_name=input_product.name,
+                    input_product_name=input_line.input_name_snapshot or input_product.name,
                     uom=input_line.unit_of_measure,
                 )
                 for input_line, input_product in self._input_rows_with_products(session, input_rows)
@@ -576,17 +856,22 @@ class AdminProductionService:
                 session,
                 AdminProductionAvailableActionsView(
                     can_cancel=row.batch.status
-                    in {PRODUCTION_STATUS_DRAFT, PRODUCTION_STATUS_IN_PROGRESS},
-                    can_complete=row.batch.status == PRODUCTION_STATUS_IN_PROGRESS,
+                    in {
+                        PRODUCTION_STATUS_DRAFT,
+                        PRODUCTION_STATUS_RELEASED,
+                        PRODUCTION_STATUS_PENDING_RECONCILIATION,
+                    },
+                    can_complete=row.batch.status
+                    in {PRODUCTION_STATUS_RELEASED, PRODUCTION_STATUS_PENDING_RECONCILIATION},
                     can_edit=row.batch.status == PRODUCTION_STATUS_DRAFT,
-                    can_start=row.batch.status == PRODUCTION_STATUS_DRAFT,
+                    can_release=row.batch.status == PRODUCTION_STATUS_DRAFT,
                     can_view_movements=True,
                 ),
                 {
                     "can_cancel": "production.cancel",
                     "can_complete": "production.execute",
                     "can_edit": "production.manage",
-                    "can_start": "production.execute",
+                    "can_release": "production.execute",
                     "can_view_movements": "inventory.view",
                 },
                 branch_ids=(row.branch.id,),
@@ -602,6 +887,21 @@ class AdminProductionService:
                 variance_reason=row.batch.variance_reason,
             ),
             overview=AdminProductionOverviewView(
+                output_lot_code=row.batch.output_lot_code,
+                output_expires_at=row.batch.output_expires_at,
+                reconciliation_finish_as=TypeAdapter(
+                    Literal["COMPLETED", "CANCELLED"] | None
+                ).validate_python(row.batch.reconciliation_finish_as),
+                plan_status=TypeAdapter(ProductionPlanStatus).validate_python(
+                    row.batch.plan_status
+                ),
+                run_id=row.batch.run_id,
+                run_status=TypeAdapter(ProductionRunStatus | None).validate_python(
+                    row.batch.run_status
+                ),
+                reconciliation_evidence=TypeAdapter(
+                    ProductionReconciliationEvidence | None
+                ).validate_python(row.batch.reconciliation_evidence),
                 actual_output_qty=row.batch.actual_output_qty,
                 branch_id=row.branch.id,
                 branch_name=row.branch.name,
@@ -617,9 +917,9 @@ class AdminProductionService:
                 notes=row.batch.notes,
                 planned_at=row.batch.planned_at,
                 planned_output_qty=row.batch.planned_output_qty,
-                started_at=row.batch.started_at,
-                started_by_user_id=started_by.id if started_by else None,
-                started_by_user_name=started_by.full_name if started_by else None,
+                released_at=row.batch.released_at,
+                released_by_user_id=started_by.id if started_by else None,
+                released_by_user_name=started_by.full_name if started_by else None,
                 status=_ADMIN_PRODUCTION_STATUS_ADAPTER.validate_python(row.batch.status),
                 variance_percent=row.batch.variance_percent,
                 variance_qty=row.batch.variance_qty,
@@ -628,10 +928,12 @@ class AdminProductionService:
             ),
             planned_inputs=[
                 AdminProductionInputLineView(
+                    id=input_line.id,
+                    reservation_id=input_line.reservation_id,
                     available_qty=input_line.available_qty_snapshot,
-                    input_product_code=input_product.code,
+                    input_product_code=input_line.input_code_snapshot or input_product.code,
                     input_product_id=input_product.id,
-                    input_product_name=input_product.name,
+                    input_product_name=input_line.input_name_snapshot or input_product.name,
                     required_qty=input_line.required_qty,
                     shortage_qty=input_line.shortage_qty_snapshot,
                     standard_cost=input_line.standard_cost_snapshot,
@@ -651,9 +953,15 @@ class AdminProductionService:
                 product_unit_of_measure=row.product.unit_of_measure,
                 recipe_id=row.recipe.id,
                 recipe_is_active=row.recipe.is_active,
-                recipe_name=_recipe_name(row.recipe),
-                recipe_yield_qty=row.recipe.yield_qty,
-                recipe_yield_uom=row.recipe.yield_uom,
+                recipe_name=str(row.batch.recipe_snapshot["version_name"])
+                if row.batch.recipe_snapshot
+                else _recipe_name(row.recipe),
+                recipe_yield_qty=Decimal(str(row.batch.recipe_snapshot["yield_qty"]))
+                if row.batch.recipe_snapshot
+                else row.recipe.yield_qty,
+                recipe_yield_uom=str(row.batch.recipe_snapshot["yield_uom"])
+                if row.batch.recipe_snapshot
+                else row.recipe.yield_uom,
             ),
             related_documents=self._related_documents(row),
             warnings=warnings,
@@ -677,7 +985,7 @@ class AdminProductionService:
             product_name=row.product.name,
             recipe_id=row.recipe.id,
             recipe_name=_recipe_name(row.recipe),
-            started_at=row.batch.started_at,
+            released_at=row.batch.released_at,
             status=_ADMIN_PRODUCTION_STATUS_ADAPTER.validate_python(row.batch.status),
             variance_percent=row.batch.variance_percent,
             variance_qty=row.batch.variance_qty,
@@ -707,12 +1015,16 @@ class AdminProductionService:
                     required_qty=plan.required_qty,
                     shortage_qty_snapshot=plan.shortage_qty,
                     standard_cost_snapshot=plan.input_product.standard_cost,
+                    input_code_snapshot=plan.input_product.code,
+                    input_name_snapshot=plan.input_product.name,
+                    recipe_input_id=plan.recipe_input_id,
                     status=plan.status,
                     unit_of_measure=plan.input_product.unit_of_measure,
                 ),
             )
         session.flush()
 
+    @inventory_calculation
     def _build_input_plan(
         self,
         session: Session,
@@ -729,10 +1041,17 @@ class AdminProductionService:
         ).all()
         if not recipe_inputs:
             raise ProductionValidationError("Production recipe requires at least one input.")
+        output = self._get_product(session, batch.product_id)
+        if recipe.yield_uom.strip().upper() != output.unit_of_measure.strip().upper():
+            raise ProductionValidationError("Recipe yield must use the output product's base unit.")
 
         plans: list[_InputPlan] = []
         for recipe_input, input_product in recipe_inputs:
-            required = _q3(
+            if not input_product.is_active or not input_product.is_usable_as_input:
+                raise ProductionValidationError(
+                    "Every recipe input must be active and usable as an input."
+                )
+            required = exact_decimal(
                 Decimal(recipe_input.quantity)
                 * Decimal(batch.planned_output_qty)
                 / Decimal(recipe.yield_qty)
@@ -743,7 +1062,11 @@ class AdminProductionService:
                 branch_id=branch.id,
                 location_code=INVENTORY_LOCATION_BACKROOM,
             )
-            available = _q3(Decimal(balance.quantity_on_hand)) if balance is not None else ZERO
+            available = (
+                _q3(Decimal(balance.quantity_on_hand) - Decimal(balance.quantity_reserved))
+                if balance is not None
+                else ZERO
+            )
             shortage = _q3(max(required - available, ZERO))
             status = (
                 PRODUCTION_INPUT_STATUS_AVAILABLE
@@ -754,6 +1077,7 @@ class AdminProductionService:
             )
             plans.append(
                 _InputPlan(
+                    recipe_input_id=recipe_input.id,
                     available_qty=available,
                     display_order=recipe_input.display_order,
                     input_product=input_product,
@@ -772,7 +1096,7 @@ class AdminProductionService:
                 1 for row in rows if row.batch.status == PRODUCTION_STATUS_COMPLETED
             ),
             in_progress_batches=sum(
-                1 for row in rows if row.batch.status == PRODUCTION_STATUS_IN_PROGRESS
+                1 for row in rows if row.batch.status == PRODUCTION_STATUS_RELEASED
             ),
             pending_batches=sum(1 for row in rows if row.batch.status == PRODUCTION_STATUS_DRAFT),
             produced_units=sum(
@@ -840,7 +1164,10 @@ class AdminProductionService:
             statuses=[
                 AdminProductionFilterOptionView(id=PRODUCTION_STATUS_DRAFT, label="Pendiente"),
                 AdminProductionFilterOptionView(
-                    id=PRODUCTION_STATUS_IN_PROGRESS, label="En proceso"
+                    id=PRODUCTION_STATUS_RELEASED, label="Plan liberado"
+                ),
+                AdminProductionFilterOptionView(
+                    id=PRODUCTION_STATUS_PENDING_RECONCILIATION, label="Pendiente de conciliación"
                 ),
                 AdminProductionFilterOptionView(id=PRODUCTION_STATUS_COMPLETED, label="Completada"),
                 AdminProductionFilterOptionView(id=PRODUCTION_STATUS_CANCELLED, label="Cancelada"),
@@ -877,7 +1204,8 @@ class AdminProductionService:
             )
         if self._has_shortage(session, row.batch.id) and row.batch.status in {
             PRODUCTION_STATUS_DRAFT,
-            PRODUCTION_STATUS_IN_PROGRESS,
+            PRODUCTION_STATUS_RELEASED,
+            PRODUCTION_STATUS_PENDING_RECONCILIATION,
         }:
             warnings.append(
                 AdminProductionWarningView(
@@ -941,6 +1269,8 @@ class AdminProductionService:
         self, movement: InventoryMovement
     ) -> AdminProductionInventoryMovementView:
         return AdminProductionInventoryMovementView(
+            unit_cost=movement.unit_cost,
+            total_cost=movement.total_cost,
             balance_after=movement.balance_after,
             branch_id=movement.branch_id,
             direction=movement.direction,

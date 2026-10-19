@@ -27,11 +27,7 @@ export function usePosCatalogQuery(query: string) {
   });
 }
 
-export function posClassProductsQueryKey(
-  workstationCode: string,
-  classId: string,
-  query: string,
-) {
+export function posClassProductsQueryKey(workstationCode: string, classId: string, query: string) {
   return ["pos-class-products", workstationCode, classId, normalizeQuery(query)] as const;
 }
 
@@ -52,5 +48,7 @@ export function usePosClassProductsQuery(classId: string | null, query: string) 
         normalizedQuery.length > 0 ? normalizedQuery : undefined,
       ),
     enabled: isAuthenticated && classId !== null,
+    refetchInterval: 15_000,
+    staleTime: 0,
   });
 }

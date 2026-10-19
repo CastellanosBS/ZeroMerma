@@ -31,7 +31,7 @@ export const productionIntentions = createCommandIntentionCoordinator<
   nullableFields: ["productionId"],
   scope: () => PRODUCTION_INTENTION_SCOPE,
   validateContext: (context) =>
-    ["create", "update", "start", "complete", "cancel"].includes(context.commandCode) &&
+    ["create", "update", "release", "complete", "cancel"].includes(context.commandCode) &&
     (context.commandCode === "create"
       ? context.productionId === null
       : context.productionId !== null),
@@ -78,21 +78,21 @@ export async function beginProductionCommand(
   payload: ProductionCommandPayload,
   observedKey: string | null,
   options: {
-    startNow: boolean;
+    releaseNow: boolean;
     canContinue: () => boolean;
     onCreated: (result: ProductionCommandResultView) => void;
   },
 ): Promise<ProductionCommandResultView> {
-  if (options.startNow && context.commandCode !== "create")
-    throw new Error("Sólo la creación puede solicitar el inicio posterior.");
+  if (options.releaseNow && context.commandCode !== "create")
+    throw new Error("Sólo la creación puede solicitar el liberación posterior.");
   const result = await productionIntentions.begin(context, payload, observedKey);
-  if (!options.startNow) return result;
+  if (!options.releaseNow) return result;
   // These are two intentions: losing either response must never repeat creation.
   options.onCreated(result);
   if (!options.canContinue()) return result;
   const created = productionIntentions.read(PRODUCTION_INTENTION_SCOPE);
   return productionIntentions.begin(
-    { ...context, commandCode: "start", productionId: result.id },
+    { ...context, commandCode: "release", productionId: result.id },
     {},
     created?.key ?? null,
   );

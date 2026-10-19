@@ -38,6 +38,7 @@ from zeromerma_api.modules.returns.application.admin_schemas import (
     AdminReturnsBackendContractView,
     AdminReturnsListResponse,
 )
+from zeromerma_api.modules.returns.application.services import _allocation_views
 from zeromerma_api.modules.returns.domain.constants import (
     OUTBOX_EVENT_SALE_RETURN_BACKOFFICE_REVIEW_REQUESTED_V1,
     RETURN_REFUND_METHOD_CASH,
@@ -47,7 +48,11 @@ from zeromerma_api.modules.returns.domain.exceptions import (
     SaleReturnNotFoundError,
     SaleReturnValidationError,
 )
-from zeromerma_api.modules.returns.infrastructure.models import SaleReturn, SaleReturnLine
+from zeromerma_api.modules.returns.infrastructure.models import (
+    ReturnDispositionAllocation,
+    SaleReturn,
+    SaleReturnLine,
+)
 from zeromerma_api.modules.sales.infrastructure.models import (
     CashMovement,
     Sale,
@@ -167,14 +172,10 @@ class AdminReturnsService:
                 select(
                     SaleReturnLine.id,
                     SaleReturnLine.original_sale_line_id,
-                    SaleReturnLine.returned_product_code_snapshot,
-                    SaleReturnLine.returned_product_name_snapshot,
-                    SaleReturnLine.returned_product_class_code_snapshot,
-                    SaleReturnLine.returned_product_class_name_snapshot,
+                    SaleReturnLine.original_catalog_name_snapshot,
                     SaleReturnLine.returned_quantity,
                     SaleReturnLine.refund_unit_price,
                     SaleReturnLine.refund_line_total_amount,
-                    SaleReturnLine.disposition_code,
                     SaleLine.quantity.label("original_quantity"),
                 )
                 .select_from(SaleReturnLine)
@@ -283,15 +284,14 @@ class AdminReturnsService:
                 AdminReturnedLineView(
                     id=type_cast(uuid.UUID, row["id"]),
                     original_sale_line_id=type_cast(uuid.UUID, row["original_sale_line_id"]),
-                    product_name=type_cast(str, row["returned_product_name_snapshot"]),
-                    product_code=type_cast(str, row["returned_product_code_snapshot"]),
-                    product_class_name=type_cast(str, row["returned_product_class_name_snapshot"]),
-                    product_class_code=type_cast(str, row["returned_product_class_code_snapshot"]),
+                    original_catalog_name_snapshot=type_cast(
+                        str, row["original_catalog_name_snapshot"]
+                    ),
+                    allocations=_allocation_views(session, type_cast(uuid.UUID, row["id"])),
                     original_quantity=type_cast(Decimal, row["original_quantity"]),
                     returned_quantity=type_cast(Decimal, row["returned_quantity"]),
                     unit_price=type_cast(Decimal, row["refund_unit_price"]),
                     refund_amount=type_cast(Decimal, row["refund_line_total_amount"]),
-                    disposition_code=type_cast(str, row["disposition_code"]),
                     line_status="COMMITTED",
                 )
                 for row in line_rows
@@ -430,13 +430,18 @@ def _build_return_conditions(
         sale_id_query = normalized_search.removeprefix("tck-")
         return_id_query = normalized_search.removeprefix("dev-")
         line_match = exists(
-            select(SaleReturnLine.id).where(
+            select(SaleReturnLine.id)
+            .join(
+                ReturnDispositionAllocation,
+                ReturnDispositionAllocation.sale_return_line_id == SaleReturnLine.id,
+            )
+            .where(
                 SaleReturnLine.sale_return_id == SaleReturn.id,
                 or_(
-                    func.lower(SaleReturnLine.returned_product_name_snapshot).contains(
+                    func.lower(ReturnDispositionAllocation.returned_product_name_snapshot).contains(
                         normalized_search
                     ),
-                    func.lower(SaleReturnLine.returned_product_code_snapshot).contains(
+                    func.lower(ReturnDispositionAllocation.returned_product_code_snapshot).contains(
                         normalized_search
                     ),
                 ),

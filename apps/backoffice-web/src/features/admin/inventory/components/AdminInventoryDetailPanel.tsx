@@ -1,3 +1,4 @@
+import { InventoryDispositionPanel } from "../../inventory-dispositions/InventoryDispositionPanel";
 import { AdminActionButton } from "../../components/AdminActionButton";
 import type { ReactNode } from "react";
 
@@ -332,6 +333,20 @@ export function AdminInventoryDetailPanel({
             </Section>
           </>
         ) : null}
+
+        {inventoryDetail && <Section title="Lotes y valoración">
+          <p className="mb-2 text-xs">Costo promedio ponderado · {inventoryDetail.stockBreakdown.valuationStatus === "KNOWN" ? "Costo conocido" : "Costo no disponible"}</p>
+          {(inventoryDetail.lots ?? []).map((lot) => <div key={lot.id} className="mb-2 grid gap-1 border-b pb-2 text-xs">
+            <strong>{lot.lot_code}{lot.unidentified ? " · Sin identificación original" : ""}</strong>
+            <span>Vence: {formatDate(lot.expires_at)}</span>
+            <span>Existencia: {lot.quantity_on_hand} · Reservado: {lot.quantity_reserved} · Disponible: {lot.available_quantity}</span>
+          </div>)}
+        </Section>}
+        {inventoryDetail?.branchLocation.locationCode === "QUARANTINE" && <InventoryDispositionPanel
+          key={inventoryDetail.balanceId} branchId={inventoryDetail.branchLocation.branchId}
+          productId={inventoryDetail.product.id} kind="QUARANTINE_RELEASE"
+          availableQuantity={inventoryDetail.stockBreakdown.availableQuantity ?? "0"}
+          lots={inventoryDetail.lots} />}
 
         <Section title="Advertencias">
           {warnings.length > 0 ? (

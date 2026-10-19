@@ -3,7 +3,7 @@ import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { withCapabilities } from "../../../../test-support/authorization";
-import type { AdminProductionFilterOption } from "../types";
+import type { AdminProductionDetail, AdminProductionFilterOption } from "../types";
 import { AdminProductionWorkflowPanel } from "./AdminProductionWorkflowPanel";
 
 (
@@ -39,7 +39,7 @@ function render(
           onCancelProduction={vi.fn()}
           onClose={vi.fn()}
           onComplete={vi.fn()}
-          onStart={vi.fn()}
+          onRelease={vi.fn()}
           onUpdate={vi.fn()}
         />,
         ["production.manage", "production.execute"],
@@ -90,10 +90,10 @@ afterEach(() => {
 
 it.each([
   ["Guardar borrador", false],
-  ["Guardar e iniciar", true],
+  ["Guardar y liberar", true],
 ] as const)(
   "uses options arriving after opening for %s without selecting the intentional recipe placeholder",
-  (button, startNow) => {
+  (button, releaseNow) => {
     render([], []);
     change("Cantidad", "20");
     click(button);
@@ -116,7 +116,7 @@ it.each([
         notes: null,
         plannedAt: null,
       },
-      startNow,
+      releaseNow,
     );
   },
 );
@@ -147,5 +147,87 @@ it("preserves explicit choices and the draft when refreshed options change their
       recipeId: "recipe-1",
     }),
     false,
+  );
+});
+
+it("restores pending manual quantities and sends explicit reconciliation instead of assuming the plan", () => {
+  const complete = vi.fn();
+  const production = {
+    overview: {
+      id: "run",
+      folio: "RUN-1",
+      branchId: "branch-1",
+      status: "PENDING_RECONCILIATION",
+      plannedOutputQty: "20",
+      actualOutputQty: "18",
+      varianceReason: "Confirmed measured yield",
+      outputLotCode: "BREAD-PENDING",
+      outputExpiresAt: "2026-11-20T18:30:00.000Z",
+      reconciliationFinishAs: "CANCELLED",
+    },
+    productRecipe: { productId: "product-1", recipeId: "recipe-1" },
+    plannedInputs: [{ inputProductId: "raw", inputProductName: "Flour", requiredQty: "4" }],
+    actualConsumption: [
+      {
+        inputProductId: "raw",
+        consumedQty: "3",
+        returnedQty: "0",
+        wasteQty: "0",
+        remainderQty: "1",
+        reconciliationReason: "Count pending",
+      },
+    ],
+  } as AdminProductionDetail;
+  act(() =>
+    root.render(
+      withCapabilities(
+        <AdminProductionWorkflowPanel
+          mode="complete"
+          production={production}
+          branchOptions={branches}
+          productOptions={products}
+          recipeOptions={recipes}
+          onComplete={complete}
+          onCreate={create}
+          onCancelProduction={vi.fn()}
+          onClose={vi.fn()}
+          onRelease={vi.fn()}
+          onUpdate={vi.fn()}
+        />,
+        ["production.execute"],
+      ),
+    ),
+  );
+  expect(field("Salida real").value).toBe("18");
+  expect(field("Consumo real").value).toBe("3");
+  expect(field("Por conciliar").value).toBe("1");
+  expect(field("Razon de variacion").value).toBe("Confirmed measured yield");
+  expect(field("Lote de salida").value).toBe("BREAD-PENDING");
+  expect(new Date(field("Caducidad de salida").value).toISOString()).toBe(
+    "2026-11-20T18:30:00.000Z",
+  );
+  expect(field("Resultado").value).toBe("CANCELLED");
+  change("Consumo real", "3.5");
+  change("Sin usar / devolver", "0.5");
+  change("Por conciliar", "0");
+  click("Completar produccion");
+  expect(complete).toHaveBeenCalledWith(
+    expect.objectContaining({
+      actualOutputQty: "18",
+      confirmWithoutDifferences: false,
+      outputLotCode: "BREAD-PENDING",
+      outputExpiresAt: "2026-11-20T18:30:00.000Z",
+      finishAs: "CANCELLED",
+      inputs: [
+        {
+          input_product_id: "raw",
+          consumed_qty: "3.5",
+          returned_qty: "0.5",
+          waste_qty: "0",
+          remainder_qty: "0",
+          reason: "Count pending",
+        },
+      ],
+    }),
   );
 });

@@ -96,6 +96,10 @@ test("real administrative transition recovers a lost response after reload witho
     counted_product_lines: reconciliation.relevant_products.map((line) => ({
       product_id: line.product_id,
       counted_quantity: line.expected_quantity_before_deferred_attr,
+      lot_counts: (line.lots ?? []).map((lot) => ({
+        lot_id: lot.lot_id,
+        counted_quantity: lot.expected_quantity,
+      })),
     })),
   };
   const previewResponse = await page.request.post(`${environment.apiUrl}/v1/cash-close/preview`, {

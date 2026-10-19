@@ -4,6 +4,7 @@ from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 
 from fastapi.testclient import TestClient
+from return_fixtures import seed_return_stock
 from sqlalchemy import select
 
 from zeromerma_api.bootstrap.seed_local import (
@@ -63,6 +64,7 @@ def _get_product_id(code: str) -> str:
 
 
 def _confirm_sale(client: TestClient) -> dict[str, object]:
+    seed_return_stock()
     headers = _authorization_header(client)
     cash_session_id = current_cash_session_id(
         client, headers=headers, workstation_code=SEED_WORKSTATION_CODE
@@ -225,7 +227,14 @@ def test_product_direct_return_commits_refund_and_writes_audit_and_outbox(
                 {
                     "original_sale_line_id": product_direct_line["id"],
                     "returned_quantity": "1.000",
-                    "disposition_code": "RESTOCK_COUNTER",
+                    "allocations": [
+                        {
+                            "exact_product_id": product_direct_line["product_id"],
+                            "quantity": "1.000",
+                            "disposition_code": "RESTOCK_COUNTER",
+                            "restock_safe_acknowledged": True,
+                        }
+                    ],
                 }
             ],
         },
@@ -235,7 +244,7 @@ def test_product_direct_return_commits_refund_and_writes_audit_and_outbox(
     payload = response.json()
     assert payload["folio"].startswith("DEV-")
     assert Decimal(str(payload["total_refund_amount"])) == Decimal("18.00")
-    assert payload["lines"][0]["disposition_code"] == "RESTOCK_COUNTER"
+    assert payload["lines"][0]["allocations"][0]["disposition_code"] == "RESTOCK_COUNTER"
 
     reread_response = client.get(
         f"/v1/returns/{payload['id']}",
@@ -318,13 +327,19 @@ def test_class_capture_return_requires_exact_product_and_blocks_over_return(
                 {
                     "original_sale_line_id": class_capture_line["id"],
                     "returned_quantity": "1.000",
-                    "disposition_code": "SEND_TO_WASTE",
+                    "allocations": [
+                        {
+                            "quantity": "1.000",
+                            "disposition_code": "SEND_TO_WASTE",
+                            "restock_safe_acknowledged": True,
+                        }
+                    ],
                 }
             ],
         },
     )
-    assert missing_product_response.status_code == 400
-    assert "producto exacto" in missing_product_response.json()["message"]
+    assert missing_product_response.status_code == 422
+    assert "exact_product_id" in str(missing_product_response.json())
 
     return_headers = _authorization_header(client)
     return_cash_session_id = current_cash_session_id(
@@ -345,8 +360,14 @@ def test_class_capture_return_requires_exact_product_and_blocks_over_return(
                 {
                     "original_sale_line_id": class_capture_line["id"],
                     "returned_quantity": "1.000",
-                    "disposition_code": "RESTOCK_BACKROOM",
-                    "exact_product_id": _get_product_id(SEED_PRODUCT_CONCHA_VAN_CODE),
+                    "allocations": [
+                        {
+                            "exact_product_id": _get_product_id(SEED_PRODUCT_CONCHA_VAN_CODE),
+                            "quantity": "1.000",
+                            "disposition_code": "RESTOCK_BACKROOM",
+                            "restock_safe_acknowledged": True,
+                        }
+                    ],
                 }
             ],
         },
@@ -372,8 +393,14 @@ def test_class_capture_return_requires_exact_product_and_blocks_over_return(
                 {
                     "original_sale_line_id": class_capture_line["id"],
                     "returned_quantity": "2.000",
-                    "disposition_code": "RESTOCK_COUNTER",
-                    "exact_product_id": _get_product_id(SEED_PRODUCT_CONCHA_VAN_CODE),
+                    "allocations": [
+                        {
+                            "exact_product_id": _get_product_id(SEED_PRODUCT_CONCHA_VAN_CODE),
+                            "quantity": "2.000",
+                            "disposition_code": "RESTOCK_COUNTER",
+                            "restock_safe_acknowledged": True,
+                        }
+                    ],
                 }
             ],
         },
@@ -412,8 +439,14 @@ def test_class_capture_line_allows_returning_only_remaining_quantity(
                 {
                     "original_sale_line_id": class_capture_line["id"],
                     "returned_quantity": "1.000",
-                    "disposition_code": "RESTOCK_COUNTER",
-                    "exact_product_id": exact_product_id,
+                    "allocations": [
+                        {
+                            "exact_product_id": exact_product_id,
+                            "quantity": "1.000",
+                            "disposition_code": "RESTOCK_COUNTER",
+                            "restock_safe_acknowledged": True,
+                        }
+                    ],
                 }
             ],
         },
@@ -439,8 +472,14 @@ def test_class_capture_line_allows_returning_only_remaining_quantity(
                 {
                     "original_sale_line_id": class_capture_line["id"],
                     "returned_quantity": "1.000",
-                    "disposition_code": "RESTOCK_COUNTER",
-                    "exact_product_id": exact_product_id,
+                    "allocations": [
+                        {
+                            "exact_product_id": exact_product_id,
+                            "quantity": "1.000",
+                            "disposition_code": "RESTOCK_COUNTER",
+                            "restock_safe_acknowledged": True,
+                        }
+                    ],
                 }
             ],
         },
@@ -482,7 +521,14 @@ def test_return_requires_reason_and_valid_refund_method(client: TestClient) -> N
                 {
                     "original_sale_line_id": product_direct_line["id"],
                     "returned_quantity": "1.000",
-                    "disposition_code": "RESTOCK_COUNTER",
+                    "allocations": [
+                        {
+                            "exact_product_id": product_direct_line["product_id"],
+                            "quantity": "1.000",
+                            "disposition_code": "RESTOCK_COUNTER",
+                            "restock_safe_acknowledged": True,
+                        }
+                    ],
                 }
             ],
         },
@@ -509,7 +555,14 @@ def test_return_requires_reason_and_valid_refund_method(client: TestClient) -> N
                 {
                     "original_sale_line_id": product_direct_line["id"],
                     "returned_quantity": "1.000",
-                    "disposition_code": "RESTOCK_COUNTER",
+                    "allocations": [
+                        {
+                            "exact_product_id": product_direct_line["product_id"],
+                            "quantity": "1.000",
+                            "disposition_code": "RESTOCK_COUNTER",
+                            "restock_safe_acknowledged": True,
+                        }
+                    ],
                 }
             ],
         },
@@ -556,7 +609,14 @@ def test_old_sale_return_requires_acknowledgement_and_prepares_backoffice_review
                 {
                     "original_sale_line_id": product_direct_line["id"],
                     "returned_quantity": "1.000",
-                    "disposition_code": "RESTOCK_COUNTER",
+                    "allocations": [
+                        {
+                            "exact_product_id": product_direct_line["product_id"],
+                            "quantity": "1.000",
+                            "disposition_code": "RESTOCK_COUNTER",
+                            "restock_safe_acknowledged": True,
+                        }
+                    ],
                 }
             ],
         },
@@ -587,7 +647,14 @@ def test_old_sale_return_requires_acknowledgement_and_prepares_backoffice_review
                 {
                     "original_sale_line_id": product_direct_line["id"],
                     "returned_quantity": "1.000",
-                    "disposition_code": "RESTOCK_COUNTER",
+                    "allocations": [
+                        {
+                            "exact_product_id": product_direct_line["product_id"],
+                            "quantity": "1.000",
+                            "disposition_code": "RESTOCK_COUNTER",
+                            "restock_safe_acknowledged": True,
+                        }
+                    ],
                 }
             ],
         },
@@ -658,7 +725,14 @@ def test_returns_history_and_detail_expose_safe_audit_summary(client: TestClient
                 {
                     "original_sale_line_id": product_direct_line["id"],
                     "returned_quantity": "1.000",
-                    "disposition_code": "RESTOCK_COUNTER",
+                    "allocations": [
+                        {
+                            "exact_product_id": product_direct_line["product_id"],
+                            "quantity": "1.000",
+                            "disposition_code": "RESTOCK_COUNTER",
+                            "restock_safe_acknowledged": True,
+                        }
+                    ],
                 }
             ],
         },

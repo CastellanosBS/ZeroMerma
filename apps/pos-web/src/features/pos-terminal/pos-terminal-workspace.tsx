@@ -1,4 +1,5 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import type { PosCatalogProductView } from "../../lib/api-contracts";
 
 import { CatalogSelectionCard } from "../../components/catalog-selection-card";
 import { CatalogVisual } from "../../components/catalog-visual";
@@ -85,7 +86,19 @@ function AvailablePosTerminalWorkspace() {
   const pendingSelection = usePosTerminalStore((state) => state.pendingSelection);
   const cartLines = usePosTerminalStore((state) => state.cartLines);
   const selectClass = usePosTerminalStore((state) => state.selectClass);
-  const selectProduct = usePosTerminalStore((state) => state.selectProduct);
+  const selectProductInStore = usePosTerminalStore((state) => state.selectProduct);
+  const selectProduct = useCallback(
+    (product: PosCatalogProductView) => {
+      try {
+        selectProductInStore(product);
+      } catch (error) {
+        setSelectionError(
+          error instanceof Error ? error.message : "No se pudo seleccionar el producto.",
+        );
+      }
+    },
+    [selectProductInStore],
+  );
   const clearQuantity = usePosTerminalStore((state) => state.clearQuantity);
   const enterPaymentCapture = usePosTerminalStore((state) => state.enterPaymentCapture);
   const setQuantityText = usePosTerminalStore((state) => state.setQuantityText);
@@ -607,12 +620,27 @@ function AvailablePosTerminalWorkspace() {
                       buttonRef={itemProps.ref}
                       code={product.code}
                       isActive={productActiveIndex === index}
+                      isDisabled={
+                        isSelectionDisabled ||
+                        (product.available_quantity !== null &&
+                          Number(product.available_quantity) <= 0)
+                      }
                       key={product.id}
                       name={product.name}
                       onCardFocus={itemProps.onFocus}
                       onCardKeyDown={itemProps.onKeyDown}
                       onSelect={() => selectProduct(product)}
                       priceText={product.unit_price}
+                      availabilityText={
+                        product.available_quantity === null
+                          ? "No inventariable"
+                          : `Disponible ${product.available_quantity} · Reservado ${product.reserved_quantity}`
+                      }
+                      lotText={
+                        product.available_lots?.[0]
+                          ? `Lote ${product.available_lots[0].lot_code} · vence ${product.available_lots[0].expires_at ?? "sin fecha"}`
+                          : null
+                      }
                       shortcutLabel={getSelectionShortcutLabel(index)}
                       tabIndex={itemProps.tabIndex}
                       variant="pos"

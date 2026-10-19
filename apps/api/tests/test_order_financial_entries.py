@@ -9,6 +9,7 @@ from uuid import UUID, uuid4
 
 import pytest
 from fastapi.testclient import TestClient
+from order_fixtures import seed_order_stock
 from sqlalchemy import and_, func, or_, select
 
 from zeromerma_api.bootstrap.seed_local import (
@@ -27,6 +28,12 @@ from zeromerma_api.modules.financial_ledger.infrastructure.models import (
     FinancialOperation,
 )
 from zeromerma_api.modules.idempotency.infrastructure.models import IdempotencyRecord
+from zeromerma_api.modules.inventory.infrastructure.models import (
+    InventoryBalance,
+    InventoryMovement,
+    InventoryReservation,
+    InventoryReservationEvent,
+)
 from zeromerma_api.modules.orders.infrastructure.models import (
     CustomerOrder,
     CustomerOrderItem,
@@ -55,6 +62,7 @@ def _post(
 
 
 def _setup(client: TestClient) -> tuple[dict[str, str], dict[str, str], str]:
+    seed_order_stock()
     headers = login_headers(
         client, email=SEED_USER_EMAIL, password=SEED_USER_PASSWORD, audience="POS"
     )
@@ -196,6 +204,9 @@ def _state() -> tuple[Any, ...]:
                 FinancialOperation,
                 FinancialEntry,
                 CashMovement,
+                InventoryMovement,
+                InventoryReservation,
+                InventoryReservationEvent,
             )
         )
         order_rows = session.execute(
@@ -215,7 +226,15 @@ def _state() -> tuple[Any, ...]:
                 (IdempotencyRecord, IdempotencyRecord.operation_code.like("order.%")),
             )
         )
-    return counts, order_rows, traces
+        inventory = session.execute(
+            select(
+                InventoryBalance.id,
+                InventoryBalance.quantity_on_hand,
+                InventoryBalance.quantity_reserved,
+                InventoryBalance.inventory_value,
+            ).order_by(InventoryBalance.id)
+        ).all()
+    return counts, order_rows, traces, inventory
 
 
 @pytest.mark.parametrize("action", ["create", "deliver", "cancel"])

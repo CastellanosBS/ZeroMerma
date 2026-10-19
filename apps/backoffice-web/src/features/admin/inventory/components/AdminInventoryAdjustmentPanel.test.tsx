@@ -64,6 +64,7 @@ it("initializes late options in React state and submits the preserved quantity a
   expect(submit).toHaveBeenCalledTimes(1);
   expect(submit).toHaveBeenCalledWith({
     adjustmentType: "INCREASE",
+    allowNegative: false, lotId: null, lotCode: null, expiresAt: null, unitCost: null, costEvidenceReference: null,
     branchId: "first",
     productId: "first",
     locationCode: "BACKROOM",

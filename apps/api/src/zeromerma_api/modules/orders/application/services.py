@@ -35,6 +35,7 @@ from zeromerma_api.modules.orders.application.financial_services import (
     order_payment_financial_references,
     record_order_payment,
 )
+from zeromerma_api.modules.orders.application.inventory import apply_order_inventory
 from zeromerma_api.modules.orders.application.schemas import (
     CancelCustomerOrderRequest,
     CreateCustomerOrderAdvancePaymentRequest,
@@ -739,6 +740,7 @@ class OrdersCommandService:
                 "Solo los pedidos pendientes se pueden marcar como listos para entrega."
             )
 
+        apply_order_inventory(session, order=order, actor_id=current_user.id, action="reserve")
         order.status = ORDER_STATUS_READY
         order.updated_at_utc = datetime.now(tz=UTC)
         resolved_request_id = request_id or str(uuid.uuid4())
@@ -865,6 +867,7 @@ class OrdersCommandService:
             raise OrderValidationError("Este pedido ya no tiene saldo pendiente por liquidar.")
 
         delivered_at = datetime.now(tz=UTC)
+        apply_order_inventory(session, order=order, actor_id=current_user.id, action="consume")
         order.status = ORDER_STATUS_DELIVERED
         order.remaining_balance_amount = ZERO_MONEY
         order.delivered_at = delivered_at
@@ -978,6 +981,7 @@ class OrdersCommandService:
             except FinancialModelError as error:
                 raise OrderStateConflictError(str(error)) from error
 
+        apply_order_inventory(session, order=order, actor_id=current_user.id, action="release")
         order.status = ORDER_STATUS_CANCELED
         if cancellation_refund_eligible:
             order.advance_amount = ZERO_MONEY

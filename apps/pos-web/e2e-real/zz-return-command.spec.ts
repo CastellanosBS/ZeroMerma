@@ -49,6 +49,17 @@ test("real partial refund survives a lost response, reload and another tab and r
   const product = (
     (await productResponse.json()) as components["schemas"]["PosClassProductsResponse"]
   ).products[0]!;
+  expect(product.is_inventory_tracked).toBe(true);
+  expect(Number(product.available_quantity)).toBeGreaterThanOrEqual(4);
+  await page
+    .getByRole("button")
+    .filter({ has: page.getByText(directClass.name, { exact: true }) })
+    .click();
+  const productCard = page
+    .getByRole("button")
+    .filter({ has: page.getByText(product.name, { exact: true }) });
+  await expect(productCard).toContainText(`Disponible ${product.available_quantity}`);
+  await expect(productCard).toContainText(`Reservado ${product.reserved_quantity}`);
   const saleResponse = await page.request.post(`${environment.apiUrl}/v1/sales/confirm`, {
     headers: {
       ...headers,
@@ -104,6 +115,16 @@ test("real partial refund survives a lost response, reload and another tab and r
     await expect(quantityInput).toBeFocused();
     await quantityInput.fill("1");
     await expect(quantityInput).toHaveValue("1");
+    const allocations = tab.getByRole("region", {
+      name: `Disposiciones de ${sale.lines[0]!.catalog_name_snapshot}`,
+      exact: true,
+    });
+    await allocations.getByRole("button", { name: "Dividir destino físico", exact: true }).click();
+    await allocations.getByLabel("Cantidad de disposición 1", { exact: true }).fill("0.4");
+    await allocations.getByLabel("Cantidad de disposición 2", { exact: true }).fill("0.6");
+    await allocations
+      .getByLabel("Destino de disposición 2", { exact: true })
+      .selectOption("SEND_TO_WASTE");
     await tab.getByLabel("Motivo de devolucion").selectOption("WRONG_ITEM");
     await tab.getByLabel("Metodo de reembolso").selectOption("CASH");
     await expect(tab.getByLabel("Motivo de devolucion")).toHaveValue("WRONG_ITEM");
@@ -125,6 +146,19 @@ test("real partial refund survives a lost response, reload and another tab and r
   expect(committed.original_sale_id).toBe(sale.id);
   expect(committed.total_refund_amount).toBe(sale.lines[0]!.unit_price);
   expect(committed.refund_cash_movement_id).toBeNull();
+  expect(committed.lines).toHaveLength(1);
+  expect(committed.lines[0]!.allocations).toHaveLength(2);
+  expect(
+    committed.lines[0]!.allocations.map((allocation) => ({
+      ...allocation,
+      quantity: Number(allocation.quantity),
+    })),
+  ).toEqual(
+    expect.arrayContaining([
+      expect.objectContaining({ quantity: 0.4, disposition_code: "QUARANTINE" }),
+      expect.objectContaining({ quantity: 0.6, disposition_code: "SEND_TO_WASTE" }),
+    ]),
+  );
   const refund = committed.financial_refund!;
   expect(refund.amount_due).toBe(committed.total_refund_amount);
   expect(refund.amount_settled).toBe("0.01");
@@ -283,10 +317,7 @@ test("real partial refund survives a lost response, reload and another tab and r
   // Recovery can already return the screen to history when its saved return identity loads.
   await expect(historyTable.or(historyNavigation)).toBeVisible();
   if (!(await historyTable.isVisible())) await historyNavigation.click();
-  await historyTable
-    .getByRole("row")
-    .filter({ hasText: committed.folio })
-    .click();
+  await historyTable.getByRole("row").filter({ hasText: committed.folio }).click();
   await expect(refundPanel).toContainText(`Entrega confirmada: $${refund.amount_due}`);
   await expect(refundPanel).toContainText("Pendiente de entregar: $0.00");
   await expect(
@@ -315,5 +346,113 @@ test("real partial refund survives a lost response, reload and another tab and r
   expect(admin.refund_impact.refund_amount).toBe(committed.total_refund_amount);
   expect(admin.refund_impact.cash_impact_amount).toBe(refund.amount_due);
   expect(admin.financial_refund).toEqual(settled);
+  expect(admin.returned_lines).toHaveLength(1);
+  expect(
+    admin.returned_lines[0]!.allocations.map((allocation) => ({
+      ...allocation,
+      quantity: Number(allocation.quantity),
+    })),
+  ).toEqual(
+    committed.lines[0]!.allocations.map((allocation) => ({
+      ...allocation,
+      quantity: Number(allocation.quantity),
+    })),
+  );
+
+  // Quarantined stock is not saleable. Its physical disposal is a separate,
+  // recoverable command and cannot change the already settled refund.
+  const operationsLogin = await page.request.post(`${environment.apiUrl}/v1/auth/login`, {
+    headers: backofficeHeaders,
+    data: {
+      email: process.env.ZM_E2E_OPERATIONS_OPERATOR_EMAIL,
+      password: environment.password,
+      audience: "BACKOFFICE",
+    },
+  });
+  expect(operationsLogin.status()).toBe(200);
+  const adminPage = await page.context().newPage();
+  await adminPage.goto(
+    `${process.env.ZM_E2E_BACKOFFICE_URL}/admin/inventario?branchId=${committed.branch_id}`,
+  );
+  await adminPage.getByPlaceholder("Buscar producto, codigo, clase o sucursal").fill(product.code);
+  await adminPage.getByRole("button", { name: /^Abrir filtros/ }).click();
+  const filters = adminPage.getByRole("dialog", { name: "Filtros", exact: true });
+  await expect(filters).toBeVisible();
+  await filters.getByLabel(/^Ubicacion/).selectOption("QUARANTINE");
+  await filters.getByRole("button", { name: "Cerrar", exact: true }).click();
+  await adminPage
+    .getByRole("button", { name: `${product.name} ${product.code}`, exact: true })
+    .click();
+  const disposal = adminPage.locator("details").filter({
+    has: adminPage.getByText("Resolver producto en cuarentena", { exact: true }),
+  });
+  await disposal.getByText("Resolver producto en cuarentena", { exact: true }).click();
+  await disposal.getByLabel("Cantidad a disponer", { exact: true }).fill("0.4");
+  await disposal.getByLabel("Destino fisico", { exact: true }).selectOption("WASTE");
+  const lotSelect = disposal.getByLabel("Lote fisico", { exact: true });
+  if (await lotSelect.count()) {
+    const quarantine = committed.lines[0]!.allocations.find(
+      (allocation) => allocation.disposition_code === "QUARANTINE",
+    )!;
+    expect(quarantine.lot_id).toBeTruthy();
+    await lotSelect.selectOption(quarantine.lot_id!);
+  }
+  await disposal
+    .getByLabel("Motivo de disposicion", { exact: true })
+    .fill("Returned product physically disposed after inspection");
+  const disposalPath = "/v1/admin/inventory-dispositions";
+  const disposalFault = await dropNextOperationalCommandResponse(
+    adminPage,
+    environment.apiUrl,
+    network,
+    disposalPath,
+  );
+  await disposal.getByRole("button", { name: "Confirmar disposicion fisica", exact: true }).click();
+  const disposed =
+    (await disposalFault.committed) as components["schemas"]["InventoryDispositionResult"];
+  expect(disposed).toMatchObject({
+    branch_id: committed.branch_id,
+    product_id: product.id,
+    kind: "QUARANTINE_RELEASE",
+    source: "QUARANTINE",
+    destination: "WASTE",
+  });
+  expect(Number(disposed.quantity)).toBe(0.4);
+  expect(disposed.movement_ids).toHaveLength(2);
+  await expect(
+    adminPage.getByRole("heading", { name: "Disposicion fisica pendiente de confirmar" }),
+  ).toBeVisible();
+  await adminPage.reload();
+  await expect(
+    adminPage.getByRole("button", { name: "Reintentar la misma disposicion" }),
+  ).toHaveCount(0);
+  const disposalRecovery = adminPage.waitForResponse((response) =>
+    new URL(response.url()).pathname.startsWith(`${disposalPath}/confirmations/`),
+  );
+  await adminPage
+    .getByRole("button", { name: "Consultar disposicion fisica", exact: true })
+    .click();
+  expect(await (await disposalRecovery).json()).toEqual(disposed);
+  expect(
+    network.filter((entry) => entry.method === "POST" && entry.path === disposalPath),
+  ).toHaveLength(1);
+  const remainingResponse = await page.request.get(
+    `${environment.apiUrl}/v1/pos/classes/${directClass.id}/products?workstation_code=${station}`,
+    { headers },
+  );
+  expect(remainingResponse.status()).toBe(200);
+  const remaining = (
+    (await remainingResponse.json()) as components["schemas"]["PosClassProductsResponse"]
+  ).products.find((item) => item.id === product.id)!;
+  expect(Number(remaining.available_quantity)).toBe(Number(product.available_quantity) - 4);
+  const unchangedRefundResponse = await page.request.get(
+    `${environment.apiUrl}/v1/returns/${committed.id}?workstation_code=${station}`,
+    { headers },
+  );
+  expect(unchangedRefundResponse.status()).toBe(200);
+  const unchangedReturn =
+    (await unchangedRefundResponse.json()) as components["schemas"]["SaleReturnDetailResponse"];
+  expect(unchangedReturn.financial_refund).toEqual(settled);
+  await adminPage.close();
   await other.close();
 });

@@ -5,6 +5,7 @@ from __future__ import annotations
 from concurrent.futures import ThreadPoolExecutor
 from copy import deepcopy
 from datetime import UTC, datetime
+from decimal import Decimal
 from http.cookies import SimpleCookie
 from statistics import median
 from threading import Barrier, Event
@@ -67,6 +68,7 @@ from zeromerma_api.modules.sales.infrastructure.models import (
     SalePayment,
 )
 from zeromerma_api.testing.idempotency import new_idempotency_key
+from zeromerma_api.testing.inventory import seed_test_inventory
 from zeromerma_api.testing.sessions import login_headers
 from zeromerma_api.testing.transfer_operators import transfer_cashier_email
 
@@ -107,6 +109,16 @@ def _setup(
         class_id = session.scalars(
             select(ProductClass.id).where(ProductClass.code == SEED_PRODUCT_CLASS_PAN_DULCE_CODE)
         ).one()
+        cash = session.get(CashSession, cash_id)
+        assert cash is not None
+        seed_test_inventory(
+            session,
+            branch_id=cash.branch_id,
+            actor_user_id=cash.user_id,
+            product_quantities={product_id: Decimal(10)},
+            location_code="COUNTER",
+            fixture_reference="sale-idempotency-stock",
+        )
     return headers, {
         "workstation_code": workstation,
         "cash_session_id": str(cash_id),
@@ -181,7 +193,7 @@ def test_retries_recover_exact_sale_and_ticket_without_repeating_effects(
         "cash_movements": 0,
         "financial_operations": 1,
         "financial_entries": len(body["payments"]),
-        "inventory_movements": 0,
+        "inventory_movements": 1,
         "audit_log": 1,
         "outbox_events": 1,
         "idempotency_records": 1,

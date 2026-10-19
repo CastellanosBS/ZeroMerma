@@ -52,7 +52,7 @@ from zeromerma_api.testing.database_safety import (
 REPO_ROOT = Path(__file__).resolve().parents[3]
 VERSIONS_DIR = REPO_ROOT / "apps" / "api" / "alembic" / "versions"
 ALEMBIC_INI = REPO_ROOT / "apps" / "api" / "alembic.ini"
-CANONICAL_HEAD = "20261019_0048_financial_import"
+CANONICAL_HEAD = "20261019_0053_purchase_prod"
 EXPECTED_POSTGRES_MAJOR = 16
 TEST_CONTAINER_VARIABLE = "ZEROMERMA_TEST_CONTAINER_NAME"
 
@@ -61,7 +61,7 @@ KNOWN_NAMING_ONLY = "KNOWN_NAMING_ONLY"
 KNOWN_MODEL_OBJECT = "KNOWN_MODEL_OBJECT"
 REAL_SCHEMA_DRIFT = "REAL_SCHEMA_DRIFT"
 UNKNOWN_SCHEMA_DRIFT = "UNKNOWN_SCHEMA_DRIFT"
-DRIFT_BASELINE_VERSION = "2026-10-19.zm-fin-047.1"
+DRIFT_BASELINE_VERSION = "2026-10-19.zm-fin-055.1"
 
 
 @dataclass(frozen=True, order=True, slots=True)
@@ -112,6 +112,28 @@ class ModelIndexFingerprint:
 # Both complete fingerprints are pinned; changed predicates never inherit this equivalence.
 KNOWN_MODEL_INDEXES: frozenset[ModelIndexFingerprint] = frozenset(
     {
+        ModelIndexFingerprint(
+            IndexFingerprint(
+                "public",
+                "purchase_documents",
+                "uq_purchase_supplier_invoice",
+                True,
+                (
+                    "column:supplier_id",
+                    "expression:upper(btrim(purchase_documents.external_document_number))",
+                ),
+                "external_document_type = 'INVOICE' AND external_document_number IS NOT NULL",
+            ),
+            IndexFingerprint(
+                "public",
+                "purchase_documents",
+                "uq_purchase_supplier_invoice",
+                True,
+                ("column:supplier_id", "expression:upper(btrim(external_document_number::text))"),
+                "(((external_document_type)::text = 'INVOICE'::text) "
+                "AND (external_document_number IS NOT NULL))",
+            ),
+        ),
         ModelIndexFingerprint(
             IndexFingerprint(
                 "public",
@@ -903,6 +925,424 @@ KNOWN_DB_ONLY_CHECKS: frozenset[CheckConstraintFingerprint] = frozenset(
 )
 KNOWN_MODEL_CHECKS: frozenset[ModelCheckFingerprint] = frozenset(
     {
+        ModelCheckFingerprint(
+            "public",
+            "class_inventory_attributions",
+            "ck_class_inventory_attributions_ck_class_attribution_quantity",
+            "ck_class_inventory_attributions_ck_class_attribution_quantity",
+            "ck_class_inventory_attributions_ck_class_attribution_quantity",
+            "quantity > 0",
+            "quantity > 0::numeric",
+        ),
+        ModelCheckFingerprint(
+            "public",
+            "class_inventory_obligations",
+            "ck_class_inventory_obligations_ck_class_obligation_required",
+            "ck_class_inventory_obligations_ck_class_obligation_required",
+            "ck_class_inventory_obligations_ck_class_obligation_required",
+            "required_quantity > 0",
+            "required_quantity > 0::numeric",
+        ),
+        ModelCheckFingerprint(
+            "public",
+            "class_inventory_obligations",
+            "ck_class_inventory_obligations_ck_class_obligation_attributed",
+            "ck_class_inventory_obligations_ck_class_obligation_attributed",
+            "ck_class_inventory_obligations_ck_class_obligation_attributed",
+            "attributed_quantity >= 0 AND attributed_quantity <= required_quantity",
+            "attributed_quantity >= 0::numeric AND attributed_quantity <= required_quantity",
+        ),
+        ModelCheckFingerprint(
+            "public",
+            "class_inventory_obligations",
+            "ck_class_inventory_obligations_ck_class_obligation_status",
+            "ck_class_inventory_obligations_ck_class_obligation_status",
+            "ck_class_inventory_obligations_ck_class_obligation_status",
+            "(status = 'OPEN' AND attributed_quantity < required_quantity) OR (status = 'FULF"
+            "ILLED' AND attributed_quantity = required_quantity)",
+            "status::text = 'OPEN'::text AND attributed_quantity < required_quantity OR statu"
+            "s::text = 'FULFILLED'::text AND attributed_quantity = required_quantity",
+        ),
+        ModelCheckFingerprint(
+            "public",
+            "inventory_adjustments",
+            "ck_inventory_adjustments_quantity_positive",
+            "ck_inventory_adjustments_quantity_positive",
+            "ck_inventory_adjustments_quantity_positive",
+            "quantity > 0 OR (adjustment_type = 'SET_COUNTED' AND quantity = 0)",
+            "quantity > 0::numeric OR adjustment_type::text = 'SET_COUNTED'::text AND quantit"
+            "y = 0::numeric",
+        ),
+        ModelCheckFingerprint(
+            "public",
+            "inventory_adjustments",
+            "ck_inventory_adjustments_location_valid",
+            "ck_inventory_adjustments_location_valid",
+            "ck_inventory_adjustments_location_valid",
+            "location_code IN ('BACKROOM','COUNTER','IN_TRANSIT','QUARANTINE','WASTE','WIP')",
+            "location_code::text = ANY (ARRAY['BACKROOM'::character varying, 'COUNTER'::chara"
+            "cter varying, 'IN_TRANSIT'::character varying, 'QUARANTINE'::character varying, "
+            "'WASTE'::character varying, 'WIP'::character varying]::text[])",
+        ),
+        ModelCheckFingerprint(
+            "public",
+            "inventory_balances",
+            "ck_inventory_balances_reserved_valid",
+            "ck_inventory_balances_reserved_valid",
+            "ck_inventory_balances_reserved_valid",
+            "quantity_reserved >= 0 AND quantity_reserved <> 'NaN'::numeric AND quantity_on_h"
+            "and <> 'NaN'::numeric",
+            "quantity_reserved >= 0::numeric AND quantity_reserved <> 'NaN'::numeric AND quan"
+            "tity_on_hand <> 'NaN'::numeric",
+        ),
+        ModelCheckFingerprint(
+            "public",
+            "inventory_balances",
+            "ck_inventory_balances_value_valid",
+            "ck_inventory_balances_value_valid",
+            "ck_inventory_balances_value_valid",
+            "inventory_value IS NULL OR (inventory_value >= 0 AND inventory_value <> 'NaN'::n"
+            "umeric AND quantity_on_hand >= 0 AND (quantity_on_hand <> 0 OR inventory_value ="
+            " 0))",
+            "inventory_value IS NULL OR inventory_value >= 0::numeric AND inventory_value <> "
+            "'NaN'::numeric AND quantity_on_hand >= 0::numeric AND (quantity_on_hand <> 0::nu"
+            "meric OR inventory_value = 0::numeric)",
+        ),
+        ModelCheckFingerprint(
+            "public",
+            "inventory_balances",
+            "ck_inventory_balances_location_valid",
+            "ck_inventory_balances_location_valid",
+            "ck_inventory_balances_location_valid",
+            "location_code IN ('BACKROOM','COUNTER','IN_TRANSIT','QUARANTINE','WASTE','WIP')",
+            "location_code::text = ANY (ARRAY['BACKROOM'::character varying, 'COUNTER'::chara"
+            "cter varying, 'IN_TRANSIT'::character varying, 'QUARANTINE'::character varying, "
+            "'WASTE'::character varying, 'WIP'::character varying]::text[])",
+        ),
+        ModelCheckFingerprint(
+            "public",
+            "inventory_lot_balances",
+            "ck_inventory_lot_balances_quantities_valid",
+            "ck_inventory_lot_balances_quantities_valid",
+            "ck_inventory_lot_balances_quantities_valid",
+            "quantity_on_hand >= 0 AND quantity_reserved >= 0 AND quantity_reserved <= quanti"
+            "ty_on_hand AND quantity_on_hand <> 'NaN'::numeric",
+            "quantity_on_hand >= 0::numeric AND quantity_reserved >= 0::numeric AND quantity_"
+            "reserved <= quantity_on_hand AND quantity_on_hand <> 'NaN'::numeric",
+        ),
+        ModelCheckFingerprint(
+            "public",
+            "inventory_lot_balances",
+            "ck_inventory_lot_balances_location_valid",
+            "ck_inventory_lot_balances_location_valid",
+            "ck_inventory_lot_balances_location_valid",
+            "location_code IN ('BACKROOM','COUNTER','IN_TRANSIT','WASTE','QUARANTINE','WIP')",
+            "location_code::text = ANY (ARRAY['BACKROOM'::character varying, 'COUNTER'::chara"
+            "cter varying, 'IN_TRANSIT'::character varying, 'WASTE'::character varying, 'QUAR"
+            "ANTINE'::character varying, 'WIP'::character varying]::text[])",
+        ),
+        ModelCheckFingerprint(
+            "public",
+            "inventory_lots",
+            "ck_inventory_lots_dates_valid",
+            "ck_inventory_lots_dates_valid",
+            "ck_inventory_lots_dates_valid",
+            "produced_at IS NULL OR expires_at IS NULL OR produced_at < expires_at",
+            "produced_at IS NULL OR expires_at IS NULL OR produced_at < expires_at",
+        ),
+        ModelCheckFingerprint(
+            "public",
+            "inventory_lots",
+            "ck_inventory_lots_code_required",
+            "ck_inventory_lots_code_required",
+            "ck_inventory_lots_code_required",
+            "length(btrim(lot_code)) > 0",
+            "length(btrim(lot_code::text)) > 0",
+        ),
+        ModelCheckFingerprint(
+            "public",
+            "inventory_lots",
+            "ck_inventory_lots_unknown_expiry",
+            "ck_inventory_lots_unknown_expiry",
+            "ck_inventory_lots_unknown_expiry",
+            "NOT unidentified OR expires_at IS NULL",
+            "NOT unidentified OR expires_at IS NULL",
+        ),
+        ModelCheckFingerprint(
+            "public",
+            "inventory_movement_lot_allocations",
+            "ck_inventory_movement_lot_allocations_quantity_valid",
+            "ck_inventory_movement_lot_allocations_quantity_valid",
+            "ck_inventory_movement_lot_allocations_quantity_valid",
+            "quantity > 0 AND quantity <> 'NaN'::numeric",
+            "quantity > 0::numeric AND quantity <> 'NaN'::numeric",
+        ),
+        ModelCheckFingerprint(
+            "public",
+            "inventory_movements",
+            "ck_inventory_movements_cause_valid",
+            "ck_inventory_movements_cause_valid",
+            "ck_inventory_movements_cause_valid",
+            "context_version IS NULL OR (context_version = 1 AND idempotency_record_id IS NOT"
+            " NULL AND causal_effect_code IS NOT NULL AND length(btrim(causal_effect_code)) >"
+            " 0 AND source_document_type IS NOT NULL AND source_document_id IS NOT NULL AND o"
+            "perator_user_id IS NOT NULL AND source_app IS NOT NULL AND correlation_id IS NOT"
+            " NULL AND source_quantity > 0 AND source_quantity <> 'NaN'::numeric AND length(b"
+            "trim(source_uom)) > 0 AND conversion_factor > 0 AND conversion_factor <> 'NaN'::"
+            "numeric AND quantity = source_quantity * conversion_factor) IS TRUE",
+            "context_version IS NULL OR (context_version = 1 AND idempotency_record_id IS NOT"
+            " NULL AND causal_effect_code IS NOT NULL AND length(btrim(causal_effect_code::te"
+            "xt)) > 0 AND source_document_type IS NOT NULL AND source_document_id IS NOT NULL"
+            " AND operator_user_id IS NOT NULL AND source_app IS NOT NULL AND correlation_id "
+            "IS NOT NULL AND source_quantity > 0::numeric AND source_quantity <> 'NaN'::numer"
+            "ic AND length(btrim(source_uom::text)) > 0 AND conversion_factor > 0::numeric AN"
+            "D conversion_factor <> 'NaN'::numeric AND quantity = (source_quantity * conversi"
+            "on_factor)) IS TRUE",
+        ),
+        ModelCheckFingerprint(
+            "public",
+            "inventory_movements",
+            "ck_inventory_movements_location_valid",
+            "ck_inventory_movements_location_valid",
+            "ck_inventory_movements_location_valid",
+            "location_code IN ('BACKROOM','COUNTER','IN_TRANSIT','QUARANTINE','WASTE','WIP')",
+            "location_code::text = ANY (ARRAY['BACKROOM'::character varying, 'COUNTER'::chara"
+            "cter varying, 'IN_TRANSIT'::character varying, 'QUARANTINE'::character varying, "
+            "'WASTE'::character varying, 'WIP'::character varying]::text[])",
+        ),
+        ModelCheckFingerprint(
+            "public",
+            "inventory_movements",
+            "ck_inventory_movements_type_valid",
+            "ck_inventory_movements_type_valid",
+            "ck_inventory_movements_type_valid",
+            "movement_type IN ('CLOSE_COUNTER_ADJUSTMENT','CLOSE_WASTE_ADJUSTMENT','COUNTER_T"
+            "RANSFER','INVENTORY_COMPENSATION','MANUAL_ADJUSTMENT','OPENING_ADJUSTMENT','ORDE"
+            "R_DELIVERY','PRODUCTION_CONSUMPTION','PRODUCTION_OUTPUT','PRODUCTION_RETURN','PR"
+            "ODUCTION_WASTE','PURCHASE_RECEIPT','QUARANTINE_RELEASE','RETURN_QUARANTINE','RET"
+            "URN_RESTOCK','RETURN_WASTE','REVERSAL','SALE_CLASS_ATTRIBUTION','SALE_DIRECT','S"
+            "TOCK_COUNT_ADJUSTMENT','TRANSFER_DISPATCH','TRANSFER_DISPOSITION','TRANSFER_RECE"
+            "IPT','TRANSFER_RETURN','WASTE_RECORD','WIP_TRANSFER')",
+            "movement_type::text = ANY (ARRAY['CLOSE_COUNTER_ADJUSTMENT'::character varying, "
+            "'CLOSE_WASTE_ADJUSTMENT'::character varying, 'COUNTER_TRANSFER'::character varyi"
+            "ng, 'INVENTORY_COMPENSATION'::character varying, 'MANUAL_ADJUSTMENT'::character "
+            "varying, 'OPENING_ADJUSTMENT'::character varying, 'ORDER_DELIVERY'::character va"
+            "rying, 'PRODUCTION_CONSUMPTION'::character varying, 'PRODUCTION_OUTPUT'::charact"
+            "er varying, 'PRODUCTION_RETURN'::character varying, 'PRODUCTION_WASTE'::characte"
+            "r varying, 'PURCHASE_RECEIPT'::character varying, 'QUARANTINE_RELEASE'::characte"
+            "r varying, 'RETURN_QUARANTINE'::character varying, 'RETURN_RESTOCK'::character v"
+            "arying, 'RETURN_WASTE'::character varying, 'REVERSAL'::character varying, 'SALE_"
+            "CLASS_ATTRIBUTION'::character varying, 'SALE_DIRECT'::character varying, 'STOCK_"
+            "COUNT_ADJUSTMENT'::character varying, 'TRANSFER_DISPATCH'::character varying, 'T"
+            "RANSFER_DISPOSITION'::character varying, 'TRANSFER_RECEIPT'::character varying, "
+            "'TRANSFER_RETURN'::character varying, 'WASTE_RECORD'::character varying, 'WIP_TR"
+            "ANSFER'::character varying]::text[])",
+        ),
+        ModelCheckFingerprint(
+            "public",
+            "inventory_movements",
+            "ck_inventory_movements_cost_valid",
+            "ck_inventory_movements_cost_valid",
+            "ck_inventory_movements_cost_valid",
+            "((unit_cost IS NULL AND total_cost IS NULL AND cost_evidence_reference IS NULL) "
+            "OR (unit_cost >= 0 AND unit_cost <> 'NaN'::numeric AND total_cost >= 0 AND total"
+            "_cost <> 'NaN'::numeric AND length(btrim(cost_evidence_reference)) > 0)) IS TRUE",
+            "(unit_cost IS NULL AND total_cost IS NULL AND cost_evidence_reference IS NULL OR"
+            " unit_cost >= 0::numeric AND unit_cost <> 'NaN'::numeric AND total_cost >= 0::nu"
+            "meric AND total_cost <> 'NaN'::numeric AND length(btrim(cost_evidence_reference:"
+            ":text)) > 0) IS TRUE",
+        ),
+        ModelCheckFingerprint(
+            "public",
+            "inventory_reconciliation_rows",
+            "ck_inventory_reconciliation_rows_action_valid",
+            "ck_inventory_reconciliation_rows_action_valid",
+            "ck_inventory_reconciliation_rows_action_valid",
+            "action IN ('OPENING','REBUILD')",
+            "action::text = ANY (ARRAY['OPENING'::character varying, 'REBUILD'::character var"
+            "ying]::text[])",
+        ),
+        ModelCheckFingerprint(
+            "public",
+            "inventory_reservation_event_lots",
+            "ck_inventory_reservation_event_lots_quantity_valid",
+            "ck_inventory_reservation_event_lots_quantity_valid",
+            "ck_inventory_reservation_event_lots_quantity_valid",
+            "quantity > 0 AND quantity <> 'NaN'::numeric",
+            "quantity > 0::numeric AND quantity <> 'NaN'::numeric",
+        ),
+        ModelCheckFingerprint(
+            "public",
+            "inventory_reservation_events",
+            "ck_inventory_reservation_events_movement_valid",
+            "ck_inventory_reservation_events_movement_valid",
+            "ck_inventory_reservation_events_movement_valid",
+            "(event_type = 'CONSUME' AND inventory_movement_id IS NOT NULL) OR (event_type <>"
+            " 'CONSUME' AND inventory_movement_id IS NULL)",
+            "event_type::text = 'CONSUME'::text AND inventory_movement_id IS NOT NULL OR even"
+            "t_type::text <> 'CONSUME'::text AND inventory_movement_id IS NULL",
+        ),
+        ModelCheckFingerprint(
+            "public",
+            "inventory_reservation_events",
+            "ck_inventory_reservation_events_quantity_valid",
+            "ck_inventory_reservation_events_quantity_valid",
+            "ck_inventory_reservation_events_quantity_valid",
+            "quantity > 0 AND quantity <> 'NaN'::numeric",
+            "quantity > 0::numeric AND quantity <> 'NaN'::numeric",
+        ),
+        ModelCheckFingerprint(
+            "public",
+            "inventory_reservation_events",
+            "ck_inventory_reservation_events_type_valid",
+            "ck_inventory_reservation_events_type_valid",
+            "ck_inventory_reservation_events_type_valid",
+            "event_type IN ('RESERVE','RELEASE','CONSUME')",
+            "event_type::text = ANY (ARRAY['RESERVE'::character varying, 'RELEASE'::character"
+            " varying, 'CONSUME'::character varying]::text[])",
+        ),
+        ModelCheckFingerprint(
+            "public",
+            "inventory_reservation_lot_allocations",
+            "ck_inventory_reservation_lot_allocations_quantities_valid",
+            "ck_inventory_reservation_lot_allocations_quantities_valid",
+            "ck_inventory_reservation_lot_allocations_quantities_valid",
+            "quantity > 0 AND consumed_quantity >= 0 AND released_quantity >= 0 AND consumed_"
+            "quantity + released_quantity <= quantity",
+            "quantity > 0::numeric AND consumed_quantity >= 0::numeric AND released_quantity "
+            ">= 0::numeric AND (consumed_quantity + released_quantity) <= quantity",
+        ),
+        ModelCheckFingerprint(
+            "public",
+            "inventory_reservations",
+            "ck_inventory_reservations_quantities_valid",
+            "ck_inventory_reservations_quantities_valid",
+            "ck_inventory_reservations_quantities_valid",
+            "quantity > 0 AND quantity <> 'NaN'::numeric AND consumed_quantity >= 0 AND relea"
+            "sed_quantity >= 0 AND consumed_quantity + released_quantity <= quantity",
+            "quantity > 0::numeric AND quantity <> 'NaN'::numeric AND consumed_quantity >= 0:"
+            ":numeric AND released_quantity >= 0::numeric AND (consumed_quantity + released_q"
+            "uantity) <= quantity",
+        ),
+        ModelCheckFingerprint(
+            "public",
+            "inventory_reservations",
+            "ck_inventory_reservations_location_valid",
+            "ck_inventory_reservations_location_valid",
+            "ck_inventory_reservations_location_valid",
+            "location_code IN ('BACKROOM','COUNTER')",
+            "location_code::text = ANY (ARRAY['BACKROOM'::character varying, 'COUNTER'::chara"
+            "cter varying]::text[])",
+        ),
+        ModelCheckFingerprint(
+            "public",
+            "inventory_reservations",
+            "ck_inventory_reservations_status_valid",
+            "ck_inventory_reservations_status_valid",
+            "ck_inventory_reservations_status_valid",
+            "(status = 'ACTIVE' AND consumed_quantity = 0 AND released_quantity < quantity) O"
+            "R (status = 'PARTIALLY_CONSUMED' AND consumed_quantity > 0 AND consumed_quantity"
+            " + released_quantity < quantity) OR (status = 'CONSUMED' AND consumed_quantity ="
+            " quantity) OR (status = 'RELEASED' AND released_quantity > 0 AND consumed_quanti"
+            "ty + released_quantity = quantity)",
+            "status::text = 'ACTIVE'::text AND consumed_quantity = 0::numeric AND released_qu"
+            "antity < quantity OR status::text = 'PARTIALLY_CONSUMED'::text AND consumed_quan"
+            "tity > 0::numeric AND (consumed_quantity + released_quantity) < quantity OR stat"
+            "us::text = 'CONSUMED'::text AND consumed_quantity = quantity OR status::text = '"
+            "RELEASED'::text AND released_quantity > 0::numeric AND (consumed_quantity + rele"
+            "ased_quantity) = quantity",
+        ),
+        ModelCheckFingerprint(
+            "public",
+            "products",
+            "ck_products_lot_expiry_policy_valid",
+            "ck_products_lot_expiry_policy_valid",
+            "ck_products_lot_expiry_policy_valid",
+            "NOT expiry_required OR lot_tracking_enabled",
+            "NOT expiry_required OR lot_tracking_enabled",
+        ),
+        ModelCheckFingerprint(
+            "public",
+            "return_disposition_allocations",
+            "ck_return_disposition_allocations_ck_return_allocation_quantity",
+            "ck_return_disposition_allocations_ck_return_allocation_quantity",
+            "ck_return_disposition_allocations_ck_return_allocation_quantity",
+            "quantity > 0",
+            "quantity > 0::numeric",
+        ),
+        ModelCheckFingerprint(
+            "public",
+            "return_disposition_allocations",
+            "ck_return_disposition_allocations_ck_return_allocation_disposition",
+            "ck_return_disposition_allocations_ck_return_allocation__f71b",
+            "ck_return_disposition_allocations_ck_return_allocation__f71b",
+            "disposition_code IN ('RESTOCK_COUNTER', 'RESTOCK_BACKROOM', 'QUARANTINE', 'SEND_"
+            "TO_WASTE', 'NO_STOCK')",
+            "disposition_code::text = ANY (ARRAY['RESTOCK_COUNTER'::character varying, 'RESTO"
+            "CK_BACKROOM'::character varying, 'QUARANTINE'::character varying, 'SEND_TO_WASTE"
+            "'::character varying, 'NO_STOCK'::character varying]::text[])",
+        ),
+        ModelCheckFingerprint(
+            "public",
+            "transfer_transit_resolution_lines",
+            "ck_transfer_transit_resolution_lines_quantity_positive",
+            "ck_transfer_transit_resolution_lines_quantity_positive",
+            "ck_transfer_transit_resolution_lines_quantity_positive",
+            "quantity > 0",
+            "quantity > 0::numeric",
+        ),
+        ModelCheckFingerprint(
+            "public",
+            "transfer_transit_resolutions",
+            "ck_transfer_transit_resolutions_physical_branch_valid",
+            "ck_transfer_transit_resolutions_physical_branch_valid",
+            "ck_transfer_transit_resolutions_physical_branch_valid",
+            "(kind = 'RETURN_TO_ORIGIN' AND branch_id = origin_branch_id) OR (kind = 'SEND_TO"
+            "_WASTE' AND branch_id = destination_branch_id)",
+            "kind::text = 'RETURN_TO_ORIGIN'::text AND branch_id = origin_branch_id OR kind::"
+            "text = 'SEND_TO_WASTE'::text AND branch_id = destination_branch_id",
+        ),
+        ModelCheckFingerprint(
+            "public",
+            "transfer_transit_resolutions",
+            "ck_transfer_transit_resolutions_kind_valid",
+            "ck_transfer_transit_resolutions_kind_valid",
+            "ck_transfer_transit_resolutions_kind_valid",
+            "kind IN ('RETURN_TO_ORIGIN', 'SEND_TO_WASTE')",
+            "kind::text = ANY (ARRAY['RETURN_TO_ORIGIN'::character varying, 'SEND_TO_WASTE'::"
+            "character varying]::text[])",
+        ),
+        ModelCheckFingerprint(
+            "public",
+            "transfer_transit_resolutions",
+            "ck_transfer_transit_resolutions_reason_required",
+            "ck_transfer_transit_resolutions_reason_required",
+            "ck_transfer_transit_resolutions_reason_required",
+            "length(trim(reason)) > 0",
+            "length(TRIM(BOTH FROM reason)) > 0",
+        ),
+        ModelCheckFingerprint(
+            "public",
+            "transfer_transit_resolutions",
+            "ck_transfer_transit_resolutions_branches_distinct",
+            "ck_transfer_transit_resolutions_branches_distinct",
+            "ck_transfer_transit_resolutions_branches_distinct",
+            "origin_branch_id <> destination_branch_id",
+            "origin_branch_id <> destination_branch_id",
+        ),
+        ModelCheckFingerprint(
+            "public",
+            "transfer_transit_resolutions",
+            "ck_transfer_transit_resolutions_destination_valid",
+            "ck_transfer_transit_resolutions_destination_valid",
+            "ck_transfer_transit_resolutions_destination_valid",
+            "(kind = 'RETURN_TO_ORIGIN' AND destination_location IN ('BACKROOM','QUARANTINE')"
+            ") OR (kind = 'SEND_TO_WASTE' AND destination_location = 'WASTE')",
+            "kind::text = 'RETURN_TO_ORIGIN'::text AND (destination_location::text = ANY (ARR"
+            "AY['BACKROOM'::character varying, 'QUARANTINE'::character varying]::text[])) OR "
+            "kind::text = 'SEND_TO_WASTE'::text AND destination_location::text = 'WASTE'::tex"
+            "t",
+        ),
         ModelCheckFingerprint(
             "public",
             "external_payment_operations",
@@ -2593,28 +3033,6 @@ KNOWN_MODEL_CHECKS: frozenset[ModelCheckFingerprint] = frozenset(
         ModelCheckFingerprint(
             "public",
             "inventory_adjustments",
-            "ck_inventory_adjustments_ck_inventory_adjustments_location_valid",
-            "ck_inventory_adjustments_ck_inventory_adjustments_locat_24ce",
-            "ck_inventory_adjustments_location_valid",
-            "location_code IN ('BACKROOM', 'COUNTER', 'IN_TRANSIT', 'WASTE')",
-            (
-                "location_code::text = ANY (ARRAY['BACKROOM'::character v"
-                "arying, 'COUNTER'::character varying, 'IN_TRANSIT'::char"
-                "acter varying, 'WASTE'::character varying]::text[])"
-            ),
-        ),
-        ModelCheckFingerprint(
-            "public",
-            "inventory_adjustments",
-            ("ck_inventory_adjustments_ck_inventory_adjustments_quantity_positive"),
-            "ck_inventory_adjustments_ck_inventory_adjustments_quant_7e97",
-            "ck_inventory_adjustments_quantity_positive",
-            "quantity > 0",
-            "quantity > 0::numeric",
-        ),
-        ModelCheckFingerprint(
-            "public",
-            "inventory_adjustments",
             "ck_inventory_adjustments_ck_inventory_adjustments_type_valid",
             "ck_inventory_adjustments_ck_inventory_adjustments_type_valid",
             "ck_inventory_adjustments_type_valid",
@@ -2623,19 +3041,6 @@ KNOWN_MODEL_CHECKS: frozenset[ModelCheckFingerprint] = frozenset(
                 "adjustment_type::text = ANY (ARRAY['INCREASE'::character"
                 " varying, 'DECREASE'::character varying, 'SET_COUNTED'::"
                 "character varying]::text[])"
-            ),
-        ),
-        ModelCheckFingerprint(
-            "public",
-            "inventory_balances",
-            "ck_inventory_balances_ck_inventory_balances_location_valid",
-            "ck_inventory_balances_ck_inventory_balances_location_valid",
-            "ck_inventory_balances_location_valid",
-            "location_code IN ('BACKROOM', 'COUNTER', 'IN_TRANSIT', 'WASTE')",
-            (
-                "location_code::text = ANY (ARRAY['BACKROOM'::character v"
-                "arying, 'COUNTER'::character varying, 'IN_TRANSIT'::char"
-                "acter varying, 'WASTE'::character varying]::text[])"
             ),
         ),
         ModelCheckFingerprint(
@@ -2650,19 +3055,6 @@ KNOWN_MODEL_CHECKS: frozenset[ModelCheckFingerprint] = frozenset(
         ModelCheckFingerprint(
             "public",
             "inventory_movements",
-            "ck_inventory_movements_ck_inventory_movements_location_valid",
-            "ck_inventory_movements_ck_inventory_movements_location_valid",
-            "ck_inventory_movements_location_valid",
-            "location_code IN ('BACKROOM', 'COUNTER', 'IN_TRANSIT', 'WASTE')",
-            (
-                "location_code::text = ANY (ARRAY['BACKROOM'::character v"
-                "arying, 'COUNTER'::character varying, 'IN_TRANSIT'::char"
-                "acter varying, 'WASTE'::character varying]::text[])"
-            ),
-        ),
-        ModelCheckFingerprint(
-            "public",
-            "inventory_movements",
             "ck_inventory_movements_ck_inventory_movements_direction_valid",
             "ck_inventory_movements_ck_inventory_movements_direction_valid",
             "ck_inventory_movements_direction_valid",
@@ -2670,28 +3062,6 @@ KNOWN_MODEL_CHECKS: frozenset[ModelCheckFingerprint] = frozenset(
             (
                 "direction::text = ANY (ARRAY['IN'::character varying, 'O"
                 "UT'::character varying]::text[])"
-            ),
-        ),
-        ModelCheckFingerprint(
-            "public",
-            "inventory_movements",
-            "ck_inventory_movements_ck_inventory_movements_type_valid",
-            "ck_inventory_movements_ck_inventory_movements_type_valid",
-            "ck_inventory_movements_type_valid",
-            (
-                "movement_type IN ('MANUAL_ADJUSTMENT', 'STOCK_COUNT_ADJU"
-                "STMENT', 'TRANSFER_DISPATCH', 'TRANSFER_RECEIPT', 'PURCH"
-                "ASE_RECEIPT', 'PRODUCTION_CONSUMPTION', 'PRODUCTION_OUTP"
-                "UT', 'WASTE_RECORD')"
-            ),
-            (
-                "movement_type::text = ANY (ARRAY['MANUAL_ADJUSTMENT'::ch"
-                "aracter varying, 'STOCK_COUNT_ADJUSTMENT'::character var"
-                "ying, 'TRANSFER_DISPATCH'::character varying, 'TRANSFER_"
-                "RECEIPT'::character varying, 'PRODUCTION_CONSUMPTION'::c"
-                "haracter varying, 'PRODUCTION_OUTPUT'::character varying"
-                ", 'WASTE_RECORD'::character varying, 'PURCHASE_RECEIPT':"
-                ":character varying]::text[])"
             ),
         ),
         ModelCheckFingerprint(
@@ -3020,12 +3390,10 @@ KNOWN_MODEL_CHECKS: frozenset[ModelCheckFingerprint] = frozenset(
             "ck_production_batches_ck_production_batches_status_valid",
             "ck_production_batches_ck_production_batches_status_valid",
             "ck_production_batches_ck_production_batches_status_valid",
-            "status IN ('DRAFT', 'IN_PROGRESS', 'COMPLETED', 'CANCELLED')",
-            (
-                "status::text = ANY (ARRAY['DRAFT'::character varying, 'I"
-                "N_PROGRESS'::character varying, 'COMPLETED'::character v"
-                "arying, 'CANCELLED'::character varying]::text[])"
-            ),
+            "status IN ('DRAFT', 'RELEASED', 'PENDING_RECONCILIATION', 'COMPLETED', 'CANCELLED')",
+            "status::text = ANY (ARRAY['DRAFT'::character varying, 'RELEASED'::character vary"
+            "ing, 'PENDING_RECONCILIATION'::character varying, 'COMPLETED'::character varying"
+            ", 'CANCELLED'::character varying]::text[])",
         ),
         ModelCheckFingerprint(
             "public",
@@ -5555,10 +5923,10 @@ def test_drift_classifier_accepts_only_exact_known_fingerprints() -> None:
     assert len(KNOWN_DB_ONLY_INDEXES) == 75
     assert len(KNOWN_DB_ONLY_DEFAULTS) == 51
     assert len(KNOWN_DB_ONLY_CHECKS) == 6
-    assert len(KNOWN_MODEL_CHECKS) == 231
-    assert len(KNOWN_MODEL_INDEXES) == 3
+    assert len(KNOWN_MODEL_CHECKS) == 263
+    assert len(KNOWN_MODEL_INDEXES) == 4
     assert (
-        sum(item.expected_database_name != item.database_name for item in KNOWN_MODEL_CHECKS) == 87
+        sum(item.expected_database_name != item.database_name for item in KNOWN_MODEL_CHECKS) == 82
     )
 
     known_index = min(KNOWN_DB_ONLY_INDEXES)
@@ -6390,8 +6758,8 @@ def test_static_graph() -> None:
     for row in inventory:
         _emit("REVISION", row)
     _emit("GRAPH", graph)
-    assert graph["revision_count"] == 48
-    assert graph["unique_revision_count"] == 48
+    assert graph["revision_count"] == 53
+    assert graph["unique_revision_count"] == 53
     assert graph["duplicate_revisions"] == []
     assert graph["roots"] == ["0001_foundation_schema"]
     assert graph["heads"] == [CANONICAL_HEAD]
@@ -6400,17 +6768,19 @@ def test_static_graph() -> None:
     assert graph["unreachable"] == []
     assert graph["branches"] == {}
     assert graph["merge_revisions"] == []
-    assert len(_topological_revisions(inventory)) == 48
+    assert len(_topological_revisions(inventory)) == 53
 
 
 def test_financial_ledger_transition_is_empty_preserves_history_and_protects_evidence() -> None:
     with _root_runtime() as (root_config, root_engine):
         with _temporary_database(root_engine, root_config, "financial-ledger") as (config, engine):
             _upgrade(engine, config, "20261018_0043_operation_context")
-            with Session(engine) as session:
-                assert_authorized_destructive_connection(session.connection(), config)
-                seed_local_data(session)
-                session.commit()
+            # Checkpoint fixtures use that revision's schema, never today's ORM seed.
+            with engine.begin() as connection:
+                assert_authorized_destructive_connection(connection, config)
+                identity = _insert_identity(connection, "financial-transition")
+                _insert_catalog(connection, "FINANCIAL-CLASS", "FINANCIAL-PRODUCT")
+                _insert_sale(connection, identity)
             with engine.connect() as connection:
                 old_tables = sorted(
                     set(inspect(connection).get_table_names()) - {"alembic_version"}
@@ -6424,7 +6794,7 @@ def test_financial_ledger_transition_is_empty_preserves_history_and_protects_evi
                     )
                     for table in old_tables
                 }
-            _upgrade(engine, config, "head")
+            _upgrade(engine, config, "20261019_0044_financial_ledger")
             with engine.connect() as connection:
                 assert_authorized_destructive_connection(connection, config)
                 for table in old_tables:
@@ -6443,7 +6813,7 @@ def test_financial_ledger_transition_is_empty_preserves_history_and_protects_evi
                 command.downgrade(
                     _alembic_config(connection, config), "20261018_0043_operation_context"
                 )
-            _upgrade(engine, config, "head")
+            _upgrade(engine, config, "20261019_0044_financial_ledger")
             source_id = uuid.uuid4()
             with engine.begin() as connection:
                 assert_authorized_destructive_connection(connection, config)
@@ -6477,7 +6847,7 @@ def test_financial_ledger_transition_is_empty_preserves_history_and_protects_evi
                     command.downgrade(
                         _alembic_config(connection, config), "20261018_0043_operation_context"
                     )
-            assert _current_revision(engine, config) == CANONICAL_HEAD
+            assert _current_revision(engine, config) == "20261019_0044_financial_ledger"
             with engine.connect() as connection:
                 assert connection.scalar(text("SELECT count(*) FROM financial_operations")) == 1
                 assert connection.scalar(text("SELECT count(*) FROM financial_entries")) == 0
@@ -6485,7 +6855,7 @@ def test_financial_ledger_transition_is_empty_preserves_history_and_protects_evi
                 "FINANCIAL_LEDGER_TRANSITION",
                 {
                     "source_revision": "20261018_0043_operation_context",
-                    "target_revision": CANONICAL_HEAD,
+                    "target_revision": "20261019_0044_financial_ledger",
                     "old_tables_preserved": len(old_tables),
                     "new_tables_initially_empty": True,
                     "empty_downgrade": "PASS",
@@ -6804,6 +7174,192 @@ def test_financial_block_downgrade_guards_preserve_evidence_and_schema(
                     "rejected_target_revision": downgrade_target,
                     "ending_revision": CANONICAL_HEAD,
                     "rows_and_schema_preserved": True,
+                    "result": "PASS",
+                },
+            )
+
+
+@pytest.mark.parametrize(
+    "case,target,message",
+    [
+        ("valuation", "20261019_0048_financial_import", "Inventory evidence requires"),
+        ("reconciliation", "20261019_0049_inventory_core", "Inventory reconciliation requires"),
+        ("close_lots", "20261019_0050_inventory_rebuild", "Lot counts require"),
+        ("transit", "20261019_0051_inv_attribution", "Transfer evidence requires"),
+        (
+            "production_run",
+            "20261019_0052_transit_resolution",
+            "Purchase/production inventory evidence",
+        ),
+    ],
+)
+def test_inventory_block_downgrade_guards_preserve_evidence_and_schema(
+    case: str, target: str, message: str
+) -> None:
+    with _root_runtime() as (root_config, root_engine):
+        with _temporary_database(root_engine, root_config, "inventory_guard") as (config, engine):
+            _upgrade(engine, config, "head")
+            with engine.begin() as connection:
+                assert_authorized_destructive_connection(connection, config)
+                identity = _insert_identity(connection, case)
+                catalog = _insert_catalog(connection, f"CLASS-{case}", f"PRODUCT-{case}")
+                now = datetime.now(UTC)
+                owner = _idempotency_result_values(identity)
+                _insert_row(connection, "idempotency_records", owner)
+                if case == "valuation":
+                    _insert_row(
+                        connection,
+                        "inventory_balances",
+                        {
+                            "id": uuid.uuid4(),
+                            "branch_id": identity["branch"],
+                            "product_id": catalog["product"],
+                            "location_code": "BACKROOM",
+                            "quantity_on_hand": Decimal(2),
+                            "quantity_reserved": Decimal(0),
+                            "inventory_value": Decimal("7.12345678"),
+                            "updated_at": now,
+                        },
+                    )
+                elif case == "reconciliation":
+                    manifest_id = uuid.uuid4()
+                    _insert_row(
+                        connection,
+                        "inventory_reconciliation_manifests",
+                        {
+                            "id": manifest_id,
+                            "branch_id": identity["branch"],
+                            "manifest_sha256": "a" * 64,
+                            "evidence": json.dumps({"source": "SYNTHETIC_MIGRATION_ACCEPTANCE"}),
+                            "admitted_by_user_id": identity["user"],
+                        },
+                    )
+                    _insert_row(
+                        connection,
+                        "inventory_reconciliation_rows",
+                        {
+                            "id": uuid.uuid4(),
+                            "manifest_id": manifest_id,
+                            "branch_id": identity["branch"],
+                            "row_key": "reviewed-empty-opening",
+                            "row_sha256": "b" * 64,
+                            "action": "OPENING",
+                            "idempotency_record_id": owner["id"],
+                            "reconciliation": json.dumps({"quantity": "0.000"}),
+                        },
+                    )
+                elif case == "close_lots":
+                    close_id = _insert_cash_close(connection, identity)
+                    _insert_row(
+                        connection,
+                        "cash_session_close_product_counts",
+                        {
+                            "id": uuid.uuid4(),
+                            "cash_session_close_id": close_id,
+                            "product_id": catalog["product"],
+                            "product_code_snapshot": "COUNTED",
+                            "product_name_snapshot": "Synthetic counted product",
+                            "product_class_id": catalog["class"],
+                            "product_class_code_snapshot": "CLASS",
+                            "product_class_name_snapshot": "Synthetic class",
+                            "quantity": Decimal(2),
+                            "bucket_code": "COUNTER",
+                            "lot_counts": json.dumps(
+                                [{"lot_id": str(uuid.uuid4()), "quantity": "2.000"}]
+                            ),
+                        },
+                    )
+                elif case == "transit":
+                    other = _insert_identity(connection, "transit-destination")
+                    shipment_id = uuid.uuid4()
+                    _insert_row(
+                        connection,
+                        "operation_documents",
+                        {
+                            "id": shipment_id,
+                            "document_type": "BRANCH_TRANSFER_SHIPMENT",
+                            "status": "IN_TRANSIT",
+                            "source_branch_id": identity["branch"],
+                            "destination_branch_id": other["branch"],
+                            "workstation_id": identity["workstation"],
+                            "created_by_user_id": identity["user"],
+                            "created_at_utc": now,
+                        },
+                    )
+                    _insert_row(
+                        connection,
+                        "transfer_transit_resolutions",
+                        {
+                            "id": uuid.uuid4(),
+                            "shipment_id": shipment_id,
+                            "branch_id": identity["branch"],
+                            "origin_branch_id": identity["branch"],
+                            "destination_branch_id": other["branch"],
+                            "idempotency_record_id": owner["id"],
+                            "kind": "RETURN_TO_ORIGIN",
+                            "destination_location": "BACKROOM",
+                            "reason": "Documented physical return",
+                            "actor_id": identity["user"],
+                            "occurred_at": now,
+                        },
+                    )
+                else:
+                    recipe_id = uuid.uuid4()
+                    _insert_row(
+                        connection,
+                        "recipes",
+                        {
+                            "id": recipe_id,
+                            "product_id": catalog["product"],
+                            "yield_qty": Decimal(1),
+                            "yield_uom": "piece",
+                            "is_active": True,
+                            "created_at": now,
+                            "updated_at": now,
+                        },
+                    )
+                    _insert_row(
+                        connection,
+                        "production_batches",
+                        {
+                            "id": uuid.uuid4(),
+                            "branch_id": identity["branch"],
+                            "product_id": catalog["product"],
+                            "recipe_id": recipe_id,
+                            "status": "RELEASED",
+                            "plan_status": "RELEASED",
+                            "run_id": uuid.uuid4(),
+                            "run_status": "PENDING_RECONCILIATION",
+                            "recipe_snapshot": json.dumps(
+                                {
+                                    "source": "SYNTHETIC_MIGRATION_ACCEPTANCE",
+                                    "yield_quantity": "1.000",
+                                }
+                            ),
+                            "planned_output_qty": Decimal(1),
+                            "released_at": now,
+                            "created_by_user_id": identity["user"],
+                            "created_at": now,
+                            "updated_at": now,
+                        },
+                    )
+            with engine.connect() as connection:
+                before = _financial_guard_snapshot(connection)
+            with pytest.raises(DBAPIError, match=message):
+                with engine.connect() as connection:
+                    assert_authorized_destructive_connection(connection, config)
+                    connection.commit()
+                    command.downgrade(_alembic_config(connection, config), target)
+            assert _current_revision(engine, config) == CANONICAL_HEAD
+            with engine.connect() as connection:
+                assert _financial_guard_snapshot(connection) == before
+            _emit(
+                "INVENTORY_DOWNGRADE_GUARD",
+                {
+                    "case": case,
+                    "target_revision": target,
+                    "ending_revision": CANONICAL_HEAD,
+                    "rows_schema_triggers_preserved": True,
                     "result": "PASS",
                 },
             )

@@ -25,11 +25,12 @@ from zeromerma_api.modules.identity.application.authorization import (
 )
 from zeromerma_api.modules.identity.application.schemas import AuthenticatedUser, CapabilityCode
 from zeromerma_api.modules.identity.application.session_services import auth_error
+from zeromerma_api.modules.inventory.domain.exceptions import InventoryValidationError
 from zeromerma_api.modules.production.application.admin_schemas import (
     AdminProductionCancelRequest,
     AdminProductionCompleteRequest,
     AdminProductionCreateRequest,
-    AdminProductionStartRequest,
+    AdminProductionReleaseRequest,
     AdminProductionUpdateRequest,
     ProductionCommandCode,
     ProductionCommandResultView,
@@ -44,7 +45,7 @@ from zeromerma_api.modules.production.infrastructure.models import ProductionBat
 ProductionCommand = (
     AdminProductionCreateRequest
     | AdminProductionUpdateRequest
-    | AdminProductionStartRequest
+    | AdminProductionReleaseRequest
     | AdminProductionCompleteRequest
     | AdminProductionCancelRequest
 )
@@ -56,7 +57,7 @@ PRODUCTION_RESPONSE_POLICY = ResponsePolicy(
 def production_capability(command_code: ProductionCommandCode) -> CapabilityCode:
     if command_code == "cancel":
         return "production.cancel"
-    if command_code in {"start", "complete"}:
+    if command_code in {"release", "complete"}:
         return "production.execute"
     return "production.manage"
 
@@ -79,7 +80,7 @@ class ProductionIdempotencyService:
         expected_type = {
             "create": AdminProductionCreateRequest,
             "update": AdminProductionUpdateRequest,
-            "start": AdminProductionStartRequest,
+            "release": AdminProductionReleaseRequest,
             "complete": AdminProductionCompleteRequest,
             "cancel": AdminProductionCancelRequest,
         }[command_code]
@@ -120,8 +121,8 @@ class ProductionIdempotencyService:
                             production_id=production_id,
                             request_id=request_id,
                         )
-                    elif isinstance(command, AdminProductionStartRequest):
-                        result = self._commands.start_production(
+                    elif isinstance(command, AdminProductionReleaseRequest):
+                        result = self._commands.release_production(
                             current,
                             command=command,
                             current_user=current_user,
@@ -144,7 +145,7 @@ class ProductionIdempotencyService:
                             production_id=production_id,
                             request_id=request_id,
                         )
-            except ProductionValidationError as error:
+            except (ProductionValidationError, InventoryValidationError) as error:
                 snapshot = IdempotencyRejectionSnapshot(
                     code="PRODUCTION_CONFLICT", message=str(error)
                 )

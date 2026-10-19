@@ -90,6 +90,7 @@ def list_admin_sales_tickets(
     max_amount: Decimal | None = None,
     page: Annotated[int, Query(ge=1)] = 1,
     page_size: Annotated[int, Query(ge=1, le=100)] = 25,
+    pending_physical_only: bool = False,
 ) -> AdminSalesTicketsListResponse:
     _require_backoffice_user(current_user)
     try:
@@ -107,6 +108,7 @@ def list_admin_sales_tickets(
             search=search,
             status_filter=status_filter,
             workstation_id=workstation_id,
+            pending_physical_only=pending_physical_only,
         )
     except (SaleNotFoundError, SaleValidationError, TicketError) as error:
         raise _to_http_exception(error) from error
@@ -216,4 +218,3 @@ def reprint_ticket(
         )
     except (BranchAccessError, TicketError) as error:
         raise _to_http_exception(error) from error
-

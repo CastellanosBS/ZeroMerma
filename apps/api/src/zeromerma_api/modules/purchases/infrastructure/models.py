@@ -9,10 +9,13 @@ from sqlalchemy import (
     CheckConstraint,
     DateTime,
     ForeignKey,
+    Index,
     Numeric,
     String,
     Text,
     UniqueConstraint,
+    func,
+    text,
 )
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column
@@ -100,6 +103,17 @@ class PurchaseDocument(Base):
     )
 
 
+Index(
+    "uq_purchase_supplier_invoice",
+    PurchaseDocument.supplier_id,
+    func.upper(func.btrim(PurchaseDocument.external_document_number)),
+    unique=True,
+    postgresql_where=text(
+        "external_document_type = 'INVOICE' AND external_document_number IS NOT NULL"
+    ),
+)
+
+
 class PurchaseDocumentLine(Base):
     __tablename__ = "purchase_document_lines"
     __table_args__ = (
@@ -129,6 +143,9 @@ class PurchaseDocumentLine(Base):
     product_name_snapshot: Mapped[str] = mapped_column(String(160), nullable=False)
     product_kind_snapshot: Mapped[str] = mapped_column(String(32), nullable=False)
     unit_of_measure: Mapped[str] = mapped_column(String(32), nullable=False)
+    source_unit_of_measure: Mapped[str] = mapped_column(String(32), nullable=False)
+    conversion_factor: Mapped[Decimal] = mapped_column(Numeric(18, 6), nullable=False)
+    ordered_quantity_base: Mapped[Decimal] = mapped_column(Numeric(18, 3), nullable=False)
     ordered_quantity: Mapped[Decimal] = mapped_column(Numeric(12, 3), nullable=False)
     received_quantity: Mapped[Decimal] = mapped_column(
         Numeric(12, 3), default=Decimal("0"), nullable=False
@@ -198,6 +215,33 @@ class PurchaseReceiptLine(Base):
     )
     line_number: Mapped[int] = mapped_column(nullable=False)
     received_quantity: Mapped[Decimal] = mapped_column(Numeric(12, 3), nullable=False)
+    source_unit_of_measure: Mapped[str] = mapped_column(String(32), nullable=False)
+    conversion_factor: Mapped[Decimal] = mapped_column(Numeric(18, 6), nullable=False)
+    received_quantity_base: Mapped[Decimal] = mapped_column(Numeric(18, 3), nullable=False)
+    base_unit_of_measure: Mapped[str] = mapped_column(String(32), nullable=False)
+    base_unit_cost: Mapped[Decimal] = mapped_column(Numeric(18, 8), nullable=False)
+    lot_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("inventory_lots.id", ondelete="RESTRICT"), nullable=True
+    )
     unit_cost: Mapped[Decimal] = mapped_column(Numeric(12, 4), nullable=False)
     discrepancy_reason: Mapped[str | None] = mapped_column(String(160), nullable=True)
     notes: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+
+class PurchaseReceiptReversal(Base):
+    __tablename__ = "purchase_receipt_reversals"
+    __table_args__ = (
+        UniqueConstraint("purchase_receipt_id", name="uq_purchase_receipt_reversal_original"),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    purchase_receipt_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("purchase_receipts.id", ondelete="RESTRICT"), nullable=False
+    )
+    created_by_user_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id", ondelete="RESTRICT"), nullable=False
+    )
+    reason: Mapped[str] = mapped_column(String(500), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=utc_now, nullable=False
+    )

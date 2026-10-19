@@ -3,6 +3,7 @@ from __future__ import annotations
 from decimal import Decimal
 
 from fastapi.testclient import TestClient
+from return_fixtures import seed_return_stock
 from sqlalchemy import select
 
 from zeromerma_api.bootstrap.seed_local import (
@@ -56,6 +57,7 @@ def _get_product_id(code: str) -> str:
 
 
 def _confirm_sale(client: TestClient) -> dict[str, object]:
+    seed_return_stock()
     headers = _authorization_header(client)
     cash_session_id = current_cash_session_id(
         client, headers=headers, workstation_code=SEED_WORKSTATION_CODE
@@ -223,7 +225,14 @@ def test_ticket_visual_state_updates_after_sale_return(client: TestClient) -> No
                 {
                     "original_sale_line_id": product_direct_line_id,
                     "returned_quantity": "1.000",
-                    "disposition_code": "RESTOCK_COUNTER",
+                    "allocations": [
+                        {
+                            "exact_product_id": _get_product_id(SEED_PRODUCT_COCA_355_CODE),
+                            "quantity": "1.000",
+                            "disposition_code": "RESTOCK_COUNTER",
+                            "restock_safe_acknowledged": True,
+                        }
+                    ],
                 }
             ],
         },

@@ -50,6 +50,8 @@ const bolilloClass: OperationsCatalogClassView = {
 };
 
 const bolilloProduct: OperationsCatalogProductView = {
+  lot_tracking_enabled: false,
+  inventory_lots: [],
   code: "BOLILLO-STD",
   currency_code: "MXN",
   display_order: 10,
@@ -60,6 +62,21 @@ const bolilloProduct: OperationsCatalogProductView = {
 };
 
 describe("cash close model", () => {
+  it("preserves captured lot counts through draft sync and the exact closing request", () => {
+    let draft = createInitialCashCloseDraftState();
+    draft = selectClassForCashCloseCount(draft, bolilloClass);
+    draft = selectProductForCashCloseCount(draft, bolilloProduct);
+    draft = setCashClosePendingQuantityText(draft, "2.125");
+    draft = addCashClosePendingCountLine(draft);
+    draft.lotCountAmounts = { [bolilloProduct.id]: { "lot-soon": "0", "lot-later": "2.125" } };
+    draft = syncCashCloseDraftState(draft, { paymentMethodCatalog });
+    expect(buildCashClosePreviewRequest("POS-01", draft).counted_product_lines).toEqual([
+      {
+        product_id: bolilloProduct.id, counted_quantity: "2.125",
+        lot_counts: [{ lot_id: "lot-soon", counted_quantity: "0" }, { lot_id: "lot-later", counted_quantity: "2.125" }],
+      },
+    ]);
+  });
   it.each(["-10.00", "-10.25", "-0.01"])(
     "preserves signed CARD counts and serializes %s without changing its cents",
     (card) => {

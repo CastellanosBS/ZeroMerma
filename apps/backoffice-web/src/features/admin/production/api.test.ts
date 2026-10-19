@@ -7,7 +7,7 @@ import {
   createAdminProduction,
   fetchAdminProduction,
   fetchAdminProductionDetail,
-  startAdminProduction,
+  releaseAdminProduction,
 } from "./api";
 import type { AdminProductionListFilters } from "./types";
 
@@ -35,7 +35,7 @@ const apiProductionItem = {
   product_name: "Vanilla Concha",
   recipe_id: "recipe-1",
   recipe_name: "Base",
-  started_at: null,
+  released_at: null,
   status: "DRAFT",
   variance_percent: null,
   variance_qty: null,
@@ -59,7 +59,7 @@ const apiProductionDetail = {
     can_cancel: true,
     can_complete: false,
     can_edit: true,
-    can_start: true,
+    can_release: true,
     can_view_movements: true,
   },
   inventory_impact: {
@@ -91,9 +91,9 @@ const apiProductionDetail = {
     notes: null,
     planned_at: "2026-05-20T10:00:00Z",
     planned_output_qty: "20.000",
-    started_at: null,
-    started_by_user_id: null,
-    started_by_user_name: null,
+    released_at: null,
+    released_by_user_id: null,
+    released_by_user_name: null,
     status: "DRAFT",
     variance_percent: null,
     variance_qty: null,
@@ -162,7 +162,7 @@ describe("admin production API boundary", () => {
       productId: "product-1",
       recipeId: "recipe-1",
       search: "PROD",
-      status: "IN_PROGRESS",
+      status: "RELEASED",
       varianceState: "with_variance",
       warningState: "critical",
     });
@@ -175,7 +175,7 @@ describe("admin production API boundary", () => {
     expect(path).toContain("product_id=product-1");
     expect(path).toContain("recipe_id=recipe-1");
     expect(path).toContain("search=PROD");
-    expect(path).toContain("status=IN_PROGRESS");
+    expect(path).toContain("status=RELEASED");
     expect(path).toContain("variance_state=with_variance");
     expect(path).toContain("warning_state=critical");
   });
@@ -238,7 +238,7 @@ describe("admin production API boundary", () => {
     expect(detail.plannedInputs[0]?.status).toBe("unavailable");
   });
 
-  it("creates, starts, completes, and cancels through canonical endpoints", async () => {
+  it("creates, releases, reconciles, and cancels through canonical endpoints", async () => {
     const fetchSpy = vi
       .spyOn(globalThis, "fetch")
       .mockImplementation(() => mockJsonResponse(apiProductionDetail, 201));
@@ -255,7 +255,7 @@ describe("admin production API boundary", () => {
       },
       key,
     );
-    await startAdminProduction("production-1", "Start", key);
+    await releaseAdminProduction("production-1", "Start", key);
     await completeAdminProduction(
       "production-1",
       {
@@ -284,7 +284,7 @@ describe("admin production API boundary", () => {
     );
     expect(fetchSpy).toHaveBeenNthCalledWith(
       2,
-      expect.stringContaining("/v1/admin/production/production-1/start"),
+      expect.stringContaining("/v1/admin/production/production-1/release"),
       expect.objectContaining({ body: JSON.stringify({ notes: "Start" }), method: "POST" }),
     );
     expect(fetchSpy).toHaveBeenNthCalledWith(
@@ -293,6 +293,11 @@ describe("admin production API boundary", () => {
       expect.objectContaining({
         body: JSON.stringify({
           actual_output_qty: "18.000",
+          confirm_without_differences: false,
+          inputs: [],
+          finish_as: "COMPLETED",
+          output_lot_code: null,
+          output_expires_at: null,
           notes: "Completed",
           variance_reason: "Shrinkage",
         }),
@@ -302,7 +307,10 @@ describe("admin production API boundary", () => {
     expect(fetchSpy).toHaveBeenNthCalledWith(
       4,
       expect.stringContaining("/v1/admin/production/production-1/cancel"),
-      expect.objectContaining({ body: JSON.stringify({ reason: "Not needed" }), method: "POST" }),
+      expect.objectContaining({
+        body: JSON.stringify({ reason: "Not needed", no_physical_effects_confirmed: false }),
+        method: "POST",
+      }),
     );
   });
 });

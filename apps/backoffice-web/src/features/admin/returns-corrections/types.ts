@@ -202,18 +202,15 @@ export interface AdminReturnDetail {
 }
 
 export interface AdminReturnedLine {
-  dispositionCode: string;
   id: string;
   lineStatus: string;
   originalQuantity: string;
   originalSaleLineId: string;
-  productClassCode: string;
-  productClassName: string;
-  productCode: string;
-  productName: string;
+  originalCatalogName: string;
   refundAmount: string;
   returnedQuantity: string;
   unitPrice: string;
+  allocations: components["schemas"]["ReturnDispositionAllocationView"][];
 }
 
 export interface AdminCorrectionDetail {

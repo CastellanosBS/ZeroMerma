@@ -19,6 +19,8 @@ function assignRef<TValue>(targetRef: Ref<TValue> | undefined, value: TValue) {
 
 export function CatalogSelectionCard({
   buttonRef,
+  availabilityText,
+  lotText,
   code,
   isActive = false,
   isDisabled = false,
@@ -35,6 +37,8 @@ export function CatalogSelectionCard({
   // Kept for caller compatibility; capture-mode/catalog badges are intentionally not rendered.
   badge?: ReactNode;
   buttonRef?: Ref<HTMLButtonElement>;
+  availabilityText?: string | null;
+  lotText?: string | null;
   code: string;
   isActive?: boolean;
   isDisabled?: boolean;
@@ -163,6 +167,8 @@ export function CatalogSelectionCard({
             </span>
           ) : null}
         </div>
+        {availabilityText ? <p className="text-xs text-slate-600">{availabilityText}</p> : null}
+        {lotText ? <p className="text-xs text-slate-600">{lotText}</p> : null}
       </div>
     </button>
   );

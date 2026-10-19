@@ -1,5 +1,7 @@
 import { AdminActionButton } from "../../components/AdminActionButton";
 import { useMemo, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { fetchAdminWasteStock } from "../api";
 
 import type { AdminWasteCreatePayload, AdminWasteFilterOption, AdminWasteReason } from "../types";
 
@@ -29,6 +31,7 @@ export function AdminWasteWorkflowPanel({
   const [notes, setNotes] = useState("");
   const [productId, setProductId] = useState("");
   const [quantity, setQuantity] = useState("");
+  const [lotId, setLotId] = useState("");
   const [reasonCode, setReasonCode] = useState("");
   const [validationMessage, setValidationMessage] = useState<string | null>(null);
 
@@ -37,6 +40,12 @@ export function AdminWasteWorkflowPanel({
     [reasonCode, reasonOptions],
   );
   const noteRequired = selectedReason?.requiresNote || selectedReason?.highImpactDefault;
+  const stock = useQuery({
+    queryKey: ["admin", "waste", "stock", branchId, productId, locationCode],
+    queryFn: () => fetchAdminWasteStock(branchId, productId, locationCode),
+    enabled: Boolean(branchId && productId && locationCode),
+    retry: false,
+  });
 
   function handleSubmit() {
     if (!branchId) {
@@ -51,6 +60,15 @@ export function AdminWasteWorkflowPanel({
       setValidationMessage("Selecciona un motivo.");
       return;
     }
+    if (!stock.data || stock.isFetching || stock.isError) {
+      setValidationMessage("Espera la consulta de lotes de la ubicación seleccionada.");
+      return;
+    }
+    const selectedLot = stock.data.lots.find((lot) => lot.lot_id === lotId);
+    if (stock.data.lot_tracking_enabled && !selectedLot) {
+      setValidationMessage("Selecciona el lote físico que vas a registrar como merma.");
+      return;
+    }
     if (!quantity || Number(quantity) <= 0) {
       setValidationMessage("La cantidad debe ser mayor que cero.");
       return;
@@ -59,9 +77,14 @@ export function AdminWasteWorkflowPanel({
       setValidationMessage("Este motivo requiere nota operacional.");
       return;
     }
+    if (selectedLot && Number(quantity) > Number(selectedLot.available_quantity)) {
+      setValidationMessage("La cantidad supera el saldo disponible del lote seleccionado.");
+      return;
+    }
 
     setValidationMessage(null);
     onCreate({
+      lotId: stock.data.lot_tracking_enabled ? lotId : null,
       branchId,
       locationCode: locationCode as AdminWasteCreatePayload["locationCode"],
       notes: notes.trim() || null,
@@ -100,7 +123,10 @@ export function AdminWasteWorkflowPanel({
           <select
             className="rounded-xl border border-slate-200 px-3 py-2 text-sm"
             value={branchId}
-            onChange={(event) => setBranchId(event.target.value)}
+            onChange={(event) => {
+              setBranchId(event.target.value);
+              setLotId("");
+            }}
           >
             <option value="">Selecciona sucursal</option>
             {branchOptions.map((option) => (
@@ -118,7 +144,10 @@ export function AdminWasteWorkflowPanel({
           <select
             className="rounded-xl border border-slate-200 px-3 py-2 text-sm"
             value={productId}
-            onChange={(event) => setProductId(event.target.value)}
+            onChange={(event) => {
+              setProductId(event.target.value);
+              setLotId("");
+            }}
           >
             <option value="">Selecciona producto</option>
             {productOptions.map((option) => (
@@ -136,13 +165,18 @@ export function AdminWasteWorkflowPanel({
           <select
             className="rounded-xl border border-slate-200 px-3 py-2 text-sm"
             value={locationCode}
-            onChange={(event) => setLocationCode(event.target.value)}
+            onChange={(event) => {
+              setLocationCode(event.target.value);
+              setLotId("");
+            }}
           >
-            {locationOptions.map((option) => (
-              <option key={option.id} value={option.id}>
-                {option.label}
-              </option>
-            ))}
+            {locationOptions
+              .filter((option) => option.id !== "IN_TRANSIT")
+              .map((option) => (
+                <option key={option.id} value={option.id}>
+                  {option.label}
+                </option>
+              ))}
           </select>
         </label>
 
@@ -159,6 +193,30 @@ export function AdminWasteWorkflowPanel({
             onChange={(event) => setQuantity(event.target.value)}
           />
         </label>
+
+        {stock.data?.lot_tracking_enabled ? (
+          <label className="flex flex-col gap-1 xl:col-span-2">
+            <span className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">
+              Lote físico de merma
+            </span>
+            <select
+              aria-label="Lote físico de merma"
+              className="rounded-xl border border-slate-200 px-3 py-2 text-sm"
+              value={lotId}
+              onChange={(event) => setLotId(event.target.value)}
+            >
+              <option value="">Selecciona el lote físico</option>
+              {stock.data.lots.map((lot) => (
+                <option key={lot.lot_id} value={lot.lot_id}>
+                  {lot.lot_code} · Disponible {lot.available_quantity} ·{" "}
+                  {lot.expires_at
+                    ? `Caduca ${new Date(lot.expires_at).toLocaleString()}`
+                    : "Sin caducidad"}
+                </option>
+              ))}
+            </select>
+          </label>
+        ) : null}
 
         <label className="flex flex-col gap-1 xl:col-span-2">
           <span className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">
@@ -203,6 +261,12 @@ export function AdminWasteWorkflowPanel({
       {validationMessage || errorMessage ? (
         <p className="mt-3 rounded-xl border border-rose-200 bg-[var(--ui-color-danger-soft)] px-3 py-2 text-sm font-semibold text-[var(--ui-color-danger)]">
           {validationMessage ?? errorMessage}
+        </p>
+      ) : null}
+      {stock.isError ? (
+        <p role="alert">
+          No se pudo consultar el inventario de esta ubicación. Vuelve a seleccionar el producto
+          para reintentar.
         </p>
       ) : null}
 

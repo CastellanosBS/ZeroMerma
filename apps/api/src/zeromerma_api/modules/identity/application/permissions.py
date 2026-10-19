@@ -75,6 +75,8 @@ POS_PERMISSION_CODES: tuple[PermissionCode, ...] = (
     "transfers.view",
     "transfers.execute",
     "returns_corrections.manage",
+    "transfers.cancel",
+    "waste.manage",
     "discounts.manage",
 )
 

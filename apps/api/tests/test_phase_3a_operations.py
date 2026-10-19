@@ -27,6 +27,7 @@ from zeromerma_api.modules.branches.infrastructure.models import Branch, Worksta
 from zeromerma_api.modules.cash.infrastructure.models import CashSession
 from zeromerma_api.modules.catalog.infrastructure.models import Product, ProductClass
 from zeromerma_api.modules.identity.application.session_services import SessionService
+from zeromerma_api.modules.identity.infrastructure.models import User
 from zeromerma_api.modules.operations.infrastructure.models import (
     OperationDocument,
     OperationDocumentLine,
@@ -34,8 +35,41 @@ from zeromerma_api.modules.operations.infrastructure.models import (
 )
 from zeromerma_api.modules.outbox.infrastructure.models import OutboxEvent
 from zeromerma_api.testing.idempotency import new_idempotency_key
+from zeromerma_api.testing.inventory import seed_test_inventory
 from zeromerma_api.testing.sessions import login_headers
 from zeromerma_api.testing.transfer_operators import transfer_cashier_email
+
+
+def _seed_operating_stock(*, locations: tuple[str, ...] = ("BACKROOM", "COUNTER")) -> None:
+    """Explicit material fixture for scenarios that physically move seeded products."""
+    with SessionLocal() as session:
+        branch_id = session.scalar(
+            select(Workstation.branch_id).where(Workstation.code == SEED_WORKSTATION_CODE)
+        )
+        actor_id = session.scalar(select(User.id).order_by(User.email))
+        products = list(
+            session.scalars(
+                select(Product).where(
+                    Product.code.in_(
+                        [
+                            SEED_PRODUCT_CONCHA_VAN_CODE,
+                            SEED_PRODUCT_BOLILLO_STD_CODE,
+                            SEED_PRODUCT_CAFE_AMERICANO_CODE,
+                        ]
+                    )
+                )
+            )
+        )
+        assert branch_id and actor_id and len(products) == 3
+        for location in locations:
+            seed_test_inventory(
+                session,
+                branch_id=branch_id,
+                actor_user_id=actor_id,
+                product_quantities={p.id: Decimal(100) for p in products},
+                location_code=location,
+                fixture_reference="Physical document acceptance stock",
+            )
 
 
 def _login(client: TestClient, workstation_code: str = SEED_WORKSTATION_CODE) -> dict[str, str]:
@@ -136,7 +170,7 @@ def test_operations_bootstrap_returns_branch_brand_waste_reasons_and_destination
         "high_impact_quantity_threshold": "10",
         "high_impact_requires_acknowledgement": True,
         "high_impact_requires_note": True,
-        "stock_validated_source_bucket_codes": ["COUNTER"],
+        "stock_validated_source_bucket_codes": ["BACKROOM", "COUNTER"],
     }
     assert payload["destination_branches"][0]["code"] == SEED_DESTINATION_BRANCH_CODE
     assert payload["destination_branches"][0]["brand_key"] == "MERENNA"
@@ -175,6 +209,7 @@ def test_operations_catalog_and_class_products_resolve_exact_products(
 
 
 def test_counter_transfer_commit_writes_document_audit_and_outbox(client: TestClient) -> None:
+    _seed_operating_stock()
     _open_cash_session(client, SEED_WORKSTATION_CODE)
 
     response = client.post(
@@ -224,6 +259,7 @@ def test_counter_transfer_commit_writes_document_audit_and_outbox(client: TestCl
 def test_counter_transfer_detail_and_history_return_folio_and_filters(
     client: TestClient,
 ) -> None:
+    _seed_operating_stock()
     _open_cash_session(client)
 
     commit_response = client.post(
@@ -309,6 +345,7 @@ def test_counter_transfer_detail_and_history_return_folio_and_filters(
 def test_waste_commit_requires_exact_product_and_reason_and_writes_audit_and_outbox(
     client: TestClient,
 ) -> None:
+    _seed_operating_stock()
     _open_cash_session(client, SEED_WORKSTATION_CODE)
 
     response = client.post(
@@ -363,6 +400,7 @@ def test_waste_commit_requires_exact_product_and_reason_and_writes_audit_and_out
 def test_waste_commit_requires_operational_notes_for_sensitive_reasons(
     client: TestClient,
 ) -> None:
+    _seed_operating_stock()
     _open_cash_session(client, SEED_WORKSTATION_CODE)
 
     response = client.post(
@@ -390,6 +428,7 @@ def test_waste_commit_requires_operational_notes_for_sensitive_reasons(
 def test_high_impact_waste_requires_acknowledgement_and_emits_alert_outbox(
     client: TestClient,
 ) -> None:
+    _seed_operating_stock()
     _open_cash_session(client, SEED_WORKSTATION_CODE)
 
     missing_ack_response = client.post(
@@ -478,6 +517,7 @@ def test_high_impact_waste_requires_acknowledgement_and_emits_alert_outbox(
 
 
 def test_waste_history_returns_reason_and_product_filters(client: TestClient) -> None:
+    _seed_operating_stock()
     _open_cash_session(client)
 
     commit_response = client.post(
@@ -532,6 +572,7 @@ def test_waste_history_returns_reason_and_product_filters(client: TestClient) ->
 
 
 def test_transfer_dispatch_pending_detail_and_receive_work_end_to_end(client: TestClient) -> None:
+    _seed_operating_stock()
     _open_cash_session(client, SEED_DESTINATION_WORKSTATION_CODE)
     _open_cash_session(client, SEED_WORKSTATION_CODE)
 
@@ -627,7 +668,7 @@ def test_transfer_dispatch_pending_detail_and_receive_work_end_to_end(client: Te
             "notes": "Received in full",
         },
     )
-    assert receive_response.status_code == 200
+    assert receive_response.status_code == 200, receive_response.text
     receive_payload = _command_detail(
         client, receive_response, SEED_DESTINATION_WORKSTATION_CODE, "transfer"
     )
@@ -695,6 +736,7 @@ def test_transfer_dispatch_pending_detail_and_receive_work_end_to_end(client: Te
 
 
 def test_transfer_dispatch_history_returns_folio_status_and_filters(client: TestClient) -> None:
+    _seed_operating_stock()
     _open_cash_session(client)
 
     dispatch_response = client.post(
@@ -740,6 +782,7 @@ def test_transfer_dispatch_history_returns_folio_status_and_filters(client: Test
 
 
 def test_transfer_inbound_history_returns_folio_status_and_filters(client: TestClient) -> None:
+    _seed_operating_stock()
     _open_cash_session(client, SEED_WORKSTATION_CODE)
 
     _open_cash_session(client, SEED_DESTINATION_WORKSTATION_CODE)
@@ -782,7 +825,7 @@ def test_transfer_inbound_history_returns_folio_status_and_filters(client: TestC
             ],
         },
     )
-    assert receive_response.status_code == 200
+    assert receive_response.status_code == 200, receive_response.text
     receipt = _command_detail(
         client, receive_response, SEED_DESTINATION_WORKSTATION_CODE, "transfer"
     )["receipts"][-1]
@@ -812,6 +855,7 @@ def test_transfer_inbound_history_returns_folio_status_and_filters(client: TestC
 
 
 def test_transfer_dispatch_rejects_same_branch_destination(client: TestClient) -> None:
+    _seed_operating_stock()
     _open_cash_session(client, SEED_WORKSTATION_CODE)
 
     response = client.post(
@@ -835,6 +879,7 @@ def test_transfer_dispatch_rejects_same_branch_destination(client: TestClient) -
 
 
 def test_transfer_receive_rejects_already_received_transfer(client: TestClient) -> None:
+    _seed_operating_stock()
     _open_cash_session(client, SEED_DESTINATION_WORKSTATION_CODE)
     _open_cash_session(client, SEED_WORKSTATION_CODE)
 
@@ -901,6 +946,7 @@ def test_transfer_receive_rejects_already_received_transfer(client: TestClient) 
 
 
 def test_transfer_receive_with_variance_marks_receipt_and_shipment(client: TestClient) -> None:
+    _seed_operating_stock()
     _open_cash_session(client, SEED_DESTINATION_WORKSTATION_CODE)
     _open_cash_session(client, SEED_WORKSTATION_CODE)
 
@@ -958,7 +1004,7 @@ def test_transfer_receive_with_variance_marks_receipt_and_shipment(client: TestC
         },
     )
 
-    assert receive_response.status_code == 200
+    assert receive_response.status_code == 200, receive_response.text
     payload = _command_detail(
         client, receive_response, SEED_DESTINATION_WORKSTATION_CODE, "transfer"
     )
@@ -996,19 +1042,23 @@ def test_transfer_receive_with_variance_marks_receipt_and_shipment(client: TestC
         audit_record = session.execute(
             select(AuditLog).where(
                 AuditLog.action == "transfer.received",
-                AuditLog.resource_id == str(receipt_record.id),
+                AuditLog.resource_id == str(shipment_record.id),
             )
         ).scalar_one()
 
     assert shipment_record.status == "IN_TRANSIT"
     assert receipt_record.status == "RECEIVED_WITH_VARIANCE"
     assert len(outbox_events) == 1
+    assert audit_record.metadata_["receipt_id"] == str(receipt_record.id)
+    assert outbox_events[0].payload["receipt_id"] == str(receipt_record.id)
+    assert audit_record.operation_id == outbox_events[0].operation_id
     assert audit_record.request_id == "b5537665-6d30-5666-846e-e9dc76fa4ad0"
 
 
 def test_transfer_receive_requires_variance_reason_when_quantity_differs(
     client: TestClient,
 ) -> None:
+    _seed_operating_stock()
     _open_cash_session(client, SEED_DESTINATION_WORKSTATION_CODE)
     _open_cash_session(client, SEED_WORKSTATION_CODE)
 
@@ -1077,6 +1127,7 @@ def test_transfer_receive_requires_variance_reason_when_quantity_differs(
 def test_pos_transfer_receipt_cannot_bypass_workstation_binding(
     client: TestClient, scenario: str
 ) -> None:
+    _seed_operating_stock()
     _open_cash_session(client, SEED_WORKSTATION_CODE)
 
     dispatch = client.post(

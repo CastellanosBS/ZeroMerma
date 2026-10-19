@@ -58,7 +58,9 @@ const purchase: AdminPurchaseListItem = {
   supplierName: "Harinas del Centro",
   totalAmount: "120.0000",
   warningState: "critical",
-  warnings: [{ code: "receipt_discrepancy", message: "Diferencia de recepcion.", severity: "critical" }],
+  warnings: [
+    { code: "receipt_discrepancy", message: "Diferencia de recepcion.", severity: "critical" },
+  ],
 };
 
 const purchaseDetail: AdminPurchaseDetail = {
@@ -155,7 +157,14 @@ const purchaseDetail: AdminPurchaseDetail = {
     branchName: "Centro",
     timezone: "America/Hermosillo",
   },
-  relatedDocuments: [{ documentId: "receipt-1", documentType: "PURCHASE_RECEIPT", folio: "REC-1", status: "COMMITTED" }],
+  relatedDocuments: [
+    {
+      documentId: "receipt-1",
+      documentType: "PURCHASE_RECEIPT",
+      folio: "REC-1",
+      status: "COMMITTED",
+    },
+  ],
   supplierContext: {
     commercialName: "Harinas Centro",
     leadTimeDays: 2,
@@ -165,7 +174,9 @@ const purchaseDetail: AdminPurchaseDetail = {
     supplierId: "supplier-1",
     supplierName: "Harinas del Centro",
   },
-  warnings: [{ code: "receipt_discrepancy", message: "Diferencia de recepcion.", severity: "critical" }],
+  warnings: [
+    { code: "receipt_discrepancy", message: "Diferencia de recepcion.", severity: "critical" },
+  ],
 };
 
 function render(element: ReactElement) {
@@ -184,12 +195,19 @@ describe("admin purchases UI components", () => {
     expect(html).toContain("Compras / entradas");
     expect(html).toContain("Nueva compra");
     expect(html).toContain("Nueva entrada directa");
-    expect(html).toContain("Selecciona una compra para revisar proveedor, productos, recepcion e impacto en inventario.");
+    expect(html).toContain(
+      "Selecciona una compra para revisar proveedor, productos, recepcion e impacto en inventario.",
+    );
   });
 
   it("renders filters and quick filters", () => {
     const html = render(
-      <AdminPurchasesFilters filters={filters} isBackendConnected={true} options={filterOptions} onChange={() => undefined} />,
+      <AdminPurchasesFilters
+        filters={filters}
+        isBackendConnected={true}
+        options={filterOptions}
+        onChange={() => undefined}
+      />,
     );
 
     expect(html).toContain("Proveedor");

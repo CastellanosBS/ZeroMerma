@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import uuid
+from dataclasses import asdict
 from datetime import UTC, datetime, time, timedelta
 from decimal import Decimal
 from typing import cast as type_cast
@@ -24,6 +25,10 @@ from zeromerma_api.modules.cash.application.schemas import CashSessionView
 from zeromerma_api.modules.cash.application.services import CashSessionQueryService
 from zeromerma_api.modules.identity.application.schemas import AuthenticatedUser
 from zeromerma_api.modules.identity.infrastructure.models import User
+from zeromerma_api.modules.inventory.application.attribution_queries import (
+    AttributionProjection,
+    read_attribution_projections,
+)
 from zeromerma_api.modules.operations.domain.constants import BRANCH_BRAND_MAPPING
 from zeromerma_api.modules.outbox.application.service import OutboxWriter
 from zeromerma_api.modules.returns.infrastructure.models import SaleReturn, SaleReturnLine
@@ -31,12 +36,14 @@ from zeromerma_api.modules.sales.application.schemas import SaleDetailView
 from zeromerma_api.modules.sales.application.services import SaleQueryService
 from zeromerma_api.modules.sales.infrastructure.models import Sale, SaleLine, SalePayment
 from zeromerma_api.modules.tickets.application.schemas import (
+    TicketAttributionOptionView,
     TicketDetailResponse,
     TicketLineItemView,
     TicketListItemView,
     TicketOperatorSummaryView,
     TicketPaymentDetailView,
     TicketPaymentSummaryView,
+    TicketPhysicalAttributionView,
     TicketsBootstrapResponse,
     TicketScopeView,
     TicketsListResponse,
@@ -268,6 +275,12 @@ class TicketsQueryService:
         return _to_ticket_detail_response(
             sale_detail,
             context=context,
+            inventory=read_attribution_projections(
+                session,
+                branch_id=sale_detail.branch_id,
+                sale_line_ids=[line.id for line in sale_detail.lines],
+                sold_at=sale_detail.confirmed_at,
+            ),
             return_summary=_get_ticket_return_summary_by_sale_ids(
                 session,
                 sale_ids=[ticket_id],
@@ -350,6 +363,12 @@ class TicketsCommandService:
         response = _to_ticket_detail_response(
             sale_detail,
             context=context,
+            inventory=read_attribution_projections(
+                session,
+                branch_id=sale_detail.branch_id,
+                sale_line_ids=[line.id for line in sale_detail.lines],
+                sold_at=sale_detail.confirmed_at,
+            ),
             return_summary=_get_ticket_return_summary_by_sale_ids(
                 session,
                 sale_ids=[ticket_id],
@@ -441,6 +460,7 @@ def _to_ticket_detail_response(
     sale_detail: SaleDetailView,
     *,
     context: WorkstationContext,
+    inventory: dict[uuid.UUID, AttributionProjection],
     return_summary: dict[str, Decimal | int | str] | None = None,
 ) -> TicketDetailResponse:
     total_quantity = sum((line.quantity for line in sale_detail.lines), Decimal("0.000"))
@@ -493,6 +513,26 @@ def _to_ticket_detail_response(
                 quantity=line.quantity,
                 unit_price=line.unit_price,
                 line_total_amount=line.line_total_amount,
+                capture_mode=line.capture_mode,
+                remaining_attribution_quantity=(
+                    inventory[line.id].remaining_quantity if line.id in inventory else ZERO_QUANTITY
+                ),
+                attribution_options=[
+                    TicketAttributionOptionView(**asdict(option))
+                    for option in (inventory[line.id].options if line.id in inventory else ())
+                ],
+                physical_attributions=[
+                    TicketPhysicalAttributionView(
+                        id=attribution.id,
+                        product_id=attribution.product_id,
+                        quantity=attribution.quantity,
+                        inventory_movement_id=attribution.inventory_movement_id,
+                        occurred_at=attribution.occurred_at,
+                    )
+                    for attribution in (
+                        inventory[line.id].attributions if line.id in inventory else ()
+                    )
+                ],
             )
             for line in sale_detail.lines
         ],

@@ -76,6 +76,10 @@ class AdminInputSupplyListItemView(BaseModel):
     is_active: bool
     is_inventory_tracked: bool
     is_purchasable: bool
+    is_sellable: bool
+    is_usable_as_input: bool
+    lot_tracking_enabled: bool
+    expiry_required: bool
     last_movement_at: datetime | None = None
     last_purchase_cost: Decimal | None = None
     name: str
@@ -114,6 +118,10 @@ class AdminInputSupplyOverviewView(BaseModel):
     is_active: bool
     is_inventory_tracked: bool
     is_purchasable: bool
+    is_sellable: bool
+    is_usable_as_input: bool
+    lot_tracking_enabled: bool
+    expiry_required: bool
     last_purchase_cost: Decimal | None = None
     name: str
     product_kind: AdminInputSupplyKind
@@ -255,6 +263,10 @@ class AdminInputSupplyCreateRequest(BaseModel):
     is_active: bool = True
     is_inventory_tracked: bool = True
     is_purchasable: bool = True
+    is_sellable: bool = False
+    is_usable_as_input: bool = True
+    lot_tracking_enabled: bool = False
+    expiry_required: bool = False
     minimum_stock: Decimal | None = Field(default=None, ge=0)
     name: str = Field(min_length=1, max_length=160)
     preferred_order_quantity: Decimal | None = Field(default=None, ge=0)

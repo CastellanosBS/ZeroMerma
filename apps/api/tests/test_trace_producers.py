@@ -5,10 +5,12 @@ from __future__ import annotations
 import json
 import uuid
 from dataclasses import dataclass
+from decimal import Decimal
 from typing import Any
 
 import pytest
 from fastapi.testclient import TestClient
+from return_fixtures import seed_return_stock
 from sqlalchemy import func, select
 
 from zeromerma_api.bootstrap.seed_local import (
@@ -123,6 +125,7 @@ def _prepare(client: TestClient, kind: str) -> _Case:
         )
 
     if kind.endswith("reprint"):
+        seed_return_stock(product_codes=(SEED_PRODUCT_COCA_355_CODE,), quantity=Decimal(1))
         pos_headers = login_headers(
             client, email=SEED_USER_EMAIL, password=SEED_USER_PASSWORD, audience="POS"
         )

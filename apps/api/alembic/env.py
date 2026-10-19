@@ -28,7 +28,14 @@ from zeromerma_api.modules.identity.infrastructure import (
     privileged_models as identity_privileged_models,
 )
 from zeromerma_api.modules.identity.infrastructure import session_models as identity_session_models
+from zeromerma_api.modules.inventory.infrastructure import (
+    attribution_models as inventory_attribution_models,
+)
+from zeromerma_api.modules.inventory.infrastructure import lot_models as inventory_lot_models
 from zeromerma_api.modules.inventory.infrastructure import models as inventory_models
+from zeromerma_api.modules.inventory.infrastructure import (
+    reconciliation_models as inventory_reconciliation_models,
+)
 from zeromerma_api.modules.operations.infrastructure import models as operations_models
 from zeromerma_api.modules.orders.infrastructure import models as orders_models
 from zeromerma_api.modules.outbox.infrastructure import models as outbox_models
@@ -40,6 +47,7 @@ from zeromerma_api.modules.quality.infrastructure import models as quality_model
 from zeromerma_api.modules.returns.infrastructure import models as returns_models
 from zeromerma_api.modules.sales.infrastructure import models as sales_models
 from zeromerma_api.modules.suppliers.infrastructure import models as suppliers_models
+from zeromerma_api.modules.transfers.infrastructure import models as transfer_models
 from zeromerma_api.testing.database_safety import (
     TEST_CONFIRMATION_VARIABLE,
     TEST_DATABASE_URL_VARIABLE,
@@ -79,6 +87,10 @@ _ = (
     identity_models,
     identity_privileged_models,
     inventory_models,
+    inventory_lot_models,
+    inventory_attribution_models,
+    inventory_reconciliation_models,
+    transfer_models,
     operations_models,
     orders_models,
     payments_models,

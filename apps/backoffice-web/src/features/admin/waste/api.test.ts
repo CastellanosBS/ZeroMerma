@@ -289,6 +289,7 @@ describe("admin waste API boundary", () => {
       expect.stringContaining("/v1/admin/waste"),
       expect.objectContaining({
         body: JSON.stringify({
+          lot_id: null,
           branch_id: "branch-1",
           location_code: "BACKROOM",
           notes: "Expired batch",

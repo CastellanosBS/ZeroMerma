@@ -86,6 +86,15 @@ sessions. These boundaries prevent moving or disabling a location during a cash
 opening. Transfer receipts retain the original source branch but validate their
 station against the receiving branch; authorization still covers both ends.
 
+Inventory completion preserves the dispatch's original station and actor. A POS
+session on another station may change only the shipment status from IN_TRANSIT
+to a completed state, supported by a validated receipt or transit resolution
+inserted in the same live transaction. Resolution evidence must also match the
+current idempotent command, actor, operation and both shipment branches. Reusing
+committed, deleted, relinked or rolled-back evidence cannot authorize the change.
+Partial progress leaves the shipment unchanged until its outstanding quantity is
+zero; a final receipt may coexist with earlier explicit transit waste or returns.
+
 Outbox headers preserve the authorization context of the committed action. The
 current worker only observes due metadata and does not execute domain jobs or
 grant authority from those headers. Delayed observation after revocation leaves

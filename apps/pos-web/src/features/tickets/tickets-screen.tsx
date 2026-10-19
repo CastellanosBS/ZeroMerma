@@ -51,6 +51,8 @@ import { useStatusMessageStore } from "../status-messages/store";
 import { writeTicketToPrintWindow } from "./print";
 import { useTicketDetailQuery, useTicketsBootstrapQuery, useTicketsListQuery } from "./queries";
 import { reprintTicket } from "./tickets-api";
+import { InventoryAttributionPanel } from "./inventory-attribution-panel";
+import { AttributionRecoveryPanel } from "./attribution-recovery-panel";
 
 type TicketConsoleState =
   | "LOADING_RESULTS"
@@ -363,7 +365,7 @@ export function TicketSummaryPanel({
           </p>
         </div>
       ) : (
-        <div className="grid h-full min-h-0 grid-rows-[auto_auto_minmax(0,1fr)_auto] gap-3">
+        <div className="grid min-h-0 content-start gap-3 overflow-y-auto">
           <div className="grid gap-2">
             <div className="flex flex-wrap items-center gap-2">
               <p className="text-base font-semibold text-slate-950">{selectedTicket.folio}</p>
@@ -440,6 +442,7 @@ export function TicketSummaryPanel({
           </div>
 
           <div className="grid gap-1.5">
+            <InventoryAttributionPanel key={selectedTicket.id} ticket={selectedTicket} />
             {selectedTicket.return_count > 0 ? (
               <PosInlineValidationMessage tone="info">
                 Devoluciones registradas: {selectedTicket.return_count}. Monto devuelto{" "}
@@ -543,12 +546,24 @@ export function TicketsScreen() {
       return;
     }
 
+    // A deep-linked ticket may load before its history list, or be outside the
+    // currently displayed scope. Its authorized detail query owns that selection.
+    if (ticketsListQuery.isPending || selectedTicketId === routeTicketId) {
+      return;
+    }
+
     if (tickets.some((ticket) => ticket.id === selectedTicketId)) {
       return;
     }
 
     setSelectedTicketId(null);
-  }, [preferredTicketId, selectedTicketId, ticketsListQuery.data]);
+  }, [
+    preferredTicketId,
+    routeTicketId,
+    selectedTicketId,
+    ticketsListQuery.data,
+    ticketsListQuery.isPending,
+  ]);
 
   useEffect(() => {
     if (pendingScannerFolio === null) {
@@ -813,15 +828,18 @@ export function TicketsScreen() {
       className="lg:h-full"
       contentClassName="min-h-0 overflow-hidden px-3 pb-3 pt-2"
       header={
-        <CompactPageHeader
-          secondaryChips={<ModuleStateChip>{scopeLabel}</ModuleStateChip>}
-          stateChip={
-            <ModuleStateChip tone={getTicketConsoleStateTone(consoleState)}>
-              {getTicketConsoleStateLabel(consoleState)}
-            </ModuleStateChip>
-          }
-          title="Tickets"
-        />
+        <>
+          <CompactPageHeader
+            secondaryChips={<ModuleStateChip>{scopeLabel}</ModuleStateChip>}
+            stateChip={
+              <ModuleStateChip tone={getTicketConsoleStateTone(consoleState)}>
+                {getTicketConsoleStateLabel(consoleState)}
+              </ModuleStateChip>
+            }
+            title="Tickets"
+          />
+          <AttributionRecoveryPanel workstationId={ticketsBootstrapQuery.data.workstation.id} />
+        </>
       }
     >
       <PosHistoryView

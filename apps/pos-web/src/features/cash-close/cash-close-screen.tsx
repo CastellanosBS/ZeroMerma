@@ -61,7 +61,7 @@ import { usePosTerminalStore } from "../pos-terminal/store";
 import { posInputClass, posOutlineButtonClass, posPrimaryButtonClass } from "../pos-theme/theme";
 import { useStatusMessageStore } from "../status-messages/store";
 import { previewCashClose } from "./cash-close-api";
-import { useCashCloseBootstrapQuery, useCashCloseSummaryQuery } from "./queries";
+import { useCashCloseBootstrapQuery, useCashCloseSummaryQuery, useCashCloseReconciliationQuery } from "./queries";
 import {
   CLOSE_PHYSICAL_STATE_CLASS_SELECTION,
   CLOSE_PHYSICAL_STATE_PRODUCT_SELECTION,
@@ -653,6 +653,7 @@ export function CashCloseScreen() {
   const isIntentionBlocked = Boolean(intentionError) || isCommandIntentionPending(metadata);
 
   const summaryQuery = useCashCloseSummaryQuery(currentOpenCashSession !== null);
+  const reconciliationQuery = useCashCloseReconciliationQuery(currentOpenCashSession !== null);
   const debouncedSearchText = useDebouncedValue(draftState.physicalSearchText, 180);
   const catalogQuery = useOperationsCatalogQuery(
     CLOSE_COUNT_CATALOG_MODULE,
@@ -731,6 +732,7 @@ export function CashCloseScreen() {
   const countedPaymentAmounts = draftState.countedPaymentAmounts;
   const countedProductDraftLines = draftState.countedProductDraftLines;
   const observationText = draftState.observationText;
+  const lotCountAmounts = draftState.lotCountAmounts;
   const previewPayload = useMemo(
     () =>
       buildCashClosePreviewRequest(
@@ -739,10 +741,11 @@ export function CashCloseScreen() {
           countedPaymentAmounts,
           countedProductDraftLines,
           observationText,
+          lotCountAmounts,
         },
         { counterEmptyConfirmed },
       ),
-    [counterEmptyConfirmed, countedPaymentAmounts, countedProductDraftLines, observationText],
+    [counterEmptyConfirmed, countedPaymentAmounts, countedProductDraftLines, observationText, lotCountAmounts],
   );
   const expectedCashText =
     livePreviewResult?.expected_cash_amount !== undefined
@@ -1445,6 +1448,29 @@ export function CashCloseScreen() {
               counterEmptyConfirmed={counterEmptyConfirmed}
             />
           ) : null}
+
+          {reconciliationQuery.isError && <PosErrorState
+            title="No se pudieron consultar los lotes del mostrador"
+            description="Recupera el inventario antes de completar el conteo por lote. Tus cantidades capturadas se conservan."
+            action={<Button type="button" onClick={() => void reconciliationQuery.refetch()}>Reintentar inventario</Button>}
+          />}
+          {!counterEmptyConfirmed && (reconciliationQuery.data?.relevant_products ?? [])
+            .filter((product) => product.lot_tracking_enabled && countedProductDraftLines.some((line) => line.productId === product.product_id))
+            .map((product) => <fieldset key={product.product_id} className="my-3 grid gap-2 rounded-xl border p-3">
+              <legend className="text-sm font-semibold">Lotes contados · {product.product_name}</legend>
+              {(product.lots ?? []).map((lot) => <label key={lot.lot_id} className="flex items-center justify-between gap-3 text-sm">
+                <span>{lot.lot_code} · vence {lot.expires_at ? formatLocalDateTime(lot.expires_at) : "sin fecha"}</span>
+                <input className={cn("h-9 w-28 rounded-lg px-2", posInputClass)} type="number" min="0" step="0.001"
+                  aria-label={`Conteo lote ${lot.lot_code}`} disabled={completedCloseDetail !== null || closeMutation.isPending}
+                  value={lotCountAmounts?.[product.product_id]?.[lot.lot_id] ?? ""}
+                  onChange={(event) => { const value = event.target.value; updateDraftState((state) => ({
+                    ...state, lotCountAmounts: { ...state.lotCountAmounts,
+                      [product.product_id]: { ...state.lotCountAmounts?.[product.product_id], [lot.lot_id]: value },
+                    },
+                  })); }} />
+              </label>)}
+              <p className="text-xs text-slate-600">La suma de estos lotes debe coincidir con el total contado del producto. Los lotes no contados se consideran cero; identifica cualquier lote nuevo en administración antes de cerrar.</p>
+            </fieldset>)}
 
           {isCountingStage && isSelectionLoading ? (
             <div className="rounded-xl border border-[var(--pos-shell-border)] bg-[var(--pos-shell-muted)] px-4 py-8 text-center text-sm text-slate-600">

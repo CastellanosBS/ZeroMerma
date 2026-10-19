@@ -123,6 +123,7 @@ export function mapAdminInventoryDetailFromApi(
 ): AdminInventoryDetail {
   return {
     balanceId: item.balance_id,
+    lots: item.lots,
     branchLocation: {
       branchId: item.branch_location.branch_id,
       branchIsActive: item.branch_location.branch_is_active,
@@ -145,6 +146,8 @@ export function mapAdminInventoryDetailFromApi(
       id: item.product.id,
       isActive: item.product.is_active,
       isSellable: item.product.is_sellable,
+      lotTrackingEnabled: item.product.lot_tracking_enabled,
+      expiryRequired: item.product.expiry_required,
       name: item.product.name,
       productKind: item.product.product_kind,
       standardCost: item.product.standard_cost ?? null,
@@ -158,6 +161,7 @@ export function mapAdminInventoryDetailFromApi(
       countEndpointAvailable: item.related_actions.count_endpoint_available,
     },
     stockBreakdown: {
+      valuationStatus: item.stock_breakdown.valuation_status,
       availableQuantity: item.stock_breakdown.available_quantity ?? null,
       estimatedValue: item.stock_breakdown.estimated_value ?? null,
       inTransitQuantity: item.stock_breakdown.in_transit_quantity ?? null,
@@ -202,12 +206,18 @@ function toAdjustmentApiPayload(
 ): AdminInventoryApiAdjustmentPayload {
   return {
     adjustment_type: payload.adjustmentType,
+    allow_negative: payload.allowNegative ?? false,
     branch_id: payload.branchId,
     location_code: payload.locationCode,
     notes: payload.notes ?? null,
     product_id: payload.productId,
     quantity: payload.quantity,
     reason: payload.reason,
+    lot_id: payload.lotId ?? null,
+    lot_code: payload.lotCode ?? null,
+    expires_at: payload.expiresAt ?? null,
+    unit_cost: payload.unitCost ?? null,
+    cost_evidence_reference: payload.costEvidenceReference ?? null,
   };
 }
 

@@ -25,16 +25,19 @@ from zeromerma_api.bootstrap.seed_local import (
 )
 from zeromerma_api.db.access_scope import bind_authorization_scope
 from zeromerma_api.db.session import SessionLocal
+from zeromerma_api.modules.cash.infrastructure.models import CashSession
 from zeromerma_api.modules.catalog.infrastructure.models import Product
 from zeromerma_api.modules.financial_ledger.infrastructure.models import (
     FinancialEntry,
     FinancialOperation,
 )
+from zeromerma_api.modules.inventory.infrastructure.models import InventoryBalance
 from zeromerma_api.modules.orders.application.financial_queries import read_order_financial_entries
 from zeromerma_api.modules.orders.infrastructure.models import CustomerOrderPayment
 from zeromerma_api.modules.sales.infrastructure.models import CashMovement, Sale
 from zeromerma_api.testing.authorization import owner_headers
 from zeromerma_api.testing.idempotency import new_idempotency_key
+from zeromerma_api.testing.inventory import seed_test_inventory
 from zeromerma_api.testing.sessions import login_headers
 
 
@@ -76,6 +79,16 @@ def _create(
         product_id = session.scalar(
             select(Product.id).where(Product.code == SEED_PRODUCT_BOLILLO_STD_CODE)
         )
+        shift = session.get(CashSession, UUID(context["cash_session_id"]))
+        assert shift is not None and product_id is not None
+        seed_test_inventory(
+            session,
+            branch_id=shift.branch_id,
+            actor_user_id=shift.user_id,
+            product_quantities={product_id: Decimal(quantity)},
+            location_code="COUNTER",
+            fixture_reference="Order cash-flow acceptance physical stock",
+        )
     return _post(
         client,
         headers,
@@ -103,8 +116,31 @@ def _summary(client: TestClient, headers: dict[str, str]) -> Any:
 
 
 def _close(
-    client: TestClient, headers: dict[str, str], context: dict[str, str], amount: str
+    client: TestClient,
+    headers: dict[str, str],
+    context: dict[str, str],
+    amount: str,
+    *,
+    class_sales_exhausted_counter: bool = False,
 ) -> Any:
+    with SessionLocal() as session:
+        shift = session.get(CashSession, UUID(context["cash_session_id"]))
+        assert shift is not None
+        balances = session.scalars(
+            select(InventoryBalance).where(
+                InventoryBalance.branch_id == shift.branch_id,
+                InventoryBalance.location_code == "COUNTER",
+                InventoryBalance.quantity_on_hand > 0,
+            )
+        ).all()
+        counts = (
+            []
+            if class_sales_exhausted_counter
+            else [
+                {"product_id": str(row.product_id), "counted_quantity": str(row.quantity_on_hand)}
+                for row in balances
+            ]
+        )
     return _post(
         client,
         headers,
@@ -112,7 +148,8 @@ def _close(
         {
             **context,
             "close_mode": "WITH_COUNT",
-            "counter_empty_confirmed": True,
+            "counter_empty_confirmed": not counts,
+            "counted_product_lines": counts,
             "counted_payment_methods": [{"payment_method_code": "CASH", "counted_amount": amount}],
         },
     )
@@ -160,7 +197,7 @@ def test_audited_missing_six_pesos_reconciles_to_527_in_pos_and_backoffice(
     assert summary["opening_amount"] == "500.00"
     assert summary["total_cash_in"] == "27.00"
     assert summary["expected_cash_amount"] == "527.00"
-    closed = _close(client, headers, context, "527.00")
+    closed = _close(client, headers, context, "527.00", class_sales_exhausted_counter=True)
     assert closed["expected_cash_amount"] == "527.00"
     assert closed["cash_variance_amount"] == "0.00"
     with SessionLocal() as session:

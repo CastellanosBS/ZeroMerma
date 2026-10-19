@@ -391,6 +391,7 @@ vi.mock("../operations/queries", () => ({
 }));
 
 vi.mock("./queries", () => ({
+  useCashCloseReconciliationQuery: () => ({ data: { relevant_products: [] }, isLoading: false }),
   useCashCloseBootstrapQuery: () => ({
     data: mockBootstrapIsPending ? undefined : mockBootstrapResponse,
     error: null,

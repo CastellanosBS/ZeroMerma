@@ -1514,6 +1514,25 @@ Estas decisiones no se resuelven mediante DEC-07.
 - **Contenido aprobado:** ledger causal e inmutable, balance materializado con existencia y reservas, afectación física de `PRODUCT_DIRECT`, obligaciones y atribuciones de `CLASS_CAPTURE`, reservas, transferencias, producción, compras, UOM, stock negativo, reversas, locking, rendimiento y migración conceptual.
 - **Respuesta aprobada:** política normativa, modelos conceptuales, invariantes, dependencias y pruebas futuras descritos en esta decisión.
 
+### Approved extension — weighted average and FEFO (2026-10-19)
+
+The owner explicitly selected weighted average valuation, then requested lot and
+expiry control so the earliest expiring goods are used first. Financial valuation
+and physical selection are independent: weighted average applies to each
+branch/product/location; FEFO selects eligible physical lots. This is not FIFO
+cost valuation. Missing documented cost remains unavailable, never assumed zero.
+
+Lot identity and expiry remain immutable through transfers, reservations, returns
+and production. Expired or unidentified goods cannot be sold, reserved or consumed
+as usable stock. Waste identifies the actual discarded lot. Unidentified returns
+remain in quarantine or waste; inspection cannot invent their original identity.
+
+The precise catalog enrollment and product shelf lives have not been supplied.
+Do not automatically enable every product or invent expiry dates. Backoffice
+captures each product's lot/expiry policy, and each controlled incoming lot needs
+its actual expiry evidence. Implementation and test acceptance are tracked in
+[the inventory block record](implementation/inventory-block-validation.md).
+
 ### Ledger causal
 
 1. Todo cambio de existencias tendrá un movimiento causal de inventario.

@@ -15,6 +15,7 @@ from uuid import UUID, uuid4
 
 import pytest
 from fastapi.testclient import TestClient
+from order_fixtures import seed_order_stock
 from sqlalchemy import func, select
 
 from zeromerma_api.bootstrap.seed_local import (
@@ -59,7 +60,12 @@ from zeromerma_api.modules.identity.infrastructure.models import (
     UserRoleAssignmentBranchScope,
 )
 from zeromerma_api.modules.identity.infrastructure.session_models import AuthSession
-from zeromerma_api.modules.inventory.infrastructure.models import InventoryMovement
+from zeromerma_api.modules.inventory.infrastructure.models import (
+    InventoryBalance,
+    InventoryMovement,
+    InventoryReservation,
+    InventoryReservationEvent,
+)
 from zeromerma_api.modules.orders.application.idempotency import OrdersIdempotencyService
 from zeromerma_api.modules.orders.application.schemas import (
     CancelCustomerOrderRequest,
@@ -107,6 +113,7 @@ def _login(client: TestClient, workstation: str = SEED_WORKSTATION_CODE) -> dict
 def _setup(
     client: TestClient, workstation: str = SEED_WORKSTATION_CODE
 ) -> tuple[dict[str, str], dict[str, Any]]:
+    seed_order_stock(workstation_code=workstation)
     headers = login_headers(
         client,
         email=transfer_cashier_email(workstation),
@@ -217,6 +224,8 @@ def _counts() -> dict[str, int]:
                 CustomerOrderPayment,
                 CashMovement,
                 InventoryMovement,
+                InventoryReservation,
+                InventoryReservationEvent,
             )
         }
         for model, predicate in (
@@ -246,7 +255,23 @@ def _state() -> tuple[Any, ...]:
                 CustomerOrderPayment.id, CustomerOrderPayment.sequence, CustomerOrderPayment.amount
             ).order_by(CustomerOrderPayment.id)
         ).all()
-        return _counts(), orders, payments
+        inventory = session.execute(
+            select(
+                InventoryBalance.id,
+                InventoryBalance.quantity_on_hand,
+                InventoryBalance.quantity_reserved,
+                InventoryBalance.inventory_value,
+            ).order_by(InventoryBalance.id)
+        ).all()
+        reservations = session.execute(
+            select(
+                InventoryReservation.id,
+                InventoryReservation.quantity,
+                InventoryReservation.consumed_quantity,
+                InventoryReservation.released_quantity,
+            ).order_by(InventoryReservation.id)
+        ).all()
+        return _counts(), orders, payments, inventory, reservations
 
 
 @pytest.mark.parametrize(("surface", "action"), COMMANDS)
@@ -288,9 +313,14 @@ def test_every_order_command_replays_its_original_result_without_effects(
     assert after[0]["idempotency_records"] == before["idempotency_records"] + 1
     assert after[0]["audit_log"] == before["audit_log"] + 1
     assert after[0]["outbox_events"] == before["outbox_events"] + 1
-    # Existing orders only write their own payment records; ledger adoption is a later task.
+    # Delivery consumes each tracked item once; ready only reserves its physical stock.
     assert after[0]["cash_movements"] == before["cash_movements"]
-    assert after[0]["inventory_movements"] == before["inventory_movements"]
+    assert after[0]["inventory_movements"] == before["inventory_movements"] + (
+        2 if action == "deliver" else 0
+    )
+    assert after[0]["inventory_reservations"] == before["inventory_reservations"] + (
+        2 if action == "mark-ready" else 0
+    )
     if surface == "POS" and action in {"create", "deliver", "cancel"}:
         assert after[0]["customer_order_payments"] == before["customer_order_payments"] + 1
     with SessionLocal() as session:

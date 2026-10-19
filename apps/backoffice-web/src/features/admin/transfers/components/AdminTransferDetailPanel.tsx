@@ -1,3 +1,4 @@
+import { AdminTransferResolutionPanel } from "./AdminTransferResolutionPanel";
 import { AdminActionButton } from "../../components/AdminActionButton";
 import type { ReactNode } from "react";
 
@@ -239,6 +240,9 @@ export function AdminTransferDetailPanel({
           </div>
         </Section>
 
+        {transferDetail ? (
+          <AdminTransferResolutionPanel key={transferDetail.overview.id} detail={transferDetail} />
+        ) : null}
         <Section title="Origen / destino">
           <div className="grid gap-1.5">
             <InfoRow

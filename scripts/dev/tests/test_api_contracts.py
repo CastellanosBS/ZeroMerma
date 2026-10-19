@@ -383,20 +383,23 @@ def test_cash_preview_remains_read_only_and_separate_from_commit_contract() -> N
 
 
 REMAINING_IDEMPOTENT_COMMANDS = [
+    ("post", "/v1/sales/{sale_id}/attribute-inventory", "ClassAttributionResult"),
+    ("post", "/v1/admin/inventory-dispositions", "InventoryDispositionResult"),
     ("post", "/v1/transfers/dispatch/commit", "TransferCommandResultView"),
     ("post", "/v1/transfers/{transfer_id}/receive", "TransferCommandResultView"),
+    ("post", "/v1/transfers/{transfer_id}/resolve", "TransferCommandResultView"),
     ("post", "/v1/admin/transfers", "TransferCommandResultView"),
     ("patch", "/v1/admin/transfers/{transfer_id}", "TransferCommandResultView"),
     *[
         ("post", f"/v1/admin/transfers/{{transfer_id}}/{action}", "TransferCommandResultView")
-        for action in ("dispatch", "receive", "cancel")
+        for action in ("dispatch", "receive", "cancel", "resolve")
     ],
     ("post", "/v1/admin/purchases", "PurchaseCommandResultView"),
     ("patch", "/v1/admin/purchases/{purchase_id}", "PurchaseCommandResultView"),
     ("post", "/v1/admin/purchases/direct-entry", "PurchaseCommandResultView"),
     *[
         ("post", f"/v1/admin/purchases/{{purchase_id}}/{action}", "PurchaseCommandResultView")
-        for action in ("confirm", "receive", "cancel")
+        for action in ("confirm", "receive", "cancel", "reverse-receipt")
     ],
     ("post", "/v1/operations/counter-transfer/commit", "OperationCommitResultView"),
     ("post", "/v1/operations/waste/commit", "OperationCommitResultView"),
@@ -407,7 +410,7 @@ REMAINING_IDEMPOTENT_COMMANDS = [
     ("patch", "/v1/admin/production/{production_id}", "ProductionCommandResultView"),
     *[
         ("post", f"/v1/admin/production/{{production_id}}/{action}", "ProductionCommandResultView")
-        for action in ("start", "complete", "cancel")
+        for action in ("release", "complete", "cancel")
     ],
 ]
 

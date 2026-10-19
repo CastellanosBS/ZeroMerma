@@ -26,6 +26,9 @@ from zeromerma_api.modules.cash.application.command_context import lock_cash_ses
 from zeromerma_api.modules.cash.application.schemas import CashSessionView
 from zeromerma_api.modules.cash.application.services import CashSessionQueryService
 from zeromerma_api.modules.catalog.infrastructure.models import Product, ProductClass
+from zeromerma_api.modules.corrections.application.physical_inventory import (
+    apply_correction_inventory,
+)
 from zeromerma_api.modules.corrections.application.schemas import (
     AppliedCorrectionLineSummaryView,
     AppliedCorrectionSummaryView,
@@ -82,8 +85,6 @@ from zeromerma_api.modules.operations.application.services import (
 from zeromerma_api.modules.operations.domain.constants import (
     BRANCH_BRAND_MAPPING,
     OPERATION_DOCUMENT_STATUS_COMMITTED,
-    OPERATION_DOCUMENT_STATUS_IN_TRANSIT,
-    OPERATION_DOCUMENT_TYPE_BRANCH_TRANSFER_RECEIPT,
     OPERATION_DOCUMENT_TYPE_BRANCH_TRANSFER_SHIPMENT,
     OPERATION_DOCUMENT_TYPE_COUNTER_TRANSFER,
     OPERATION_DOCUMENT_TYPE_WASTE_RECORD,
@@ -228,12 +229,6 @@ class CorrectionQueryService:
         document_record = aliased(OperationDocument)
         source_branch = aliased(Branch)
         destination_branch = aliased(Branch)
-        receipt_exists = exists(
-            select(OperationDocument.id).where(
-                OperationDocument.reference_document_id == document_record.id,
-                OperationDocument.document_type == OPERATION_DOCUMENT_TYPE_BRANCH_TRANSFER_RECEIPT,
-            )
-        )
 
         correction_count_subquery = (
             select(func.count(CorrectionDocument.id))
@@ -264,23 +259,10 @@ class CorrectionQueryService:
             .where(
                 document_record.source_branch_id == context.branch_id,
                 document_record.document_type.in_(VALID_CORRECTION_TARGET_DOCUMENT_TYPES),
-                or_(
-                    (
-                        document_record.document_type.in_(
-                            [
-                                OPERATION_DOCUMENT_TYPE_COUNTER_TRANSFER,
-                                OPERATION_DOCUMENT_TYPE_WASTE_RECORD,
-                            ]
-                        )
-                        & (document_record.status == OPERATION_DOCUMENT_STATUS_COMMITTED)
-                    ),
-                    (
-                        document_record.document_type
-                        == OPERATION_DOCUMENT_TYPE_BRANCH_TRANSFER_SHIPMENT
-                    )
-                    & (document_record.status == OPERATION_DOCUMENT_STATUS_IN_TRANSIT)
-                    & ~receipt_exists,
+                document_record.document_type.in_(
+                    [OPERATION_DOCUMENT_TYPE_COUNTER_TRANSFER, OPERATION_DOCUMENT_TYPE_WASTE_RECORD]
                 ),
+                document_record.status == OPERATION_DOCUMENT_STATUS_COMMITTED,
             )
             .order_by(
                 document_record.committed_at_utc.desc(), document_record.created_at_utc.desc()
@@ -894,7 +876,7 @@ class CorrectionCommandService:
             branch_id=context.branch_id,
             cash_session_id=command.cash_session_id,
         )
-        trace = {
+        trace: dict[str, object] = {
             "idempotency_key": str(idempotency_key),
             "operation_id": str(operation_id),
             "operation_code": "correction.commit",
@@ -1065,6 +1047,12 @@ class CorrectionCommandService:
                     "notes": line.notes,
                 }
             )
+
+        session.flush()
+        trace["inventory_movement_ids"] = [
+            str(value)
+            for value in apply_correction_inventory(session, correction_document, target_document)
+        ]
 
         self._audit_recorder.record(
             session,
@@ -1270,23 +1258,10 @@ def _assess_correction_eligibility(
         return True, None
 
     if target_document.document_type == OPERATION_DOCUMENT_TYPE_BRANCH_TRANSFER_SHIPMENT:
-        receipt_exists = session.execute(
-            select(OperationDocument.id)
-            .where(
-                OperationDocument.reference_document_id == target_document.id,
-                OperationDocument.document_type == OPERATION_DOCUMENT_TYPE_BRANCH_TRANSFER_RECEIPT,
-            )
-            .limit(1)
-        ).scalar_one_or_none()
-        if (
-            target_document.status != OPERATION_DOCUMENT_STATUS_IN_TRANSIT
-            or receipt_exists is not None
-        ):
-            return (
-                False,
-                ("Este envio ya fue recibido en la sucursal destino y ya no se puede corregir."),
-            )
-        return True, None
+        return False, (
+            "Dispatched transfers require an explicit transit return or waste resolution. "
+            "Receive or return the goods before creating a new transfer."
+        )
 
     return False, "El documento seleccionado no admite correcciones."
 

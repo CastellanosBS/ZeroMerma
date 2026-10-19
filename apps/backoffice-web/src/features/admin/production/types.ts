@@ -1,4 +1,5 @@
-export type AdminProductionStatus = "DRAFT" | "IN_PROGRESS" | "COMPLETED" | "CANCELLED";
+import type { components } from "@zeromerma/api-client";
+export type AdminProductionStatus = components["schemas"]["AdminProductionListItemView"]["status"];
 export type AdminProductionWarningSeverity = "info" | "warning" | "critical";
 export type AdminProductionVarianceState = "with_variance" | "without_variance";
 
@@ -19,7 +20,7 @@ export interface AdminProductionBackendContract {
   createEndpoint: string;
   detailEndpoint: string;
   listEndpoint: string;
-  startEndpoint: string;
+  releaseEndpoint: string;
   updateEndpoint: string;
 }
 
@@ -71,7 +72,7 @@ export interface AdminProductionListItem {
   productName: string;
   recipeId: string;
   recipeName: string;
-  startedAt?: string | null;
+  releasedAt?: string | null;
   status: AdminProductionStatus;
   variancePercent?: string | null;
   varianceQty?: string | null;
@@ -91,6 +92,13 @@ export interface AdminProductionListResponse {
 }
 
 export interface AdminProductionOverview {
+  planStatus?: components["schemas"]["AdminProductionOverviewView"]["plan_status"];
+  runId?: string | null;
+  runStatus?: components["schemas"]["AdminProductionOverviewView"]["run_status"];
+  reconciliationEvidence?: string | null;
+  outputLotCode?: string | null;
+  outputExpiresAt?: string | null;
+  reconciliationFinishAs?: components["schemas"]["AdminProductionOverviewView"]["reconciliation_finish_as"];
   actualOutputQty?: string | null;
   branchId: string;
   branchName: string;
@@ -106,9 +114,9 @@ export interface AdminProductionOverview {
   notes?: string | null;
   plannedAt?: string | null;
   plannedOutputQty: string;
-  startedAt?: string | null;
-  startedByUserId?: string | null;
-  startedByUserName?: string | null;
+  releasedAt?: string | null;
+  releasedByUserId?: string | null;
+  releasedByUserName?: string | null;
   status: AdminProductionStatus;
   variancePercent?: string | null;
   varianceQty?: string | null;
@@ -143,6 +151,10 @@ export interface AdminProductionInputLine {
 }
 
 export interface AdminProductionActualConsumptionLine {
+  returnedQty?: string | null;
+  wasteQty?: string | null;
+  remainderQty?: string | null;
+  reconciliationReason?: string | null;
   consumedQty?: string | null;
   differenceQty?: string | null;
   expectedQty: string;
@@ -162,6 +174,8 @@ export interface AdminProductionOutputYield {
 }
 
 export interface AdminProductionInventoryMovement {
+  unitCost?: string | null;
+  totalCost?: string | null;
   balanceAfter?: string | null;
   branchId: string;
   direction: string;
@@ -198,7 +212,7 @@ export interface AdminProductionAvailableActions {
   canCancel: boolean;
   canComplete: boolean;
   canEdit: boolean;
-  canStart: boolean;
+  canRelease: boolean;
   canViewMovements: boolean;
 }
 
@@ -233,6 +247,11 @@ export interface AdminProductionUpdatePayload {
 }
 
 export interface AdminProductionCompletePayload {
+  confirmWithoutDifferences?: boolean;
+  inputs?: components["schemas"]["AdminProductionInputReconciliation"][];
+  finishAs?: "COMPLETED" | "CANCELLED";
+  outputLotCode?: string | null;
+  outputExpiresAt?: string | null;
   actualOutputQty: string;
   notes?: string | null;
   varianceReason?: string | null;

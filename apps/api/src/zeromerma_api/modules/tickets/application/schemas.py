@@ -64,6 +64,26 @@ class TicketOperatorSummaryView(BaseModel):
     full_name: str
 
 
+class TicketAttributionOptionView(BaseModel):
+    product_id: UUID
+    product_code: str
+    product_name: str
+    lot_id: UUID | None
+    lot_code: str | None
+    expires_at: datetime | None
+    available_quantity: Decimal | None
+    is_inventory_tracked: bool
+    lot_tracking_enabled: bool
+
+
+class TicketPhysicalAttributionView(BaseModel):
+    id: UUID
+    product_id: UUID
+    quantity: Decimal
+    inventory_movement_id: UUID | None
+    occurred_at: datetime
+
+
 class TicketLineItemView(BaseModel):
     id: UUID
     sequence: int
@@ -71,6 +91,10 @@ class TicketLineItemView(BaseModel):
     quantity: Decimal
     unit_price: Decimal
     line_total_amount: Decimal
+    capture_mode: str
+    remaining_attribution_quantity: Decimal
+    attribution_options: list[TicketAttributionOptionView]
+    physical_attributions: list[TicketPhysicalAttributionView]
 
 
 class TicketPaymentDetailView(BaseModel):

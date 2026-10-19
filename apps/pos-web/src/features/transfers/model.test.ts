@@ -90,6 +90,8 @@ describe("transfer receipt model", () => {
         product_id: line.product_id,
         sent_quantity: line.quantity,
         received_quantity: "0.000",
+        returned_quantity: "0.000",
+        waste_quantity: "0.000",
         pending_quantity: line.quantity,
       })),
     );
@@ -112,6 +114,8 @@ describe("transfer receipt model", () => {
         product_id: line.product_id,
         sent_quantity: line.quantity,
         received_quantity: "0.000",
+        returned_quantity: "0.000",
+        waste_quantity: "0.000",
         pending_quantity: line.quantity,
       })),
     );
@@ -142,6 +146,8 @@ describe("transfer receipt model", () => {
         product_id: line.product_id,
         sent_quantity: line.quantity,
         received_quantity: "0.000",
+        returned_quantity: "0.000",
+        waste_quantity: "0.000",
         pending_quantity: line.quantity,
       })),
     );
@@ -181,6 +187,8 @@ describe("transfer receipt model", () => {
         product_id: line.product_id,
         sent_quantity: line.quantity,
         received_quantity: "0.000",
+        returned_quantity: "0.000",
+        waste_quantity: "0.000",
         pending_quantity: line.quantity,
       })),
     );
@@ -203,6 +211,8 @@ describe("transfer receipt model", () => {
         product_id: line.product_id,
         sent_quantity: line.quantity,
         received_quantity: "0.000",
+        returned_quantity: "0.000",
+        waste_quantity: "0.000",
         pending_quantity: line.quantity,
       })),
     );

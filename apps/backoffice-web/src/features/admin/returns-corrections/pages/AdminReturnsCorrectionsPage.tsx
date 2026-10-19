@@ -1,3 +1,4 @@
+import { InventoryDispositionRecoveryPanel } from "../../inventory-dispositions/InventoryDispositionRecoveryPanel";
 import { useQuery } from "@tanstack/react-query";
 import { useMemo, useState } from "react";
 
@@ -292,6 +293,7 @@ export function AdminReturnsCorrectionsPage() {
 
   return (
     <section className="flex min-h-0 min-w-0 flex-col overflow-hidden rounded-[28px] border border-[var(--ui-color-border)] bg-white shadow-[var(--ui-shadow-subtle)] lg:h-full">
+      <InventoryDispositionRecoveryPanel />
       <AdminPageHeader
         actionCapability="returns_corrections.view"
         actionLabel="Actualizar"

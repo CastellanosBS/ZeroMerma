@@ -15,6 +15,7 @@ from uuid import UUID, uuid4
 
 import pytest
 from fastapi.testclient import TestClient
+from return_fixtures import seed_return_stock
 from sqlalchemy import func, select
 
 from zeromerma_api.bootstrap.seed_local import (
@@ -900,6 +901,7 @@ def test_counted_close_replay_preserves_real_class_attributions_and_baseline(
             )
         )
         session.commit()
+    seed_return_stock(product_codes=(SEED_PRODUCT_CONCHA_VAN_CODE,), quantity=Decimal(3))
     sale = client.post(
         "/v1/sales/confirm",
         headers={**headers, "Idempotency-Key": new_idempotency_key()},

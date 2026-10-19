@@ -98,7 +98,22 @@ export function AdminInventoryAdjustmentPanel({
   );
   const [quantity, setQuantity] = useState("");
   const [reason, setReason] = useState("");
+  const [allowNegative, setAllowNegative] = useState(false);
+  const [lotId, setLotId] = useState("");
+  const [lotCode, setLotCode] = useState("");
+  const [expiresAt, setExpiresAt] = useState("");
+  const [unitCost, setUnitCost] = useState("");
+  const [costEvidence, setCostEvidence] = useState("");
+  const detail = initialInventory && "product" in initialInventory
+    && initialInventory.product.id === productId
+    && initialInventory.branchLocation.branchId === branchId
+    && initialInventory.branchLocation.locationCode === locationCode ? initialInventory : null;
   const [localError, setLocalError] = useState<string | null>(null);
+
+  function clearLotEvidence() {
+    setLotId(""); setLotCode(""); setExpiresAt("");
+    setUnitCost(""); setCostEvidence(""); setAllowNegative(false);
+  }
 
   useEffect(() => {
     // The drawer can open before its options arrive. Initialize only untouched empty fields.
@@ -137,8 +152,8 @@ export function AdminInventoryAdjustmentPanel({
       setLocalError("Selecciona una ubicacion de inventario.");
       return;
     }
-    if (!quantity || Number(quantity) <= 0) {
-      setLocalError("La cantidad debe ser mayor que cero.");
+    if (!quantity || Number(quantity) < 0 || (adjustmentType !== "SET_COUNTED" && Number(quantity) === 0)) {
+      setLocalError("La cantidad debe ser positiva; un conteo puede ser cero.");
       return;
     }
     if (!reason.trim()) {
@@ -146,8 +161,22 @@ export function AdminInventoryAdjustmentPanel({
       return;
     }
 
+    if (detail?.product.lotTrackingEnabled && adjustmentType === "SET_COUNTED" && !lotId) {
+      setLocalError("Selecciona el lote contado. La cantidad corresponde a ese lote.");
+      return;
+    }
+    if (Boolean(unitCost) !== Boolean(costEvidence.trim())) {
+      setLocalError("Captura juntos el costo y su documento de respaldo, o deja ambos vacíos.");
+      return;
+    }
     onSubmit({
+      lotId: lotId || null,
+      lotCode: !lotId && lotCode.trim() ? lotCode.trim() : null,
+      expiresAt: !lotId && expiresAt ? new Date(expiresAt).toISOString() : null,
+      unitCost: unitCost || null,
+      costEvidenceReference: costEvidence.trim() || null,
       adjustmentType,
+      allowNegative,
       branchId,
       locationCode,
       notes: notes.trim() || null,
@@ -197,7 +226,7 @@ export function AdminInventoryAdjustmentPanel({
             disabled={productOptions.length === 0}
             title={selectedProductLabel}
             value={productId}
-            onChange={(event) => setProductId(event.target.value)}
+            onChange={(event) => { setProductId(event.target.value); clearLotEvidence(); }}
           >
             {productOptions.length === 0 ? (
               <option value="">Productos pendientes de API</option>
@@ -217,7 +246,7 @@ export function AdminInventoryAdjustmentPanel({
             disabled={branchOptions.length === 0}
             title={selectedBranchLabel}
             value={branchId}
-            onChange={(event) => setBranchId(event.target.value)}
+            onChange={(event) => { setBranchId(event.target.value); clearLotEvidence(); }}
           >
             {branchOptions.length === 0 ? (
               <option value="">Sucursales pendientes de API</option>
@@ -236,7 +265,7 @@ export function AdminInventoryAdjustmentPanel({
             className={inputClassName}
             disabled={locationOptions.length === 0}
             value={locationCode}
-            onChange={(event) => setLocationCode(event.target.value as AdminInventoryLocationCode)}
+            onChange={(event) => { setLocationCode(event.target.value as AdminInventoryLocationCode); clearLotEvidence(); }}
           >
             {locationOptions.length === 0 ? (
               <option value="">Ubicaciones pendientes de API</option>
@@ -256,9 +285,10 @@ export function AdminInventoryAdjustmentPanel({
           <select
             className={inputClassName}
             value={adjustmentType}
-            onChange={(event) =>
-              setAdjustmentType(event.target.value as AdminInventoryAdjustmentType)
-            }
+            onChange={(event) => {
+              setAdjustmentType(event.target.value as AdminInventoryAdjustmentType);
+              clearLotEvidence();
+            }}
           >
             {adjustmentTypeOptions.map((option) => (
               <option key={option.value} value={option.value}>
@@ -272,7 +302,7 @@ export function AdminInventoryAdjustmentPanel({
           Cantidad
           <input
             className={inputClassName}
-            min="0.001"
+            min={adjustmentType === "SET_COUNTED" ? "0" : "0.001"}
             placeholder="0.000"
             step="0.001"
             type="number"
@@ -293,6 +323,35 @@ export function AdminInventoryAdjustmentPanel({
         </label>
       </div>
 
+      <fieldset className="grid gap-2 rounded-2xl border p-3">
+        <legend className="text-sm font-semibold">Lote y caducidad</legend>
+        <label className="grid gap-1 text-sm">Lote existente
+          <select className={inputClassName} value={lotId} onChange={(event) => { setLotId(event.target.value); setLotCode(""); setExpiresAt(""); }}>
+            <option value="">{adjustmentType === "DECREASE" ? "Selección FEFO automática" : "Sin lote seleccionado / registrar lote nuevo"}</option>
+            {(detail?.lots ?? []).map((lot) => <option key={lot.id} value={lot.id}>{lot.lot_code} · {lot.quantity_on_hand} · {lot.expires_at ? new Date(lot.expires_at).toLocaleString() : "Sin vencimiento"}</option>)}
+          </select>
+        </label>
+        {!lotId && adjustmentType === "INCREASE" && <>
+          <label className="grid gap-1 text-sm">Código del nuevo lote
+            <input className={inputClassName} value={lotCode} maxLength={120} onChange={(event) => setLotCode(event.target.value)} />
+          </label>
+          <label className="grid gap-1 text-sm">Vencimiento (hora local de este equipo)
+            <input className={inputClassName} type="datetime-local" value={expiresAt} onChange={(event) => setExpiresAt(event.target.value)} />
+          </label>
+        </>}
+        <p className="text-xs text-slate-600">En productos con lotes, el conteo fija la cantidad del lote seleccionado. Una salida sin lote elegido utiliza primero el vencimiento más próximo que sea elegible.</p>
+      </fieldset>
+      {adjustmentType !== "DECREASE" && <fieldset className="grid gap-2 rounded-2xl border p-3">
+        <legend className="text-sm font-semibold">Costo documentado de la entrada</legend>
+        <label className="grid gap-1 text-sm">Costo por unidad base
+          <input className={inputClassName} type="number" min="0" step="0.00000001" value={unitCost} onChange={(event) => setUnitCost(event.target.value)} />
+        </label>
+        <label className="grid gap-1 text-sm">Documento o evidencia del costo
+          <input className={inputClassName} maxLength={240} value={costEvidence} onChange={(event) => setCostEvidence(event.target.value)} />
+        </label>
+        <p className="text-xs text-slate-600">Si el costo se desconoce, deja ambos campos vacíos. No se tratará como costo cero.</p>
+      </fieldset>}
+
       <label className="grid min-w-0 gap-1 text-xs font-semibold uppercase tracking-[0.1em] text-slate-500">
         Notas
         <textarea
@@ -304,6 +363,10 @@ export function AdminInventoryAdjustmentPanel({
         />
       </label>
 
+      <label className="flex items-start gap-2 text-sm text-slate-700">
+        <input type="checkbox" checked={allowNegative} onChange={(event) => setAllowNegative(event.target.checked)} />
+        Autorizar existencia negativa excepcional con el motivo indicado. Requiere permiso de ajuste y no permite inventar lotes.
+      </label>
       <p className="rounded-[16px] border border-[var(--ui-color-border)] bg-slate-50 px-3 py-2 text-xs leading-5 text-slate-600">
         El ajuste crea un documento y movimiento auditado. No se edita la existencia historica ni se
         modifica el kardex de forma destructiva.

@@ -431,6 +431,7 @@ def test_sale_entitlement_is_not_reopened_by_partial_financial_settlement(
 ) -> None:
     headers, body, receipt = _partial_return(client)
     body["lines"][0]["returned_quantity"] = "4.000"
+    body["lines"][0]["allocations"][0]["quantity"] = "4.000"
     rejected = _post(client, headers, body, new_idempotency_key())
     assert rejected.status_code == 409
     with SessionLocal() as session:

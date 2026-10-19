@@ -7,11 +7,22 @@ from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
+from zeromerma_api.modules.operations.application.lot_queries import OperationInventoryLotView
+
+
+class AdminWasteStockView(BaseModel):
+    product_id: UUID
+    branch_id: UUID
+    location_code: str
+    lot_tracking_enabled: bool
+    lots: list[OperationInventoryLotView]
+
+
 AdminWasteStatus = Literal["COMMITTED", "CANCELLED"]
 AdminWasteImpactLevel = Literal["normal", "high"]
 AdminWasteEvidenceState = Literal["all", "with_evidence", "without_evidence"]
 AdminWasteWarningSeverity = Literal["info", "warning", "critical"]
-AdminWasteLocationCode = Literal["BACKROOM", "COUNTER", "IN_TRANSIT"]
+AdminWasteLocationCode = Literal["BACKROOM", "COUNTER", "IN_TRANSIT", "QUARANTINE"]
 AdminWasteProductKind = Literal["FINISHED_GOOD", "RAW_MATERIAL", "CONSUMABLE", "DISPOSABLE"]
 
 
@@ -222,6 +233,7 @@ class AdminWasteCreateRequest(BaseModel):
     location_code: AdminWasteLocationCode = "BACKROOM"
     notes: str | None = Field(default=None, max_length=1000)
     product_id: UUID
+    lot_id: UUID | None = None
     quantity: Decimal = Field(gt=0, max_digits=12, decimal_places=3)
     reason_code: str = Field(min_length=1, max_length=40)
 

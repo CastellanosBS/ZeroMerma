@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session
 
 from zeromerma_api.modules.branches.application.access import WorkstationAccessService
 from zeromerma_api.modules.catalog.application.schemas import (
+    PosCatalogAvailableLotView,
     PosCatalogClassView,
     PosCatalogProductView,
     PosCatalogResponse,
@@ -22,6 +23,7 @@ from zeromerma_api.modules.catalog.domain.exceptions import (
 )
 from zeromerma_api.modules.catalog.infrastructure.models import Product, ProductClass
 from zeromerma_api.modules.identity.application.schemas import AuthenticatedUser
+from zeromerma_api.modules.inventory.application.availability import read_product_availability
 
 
 class PosCatalogQueryService:
@@ -140,7 +142,7 @@ class PosCatalogQueryService:
         class_id: uuid.UUID,
         query: str | None,
     ) -> PosClassProductsResponse:
-        self._workstation_access.resolve_context(
+        context = self._workstation_access.resolve_context(
             session,
             user_id=current_user.id,
             workstation_code=workstation_code,
@@ -162,15 +164,7 @@ class PosCatalogQueryService:
             )
 
         statement = (
-            select(
-                Product.id,
-                Product.code,
-                Product.name,
-                Product.quick_name,
-                Product.display_order,
-                Product.unit_price,
-                Product.currency_code,
-            )
+            select(Product)
             .where(
                 Product.product_class_id == class_id,
                 Product.is_active.is_(True),
@@ -189,7 +183,10 @@ class PosCatalogQueryService:
                 )
             )
 
-        product_records = session.execute(statement).mappings().all()
+        product_records = list(session.scalars(statement))
+        availability = read_product_availability(
+            session, branch_id=context.branch_id, products=product_records
+        )
         return PosClassProductsResponse(
             class_id=product_class.id,
             class_code=product_class.code,
@@ -199,13 +196,26 @@ class PosCatalogQueryService:
             query=normalized_query,
             products=[
                 PosCatalogProductView(
-                    id=record["id"],
-                    code=record["code"],
-                    name=record["name"],
-                    quick_name=record["quick_name"],
-                    display_order=record["display_order"],
-                    unit_price=record["unit_price"],
-                    currency_code=record["currency_code"],
+                    id=record.id,
+                    code=record.code,
+                    name=record.name,
+                    quick_name=record.quick_name,
+                    display_order=record.display_order,
+                    unit_price=record.unit_price,
+                    currency_code=record.currency_code,
+                    is_inventory_tracked=record.is_inventory_tracked,
+                    lot_tracking_enabled=record.lot_tracking_enabled,
+                    available_quantity=availability[record.id].available_quantity,
+                    reserved_quantity=availability[record.id].reserved_quantity,
+                    available_lots=[
+                        PosCatalogAvailableLotView(
+                            lot_id=lot.lot_id,
+                            lot_code=lot.lot_code,
+                            expires_at=lot.expires_at,
+                            available_quantity=lot.available_quantity,
+                        )
+                        for lot in availability[record.id].lots
+                    ],
                 )
                 for record in product_records
             ],

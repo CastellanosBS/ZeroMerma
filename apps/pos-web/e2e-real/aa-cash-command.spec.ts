@@ -145,9 +145,47 @@ test("real cash opening, outflow and close recover lost responses across reload 
   expect(restoredDiscount.status()).toBe(200);
   expect(await restoredDiscount.json()).toEqual(discount);
 
+  const reconciliationResponse = await page.request.get(
+    `${environment.apiUrl}/v1/cash-close/reconciliation?workstation_code=${station}`,
+    { headers },
+  );
+  expect(reconciliationResponse.status()).toBe(200);
+  const reconciliation =
+    (await reconciliationResponse.json()) as components["schemas"]["CashCloseReconciliationResponse"];
+  expect(reconciliation.pending_class_capture.has_pending_class_capture).toBe(false);
+  const physicalStock = reconciliation.relevant_products.filter(
+    (line) => Number(line.expected_quantity_before_deferred_attr) > 0,
+  );
+  expect(physicalStock.length).toBeGreaterThan(0);
   await page.goto("/cerrar-turno");
   await expect(page.getByRole("heading", { name: "Cierre de turno", exact: true })).toBeVisible();
-  await page.getByRole("button", { name: "No sobró pan", exact: true }).click();
+  // Enter the fixture's actual stock through the same counting UI used by the
+  // operator. Do not claim an empty counter or create a corrective stock loss.
+  for (const line of physicalStock) {
+    await page
+      .locator('[data-pos-catalog-card="true"]')
+      .filter({ has: page.getByText(line.product_class_name, { exact: true }) })
+      .click();
+    await page
+      .locator('[data-pos-catalog-card="true"]')
+      .filter({ has: page.getByText(line.product_name, { exact: true }) })
+      .click();
+    await page
+      .getByLabel(`Cantidad contada de ${line.product_name}`, { exact: true })
+      .fill(line.expected_quantity_before_deferred_attr);
+    await page.getByRole("button", { name: "Guardar conteo", exact: true }).click();
+    if (line.lot_tracking_enabled) {
+      const lotCounts = page.getByRole("group", {
+        name: `Lotes contados · ${line.product_name}`,
+        exact: true,
+      });
+      for (const lot of line.lots ?? [])
+        await lotCounts
+          .getByLabel(`Conteo lote ${lot.lot_code}`, { exact: true })
+          .fill(lot.expected_quantity);
+    }
+  }
+  await page.getByRole("button", { name: "Cerrar con conteo", exact: true }).click();
   await expect(page.getByLabel("Efectivo", { exact: true })).toBeVisible();
   await page.getByLabel("Efectivo", { exact: true }).fill("10.00");
   const closeFault = await dropNextCashCommandResponse(
@@ -156,11 +194,23 @@ test("real cash opening, outflow and close recover lost responses across reload 
     network,
     "/v1/cash-close/commit",
   );
+  const submittedClose = page.waitForRequest(
+    (request) =>
+      new URL(request.url()).pathname === "/v1/cash-close/commit" && request.method() === "POST",
+  );
   await page
     .locator('[data-pos-shell-region="right"]')
     .getByRole("button", { name: "Cerrar turno", exact: true })
     .click();
-  await page.getByRole("button", { name: "Cerrar con mostrador vacío", exact: true }).click();
+  const closePayload = (
+    await submittedClose
+  ).postDataJSON() as components["schemas"]["CashCloseCommitRequest"];
+  expect(closePayload.counter_empty_confirmed).toBe(false);
+  for (const counted of physicalStock)
+    expect(
+      closePayload.counted_product_lines?.find((line) => line.product_id === counted.product_id)
+        ?.counted_quantity,
+    ).toBe(String(Number(counted.expected_quantity_before_deferred_attr)));
   const closed = (await closeFault.committed) as components["schemas"]["CashCloseCommitResultView"];
   expect(closed.cash_session_id).toBe(opened.id);
   expect(closed.expected_cash_amount).toBe("10.00");
@@ -184,8 +234,15 @@ test("real cash opening, outflow and close recover lost responses across reload 
     { headers },
   );
   expect(detailResponse.status()).toBe(200);
-  const detail =
-    (await detailResponse.json()) as components["schemas"]["CashCloseDetailResponse"];
+  const detail = (await detailResponse.json()) as components["schemas"]["CashCloseDetailResponse"];
+  expect(detail.counter_empty_confirmed).toBe(false);
+  for (const counted of physicalStock) {
+    const recorded = detail.counted_product_lines.find(
+      (line) => line.product_id === counted.product_id,
+    );
+    expect(recorded?.counted_quantity).toBe(counted.expected_quantity_before_deferred_attr);
+  }
+  expect(detail.generated_discrepancy_documents).toEqual([]);
   const methods = Object.fromEntries(
     detail.payment_method_rows.map((row) => [row.payment_method_code, row]),
   );

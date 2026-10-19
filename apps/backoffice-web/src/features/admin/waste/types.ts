@@ -2,7 +2,7 @@ export type AdminWasteStatus = "COMMITTED" | "CANCELLED";
 export type AdminWasteImpactLevel = "normal" | "high";
 export type AdminWasteEvidenceState = "all" | "with_evidence" | "without_evidence";
 export type AdminWasteWarningSeverity = "info" | "warning" | "critical";
-export type AdminWasteLocationCode = "BACKROOM" | "COUNTER" | "IN_TRANSIT";
+export type AdminWasteLocationCode = "BACKROOM" | "COUNTER" | "IN_TRANSIT" | "QUARANTINE";
 
 export interface AdminWasteFilterOption {
   id: string;
@@ -222,6 +222,7 @@ export interface AdminWasteDetail {
 }
 
 export interface AdminWasteCreatePayload {
+  lotId?: string | null;
   branchId: string;
   locationCode: AdminWasteLocationCode;
   notes?: string | null;

@@ -7,6 +7,12 @@ from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
+from zeromerma_api.modules.transfers.application.schemas import (
+    TransferLotAllocationRequest,
+    TransferLotProgressView,
+    TransferResolutionView,
+)
+
 AdminTransferStatus = Literal[
     "DRAFT",
     "IN_TRANSIT",
@@ -120,6 +126,9 @@ class AdminTransferBranchView(BaseModel):
 
 
 class AdminTransferLineView(BaseModel):
+    lots: list[TransferLotProgressView] = Field(default_factory=list)
+    returned_quantity: Decimal = Decimal("0")
+    waste_quantity: Decimal = Decimal("0")
     pending_quantity: Decimal
     difference: Decimal | None = None
     line_status: str
@@ -174,6 +183,7 @@ class AdminTransferRelatedDocumentView(BaseModel):
 
 
 class AdminTransferAvailableActionsView(BaseModel):
+    can_resolve: bool = False
     can_cancel: bool
     can_dispatch: bool
     can_edit: bool
@@ -182,6 +192,7 @@ class AdminTransferAvailableActionsView(BaseModel):
 
 
 class AdminTransferDetailView(BaseModel):
+    resolutions: list[TransferResolutionView] = Field(default_factory=list)
     available_actions: AdminTransferAvailableActionsView
     destination: AdminTransferBranchView
     inventory_impact: AdminTransferInventoryImpactView
@@ -288,6 +299,7 @@ class AdminTransferReceiptLineInput(BaseModel):
     received_quantity: Decimal = Field(ge=Decimal("0"), max_digits=12, decimal_places=3)
     shipment_line_id: UUID
     variance_reason: str | None = Field(default=None, max_length=120)
+    lot_allocations: list[TransferLotAllocationRequest] | None = None
 
     @field_validator("notes", "variance_reason")
     @classmethod

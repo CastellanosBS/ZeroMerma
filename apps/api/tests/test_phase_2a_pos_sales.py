@@ -3,6 +3,7 @@ from __future__ import annotations
 from decimal import Decimal
 
 from fastapi.testclient import TestClient
+from inventory_fixtures import stock_for_codes
 from sqlalchemy import select
 
 from zeromerma_api.bootstrap.seed_local import (
@@ -40,6 +41,15 @@ def _authorization_header(client: TestClient) -> dict[str, str]:
 
 
 def _open_cash_session(client: TestClient) -> None:
+    stock_for_codes(
+        workstation_code=SEED_WORKSTATION_CODE,
+        quantities={
+            SEED_PRODUCT_COCA_355_CODE: Decimal(10),
+            SEED_PRODUCT_REBANADA_TRES_LECHES_CODE: Decimal(10),
+        },
+        location="COUNTER",
+        reference="sale-contract-physical-input",
+    )
     response = client.post(
         "/v1/cash-sessions/open",
         headers={**_authorization_header(client), "Idempotency-Key": new_idempotency_key()},

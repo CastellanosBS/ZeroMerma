@@ -50,6 +50,12 @@ from zeromerma_api.modules.identity.presentation.router import (
     roles_admin_router as admin_roles_router,
 )
 from zeromerma_api.modules.identity.presentation.router import router as identity_router
+from zeromerma_api.modules.inventory.presentation.attribution_router import (
+    router as attribution_router,
+)
+from zeromerma_api.modules.inventory.presentation.disposition_router import (
+    router as inventory_disposition_router,
+)
 from zeromerma_api.modules.inventory.presentation.router import (
     admin_router as admin_inventory_router,
 )
@@ -145,5 +151,7 @@ api_router.include_router(returns_router)
 api_router.include_router(tickets_router)
 api_router.include_router(transfers_router)
 api_router.include_router(sales_router)
+api_router.include_router(attribution_router)
+api_router.include_router(inventory_disposition_router)
 
 install_access_policies(api_router)

@@ -142,9 +142,16 @@ def test_admin_waste_create_confirms_document_inventory_movement_audit_and_outbo
                 InventoryBalance.location_code == "BACKROOM",
             ),
         ).scalar_one()
-        movement = session.execute(
+        movements = session.scalars(
             select(InventoryMovement).where(InventoryMovement.source_document_id == waste_id),
-        ).scalar_one()
+        ).all()
+        waste_balance = session.scalars(
+            select(InventoryBalance).where(
+                InventoryBalance.product_id == _get_product_id(SEED_PRODUCT_CONCHA_VAN_CODE),
+                InventoryBalance.branch_id == _get_branch_id(),
+                InventoryBalance.location_code == "WASTE",
+            )
+        ).one()
         audit_record = session.execute(
             select(AuditLog).where(AuditLog.resource_id == str(waste_id)),
         ).scalar_one()
@@ -153,8 +160,17 @@ def test_admin_waste_create_confirms_document_inventory_movement_audit_and_outbo
         ).scalar_one()
 
     assert document.document_type == "WASTE_RECORD"
-    assert movement.direction == "OUT"
-    assert movement.balance_after == Decimal("17.000")
+    assert len(movements) == 2
+    outgoing = next(movement for movement in movements if movement.direction == "OUT")
+    incoming = next(movement for movement in movements if movement.direction == "IN")
+    assert outgoing.location_code == "BACKROOM"
+    assert incoming.location_code == "WASTE"
+    assert outgoing.quantity == incoming.quantity == Decimal("3.000")
+    assert outgoing.unit_cost == incoming.unit_cost
+    assert outgoing.total_cost == incoming.total_cost
+    assert outgoing.idempotency_record_id == incoming.idempotency_record_id
+    assert outgoing.balance_after == Decimal("17.000")
+    assert incoming.balance_after == waste_balance.quantity_on_hand == Decimal("3.000")
     assert balance.quantity_on_hand == Decimal("17.000")
     assert audit_record.action == "admin.waste.confirmed"
     assert audit_record.request_id == "c4df92bb-3ed5-52a3-b6af-c3cfb47c12cc"
@@ -265,10 +281,8 @@ def test_admin_waste_validates_note_reason_stock_and_quantity(client: TestClient
         json={**base_payload, "quantity": "5.000"},
     )
     assert excess_response.status_code == 409
-    assert (
-        excess_response.json()["message"]
-        == "Waste quantity exceeds available stock for selected branch and location."
-    )
+    assert excess_response.json()["code"] == "INVENTORY_CONFLICT"
+    assert excess_response.json()["message"] == "Inventory stock is insufficient."
 
 
 def test_admin_waste_high_impact_notifies_backoffice_without_supervisor_approval(

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from datetime import datetime
 from decimal import Decimal
 from uuid import UUID
 
@@ -24,6 +25,13 @@ class PosCatalogResponse(BaseModel):
     classes: list[PosCatalogClassView]
 
 
+class PosCatalogAvailableLotView(BaseModel):
+    lot_id: UUID
+    lot_code: str
+    expires_at: datetime | None
+    available_quantity: Decimal
+
+
 class PosCatalogProductView(BaseModel):
     id: UUID
     code: str
@@ -32,6 +40,11 @@ class PosCatalogProductView(BaseModel):
     display_order: int
     unit_price: Decimal
     currency_code: str
+    is_inventory_tracked: bool
+    lot_tracking_enabled: bool
+    available_quantity: Decimal | None
+    reserved_quantity: Decimal
+    available_lots: list[PosCatalogAvailableLotView]
 
 
 class PosClassProductsResponse(BaseModel):

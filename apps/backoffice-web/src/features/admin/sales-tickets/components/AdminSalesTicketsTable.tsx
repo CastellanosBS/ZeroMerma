@@ -1,15 +1,14 @@
 import { AdminEmptyState } from "../../components/AdminEmptyState";
-import type {
-  AdminSalesTicketBackendContract,
-  AdminSalesTicketListItem,
-} from "../types";
+import type { AdminSalesTicketBackendContract, AdminSalesTicketListItem } from "../types";
 
 function formatMoney(value: string, currencyCode: string): string {
   const numericValue = Number(value);
   if (!Number.isFinite(numericValue)) {
     return `${value} ${currencyCode}`;
   }
-  return new Intl.NumberFormat("es-MX", { currency: currencyCode, style: "currency" }).format(numericValue);
+  return new Intl.NumberFormat("es-MX", { currency: currencyCode, style: "currency" }).format(
+    numericValue,
+  );
 }
 
 function formatDateTime(value: string): string {
@@ -87,7 +86,10 @@ export function AdminSalesTicketsTable({
 
       <div className="min-h-0 min-w-0 flex-1 overflow-y-auto p-2.5">
         {isLoading ? (
-          <AdminEmptyState description="Consultando ventas reales del backend." title="Cargando tickets" />
+          <AdminEmptyState
+            description="Consultando ventas reales del backend."
+            title="Cargando tickets"
+          />
         ) : errorMessage ? (
           <AdminEmptyState description={errorMessage} title="No se pudieron cargar los tickets" />
         ) : tickets.length > 0 ? (
@@ -110,8 +112,17 @@ export function AdminSalesTicketsTable({
                     type="button"
                     onClick={() => onSelectTicket(item)}
                   >
-                    <span className="block truncate text-sm font-semibold text-slate-950">{item.folio}</span>
-                    <span className="mt-0.5 block truncate text-xs text-slate-500">{item.itemCount} lineas</span>
+                    <span className="block truncate text-sm font-semibold text-slate-950">
+                      {item.folio}
+                    </span>
+                    <span className="mt-0.5 block truncate text-xs text-slate-500">
+                      {item.itemCount} lineas
+                    </span>
+                    {item.pendingAttributionLineCount > 0 ? (
+                      <span className="mt-1 block text-xs font-semibold text-amber-800">
+                        {item.pendingAttributionLineCount} líneas pendientes de atribución física
+                      </span>
+                    ) : null}
                   </button>
 
                   <button
@@ -123,7 +134,9 @@ export function AdminSalesTicketsTable({
                     <span className="block truncate text-sm font-semibold text-slate-800">
                       {formatDateTime(item.occurredAt)}
                     </span>
-                    <span className="mt-0.5 block truncate text-xs text-slate-500">{item.unitCount} unidades</span>
+                    <span className="mt-0.5 block truncate text-xs text-slate-500">
+                      {item.unitCount} unidades
+                    </span>
                   </button>
 
                   <button
@@ -132,7 +145,9 @@ export function AdminSalesTicketsTable({
                     type="button"
                     onClick={() => onSelectTicket(item)}
                   >
-                    <span className="block truncate text-sm font-semibold text-slate-950">{item.branchName}</span>
+                    <span className="block truncate text-sm font-semibold text-slate-950">
+                      {item.branchName}
+                    </span>
                     <span className="mt-0.5 block truncate text-xs text-slate-500">
                       {item.workstationName} · {item.workstationCode}
                     </span>
@@ -144,8 +159,12 @@ export function AdminSalesTicketsTable({
                     type="button"
                     onClick={() => onSelectTicket(item)}
                   >
-                    <span className="block truncate text-sm font-semibold text-slate-950">{item.cashierName}</span>
-                    <span className="mt-0.5 block truncate text-xs text-slate-500">{item.paymentMethodsLabel}</span>
+                    <span className="block truncate text-sm font-semibold text-slate-950">
+                      {item.cashierName}
+                    </span>
+                    <span className="mt-0.5 block truncate text-xs text-slate-500">
+                      {item.paymentMethodsLabel}
+                    </span>
                   </button>
 
                   <button
@@ -157,7 +176,9 @@ export function AdminSalesTicketsTable({
                     <span className="block truncate text-sm font-semibold text-slate-950">
                       {formatMoney(item.totalAmount, item.currencyCode)}
                     </span>
-                    <span className="mt-0.5 block truncate text-xs text-slate-500">{item.currencyCode}</span>
+                    <span className="mt-0.5 block truncate text-xs text-slate-500">
+                      {item.currencyCode}
+                    </span>
                   </button>
 
                   <button

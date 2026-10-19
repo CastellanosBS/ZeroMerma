@@ -1,3 +1,4 @@
+import { TransitResolutionPanel } from "./transit-resolution-panel";
 import { isCommandIntentionPending } from "@zeromerma/api-client";
 import { transferIntentions } from "./transfer-command-intent";
 import { useTransferDraftIdentity, useTransferIntention } from "./use-transfer-intention";
@@ -820,7 +821,10 @@ function TransferDispatchHistoryDetailPanel({
                 )}
               />
               <TransferDetailRow label="Operador" value={shipment.created_by_user_full_name} />
-              <TransferDetailRow label="Estacion" value={shipment.workstation_name} />
+              <TransferDetailRow
+                label="Estacion"
+                value={shipment.workstation_name ?? "Administracion"}
+              />
               <TransferDetailRow label="Origen" value={shipment.source_branch_name} />
               <TransferDetailRow
                 label="Destino"
@@ -832,6 +836,7 @@ function TransferDispatchHistoryDetailPanel({
             </div>
           </RightPanelBlock>
 
+          <TransitResolutionPanel key={shipment.id} detail={transferDetail} />
           {transferDetail.receipt_summaries.at(-1) ? (
             <InlineNotice
               tone={

@@ -20,7 +20,7 @@ export const adminProductionBackendContract: AdminProductionBackendContract = {
   createEndpoint: "POST /v1/admin/production",
   detailEndpoint: "GET /v1/admin/production/{production_id}",
   listEndpoint: "GET /v1/admin/production",
-  startEndpoint: "POST /v1/admin/production/{production_id}/start",
+  releaseEndpoint: "POST /v1/admin/production/{production_id}/release",
   updateEndpoint: "PATCH /v1/admin/production/{production_id}",
 };
 
@@ -30,7 +30,7 @@ export type ProductionCommandCode =
 export type ProductionCommandPayload =
   | components["schemas"]["AdminProductionCreateRequest"]
   | components["schemas"]["AdminProductionUpdateRequest"]
-  | components["schemas"]["AdminProductionStartRequest"]
+  | components["schemas"]["AdminProductionReleaseRequest"]
   | components["schemas"]["AdminProductionCompleteRequest"]
   | components["schemas"]["AdminProductionCancelRequest"];
 
@@ -79,7 +79,7 @@ function mapBackendContract(
     createEndpoint: contract.create_endpoint,
     detailEndpoint: contract.detail_endpoint,
     listEndpoint: contract.list_endpoint,
-    startEndpoint: contract.start_endpoint,
+    releaseEndpoint: contract.release_endpoint,
     updateEndpoint: contract.update_endpoint,
   };
 }
@@ -110,7 +110,7 @@ export function mapAdminProductionListItemFromApi(
     productName: item.product_name,
     recipeId: item.recipe_id,
     recipeName: item.recipe_name,
-    startedAt: item.started_at ?? null,
+    releasedAt: item.released_at ?? null,
     status: item.status,
     variancePercent: item.variance_percent ?? null,
     varianceQty: item.variance_qty ?? null,
@@ -123,6 +123,10 @@ export function mapAdminProductionDetailFromApi(item: ApiProductionDetail): Admi
   return {
     actualConsumption: item.actual_consumption.map((line) => ({
       consumedQty: line.consumed_qty ?? null,
+      returnedQty: line.returned_qty ?? null,
+      wasteQty: line.waste_qty ?? null,
+      remainderQty: line.remainder_qty ?? null,
+      reconciliationReason: line.reconciliation_reason ?? null,
       differenceQty: line.difference_qty ?? null,
       expectedQty: line.expected_qty,
       inputProductCode: line.input_product_code,
@@ -134,12 +138,14 @@ export function mapAdminProductionDetailFromApi(item: ApiProductionDetail): Admi
       canCancel: item.available_actions.can_cancel,
       canComplete: item.available_actions.can_complete,
       canEdit: item.available_actions.can_edit,
-      canStart: item.available_actions.can_start,
+      canRelease: item.available_actions.can_release,
       canViewMovements: item.available_actions.can_view_movements,
     },
     inventoryImpact: {
       integrationAvailable: item.inventory_impact.integration_available,
       movements: item.inventory_impact.movements.map((movement) => ({
+        unitCost: movement.unit_cost ?? null,
+        totalCost: movement.total_cost ?? null,
         balanceAfter: movement.balance_after ?? null,
         branchId: movement.branch_id,
         direction: movement.direction,
@@ -163,6 +169,13 @@ export function mapAdminProductionDetailFromApi(item: ApiProductionDetail): Admi
       varianceReason: item.output_yield.variance_reason ?? null,
     },
     overview: {
+      planStatus: item.overview.plan_status,
+      runId: item.overview.run_id,
+      runStatus: item.overview.run_status,
+      reconciliationEvidence: item.overview.reconciliation_evidence,
+      outputLotCode: item.overview.output_lot_code ?? null,
+      outputExpiresAt: item.overview.output_expires_at ?? null,
+      reconciliationFinishAs: item.overview.reconciliation_finish_as ?? null,
       actualOutputQty: item.overview.actual_output_qty ?? null,
       branchId: item.overview.branch_id,
       branchName: item.overview.branch_name,
@@ -178,9 +191,9 @@ export function mapAdminProductionDetailFromApi(item: ApiProductionDetail): Admi
       notes: item.overview.notes ?? null,
       plannedAt: item.overview.planned_at ?? null,
       plannedOutputQty: item.overview.planned_output_qty,
-      startedAt: item.overview.started_at ?? null,
-      startedByUserId: item.overview.started_by_user_id ?? null,
-      startedByUserName: item.overview.started_by_user_name ?? null,
+      releasedAt: item.overview.released_at ?? null,
+      releasedByUserId: item.overview.released_by_user_id ?? null,
+      releasedByUserName: item.overview.released_by_user_name ?? null,
       status: item.overview.status,
       variancePercent: item.overview.variance_percent ?? null,
       varianceQty: item.overview.variance_qty ?? null,
@@ -287,6 +300,11 @@ export function toCompleteApiPayload(
 ): ApiProductionCompletePayload {
   return {
     actual_output_qty: payload.actualOutputQty,
+    confirm_without_differences: payload.confirmWithoutDifferences ?? false,
+    inputs: payload.inputs ?? [],
+    finish_as: payload.finishAs ?? "COMPLETED",
+    output_lot_code: payload.outputLotCode ?? null,
+    output_expires_at: payload.outputExpiresAt ?? null,
     notes: payload.notes ?? null,
     variance_reason: payload.varianceReason ?? null,
   };
@@ -365,8 +383,8 @@ export function updateAdminProduction(
 ) {
   return sendProductionCommand("update", productionId, toUpdateApiPayload(payload), key);
 }
-export function startAdminProduction(productionId: string, notes: string | null, key: string) {
-  return sendProductionCommand("start", productionId, { notes }, key);
+export function releaseAdminProduction(productionId: string, notes: string | null, key: string) {
+  return sendProductionCommand("release", productionId, { notes }, key);
 }
 export function completeAdminProduction(
   productionId: string,
@@ -375,6 +393,16 @@ export function completeAdminProduction(
 ) {
   return sendProductionCommand("complete", productionId, toCompleteApiPayload(payload), key);
 }
-export function cancelAdminProduction(productionId: string, reason: string | null, key: string) {
-  return sendProductionCommand("cancel", productionId, { reason }, key);
+export function cancelAdminProduction(
+  productionId: string,
+  reason: string | null,
+  key: string,
+  noPhysicalEffectsConfirmed = false,
+) {
+  return sendProductionCommand(
+    "cancel",
+    productionId,
+    { reason, no_physical_effects_confirmed: noPhysicalEffectsConfirmed },
+    key,
+  );
 }

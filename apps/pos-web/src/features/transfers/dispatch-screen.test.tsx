@@ -91,6 +91,8 @@ const committedTransfer: TransferDetailResponse = {
       sent_quantity: "3.000",
       received_quantity: "0.000",
       pending_quantity: "3.000",
+      returned_quantity: "0.000",
+      waste_quantity: "0.000",
     },
   ],
   shipment: {

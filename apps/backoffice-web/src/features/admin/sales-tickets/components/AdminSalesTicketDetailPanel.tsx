@@ -9,7 +9,9 @@ function formatMoney(value: string | null | undefined, currencyCode = "MXN"): st
   if (!Number.isFinite(numericValue)) {
     return `${value} ${currencyCode}`;
   }
-  return new Intl.NumberFormat("es-MX", { currency: currencyCode, style: "currency" }).format(numericValue);
+  return new Intl.NumberFormat("es-MX", { currency: currencyCode, style: "currency" }).format(
+    numericValue,
+  );
 }
 
 function formatDateTime(value: string): string {
@@ -25,6 +27,9 @@ function formatStatus(value: string): string {
     FULLY_RETURNED: "Devuelto",
     NOT_RETURNED: "Sin devolucion",
     PARTIALLY_RETURNED: "Devolucion parcial",
+    PENDING_RECONCILIATION: "Pendiente de atribución",
+    DIRECT_ASSIGNED: "Atribución directa",
+    RECONCILED: "Atribución completada",
   };
   return labels[value] ?? value;
 }
@@ -59,7 +64,9 @@ export function AdminSalesTicketDetailPanel({
     return (
       <aside className="flex min-h-0 min-w-0 flex-col overflow-hidden rounded-[20px] border border-[var(--ui-color-border)] bg-white">
         <div className="border-b border-[var(--ui-color-border)] px-4 py-3">
-          <p className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">Detalle</p>
+          <p className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">
+            Detalle
+          </p>
           <h3 className="mt-1 text-lg font-semibold text-slate-950">Sin ticket seleccionado</h3>
         </div>
         <div className="min-h-0 flex-1 p-4">
@@ -76,11 +83,18 @@ export function AdminSalesTicketDetailPanel({
     return (
       <aside className="flex min-h-0 min-w-0 flex-col overflow-hidden rounded-[20px] border border-[var(--ui-color-border)] bg-white">
         <div className="border-b border-[var(--ui-color-border)] px-4 py-3">
-          <p className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">Detalle</p>
-          <h3 className="mt-1 truncate text-lg font-semibold text-slate-950">{selectedTicket.folio}</h3>
+          <p className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">
+            Detalle
+          </p>
+          <h3 className="mt-1 truncate text-lg font-semibold text-slate-950">
+            {selectedTicket.folio}
+          </h3>
         </div>
         <div className="min-h-0 flex-1 p-4">
-          <AdminEmptyState description="Consultando lineas, pagos y contexto operativo." title="Cargando ticket" />
+          <AdminEmptyState
+            description="Consultando lineas, pagos y contexto operativo."
+            title="Cargando ticket"
+          />
         </div>
       </aside>
     );
@@ -90,8 +104,12 @@ export function AdminSalesTicketDetailPanel({
     return (
       <aside className="flex min-h-0 min-w-0 flex-col overflow-hidden rounded-[20px] border border-[var(--ui-color-border)] bg-white">
         <div className="border-b border-[var(--ui-color-border)] px-4 py-3">
-          <p className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">Detalle</p>
-          <h3 className="mt-1 truncate text-lg font-semibold text-slate-950">{selectedTicket.folio}</h3>
+          <p className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">
+            Detalle
+          </p>
+          <h3 className="mt-1 truncate text-lg font-semibold text-slate-950">
+            {selectedTicket.folio}
+          </h3>
         </div>
         <div className="min-h-0 flex-1 p-4">
           <AdminEmptyState
@@ -110,8 +128,13 @@ export function AdminSalesTicketDetailPanel({
       <div className="shrink-0 border-b border-[var(--ui-color-border)] px-4 py-3">
         <div className="flex min-w-0 items-start justify-between gap-3">
           <div className="min-w-0">
-            <p className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">Ticket</p>
-            <h3 className="mt-1 truncate text-lg font-semibold text-slate-950" title={detail.overview.folio}>
+            <p className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">
+              Ticket
+            </p>
+            <h3
+              className="mt-1 truncate text-lg font-semibold text-slate-950"
+              title={detail.overview.folio}
+            >
               {detail.overview.folio}
             </h3>
           </div>
@@ -124,22 +147,38 @@ export function AdminSalesTicketDetailPanel({
       <div className="min-h-0 flex-1 overflow-y-auto p-3">
         <section className="rounded-[18px] border border-[var(--ui-color-border)] bg-slate-50/80 p-3">
           <div className="flex items-center justify-between gap-3">
-            <span className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">Resumen</span>
+            <span className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">
+              Resumen
+            </span>
             <strong className="text-xl font-semibold text-slate-950">
               {formatMoney(detail.overview.totalAmount, currencyCode)}
             </strong>
           </div>
           <div className="mt-3 grid gap-1.5">
-            <FieldRow label="Subtotal" value={formatMoney(detail.overview.subtotalAmount, currencyCode)} />
-            <FieldRow label="Pagado" value={formatMoney(detail.overview.paidAmount, currencyCode)} />
-            <FieldRow label="Cambio" value={formatMoney(detail.overview.changeAmount, currencyCode)} />
-            <FieldRow label="Devuelto" value={formatMoney(detail.overview.returnedAmount, currencyCode)} />
+            <FieldRow
+              label="Subtotal"
+              value={formatMoney(detail.overview.subtotalAmount, currencyCode)}
+            />
+            <FieldRow
+              label="Pagado"
+              value={formatMoney(detail.overview.paidAmount, currencyCode)}
+            />
+            <FieldRow
+              label="Cambio"
+              value={formatMoney(detail.overview.changeAmount, currencyCode)}
+            />
+            <FieldRow
+              label="Devuelto"
+              value={formatMoney(detail.overview.returnedAmount, currencyCode)}
+            />
             <FieldRow label="Fecha" value={formatDateTime(detail.overview.confirmedAt)} />
           </div>
         </section>
 
         <section className="mt-3 rounded-[18px] border border-[var(--ui-color-border)] bg-white p-3">
-          <p className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">Contexto operativo</p>
+          <p className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">
+            Contexto operativo
+          </p>
           <div className="mt-3 grid gap-1.5">
             <FieldRow label="Sucursal" value={detail.operationalContext.branchName} />
             <FieldRow
@@ -154,7 +193,9 @@ export function AdminSalesTicketDetailPanel({
 
         <section className="mt-3 rounded-[18px] border border-[var(--ui-color-border)] bg-white p-3">
           <div className="flex items-center justify-between gap-2">
-            <p className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">Productos</p>
+            <p className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">
+              Productos
+            </p>
             <span className="rounded-full border border-[var(--ui-color-border)] bg-white px-2.5 py-1 text-xs font-semibold text-slate-600">
               {detail.lines.length} lineas
             </span>
@@ -177,6 +218,47 @@ export function AdminSalesTicketDetailPanel({
                 <span className="text-right font-semibold text-slate-950">
                   {formatMoney(line.lineTotalAmount, currencyCode)}
                 </span>
+                <div className="col-span-3 min-w-0 border-t border-slate-200 pt-2 text-xs">
+                  <p>Estado físico: {formatStatus(line.physicalAttributionStatus)}</p>
+                  {line.captureMode === "CLASS_CAPTURE" ? (
+                    <>
+                      {line.attributedQuantity !== null &&
+                      line.remainingAttributionQuantity !== null ? (
+                        <p className="mt-1 font-semibold">
+                          Atribuido: {line.attributedQuantity} · Pendiente:{" "}
+                          {line.remainingAttributionQuantity}
+                        </p>
+                      ) : (
+                        <p>Progreso de atribución no disponible.</p>
+                      )}
+                      <ul
+                        aria-label={`Atribuciones físicas de ${line.catalogName}`}
+                        className="mt-2 grid gap-2"
+                      >
+                        {line.physicalAttributions.map((attribution) => (
+                          <li
+                            key={attribution.id}
+                            className="break-words rounded border border-slate-200 bg-white p-2"
+                          >
+                            <p>
+                              {attribution.product_name} ({attribution.product_code}) · Cantidad{" "}
+                              {attribution.quantity}
+                            </p>
+                            <p>{formatDateTime(attribution.occurred_at)}</p>
+                            <p>
+                              {attribution.inventory_movement_id
+                                ? `Movimiento: ${attribution.inventory_movement_id}`
+                                : "Producto sin control de inventario"}
+                            </p>
+                          </li>
+                        ))}
+                      </ul>
+                      {line.physicalAttributions.length === 0 ? (
+                        <p>Sin atribuciones físicas registradas.</p>
+                      ) : null}
+                    </>
+                  ) : null}
+                </div>
               </div>
             ))}
           </div>
@@ -190,19 +272,27 @@ export function AdminSalesTicketDetailPanel({
                 className="grid grid-cols-[minmax(0,1fr)_6rem] gap-2 rounded-[14px] border border-[var(--ui-color-border)] bg-slate-50 px-3 py-2 text-sm"
                 key={payment.id}
               >
-                <span className="truncate font-semibold text-slate-950">{payment.paymentMethodCode}</span>
+                <span className="truncate font-semibold text-slate-950">
+                  {payment.paymentMethodCode}
+                </span>
                 <span className="text-right font-semibold text-slate-950">
                   {formatMoney(payment.appliedAmount, payment.currencyCode)}
                 </span>
-                <span className="text-xs text-slate-500">Recibido {formatMoney(payment.tenderedAmount, payment.currencyCode)}</span>
-                <span className="text-right text-xs text-slate-500">Cambio {formatMoney(payment.changeAmount, payment.currencyCode)}</span>
+                <span className="text-xs text-slate-500">
+                  Recibido {formatMoney(payment.tenderedAmount, payment.currencyCode)}
+                </span>
+                <span className="text-right text-xs text-slate-500">
+                  Cambio {formatMoney(payment.changeAmount, payment.currencyCode)}
+                </span>
               </div>
             ))}
           </div>
         </section>
 
         <section className="mt-3 rounded-[18px] border border-[var(--ui-color-border)] bg-white p-3">
-          <p className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">Documentos relacionados</p>
+          <p className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">
+            Documentos relacionados
+          </p>
           <div className="mt-3 grid gap-1.5">
             {detail.relatedDocuments.length > 0 ? (
               detail.relatedDocuments.map((document) => (
@@ -212,7 +302,9 @@ export function AdminSalesTicketDetailPanel({
                 >
                   <div className="flex min-w-0 items-center justify-between gap-2">
                     <span className="truncate font-semibold text-slate-950">{document.folio}</span>
-                    <span className="shrink-0 text-xs font-semibold text-slate-500">{document.status}</span>
+                    <span className="shrink-0 text-xs font-semibold text-slate-500">
+                      {document.status}
+                    </span>
                   </div>
                   <p className="mt-1 text-xs text-slate-500">
                     {document.documentType === "return" ? "Devolucion" : document.documentType}

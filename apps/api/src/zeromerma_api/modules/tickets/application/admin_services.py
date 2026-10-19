@@ -13,6 +13,7 @@ from sqlalchemy.sql.elements import ColumnElement
 from zeromerma_api.db.transactions import rollback_on_failure
 from zeromerma_api.modules.audit.application.service import AuditRecorder
 from zeromerma_api.modules.branches.infrastructure.models import Branch, Workstation
+from zeromerma_api.modules.catalog.infrastructure.models import Product
 from zeromerma_api.modules.financial_ledger.application.classification import mixed_sale_ids
 from zeromerma_api.modules.financial_ledger.infrastructure.models import (
     FinancialEntry,
@@ -20,6 +21,12 @@ from zeromerma_api.modules.financial_ledger.infrastructure.models import (
 )
 from zeromerma_api.modules.identity.application.schemas import AuthenticatedUser
 from zeromerma_api.modules.identity.infrastructure.models import User
+from zeromerma_api.modules.inventory.application.attribution_queries import (
+    read_attribution_progress,
+)
+from zeromerma_api.modules.inventory.infrastructure.attribution_models import (
+    ClassInventoryObligation,
+)
 from zeromerma_api.modules.outbox.application.service import OutboxWriter
 from zeromerma_api.modules.returns.infrastructure.models import SaleReturn, SaleReturnLine
 from zeromerma_api.modules.sales.domain.constants import (
@@ -31,6 +38,7 @@ from zeromerma_api.modules.sales.domain.constants import (
 from zeromerma_api.modules.sales.domain.exceptions import SaleNotFoundError, SaleValidationError
 from zeromerma_api.modules.sales.infrastructure.models import Sale, SaleLine, SalePayment
 from zeromerma_api.modules.tickets.application.admin_schemas import (
+    AdminSalesTicketAttributionView,
     AdminSalesTicketBackendContractView,
     AdminSalesTicketDetailView,
     AdminSalesTicketFilterOptionsView,
@@ -87,6 +95,7 @@ class AdminSalesTicketService:
         search: str | None,
         status_filter: str | None,
         workstation_id: uuid.UUID | None,
+        pending_physical_only: bool = False,
     ) -> AdminSalesTicketsListResponse:
         resolved_page_size = min(page_size, ADMIN_TICKETS_PAGE_SIZE_MAX)
         conditions = self._build_conditions(
@@ -100,6 +109,7 @@ class AdminSalesTicketService:
             search=search,
             status_filter=status_filter,
             workstation_id=workstation_id,
+            pending_physical_only=pending_physical_only,
         )
         sale_ids_statement = self._build_sale_ids_statement(conditions)
 
@@ -114,6 +124,16 @@ class AdminSalesTicketService:
                 SaleLine.sale_id.label("sale_id"),
                 func.count(SaleLine.id).label("item_count"),
                 func.coalesce(func.sum(SaleLine.quantity), ZERO_QUANTITY).label("unit_count"),
+            )
+            .group_by(SaleLine.sale_id)
+            .subquery()
+        )
+        pending_lines = (
+            select(SaleLine.sale_id, func.count().label("line_count"))
+            .join(ClassInventoryObligation, ClassInventoryObligation.sale_line_id == SaleLine.id)
+            .where(
+                ClassInventoryObligation.required_quantity
+                > ClassInventoryObligation.attributed_quantity
             )
             .group_by(SaleLine.sale_id)
             .subquery()
@@ -137,12 +157,16 @@ class AdminSalesTicketService:
                     func.coalesce(line_stats_subquery.c.unit_count, ZERO_QUANTITY).label(
                         "unit_count"
                     ),
+                    func.coalesce(pending_lines.c.line_count, 0).label(
+                        "pending_attribution_line_count"
+                    ),
                 )
                 .select_from(Sale)
                 .join(Branch, Branch.id == Sale.branch_id)
                 .join(Workstation, Workstation.id == Sale.workstation_id)
                 .join(User, User.id == Sale.operator_id)
                 .outerjoin(line_stats_subquery, line_stats_subquery.c.sale_id == Sale.id)
+                .outerjoin(pending_lines, pending_lines.c.sale_id == Sale.id)
                 .where(Sale.id.in_(sale_ids_statement))
                 .order_by(Sale.confirmed_at.desc(), Sale.id.desc())
                 .limit(resolved_page_size)
@@ -260,6 +284,25 @@ class AdminSalesTicketService:
             ticket_id
         )
         resolved_return_summary = _resolve_return_summary(return_summary)
+        progress = read_attribution_progress(
+            session,
+            branch_id=type_cast(uuid.UUID, sale_record["branch_id"]),
+            sale_line_ids=[type_cast(uuid.UUID, row["id"]) for row in line_records],
+        )
+        attributed_products = {
+            product.id: product
+            for product in session.scalars(
+                select(Product).where(
+                    Product.id.in_(
+                        {
+                            attribution.product_id
+                            for item in progress.values()
+                            for attribution in item.attributions
+                        }
+                    )
+                )
+            )
+        }
 
         return AdminSalesTicketDetailView(
             overview=AdminSalesTicketOverviewView(
@@ -311,6 +354,26 @@ class AdminSalesTicketService:
                     line_total_amount=type_cast(Decimal, row["line_total_amount"]),
                     discount_amount=ZERO_MONEY,
                     physical_attribution_status=type_cast(str, row["physical_attribution_status"]),
+                    attributed_quantity=progress[row["id"]].attributed_quantity
+                    if row["id"] in progress
+                    else None,
+                    remaining_attribution_quantity=progress[row["id"]].remaining_quantity
+                    if row["id"] in progress
+                    else None,
+                    physical_attributions=[
+                        AdminSalesTicketAttributionView(
+                            id=attribution.id,
+                            product_id=attribution.product_id,
+                            product_code=attributed_products[attribution.product_id].code,
+                            product_name=attributed_products[attribution.product_id].name,
+                            quantity=attribution.quantity,
+                            inventory_movement_id=attribution.inventory_movement_id,
+                            occurred_at=attribution.occurred_at,
+                        )
+                        for attribution in (
+                            progress[row["id"]].attributions if row["id"] in progress else ()
+                        )
+                    ],
                 )
                 for row in line_records
             ],
@@ -387,8 +450,21 @@ class AdminSalesTicketService:
         search: str | None,
         status_filter: str | None,
         workstation_id: uuid.UUID | None,
+        pending_physical_only: bool = False,
     ) -> list[ColumnElement[bool]]:
         conditions: list[ColumnElement[bool]] = []
+        if pending_physical_only:
+            conditions.append(
+                exists(
+                    select(ClassInventoryObligation.id)
+                    .join(SaleLine, SaleLine.id == ClassInventoryObligation.sale_line_id)
+                    .where(
+                        SaleLine.sale_id == Sale.id,
+                        ClassInventoryObligation.required_quantity
+                        > ClassInventoryObligation.attributed_quantity,
+                    )
+                )
+            )
         if branch_id is not None:
             conditions.append(Sale.branch_id == branch_id)
         if workstation_id is not None:
@@ -709,6 +785,7 @@ def _to_list_item(
         return_count=int(resolved_return_summary["return_count"]),
         return_status=return_status,
         has_returns=int(resolved_return_summary["return_count"]) > 0,
+        pending_attribution_line_count=int(row["pending_attribution_line_count"]),
     )
 
 

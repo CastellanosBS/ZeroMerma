@@ -12,6 +12,7 @@ from pydantic import BaseModel, ConfigDict
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from zeromerma_api.db.concurrency import CommandConcurrencyConflict
+from zeromerma_api.modules.inventory.domain.exceptions import InventoryError, InventoryNotFoundError
 from zeromerma_api.presentation.operation_context import (
     request_context,
     request_trace_headers,
@@ -203,7 +204,19 @@ def error_responses() -> dict[int | str, dict[str, Any]]:
     }
 
 
+async def inventory_exception_handler(request: Request, exc: Exception) -> JSONResponse:
+    return _response(
+        status_code=404 if isinstance(exc, InventoryNotFoundError) else 409,
+        request=request,
+        code="INVENTORY_NOT_FOUND"
+        if isinstance(exc, InventoryNotFoundError)
+        else "INVENTORY_CONFLICT",
+        message=str(exc),
+    )
+
+
 def install_error_handlers(app: FastAPI) -> None:
+    app.add_exception_handler(InventoryError, inventory_exception_handler)
     app.add_exception_handler(CommandConcurrencyConflict, concurrency_exception_handler)
     app.add_exception_handler(StarletteHTTPException, http_exception_handler)
     app.add_exception_handler(RequestValidationError, validation_exception_handler)

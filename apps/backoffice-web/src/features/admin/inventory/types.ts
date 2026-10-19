@@ -1,4 +1,6 @@
-export type AdminInventoryLocationCode = "BACKROOM" | "COUNTER" | "IN_TRANSIT" | "WASTE";
+import type { components } from "@zeromerma/api-client";
+
+export type AdminInventoryLocationCode = components["schemas"]["AdminInventoryListItemView"]["location_code"];
 export type AdminInventoryProductKind =
   | "FINISHED_GOOD"
   | "RAW_MATERIAL"
@@ -47,6 +49,8 @@ export interface AdminInventoryListItem {
 }
 
 export interface AdminInventoryProduct {
+  lotTrackingEnabled?: boolean;
+  expiryRequired?: boolean;
   classId: string;
   className: string;
   code: string;
@@ -69,6 +73,7 @@ export interface AdminInventoryBranchLocation {
 }
 
 export interface AdminInventoryStockBreakdown {
+  valuationStatus?: components["schemas"]["AdminInventoryStockBreakdownView"]["valuation_status"];
   availableQuantity?: string | null;
   estimatedValue?: string | null;
   inTransitQuantity?: string | null;
@@ -112,6 +117,7 @@ export interface AdminInventoryMovement {
 }
 
 export interface AdminInventoryDetail {
+  lots?: components["schemas"]["AdminInventoryLotView"][];
   balanceId: string;
   branchLocation: AdminInventoryBranchLocation;
   movementSummary: AdminInventoryMovementSummary;
@@ -177,6 +183,12 @@ export interface AdminInventoryListFilters {
 }
 
 export interface AdminInventoryAdjustmentPayload {
+  lotId?: string | null;
+  lotCode?: string | null;
+  expiresAt?: string | null;
+  unitCost?: string | null;
+  costEvidenceReference?: string | null;
+  allowNegative?: boolean;
   adjustmentType: AdminInventoryAdjustmentType;
   branchId: string;
   locationCode: AdminInventoryLocationCode;

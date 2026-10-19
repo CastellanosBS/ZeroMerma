@@ -1,3 +1,4 @@
+import type { components } from "@zeromerma/api-client";
 import type { ReturnCommitLineRequest, ReturnableSaleLineView } from "../../lib/api-contracts";
 import {
   formatMoneyFromCents,
@@ -10,6 +11,12 @@ import {
 export const RETURN_DISPOSITION_RESTOCK_COUNTER = "RESTOCK_COUNTER";
 export const RETURN_DISPOSITION_RESTOCK_BACKROOM = "RESTOCK_BACKROOM";
 export const RETURN_DISPOSITION_SEND_TO_WASTE = "SEND_TO_WASTE";
+export const RETURN_DISPOSITION_QUARANTINE = "QUARANTINE";
+
+export type ReturnAllocationDraft = Omit<
+  components["schemas"]["ReturnDispositionAllocationRequest"],
+  "quantity"
+> & { key: string; quantityText: string };
 
 export interface ReturnDraftLine {
   alreadyReturnedMilliUnits: number;
@@ -17,9 +24,8 @@ export interface ReturnDraftLine {
   originalLineTotalCents: number;
   remainingRefundableCents: number;
   captureMode: string;
-  dispositionCode: string;
-  exactProductId: string;
-  exactProductName: string | null;
+  allocations: ReturnAllocationDraft[];
+  physicalOptions: NonNullable<ReturnableSaleLineView["physical_options"]>;
   exactProductRequired: boolean;
   fixedProductName: string | null;
   key: string;
@@ -83,6 +89,10 @@ export function setReturnDraftLineQuantityText(
           ...line,
           quantityText: sanitizeQuantityInput(quantityText),
           quantityMilliUnits: parseQuantityToMilliUnits(sanitizeQuantityInput(quantityText)) ?? 0,
+          allocations:
+            line.allocations.length === 1
+              ? [{ ...line.allocations[0]!, quantityText: sanitizeQuantityInput(quantityText) }]
+              : line.allocations,
         }
       : line,
   );
@@ -105,6 +115,15 @@ export function incrementReturnDraftLineQuantity(
       ...line,
       quantityMilliUnits: nextQuantityMilliUnits,
       quantityText: formatQuantityFromMilliUnits(nextQuantityMilliUnits),
+      allocations:
+        line.allocations.length === 1
+          ? [
+              {
+                ...line.allocations[0]!,
+                quantityText: formatQuantityFromMilliUnits(nextQuantityMilliUnits),
+              },
+            ]
+          : line.allocations,
     };
   });
 }
@@ -123,20 +142,43 @@ export function decrementReturnDraftLineQuantity(
       ...line,
       quantityMilliUnits: nextQuantityMilliUnits,
       quantityText: formatQuantityFromMilliUnits(nextQuantityMilliUnits),
+      allocations:
+        line.allocations.length === 1
+          ? [
+              {
+                ...line.allocations[0]!,
+                quantityText: formatQuantityFromMilliUnits(nextQuantityMilliUnits),
+              },
+            ]
+          : line.allocations,
     };
   });
+}
+
+export function setReturnDraftLineAllocations(
+  lines: ReturnDraftLine[],
+  originalSaleLineId: string,
+  allocations: ReturnAllocationDraft[],
+): ReturnDraftLine[] {
+  return lines.map((line) =>
+    line.originalSaleLineId === originalSaleLineId ? { ...line, allocations } : line,
+  );
 }
 
 export function setReturnDraftLineDisposition(
   lines: ReturnDraftLine[],
   originalSaleLineId: string,
-  dispositionCode: string,
+  dispositionCode: ReturnAllocationDraft["disposition_code"],
 ): ReturnDraftLine[] {
   return lines.map((line) =>
     line.originalSaleLineId === originalSaleLineId
       ? {
           ...line,
-          dispositionCode,
+          allocations: line.allocations.map((allocation) => ({
+            ...allocation,
+            disposition_code: dispositionCode,
+            restock_safe_acknowledged: false,
+          })),
         }
       : line,
   );
@@ -146,17 +188,48 @@ export function setReturnDraftLineExactProduct(
   lines: ReturnDraftLine[],
   originalSaleLineId: string,
   exactProductId: string,
-  exactProductName: string | null,
 ): ReturnDraftLine[] {
   return lines.map((line) =>
     line.originalSaleLineId === originalSaleLineId
       ? {
           ...line,
-          exactProductId,
-          exactProductName,
+          allocations: line.allocations.map((allocation) => ({
+            ...allocation,
+            exact_product_id: exactProductId,
+            lot_id: null,
+            restock_safe_acknowledged: false,
+          })),
         }
       : line,
   );
+}
+
+export function getReturnAllocationError(line: ReturnDraftLine): string | null {
+  let allocated = 0;
+  for (const allocation of line.allocations) {
+    const quantity = parseQuantityToMilliUnits(allocation.quantityText);
+    if (quantity === null || quantity <= 0)
+      return "Captura una cantidad valida en cada disposicion.";
+    allocated += quantity;
+    if (!allocation.exact_product_id) return "Selecciona el producto exacto requerido.";
+    if (!allocation.disposition_code) return "Define el destino fisico de cada disposicion.";
+    const options = line.physicalOptions.filter(
+      (option) => option.product_id === allocation.exact_product_id,
+    );
+    const restock = ["RESTOCK_COUNTER", "RESTOCK_BACKROOM"].includes(allocation.disposition_code);
+    if (restock && !allocation.restock_safe_acknowledged)
+      return "Confirma la inspeccion del producto antes de reponerlo.";
+    if (restock && options.some((option) => option.lot_tracking_enabled) && !allocation.lot_id)
+      return "Identifica el lote original antes de reponer el producto.";
+    if (
+      allocation.disposition_code === "NO_STOCK" &&
+      !options.some((option) => !option.is_inventory_tracked)
+    )
+      return "Sin inventario solo aplica a productos no inventariables.";
+  }
+  return allocated === line.quantityMilliUnits
+    ? null
+    : "Las disposiciones deben sumar la cantidad a devolver.";
 }
 
 export function getReturnDraftLineRefundCents(line: ReturnDraftLine): number {
@@ -188,13 +261,7 @@ export function isReturnDraftLineValid(line: ReturnDraftLine): boolean {
   if (quantityMilliUnits > line.remainingReturnableMilliUnits) {
     return false;
   }
-  if (line.dispositionCode.trim().length === 0) {
-    return false;
-  }
-  if (line.exactProductRequired && line.exactProductId.trim().length === 0) {
-    return false;
-  }
-  return true;
+  return getReturnAllocationError(line) === null;
 }
 
 export function hasReturnDraftInvalidQuantity(lines: ReturnDraftLine[]): boolean {
@@ -209,11 +276,11 @@ export function hasReturnDraftInvalidQuantity(lines: ReturnDraftLine[]): boolean
 }
 
 export function hasReturnDraftMissingExactProduct(lines: ReturnDraftLine[]): boolean {
-  return lines.some((line) => line.exactProductRequired && line.exactProductId.trim().length === 0);
+  return lines.some((line) => line.allocations.some((allocation) => !allocation.exact_product_id));
 }
 
 export function hasReturnDraftMissingDisposition(lines: ReturnDraftLine[]): boolean {
-  return lines.some((line) => line.dispositionCode.trim().length === 0);
+  return lines.some((line) => line.allocations.some((allocation) => !allocation.disposition_code));
 }
 
 export function hasReturnDraftMissingReason(reasonCode: string): boolean {
@@ -259,6 +326,8 @@ export function getReturnDraftBlockingMessages({
   if (hasReturnDraftMissingDisposition(lines)) {
     messages.push("Define el destino fisico de cada linea.");
   }
+  const allocationError = lines.map(getReturnAllocationError).find(Boolean);
+  if (allocationError && !messages.includes(allocationError)) messages.push(allocationError);
   if (hasReturnDraftMissingReason(reasonCode)) {
     messages.push("Selecciona un motivo para continuar.");
   }
@@ -317,18 +386,18 @@ export function buildReturnCommitLines(lines: ReturnDraftLine[]): ReturnCommitLi
     if (quantityMilliUnits > line.remainingReturnableMilliUnits) {
       throw new Error("La cantidad a devolver supera lo que aun se puede devolver.");
     }
-    if (line.dispositionCode.trim().length === 0) {
-      throw new Error("Define el destino fisico de cada linea.");
-    }
-    if (line.exactProductRequired && line.exactProductId.trim().length === 0) {
-      throw new Error("Selecciona el producto exacto para las ventas por clase.");
-    }
-
+    const allocationError = getReturnAllocationError(line);
+    if (allocationError) throw new Error(allocationError);
     return {
       original_sale_line_id: line.originalSaleLineId,
       returned_quantity: formatQuantityFromMilliUnits(quantityMilliUnits),
-      disposition_code: line.dispositionCode,
-      exact_product_id: line.exactProductRequired ? line.exactProductId : undefined,
+      allocations: line.allocations.map((allocation) => ({
+        exact_product_id: allocation.exact_product_id,
+        disposition_code: allocation.disposition_code,
+        lot_id: allocation.lot_id,
+        restock_safe_acknowledged: allocation.restock_safe_acknowledged,
+        quantity: formatQuantityFromMilliUnits(parseQuantityToMilliUnits(allocation.quantityText)!),
+      })),
     };
   });
 }
@@ -385,9 +454,17 @@ function buildReturnDraftLine(originalLine: ReturnableSaleLineView): ReturnDraft
     originalLineTotalCents,
     remainingRefundableCents,
     captureMode: originalLine.capture_mode,
-    dispositionCode: "",
-    exactProductId: "",
-    exactProductName: null,
+    allocations: [
+      {
+        key: crypto.randomUUID(),
+        exact_product_id: originalLine.product_id ?? "",
+        quantityText: formatQuantityFromMilliUnits(remainingReturnableMilliUnits),
+        disposition_code: "QUARANTINE",
+        lot_id: null,
+        restock_safe_acknowledged: false,
+      },
+    ],
+    physicalOptions: originalLine.physical_options ?? [],
     exactProductRequired: originalLine.requires_exact_product_selection,
     fixedProductName: originalLine.product_name ?? null,
     key: originalLine.id,

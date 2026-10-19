@@ -1,17 +1,15 @@
 import type { AdminProduct, AdminProductReadinessStatus } from "../types";
+import { AdminProductInventoryPolicyForm } from "./AdminProductInventoryPolicyForm";
 
-const actionLabels = [
-  "Editar",
-  "Disponibilidad",
-  "Precios",
-  "Recetas/costos",
-  "Auditoria",
-];
+const actionLabels = ["Editar", "Disponibilidad", "Precios", "Recetas/costos", "Auditoria"];
 
 function Field({ label, value }: { label: string; value: string }) {
   return (
     <div className="min-w-0 border-b border-[var(--ui-color-border)] py-2 last:border-b-0">
-      <p className="truncate text-[0.68rem] font-semibold uppercase tracking-[0.12em] text-slate-500" title={label}>
+      <p
+        className="truncate text-[0.68rem] font-semibold uppercase tracking-[0.12em] text-slate-500"
+        title={label}
+      >
         {label}
       </p>
       <p className="mt-0.5 truncate text-sm font-semibold text-slate-950" title={value}>
@@ -65,7 +63,10 @@ export function AdminProductsDetailPanel({
     <aside className="flex min-h-0 min-w-0 flex-col overflow-hidden rounded-[20px] border border-[var(--ui-color-border)] bg-slate-50/80">
       <div className="shrink-0 border-b border-[var(--ui-color-border)] px-3 py-2.5">
         <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">Detalle</p>
-        <h3 className="mt-1 truncate text-base font-semibold text-slate-950" title={product?.name ?? "Sin producto seleccionado"}>
+        <h3
+          className="mt-1 truncate text-base font-semibold text-slate-950"
+          title={product?.name ?? "Sin producto seleccionado"}
+        >
           {product ? product.name : "Sin producto seleccionado"}
         </h3>
       </div>
@@ -74,26 +75,38 @@ export function AdminProductsDetailPanel({
         {isLoading ? (
           <article className="rounded-[16px] border border-[var(--ui-color-border)] bg-white p-3">
             <p className="text-sm font-semibold text-slate-950">Cargando detalle</p>
-            <p className="mt-1 text-sm leading-5 text-slate-600">Consultando el producto seleccionado.</p>
+            <p className="mt-1 text-sm leading-5 text-slate-600">
+              Consultando el producto seleccionado.
+            </p>
           </article>
         ) : errorMessage ? (
           <article className="rounded-[16px] border border-rose-200 bg-[var(--ui-color-danger-soft)] p-3">
-            <p className="text-sm font-semibold text-[var(--ui-color-danger)]">No se pudo cargar el detalle</p>
+            <p className="text-sm font-semibold text-[var(--ui-color-danger)]">
+              No se pudo cargar el detalle
+            </p>
             <p className="mt-1 text-sm leading-5 text-slate-700">{errorMessage}</p>
           </article>
         ) : product ? (
           <div className="grid min-w-0 gap-3">
+            <AdminProductInventoryPolicyForm key={product.id} product={product} />
             <section className="min-w-0 rounded-[16px] border border-[var(--ui-color-border)] bg-white px-3">
               <Field label="Marca" value={product.brandName ?? "Sin marca"} />
               <Field label="Codigo" value={product.code ?? "Pendiente"} />
               <Field label="Estado" value={product.status === "active" ? "Activo" : "Inactivo"} />
-              <Field label="Clase / modo" value={`${product.className ?? "Pendiente"} - ${formatCaptureMode(product)}`} />
+              <Field
+                label="Clase / modo"
+                value={`${product.className ?? "Pendiente"} - ${formatCaptureMode(product)}`}
+              />
               <Field label="Precio base" value={formatMoney(product)} />
             </section>
 
             <section className="rounded-[16px] border border-[var(--ui-color-border)] bg-white p-3">
-              <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">Preparacion</p>
-              <p className="mt-1 text-sm font-semibold text-slate-950">{formatReadiness(product.readiness.status)}</p>
+              <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
+                Preparacion
+              </p>
+              <p className="mt-1 text-sm font-semibold text-slate-950">
+                {formatReadiness(product.readiness.status)}
+              </p>
               {product.readiness.missingRequirements.length > 0 ? (
                 <ul className="mt-2 space-y-1 text-sm leading-5 text-slate-600">
                   {product.readiness.missingRequirements.map((requirement) => (
@@ -108,7 +121,9 @@ export function AdminProductsDetailPanel({
             </section>
 
             <section className="grid min-w-0 gap-1.5 rounded-[16px] border border-[var(--ui-color-border)] bg-white p-3">
-              <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">Vinculos</p>
+              <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
+                Vinculos
+              </p>
               <div className="grid min-w-0 grid-cols-2 gap-1.5 text-xs">
                 <span className="rounded-full bg-slate-100 px-2 py-1" title="Precio">
                   Precio: {formatReadiness(product.readiness.related.price)}
@@ -126,7 +141,9 @@ export function AdminProductsDetailPanel({
             </section>
 
             <section className="rounded-[16px] border border-[var(--ui-color-border)] bg-white p-3">
-              <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">Acciones</p>
+              <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
+                Acciones
+              </p>
               <div className="mt-2 flex flex-wrap gap-1.5">
                 {actionLabels.map((label) => (
                   <button

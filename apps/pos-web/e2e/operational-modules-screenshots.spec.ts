@@ -5,6 +5,7 @@ import path from "node:path";
 import { expect, test, type Page, type Route } from "@playwright/test";
 
 const branch = {
+  id: "branch-1",
   brand_key: "EMP",
   code: "MAIN",
   name: "Sucursal Centro",
@@ -12,6 +13,7 @@ const branch = {
 };
 
 const workstation = {
+  id: "workstation-1",
   code: "POS-01",
   name: "Caja 01",
 };
@@ -125,6 +127,10 @@ const ticketDetail = {
   lines: [
     {
       id: "ticket-line-1",
+      capture_mode: "PRODUCT_DIRECT",
+      remaining_attribution_quantity: "0.000",
+      attribution_options: [],
+      physical_attributions: [],
       line_total_amount: "72.00",
       name: "Concha vainilla",
       quantity: "3",
@@ -132,6 +138,10 @@ const ticketDetail = {
     },
     {
       id: "ticket-line-2",
+      capture_mode: "PRODUCT_DIRECT",
+      remaining_attribution_quantity: "0.000",
+      attribution_options: [],
+      physical_attributions: [],
       line_total_amount: "22.00",
       name: "Cafe americano",
       quantity: "1",
@@ -185,6 +195,7 @@ const returnSaleDetail = {
       product_name: "Concha vainilla",
       quantity: "6",
       remaining_returnable_quantity: "2",
+      physical_options: [],
       requires_exact_product_selection: false,
       sequence: 1,
       unit_price: "12.00",

@@ -33,13 +33,18 @@ export const adminProductsBackendContract: AdminProductBackendContract = {
 };
 
 type AdminProductApiFilterOption = components["schemas"]["AdminProductFilterOptionView"];
-type AdminProductApiBranchAvailability = components["schemas"]["AdminProductBranchAvailabilityView"];
+type AdminProductApiBranchAvailability =
+  components["schemas"]["AdminProductBranchAvailabilityView"];
 type AdminProductApiView = components["schemas"]["AdminProductView"];
 type AdminProductsListApiResponse = components["schemas"]["AdminProductsListResponse"];
 type AdminProductCreateApiPayload = components["schemas"]["AdminProductCreateRequest"];
 type AdminProductUpdateApiPayload = components["schemas"]["AdminProductUpdateRequest"];
 
-function appendOptionalParam(params: URLSearchParams, key: string, value: string | null | undefined) {
+function appendOptionalParam(
+  params: URLSearchParams,
+  key: string,
+  value: string | null | undefined,
+) {
   if (!value || value === "all") {
     return;
   }
@@ -54,7 +59,9 @@ function mapFilterOptions(options: AdminProductApiFilterOption[]): AdminProductF
   }));
 }
 
-function mapBranchAvailability(item: AdminProductApiBranchAvailability): AdminProductBranchAvailability {
+function mapBranchAvailability(
+  item: AdminProductApiBranchAvailability,
+): AdminProductBranchAvailability {
   return {
     branchId: item.branch_id,
     branchName: item.branch_name,
@@ -102,6 +109,10 @@ export function mapAdminProductFromApi(item: AdminProductApiView): AdminProduct 
     },
     sku: item.sku ?? null,
     status: item.status,
+    isSellable: item.is_sellable,
+    isUsableAsInput: item.is_usable_as_input,
+    lotTrackingEnabled: item.lot_tracking_enabled,
+    expiryRequired: item.expiry_required,
     unitOfMeasure: null,
     unitPrice: String(item.unit_price),
     updatedAt: item.updated_at ?? null,
@@ -109,7 +120,9 @@ export function mapAdminProductFromApi(item: AdminProductApiView): AdminProduct 
   };
 }
 
-function mapAdminProductsListFromApi(response: AdminProductsListApiResponse): AdminProductListResponse {
+function mapAdminProductsListFromApi(
+  response: AdminProductsListApiResponse,
+): AdminProductListResponse {
   return {
     backendContract: adminProductsBackendContract,
     filterOptions: {
@@ -141,6 +154,10 @@ function toCreateApiPayload(payload: AdminProductCreatePayload): AdminProductCre
     quick_name: payload.quickName ?? null,
     search_aliases: payload.searchAliases ?? null,
     status: payload.status,
+    is_sellable: payload.isSellable ?? true,
+    is_usable_as_input: payload.isUsableAsInput ?? false,
+    lot_tracking_enabled: payload.lotTrackingEnabled ?? false,
+    expiry_required: payload.expiryRequired ?? false,
     unit_price: payload.unitPrice,
   };
 }
@@ -154,6 +171,10 @@ function toUpdateApiPayload(payload: AdminProductUpdatePayload): AdminProductUpd
     quick_name: payload.quickName,
     search_aliases: payload.searchAliases,
     status: payload.status,
+    is_sellable: payload.isSellable,
+    is_usable_as_input: payload.isUsableAsInput,
+    lot_tracking_enabled: payload.lotTrackingEnabled,
+    expiry_required: payload.expiryRequired,
     unit_price: payload.unitPrice,
   };
 }
@@ -188,9 +209,7 @@ export function fetchAdminProductDetail(productId: string): Promise<AdminProduct
   }).then(mapAdminProductFromApi);
 }
 
-export function createAdminProduct(
-  payload: AdminProductCreatePayload,
-): Promise<AdminProduct> {
+export function createAdminProduct(payload: AdminProductCreatePayload): Promise<AdminProduct> {
   return requestJson<AdminProductApiView>({
     body: toCreateApiPayload(payload),
     method: "POST",

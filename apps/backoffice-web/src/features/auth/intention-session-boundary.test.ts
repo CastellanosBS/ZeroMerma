@@ -82,7 +82,7 @@ const cases = [
     name: "production",
     begin: () =>
       productionIntentions.begin(
-        { userId: "actor", branchId: "branch", productionId: "batch", commandCode: "start" },
+        { userId: "actor", branchId: "branch", productionId: "batch", commandCode: "release" },
         {},
         null,
       ),

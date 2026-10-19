@@ -4,6 +4,7 @@ from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 
 from fastapi.testclient import TestClient
+from order_fixtures import seed_order_stock
 from sqlalchemy import select
 
 from zeromerma_api.bootstrap.seed_local import (
@@ -35,6 +36,7 @@ def _cashier_headers(client: TestClient) -> dict[str, str]:
 
 
 def _open_cash_session(client: TestClient) -> None:
+    seed_order_stock()
     response = client.post(
         "/v1/cash-sessions/open",
         headers={**_cashier_headers(client), "Idempotency-Key": new_idempotency_key()},

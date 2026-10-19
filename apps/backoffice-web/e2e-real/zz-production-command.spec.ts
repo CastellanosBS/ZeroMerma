@@ -2,7 +2,7 @@ import { createIdempotencyKey, type components } from "@zeromerma/api-client";
 import { dropNextOperationalCommandResponse } from "../../../scripts/dev/web-integration-support.mjs";
 import { environment, expect, test } from "./fixtures";
 
-test("real production create and start stay distinct and completion recovers after a lost response", async ({
+test("real production create and release stay distinct and reconciliation recovers after a lost response", async ({
   page,
   network,
 }) => {
@@ -104,22 +104,22 @@ test("real production create and start stay distinct and completion recovers aft
       new URL(response.url()).pathname === "/v1/admin/production" &&
       response.request().method() === "POST",
   );
-  const startResponse = page.waitForResponse(
+  const releaseResponse = page.waitForResponse(
     (response) =>
-      /\/v1\/admin\/production\/[^/]+\/start$/.test(new URL(response.url()).pathname) &&
+      /\/v1\/admin\/production\/[^/]+\/release$/.test(new URL(response.url()).pathname) &&
       response.request().method() === "POST",
   );
-  await page.getByRole("button", { name: "Guardar e iniciar", exact: true }).click();
+  await page.getByRole("button", { name: "Guardar y liberar", exact: true }).click();
   const createdResponse = await createResponse;
-  const startedResponse = await startResponse;
+  const releasedResponse = await releaseResponse;
   expect(createdResponse.status()).toBe(201);
-  expect(startedResponse.status()).toBe(200);
+  expect(releasedResponse.status()).toBe(200);
   expect(createdResponse.request().headers()["idempotency-key"]).not.toBe(
-    startedResponse.request().headers()["idempotency-key"],
+    releasedResponse.request().headers()["idempotency-key"],
   );
   const batch =
-    (await startedResponse.json()) as components["schemas"]["ProductionCommandResultView"];
-  expect(batch.status).toBe("IN_PROGRESS");
+    (await releasedResponse.json()) as components["schemas"]["ProductionCommandResultView"];
+  expect(batch.status).toBe("RELEASED");
   const row = page.getByRole("article").filter({ hasText: batch.folio });
   await row.getByRole("button", { name: "Completar", exact: true }).click();
   await expect(

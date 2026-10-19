@@ -17,7 +17,9 @@ interface AdminSalesTicketsFiltersProps {
   onChange: (patch: Partial<AdminSalesTicketListFilters>) => void;
 }
 
-function quickDateRange(kind: "today" | "sevenDays" | "month"): Pick<AdminSalesTicketListFilters, "dateFrom" | "dateTo"> {
+function quickDateRange(
+  kind: "today" | "sevenDays" | "month",
+): Pick<AdminSalesTicketListFilters, "dateFrom" | "dateTo"> {
   const today = new Date();
   const toDateInput = (value: Date) => value.toISOString().slice(0, 10);
   if (kind === "today") {
@@ -48,6 +50,7 @@ export function AdminSalesTicketsFilters({
   const disabledTitle = isBackendConnected ? undefined : "Endpoint administrativo pendiente";
   const inputClassName = adminFilterInputClassName();
   const resetFilters: Partial<AdminSalesTicketListFilters> = {
+    pendingPhysicalOnly: false,
     branchId: "all",
     cashierId: "all",
     dateFrom: null,
@@ -60,14 +63,37 @@ export function AdminSalesTicketsFilters({
     workstationId: "all",
   };
   const chips: AdminFilterChip[] = [
+    filters.pendingPhysicalOnly
+      ? {
+          key: "pending-physical",
+          label: "Atribución física",
+          value: "Pendientes",
+          onRemove: () => onChange({ pendingPhysicalOnly: false }),
+        }
+      : null,
     filters.search
-      ? { key: "search", label: "Busqueda", value: filters.search, onRemove: () => onChange({ search: "" }) }
+      ? {
+          key: "search",
+          label: "Busqueda",
+          value: filters.search,
+          onRemove: () => onChange({ search: "" }),
+        }
       : null,
     filters.dateFrom
-      ? { key: "date-from", label: "Desde", value: filters.dateFrom, onRemove: () => onChange({ dateFrom: null }) }
+      ? {
+          key: "date-from",
+          label: "Desde",
+          value: filters.dateFrom,
+          onRemove: () => onChange({ dateFrom: null }),
+        }
       : null,
     filters.dateTo
-      ? { key: "date-to", label: "Hasta", value: filters.dateTo, onRemove: () => onChange({ dateTo: null }) }
+      ? {
+          key: "date-to",
+          label: "Hasta",
+          value: filters.dateTo,
+          onRemove: () => onChange({ dateTo: null }),
+        }
       : null,
     filters.status !== "all"
       ? {
@@ -110,10 +136,20 @@ export function AdminSalesTicketsFilters({
         }
       : null,
     filters.minAmount
-      ? { key: "min", label: "Minimo", value: filters.minAmount, onRemove: () => onChange({ minAmount: null }) }
+      ? {
+          key: "min",
+          label: "Minimo",
+          value: filters.minAmount,
+          onRemove: () => onChange({ minAmount: null }),
+        }
       : null,
     filters.maxAmount
-      ? { key: "max", label: "Maximo", value: filters.maxAmount, onRemove: () => onChange({ maxAmount: null }) }
+      ? {
+          key: "max",
+          label: "Maximo",
+          value: filters.maxAmount,
+          onRemove: () => onChange({ maxAmount: null }),
+        }
       : null,
   ].filter((chip): chip is AdminFilterChip => Boolean(chip));
 
@@ -128,6 +164,15 @@ export function AdminSalesTicketsFilters({
         onOpenFilters={() => setIsFiltersOpen(true)}
         onSearchChange={(search) => onChange({ search })}
       >
+        <label className="flex items-center gap-2 text-sm font-medium text-slate-700">
+          <input
+            type="checkbox"
+            checked={filters.pendingPhysicalOnly ?? false}
+            disabled={!isBackendConnected}
+            onChange={(event) => onChange({ pendingPhysicalOnly: event.target.checked })}
+          />
+          Pendientes de atribución física
+        </label>
         <AdminActiveFilterChips chips={chips} onClearAll={() => onChange(resetFilters)} />
       </AdminDataToolbar>
 
@@ -137,39 +182,39 @@ export function AdminSalesTicketsFilters({
         onClose={() => setIsFiltersOpen(false)}
       >
         <div className="grid min-w-0 gap-3">
-        <AdminFilterField label="Desde">
-          <input
-            className={inputClassName}
-            type="date"
-            value={filters.dateFrom ?? ""}
-            onChange={(event) => onChange({ dateFrom: event.target.value || null })}
-          />
-        </AdminFilterField>
+          <AdminFilterField label="Desde">
+            <input
+              className={inputClassName}
+              type="date"
+              value={filters.dateFrom ?? ""}
+              onChange={(event) => onChange({ dateFrom: event.target.value || null })}
+            />
+          </AdminFilterField>
 
-        <AdminFilterField label="Hasta">
-          <input
-            className={inputClassName}
-            type="date"
-            value={filters.dateTo ?? ""}
-            onChange={(event) => onChange({ dateTo: event.target.value || null })}
-          />
-        </AdminFilterField>
+          <AdminFilterField label="Hasta">
+            <input
+              className={inputClassName}
+              type="date"
+              value={filters.dateTo ?? ""}
+              onChange={(event) => onChange({ dateTo: event.target.value || null })}
+            />
+          </AdminFilterField>
 
-        <AdminFilterField label="Estado">
-          <select
-            className={inputClassName}
-            title={disabledTitle ?? "Filtrar por estado"}
-            value={filters.status ?? "all"}
-            onChange={(event) => onChange({ status: event.target.value })}
-          >
-            <option value="all">Todos los estados</option>
-            {options.statuses.map((option) => (
-              <option key={option.id} value={option.id}>
-                {option.label}
-              </option>
-            ))}
-          </select>
-        </AdminFilterField>
+          <AdminFilterField label="Estado">
+            <select
+              className={inputClassName}
+              title={disabledTitle ?? "Filtrar por estado"}
+              value={filters.status ?? "all"}
+              onChange={(event) => onChange({ status: event.target.value })}
+            >
+              <option value="all">Todos los estados</option>
+              {options.statuses.map((option) => (
+                <option key={option.id} value={option.id}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+          </AdminFilterField>
 
           <AdminFilterField label="Sucursal">
             <select
@@ -225,10 +270,10 @@ export function AdminSalesTicketsFilters({
               <option value="all">Todos</option>
               {options.paymentMethods.map((option) => (
                 <option key={option.id} value={option.id}>
-                {option.label}
-              </option>
-            ))}
-          </select>
+                  {option.label}
+                </option>
+              ))}
+            </select>
           </AdminFilterField>
 
           <AdminFilterField label="Minimo">
@@ -253,29 +298,29 @@ export function AdminSalesTicketsFilters({
             />
           </AdminFilterField>
 
-      <div className="flex min-w-0 flex-wrap items-center gap-2 border-t border-[var(--ui-color-border)] pt-3">
-        <button
-          className="rounded-full border border-[var(--ui-color-border)] bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 transition hover:border-[var(--ui-color-info)] hover:text-[var(--ui-color-info)] focus:outline-none focus:ring-4 focus:ring-[var(--ui-color-ring)]"
-          type="button"
-          onClick={() => onChange(quickDateRange("today"))}
-        >
-          Hoy
-        </button>
-        <button
-          className="rounded-full border border-[var(--ui-color-border)] bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 transition hover:border-[var(--ui-color-info)] hover:text-[var(--ui-color-info)] focus:outline-none focus:ring-4 focus:ring-[var(--ui-color-ring)]"
-          type="button"
-          onClick={() => onChange(quickDateRange("sevenDays"))}
-        >
-          Ultimos 7 dias
-        </button>
-        <button
-          className="rounded-full border border-[var(--ui-color-border)] bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 transition hover:border-[var(--ui-color-info)] hover:text-[var(--ui-color-info)] focus:outline-none focus:ring-4 focus:ring-[var(--ui-color-ring)]"
-          type="button"
-          onClick={() => onChange(quickDateRange("month"))}
-        >
-          Este mes
-        </button>
-      </div>
+          <div className="flex min-w-0 flex-wrap items-center gap-2 border-t border-[var(--ui-color-border)] pt-3">
+            <button
+              className="rounded-full border border-[var(--ui-color-border)] bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 transition hover:border-[var(--ui-color-info)] hover:text-[var(--ui-color-info)] focus:outline-none focus:ring-4 focus:ring-[var(--ui-color-ring)]"
+              type="button"
+              onClick={() => onChange(quickDateRange("today"))}
+            >
+              Hoy
+            </button>
+            <button
+              className="rounded-full border border-[var(--ui-color-border)] bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 transition hover:border-[var(--ui-color-info)] hover:text-[var(--ui-color-info)] focus:outline-none focus:ring-4 focus:ring-[var(--ui-color-ring)]"
+              type="button"
+              onClick={() => onChange(quickDateRange("sevenDays"))}
+            >
+              Ultimos 7 dias
+            </button>
+            <button
+              className="rounded-full border border-[var(--ui-color-border)] bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 transition hover:border-[var(--ui-color-info)] hover:text-[var(--ui-color-info)] focus:outline-none focus:ring-4 focus:ring-[var(--ui-color-ring)]"
+              type="button"
+              onClick={() => onChange(quickDateRange("month"))}
+            >
+              Este mes
+            </button>
+          </div>
         </div>
       </AdminAdvancedFiltersSheet>
     </>

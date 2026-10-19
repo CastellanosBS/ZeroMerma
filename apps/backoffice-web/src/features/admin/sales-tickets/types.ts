@@ -1,3 +1,5 @@
+import type { components, paths } from "@zeromerma/api-client";
+
 export interface AdminSalesTicketBackendContract {
   detailEndpoint: string;
   listEndpoint: string;
@@ -18,6 +20,9 @@ export interface AdminSalesTicketFilterOptions {
 }
 
 export interface AdminSalesTicketListFilters {
+  pendingPhysicalOnly?: NonNullable<
+    paths["/v1/admin/sales/tickets"]["get"]["parameters"]["query"]
+  >["pending_physical_only"];
   branchId?: string | null;
   cashierId?: string | null;
   dateFrom?: string | null;
@@ -48,6 +53,7 @@ export interface AdminSalesTicketMetrics {
 }
 
 export interface AdminSalesTicketListItem {
+  pendingAttributionLineCount: components["schemas"]["AdminSalesTicketListItemView"]["pending_attribution_line_count"];
   branchId: string;
   branchName: string;
   cashierId: string;
@@ -115,6 +121,9 @@ export interface AdminSalesTicketOperationalContext {
 }
 
 export interface AdminSalesTicketLine {
+  attributedQuantity: components["schemas"]["AdminSalesTicketLineView"]["attributed_quantity"];
+  remainingAttributionQuantity: components["schemas"]["AdminSalesTicketLineView"]["remaining_attribution_quantity"];
+  physicalAttributions: components["schemas"]["AdminSalesTicketLineView"]["physical_attributions"];
   captureMode: string;
   catalogCode: string;
   catalogName: string;

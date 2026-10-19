@@ -24,14 +24,21 @@ export const adminSalesTicketsBackendContract: AdminSalesTicketBackendContract =
   reprintEndpoint: "POST /v1/admin/sales/tickets/{ticket_id}/reprint",
 };
 
-function appendOptionalParam(params: URLSearchParams, key: string, value: string | null | undefined) {
+function appendOptionalParam(
+  params: URLSearchParams,
+  key: string,
+  value: string | null | undefined,
+) {
   if (!value || value === "all") {
     return;
   }
   params.set(key, value);
 }
 
-function toDateTimeParam(value: string | null | undefined, boundary: "start" | "end"): string | null {
+function toDateTimeParam(
+  value: string | null | undefined,
+  boundary: "start" | "end",
+): string | null {
   if (!value) {
     return null;
   }
@@ -76,6 +83,7 @@ export function mapAdminSalesTicketFromApi(item: ApiTicketListItem): AdminSalesT
     hasReturns: item.has_returns,
     id: item.id,
     itemCount: item.item_count,
+    pendingAttributionLineCount: item.pending_attribution_line_count,
     occurredAt: item.occurred_at,
     paymentMethodsLabel: item.payment_methods_label,
     paymentSummary: item.payment_summary.map(mapPaymentSummary),
@@ -124,6 +132,9 @@ function mapDetailFromApi(response: ApiTicketDetail): AdminSalesTicketDetail {
       id: line.id,
       lineTotalAmount: String(line.line_total_amount),
       physicalAttributionStatus: line.physical_attribution_status,
+      attributedQuantity: line.attributed_quantity,
+      remainingAttributionQuantity: line.remaining_attribution_quantity,
+      physicalAttributions: line.physical_attributions,
       productClassId: line.product_class_id ?? null,
       productId: line.product_id ?? null,
       quantity: String(line.quantity),
@@ -189,6 +200,7 @@ function mapDetailFromApi(response: ApiTicketDetail): AdminSalesTicketDetail {
 
 export function buildAdminSalesTicketsListPath(filters: AdminSalesTicketListFilters): string {
   const params = new URLSearchParams();
+  if (filters.pendingPhysicalOnly) params.set("pending_physical_only", "true");
 
   params.set("page", String(filters.page));
   params.set("page_size", String(filters.pageSize));
@@ -214,17 +226,13 @@ export function fetchAdminSalesTickets(
   }).then(mapListFromApi);
 }
 
-export function fetchAdminSalesTicketDetail(
-  ticketId: string,
-): Promise<AdminSalesTicketDetail> {
+export function fetchAdminSalesTicketDetail(ticketId: string): Promise<AdminSalesTicketDetail> {
   return requestJson<ApiTicketDetail>({
     path: `/v1/admin/sales/tickets/${ticketId}`,
   }).then(mapDetailFromApi);
 }
 
-export function reprintAdminSalesTicket(
-  ticketId: string,
-): Promise<AdminSalesTicketDetail> {
+export function reprintAdminSalesTicket(ticketId: string): Promise<AdminSalesTicketDetail> {
   return requestJson<ApiTicketDetail>({
     method: "POST",
     path: `/v1/admin/sales/tickets/${ticketId}/reprint`,

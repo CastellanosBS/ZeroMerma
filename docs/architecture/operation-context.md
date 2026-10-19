@@ -151,3 +151,33 @@ printing. Transport or printer failures after commit cannot undo these records.
 040 establishes correct trace context for existing behavior. It does not declare
 the worker functional, event delivery exactly-once, complete data minimization of
 all historical payloads, a new retention policy, or production readiness.
+
+## Physical inventory adoption (ZM-FIN-048–055)
+
+Current inventory mutations require the admitted idempotent command while its
+action is running. Every new movement retains the owner, actor, source app,
+branch and related branches, workstation and cash session when applicable,
+operation/correlation/causation identifiers, source document and line, and a
+stable causal effect code. Quantities and conversion snapshots are exact;
+weighted-average value is separate from the immutable physical lot allocations.
+Unknown historical cost remains unavailable.
+
+Reservations have immutable reserve, consume and release events. A consume event
+references its actual movement; lot event allocations explain the reservation
+projection. Transfer pairs preserve lot identity and the documented source cost.
+Partial compensations point to the original movement and cannot exceed its
+remaining quantity, original lots or frozen value. The original facts are never
+rewritten. Audit, outbox, physical effects and acknowledgement share one command
+transaction; recovery only reads that acknowledgement.
+
+Inventory reconciliation records the reviewed manifest hash, row identity and
+before/after projection hashes in the same transaction. Diagnosis and dry-run are
+read-only. Rebuilding an approved projection never rewrites old movements,
+reservations, financial entries or cash-close facts. Development/test evidence
+cannot be relabeled as a productive opening. The authorization, controlled-window
+and evidence requirements are documented in
+[the inventory reconciliation runbook](../operations/inventory-reconciliation.md).
+
+These statements describe the current producer boundary. Complete browser and
+immutable-commit acceptance, real physical counts and operational readiness are
+separate evidence; source implementation alone does not establish them.

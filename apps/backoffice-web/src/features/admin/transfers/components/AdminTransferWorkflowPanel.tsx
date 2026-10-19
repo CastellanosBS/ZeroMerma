@@ -26,6 +26,7 @@ interface DraftLineState {
 }
 
 interface ReceiveLineState {
+  lotQuantities: Record<string, string>;
   notes: string;
   receivedQuantity: string;
   shipmentLineId: string;
@@ -150,6 +151,7 @@ export function AdminTransferWorkflowPanel({
       .filter((line) => Number(line.pendingQuantity) > 0)
       .map((line) => ({
         notes: "",
+        lotQuantities: {},
         receivedQuantity: line.pendingQuantity,
         shipmentLineId: line.shipmentLineId,
         varianceReason: line.varianceReason ?? "",
@@ -237,6 +239,28 @@ export function AdminTransferWorkflowPanel({
       const sourceLine = transfer.lines.find(
         (line) => line.shipmentLineId === receiveLine.shipmentLineId,
       );
+      const selectedLots = Object.entries(receiveLine.lotQuantities).filter(([, value]) =>
+        value.trim(),
+      );
+      if (
+        selectedLots.some(
+          ([id, value]) =>
+            !/^\d+(\.\d{1,3})?$/.test(value) ||
+            Number(value) <= 0 ||
+            Number(value) >
+              Number(sourceLine?.lots?.find((lot) => lot.lot_id === id)?.pending_quantity ?? "0"),
+        ) ||
+        (selectedLots.length > 0 &&
+          Math.round(selectedLots.reduce((sum, [, value]) => sum + Number(value), 0) * 1000) !==
+            Math.round(Number(receiveLine.receivedQuantity) * 1000)) ||
+        ((sourceLine?.lots ?? []).filter((lot) => Number(lot.pending_quantity) > 0).length > 1 &&
+          Number(receiveLine.receivedQuantity) > 0 &&
+          receiveLine.receivedQuantity !== sourceLine?.pendingQuantity &&
+          !selectedLots.length)
+      ) {
+        setLocalError("Identifica los lotes recibidos; sus cantidades deben sumar la recepcion.");
+        return false;
+      }
       if (
         !sourceLine ||
         receiveLine.receivedQuantity === "" ||
@@ -296,6 +320,11 @@ export function AdminTransferWorkflowPanel({
       }
       onReceive({
         lines: receiveLines.map((line) => ({
+          lotAllocations: Object.values(line.lotQuantities).some((quantity) => quantity.trim())
+            ? Object.entries(line.lotQuantities)
+                .filter(([, quantity]) => quantity.trim())
+                .map(([lot_id, quantity]) => ({ lot_id, quantity }))
+            : undefined,
           notes: line.notes.trim() || null,
           receivedQuantity: line.receivedQuantity,
           shipmentLineId: line.shipmentLineId,
@@ -516,6 +545,30 @@ export function AdminTransferWorkflowPanel({
                       }
                     />
                   </label>
+                  <div className="col-span-full grid gap-2 text-xs">
+                    {(line.lots ?? [])
+                      .filter((lot) => Number(lot.pending_quantity) > 0)
+                      .map((lot) => (
+                        <label className="grid gap-1" key={lot.lot_id}>
+                          Lote {lot.lot_code} / vence {lot.expires_at ?? "sin fecha"} / pendiente{" "}
+                          {lot.pending_quantity}
+                          <input
+                            className={inputClassName}
+                            aria-label={`Recibido lote ${lot.lot_code}`}
+                            inputMode="decimal"
+                            value={receiveLine?.lotQuantities[lot.lot_id] ?? ""}
+                            onChange={(event) =>
+                              updateReceiveLine(line.shipmentLineId, {
+                                lotQuantities: {
+                                  ...receiveLine?.lotQuantities,
+                                  [lot.lot_id]: event.target.value,
+                                },
+                              })
+                            }
+                          />
+                        </label>
+                      ))}
+                  </div>
                   <label className="grid min-w-0 gap-1 text-xs font-semibold uppercase tracking-[0.1em] text-slate-500">
                     Notas
                     <input

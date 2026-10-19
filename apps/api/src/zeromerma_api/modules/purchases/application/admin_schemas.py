@@ -9,7 +9,9 @@ from pydantic import AwareDatetime, BaseModel, ConfigDict, Field, field_validato
 
 AdminPurchaseStatus = Literal["DRAFT", "ORDERED", "PARTIALLY_RECEIVED", "RECEIVED", "CANCELLED"]
 AdminPurchaseType = Literal["PURCHASE", "DIRECT_ENTRY"]
-PurchaseCommandCode = Literal["create", "update", "direct-entry", "confirm", "receive", "cancel"]
+PurchaseCommandCode = Literal[
+    "create", "update", "direct-entry", "confirm", "receive", "cancel", "reverse-receipt"
+]
 AdminPurchaseWarningSeverity = Literal["info", "warning", "critical"]
 
 
@@ -57,6 +59,9 @@ class AdminPurchaseBackendContractView(BaseModel):
 class AdminPurchaseFilterOptionView(BaseModel):
     id: UUID | str
     label: str
+    base_uom: str | None = None
+    purchase_uom: str | None = None
+    conversion_factor: Decimal | None = None
 
 
 class AdminPurchaseFilterOptionsView(BaseModel):
@@ -180,6 +185,9 @@ class AdminPurchaseLineView(BaseModel):
     supplier_last_known_price: Decimal | None = None
     unit_cost: Decimal
     unit_of_measure: str
+    source_unit_of_measure: str
+    conversion_factor: Decimal
+    ordered_quantity_base: Decimal
 
 
 class AdminPurchaseReceiptSummaryView(BaseModel):
@@ -200,6 +208,8 @@ class AdminPurchaseCostSummaryView(BaseModel):
 
 
 class AdminPurchaseInventoryMovementView(BaseModel):
+    unit_cost: Decimal | None = None
+    total_cost: Decimal | None = None
     balance_after: Decimal | None = None
     branch_id: UUID
     direction: str
@@ -232,6 +242,30 @@ class AdminPurchaseAvailableActionsView(BaseModel):
     can_edit: bool
     can_receive: bool
     can_view_movements: bool
+    can_reverse_receipt: bool
+
+
+class AdminPurchaseReceiptLineView(BaseModel):
+    id: UUID
+    product_id: UUID
+    lot_id: UUID | None
+    received_quantity: Decimal
+    source_unit_of_measure: str
+    conversion_factor: Decimal
+    received_quantity_base: Decimal
+    base_unit_of_measure: str
+    source_unit_cost: Decimal
+    base_unit_cost: Decimal
+
+
+class AdminPurchaseReceiptView(BaseModel):
+    id: UUID
+    folio: str
+    received_at: datetime
+    received_total: Decimal
+    lines: list[AdminPurchaseReceiptLineView] = Field(default_factory=list)
+    reversal_id: UUID | None = None
+    reversal_reason: str | None = None
 
 
 class AdminPurchaseDetailView(BaseModel):
@@ -245,9 +279,11 @@ class AdminPurchaseDetailView(BaseModel):
     related_documents: list[AdminPurchaseRelatedDocumentView]
     supplier_context: AdminPurchaseSupplierContextView
     warnings: list[AdminPurchaseWarningView]
+    receipts: list[AdminPurchaseReceiptView]
 
 
 class AdminPurchaseLineInput(BaseModel):
+    source_unit_of_measure: str | None = Field(default=None, min_length=1, max_length=32)
     notes: str | None = Field(default=None, max_length=500)
     ordered_quantity: Decimal = Field(gt=Decimal("0"), max_digits=12, decimal_places=3)
     product_id: UUID
@@ -302,6 +338,9 @@ class AdminPurchaseUpdateRequest(BaseModel):
 
 
 class AdminPurchaseDirectEntryLineInput(BaseModel):
+    lot_code: str | None = Field(default=None, min_length=1, max_length=120)
+    expires_at: AwareDatetime | None = None
+    source_unit_of_measure: str | None = Field(default=None, min_length=1, max_length=32)
     notes: str | None = Field(default=None, max_length=500)
     product_id: UUID
     received_quantity: Decimal = Field(gt=Decimal("0"), max_digits=12, decimal_places=3)
@@ -330,6 +369,8 @@ class AdminPurchaseDirectEntryRequest(BaseModel):
 
 
 class AdminPurchaseReceiptLineInput(BaseModel):
+    lot_code: str | None = Field(default=None, min_length=1, max_length=120)
+    expires_at: AwareDatetime | None = None
     discrepancy_reason: str | None = Field(default=None, max_length=160)
     notes: str | None = Field(default=None, max_length=500)
     purchase_line_id: UUID
@@ -368,6 +409,20 @@ class AdminPurchaseCancelRequest(BaseModel):
     @classmethod
     def normalize_reason(cls, value: str | None) -> str | None:
         return _blank_to_none(value)
+
+
+class AdminPurchaseReverseReceiptRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    receipt_id: UUID
+    reason: str = Field(min_length=1, max_length=500)
+
+    @field_validator("reason")
+    @classmethod
+    def normalize_reason(cls, value: str) -> str:
+        if not value.strip():
+            raise ValueError("A reversal reason is required.")
+        return value.strip()
 
 
 def _blank_to_none(value: str | None) -> str | None:

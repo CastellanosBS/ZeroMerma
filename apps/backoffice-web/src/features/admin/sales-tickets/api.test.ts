@@ -48,6 +48,7 @@ const apiListPayload = {
       has_returns: false,
       id: "ticket-1",
       item_count: 1,
+      pending_attribution_line_count: 1,
       occurred_at: "2026-05-20T10:00:00Z",
       payment_methods_label: "CASH",
       payment_summary: [{ amount: "42.00", currency_code: "MXN", payment_method_code: "CASH" }],
@@ -85,6 +86,9 @@ const apiDetailPayload = {
       id: "line-1",
       line_total_amount: "42.00",
       physical_attribution_status: "DIRECT_ASSIGNED",
+      attributed_quantity: null,
+      remaining_attribution_quantity: null,
+      physical_attributions: [],
       product_class_id: null,
       product_id: "product-1",
       quantity: "3.000",
@@ -143,6 +147,53 @@ const apiDetailPayload = {
 };
 
 describe("admin sales tickets api", () => {
+  it("requests the pending report only when explicitly filtered", () => {
+    expect(buildAdminSalesTicketsListPath({ ...baseFilters, pendingPhysicalOnly: true })).toContain(
+      "pending_physical_only=true",
+    );
+    expect(
+      buildAdminSalesTicketsListPath({ ...baseFilters, pendingPhysicalOnly: false }),
+    ).not.toContain("pending_physical_only");
+  });
+
+  it("preserves partial quantities and actual attribution identities from the backend", async () => {
+    const attribution = {
+      id: "attribution-1",
+      product_id: "product-1",
+      product_code: "PAN",
+      product_name: "Pan dulce",
+      quantity: "0.400",
+      inventory_movement_id: "movement-1",
+      occurred_at: "2026-05-20T10:01:00Z",
+    };
+    const fetchMock = vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(
+      new Response(
+        JSON.stringify({
+          ...apiDetailPayload,
+          lines: [
+            {
+              ...apiDetailPayload.lines[0],
+              capture_mode: "CLASS_CAPTURE",
+              physical_attribution_status: "PENDING_RECONCILIATION",
+              attributed_quantity: "0.400",
+              remaining_attribution_quantity: "2.600",
+              physical_attributions: [attribution],
+            },
+          ],
+        }),
+        { status: 200 },
+      ),
+    );
+    try {
+      const detail = await fetchAdminSalesTicketDetail("ticket-1");
+      expect(detail.lines[0]?.attributedQuantity).toBe("0.400");
+      expect(detail.lines[0]?.remainingAttributionQuantity).toBe("2.600");
+      expect(detail.lines[0]?.physicalAttributions).toEqual([attribution]);
+    } finally {
+      fetchMock.mockRestore();
+    }
+  });
+
   it("builds list query params", () => {
     const path = buildAdminSalesTicketsListPath({
       ...baseFilters,
@@ -170,9 +221,9 @@ describe("admin sales tickets api", () => {
   });
 
   it("maps list responses from backend contract", async () => {
-    const fetchMock = vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(
-      new Response(JSON.stringify(apiListPayload), { status: 200 }),
-    );
+    const fetchMock = vi
+      .spyOn(globalThis, "fetch")
+      .mockResolvedValueOnce(new Response(JSON.stringify(apiListPayload), { status: 200 }));
 
     const response = await fetchAdminSalesTickets(baseFilters);
 
@@ -182,6 +233,7 @@ describe("admin sales tickets api", () => {
     );
     expect(response.items[0]?.folio).toBe("TCK-123");
     expect(response.items[0]?.paymentMethodsLabel).toBe("CASH");
+    expect(response.items[0]?.pendingAttributionLineCount).toBe(1);
     expect(response.metrics.cashAmount).toBe("42.00");
     fetchMock.mockRestore();
   });

@@ -36,7 +36,9 @@ export function buildReturnReceiptDocument(document: SaleReturnDetailResponse): 
     .map(
       (line) => `
         <tr>
-          <td>${escapeHtml(line.original_catalog_name_snapshot)}</td>
+          <td>${escapeHtml(line.original_catalog_name_snapshot)}
+            ${line.allocations.map((allocation) => `<p class="muted">${formatQuantity(allocation.quantity)} ${escapeHtml(allocation.returned_product_name_snapshot)} / ${escapeHtml(allocation.disposition_code)}${allocation.lot_id ? ` / Lote ${escapeHtml(allocation.lot_id)}` : ""}</p>`).join("")}
+          </td>
           <td class="numeric">${formatQuantity(line.returned_quantity)}</td>
           <td class="numeric">${formatCurrency(line.refund_unit_price)}</td>
           <td class="numeric">${formatCurrency(line.refund_line_total_amount)}</td>

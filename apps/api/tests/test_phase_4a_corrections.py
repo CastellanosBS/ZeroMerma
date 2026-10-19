@@ -5,6 +5,7 @@ from uuid import uuid4
 
 from fastapi.testclient import TestClient
 from sqlalchemy import func, select
+from test_phase_3a_operations import _seed_operating_stock
 
 from zeromerma_api.bootstrap.seed_local import (
     SEED_ALT_DESTINATION_BRANCH_CODE,
@@ -26,6 +27,10 @@ from zeromerma_api.modules.corrections.infrastructure.models import (
     CorrectionDocument,
     CorrectionDocumentLine,
     CorrectionReason,
+)
+from zeromerma_api.modules.inventory.infrastructure.models import (
+    InventoryBalance,
+    InventoryMovement,
 )
 from zeromerma_api.modules.operations.infrastructure.models import (
     OperationDocument,
@@ -102,6 +107,7 @@ def _commit_counter_transfer(
     *,
     quantity: str = "4",
 ) -> dict[str, object]:
+    _seed_operating_stock(locations=("BACKROOM",))
     response = client.post(
         "/v1/operations/counter-transfer/commit",
         headers={**_authorization_header(client), "Idempotency-Key": new_idempotency_key()},
@@ -122,6 +128,7 @@ def _commit_counter_transfer(
 
 
 def _dispatch_transfer(client: TestClient) -> dict[str, object]:
+    _seed_operating_stock(locations=("BACKROOM",))
     response = client.post(
         "/v1/transfers/dispatch/commit",
         headers={**_authorization_header(client), "Idempotency-Key": new_idempotency_key()},
@@ -381,7 +388,7 @@ def test_shipment_correction_after_receipt_is_rejected(client: TestClient) -> No
     assert detail_response.status_code == 200
     detail_payload = detail_response.json()
     assert detail_payload["is_correctable"] is False
-    assert "ya fue recibido" in detail_payload["blocking_reason"]
+    assert "explicit transit return or waste resolution" in detail_payload["blocking_reason"]
 
     commit_response = client.post(
         "/v1/corrections/commit",
@@ -400,7 +407,7 @@ def test_shipment_correction_after_receipt_is_rejected(client: TestClient) -> No
         },
     )
     assert commit_response.status_code == 409
-    assert "ya fue recibido" in commit_response.json()["message"]
+    assert "explicit transit return or waste resolution" in commit_response.json()["message"]
 
 
 def test_correction_commit_supports_wrong_product_delta_composition(client: TestClient) -> None:
@@ -439,16 +446,38 @@ def test_correction_commit_supports_wrong_product_delta_composition(client: Test
     assert payload["lines"][1]["product_id"] == replacement_product_id
 
 
-def test_correction_commit_supports_wrong_destination_for_shipments(
+def test_correction_rejects_destination_change_after_dispatch_without_mutating_evidence(
     client: TestClient,
 ) -> None:
     _open_cash_session(client)
     shipment = _dispatch_transfer(client)
     corrected_destination_branch_id = _get_branch_id(SEED_ALT_DESTINATION_BRANCH_CODE)
+    headers = _authorization_header(client)
+
+    def snapshot() -> tuple[object, ...]:
+        with SessionLocal() as session:
+            document = session.scalars(
+                select(OperationDocument).where(OperationDocument.id == shipment["id"])
+            ).one()
+            balances = sorted(
+                (str(row.id), row.quantity_on_hand, row.quantity_reserved, row.inventory_value)
+                for row in session.scalars(select(InventoryBalance))
+            )
+            return (
+                document.destination_branch_id,
+                document.status,
+                balances,
+                session.scalar(select(func.count()).select_from(InventoryMovement)),
+                session.scalar(select(func.count()).select_from(CorrectionDocument)),
+                session.scalar(select(func.count()).select_from(AuditLog)),
+                session.scalar(select(func.count()).select_from(OutboxEvent)),
+            )
+
+    before = snapshot()
 
     response = client.post(
         "/v1/corrections/commit",
-        headers={**_authorization_header(client), "Idempotency-Key": new_idempotency_key()},
+        headers={**headers, "Idempotency-Key": new_idempotency_key()},
         json={
             "cash_session_id": _cash_id(SEED_WORKSTATION_CODE),
             "workstation_code": SEED_WORKSTATION_CODE,
@@ -460,35 +489,20 @@ def test_correction_commit_supports_wrong_destination_for_shipments(
         },
     )
 
-    assert response.status_code == 201
-    payload = _correction_detail(client, response.json()["id"])
-    assert payload["target_document_id"] == shipment["id"]
-    assert payload["correction_type"] == "DESTINATION_ADJUSTMENT"
-    assert payload["reason_code"] == "WRONG_DESTINATION"
-    assert payload["corrected_destination_branch_id"] == corrected_destination_branch_id
-    assert payload["corrected_destination_branch_code"] == SEED_ALT_DESTINATION_BRANCH_CODE
-    assert payload["corrected_destination_branch_name"] == "South Branch"
-    assert payload["lines"] == []
+    assert response.status_code == 409
+    assert "explicit transit return or waste resolution" in response.json()["message"]
+    assert snapshot() == before
 
     detail_response = client.get(
         f"/v1/corrections/{shipment['id']}",
         params={"workstation_code": SEED_WORKSTATION_CODE},
-        headers=_authorization_header(client),
+        headers=headers,
     )
     assert detail_response.status_code == 200
     detail_payload = detail_response.json()
-    assert len(detail_payload["applied_corrections"]) == 1
-    assert detail_payload["applied_corrections"][0]["id"] == payload["id"]
-    assert detail_payload["applied_corrections"][0]["line_count"] == 0
-    assert (
-        detail_payload["applied_corrections"][0]["corrected_destination_branch_code"]
-        == SEED_ALT_DESTINATION_BRANCH_CODE
-    )
-    assert (
-        detail_payload["applied_corrections"][0]["corrected_destination_branch_name"]
-        == "South Branch"
-    )
-    assert detail_payload["applied_corrections"][0]["lines"] == []
+    assert detail_payload["is_correctable"] is False
+    assert detail_payload["applied_corrections"] == []
+    assert snapshot() == before
 
 
 def test_correction_history_and_detail_expose_safe_audit_summary(

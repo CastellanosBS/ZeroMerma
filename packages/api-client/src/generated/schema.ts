@@ -644,6 +644,40 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/admin/inventory-dispositions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Create Disposition */
+        post: operations["create_disposition_v1_admin_inventory_dispositions_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/admin/inventory-dispositions/confirmations/{idempotency_key}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Recover Disposition */
+        get: operations["recover_disposition_v1_admin_inventory_dispositions_confirmations__idempotency_key__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/admin/inventory/adjustments": {
         parameters: {
             query?: never;
@@ -972,7 +1006,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/v1/admin/production/{production_id}/start": {
+    "/v1/admin/production/{production_id}/release": {
         parameters: {
             query?: never;
             header?: never;
@@ -981,8 +1015,8 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Start Admin Production */
-        post: operations["start_admin_production_v1_admin_production__production_id__start_post"];
+        /** Release Admin Production */
+        post: operations["release_admin_production_v1_admin_production__production_id__release_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1157,6 +1191,23 @@ export interface paths {
         put?: never;
         /** Receive Admin Purchase */
         post: operations["receive_admin_purchase_v1_admin_purchases__purchase_id__receive_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/admin/purchases/{purchase_id}/reverse-receipt": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Reverse Admin Purchase Receipt */
+        post: operations["reverse_admin_purchase_receipt_v1_admin_purchases__purchase_id__reverse_receipt_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -2073,6 +2124,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/admin/transfers/{transfer_id}/resolve": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Resolve Admin Transfer */
+        post: operations["resolve_admin_transfer_v1_admin_transfers__transfer_id__resolve_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/admin/users": {
         parameters: {
             query?: never;
@@ -2340,6 +2408,23 @@ export interface paths {
         };
         /** List Admin Waste Reasons */
         get: operations["list_admin_waste_reasons_v1_admin_waste_reasons_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/admin/waste/stock": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Admin Waste Stock */
+        get: operations["get_admin_waste_stock_v1_admin_waste_stock_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -3747,6 +3832,40 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/sales/{sale_id}/attribute-inventory": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Attribute Inventory */
+        post: operations["attribute_inventory_v1_sales__sale_id__attribute_inventory_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/sales/{sale_id}/inventory-attributions/{idempotency_key}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Recover Attribution */
+        get: operations["recover_attribution_v1_sales__sale_id__inventory_attributions__idempotency_key__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/tickets": {
         parameters: {
             query?: never;
@@ -3928,6 +4047,23 @@ export interface paths {
         put?: never;
         /** Receive Transfer */
         post: operations["receive_transfer_v1_transfers__transfer_id__receive_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/transfers/{transfer_id}/resolve": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Resolve Pos Transfer */
+        post: operations["resolve_pos_transfer_v1_transfers__transfer_id__resolve_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -8081,6 +8217,11 @@ export interface components {
             /** Code */
             code: string;
             /**
+             * Expiry Required
+             * @default false
+             */
+            expiry_required: boolean;
+            /**
              * Is Active
              * @default true
              */
@@ -8095,6 +8236,21 @@ export interface components {
              * @default true
              */
             is_purchasable: boolean;
+            /**
+             * Is Sellable
+             * @default false
+             */
+            is_sellable: boolean;
+            /**
+             * Is Usable As Input
+             * @default true
+             */
+            is_usable_as_input: boolean;
+            /**
+             * Lot Tracking Enabled
+             * @default false
+             */
+            lot_tracking_enabled: boolean;
             /** Minimum Stock */
             minimum_stock?: number | string | null;
             /** Name */
@@ -8229,6 +8385,8 @@ export interface components {
             category_name: string;
             /** Code */
             code: string;
+            /** Expiry Required */
+            expiry_required: boolean;
             /**
              * Id
              * Format: uuid
@@ -8240,10 +8398,16 @@ export interface components {
             is_inventory_tracked: boolean;
             /** Is Purchasable */
             is_purchasable: boolean;
+            /** Is Sellable */
+            is_sellable: boolean;
+            /** Is Usable As Input */
+            is_usable_as_input: boolean;
             /** Last Movement At */
             last_movement_at?: string | null;
             /** Last Purchase Cost */
             last_purchase_cost?: string | null;
+            /** Lot Tracking Enabled */
+            lot_tracking_enabled: boolean;
             /** Name */
             name: string;
             /** Primary Supplier Name */
@@ -8333,6 +8497,8 @@ export interface components {
              * Format: date-time
              */
             created_at: string;
+            /** Expiry Required */
+            expiry_required: boolean;
             /**
              * Id
              * Format: uuid
@@ -8344,8 +8510,14 @@ export interface components {
             is_inventory_tracked: boolean;
             /** Is Purchasable */
             is_purchasable: boolean;
+            /** Is Sellable */
+            is_sellable: boolean;
+            /** Is Usable As Input */
+            is_usable_as_input: boolean;
             /** Last Purchase Cost */
             last_purchase_cost?: string | null;
+            /** Lot Tracking Enabled */
+            lot_tracking_enabled: boolean;
             /** Name */
             name: string;
             /**
@@ -8502,6 +8674,11 @@ export interface components {
             /** Code */
             code: string;
             /**
+             * Expiry Required
+             * @default false
+             */
+            expiry_required: boolean;
+            /**
              * Is Active
              * @default true
              */
@@ -8516,6 +8693,21 @@ export interface components {
              * @default true
              */
             is_purchasable: boolean;
+            /**
+             * Is Sellable
+             * @default false
+             */
+            is_sellable: boolean;
+            /**
+             * Is Usable As Input
+             * @default true
+             */
+            is_usable_as_input: boolean;
+            /**
+             * Lot Tracking Enabled
+             * @default false
+             */
+            lot_tracking_enabled: boolean;
             /** Minimum Stock */
             minimum_stock?: number | string | null;
             /** Name */
@@ -8569,16 +8761,29 @@ export interface components {
              */
             adjustment_type: "INCREASE" | "DECREASE" | "SET_COUNTED";
             /**
+             * Allow Negative
+             * @default false
+             */
+            allow_negative: boolean;
+            /**
              * Branch Id
              * Format: uuid
              */
             branch_id: string;
+            /** Cost Evidence Reference */
+            cost_evidence_reference?: string | null;
+            /** Expires At */
+            expires_at?: string | null;
             /**
              * Location Code
              * @default BACKROOM
              * @enum {string}
              */
-            location_code: "BACKROOM" | "COUNTER" | "IN_TRANSIT" | "WASTE";
+            location_code: "BACKROOM" | "COUNTER" | "IN_TRANSIT" | "WASTE" | "QUARANTINE" | "WIP";
+            /** Lot Code */
+            lot_code?: string | null;
+            /** Lot Id */
+            lot_id?: string | null;
             /** Notes */
             notes?: string | null;
             /**
@@ -8590,6 +8795,8 @@ export interface components {
             quantity: number | string;
             /** Reason */
             reason: string;
+            /** Unit Cost */
+            unit_cost?: number | string | null;
         };
         /** AdminInventoryAdjustmentResultView */
         AdminInventoryAdjustmentResultView: {
@@ -8627,7 +8834,7 @@ export interface components {
              * Location Code
              * @enum {string}
              */
-            location_code: "BACKROOM" | "COUNTER" | "IN_TRANSIT" | "WASTE";
+            location_code: "BACKROOM" | "COUNTER" | "IN_TRANSIT" | "WASTE" | "QUARANTINE" | "WIP";
             /** New Quantity */
             new_quantity: string;
             /** Previous Quantity */
@@ -8678,7 +8885,7 @@ export interface components {
              * Location Code
              * @enum {string}
              */
-            location_code: "BACKROOM" | "COUNTER" | "IN_TRANSIT" | "WASTE";
+            location_code: "BACKROOM" | "COUNTER" | "IN_TRANSIT" | "WASTE" | "QUARANTINE" | "WIP";
             /**
              * Location Model Supported
              * @default true
@@ -8695,6 +8902,8 @@ export interface components {
              */
             balance_id: string;
             branch_location: components["schemas"]["AdminInventoryBranchLocationView"];
+            /** Lots */
+            lots: components["schemas"]["AdminInventoryLotView"][];
             movement_summary: components["schemas"]["AdminInventoryMovementSummaryView"];
             /** Movements */
             movements: components["schemas"]["AdminInventoryMovementView"][];
@@ -8762,7 +8971,7 @@ export interface components {
              * Location Code
              * @enum {string}
              */
-            location_code: "BACKROOM" | "COUNTER" | "IN_TRANSIT" | "WASTE";
+            location_code: "BACKROOM" | "COUNTER" | "IN_TRANSIT" | "WASTE" | "QUARANTINE" | "WIP";
             /** Location Name */
             location_name: string;
             /** Product Code */
@@ -8816,6 +9025,26 @@ export interface components {
             /** Total */
             total: number;
         };
+        /** AdminInventoryLotView */
+        AdminInventoryLotView: {
+            /** Available Quantity */
+            available_quantity: string;
+            /** Expires At */
+            expires_at: string | null;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Lot Code */
+            lot_code: string;
+            /** Quantity On Hand */
+            quantity_on_hand: string;
+            /** Quantity Reserved */
+            quantity_reserved: string;
+            /** Unidentified */
+            unidentified: boolean;
+        };
         /** AdminInventoryMetricsView */
         AdminInventoryMetricsView: {
             /** Estimated Value */
@@ -8865,7 +9094,7 @@ export interface components {
              * Location Code
              * @enum {string}
              */
-            location_code: "BACKROOM" | "COUNTER" | "IN_TRANSIT" | "WASTE";
+            location_code: "BACKROOM" | "COUNTER" | "IN_TRANSIT" | "WASTE" | "QUARANTINE" | "WIP";
             /** Movement Type */
             movement_type: string;
             /** Notes */
@@ -8915,6 +9144,8 @@ export interface components {
             class_name: string;
             /** Code */
             code: string;
+            /** Expiry Required */
+            expiry_required: boolean;
             /**
              * Id
              * Format: uuid
@@ -8924,6 +9155,8 @@ export interface components {
             is_active: boolean;
             /** Is Sellable */
             is_sellable: boolean;
+            /** Lot Tracking Enabled */
+            lot_tracking_enabled: boolean;
             /** Name */
             name: string;
             /**
@@ -8978,6 +9211,17 @@ export interface components {
             reserved_quantity?: string | null;
             /** Unit Of Measure */
             unit_of_measure: string;
+            /**
+             * Valuation Method
+             * @default WEIGHTED_AVERAGE
+             * @constant
+             */
+            valuation_method: "WEIGHTED_AVERAGE";
+            /**
+             * Valuation Status
+             * @enum {string}
+             */
+            valuation_status: "KNOWN" | "UNAVAILABLE";
         };
         /** AdminInventoryWarningView */
         AdminInventoryWarningView: {
@@ -9929,6 +10173,26 @@ export interface components {
             capture_mode?: ("PRODUCT_DIRECT" | "CLASS_CAPTURE") | null;
             /** Code */
             code: string;
+            /**
+             * Expiry Required
+             * @default false
+             */
+            expiry_required: boolean;
+            /**
+             * Is Sellable
+             * @default true
+             */
+            is_sellable: boolean;
+            /**
+             * Is Usable As Input
+             * @default false
+             */
+            is_usable_as_input: boolean;
+            /**
+             * Lot Tracking Enabled
+             * @default false
+             */
+            lot_tracking_enabled: boolean;
             /** Name */
             name: string;
             /**
@@ -10031,6 +10295,14 @@ export interface components {
             capture_mode?: ("PRODUCT_DIRECT" | "CLASS_CAPTURE") | null;
             /** Code */
             code?: string | null;
+            /** Expiry Required */
+            expiry_required?: boolean | null;
+            /** Is Sellable */
+            is_sellable?: boolean | null;
+            /** Is Usable As Input */
+            is_usable_as_input?: boolean | null;
+            /** Lot Tracking Enabled */
+            lot_tracking_enabled?: boolean | null;
             /** Name */
             name?: string | null;
             /** Product Class Id */
@@ -10072,10 +10344,30 @@ export interface components {
             /** Description */
             description?: string | null;
             /**
+             * Expiry Required
+             * @default false
+             */
+            expiry_required: boolean;
+            /**
              * Id
              * Format: uuid
              */
             id: string;
+            /**
+             * Is Sellable
+             * @default true
+             */
+            is_sellable: boolean;
+            /**
+             * Is Usable As Input
+             * @default false
+             */
+            is_usable_as_input: boolean;
+            /**
+             * Lot Tracking Enabled
+             * @default false
+             */
+            lot_tracking_enabled: boolean;
             /** Name */
             name: string;
             /**
@@ -10125,8 +10417,16 @@ export interface components {
             input_product_id: string;
             /** Input Product Name */
             input_product_name: string;
+            /** Reconciliation Reason */
+            reconciliation_reason?: string | null;
+            /** Remainder Qty */
+            remainder_qty?: string | null;
+            /** Returned Qty */
+            returned_qty?: string | null;
             /** Uom */
             uom: string;
+            /** Waste Qty */
+            waste_qty?: string | null;
         };
         /** AdminProductionAvailableActionsView */
         AdminProductionAvailableActionsView: {
@@ -10136,8 +10436,8 @@ export interface components {
             can_complete: boolean;
             /** Can Edit */
             can_edit: boolean;
-            /** Can Start */
-            can_start: boolean;
+            /** Can Release */
+            can_release: boolean;
             /** Can View Movements */
             can_view_movements: boolean;
         };
@@ -10169,10 +10469,10 @@ export interface components {
              */
             list_endpoint: string;
             /**
-             * Start Endpoint
-             * @default POST /v1/admin/production/{production_id}/start
+             * Release Endpoint
+             * @default POST /v1/admin/production/{production_id}/release
              */
-            start_endpoint: string;
+            release_endpoint: string;
             /**
              * Update Endpoint
              * @default PATCH /v1/admin/production/{production_id}
@@ -10181,6 +10481,11 @@ export interface components {
         };
         /** AdminProductionCancelRequest */
         AdminProductionCancelRequest: {
+            /**
+             * No Physical Effects Confirmed
+             * @default false
+             */
+            no_physical_effects_confirmed: boolean;
             /** Reason */
             reason?: string | null;
         };
@@ -10188,8 +10493,25 @@ export interface components {
         AdminProductionCompleteRequest: {
             /** Actual Output Qty */
             actual_output_qty: number | string;
+            /**
+             * Confirm Without Differences
+             * @default false
+             */
+            confirm_without_differences: boolean;
+            /**
+             * Finish As
+             * @default COMPLETED
+             * @enum {string}
+             */
+            finish_as: "COMPLETED" | "CANCELLED";
+            /** Inputs */
+            inputs?: components["schemas"]["AdminProductionInputReconciliation"][];
             /** Notes */
             notes?: string | null;
+            /** Output Expires At */
+            output_expires_at?: string | null;
+            /** Output Lot Code */
+            output_lot_code?: string | null;
             /** Variance Reason */
             variance_reason?: string | null;
         };
@@ -10255,6 +10577,11 @@ export interface components {
         AdminProductionInputLineView: {
             /** Available Qty */
             available_qty?: string | null;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
             /** Input Product Code */
             input_product_code: string;
             /**
@@ -10266,6 +10593,8 @@ export interface components {
             input_product_name: string;
             /** Required Qty */
             required_qty: string;
+            /** Reservation Id */
+            reservation_id: string | null;
             /** Shortage Qty */
             shortage_qty?: string | null;
             /** Standard Cost */
@@ -10277,6 +10606,24 @@ export interface components {
             status: "available" | "insufficient" | "unavailable";
             /** Uom */
             uom: string;
+        };
+        /** AdminProductionInputReconciliation */
+        AdminProductionInputReconciliation: {
+            /** Consumed Qty */
+            consumed_qty: number | string;
+            /**
+             * Input Product Id
+             * Format: uuid
+             */
+            input_product_id: string;
+            /** Reason */
+            reason?: string | null;
+            /** Remainder Qty */
+            remainder_qty: number | string;
+            /** Returned Qty */
+            returned_qty: number | string;
+            /** Waste Qty */
+            waste_qty: number | string;
         };
         /** AdminProductionInventoryImpactView */
         AdminProductionInventoryImpactView: {
@@ -10321,6 +10668,10 @@ export interface components {
             source_document_id?: string | null;
             /** Source Document Type */
             source_document_type?: string | null;
+            /** Total Cost */
+            total_cost?: string | null;
+            /** Unit Cost */
+            unit_cost?: string | null;
             /** Unit Of Measure */
             unit_of_measure: string;
         };
@@ -10366,13 +10717,13 @@ export interface components {
             recipe_id: string;
             /** Recipe Name */
             recipe_name: string;
-            /** Started At */
-            started_at?: string | null;
+            /** Released At */
+            released_at?: string | null;
             /**
              * Status
              * @enum {string}
              */
-            status: "DRAFT" | "IN_PROGRESS" | "COMPLETED" | "CANCELLED";
+            status: "DRAFT" | "RELEASED" | "PENDING_RECONCILIATION" | "COMPLETED" | "CANCELLED";
             /** Variance Percent */
             variance_percent?: string | null;
             /** Variance Qty */
@@ -10473,21 +10824,38 @@ export interface components {
             id: string;
             /** Notes */
             notes?: string | null;
+            /** Output Expires At */
+            output_expires_at?: string | null;
+            /** Output Lot Code */
+            output_lot_code?: string | null;
+            /**
+             * Plan Status
+             * @enum {string}
+             */
+            plan_status: "DRAFT" | "RELEASED" | "CANCELLED";
             /** Planned At */
             planned_at?: string | null;
             /** Planned Output Qty */
             planned_output_qty: string;
-            /** Started At */
-            started_at?: string | null;
-            /** Started By User Id */
-            started_by_user_id?: string | null;
-            /** Started By User Name */
-            started_by_user_name?: string | null;
+            /** Reconciliation Evidence */
+            reconciliation_evidence: "MANUAL_CONFIRMED" | null;
+            /** Reconciliation Finish As */
+            reconciliation_finish_as?: ("COMPLETED" | "CANCELLED") | null;
+            /** Released At */
+            released_at?: string | null;
+            /** Released By User Id */
+            released_by_user_id?: string | null;
+            /** Released By User Name */
+            released_by_user_name?: string | null;
+            /** Run Id */
+            run_id: string | null;
+            /** Run Status */
+            run_status: ("OPEN" | "PENDING_RECONCILIATION" | "COMPLETED" | "CANCELLED") | null;
             /**
              * Status
              * @enum {string}
              */
-            status: "DRAFT" | "IN_PROGRESS" | "COMPLETED" | "CANCELLED";
+            status: "DRAFT" | "RELEASED" | "PENDING_RECONCILIATION" | "COMPLETED" | "CANCELLED";
             /** Variance Percent */
             variance_percent?: string | null;
             /** Variance Qty */
@@ -10542,8 +10910,8 @@ export interface components {
             /** Status */
             status: string;
         };
-        /** AdminProductionStartRequest */
-        AdminProductionStartRequest: {
+        /** AdminProductionReleaseRequest */
+        AdminProductionReleaseRequest: {
             /** Notes */
             notes?: string | null;
         };
@@ -10577,12 +10945,12 @@ export interface components {
         AdminProductionWasteScrapView: {
             /**
              * Integration Available
-             * @default false
+             * @default true
              */
             integration_available: boolean;
             /**
              * Notes
-             * @default Waste/scrap is represented as production yield variance; dedicated merma documents are pending contract.
+             * @default Only explicitly reconciled input waste is recorded; yield variance is not waste.
              */
             notes: string;
             /** Records */
@@ -10618,6 +10986,8 @@ export interface components {
             can_edit: boolean;
             /** Can Receive */
             can_receive: boolean;
+            /** Can Reverse Receipt */
+            can_reverse_receipt: boolean;
             /** Can View Movements */
             can_view_movements: boolean;
         };
@@ -10737,6 +11107,8 @@ export interface components {
             lines: components["schemas"]["AdminPurchaseLineView"][];
             overview: components["schemas"]["AdminPurchaseOverviewView"];
             receipt: components["schemas"]["AdminPurchaseReceiptSummaryView"];
+            /** Receipts */
+            receipts: components["schemas"]["AdminPurchaseReceiptView"][];
             receiving_branch: components["schemas"]["AdminPurchaseBranchView"];
             /** Related Documents */
             related_documents: components["schemas"]["AdminPurchaseRelatedDocumentView"][];
@@ -10746,6 +11118,10 @@ export interface components {
         };
         /** AdminPurchaseDirectEntryLineInput */
         AdminPurchaseDirectEntryLineInput: {
+            /** Expires At */
+            expires_at?: string | null;
+            /** Lot Code */
+            lot_code?: string | null;
             /** Notes */
             notes?: string | null;
             /**
@@ -10755,6 +11131,8 @@ export interface components {
             product_id: string;
             /** Received Quantity */
             received_quantity: number | string;
+            /** Source Unit Of Measure */
+            source_unit_of_measure?: string | null;
             /** Unit Cost */
             unit_cost: number | string;
         };
@@ -10785,10 +11163,16 @@ export interface components {
         };
         /** AdminPurchaseFilterOptionView */
         AdminPurchaseFilterOptionView: {
+            /** Base Uom */
+            base_uom?: string | null;
+            /** Conversion Factor */
+            conversion_factor?: string | null;
             /** Id */
             id: string;
             /** Label */
             label: string;
+            /** Purchase Uom */
+            purchase_uom?: string | null;
         };
         /** AdminPurchaseFilterOptionsView */
         AdminPurchaseFilterOptionsView: {
@@ -10845,6 +11229,10 @@ export interface components {
             source_document_id?: string | null;
             /** Source Document Type */
             source_document_type?: string | null;
+            /** Total Cost */
+            total_cost?: string | null;
+            /** Unit Cost */
+            unit_cost?: string | null;
             /** Unit Of Measure */
             unit_of_measure: string;
         };
@@ -10859,11 +11247,15 @@ export interface components {
              * Format: uuid
              */
             product_id: string;
+            /** Source Unit Of Measure */
+            source_unit_of_measure?: string | null;
             /** Unit Cost */
             unit_cost: number | string;
         };
         /** AdminPurchaseLineView */
         AdminPurchaseLineView: {
+            /** Conversion Factor */
+            conversion_factor: string;
             /** Discrepancy */
             discrepancy: string;
             /** Discrepancy Reason */
@@ -10876,6 +11268,8 @@ export interface components {
             notes?: string | null;
             /** Ordered Quantity */
             ordered_quantity: string;
+            /** Ordered Quantity Base */
+            ordered_quantity_base: string;
             /** Pending Quantity */
             pending_quantity: string;
             /** Product Code */
@@ -10896,6 +11290,8 @@ export interface components {
             purchase_line_id: string;
             /** Received Quantity */
             received_quantity: string;
+            /** Source Unit Of Measure */
+            source_unit_of_measure: string;
             /** Standard Cost */
             standard_cost?: string | null;
             /** Supplier Last Known Price */
@@ -11078,6 +11474,10 @@ export interface components {
         AdminPurchaseReceiptLineInput: {
             /** Discrepancy Reason */
             discrepancy_reason?: string | null;
+            /** Expires At */
+            expires_at?: string | null;
+            /** Lot Code */
+            lot_code?: string | null;
             /** Notes */
             notes?: string | null;
             /**
@@ -11089,6 +11489,35 @@ export interface components {
             received_quantity: number | string;
             /** Unit Cost */
             unit_cost?: number | string | null;
+        };
+        /** AdminPurchaseReceiptLineView */
+        AdminPurchaseReceiptLineView: {
+            /** Base Unit Cost */
+            base_unit_cost: string;
+            /** Base Unit Of Measure */
+            base_unit_of_measure: string;
+            /** Conversion Factor */
+            conversion_factor: string;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Lot Id */
+            lot_id: string | null;
+            /**
+             * Product Id
+             * Format: uuid
+             */
+            product_id: string;
+            /** Received Quantity */
+            received_quantity: string;
+            /** Received Quantity Base */
+            received_quantity_base: string;
+            /** Source Unit Cost */
+            source_unit_cost: string;
+            /** Source Unit Of Measure */
+            source_unit_of_measure: string;
         };
         /** AdminPurchaseReceiptSummaryView */
         AdminPurchaseReceiptSummaryView: {
@@ -11104,6 +11533,29 @@ export interface components {
             received_quantity: string;
             /** State */
             state: string;
+        };
+        /** AdminPurchaseReceiptView */
+        AdminPurchaseReceiptView: {
+            /** Folio */
+            folio: string;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Lines */
+            lines?: components["schemas"]["AdminPurchaseReceiptLineView"][];
+            /**
+             * Received At
+             * Format: date-time
+             */
+            received_at: string;
+            /** Received Total */
+            received_total: string;
+            /** Reversal Id */
+            reversal_id?: string | null;
+            /** Reversal Reason */
+            reversal_reason?: string | null;
         };
         /** AdminPurchaseReceiveRequest */
         AdminPurchaseReceiveRequest: {
@@ -11125,6 +11577,16 @@ export interface components {
             folio: string;
             /** Status */
             status: string;
+        };
+        /** AdminPurchaseReverseReceiptRequest */
+        AdminPurchaseReverseReceiptRequest: {
+            /** Reason */
+            reason: string;
+            /**
+             * Receipt Id
+             * Format: uuid
+             */
+            receipt_id: string;
         };
         /** AdminPurchaseSupplierContextView */
         AdminPurchaseSupplierContextView: {
@@ -12324,8 +12786,8 @@ export interface components {
         };
         /** AdminReturnedLineView */
         AdminReturnedLineView: {
-            /** Disposition Code */
-            disposition_code: string;
+            /** Allocations */
+            allocations: components["schemas"]["ReturnDispositionAllocationView"][];
             /**
              * Id
              * Format: uuid
@@ -12333,6 +12795,8 @@ export interface components {
             id: string;
             /** Line Status */
             line_status: string;
+            /** Original Catalog Name Snapshot */
+            original_catalog_name_snapshot: string;
             /** Original Quantity */
             original_quantity: string;
             /**
@@ -12340,14 +12804,6 @@ export interface components {
              * Format: uuid
              */
             original_sale_line_id: string;
-            /** Product Class Code */
-            product_class_code: string;
-            /** Product Class Name */
-            product_class_name: string;
-            /** Product Code */
-            product_code: string;
-            /** Product Name */
-            product_name: string;
             /** Refund Amount */
             refund_amount: string;
             /** Returned Quantity */
@@ -12790,6 +13246,32 @@ export interface components {
             /** Total */
             total: number;
         };
+        /** AdminSalesTicketAttributionView */
+        AdminSalesTicketAttributionView: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Inventory Movement Id */
+            inventory_movement_id: string | null;
+            /**
+             * Occurred At
+             * Format: date-time
+             */
+            occurred_at: string;
+            /** Product Code */
+            product_code: string;
+            /**
+             * Product Id
+             * Format: uuid
+             */
+            product_id: string;
+            /** Product Name */
+            product_name: string;
+            /** Quantity */
+            quantity: string;
+        };
         /** AdminSalesTicketBackendContractView */
         AdminSalesTicketBackendContractView: {
             /** Detail Endpoint */
@@ -12833,6 +13315,8 @@ export interface components {
         };
         /** AdminSalesTicketLineView */
         AdminSalesTicketLineView: {
+            /** Attributed Quantity */
+            attributed_quantity: string | null;
             /** Capture Mode */
             capture_mode: string;
             /** Catalog Code */
@@ -12850,12 +13334,16 @@ export interface components {
             line_total_amount: string;
             /** Physical Attribution Status */
             physical_attribution_status: string;
+            /** Physical Attributions */
+            physical_attributions: components["schemas"]["AdminSalesTicketAttributionView"][];
             /** Product Class Id */
             product_class_id?: string | null;
             /** Product Id */
             product_id?: string | null;
             /** Quantity */
             quantity: string;
+            /** Remaining Attribution Quantity */
+            remaining_attribution_quantity: string | null;
             /** Sequence */
             sequence: number;
             /** Unit Price */
@@ -12899,6 +13387,8 @@ export interface components {
             payment_methods_label: string;
             /** Payment Summary */
             payment_summary: components["schemas"]["AdminSalesTicketPaymentSummaryView"][];
+            /** Pending Attribution Line Count */
+            pending_attribution_line_count: number;
             /** Return Count */
             return_count: number;
             /** Return Status */
@@ -14610,6 +15100,11 @@ export interface components {
             can_edit: boolean;
             /** Can Receive */
             can_receive: boolean;
+            /**
+             * Can Resolve
+             * @default false
+             */
+            can_resolve: boolean;
             /** Can View Movements */
             can_view_movements: boolean;
         };
@@ -14701,6 +15196,8 @@ export interface components {
             receipt: components["schemas"]["AdminTransferReceiptView"];
             /** Related Documents */
             related_documents: components["schemas"]["AdminTransferRelatedDocumentView"][];
+            /** Resolutions */
+            resolutions?: components["schemas"]["TransferResolutionView"][];
             /** Warnings */
             warnings: components["schemas"]["AdminTransferWarningView"][];
         };
@@ -14788,6 +15285,8 @@ export interface components {
             difference?: string | null;
             /** Line Status */
             line_status: string;
+            /** Lots */
+            lots?: components["schemas"]["TransferLotProgressView"][];
             /** Notes */
             notes?: string | null;
             /** Pending Quantity */
@@ -14807,6 +15306,11 @@ export interface components {
             received_quantity?: string | null;
             /** Requested Quantity */
             requested_quantity: string;
+            /**
+             * Returned Quantity
+             * @default 0
+             */
+            returned_quantity: string;
             /** Sent Quantity */
             sent_quantity: string;
             /**
@@ -14818,6 +15322,11 @@ export interface components {
             unit_of_measure: string;
             /** Variance Reason */
             variance_reason?: string | null;
+            /**
+             * Waste Quantity
+             * @default 0
+             */
+            waste_quantity: string;
         };
         /** AdminTransferListItemView */
         AdminTransferListItemView: {
@@ -14962,6 +15471,8 @@ export interface components {
         };
         /** AdminTransferReceiptLineInput */
         AdminTransferReceiptLineInput: {
+            /** Lot Allocations */
+            lot_allocations?: components["schemas"]["TransferLotAllocationRequest"][] | null;
             /** Notes */
             notes?: string | null;
             /** Received Quantity */
@@ -15011,6 +15522,24 @@ export interface components {
             folio: string;
             /** Status */
             status: string;
+        };
+        /** AdminTransferResolveRequest */
+        AdminTransferResolveRequest: {
+            /**
+             * Destination Location
+             * @default QUARANTINE
+             * @enum {string}
+             */
+            destination_location: "BACKROOM" | "QUARANTINE";
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "RETURN_TO_ORIGIN" | "SEND_TO_WASTE";
+            /** Lines */
+            lines: components["schemas"]["TransferResolutionLineRequest"][];
+            /** Reason */
+            reason: string;
         };
         /** AdminTransferUpdateRequest */
         AdminTransferUpdateRequest: {
@@ -15683,7 +16212,9 @@ export interface components {
              * @default BACKROOM
              * @enum {string}
              */
-            location_code: "BACKROOM" | "COUNTER" | "IN_TRANSIT";
+            location_code: "BACKROOM" | "COUNTER" | "IN_TRANSIT" | "QUARANTINE";
+            /** Lot Id */
+            lot_id?: string | null;
             /** Notes */
             notes?: string | null;
             /**
@@ -15860,7 +16391,7 @@ export interface components {
              * Location Code
              * @enum {string}
              */
-            location_code: "BACKROOM" | "COUNTER" | "IN_TRANSIT";
+            location_code: "BACKROOM" | "COUNTER" | "IN_TRANSIT" | "QUARANTINE";
             /** Location Name */
             location_name: string;
             /** Operator Name */
@@ -15970,7 +16501,7 @@ export interface components {
              * Location Code
              * @enum {string}
              */
-            location_code: "BACKROOM" | "COUNTER" | "IN_TRANSIT";
+            location_code: "BACKROOM" | "COUNTER" | "IN_TRANSIT" | "QUARANTINE";
             /** Location Name */
             location_name: string;
             /** Notes */
@@ -16093,6 +16624,25 @@ export interface components {
             folio: string;
             /** Status */
             status: string;
+        };
+        /** AdminWasteStockView */
+        AdminWasteStockView: {
+            /**
+             * Branch Id
+             * Format: uuid
+             */
+            branch_id: string;
+            /** Location Code */
+            location_code: string;
+            /** Lot Tracking Enabled */
+            lot_tracking_enabled: boolean;
+            /** Lots */
+            lots: components["schemas"]["OperationInventoryLotView"][];
+            /**
+             * Product Id
+             * Format: uuid
+             */
+            product_id: string;
         };
         /** AdminWasteWarningView */
         AdminWasteWarningView: {
@@ -16793,6 +17343,8 @@ export interface components {
         CashCloseCountedProductLineRequest: {
             /** Counted Quantity */
             counted_quantity: number | string;
+            /** Lot Counts */
+            lot_counts?: components["schemas"]["CashCloseLotCountRequest"][];
             /** Notes */
             notes?: string | null;
             /**
@@ -16957,6 +17509,34 @@ export interface components {
             /** Message */
             message: string;
         };
+        /** CashCloseLotCountRequest */
+        CashCloseLotCountRequest: {
+            /** Counted Quantity */
+            counted_quantity: number | string;
+            /**
+             * Lot Id
+             * Format: uuid
+             */
+            lot_id: string;
+        };
+        /** CashCloseLotCountView */
+        CashCloseLotCountView: {
+            /** Counted Quantity */
+            counted_quantity?: string | null;
+            /** Expected Quantity */
+            expected_quantity: string;
+            /** Expires At */
+            expires_at: string | null;
+            /** Lot Code */
+            lot_code: string;
+            /**
+             * Lot Id
+             * Format: uuid
+             */
+            lot_id: string;
+            /** Reserved Quantity */
+            reserved_quantity: string;
+        };
         /** CashCloseManualReconciliationAttributionLineRequest */
         CashCloseManualReconciliationAttributionLineRequest: {
             /** Attributed Quantity */
@@ -17118,6 +17698,13 @@ export interface components {
             expected_quantity_before_deferred_attr: string;
             /** Final Expected Quantity */
             final_expected_quantity?: string | null;
+            /**
+             * Lot Tracking Enabled
+             * @default false
+             */
+            lot_tracking_enabled: boolean;
+            /** Lots */
+            lots?: components["schemas"]["CashCloseLotCountView"][];
             /** Notes */
             notes?: string | null;
             /** Product Class Code */
@@ -17287,6 +17874,74 @@ export interface components {
             workstation_id: string;
             /** Workstation Name */
             workstation_name: string;
+        };
+        /** ClassAttributionLineRequest */
+        ClassAttributionLineRequest: {
+            /** Lot Id */
+            lot_id?: string | null;
+            /**
+             * Product Id
+             * Format: uuid
+             */
+            product_id: string;
+            /** Quantity */
+            quantity: number | string;
+            /**
+             * Sale Line Id
+             * Format: uuid
+             */
+            sale_line_id: string;
+        };
+        /** ClassAttributionRequest */
+        ClassAttributionRequest: {
+            /**
+             * Cash Session Id
+             * Format: uuid
+             */
+            cash_session_id: string;
+            /** Lines */
+            lines: components["schemas"]["ClassAttributionLineRequest"][];
+            /** Workstation Code */
+            workstation_code: string;
+        };
+        /** ClassAttributionResult */
+        ClassAttributionResult: {
+            /** Lines */
+            lines: components["schemas"]["ClassAttributionResultLine"][];
+            /**
+             * Operation Id
+             * Format: uuid
+             */
+            operation_id: string;
+            /**
+             * Sale Id
+             * Format: uuid
+             */
+            sale_id: string;
+        };
+        /** ClassAttributionResultLine */
+        ClassAttributionResultLine: {
+            /**
+             * Attribution Id
+             * Format: uuid
+             */
+            attribution_id: string;
+            /** Inventory Movement Id */
+            inventory_movement_id: string | null;
+            /**
+             * Product Id
+             * Format: uuid
+             */
+            product_id: string;
+            /** Quantity */
+            quantity: string;
+            /** Remaining Quantity */
+            remaining_quantity: string;
+            /**
+             * Sale Line Id
+             * Format: uuid
+             */
+            sale_line_id: string;
         };
         /** ConfirmSaleLineRequest */
         ConfirmSaleLineRequest: {
@@ -18236,6 +18891,79 @@ export interface components {
          * @enum {string}
          */
         IdempotencyStatus: "PROCESSING" | "COMPLETED" | "REJECTED" | "UNKNOWN";
+        /** InventoryDispositionRequest */
+        InventoryDispositionRequest: {
+            /**
+             * Branch Id
+             * Format: uuid
+             */
+            branch_id: string;
+            /**
+             * Destination
+             * @enum {string}
+             */
+            destination: "BACKROOM" | "COUNTER" | "QUARANTINE" | "WASTE";
+            /**
+             * Inspection Passed
+             * @default false
+             */
+            inspection_passed: boolean;
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "RETURN_CORRECTION" | "QUARANTINE_RELEASE";
+            /** Lot Id */
+            lot_id?: string | null;
+            /** Notes */
+            notes?: string | null;
+            /**
+             * Product Id
+             * Format: uuid
+             */
+            product_id: string;
+            /** Quantity */
+            quantity: number | string;
+            /** Reason */
+            reason: string;
+            /** Return Allocation Id */
+            return_allocation_id?: string | null;
+        };
+        /** InventoryDispositionResult */
+        InventoryDispositionResult: {
+            /**
+             * Branch Id
+             * Format: uuid
+             */
+            branch_id: string;
+            /** Destination */
+            destination: string;
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "RETURN_CORRECTION" | "QUARANTINE_RELEASE";
+            /** Lot Id */
+            lot_id: string | null;
+            /** Movement Ids */
+            movement_ids: string[];
+            /**
+             * Operation Id
+             * Format: uuid
+             */
+            operation_id: string;
+            /**
+             * Product Id
+             * Format: uuid
+             */
+            product_id: string;
+            /** Quantity */
+            quantity: string;
+            /** Return Allocation Id */
+            return_allocation_id: string | null;
+            /** Source */
+            source: string;
+        };
         JsonValue: unknown;
         /** LoginRequest */
         LoginRequest: {
@@ -18285,6 +19013,8 @@ export interface components {
         };
         /** OperationCommitLineRequest */
         OperationCommitLineRequest: {
+            /** Lot Id */
+            lot_id?: string | null;
             /** Notes */
             notes?: string | null;
             /**
@@ -18350,11 +19080,8 @@ export interface components {
             source_bucket_code: string | null;
             /** Status */
             status: string;
-            /**
-             * Workstation Id
-             * Format: uuid
-             */
-            workstation_id: string;
+            /** Workstation Id */
+            workstation_id: string | null;
         };
         /** OperationDocumentLineView */
         OperationDocumentLineView: {
@@ -18456,14 +19183,11 @@ export interface components {
             /** Status */
             status: string;
             /** Workstation Code */
-            workstation_code: string;
-            /**
-             * Workstation Id
-             * Format: uuid
-             */
-            workstation_id: string;
+            workstation_code: string | null;
+            /** Workstation Id */
+            workstation_id: string | null;
             /** Workstation Name */
-            workstation_name: string;
+            workstation_name: string | null;
         };
         /** OperationHistoryFilterOptionView */
         OperationHistoryFilterOptionView: {
@@ -18520,9 +19244,9 @@ export interface components {
             /** Total Quantity */
             total_quantity: string;
             /** Workstation Code */
-            workstation_code: string;
+            workstation_code: string | null;
             /** Workstation Name */
-            workstation_name: string;
+            workstation_name: string | null;
         };
         /** OperationHistoryResponse */
         OperationHistoryResponse: {
@@ -18563,6 +19287,28 @@ export interface components {
             code: string;
             /** Label */
             label: string;
+        };
+        /** OperationInventoryLotView */
+        OperationInventoryLotView: {
+            /** Available Quantity */
+            available_quantity: string;
+            /** Expires At */
+            expires_at: string | null;
+            /** Location Code */
+            location_code: string;
+            /** Lot Code */
+            lot_code: string;
+            /**
+             * Lot Id
+             * Format: uuid
+             */
+            lot_id: string;
+            /** Quantity On Hand */
+            quantity_on_hand: string;
+            /** Quantity Reserved */
+            quantity_reserved: string;
+            /** Unidentified */
+            unidentified: boolean;
         };
         /** OperationalDiscountCategoryView */
         OperationalDiscountCategoryView: {
@@ -18979,6 +19725,13 @@ export interface components {
              * Format: uuid
              */
             id: string;
+            /** Inventory Lots */
+            inventory_lots?: components["schemas"]["OperationInventoryLotView"][];
+            /**
+             * Lot Tracking Enabled
+             * @default false
+             */
+            lot_tracking_enabled: boolean;
             /** Name */
             name: string;
             /** Quick Name */
@@ -19319,14 +20072,11 @@ export interface components {
             /** Status */
             status: string;
             /** Workstation Code */
-            workstation_code: string;
-            /**
-             * Workstation Id
-             * Format: uuid
-             */
-            workstation_id: string;
+            workstation_code: string | null;
+            /** Workstation Id */
+            workstation_id: string | null;
             /** Workstation Name */
-            workstation_name: string;
+            workstation_name: string | null;
         };
         /** PendingInboundTransfersResponse */
         PendingInboundTransfersResponse: {
@@ -19347,6 +20097,20 @@ export interface components {
             training_mode?: components["schemas"]["TrainingModeView"] | null;
             user: components["schemas"]["AuthenticatedUser"];
             workstation: components["schemas"]["WorkstationSummary"];
+        };
+        /** PosCatalogAvailableLotView */
+        PosCatalogAvailableLotView: {
+            /** Available Quantity */
+            available_quantity: string;
+            /** Expires At */
+            expires_at: string | null;
+            /** Lot Code */
+            lot_code: string;
+            /**
+             * Lot Id
+             * Format: uuid
+             */
+            lot_id: string;
         };
         /** PosCatalogClassView */
         PosCatalogClassView: {
@@ -19374,6 +20138,10 @@ export interface components {
         };
         /** PosCatalogProductView */
         PosCatalogProductView: {
+            /** Available Lots */
+            available_lots: components["schemas"]["PosCatalogAvailableLotView"][];
+            /** Available Quantity */
+            available_quantity: string | null;
             /** Code */
             code: string;
             /** Currency Code */
@@ -19385,10 +20153,16 @@ export interface components {
              * Format: uuid
              */
             id: string;
+            /** Is Inventory Tracked */
+            is_inventory_tracked: boolean;
+            /** Lot Tracking Enabled */
+            lot_tracking_enabled: boolean;
             /** Name */
             name: string;
             /** Quick Name */
             quick_name?: string | null;
+            /** Reserved Quantity */
+            reserved_quantity: string;
             /** Unit Price */
             unit_price: string;
         };
@@ -19532,7 +20306,7 @@ export interface components {
              * Status
              * @enum {string}
              */
-            status: "DRAFT" | "IN_PROGRESS" | "COMPLETED" | "CANCELLED";
+            status: "DRAFT" | "RELEASED" | "PENDING_RECONCILIATION" | "COMPLETED" | "CANCELLED";
             /**
              * Updated At
              * Format: date-time
@@ -19610,10 +20384,8 @@ export interface components {
         };
         /** ReturnCommitLineRequest */
         ReturnCommitLineRequest: {
-            /** Disposition Code */
-            disposition_code: string;
-            /** Exact Product Id */
-            exact_product_id?: string | null;
+            /** Allocations */
+            allocations: components["schemas"]["ReturnDispositionAllocationRequest"][];
             /**
              * Original Sale Line Id
              * Format: uuid
@@ -19624,11 +20396,8 @@ export interface components {
         };
         /** ReturnCommitLineResultView */
         ReturnCommitLineResultView: {
-            /**
-             * Disposition Code
-             * @enum {string}
-             */
-            disposition_code: "RESTOCK_COUNTER" | "RESTOCK_BACKROOM" | "SEND_TO_WASTE";
+            /** Allocations */
+            allocations: components["schemas"]["ReturnDispositionAllocationView"][];
             /**
              * Id
              * Format: uuid
@@ -19645,11 +20414,6 @@ export interface components {
             refund_line_total_amount: string;
             /** Refund Unit Price */
             refund_unit_price: string;
-            /**
-             * Returned Product Id
-             * Format: uuid
-             */
-            returned_product_id: string;
             /** Returned Quantity */
             returned_quantity: string;
         };
@@ -19748,6 +20512,57 @@ export interface components {
             high_risk_requires_acknowledgement: boolean;
             /** Old Sale Days Threshold */
             old_sale_days_threshold: number;
+        };
+        /** ReturnDispositionAllocationRequest */
+        ReturnDispositionAllocationRequest: {
+            /**
+             * Disposition Code
+             * @default QUARANTINE
+             * @enum {string}
+             */
+            disposition_code: "RESTOCK_COUNTER" | "RESTOCK_BACKROOM" | "QUARANTINE" | "SEND_TO_WASTE" | "NO_STOCK";
+            /**
+             * Exact Product Id
+             * Format: uuid
+             */
+            exact_product_id: string;
+            /** Lot Id */
+            lot_id?: string | null;
+            /** Quantity */
+            quantity: number | string;
+            /**
+             * Restock Safe Acknowledged
+             * @default false
+             */
+            restock_safe_acknowledged: boolean;
+        };
+        /** ReturnDispositionAllocationView */
+        ReturnDispositionAllocationView: {
+            /**
+             * Disposition Code
+             * @enum {string}
+             */
+            disposition_code: "RESTOCK_COUNTER" | "RESTOCK_BACKROOM" | "QUARANTINE" | "SEND_TO_WASTE" | "NO_STOCK";
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Inventory Movement Id */
+            inventory_movement_id: string | null;
+            /** Lot Id */
+            lot_id: string | null;
+            /** Quantity */
+            quantity: string;
+            /** Returned Product Code Snapshot */
+            returned_product_code_snapshot: string;
+            /**
+             * Returned Product Id
+             * Format: uuid
+             */
+            returned_product_id: string;
+            /** Returned Product Name Snapshot */
+            returned_product_name_snapshot: string;
         };
         /** ReturnFilterOptionView */
         ReturnFilterOptionView: {
@@ -19872,6 +20687,30 @@ export interface components {
             /** Tendered Amount */
             tendered_amount: string;
         };
+        /** ReturnPhysicalOptionView */
+        ReturnPhysicalOptionView: {
+            /** Expires At */
+            expires_at: string | null;
+            /** Is Inventory Tracked */
+            is_inventory_tracked: boolean;
+            /** Lot Code */
+            lot_code: string | null;
+            /** Lot Id */
+            lot_id: string | null;
+            /** Lot Tracking Enabled */
+            lot_tracking_enabled: boolean;
+            /** Product Code */
+            product_code: string;
+            /**
+             * Product Id
+             * Format: uuid
+             */
+            product_id: string;
+            /** Product Name */
+            product_name: string;
+            /** Remaining Quantity */
+            remaining_quantity: string;
+        };
         /** ReturnProductOptionView */
         ReturnProductOptionView: {
             /** Code */
@@ -19965,6 +20804,8 @@ export interface components {
             id: string;
             /** Line Total Amount */
             line_total_amount: string;
+            /** Physical Options */
+            physical_options?: components["schemas"]["ReturnPhysicalOptionView"][];
             /** Product Class Code */
             product_class_code: string;
             /**
@@ -20259,8 +21100,8 @@ export interface components {
         };
         /** SaleReturnCommittedLineView */
         SaleReturnCommittedLineView: {
-            /** Disposition Code */
-            disposition_code: string;
+            /** Allocations */
+            allocations: components["schemas"]["ReturnDispositionAllocationView"][];
             /**
              * Id
              * Format: uuid
@@ -20279,8 +21120,6 @@ export interface components {
             refund_line_total_amount: string;
             /** Refund Unit Price */
             refund_unit_price: string;
-            /** Returned Product Name Snapshot */
-            returned_product_name_snapshot: string;
             /** Returned Quantity */
             returned_quantity: string;
         };
@@ -20467,6 +21306,30 @@ export interface components {
              */
             workstation_id: string;
         };
+        /** TicketAttributionOptionView */
+        TicketAttributionOptionView: {
+            /** Available Quantity */
+            available_quantity: string | null;
+            /** Expires At */
+            expires_at: string | null;
+            /** Is Inventory Tracked */
+            is_inventory_tracked: boolean;
+            /** Lot Code */
+            lot_code: string | null;
+            /** Lot Id */
+            lot_id: string | null;
+            /** Lot Tracking Enabled */
+            lot_tracking_enabled: boolean;
+            /** Product Code */
+            product_code: string;
+            /**
+             * Product Id
+             * Format: uuid
+             */
+            product_id: string;
+            /** Product Name */
+            product_name: string;
+        };
         /** TicketDetailResponse */
         TicketDetailResponse: {
             branch: components["schemas"]["BranchSummary"];
@@ -20525,6 +21388,10 @@ export interface components {
         };
         /** TicketLineItemView */
         TicketLineItemView: {
+            /** Attribution Options */
+            attribution_options: components["schemas"]["TicketAttributionOptionView"][];
+            /** Capture Mode */
+            capture_mode: string;
             /**
              * Id
              * Format: uuid
@@ -20534,8 +21401,12 @@ export interface components {
             line_total_amount: string;
             /** Name */
             name: string;
+            /** Physical Attributions */
+            physical_attributions: components["schemas"]["TicketPhysicalAttributionView"][];
             /** Quantity */
             quantity: string;
+            /** Remaining Attribution Quantity */
+            remaining_attribution_quantity: string;
             /** Sequence */
             sequence: number;
             /** Unit Price */
@@ -20624,6 +21495,28 @@ export interface components {
             /** Payment Method Code */
             payment_method_code: string;
         };
+        /** TicketPhysicalAttributionView */
+        TicketPhysicalAttributionView: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Inventory Movement Id */
+            inventory_movement_id: string | null;
+            /**
+             * Occurred At
+             * Format: date-time
+             */
+            occurred_at: string;
+            /**
+             * Product Id
+             * Format: uuid
+             */
+            product_id: string;
+            /** Quantity */
+            quantity: string;
+        };
         /** TicketReprintRequest */
         TicketReprintRequest: {
             /** Workstation Code */
@@ -20678,6 +21571,8 @@ export interface components {
         };
         /** TransferCommandLineView */
         TransferCommandLineView: {
+            /** Lots */
+            lots?: components["schemas"]["TransferLotProgressView"][];
             /** Pending Quantity */
             pending_quantity: string;
             /**
@@ -20687,6 +21582,11 @@ export interface components {
             product_id: string;
             /** Received Quantity */
             received_quantity: string;
+            /**
+             * Returned Quantity
+             * @default 0
+             */
+            returned_quantity: string;
             /** Sent Quantity */
             sent_quantity: string;
             /**
@@ -20694,6 +21594,11 @@ export interface components {
              * Format: uuid
              */
             shipment_line_id: string;
+            /**
+             * Waste Quantity
+             * @default 0
+             */
+            waste_quantity: string;
         };
         /** TransferCommandResultView */
         TransferCommandResultView: {
@@ -20722,6 +21627,8 @@ export interface components {
             origin_branch_id: string;
             /** Receipt Id */
             receipt_id: string | null;
+            /** Resolution Id */
+            resolution_id?: string | null;
             /** Status */
             status: string;
         };
@@ -20749,6 +21656,8 @@ export interface components {
             receipt_summaries: components["schemas"]["TransferDocumentSummaryView"][];
             /** Receipts */
             receipts: components["schemas"]["OperationDocumentView"][];
+            /** Resolutions */
+            resolutions?: components["schemas"]["TransferResolutionView"][];
             shipment: components["schemas"]["OperationDocumentView"];
             shipment_summary: components["schemas"]["TransferDocumentSummaryView"];
         };
@@ -20819,6 +21728,52 @@ export interface components {
             /** Status */
             status: string;
         };
+        /** TransferLotAllocationRequest */
+        TransferLotAllocationRequest: {
+            /**
+             * Lot Id
+             * Format: uuid
+             */
+            lot_id: string;
+            /** Quantity */
+            quantity: number | string;
+        };
+        /** TransferLotProgressView */
+        TransferLotProgressView: {
+            /** Expires At */
+            expires_at: string | null;
+            /** Lot Code */
+            lot_code: string;
+            /**
+             * Lot Id
+             * Format: uuid
+             */
+            lot_id: string;
+            /** Pending Quantity */
+            pending_quantity: string;
+            /** Received Quantity */
+            received_quantity: string;
+            /** Returned Quantity */
+            returned_quantity: string;
+            /** Sent Quantity */
+            sent_quantity: string;
+            /** Waste Quantity */
+            waste_quantity: string;
+        };
+        /** TransferLotQuantityView */
+        TransferLotQuantityView: {
+            /** Expires At */
+            expires_at: string | null;
+            /** Lot Code */
+            lot_code: string;
+            /**
+             * Lot Id
+             * Format: uuid
+             */
+            lot_id: string;
+            /** Quantity */
+            quantity: string;
+        };
         /** TransferQuantitySummaryView */
         TransferQuantitySummaryView: {
             /** Expected Total Quantity */
@@ -20885,9 +21840,9 @@ export interface components {
             /** Total Quantity */
             total_quantity: string;
             /** Workstation Code */
-            workstation_code: string;
+            workstation_code: string | null;
             /** Workstation Name */
-            workstation_name: string;
+            workstation_name: string | null;
         };
         /** TransferReceiptHistoryResponse */
         TransferReceiptHistoryResponse: {
@@ -20916,6 +21871,8 @@ export interface components {
         TransferReceiptLineRequest: {
             /** Expected Quantity */
             expected_quantity: number | string;
+            /** Lot Allocations */
+            lot_allocations?: components["schemas"]["TransferLotAllocationRequest"][] | null;
             /** Notes */
             notes?: string | null;
             /** Received Quantity */
@@ -20939,6 +21896,96 @@ export interface components {
             lines: components["schemas"]["TransferReceiptLineRequest"][];
             /** Notes */
             notes?: string | null;
+            /** Workstation Code */
+            workstation_code: string;
+        };
+        /** TransferResolutionLineRequest */
+        TransferResolutionLineRequest: {
+            /** Lot Allocations */
+            lot_allocations?: components["schemas"]["TransferLotAllocationRequest"][] | null;
+            /** Quantity */
+            quantity: number | string;
+            /**
+             * Shipment Line Id
+             * Format: uuid
+             */
+            shipment_line_id: string;
+        };
+        /** TransferResolutionLineView */
+        TransferResolutionLineView: {
+            /** Lots */
+            lots?: components["schemas"]["TransferLotQuantityView"][];
+            /**
+             * Product Id
+             * Format: uuid
+             */
+            product_id: string;
+            /** Quantity */
+            quantity: string;
+            /**
+             * Shipment Line Id
+             * Format: uuid
+             */
+            shipment_line_id: string;
+            /** Unit Of Measure */
+            unit_of_measure: string;
+        };
+        /** TransferResolutionView */
+        TransferResolutionView: {
+            /**
+             * Actor Id
+             * Format: uuid
+             */
+            actor_id: string;
+            /**
+             * Branch Id
+             * Format: uuid
+             */
+            branch_id: string;
+            /** Destination Location */
+            destination_location: string;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "RETURN_TO_ORIGIN" | "SEND_TO_WASTE";
+            /** Lines */
+            lines: components["schemas"]["TransferResolutionLineView"][];
+            /**
+             * Occurred At
+             * Format: date-time
+             */
+            occurred_at: string;
+            /** Reason */
+            reason: string;
+        };
+        /** TransferResolveRequest */
+        TransferResolveRequest: {
+            /**
+             * Cash Session Id
+             * Format: uuid
+             */
+            cash_session_id: string;
+            /**
+             * Destination Location
+             * @default QUARANTINE
+             * @enum {string}
+             */
+            destination_location: "BACKROOM" | "QUARANTINE";
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "RETURN_TO_ORIGIN" | "SEND_TO_WASTE";
+            /** Lines */
+            lines: components["schemas"]["TransferResolutionLineRequest"][];
+            /** Reason */
+            reason: string;
             /** Workstation Code */
             workstation_code: string;
         };
@@ -27315,6 +28362,266 @@ export interface operations {
             };
         };
     };
+    create_disposition_v1_admin_inventory_dispositions_post: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description A globally unique UUIDv7 identifying this business intention. */
+                "Idempotency-Key": string;
+                /** @description UUID for this HTTP attempt. Missing, duplicate or invalid IDs are replaced. */
+                "X-Request-ID"?: string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["InventoryDispositionRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    "Idempotency-Replayed": components["headers"]["IdempotencyReplayed"];
+                    "X-Correlation-ID": components["headers"]["CorrelationId"];
+                    "X-Request-ID": components["headers"]["RequestId"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InventoryDispositionResult"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    "X-Correlation-ID": components["headers"]["CorrelationId"];
+                    "X-Request-ID": components["headers"]["RequestId"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorResponse"];
+                };
+            };
+            /** @description Authentication Required */
+            401: {
+                headers: {
+                    "X-Correlation-ID": components["headers"]["CorrelationId"];
+                    "X-Request-ID": components["headers"]["RequestId"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorResponse"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    "X-Correlation-ID": components["headers"]["CorrelationId"];
+                    "X-Request-ID": components["headers"]["RequestId"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorResponse"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    "X-Correlation-ID": components["headers"]["CorrelationId"];
+                    "X-Request-ID": components["headers"]["RequestId"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorResponse"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    "X-Correlation-ID": components["headers"]["CorrelationId"];
+                    "X-Request-ID": components["headers"]["RequestId"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    "X-Correlation-ID": components["headers"]["CorrelationId"];
+                    "X-Request-ID": components["headers"]["RequestId"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorResponse"];
+                };
+            };
+            /** @description Session Locked */
+            423: {
+                headers: {
+                    "X-Correlation-ID": components["headers"]["CorrelationId"];
+                    "X-Request-ID": components["headers"]["RequestId"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorResponse"];
+                };
+            };
+            /** @description Login Rate Limited */
+            429: {
+                headers: {
+                    "X-Correlation-ID": components["headers"]["CorrelationId"];
+                    "X-Request-ID": components["headers"]["RequestId"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorResponse"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    "X-Correlation-ID": components["headers"]["CorrelationId"];
+                    "X-Request-ID": components["headers"]["RequestId"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorResponse"];
+                };
+            };
+        };
+    };
+    recover_disposition_v1_admin_inventory_dispositions_confirmations__idempotency_key__get: {
+        parameters: {
+            query: {
+                branch_id: string;
+                kind: "RETURN_CORRECTION" | "QUARANTINE_RELEASE";
+            };
+            header?: {
+                /** @description UUID for this HTTP attempt. Missing, duplicate or invalid IDs are replaced. */
+                "X-Request-ID"?: string;
+            };
+            path: {
+                idempotency_key: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    "X-Correlation-ID": components["headers"]["CorrelationId"];
+                    "X-Request-ID": components["headers"]["RequestId"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InventoryDispositionResult"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    "X-Correlation-ID": components["headers"]["CorrelationId"];
+                    "X-Request-ID": components["headers"]["RequestId"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorResponse"];
+                };
+            };
+            /** @description Authentication Required */
+            401: {
+                headers: {
+                    "X-Correlation-ID": components["headers"]["CorrelationId"];
+                    "X-Request-ID": components["headers"]["RequestId"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorResponse"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    "X-Correlation-ID": components["headers"]["CorrelationId"];
+                    "X-Request-ID": components["headers"]["RequestId"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorResponse"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    "X-Correlation-ID": components["headers"]["CorrelationId"];
+                    "X-Request-ID": components["headers"]["RequestId"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorResponse"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    "X-Correlation-ID": components["headers"]["CorrelationId"];
+                    "X-Request-ID": components["headers"]["RequestId"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    "X-Correlation-ID": components["headers"]["CorrelationId"];
+                    "X-Request-ID": components["headers"]["RequestId"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorResponse"];
+                };
+            };
+            /** @description Session Locked */
+            423: {
+                headers: {
+                    "X-Correlation-ID": components["headers"]["CorrelationId"];
+                    "X-Request-ID": components["headers"]["RequestId"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorResponse"];
+                };
+            };
+            /** @description Login Rate Limited */
+            429: {
+                headers: {
+                    "X-Correlation-ID": components["headers"]["CorrelationId"];
+                    "X-Request-ID": components["headers"]["RequestId"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorResponse"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    "X-Correlation-ID": components["headers"]["CorrelationId"];
+                    "X-Request-ID": components["headers"]["RequestId"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorResponse"];
+                };
+            };
+        };
+    };
     create_admin_inventory_adjustment_v1_admin_inventory_adjustments_post: {
         parameters: {
             query?: never;
@@ -29810,7 +31117,7 @@ export interface operations {
                 "X-Request-ID"?: string;
             };
             path: {
-                command_code: "create" | "update" | "start" | "complete" | "cancel";
+                command_code: "create" | "update" | "release" | "complete" | "cancel";
                 idempotency_key: string;
             };
             cookie?: never;
@@ -30455,7 +31762,7 @@ export interface operations {
             };
         };
     };
-    start_admin_production_v1_admin_production__production_id__start_post: {
+    release_admin_production_v1_admin_production__production_id__release_post: {
         parameters: {
             query?: never;
             header: {
@@ -30471,7 +31778,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["AdminProductionStartRequest"];
+                "application/json": components["schemas"]["AdminProductionReleaseRequest"];
             };
         };
         responses: {
@@ -31518,7 +32825,7 @@ export interface operations {
                 "X-Request-ID"?: string;
             };
             path: {
-                command_code: "create" | "update" | "direct-entry" | "confirm" | "receive" | "cancel";
+                command_code: "create" | "update" | "direct-entry" | "confirm" | "receive" | "cancel" | "reverse-receipt";
                 idempotency_key: string;
             };
             cookie?: never;
@@ -32312,6 +33619,140 @@ export interface operations {
         requestBody: {
             content: {
                 "application/json": components["schemas"]["AdminPurchaseReceiveRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    "Idempotency-Replayed": components["headers"]["IdempotencyReplayed"];
+                    "X-Correlation-ID": components["headers"]["CorrelationId"];
+                    "X-Request-ID": components["headers"]["RequestId"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PurchaseCommandResultView"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    "X-Correlation-ID": components["headers"]["CorrelationId"];
+                    "X-Request-ID": components["headers"]["RequestId"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorResponse"];
+                };
+            };
+            /** @description Authentication Required */
+            401: {
+                headers: {
+                    "X-Correlation-ID": components["headers"]["CorrelationId"];
+                    "X-Request-ID": components["headers"]["RequestId"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorResponse"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    "X-Correlation-ID": components["headers"]["CorrelationId"];
+                    "X-Request-ID": components["headers"]["RequestId"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorResponse"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    "X-Correlation-ID": components["headers"]["CorrelationId"];
+                    "X-Request-ID": components["headers"]["RequestId"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorResponse"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    "Idempotency-Replayed": components["headers"]["IdempotencyReplayed"];
+                    "X-Correlation-ID": components["headers"]["CorrelationId"];
+                    "X-Request-ID": components["headers"]["RequestId"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    "X-Correlation-ID": components["headers"]["CorrelationId"];
+                    "X-Request-ID": components["headers"]["RequestId"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorResponse"];
+                };
+            };
+            /** @description Session Locked */
+            423: {
+                headers: {
+                    "X-Correlation-ID": components["headers"]["CorrelationId"];
+                    "X-Request-ID": components["headers"]["RequestId"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorResponse"];
+                };
+            };
+            /** @description Login Rate Limited */
+            429: {
+                headers: {
+                    "X-Correlation-ID": components["headers"]["CorrelationId"];
+                    "X-Request-ID": components["headers"]["RequestId"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorResponse"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    "X-Correlation-ID": components["headers"]["CorrelationId"];
+                    "X-Request-ID": components["headers"]["RequestId"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorResponse"];
+                };
+            };
+        };
+    };
+    reverse_admin_purchase_receipt_v1_admin_purchases__purchase_id__reverse_receipt_post: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description A globally unique UUIDv7 identifying this business intention. */
+                "Idempotency-Key": string;
+                /** @description UUID for this HTTP attempt. Missing, duplicate or invalid IDs are replaced. */
+                "X-Request-ID"?: string;
+            };
+            path: {
+                purchase_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AdminPurchaseReverseReceiptRequest"];
             };
         };
         responses: {
@@ -36332,6 +37773,7 @@ export interface operations {
                 max_amount?: number | string | null;
                 page?: number;
                 page_size?: number;
+                pending_physical_only?: boolean;
             };
             header?: {
                 /** @description UUID for this HTTP attempt. Missing, duplicate or invalid IDs are replaced. */
@@ -39708,7 +41150,7 @@ export interface operations {
                 "X-Request-ID"?: string;
             };
             path: {
-                command_code: "create" | "update" | "dispatch" | "receive" | "cancel";
+                command_code: "create" | "update" | "dispatch" | "receive" | "cancel" | "resolve_return" | "resolve_waste";
                 idempotency_key: string;
             };
             cookie?: never;
@@ -40374,6 +41816,140 @@ export interface operations {
         requestBody: {
             content: {
                 "application/json": components["schemas"]["AdminTransferReceiveRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    "Idempotency-Replayed": components["headers"]["IdempotencyReplayed"];
+                    "X-Correlation-ID": components["headers"]["CorrelationId"];
+                    "X-Request-ID": components["headers"]["RequestId"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TransferCommandResultView"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    "X-Correlation-ID": components["headers"]["CorrelationId"];
+                    "X-Request-ID": components["headers"]["RequestId"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorResponse"];
+                };
+            };
+            /** @description Authentication Required */
+            401: {
+                headers: {
+                    "X-Correlation-ID": components["headers"]["CorrelationId"];
+                    "X-Request-ID": components["headers"]["RequestId"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorResponse"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    "X-Correlation-ID": components["headers"]["CorrelationId"];
+                    "X-Request-ID": components["headers"]["RequestId"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorResponse"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    "X-Correlation-ID": components["headers"]["CorrelationId"];
+                    "X-Request-ID": components["headers"]["RequestId"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorResponse"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    "Idempotency-Replayed": components["headers"]["IdempotencyReplayed"];
+                    "X-Correlation-ID": components["headers"]["CorrelationId"];
+                    "X-Request-ID": components["headers"]["RequestId"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    "X-Correlation-ID": components["headers"]["CorrelationId"];
+                    "X-Request-ID": components["headers"]["RequestId"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorResponse"];
+                };
+            };
+            /** @description Session Locked */
+            423: {
+                headers: {
+                    "X-Correlation-ID": components["headers"]["CorrelationId"];
+                    "X-Request-ID": components["headers"]["RequestId"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorResponse"];
+                };
+            };
+            /** @description Login Rate Limited */
+            429: {
+                headers: {
+                    "X-Correlation-ID": components["headers"]["CorrelationId"];
+                    "X-Request-ID": components["headers"]["RequestId"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorResponse"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    "X-Correlation-ID": components["headers"]["CorrelationId"];
+                    "X-Request-ID": components["headers"]["RequestId"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorResponse"];
+                };
+            };
+        };
+    };
+    resolve_admin_transfer_v1_admin_transfers__transfer_id__resolve_post: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description A globally unique UUIDv7 identifying this business intention. */
+                "Idempotency-Key": string;
+                /** @description UUID for this HTTP attempt. Missing, duplicate or invalid IDs are replaced. */
+                "X-Request-ID"?: string;
+            };
+            path: {
+                transfer_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AdminTransferResolveRequest"];
             };
         };
         responses: {
@@ -42844,6 +44420,134 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["AdminWasteReasonView"][];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    "X-Correlation-ID": components["headers"]["CorrelationId"];
+                    "X-Request-ID": components["headers"]["RequestId"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorResponse"];
+                };
+            };
+            /** @description Authentication Required */
+            401: {
+                headers: {
+                    "X-Correlation-ID": components["headers"]["CorrelationId"];
+                    "X-Request-ID": components["headers"]["RequestId"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorResponse"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    "X-Correlation-ID": components["headers"]["CorrelationId"];
+                    "X-Request-ID": components["headers"]["RequestId"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorResponse"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    "X-Correlation-ID": components["headers"]["CorrelationId"];
+                    "X-Request-ID": components["headers"]["RequestId"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorResponse"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    "X-Correlation-ID": components["headers"]["CorrelationId"];
+                    "X-Request-ID": components["headers"]["RequestId"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    "X-Correlation-ID": components["headers"]["CorrelationId"];
+                    "X-Request-ID": components["headers"]["RequestId"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorResponse"];
+                };
+            };
+            /** @description Session Locked */
+            423: {
+                headers: {
+                    "X-Correlation-ID": components["headers"]["CorrelationId"];
+                    "X-Request-ID": components["headers"]["RequestId"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorResponse"];
+                };
+            };
+            /** @description Login Rate Limited */
+            429: {
+                headers: {
+                    "X-Correlation-ID": components["headers"]["CorrelationId"];
+                    "X-Request-ID": components["headers"]["RequestId"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorResponse"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    "X-Correlation-ID": components["headers"]["CorrelationId"];
+                    "X-Request-ID": components["headers"]["RequestId"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorResponse"];
+                };
+            };
+        };
+    };
+    get_admin_waste_stock_v1_admin_waste_stock_get: {
+        parameters: {
+            query: {
+                branch_id: string;
+                product_id: string;
+                location_code: string;
+            };
+            header?: {
+                /** @description UUID for this HTTP attempt. Missing, duplicate or invalid IDs are replaced. */
+                "X-Request-ID"?: string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    "X-Correlation-ID": components["headers"]["CorrelationId"];
+                    "X-Request-ID": components["headers"]["RequestId"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminWasteStockView"];
                 };
             };
             /** @description Bad Request */
@@ -54135,6 +55839,269 @@ export interface operations {
             };
         };
     };
+    attribute_inventory_v1_sales__sale_id__attribute_inventory_post: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description A globally unique UUIDv7 identifying this business intention. */
+                "Idempotency-Key": string;
+                /** @description UUID for this HTTP attempt. Missing, duplicate or invalid IDs are replaced. */
+                "X-Request-ID"?: string;
+            };
+            path: {
+                sale_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ClassAttributionRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    "Idempotency-Replayed": components["headers"]["IdempotencyReplayed"];
+                    "X-Correlation-ID": components["headers"]["CorrelationId"];
+                    "X-Request-ID": components["headers"]["RequestId"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ClassAttributionResult"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    "X-Correlation-ID": components["headers"]["CorrelationId"];
+                    "X-Request-ID": components["headers"]["RequestId"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorResponse"];
+                };
+            };
+            /** @description Authentication Required */
+            401: {
+                headers: {
+                    "X-Correlation-ID": components["headers"]["CorrelationId"];
+                    "X-Request-ID": components["headers"]["RequestId"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorResponse"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    "X-Correlation-ID": components["headers"]["CorrelationId"];
+                    "X-Request-ID": components["headers"]["RequestId"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorResponse"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    "X-Correlation-ID": components["headers"]["CorrelationId"];
+                    "X-Request-ID": components["headers"]["RequestId"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorResponse"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    "X-Correlation-ID": components["headers"]["CorrelationId"];
+                    "X-Request-ID": components["headers"]["RequestId"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    "X-Correlation-ID": components["headers"]["CorrelationId"];
+                    "X-Request-ID": components["headers"]["RequestId"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorResponse"];
+                };
+            };
+            /** @description Session Locked */
+            423: {
+                headers: {
+                    "X-Correlation-ID": components["headers"]["CorrelationId"];
+                    "X-Request-ID": components["headers"]["RequestId"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorResponse"];
+                };
+            };
+            /** @description Login Rate Limited */
+            429: {
+                headers: {
+                    "X-Correlation-ID": components["headers"]["CorrelationId"];
+                    "X-Request-ID": components["headers"]["RequestId"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorResponse"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    "X-Correlation-ID": components["headers"]["CorrelationId"];
+                    "X-Request-ID": components["headers"]["RequestId"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorResponse"];
+                };
+            };
+        };
+    };
+    recover_attribution_v1_sales__sale_id__inventory_attributions__idempotency_key__get: {
+        parameters: {
+            query: {
+                workstation_code: string;
+                cash_session_id: string;
+            };
+            header?: {
+                /** @description UUID for this HTTP attempt. Missing, duplicate or invalid IDs are replaced. */
+                "X-Request-ID"?: string;
+            };
+            path: {
+                sale_id: string;
+                idempotency_key: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    "X-Correlation-ID": components["headers"]["CorrelationId"];
+                    "X-Request-ID": components["headers"]["RequestId"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ClassAttributionResult"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    "X-Correlation-ID": components["headers"]["CorrelationId"];
+                    "X-Request-ID": components["headers"]["RequestId"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorResponse"];
+                };
+            };
+            /** @description Authentication Required */
+            401: {
+                headers: {
+                    "X-Correlation-ID": components["headers"]["CorrelationId"];
+                    "X-Request-ID": components["headers"]["RequestId"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorResponse"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    "X-Correlation-ID": components["headers"]["CorrelationId"];
+                    "X-Request-ID": components["headers"]["RequestId"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorResponse"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    "X-Correlation-ID": components["headers"]["CorrelationId"];
+                    "X-Request-ID": components["headers"]["RequestId"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorResponse"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    "X-Correlation-ID": components["headers"]["CorrelationId"];
+                    "X-Request-ID": components["headers"]["RequestId"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    "X-Correlation-ID": components["headers"]["CorrelationId"];
+                    "X-Request-ID": components["headers"]["RequestId"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorResponse"];
+                };
+            };
+            /** @description Session Locked */
+            423: {
+                headers: {
+                    "X-Correlation-ID": components["headers"]["CorrelationId"];
+                    "X-Request-ID": components["headers"]["RequestId"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorResponse"];
+                };
+            };
+            /** @description Login Rate Limited */
+            429: {
+                headers: {
+                    "X-Correlation-ID": components["headers"]["CorrelationId"];
+                    "X-Request-ID": components["headers"]["RequestId"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorResponse"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    "X-Correlation-ID": components["headers"]["CorrelationId"];
+                    "X-Request-ID": components["headers"]["RequestId"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorResponse"];
+                };
+            };
+        };
+    };
     list_tickets_v1_tickets_get: {
         parameters: {
             query: {
@@ -54658,7 +56625,7 @@ export interface operations {
                 "X-Request-ID"?: string;
             };
             path: {
-                command_code: "dispatch" | "receive";
+                command_code: "dispatch" | "receive" | "resolve_return" | "resolve_waste";
                 idempotency_key: string;
             };
             cookie?: never;
@@ -55441,6 +57408,140 @@ export interface operations {
         requestBody: {
             content: {
                 "application/json": components["schemas"]["TransferReceiveRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    "Idempotency-Replayed": components["headers"]["IdempotencyReplayed"];
+                    "X-Correlation-ID": components["headers"]["CorrelationId"];
+                    "X-Request-ID": components["headers"]["RequestId"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TransferCommandResultView"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    "X-Correlation-ID": components["headers"]["CorrelationId"];
+                    "X-Request-ID": components["headers"]["RequestId"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorResponse"];
+                };
+            };
+            /** @description Authentication Required */
+            401: {
+                headers: {
+                    "X-Correlation-ID": components["headers"]["CorrelationId"];
+                    "X-Request-ID": components["headers"]["RequestId"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorResponse"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    "X-Correlation-ID": components["headers"]["CorrelationId"];
+                    "X-Request-ID": components["headers"]["RequestId"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorResponse"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    "X-Correlation-ID": components["headers"]["CorrelationId"];
+                    "X-Request-ID": components["headers"]["RequestId"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorResponse"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    "Idempotency-Replayed": components["headers"]["IdempotencyReplayed"];
+                    "X-Correlation-ID": components["headers"]["CorrelationId"];
+                    "X-Request-ID": components["headers"]["RequestId"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    "X-Correlation-ID": components["headers"]["CorrelationId"];
+                    "X-Request-ID": components["headers"]["RequestId"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorResponse"];
+                };
+            };
+            /** @description Session Locked */
+            423: {
+                headers: {
+                    "X-Correlation-ID": components["headers"]["CorrelationId"];
+                    "X-Request-ID": components["headers"]["RequestId"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorResponse"];
+                };
+            };
+            /** @description Login Rate Limited */
+            429: {
+                headers: {
+                    "X-Correlation-ID": components["headers"]["CorrelationId"];
+                    "X-Request-ID": components["headers"]["RequestId"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorResponse"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    "X-Correlation-ID": components["headers"]["CorrelationId"];
+                    "X-Request-ID": components["headers"]["RequestId"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorResponse"];
+                };
+            };
+        };
+    };
+    resolve_pos_transfer_v1_transfers__transfer_id__resolve_post: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description A globally unique UUIDv7 identifying this business intention. */
+                "Idempotency-Key": string;
+                /** @description UUID for this HTTP attempt. Missing, duplicate or invalid IDs are replaced. */
+                "X-Request-ID"?: string;
+            };
+            path: {
+                transfer_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TransferResolveRequest"];
             };
         };
         responses: {

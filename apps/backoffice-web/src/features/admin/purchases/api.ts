@@ -59,7 +59,13 @@ function mapMetric(value: number | string | null | undefined): string {
 }
 
 function mapFilterOptions(options: ApiPurchaseFilterOption[]): AdminPurchaseFilterOption[] {
-  return options.map((option) => ({ id: String(option.id), label: option.label }));
+  return options.map((option) => ({
+    id: String(option.id),
+    label: option.label,
+    baseUom: option.base_uom,
+    purchaseUom: option.purchase_uom,
+    conversionFactor: option.conversion_factor,
+  }));
 }
 
 function mapWarning(warning: ApiPurchaseWarning): AdminPurchaseWarning {
@@ -112,8 +118,10 @@ export function mapAdminPurchaseListItemFromApi(item: ApiPurchaseListItem): Admi
 
 export function mapAdminPurchaseDetailFromApi(item: ApiPurchaseDetail): AdminPurchaseDetail {
   return {
+    receipts: item.receipts,
     availableActions: {
       canCancel: item.available_actions.can_cancel,
+      canReverseReceipt: item.available_actions.can_reverse_receipt,
       canConfirm: item.available_actions.can_confirm,
       canEdit: item.available_actions.can_edit,
       canReceive: item.available_actions.can_receive,
@@ -129,6 +137,8 @@ export function mapAdminPurchaseDetailFromApi(item: ApiPurchaseDetail): AdminPur
     inventoryImpact: {
       integrationAvailable: item.inventory_impact.integration_available,
       movements: item.inventory_impact.movements.map((movement) => ({
+        unitCost: movement.unit_cost ?? null,
+        totalCost: movement.total_cost ?? null,
         balanceAfter: movement.balance_after == null ? null : String(movement.balance_after),
         branchId: movement.branch_id,
         direction: movement.direction,
@@ -162,6 +172,9 @@ export function mapAdminPurchaseDetailFromApi(item: ApiPurchaseDetail): AdminPur
         line.supplier_last_known_price == null ? null : String(line.supplier_last_known_price),
       unitCost: String(line.unit_cost),
       unitOfMeasure: line.unit_of_measure,
+      sourceUnitOfMeasure: line.source_unit_of_measure,
+      conversionFactor: line.conversion_factor,
+      orderedQuantityBase: line.ordered_quantity_base,
     })),
     overview: {
       branchId: item.overview.branch_id,
@@ -260,6 +273,7 @@ function toPurchaseApiPayload(payload: AdminPurchasePayload): ApiPurchaseCreateP
     lines: payload.lines.map((line) => ({
       notes: line.notes ?? null,
       ordered_quantity: line.orderedQuantity,
+      source_unit_of_measure: line.sourceUnitOfMeasure ?? null,
       product_id: line.productId,
       unit_cost: line.unitCost,
     })),
@@ -278,6 +292,9 @@ function toDirectEntryApiPayload(payload: AdminDirectEntryPayload): ApiDirectEnt
     lines: payload.lines.map((line) => ({
       notes: line.notes ?? null,
       product_id: line.productId,
+      source_unit_of_measure: line.sourceUnitOfMeasure ?? null,
+      lot_code: line.lotCode ?? null,
+      expires_at: line.expiresAt ?? null,
       received_quantity: line.receivedQuantity,
       unit_cost: line.unitCost,
     })),
@@ -292,6 +309,8 @@ function toReceiptApiPayload(payload: AdminPurchaseReceiptPayload): ApiPurchaseR
       discrepancy_reason: line.discrepancyReason ?? null,
       notes: line.notes ?? null,
       purchase_line_id: line.purchaseLineId,
+      lot_code: line.lotCode ?? null,
+      expires_at: line.expiresAt ?? null,
       received_quantity: line.receivedQuantity,
       unit_cost: line.unitCost ?? null,
     })),
@@ -415,5 +434,18 @@ export function recoverAdminPurchaseCommand(
 ): Promise<PurchaseCommandResultView> {
   return requestJson<PurchaseCommandResultView>({
     path: `/v1/admin/purchases/commands/${commandCode}/${encodeURIComponent(key)}?${new URLSearchParams({ branch_id: branchId })}`,
+  });
+}
+
+export function reverseAdminPurchaseReceipt(
+  purchaseId: string,
+  payload: components["schemas"]["AdminPurchaseReverseReceiptRequest"],
+  key: string,
+): Promise<PurchaseCommandResultView> {
+  return requestJson<PurchaseCommandResultView>({
+    path: `/v1/admin/purchases/${purchaseId}/reverse-receipt`,
+    method: "POST",
+    body: payload,
+    headers: { "Idempotency-Key": key },
   });
 }

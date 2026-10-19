@@ -252,12 +252,14 @@ describe("admin inventory API boundary", () => {
       expect.objectContaining({
         body: JSON.stringify({
           adjustment_type: "INCREASE",
+          allow_negative: false,
           branch_id: "branch-1",
           location_code: "BACKROOM",
           notes: null,
           product_id: "product-1",
           quantity: "12.000",
           reason: "Initial count",
+          lot_id: null, lot_code: null, expires_at: null, unit_cost: null, cost_evidence_reference: null,
         }),
         method: "POST",
       }),

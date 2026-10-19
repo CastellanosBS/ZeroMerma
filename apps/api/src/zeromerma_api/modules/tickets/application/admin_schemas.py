@@ -4,7 +4,7 @@ from datetime import datetime
 from decimal import Decimal
 from uuid import UUID
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 
 class AdminSalesTicketFilterOptionView(BaseModel):
@@ -63,6 +63,7 @@ class AdminSalesTicketListItemView(BaseModel):
     return_status: str
     return_count: int
     has_returns: bool
+    pending_attribution_line_count: int = Field(ge=0)
 
 
 class AdminSalesTicketsListResponse(BaseModel):
@@ -108,6 +109,16 @@ class AdminSalesTicketOperationalContextView(BaseModel):
     confirmed_at: datetime
 
 
+class AdminSalesTicketAttributionView(BaseModel):
+    id: UUID
+    product_id: UUID
+    product_code: str
+    product_name: str
+    quantity: Decimal
+    inventory_movement_id: UUID | None
+    occurred_at: datetime
+
+
 class AdminSalesTicketLineView(BaseModel):
     id: UUID
     sequence: int
@@ -121,6 +132,9 @@ class AdminSalesTicketLineView(BaseModel):
     line_total_amount: Decimal
     discount_amount: Decimal
     physical_attribution_status: str
+    attributed_quantity: Decimal | None
+    remaining_attribution_quantity: Decimal | None
+    physical_attributions: list[AdminSalesTicketAttributionView]
 
 
 class AdminSalesTicketPaymentView(BaseModel):

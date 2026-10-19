@@ -17,19 +17,17 @@ from zeromerma_api.modules.catalog.infrastructure.models import Product, Product
 from zeromerma_api.modules.identity.application.actions import restrict_actions
 from zeromerma_api.modules.identity.application.schemas import AuthenticatedUser
 from zeromerma_api.modules.identity.infrastructure.models import User
-from zeromerma_api.modules.inventory.application.mutations import (
-    InventoryBalanceKey,
-    lock_inventory_balances,
-)
 from zeromerma_api.modules.inventory.domain.constants import (
     INVENTORY_LOCATION_BACKROOM,
     INVENTORY_LOCATION_COUNTER,
     INVENTORY_LOCATION_IN_TRANSIT,
-    INVENTORY_MOVEMENT_TYPE_WASTE_RECORD,
 )
 from zeromerma_api.modules.inventory.infrastructure.models import (
     InventoryBalance,
     InventoryMovement,
+)
+from zeromerma_api.modules.operations.application.physical_inventory import (
+    apply_operation_inventory,
 )
 from zeromerma_api.modules.operations.application.results import build_operation_result
 from zeromerma_api.modules.operations.application.schemas import OperationCommitResultView
@@ -81,7 +79,6 @@ from zeromerma_api.modules.waste.domain.constants import (
     ADMIN_WASTE_IMPACT_LEVEL_HIGH,
     ADMIN_WASTE_IMPACT_LEVEL_NORMAL,
     ADMIN_WASTE_RESOURCE_TYPE,
-    ADMIN_WASTE_SOURCE_DOCUMENT_TYPE,
     AUDIT_ACTION_ADMIN_WASTE_CONFIRMED,
     AUDIT_ACTION_ADMIN_WASTE_HIGH_IMPACT_NOTIFIED,
 )
@@ -104,6 +101,7 @@ LOCATION_LABELS = {
     INVENTORY_LOCATION_BACKROOM: "Fondo",
     INVENTORY_LOCATION_COUNTER: "Mostrador",
     INVENTORY_LOCATION_IN_TRANSIT: "En transito",
+    "QUARANTINE": "Cuarentena",
 }
 
 PRODUCT_KIND_LABELS = {
@@ -258,10 +256,11 @@ class AdminWasteService:
         branch = self._get_branch(session, command.branch_id)
         if not branch.is_active:
             raise WasteValidationError("Waste branch is inactive.")
-        workstation = self._get_active_workstation_for_branch(session, branch.id)
         reason = self._get_reason(session, command.reason_code)
         resolved_product = self._resolve_product(session, command.product_id)
         location_code = command.location_code
+        if location_code == "IN_TRANSIT":
+            raise WasteValidationError("Resolve transit waste from its original transfer document.")
         if location_code not in LOCATION_LABELS:
             raise WasteValidationError("Waste source location is not supported.")
 
@@ -270,13 +269,6 @@ class AdminWasteService:
         notes_required = reason.code in WASTE_REASON_CODES_REQUIRING_NOTE or is_high_impact
         if notes_required and not _has_text(command.notes):
             raise WasteValidationError("Notes are required for this waste reason or impact level.")
-
-        key = InventoryBalanceKey(branch.id, resolved_product.product.id, location_code)
-        balances = lock_inventory_balances(session, [key])
-        if balances.quantity(key) < quantity:
-            raise WasteValidationError(
-                "Waste quantity exceeds available stock for selected branch and location."
-            )
 
         now = _utc_now()
         document = OperationDocument(
@@ -289,7 +281,7 @@ class AdminWasteService:
             source_branch_id=branch.id,
             source_bucket_code=location_code,
             status=OPERATION_DOCUMENT_STATUS_COMMITTED,
-            workstation_id=workstation.id,
+            workstation_id=None,
         )
 
         session.add(document)
@@ -308,17 +300,13 @@ class AdminWasteService:
                 unit_of_measure_code=resolved_product.product.unit_of_measure,
             ),
         )
-        movement = balances.apply_delta(
-            key,
-            delta=-quantity,
-            movement_type=INVENTORY_MOVEMENT_TYPE_WASTE_RECORD,
-            notes=command.notes,
-            operator_user_id=current_user.id,
-            reason=reason.code,
-            source_document_id=document.id,
-            source_document_type=ADMIN_WASTE_SOURCE_DOCUMENT_TYPE,
-            unit_of_measure=resolved_product.product.unit_of_measure,
+        movement_ids = apply_operation_inventory(
+            session, document, line_lots={1: command.lot_id} if command.lot_id else None
         )
+        session.flush()
+        movement = session.get(InventoryMovement, movement_ids[0])
+        if movement is None:
+            raise WasteValidationError("The physical waste movement is missing.")
         self._record_confirmed(
             session,
             branch=branch,
@@ -336,7 +324,7 @@ class AdminWasteService:
         session.flush()
 
         return build_operation_result(
-            session, document, cash_session_id=None, inventory_movement_ids=[movement.id]
+            session, document, cash_session_id=None, inventory_movement_ids=movement_ids
         )
 
     def _fetch_rows(
@@ -355,7 +343,7 @@ class AdminWasteService:
             select(OperationDocument, Branch, User, Workstation, WasteReason)
             .join(Branch, Branch.id == OperationDocument.source_branch_id)
             .join(User, User.id == OperationDocument.created_by_user_id)
-            .join(Workstation, Workstation.id == OperationDocument.workstation_id)
+            .outerjoin(Workstation, Workstation.id == OperationDocument.workstation_id)
             .join(WasteReason, WasteReason.code == OperationDocument.reason_code)
             .where(OperationDocument.document_type == OPERATION_DOCUMENT_TYPE_WASTE_RECORD)
             .order_by(OperationDocument.created_at_utc.desc())
@@ -400,7 +388,7 @@ class AdminWasteService:
             select(OperationDocument, Branch, User, Workstation, WasteReason)
             .join(Branch, Branch.id == OperationDocument.source_branch_id)
             .join(User, User.id == OperationDocument.created_by_user_id)
-            .join(Workstation, Workstation.id == OperationDocument.workstation_id)
+            .outerjoin(Workstation, Workstation.id == OperationDocument.workstation_id)
             .join(WasteReason, WasteReason.code == OperationDocument.reason_code)
             .where(
                 OperationDocument.id == waste_id,
@@ -559,8 +547,8 @@ class AdminWasteService:
                 status=_ADMIN_WASTE_STATUS_ADAPTER.validate_python(row.document.status),
                 uom=primary.line.unit_of_measure_code if len(row.lines) == 1 else "mixed",
                 warning_state=self._warning_state_from_warnings(warnings),
-                workstation_code=row.workstation.code,
-                workstation_name=row.workstation.name,
+                workstation_code=row.workstation.code if row.workstation else None,
+                workstation_name=row.workstation.name if row.workstation else None,
             ),
             product_inventory_context=AdminWasteProductInventoryContextView(
                 branch_id=row.branch.id,
@@ -841,7 +829,7 @@ class AdminWasteService:
                 select(InventoryMovement)
                 .where(
                     InventoryMovement.source_document_id == waste_id,
-                    InventoryMovement.source_document_type == ADMIN_WASTE_SOURCE_DOCUMENT_TYPE,
+                    InventoryMovement.source_document_type == "OPERATION_DOCUMENT",
                 )
                 .order_by(InventoryMovement.occurred_at.asc()),
             )
@@ -891,21 +879,6 @@ class AdminWasteService:
         if branch is None:
             raise WasteNotFoundError("Branch was not found.")
         return branch
-
-    def _get_active_workstation_for_branch(
-        self, session: Session, branch_id: uuid.UUID
-    ) -> Workstation:
-        workstation = session.execute(
-            select(Workstation)
-            .where(Workstation.branch_id == branch_id, Workstation.is_active.is_(True))
-            .order_by(Workstation.code.asc())
-            .limit(1),
-        ).scalar_one_or_none()
-        if workstation is None:
-            raise WasteValidationError(
-                "Branch needs an active workstation before waste can be managed."
-            )
-        return workstation
 
     def _get_reason(self, session: Session, reason_code: str) -> WasteReason:
         reason = session.execute(

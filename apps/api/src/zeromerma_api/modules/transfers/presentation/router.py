@@ -46,6 +46,7 @@ from zeromerma_api.modules.transfers.application.admin_schemas import (
 from zeromerma_api.modules.transfers.application.admin_services import AdminTransferService
 from zeromerma_api.modules.transfers.application.idempotency import TransferCommandServiceWrapper
 from zeromerma_api.modules.transfers.application.schemas import (
+    AdminTransferResolveRequest,
     PendingInboundTransfersResponse,
     PosTransferCommandCode,
     TransferCommandCode,
@@ -55,6 +56,7 @@ from zeromerma_api.modules.transfers.application.schemas import (
     TransferDispatchHistoryResponse,
     TransferReceiptHistoryResponse,
     TransferReceiveRequest,
+    TransferResolveRequest,
 )
 from zeromerma_api.modules.transfers.application.services import (
     TransferQueryService,
@@ -517,3 +519,64 @@ def recover_admin_transfer(
     return idempotency_response(
         replace(result, status_code=200) if result.status_code < 300 else result, request
     )
+
+
+@admin_router.post(
+    "/{transfer_id}/resolve",
+    response_model=TransferCommandResultView,
+    responses={200: _REPLAY_RESPONSE, 409: {**error_responses()[409], **_REPLAY_RESPONSE}},
+)
+def resolve_admin_transfer(
+    transfer_id: UUID,
+    payload: AdminTransferResolveRequest,
+    request: Request,
+    current_user: Annotated[AuthenticatedUser, Depends(get_current_user)],
+    session: Annotated[Session, Depends(get_session)],
+    key: Annotated[UUID, Depends(require_idempotency_key)],
+) -> Response:
+    _require_backoffice_user(current_user)
+    try:
+        result = TransferCommandServiceWrapper().execute_admin(
+            session,
+            current_user=current_user,
+            key=key,
+            transfer_id=transfer_id,
+            command_code="resolve_return"
+            if payload.kind == "RETURN_TO_ORIGIN"
+            else "resolve_waste",
+            command=payload,
+            request_id=request.headers.get("X-Request-ID"),
+        )
+        return idempotency_response(result, request)
+    except TransferError as error:
+        raise _to_http_exception(error) from error
+
+
+@router.post(
+    "/{transfer_id}/resolve",
+    response_model=TransferCommandResultView,
+    responses={200: _REPLAY_RESPONSE, 409: {**error_responses()[409], **_REPLAY_RESPONSE}},
+)
+def resolve_pos_transfer(
+    transfer_id: UUID,
+    payload: TransferResolveRequest,
+    request: Request,
+    current_user: Annotated[AuthenticatedUser, Depends(get_current_user)],
+    session: Annotated[Session, Depends(get_session)],
+    key: Annotated[UUID, Depends(require_idempotency_key)],
+) -> Response:
+    try:
+        result = TransferCommandServiceWrapper().execute_pos(
+            session,
+            current_user=current_user,
+            key=key,
+            transfer_id=transfer_id,
+            command_code="resolve_return"
+            if payload.kind == "RETURN_TO_ORIGIN"
+            else "resolve_waste",
+            command=payload,
+            request_id=request.headers.get("X-Request-ID"),
+        )
+        return idempotency_response(result, request)
+    except (BranchAccessError, CatalogError, OperationError, TransferError) as error:
+        raise _to_http_exception(error) from error

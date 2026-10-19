@@ -110,7 +110,14 @@ const cases = [
             {
               original_sale_line_id: "line",
               returned_quantity: "1",
-              disposition_code: "RESTOCK_COUNTER",
+              allocations: [
+                {
+                  exact_product_id: "product",
+                  quantity: "1",
+                  disposition_code: "QUARANTINE",
+                  restock_safe_acknowledged: false,
+                },
+              ],
             },
           ],
         },

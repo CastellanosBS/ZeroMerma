@@ -69,6 +69,11 @@ const productDirectClass: PosCatalogClassView = {
 };
 
 const productDirectProduct: PosCatalogProductView = {
+  is_inventory_tracked: true,
+  lot_tracking_enabled: false,
+  available_quantity: "100.000",
+  reserved_quantity: "0.000",
+  available_lots: [],
   code: "COCA-355",
   currency_code: "MXN",
   display_order: 10,
@@ -92,6 +97,33 @@ function addClassLine(quantityText: string) {
 }
 
 describe("pos terminal model", () => {
+  it("rejects unavailable direct products and quantities beyond the consulted balance", () => {
+    const initial = beginSelectionFromClass(createInitialPosTerminalState(), productDirectClass);
+    expect(() =>
+      selectProductForPending(initial, { ...productDirectProduct, available_quantity: "0.000" }),
+    ).toThrow(/existencias/);
+    const selected = selectProductForPending(initial, {
+      ...productDirectProduct,
+      available_quantity: "0.500",
+    });
+    expect(() =>
+      addPendingSelectionToCart({
+        ...selected,
+        pendingSelection: { ...selected.pendingSelection!, quantityText: "1" },
+      }),
+    ).toThrow(/existencias/);
+    const untracked = selectProductForPending(initial, {
+      ...productDirectProduct,
+      is_inventory_tracked: false,
+      available_quantity: null,
+    });
+    expect(
+      addPendingSelectionToCart({
+        ...untracked,
+        pendingSelection: { ...untracked.pendingSelection!, quantityText: "1" },
+      }).cartLines,
+    ).toHaveLength(1);
+  });
   it("orders class capture entries before product direct entries and by display order", () => {
     expect(
       sortCatalogClasses([productDirectClass, classCaptureClass, bolilloClass]).map(

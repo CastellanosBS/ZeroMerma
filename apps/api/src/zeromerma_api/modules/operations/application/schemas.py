@@ -9,6 +9,7 @@ from pydantic import BaseModel, ConfigDict, Field
 from zeromerma_api.modules.audit.application.schemas import AuditSummaryView
 from zeromerma_api.modules.branches.application.schemas import BranchSummary, WorkstationSummary
 from zeromerma_api.modules.identity.application.schemas import AuthenticatedUser
+from zeromerma_api.modules.operations.application.lot_queries import OperationInventoryLotView
 from zeromerma_api.modules.operations.domain.constants import OPERATION_BUCKET_COUNTER
 
 
@@ -74,6 +75,8 @@ class OperationsCatalogProductView(BaseModel):
     display_order: int
     unit_price: Decimal
     currency_code: str
+    lot_tracking_enabled: bool = False
+    inventory_lots: list[OperationInventoryLotView] = Field(default_factory=list)
 
 
 class OperationsClassProductsResponse(BaseModel):
@@ -89,6 +92,7 @@ class OperationCommitLineRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     product_id: UUID
+    lot_id: UUID | None = None
     quantity: Decimal = Field(gt=Decimal("0"), max_digits=12, decimal_places=3)
     notes: str | None = Field(default=None, max_length=500)
 
@@ -144,9 +148,9 @@ class OperationDocumentView(BaseModel):
     destination_branch_name: str | None
     source_bucket_code: str | None
     destination_bucket_code: str | None
-    workstation_id: UUID
-    workstation_code: str
-    workstation_name: str
+    workstation_id: UUID | None
+    workstation_code: str | None
+    workstation_name: str | None
     created_by_user_id: UUID
     created_by_user_email: str
     created_by_user_full_name: str
@@ -181,8 +185,8 @@ class OperationHistoryListItemView(BaseModel):
     destination_branch_name: str | None
     source_bucket_code: str | None
     destination_bucket_code: str | None
-    workstation_code: str
-    workstation_name: str
+    workstation_code: str | None
+    workstation_name: str | None
     created_by_user_id: UUID
     created_by_user_full_name: str
     reason_code: str | None = None
@@ -231,7 +235,7 @@ class OperationCommitResultView(BaseModel):
     document_type: str
     status: str
     branch_id: UUID
-    workstation_id: UUID
+    workstation_id: UUID | None
     cash_session_id: UUID | None
     source_bucket_code: str | None
     destination_bucket_code: str | None

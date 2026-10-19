@@ -12097,6 +12097,11 @@
             "title": "Code",
             "type": "string"
           },
+          "expiry_required": {
+            "default": false,
+            "title": "Expiry Required",
+            "type": "boolean"
+          },
           "is_active": {
             "default": true,
             "title": "Is Active",
@@ -12110,6 +12115,21 @@
           "is_purchasable": {
             "default": true,
             "title": "Is Purchasable",
+            "type": "boolean"
+          },
+          "is_sellable": {
+            "default": false,
+            "title": "Is Sellable",
+            "type": "boolean"
+          },
+          "is_usable_as_input": {
+            "default": true,
+            "title": "Is Usable As Input",
+            "type": "boolean"
+          },
+          "lot_tracking_enabled": {
+            "default": false,
+            "title": "Lot Tracking Enabled",
             "type": "boolean"
           },
           "minimum_stock": {
@@ -12619,6 +12639,10 @@
             "title": "Code",
             "type": "string"
           },
+          "expiry_required": {
+            "title": "Expiry Required",
+            "type": "boolean"
+          },
           "id": {
             "format": "uuid",
             "title": "Id",
@@ -12635,6 +12659,14 @@
           },
           "is_purchasable": {
             "title": "Is Purchasable",
+            "type": "boolean"
+          },
+          "is_sellable": {
+            "title": "Is Sellable",
+            "type": "boolean"
+          },
+          "is_usable_as_input": {
+            "title": "Is Usable As Input",
             "type": "boolean"
           },
           "last_movement_at": {
@@ -12662,6 +12694,10 @@
               }
             ],
             "title": "Last Purchase Cost"
+          },
+          "lot_tracking_enabled": {
+            "title": "Lot Tracking Enabled",
+            "type": "boolean"
           },
           "name": {
             "title": "Name",
@@ -12763,6 +12799,10 @@
           "is_active",
           "is_inventory_tracked",
           "is_purchasable",
+          "is_sellable",
+          "is_usable_as_input",
+          "lot_tracking_enabled",
+          "expiry_required",
           "name",
           "product_kind",
           "recipe_usage_count",
@@ -12891,6 +12931,10 @@
             "type": "string",
             "x-zeromerma-instant-format": "ISO8601_DATETIME"
           },
+          "expiry_required": {
+            "title": "Expiry Required",
+            "type": "boolean"
+          },
           "id": {
             "format": "uuid",
             "title": "Id",
@@ -12909,6 +12953,14 @@
             "title": "Is Purchasable",
             "type": "boolean"
           },
+          "is_sellable": {
+            "title": "Is Sellable",
+            "type": "boolean"
+          },
+          "is_usable_as_input": {
+            "title": "Is Usable As Input",
+            "type": "boolean"
+          },
           "last_purchase_cost": {
             "anyOf": [
               {
@@ -12921,6 +12973,10 @@
               }
             ],
             "title": "Last Purchase Cost"
+          },
+          "lot_tracking_enabled": {
+            "title": "Lot Tracking Enabled",
+            "type": "boolean"
           },
           "name": {
             "title": "Name",
@@ -12996,6 +13052,10 @@
           "is_active",
           "is_inventory_tracked",
           "is_purchasable",
+          "is_sellable",
+          "is_usable_as_input",
+          "lot_tracking_enabled",
+          "expiry_required",
           "name",
           "product_kind",
           "readiness_state",
@@ -13427,6 +13487,11 @@
             "title": "Code",
             "type": "string"
           },
+          "expiry_required": {
+            "default": false,
+            "title": "Expiry Required",
+            "type": "boolean"
+          },
           "is_active": {
             "default": true,
             "title": "Is Active",
@@ -13440,6 +13505,21 @@
           "is_purchasable": {
             "default": true,
             "title": "Is Purchasable",
+            "type": "boolean"
+          },
+          "is_sellable": {
+            "default": false,
+            "title": "Is Sellable",
+            "type": "boolean"
+          },
+          "is_usable_as_input": {
+            "default": true,
+            "title": "Is Usable As Input",
+            "type": "boolean"
+          },
+          "lot_tracking_enabled": {
+            "default": false,
+            "title": "Lot Tracking Enabled",
             "type": "boolean"
           },
           "minimum_stock": {
@@ -13653,11 +13733,42 @@
             "title": "Adjustment Type",
             "type": "string"
           },
+          "allow_negative": {
+            "default": false,
+            "title": "Allow Negative",
+            "type": "boolean"
+          },
           "branch_id": {
             "format": "uuid",
             "title": "Branch Id",
             "type": "string",
             "x-zeromerma-id-representation": "JSON_STRING"
+          },
+          "cost_evidence_reference": {
+            "anyOf": [
+              {
+                "maxLength": 240,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cost Evidence Reference"
+          },
+          "expires_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string",
+                "x-zeromerma-instant-format": "ISO8601_DATETIME"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expires At"
           },
           "location_code": {
             "default": "BACKROOM",
@@ -13665,10 +13776,38 @@
               "BACKROOM",
               "COUNTER",
               "IN_TRANSIT",
-              "WASTE"
+              "WASTE",
+              "QUARANTINE",
+              "WIP"
             ],
             "title": "Location Code",
             "type": "string"
+          },
+          "lot_code": {
+            "anyOf": [
+              {
+                "maxLength": 120,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Lot Code"
+          },
+          "lot_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string",
+                "x-zeromerma-id-representation": "JSON_STRING"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Lot Id"
           },
           "notes": {
             "anyOf": [
@@ -13691,7 +13830,7 @@
           "quantity": {
             "anyOf": [
               {
-                "exclusiveMinimum": 0.0,
+                "minimum": 0.0,
                 "type": "number"
               },
               {
@@ -13708,6 +13847,24 @@
             "minLength": 1,
             "title": "Reason",
             "type": "string"
+          },
+          "unit_cost": {
+            "anyOf": [
+              {
+                "minimum": 0.0,
+                "type": "number"
+              },
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*(?:\\d{0,10}|(?=[\\d.]{1,19}0*$)\\d{0,10}\\.\\d{0,8}0*$)",
+                "type": "string",
+                "x-zeromerma-decimal-representation": "JSON_STRING"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Unit Cost",
+            "x-zeromerma-decimal-input-representation": "JSON_NUMBER_OR_STRING"
           }
         },
         "required": [
@@ -13767,7 +13924,9 @@
               "BACKROOM",
               "COUNTER",
               "IN_TRANSIT",
-              "WASTE"
+              "WASTE",
+              "QUARANTINE",
+              "WIP"
             ],
             "title": "Location Code",
             "type": "string"
@@ -13860,7 +14019,9 @@
               "BACKROOM",
               "COUNTER",
               "IN_TRANSIT",
-              "WASTE"
+              "WASTE",
+              "QUARANTINE",
+              "WIP"
             ],
             "title": "Location Code",
             "type": "string"
@@ -13895,6 +14056,13 @@
           },
           "branch_location": {
             "$ref": "#/components/schemas/AdminInventoryBranchLocationView"
+          },
+          "lots": {
+            "items": {
+              "$ref": "#/components/schemas/AdminInventoryLotView"
+            },
+            "title": "Lots",
+            "type": "array"
           },
           "movement_summary": {
             "$ref": "#/components/schemas/AdminInventoryMovementSummaryView"
@@ -13942,7 +14110,8 @@
           "related_actions",
           "stock_breakdown",
           "stock_state",
-          "warnings"
+          "warnings",
+          "lots"
         ],
         "title": "AdminInventoryDetailView",
         "type": "object"
@@ -14098,7 +14267,9 @@
               "BACKROOM",
               "COUNTER",
               "IN_TRANSIT",
-              "WASTE"
+              "WASTE",
+              "QUARANTINE",
+              "WIP"
             ],
             "title": "Location Code",
             "type": "string"
@@ -14261,6 +14432,66 @@
         "title": "AdminInventoryListResponse",
         "type": "object"
       },
+      "AdminInventoryLotView": {
+        "properties": {
+          "available_quantity": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Available Quantity",
+            "type": "string",
+            "x-zeromerma-decimal-representation": "JSON_STRING"
+          },
+          "expires_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string",
+                "x-zeromerma-instant-format": "ISO8601_DATETIME"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expires At"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string",
+            "x-zeromerma-id-representation": "JSON_STRING"
+          },
+          "lot_code": {
+            "title": "Lot Code",
+            "type": "string"
+          },
+          "quantity_on_hand": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Quantity On Hand",
+            "type": "string",
+            "x-zeromerma-decimal-representation": "JSON_STRING"
+          },
+          "quantity_reserved": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Quantity Reserved",
+            "type": "string",
+            "x-zeromerma-decimal-representation": "JSON_STRING"
+          },
+          "unidentified": {
+            "title": "Unidentified",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "id",
+          "lot_code",
+          "expires_at",
+          "unidentified",
+          "quantity_on_hand",
+          "quantity_reserved",
+          "available_quantity"
+        ],
+        "title": "AdminInventoryLotView",
+        "type": "object"
+      },
       "AdminInventoryMetricsView": {
         "properties": {
           "estimated_value": {
@@ -14404,7 +14635,9 @@
               "BACKROOM",
               "COUNTER",
               "IN_TRANSIT",
-              "WASTE"
+              "WASTE",
+              "QUARANTINE",
+              "WIP"
             ],
             "title": "Location Code",
             "type": "string"
@@ -14555,6 +14788,10 @@
             "title": "Code",
             "type": "string"
           },
+          "expiry_required": {
+            "title": "Expiry Required",
+            "type": "boolean"
+          },
           "id": {
             "format": "uuid",
             "title": "Id",
@@ -14567,6 +14804,10 @@
           },
           "is_sellable": {
             "title": "Is Sellable",
+            "type": "boolean"
+          },
+          "lot_tracking_enabled": {
+            "title": "Lot Tracking Enabled",
             "type": "boolean"
           },
           "name": {
@@ -14610,7 +14851,9 @@
           "is_sellable",
           "name",
           "product_kind",
-          "unit_of_measure"
+          "unit_of_measure",
+          "lot_tracking_enabled",
+          "expiry_required"
         ],
         "title": "AdminInventoryProductView",
         "type": "object"
@@ -14709,11 +14952,26 @@
           "unit_of_measure": {
             "title": "Unit Of Measure",
             "type": "string"
+          },
+          "valuation_method": {
+            "const": "WEIGHTED_AVERAGE",
+            "default": "WEIGHTED_AVERAGE",
+            "title": "Valuation Method",
+            "type": "string"
+          },
+          "valuation_status": {
+            "enum": [
+              "KNOWN",
+              "UNAVAILABLE"
+            ],
+            "title": "Valuation Status",
+            "type": "string"
           }
         },
         "required": [
           "quantity_on_hand",
-          "unit_of_measure"
+          "unit_of_measure",
+          "valuation_status"
         ],
         "title": "AdminInventoryStockBreakdownView",
         "type": "object"
@@ -17551,6 +17809,26 @@
             "title": "Code",
             "type": "string"
           },
+          "expiry_required": {
+            "default": false,
+            "title": "Expiry Required",
+            "type": "boolean"
+          },
+          "is_sellable": {
+            "default": true,
+            "title": "Is Sellable",
+            "type": "boolean"
+          },
+          "is_usable_as_input": {
+            "default": false,
+            "title": "Is Usable As Input",
+            "type": "boolean"
+          },
+          "lot_tracking_enabled": {
+            "default": false,
+            "title": "Lot Tracking Enabled",
+            "type": "boolean"
+          },
           "name": {
             "maxLength": 160,
             "minLength": 1,
@@ -17875,6 +18153,50 @@
             ],
             "title": "Code"
           },
+          "expiry_required": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expiry Required"
+          },
+          "is_sellable": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Is Sellable"
+          },
+          "is_usable_as_input": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Is Usable As Input"
+          },
+          "lot_tracking_enabled": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Lot Tracking Enabled"
+          },
           "name": {
             "anyOf": [
               {
@@ -18034,11 +18356,31 @@
             ],
             "title": "Description"
           },
+          "expiry_required": {
+            "default": false,
+            "title": "Expiry Required",
+            "type": "boolean"
+          },
           "id": {
             "format": "uuid",
             "title": "Id",
             "type": "string",
             "x-zeromerma-id-representation": "JSON_STRING"
+          },
+          "is_sellable": {
+            "default": true,
+            "title": "Is Sellable",
+            "type": "boolean"
+          },
+          "is_usable_as_input": {
+            "default": false,
+            "title": "Is Usable As Input",
+            "type": "boolean"
+          },
+          "lot_tracking_enabled": {
+            "default": false,
+            "title": "Lot Tracking Enabled",
+            "type": "boolean"
           },
           "name": {
             "title": "Name",
@@ -18196,9 +18538,59 @@
             "title": "Input Product Name",
             "type": "string"
           },
+          "reconciliation_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reconciliation Reason"
+          },
+          "remainder_qty": {
+            "anyOf": [
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string",
+                "x-zeromerma-decimal-representation": "JSON_STRING"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Remainder Qty"
+          },
+          "returned_qty": {
+            "anyOf": [
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string",
+                "x-zeromerma-decimal-representation": "JSON_STRING"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Returned Qty"
+          },
           "uom": {
             "title": "Uom",
             "type": "string"
+          },
+          "waste_qty": {
+            "anyOf": [
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string",
+                "x-zeromerma-decimal-representation": "JSON_STRING"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Waste Qty"
           }
         },
         "required": [
@@ -18225,8 +18617,8 @@
             "title": "Can Edit",
             "type": "boolean"
           },
-          "can_start": {
-            "title": "Can Start",
+          "can_release": {
+            "title": "Can Release",
             "type": "boolean"
           },
           "can_view_movements": {
@@ -18238,7 +18630,7 @@
           "can_cancel",
           "can_complete",
           "can_edit",
-          "can_start",
+          "can_release",
           "can_view_movements"
         ],
         "title": "AdminProductionAvailableActionsView",
@@ -18271,9 +18663,9 @@
             "title": "List Endpoint",
             "type": "string"
           },
-          "start_endpoint": {
-            "default": "POST /v1/admin/production/{production_id}/start",
-            "title": "Start Endpoint",
+          "release_endpoint": {
+            "default": "POST /v1/admin/production/{production_id}/release",
+            "title": "Release Endpoint",
             "type": "string"
           },
           "update_endpoint": {
@@ -18288,6 +18680,11 @@
       "AdminProductionCancelRequest": {
         "additionalProperties": false,
         "properties": {
+          "no_physical_effects_confirmed": {
+            "default": false,
+            "title": "No Physical Effects Confirmed",
+            "type": "boolean"
+          },
           "reason": {
             "anyOf": [
               {
@@ -18321,6 +18718,27 @@
             "title": "Actual Output Qty",
             "x-zeromerma-decimal-input-representation": "JSON_NUMBER_OR_STRING"
           },
+          "confirm_without_differences": {
+            "default": false,
+            "title": "Confirm Without Differences",
+            "type": "boolean"
+          },
+          "finish_as": {
+            "default": "COMPLETED",
+            "enum": [
+              "COMPLETED",
+              "CANCELLED"
+            ],
+            "title": "Finish As",
+            "type": "string"
+          },
+          "inputs": {
+            "items": {
+              "$ref": "#/components/schemas/AdminProductionInputReconciliation"
+            },
+            "title": "Inputs",
+            "type": "array"
+          },
           "notes": {
             "anyOf": [
               {
@@ -18331,6 +18749,32 @@
               }
             ],
             "title": "Notes"
+          },
+          "output_expires_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string",
+                "x-zeromerma-instant-format": "ISO8601_DATETIME"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Output Expires At"
+          },
+          "output_lot_code": {
+            "anyOf": [
+              {
+                "maxLength": 120,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Output Lot Code"
           },
           "variance_reason": {
             "anyOf": [
@@ -18571,6 +19015,12 @@
             ],
             "title": "Available Qty"
           },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string",
+            "x-zeromerma-id-representation": "JSON_STRING"
+          },
           "input_product_code": {
             "title": "Input Product Code",
             "type": "string"
@@ -18590,6 +19040,19 @@
             "title": "Required Qty",
             "type": "string",
             "x-zeromerma-decimal-representation": "JSON_STRING"
+          },
+          "reservation_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string",
+                "x-zeromerma-id-representation": "JSON_STRING"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reservation Id"
           },
           "shortage_qty": {
             "anyOf": [
@@ -18632,6 +19095,8 @@
           }
         },
         "required": [
+          "id",
+          "reservation_id",
           "input_product_code",
           "input_product_id",
           "input_product_name",
@@ -18640,6 +19105,98 @@
           "uom"
         ],
         "title": "AdminProductionInputLineView",
+        "type": "object"
+      },
+      "AdminProductionInputReconciliation": {
+        "additionalProperties": false,
+        "properties": {
+          "consumed_qty": {
+            "anyOf": [
+              {
+                "minimum": 0.0,
+                "type": "number"
+              },
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*(?:\\d{0,9}|(?=[\\d.]{1,13}0*$)\\d{0,9}\\.\\d{0,3}0*$)",
+                "type": "string",
+                "x-zeromerma-decimal-representation": "JSON_STRING"
+              }
+            ],
+            "title": "Consumed Qty",
+            "x-zeromerma-decimal-input-representation": "JSON_NUMBER_OR_STRING"
+          },
+          "input_product_id": {
+            "format": "uuid",
+            "title": "Input Product Id",
+            "type": "string",
+            "x-zeromerma-id-representation": "JSON_STRING"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "maxLength": 500,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          },
+          "remainder_qty": {
+            "anyOf": [
+              {
+                "minimum": 0.0,
+                "type": "number"
+              },
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*(?:\\d{0,9}|(?=[\\d.]{1,13}0*$)\\d{0,9}\\.\\d{0,3}0*$)",
+                "type": "string",
+                "x-zeromerma-decimal-representation": "JSON_STRING"
+              }
+            ],
+            "title": "Remainder Qty",
+            "x-zeromerma-decimal-input-representation": "JSON_NUMBER_OR_STRING"
+          },
+          "returned_qty": {
+            "anyOf": [
+              {
+                "minimum": 0.0,
+                "type": "number"
+              },
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*(?:\\d{0,9}|(?=[\\d.]{1,13}0*$)\\d{0,9}\\.\\d{0,3}0*$)",
+                "type": "string",
+                "x-zeromerma-decimal-representation": "JSON_STRING"
+              }
+            ],
+            "title": "Returned Qty",
+            "x-zeromerma-decimal-input-representation": "JSON_NUMBER_OR_STRING"
+          },
+          "waste_qty": {
+            "anyOf": [
+              {
+                "minimum": 0.0,
+                "type": "number"
+              },
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*(?:\\d{0,9}|(?=[\\d.]{1,13}0*$)\\d{0,9}\\.\\d{0,3}0*$)",
+                "type": "string",
+                "x-zeromerma-decimal-representation": "JSON_STRING"
+              }
+            ],
+            "title": "Waste Qty",
+            "x-zeromerma-decimal-input-representation": "JSON_NUMBER_OR_STRING"
+          }
+        },
+        "required": [
+          "input_product_id",
+          "consumed_qty",
+          "returned_qty",
+          "waste_qty",
+          "remainder_qty"
+        ],
+        "title": "AdminProductionInputReconciliation",
         "type": "object"
       },
       "AdminProductionInventoryImpactView": {
@@ -18748,6 +19305,32 @@
               }
             ],
             "title": "Source Document Type"
+          },
+          "total_cost": {
+            "anyOf": [
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string",
+                "x-zeromerma-decimal-representation": "JSON_STRING"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Total Cost"
+          },
+          "unit_cost": {
+            "anyOf": [
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string",
+                "x-zeromerma-decimal-representation": "JSON_STRING"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Unit Cost"
           },
           "unit_of_measure": {
             "title": "Unit Of Measure",
@@ -18862,7 +19445,7 @@
             "title": "Recipe Name",
             "type": "string"
           },
-          "started_at": {
+          "released_at": {
             "anyOf": [
               {
                 "format": "date-time",
@@ -18873,12 +19456,13 @@
                 "type": "null"
               }
             ],
-            "title": "Started At"
+            "title": "Released At"
           },
           "status": {
             "enum": [
               "DRAFT",
-              "IN_PROGRESS",
+              "RELEASED",
+              "PENDING_RECONCILIATION",
               "COMPLETED",
               "CANCELLED"
             ],
@@ -19227,6 +19811,39 @@
             ],
             "title": "Notes"
           },
+          "output_expires_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string",
+                "x-zeromerma-instant-format": "ISO8601_DATETIME"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Output Expires At"
+          },
+          "output_lot_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Output Lot Code"
+          },
+          "plan_status": {
+            "enum": [
+              "DRAFT",
+              "RELEASED",
+              "CANCELLED"
+            ],
+            "title": "Plan Status",
+            "type": "string"
+          },
           "planned_at": {
             "anyOf": [
               {
@@ -19246,7 +19863,34 @@
             "type": "string",
             "x-zeromerma-decimal-representation": "JSON_STRING"
           },
-          "started_at": {
+          "reconciliation_evidence": {
+            "anyOf": [
+              {
+                "const": "MANUAL_CONFIRMED",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reconciliation Evidence"
+          },
+          "reconciliation_finish_as": {
+            "anyOf": [
+              {
+                "enum": [
+                  "COMPLETED",
+                  "CANCELLED"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reconciliation Finish As"
+          },
+          "released_at": {
             "anyOf": [
               {
                 "format": "date-time",
@@ -19257,9 +19901,9 @@
                 "type": "null"
               }
             ],
-            "title": "Started At"
+            "title": "Released At"
           },
-          "started_by_user_id": {
+          "released_by_user_id": {
             "anyOf": [
               {
                 "format": "uuid",
@@ -19270,9 +19914,9 @@
                 "type": "null"
               }
             ],
-            "title": "Started By User Id"
+            "title": "Released By User Id"
           },
-          "started_by_user_name": {
+          "released_by_user_name": {
             "anyOf": [
               {
                 "type": "string"
@@ -19281,12 +19925,43 @@
                 "type": "null"
               }
             ],
-            "title": "Started By User Name"
+            "title": "Released By User Name"
+          },
+          "run_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string",
+                "x-zeromerma-id-representation": "JSON_STRING"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Run Id"
+          },
+          "run_status": {
+            "anyOf": [
+              {
+                "enum": [
+                  "OPEN",
+                  "PENDING_RECONCILIATION",
+                  "COMPLETED",
+                  "CANCELLED"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Run Status"
           },
           "status": {
             "enum": [
               "DRAFT",
-              "IN_PROGRESS",
+              "RELEASED",
+              "PENDING_RECONCILIATION",
               "COMPLETED",
               "CANCELLED"
             ],
@@ -19348,6 +20023,10 @@
           }
         },
         "required": [
+          "plan_status",
+          "run_id",
+          "run_status",
+          "reconciliation_evidence",
           "branch_id",
           "branch_name",
           "created_at",
@@ -19460,7 +20139,7 @@
         "title": "AdminProductionRelatedDocumentView",
         "type": "object"
       },
-      "AdminProductionStartRequest": {
+      "AdminProductionReleaseRequest": {
         "additionalProperties": false,
         "properties": {
           "notes": {
@@ -19475,7 +20154,7 @@
             "title": "Notes"
           }
         },
-        "title": "AdminProductionStartRequest",
+        "title": "AdminProductionReleaseRequest",
         "type": "object"
       },
       "AdminProductionUpdateRequest": {
@@ -19584,12 +20263,12 @@
       "AdminProductionWasteScrapView": {
         "properties": {
           "integration_available": {
-            "default": false,
+            "default": true,
             "title": "Integration Available",
             "type": "boolean"
           },
           "notes": {
-            "default": "Waste/scrap is represented as production yield variance; dedicated merma documents are pending contract.",
+            "default": "Only explicitly reconciled input waste is recorded; yield variance is not waste.",
             "title": "Notes",
             "type": "string"
           },
@@ -19669,6 +20348,10 @@
             "title": "Can Receive",
             "type": "boolean"
           },
+          "can_reverse_receipt": {
+            "title": "Can Reverse Receipt",
+            "type": "boolean"
+          },
           "can_view_movements": {
             "title": "Can View Movements",
             "type": "boolean"
@@ -19679,7 +20362,8 @@
           "can_confirm",
           "can_edit",
           "can_receive",
-          "can_view_movements"
+          "can_view_movements",
+          "can_reverse_receipt"
         ],
         "title": "AdminPurchaseAvailableActionsView",
         "type": "object"
@@ -19952,6 +20636,13 @@
           "receipt": {
             "$ref": "#/components/schemas/AdminPurchaseReceiptSummaryView"
           },
+          "receipts": {
+            "items": {
+              "$ref": "#/components/schemas/AdminPurchaseReceiptView"
+            },
+            "title": "Receipts",
+            "type": "array"
+          },
           "receiving_branch": {
             "$ref": "#/components/schemas/AdminPurchaseBranchView"
           },
@@ -19983,13 +20674,40 @@
           "receiving_branch",
           "related_documents",
           "supplier_context",
-          "warnings"
+          "warnings",
+          "receipts"
         ],
         "title": "AdminPurchaseDetailView",
         "type": "object"
       },
       "AdminPurchaseDirectEntryLineInput": {
         "properties": {
+          "expires_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string",
+                "x-zeromerma-instant-format": "ISO8601_DATETIME"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expires At"
+          },
+          "lot_code": {
+            "anyOf": [
+              {
+                "maxLength": 120,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Lot Code"
+          },
           "notes": {
             "anyOf": [
               {
@@ -20022,6 +20740,19 @@
             ],
             "title": "Received Quantity",
             "x-zeromerma-decimal-input-representation": "JSON_NUMBER_OR_STRING"
+          },
+          "source_unit_of_measure": {
+            "anyOf": [
+              {
+                "maxLength": 32,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Unit Of Measure"
           },
           "unit_cost": {
             "anyOf": [
@@ -20142,6 +20873,30 @@
       },
       "AdminPurchaseFilterOptionView": {
         "properties": {
+          "base_uom": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Base Uom"
+          },
+          "conversion_factor": {
+            "anyOf": [
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string",
+                "x-zeromerma-decimal-representation": "JSON_STRING"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Conversion Factor"
+          },
           "id": {
             "anyOf": [
               {
@@ -20158,6 +20913,17 @@
           "label": {
             "title": "Label",
             "type": "string"
+          },
+          "purchase_uom": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Purchase Uom"
           }
         },
         "required": [
@@ -20330,6 +21096,32 @@
             ],
             "title": "Source Document Type"
           },
+          "total_cost": {
+            "anyOf": [
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string",
+                "x-zeromerma-decimal-representation": "JSON_STRING"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Total Cost"
+          },
+          "unit_cost": {
+            "anyOf": [
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string",
+                "x-zeromerma-decimal-representation": "JSON_STRING"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Unit Cost"
+          },
           "unit_of_measure": {
             "title": "Unit Of Measure",
             "type": "string"
@@ -20383,6 +21175,19 @@
             "type": "string",
             "x-zeromerma-id-representation": "JSON_STRING"
           },
+          "source_unit_of_measure": {
+            "anyOf": [
+              {
+                "maxLength": 32,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Unit Of Measure"
+          },
           "unit_cost": {
             "anyOf": [
               {
@@ -20409,6 +21214,12 @@
       },
       "AdminPurchaseLineView": {
         "properties": {
+          "conversion_factor": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Conversion Factor",
+            "type": "string",
+            "x-zeromerma-decimal-representation": "JSON_STRING"
+          },
           "discrepancy": {
             "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
             "title": "Discrepancy",
@@ -20453,6 +21264,12 @@
             "type": "string",
             "x-zeromerma-decimal-representation": "JSON_STRING"
           },
+          "ordered_quantity_base": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Ordered Quantity Base",
+            "type": "string",
+            "x-zeromerma-decimal-representation": "JSON_STRING"
+          },
           "pending_quantity": {
             "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
             "title": "Pending Quantity",
@@ -20488,6 +21305,10 @@
             "title": "Received Quantity",
             "type": "string",
             "x-zeromerma-decimal-representation": "JSON_STRING"
+          },
+          "source_unit_of_measure": {
+            "title": "Source Unit Of Measure",
+            "type": "string"
           },
           "standard_cost": {
             "anyOf": [
@@ -20539,7 +21360,10 @@
           "purchase_line_id",
           "received_quantity",
           "unit_cost",
-          "unit_of_measure"
+          "unit_of_measure",
+          "source_unit_of_measure",
+          "conversion_factor",
+          "ordered_quantity_base"
         ],
         "title": "AdminPurchaseLineView",
         "type": "object"
@@ -20996,6 +21820,32 @@
             ],
             "title": "Discrepancy Reason"
           },
+          "expires_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string",
+                "x-zeromerma-instant-format": "ISO8601_DATETIME"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expires At"
+          },
+          "lot_code": {
+            "anyOf": [
+              {
+                "maxLength": 120,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Lot Code"
+          },
           "notes": {
             "anyOf": [
               {
@@ -21055,6 +21905,87 @@
         "title": "AdminPurchaseReceiptLineInput",
         "type": "object"
       },
+      "AdminPurchaseReceiptLineView": {
+        "properties": {
+          "base_unit_cost": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Base Unit Cost",
+            "type": "string",
+            "x-zeromerma-decimal-representation": "JSON_STRING"
+          },
+          "base_unit_of_measure": {
+            "title": "Base Unit Of Measure",
+            "type": "string"
+          },
+          "conversion_factor": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Conversion Factor",
+            "type": "string",
+            "x-zeromerma-decimal-representation": "JSON_STRING"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string",
+            "x-zeromerma-id-representation": "JSON_STRING"
+          },
+          "lot_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string",
+                "x-zeromerma-id-representation": "JSON_STRING"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Lot Id"
+          },
+          "product_id": {
+            "format": "uuid",
+            "title": "Product Id",
+            "type": "string",
+            "x-zeromerma-id-representation": "JSON_STRING"
+          },
+          "received_quantity": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Received Quantity",
+            "type": "string",
+            "x-zeromerma-decimal-representation": "JSON_STRING"
+          },
+          "received_quantity_base": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Received Quantity Base",
+            "type": "string",
+            "x-zeromerma-decimal-representation": "JSON_STRING"
+          },
+          "source_unit_cost": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Source Unit Cost",
+            "type": "string",
+            "x-zeromerma-decimal-representation": "JSON_STRING"
+          },
+          "source_unit_of_measure": {
+            "title": "Source Unit Of Measure",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "product_id",
+          "lot_id",
+          "received_quantity",
+          "source_unit_of_measure",
+          "conversion_factor",
+          "received_quantity_base",
+          "base_unit_of_measure",
+          "source_unit_cost",
+          "base_unit_cost"
+        ],
+        "title": "AdminPurchaseReceiptLineView",
+        "type": "object"
+      },
       "AdminPurchaseReceiptSummaryView": {
         "properties": {
           "expected_quantity": {
@@ -21097,6 +22028,71 @@
           "state"
         ],
         "title": "AdminPurchaseReceiptSummaryView",
+        "type": "object"
+      },
+      "AdminPurchaseReceiptView": {
+        "properties": {
+          "folio": {
+            "title": "Folio",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string",
+            "x-zeromerma-id-representation": "JSON_STRING"
+          },
+          "lines": {
+            "items": {
+              "$ref": "#/components/schemas/AdminPurchaseReceiptLineView"
+            },
+            "title": "Lines",
+            "type": "array"
+          },
+          "received_at": {
+            "format": "date-time",
+            "title": "Received At",
+            "type": "string",
+            "x-zeromerma-instant-format": "ISO8601_DATETIME"
+          },
+          "received_total": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Received Total",
+            "type": "string",
+            "x-zeromerma-decimal-representation": "JSON_STRING"
+          },
+          "reversal_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string",
+                "x-zeromerma-id-representation": "JSON_STRING"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reversal Id"
+          },
+          "reversal_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reversal Reason"
+          }
+        },
+        "required": [
+          "id",
+          "folio",
+          "received_at",
+          "received_total"
+        ],
+        "title": "AdminPurchaseReceiptView",
         "type": "object"
       },
       "AdminPurchaseReceiveRequest": {
@@ -21156,6 +22152,29 @@
           "status"
         ],
         "title": "AdminPurchaseRelatedDocumentView",
+        "type": "object"
+      },
+      "AdminPurchaseReverseReceiptRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "reason": {
+            "maxLength": 500,
+            "minLength": 1,
+            "title": "Reason",
+            "type": "string"
+          },
+          "receipt_id": {
+            "format": "uuid",
+            "title": "Receipt Id",
+            "type": "string",
+            "x-zeromerma-id-representation": "JSON_STRING"
+          }
+        },
+        "required": [
+          "receipt_id",
+          "reason"
+        ],
+        "title": "AdminPurchaseReverseReceiptRequest",
         "type": "object"
       },
       "AdminPurchaseSupplierContextView": {
@@ -24576,9 +25595,12 @@
       },
       "AdminReturnedLineView": {
         "properties": {
-          "disposition_code": {
-            "title": "Disposition Code",
-            "type": "string"
+          "allocations": {
+            "items": {
+              "$ref": "#/components/schemas/ReturnDispositionAllocationView"
+            },
+            "title": "Allocations",
+            "type": "array"
           },
           "id": {
             "format": "uuid",
@@ -24588,6 +25610,10 @@
           },
           "line_status": {
             "title": "Line Status",
+            "type": "string"
+          },
+          "original_catalog_name_snapshot": {
+            "title": "Original Catalog Name Snapshot",
             "type": "string"
           },
           "original_quantity": {
@@ -24601,22 +25627,6 @@
             "title": "Original Sale Line Id",
             "type": "string",
             "x-zeromerma-id-representation": "JSON_STRING"
-          },
-          "product_class_code": {
-            "title": "Product Class Code",
-            "type": "string"
-          },
-          "product_class_name": {
-            "title": "Product Class Name",
-            "type": "string"
-          },
-          "product_code": {
-            "title": "Product Code",
-            "type": "string"
-          },
-          "product_name": {
-            "title": "Product Name",
-            "type": "string"
           },
           "refund_amount": {
             "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
@@ -24640,15 +25650,12 @@
         "required": [
           "id",
           "original_sale_line_id",
-          "product_name",
-          "product_code",
-          "product_class_name",
-          "product_class_code",
+          "original_catalog_name_snapshot",
           "original_quantity",
           "returned_quantity",
           "unit_price",
           "refund_amount",
-          "disposition_code",
+          "allocations",
           "line_status"
         ],
         "title": "AdminReturnedLineView",
@@ -25692,6 +26699,66 @@
         "title": "AdminRolesListResponse",
         "type": "object"
       },
+      "AdminSalesTicketAttributionView": {
+        "properties": {
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string",
+            "x-zeromerma-id-representation": "JSON_STRING"
+          },
+          "inventory_movement_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string",
+                "x-zeromerma-id-representation": "JSON_STRING"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Inventory Movement Id"
+          },
+          "occurred_at": {
+            "format": "date-time",
+            "title": "Occurred At",
+            "type": "string",
+            "x-zeromerma-instant-format": "ISO8601_DATETIME"
+          },
+          "product_code": {
+            "title": "Product Code",
+            "type": "string"
+          },
+          "product_id": {
+            "format": "uuid",
+            "title": "Product Id",
+            "type": "string",
+            "x-zeromerma-id-representation": "JSON_STRING"
+          },
+          "product_name": {
+            "title": "Product Name",
+            "type": "string"
+          },
+          "quantity": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Quantity",
+            "type": "string",
+            "x-zeromerma-decimal-representation": "JSON_STRING"
+          }
+        },
+        "required": [
+          "id",
+          "product_id",
+          "product_code",
+          "product_name",
+          "quantity",
+          "inventory_movement_id",
+          "occurred_at"
+        ],
+        "title": "AdminSalesTicketAttributionView",
+        "type": "object"
+      },
       "AdminSalesTicketBackendContractView": {
         "properties": {
           "detail_endpoint": {
@@ -25833,6 +26900,19 @@
       },
       "AdminSalesTicketLineView": {
         "properties": {
+          "attributed_quantity": {
+            "anyOf": [
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string",
+                "x-zeromerma-decimal-representation": "JSON_STRING"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Attributed Quantity"
+          },
           "capture_mode": {
             "title": "Capture Mode",
             "type": "string"
@@ -25867,6 +26947,13 @@
             "title": "Physical Attribution Status",
             "type": "string"
           },
+          "physical_attributions": {
+            "items": {
+              "$ref": "#/components/schemas/AdminSalesTicketAttributionView"
+            },
+            "title": "Physical Attributions",
+            "type": "array"
+          },
           "product_class_id": {
             "anyOf": [
               {
@@ -25899,6 +26986,19 @@
             "type": "string",
             "x-zeromerma-decimal-representation": "JSON_STRING"
           },
+          "remaining_attribution_quantity": {
+            "anyOf": [
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string",
+                "x-zeromerma-decimal-representation": "JSON_STRING"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Remaining Attribution Quantity"
+          },
           "sequence": {
             "title": "Sequence",
             "type": "integer"
@@ -25920,7 +27020,10 @@
           "unit_price",
           "line_total_amount",
           "discount_amount",
-          "physical_attribution_status"
+          "physical_attribution_status",
+          "attributed_quantity",
+          "remaining_attribution_quantity",
+          "physical_attributions"
         ],
         "title": "AdminSalesTicketLineView",
         "type": "object"
@@ -25985,6 +27088,11 @@
             },
             "title": "Payment Summary",
             "type": "array"
+          },
+          "pending_attribution_line_count": {
+            "minimum": 0.0,
+            "title": "Pending Attribution Line Count",
+            "type": "integer"
           },
           "return_count": {
             "title": "Return Count",
@@ -26052,7 +27160,8 @@
           "status",
           "return_status",
           "return_count",
-          "has_returns"
+          "has_returns",
+          "pending_attribution_line_count"
         ],
         "title": "AdminSalesTicketListItemView",
         "type": "object"
@@ -30634,6 +31743,11 @@
             "title": "Can Receive",
             "type": "boolean"
           },
+          "can_resolve": {
+            "default": false,
+            "title": "Can Resolve",
+            "type": "boolean"
+          },
           "can_view_movements": {
             "title": "Can View Movements",
             "type": "boolean"
@@ -30820,6 +31934,13 @@
               "$ref": "#/components/schemas/AdminTransferRelatedDocumentView"
             },
             "title": "Related Documents",
+            "type": "array"
+          },
+          "resolutions": {
+            "items": {
+              "$ref": "#/components/schemas/TransferResolutionView"
+            },
+            "title": "Resolutions",
             "type": "array"
           },
           "warnings": {
@@ -31118,6 +32239,13 @@
             "title": "Line Status",
             "type": "string"
           },
+          "lots": {
+            "items": {
+              "$ref": "#/components/schemas/TransferLotProgressView"
+            },
+            "title": "Lots",
+            "type": "array"
+          },
           "notes": {
             "anyOf": [
               {
@@ -31172,6 +32300,13 @@
             "type": "string",
             "x-zeromerma-decimal-representation": "JSON_STRING"
           },
+          "returned_quantity": {
+            "default": "0",
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Returned Quantity",
+            "type": "string",
+            "x-zeromerma-decimal-representation": "JSON_STRING"
+          },
           "sent_quantity": {
             "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
             "title": "Sent Quantity",
@@ -31198,6 +32333,13 @@
               }
             ],
             "title": "Variance Reason"
+          },
+          "waste_quantity": {
+            "default": "0",
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Waste Quantity",
+            "type": "string",
+            "x-zeromerma-decimal-representation": "JSON_STRING"
           }
         },
         "required": [
@@ -31624,6 +32766,20 @@
       "AdminTransferReceiptLineInput": {
         "additionalProperties": false,
         "properties": {
+          "lot_allocations": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/TransferLotAllocationRequest"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Lot Allocations"
+          },
           "notes": {
             "anyOf": [
               {
@@ -31804,6 +32960,49 @@
           "status"
         ],
         "title": "AdminTransferRelatedDocumentView",
+        "type": "object"
+      },
+      "AdminTransferResolveRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "destination_location": {
+            "default": "QUARANTINE",
+            "enum": [
+              "BACKROOM",
+              "QUARANTINE"
+            ],
+            "title": "Destination Location",
+            "type": "string"
+          },
+          "kind": {
+            "enum": [
+              "RETURN_TO_ORIGIN",
+              "SEND_TO_WASTE"
+            ],
+            "title": "Kind",
+            "type": "string"
+          },
+          "lines": {
+            "items": {
+              "$ref": "#/components/schemas/TransferResolutionLineRequest"
+            },
+            "minItems": 1,
+            "title": "Lines",
+            "type": "array"
+          },
+          "reason": {
+            "maxLength": 500,
+            "minLength": 1,
+            "title": "Reason",
+            "type": "string"
+          }
+        },
+        "required": [
+          "kind",
+          "reason",
+          "lines"
+        ],
+        "title": "AdminTransferResolveRequest",
         "type": "object"
       },
       "AdminTransferUpdateRequest": {
@@ -33341,10 +34540,24 @@
             "enum": [
               "BACKROOM",
               "COUNTER",
-              "IN_TRANSIT"
+              "IN_TRANSIT",
+              "QUARANTINE"
             ],
             "title": "Location Code",
             "type": "string"
+          },
+          "lot_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string",
+                "x-zeromerma-id-representation": "JSON_STRING"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Lot Id"
           },
           "notes": {
             "anyOf": [
@@ -33835,7 +35048,8 @@
             "enum": [
               "BACKROOM",
               "COUNTER",
-              "IN_TRANSIT"
+              "IN_TRANSIT",
+              "QUARANTINE"
             ],
             "title": "Location Code",
             "type": "string"
@@ -34105,7 +35319,8 @@
             "enum": [
               "BACKROOM",
               "COUNTER",
-              "IN_TRANSIT"
+              "IN_TRANSIT",
+              "QUARANTINE"
             ],
             "title": "Location Code",
             "type": "string"
@@ -34434,6 +35649,46 @@
           "status"
         ],
         "title": "AdminWasteRelatedDocumentView",
+        "type": "object"
+      },
+      "AdminWasteStockView": {
+        "properties": {
+          "branch_id": {
+            "format": "uuid",
+            "title": "Branch Id",
+            "type": "string",
+            "x-zeromerma-id-representation": "JSON_STRING"
+          },
+          "location_code": {
+            "title": "Location Code",
+            "type": "string"
+          },
+          "lot_tracking_enabled": {
+            "title": "Lot Tracking Enabled",
+            "type": "boolean"
+          },
+          "lots": {
+            "items": {
+              "$ref": "#/components/schemas/OperationInventoryLotView"
+            },
+            "title": "Lots",
+            "type": "array"
+          },
+          "product_id": {
+            "format": "uuid",
+            "title": "Product Id",
+            "type": "string",
+            "x-zeromerma-id-representation": "JSON_STRING"
+          }
+        },
+        "required": [
+          "product_id",
+          "branch_id",
+          "location_code",
+          "lot_tracking_enabled",
+          "lots"
+        ],
+        "title": "AdminWasteStockView",
         "type": "object"
       },
       "AdminWasteWarningView": {
@@ -36433,6 +37688,13 @@
             "title": "Counted Quantity",
             "x-zeromerma-decimal-input-representation": "JSON_NUMBER_OR_STRING"
           },
+          "lot_counts": {
+            "items": {
+              "$ref": "#/components/schemas/CashCloseLotCountRequest"
+            },
+            "title": "Lot Counts",
+            "type": "array"
+          },
           "notes": {
             "anyOf": [
               {
@@ -36940,6 +38202,99 @@
           "message"
         ],
         "title": "CashCloseIssueView",
+        "type": "object"
+      },
+      "CashCloseLotCountRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "counted_quantity": {
+            "anyOf": [
+              {
+                "minimum": 0.0,
+                "type": "number"
+              },
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*(?:\\d{0,9}|(?=[\\d.]{1,13}0*$)\\d{0,9}\\.\\d{0,3}0*$)",
+                "type": "string",
+                "x-zeromerma-decimal-representation": "JSON_STRING"
+              }
+            ],
+            "title": "Counted Quantity",
+            "x-zeromerma-decimal-input-representation": "JSON_NUMBER_OR_STRING"
+          },
+          "lot_id": {
+            "format": "uuid",
+            "title": "Lot Id",
+            "type": "string",
+            "x-zeromerma-id-representation": "JSON_STRING"
+          }
+        },
+        "required": [
+          "lot_id",
+          "counted_quantity"
+        ],
+        "title": "CashCloseLotCountRequest",
+        "type": "object"
+      },
+      "CashCloseLotCountView": {
+        "properties": {
+          "counted_quantity": {
+            "anyOf": [
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string",
+                "x-zeromerma-decimal-representation": "JSON_STRING"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Counted Quantity"
+          },
+          "expected_quantity": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Expected Quantity",
+            "type": "string",
+            "x-zeromerma-decimal-representation": "JSON_STRING"
+          },
+          "expires_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string",
+                "x-zeromerma-instant-format": "ISO8601_DATETIME"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expires At"
+          },
+          "lot_code": {
+            "title": "Lot Code",
+            "type": "string"
+          },
+          "lot_id": {
+            "format": "uuid",
+            "title": "Lot Id",
+            "type": "string",
+            "x-zeromerma-id-representation": "JSON_STRING"
+          },
+          "reserved_quantity": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Reserved Quantity",
+            "type": "string",
+            "x-zeromerma-decimal-representation": "JSON_STRING"
+          }
+        },
+        "required": [
+          "lot_id",
+          "lot_code",
+          "expires_at",
+          "expected_quantity",
+          "reserved_quantity"
+        ],
+        "title": "CashCloseLotCountView",
         "type": "object"
       },
       "CashCloseManualReconciliationAttributionLineRequest": {
@@ -37479,6 +38834,18 @@
             ],
             "title": "Final Expected Quantity"
           },
+          "lot_tracking_enabled": {
+            "default": false,
+            "title": "Lot Tracking Enabled",
+            "type": "boolean"
+          },
+          "lots": {
+            "items": {
+              "$ref": "#/components/schemas/CashCloseLotCountView"
+            },
+            "title": "Lots",
+            "type": "array"
+          },
           "notes": {
             "anyOf": [
               {
@@ -37894,6 +39261,180 @@
           "user_full_name"
         ],
         "title": "CashSessionView",
+        "type": "object"
+      },
+      "ClassAttributionLineRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "lot_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string",
+                "x-zeromerma-id-representation": "JSON_STRING"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Lot Id"
+          },
+          "product_id": {
+            "format": "uuid",
+            "title": "Product Id",
+            "type": "string",
+            "x-zeromerma-id-representation": "JSON_STRING"
+          },
+          "quantity": {
+            "anyOf": [
+              {
+                "exclusiveMinimum": 0.0,
+                "type": "number"
+              },
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*(?:\\d{0,9}|(?=[\\d.]{1,13}0*$)\\d{0,9}\\.\\d{0,3}0*$)",
+                "type": "string",
+                "x-zeromerma-decimal-representation": "JSON_STRING"
+              }
+            ],
+            "title": "Quantity",
+            "x-zeromerma-decimal-input-representation": "JSON_NUMBER_OR_STRING"
+          },
+          "sale_line_id": {
+            "format": "uuid",
+            "title": "Sale Line Id",
+            "type": "string",
+            "x-zeromerma-id-representation": "JSON_STRING"
+          }
+        },
+        "required": [
+          "sale_line_id",
+          "product_id",
+          "quantity"
+        ],
+        "title": "ClassAttributionLineRequest",
+        "type": "object"
+      },
+      "ClassAttributionRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "cash_session_id": {
+            "format": "uuid",
+            "title": "Cash Session Id",
+            "type": "string",
+            "x-zeromerma-id-representation": "JSON_STRING"
+          },
+          "lines": {
+            "items": {
+              "$ref": "#/components/schemas/ClassAttributionLineRequest"
+            },
+            "maxItems": 200,
+            "minItems": 1,
+            "title": "Lines",
+            "type": "array"
+          },
+          "workstation_code": {
+            "maxLength": 64,
+            "minLength": 1,
+            "title": "Workstation Code",
+            "type": "string"
+          }
+        },
+        "required": [
+          "workstation_code",
+          "cash_session_id",
+          "lines"
+        ],
+        "title": "ClassAttributionRequest",
+        "type": "object"
+      },
+      "ClassAttributionResult": {
+        "additionalProperties": false,
+        "properties": {
+          "lines": {
+            "items": {
+              "$ref": "#/components/schemas/ClassAttributionResultLine"
+            },
+            "title": "Lines",
+            "type": "array"
+          },
+          "operation_id": {
+            "format": "uuid",
+            "title": "Operation Id",
+            "type": "string",
+            "x-zeromerma-id-representation": "JSON_STRING"
+          },
+          "sale_id": {
+            "format": "uuid",
+            "title": "Sale Id",
+            "type": "string",
+            "x-zeromerma-id-representation": "JSON_STRING"
+          }
+        },
+        "required": [
+          "sale_id",
+          "operation_id",
+          "lines"
+        ],
+        "title": "ClassAttributionResult",
+        "type": "object"
+      },
+      "ClassAttributionResultLine": {
+        "additionalProperties": false,
+        "properties": {
+          "attribution_id": {
+            "format": "uuid",
+            "title": "Attribution Id",
+            "type": "string",
+            "x-zeromerma-id-representation": "JSON_STRING"
+          },
+          "inventory_movement_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string",
+                "x-zeromerma-id-representation": "JSON_STRING"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Inventory Movement Id"
+          },
+          "product_id": {
+            "format": "uuid",
+            "title": "Product Id",
+            "type": "string",
+            "x-zeromerma-id-representation": "JSON_STRING"
+          },
+          "quantity": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Quantity",
+            "type": "string",
+            "x-zeromerma-decimal-representation": "JSON_STRING"
+          },
+          "remaining_quantity": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Remaining Quantity",
+            "type": "string",
+            "x-zeromerma-decimal-representation": "JSON_STRING"
+          },
+          "sale_line_id": {
+            "format": "uuid",
+            "title": "Sale Line Id",
+            "type": "string",
+            "x-zeromerma-id-representation": "JSON_STRING"
+          }
+        },
+        "required": [
+          "attribution_id",
+          "sale_line_id",
+          "product_id",
+          "quantity",
+          "remaining_quantity",
+          "inventory_movement_id"
+        ],
+        "title": "ClassAttributionResultLine",
         "type": "object"
       },
       "ConfirmSaleLineRequest": {
@@ -40745,6 +42286,209 @@
         "title": "IdempotencyStatus",
         "type": "string"
       },
+      "InventoryDispositionRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "branch_id": {
+            "format": "uuid",
+            "title": "Branch Id",
+            "type": "string",
+            "x-zeromerma-id-representation": "JSON_STRING"
+          },
+          "destination": {
+            "enum": [
+              "BACKROOM",
+              "COUNTER",
+              "QUARANTINE",
+              "WASTE"
+            ],
+            "title": "Destination",
+            "type": "string"
+          },
+          "inspection_passed": {
+            "default": false,
+            "title": "Inspection Passed",
+            "type": "boolean"
+          },
+          "kind": {
+            "enum": [
+              "RETURN_CORRECTION",
+              "QUARANTINE_RELEASE"
+            ],
+            "title": "Kind",
+            "type": "string"
+          },
+          "lot_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string",
+                "x-zeromerma-id-representation": "JSON_STRING"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Lot Id"
+          },
+          "notes": {
+            "anyOf": [
+              {
+                "maxLength": 1000,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Notes"
+          },
+          "product_id": {
+            "format": "uuid",
+            "title": "Product Id",
+            "type": "string",
+            "x-zeromerma-id-representation": "JSON_STRING"
+          },
+          "quantity": {
+            "anyOf": [
+              {
+                "exclusiveMinimum": 0.0,
+                "type": "number"
+              },
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*(?:\\d{0,9}|(?=[\\d.]{1,13}0*$)\\d{0,9}\\.\\d{0,3}0*$)",
+                "type": "string",
+                "x-zeromerma-decimal-representation": "JSON_STRING"
+              }
+            ],
+            "title": "Quantity",
+            "x-zeromerma-decimal-input-representation": "JSON_NUMBER_OR_STRING"
+          },
+          "reason": {
+            "maxLength": 160,
+            "minLength": 3,
+            "title": "Reason",
+            "type": "string"
+          },
+          "return_allocation_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string",
+                "x-zeromerma-id-representation": "JSON_STRING"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Return Allocation Id"
+          }
+        },
+        "required": [
+          "branch_id",
+          "product_id",
+          "quantity",
+          "kind",
+          "destination",
+          "reason"
+        ],
+        "title": "InventoryDispositionRequest",
+        "type": "object"
+      },
+      "InventoryDispositionResult": {
+        "additionalProperties": false,
+        "properties": {
+          "branch_id": {
+            "format": "uuid",
+            "title": "Branch Id",
+            "type": "string",
+            "x-zeromerma-id-representation": "JSON_STRING"
+          },
+          "destination": {
+            "title": "Destination",
+            "type": "string"
+          },
+          "kind": {
+            "enum": [
+              "RETURN_CORRECTION",
+              "QUARANTINE_RELEASE"
+            ],
+            "title": "Kind",
+            "type": "string"
+          },
+          "lot_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string",
+                "x-zeromerma-id-representation": "JSON_STRING"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Lot Id"
+          },
+          "movement_ids": {
+            "items": {
+              "format": "uuid",
+              "type": "string",
+              "x-zeromerma-id-representation": "JSON_STRING"
+            },
+            "title": "Movement Ids",
+            "type": "array"
+          },
+          "operation_id": {
+            "format": "uuid",
+            "title": "Operation Id",
+            "type": "string",
+            "x-zeromerma-id-representation": "JSON_STRING"
+          },
+          "product_id": {
+            "format": "uuid",
+            "title": "Product Id",
+            "type": "string",
+            "x-zeromerma-id-representation": "JSON_STRING"
+          },
+          "quantity": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Quantity",
+            "type": "string",
+            "x-zeromerma-decimal-representation": "JSON_STRING"
+          },
+          "return_allocation_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string",
+                "x-zeromerma-id-representation": "JSON_STRING"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Return Allocation Id"
+          },
+          "source": {
+            "title": "Source",
+            "type": "string"
+          }
+        },
+        "required": [
+          "operation_id",
+          "branch_id",
+          "product_id",
+          "kind",
+          "source",
+          "destination",
+          "quantity",
+          "return_allocation_id",
+          "lot_id",
+          "movement_ids"
+        ],
+        "title": "InventoryDispositionResult",
+        "type": "object"
+      },
       "JsonValue": {},
       "LoginRequest": {
         "additionalProperties": false,
@@ -40893,6 +42637,19 @@
       "OperationCommitLineRequest": {
         "additionalProperties": false,
         "properties": {
+          "lot_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string",
+                "x-zeromerma-id-representation": "JSON_STRING"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Lot Id"
+          },
           "notes": {
             "anyOf": [
               {
@@ -41060,10 +42817,17 @@
             "type": "string"
           },
           "workstation_id": {
-            "format": "uuid",
-            "title": "Workstation Id",
-            "type": "string",
-            "x-zeromerma-id-representation": "JSON_STRING"
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string",
+                "x-zeromerma-id-representation": "JSON_STRING"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Workstation Id"
           }
         },
         "required": [
@@ -41389,18 +43153,39 @@
             "type": "string"
           },
           "workstation_code": {
-            "title": "Workstation Code",
-            "type": "string"
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Workstation Code"
           },
           "workstation_id": {
-            "format": "uuid",
-            "title": "Workstation Id",
-            "type": "string",
-            "x-zeromerma-id-representation": "JSON_STRING"
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string",
+                "x-zeromerma-id-representation": "JSON_STRING"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Workstation Id"
           },
           "workstation_name": {
-            "title": "Workstation Name",
-            "type": "string"
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Workstation Name"
           }
         },
         "required": [
@@ -41585,12 +43370,26 @@
             "x-zeromerma-decimal-representation": "JSON_STRING"
           },
           "workstation_code": {
-            "title": "Workstation Code",
-            "type": "string"
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Workstation Code"
           },
           "workstation_name": {
-            "title": "Workstation Name",
-            "type": "string"
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Workstation Name"
           }
         },
         "required": [
@@ -41766,6 +43565,71 @@
           "label"
         ],
         "title": "OperationHistoryScopeView",
+        "type": "object"
+      },
+      "OperationInventoryLotView": {
+        "properties": {
+          "available_quantity": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Available Quantity",
+            "type": "string",
+            "x-zeromerma-decimal-representation": "JSON_STRING"
+          },
+          "expires_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string",
+                "x-zeromerma-instant-format": "ISO8601_DATETIME"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expires At"
+          },
+          "location_code": {
+            "title": "Location Code",
+            "type": "string"
+          },
+          "lot_code": {
+            "title": "Lot Code",
+            "type": "string"
+          },
+          "lot_id": {
+            "format": "uuid",
+            "title": "Lot Id",
+            "type": "string",
+            "x-zeromerma-id-representation": "JSON_STRING"
+          },
+          "quantity_on_hand": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Quantity On Hand",
+            "type": "string",
+            "x-zeromerma-decimal-representation": "JSON_STRING"
+          },
+          "quantity_reserved": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Quantity Reserved",
+            "type": "string",
+            "x-zeromerma-decimal-representation": "JSON_STRING"
+          },
+          "unidentified": {
+            "title": "Unidentified",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "lot_id",
+          "lot_code",
+          "expires_at",
+          "unidentified",
+          "location_code",
+          "quantity_on_hand",
+          "quantity_reserved",
+          "available_quantity"
+        ],
+        "title": "OperationInventoryLotView",
         "type": "object"
       },
       "OperationalDiscountCategoryView": {
@@ -42833,6 +44697,18 @@
             "type": "string",
             "x-zeromerma-id-representation": "JSON_STRING"
           },
+          "inventory_lots": {
+            "items": {
+              "$ref": "#/components/schemas/OperationInventoryLotView"
+            },
+            "title": "Inventory Lots",
+            "type": "array"
+          },
+          "lot_tracking_enabled": {
+            "default": false,
+            "title": "Lot Tracking Enabled",
+            "type": "boolean"
+          },
           "name": {
             "title": "Name",
             "type": "string"
@@ -43795,18 +45671,39 @@
             "type": "string"
           },
           "workstation_code": {
-            "title": "Workstation Code",
-            "type": "string"
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Workstation Code"
           },
           "workstation_id": {
-            "format": "uuid",
-            "title": "Workstation Id",
-            "type": "string",
-            "x-zeromerma-id-representation": "JSON_STRING"
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string",
+                "x-zeromerma-id-representation": "JSON_STRING"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Workstation Id"
           },
           "workstation_name": {
-            "title": "Workstation Name",
-            "type": "string"
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Workstation Name"
           }
         },
         "required": [
@@ -43899,6 +45796,47 @@
         "title": "PosBootstrapResponse",
         "type": "object"
       },
+      "PosCatalogAvailableLotView": {
+        "properties": {
+          "available_quantity": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Available Quantity",
+            "type": "string",
+            "x-zeromerma-decimal-representation": "JSON_STRING"
+          },
+          "expires_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string",
+                "x-zeromerma-instant-format": "ISO8601_DATETIME"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expires At"
+          },
+          "lot_code": {
+            "title": "Lot Code",
+            "type": "string"
+          },
+          "lot_id": {
+            "format": "uuid",
+            "title": "Lot Id",
+            "type": "string",
+            "x-zeromerma-id-representation": "JSON_STRING"
+          }
+        },
+        "required": [
+          "lot_id",
+          "lot_code",
+          "expires_at",
+          "available_quantity"
+        ],
+        "title": "PosCatalogAvailableLotView",
+        "type": "object"
+      },
       "PosCatalogClassView": {
         "properties": {
           "capture_mode_default": {
@@ -43970,6 +45908,26 @@
       },
       "PosCatalogProductView": {
         "properties": {
+          "available_lots": {
+            "items": {
+              "$ref": "#/components/schemas/PosCatalogAvailableLotView"
+            },
+            "title": "Available Lots",
+            "type": "array"
+          },
+          "available_quantity": {
+            "anyOf": [
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string",
+                "x-zeromerma-decimal-representation": "JSON_STRING"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Available Quantity"
+          },
           "code": {
             "title": "Code",
             "type": "string"
@@ -43988,6 +45946,14 @@
             "type": "string",
             "x-zeromerma-id-representation": "JSON_STRING"
           },
+          "is_inventory_tracked": {
+            "title": "Is Inventory Tracked",
+            "type": "boolean"
+          },
+          "lot_tracking_enabled": {
+            "title": "Lot Tracking Enabled",
+            "type": "boolean"
+          },
           "name": {
             "title": "Name",
             "type": "string"
@@ -44003,6 +45969,12 @@
             ],
             "title": "Quick Name"
           },
+          "reserved_quantity": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Reserved Quantity",
+            "type": "string",
+            "x-zeromerma-decimal-representation": "JSON_STRING"
+          },
           "unit_price": {
             "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
             "title": "Unit Price",
@@ -44016,7 +45988,12 @@
           "name",
           "display_order",
           "unit_price",
-          "currency_code"
+          "currency_code",
+          "is_inventory_tracked",
+          "lot_tracking_enabled",
+          "available_quantity",
+          "reserved_quantity",
+          "available_lots"
         ],
         "title": "PosCatalogProductView",
         "type": "object"
@@ -44396,7 +46373,8 @@
           "status": {
             "enum": [
               "DRAFT",
-              "IN_PROGRESS",
+              "RELEASED",
+              "PENDING_RECONCILIATION",
               "COMPLETED",
               "CANCELLED"
             ],
@@ -44614,25 +46592,15 @@
         "type": "object"
       },
       "ReturnCommitLineRequest": {
+        "additionalProperties": false,
         "properties": {
-          "disposition_code": {
-            "maxLength": 32,
-            "minLength": 1,
-            "title": "Disposition Code",
-            "type": "string"
-          },
-          "exact_product_id": {
-            "anyOf": [
-              {
-                "format": "uuid",
-                "type": "string",
-                "x-zeromerma-id-representation": "JSON_STRING"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Exact Product Id"
+          "allocations": {
+            "items": {
+              "$ref": "#/components/schemas/ReturnDispositionAllocationRequest"
+            },
+            "minItems": 1,
+            "title": "Allocations",
+            "type": "array"
           },
           "original_sale_line_id": {
             "format": "uuid",
@@ -44659,7 +46627,7 @@
         "required": [
           "original_sale_line_id",
           "returned_quantity",
-          "disposition_code"
+          "allocations"
         ],
         "title": "ReturnCommitLineRequest",
         "type": "object"
@@ -44667,14 +46635,12 @@
       "ReturnCommitLineResultView": {
         "additionalProperties": false,
         "properties": {
-          "disposition_code": {
-            "enum": [
-              "RESTOCK_COUNTER",
-              "RESTOCK_BACKROOM",
-              "SEND_TO_WASTE"
-            ],
-            "title": "Disposition Code",
-            "type": "string"
+          "allocations": {
+            "items": {
+              "$ref": "#/components/schemas/ReturnDispositionAllocationView"
+            },
+            "title": "Allocations",
+            "type": "array"
           },
           "id": {
             "format": "uuid",
@@ -44704,12 +46670,6 @@
             "type": "string",
             "x-zeromerma-decimal-representation": "JSON_STRING"
           },
-          "returned_product_id": {
-            "format": "uuid",
-            "title": "Returned Product Id",
-            "type": "string",
-            "x-zeromerma-id-representation": "JSON_STRING"
-          },
           "returned_quantity": {
             "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
             "title": "Returned Quantity",
@@ -44721,16 +46681,16 @@
           "id",
           "line_number",
           "original_sale_line_id",
-          "returned_product_id",
           "returned_quantity",
           "refund_unit_price",
           "refund_line_total_amount",
-          "disposition_code"
+          "allocations"
         ],
         "title": "ReturnCommitLineResultView",
         "type": "object"
       },
       "ReturnCommitRequest": {
+        "additionalProperties": false,
         "properties": {
           "cash_session_id": {
             "format": "uuid",
@@ -44938,6 +46898,148 @@
           "old_sale_days_threshold"
         ],
         "title": "ReturnControlsView",
+        "type": "object"
+      },
+      "ReturnDispositionAllocationRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "disposition_code": {
+            "default": "QUARANTINE",
+            "enum": [
+              "RESTOCK_COUNTER",
+              "RESTOCK_BACKROOM",
+              "QUARANTINE",
+              "SEND_TO_WASTE",
+              "NO_STOCK"
+            ],
+            "title": "Disposition Code",
+            "type": "string"
+          },
+          "exact_product_id": {
+            "format": "uuid",
+            "title": "Exact Product Id",
+            "type": "string",
+            "x-zeromerma-id-representation": "JSON_STRING"
+          },
+          "lot_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string",
+                "x-zeromerma-id-representation": "JSON_STRING"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Lot Id"
+          },
+          "quantity": {
+            "anyOf": [
+              {
+                "exclusiveMinimum": 0.0,
+                "type": "number"
+              },
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*(?:\\d{0,9}|(?=[\\d.]{1,13}0*$)\\d{0,9}\\.\\d{0,3}0*$)",
+                "type": "string",
+                "x-zeromerma-decimal-representation": "JSON_STRING"
+              }
+            ],
+            "title": "Quantity",
+            "x-zeromerma-decimal-input-representation": "JSON_NUMBER_OR_STRING"
+          },
+          "restock_safe_acknowledged": {
+            "default": false,
+            "title": "Restock Safe Acknowledged",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "exact_product_id",
+          "quantity"
+        ],
+        "title": "ReturnDispositionAllocationRequest",
+        "type": "object"
+      },
+      "ReturnDispositionAllocationView": {
+        "additionalProperties": false,
+        "properties": {
+          "disposition_code": {
+            "enum": [
+              "RESTOCK_COUNTER",
+              "RESTOCK_BACKROOM",
+              "QUARANTINE",
+              "SEND_TO_WASTE",
+              "NO_STOCK"
+            ],
+            "title": "Disposition Code",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string",
+            "x-zeromerma-id-representation": "JSON_STRING"
+          },
+          "inventory_movement_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string",
+                "x-zeromerma-id-representation": "JSON_STRING"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Inventory Movement Id"
+          },
+          "lot_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string",
+                "x-zeromerma-id-representation": "JSON_STRING"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Lot Id"
+          },
+          "quantity": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Quantity",
+            "type": "string",
+            "x-zeromerma-decimal-representation": "JSON_STRING"
+          },
+          "returned_product_code_snapshot": {
+            "title": "Returned Product Code Snapshot",
+            "type": "string"
+          },
+          "returned_product_id": {
+            "format": "uuid",
+            "title": "Returned Product Id",
+            "type": "string",
+            "x-zeromerma-id-representation": "JSON_STRING"
+          },
+          "returned_product_name_snapshot": {
+            "title": "Returned Product Name Snapshot",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "returned_product_id",
+          "returned_product_code_snapshot",
+          "returned_product_name_snapshot",
+          "quantity",
+          "disposition_code",
+          "lot_id",
+          "inventory_movement_id"
+        ],
+        "title": "ReturnDispositionAllocationView",
         "type": "object"
       },
       "ReturnFilterOptionView": {
@@ -45234,6 +47336,88 @@
         "title": "ReturnPaymentSummaryView",
         "type": "object"
       },
+      "ReturnPhysicalOptionView": {
+        "properties": {
+          "expires_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string",
+                "x-zeromerma-instant-format": "ISO8601_DATETIME"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expires At"
+          },
+          "is_inventory_tracked": {
+            "title": "Is Inventory Tracked",
+            "type": "boolean"
+          },
+          "lot_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Lot Code"
+          },
+          "lot_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string",
+                "x-zeromerma-id-representation": "JSON_STRING"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Lot Id"
+          },
+          "lot_tracking_enabled": {
+            "title": "Lot Tracking Enabled",
+            "type": "boolean"
+          },
+          "product_code": {
+            "title": "Product Code",
+            "type": "string"
+          },
+          "product_id": {
+            "format": "uuid",
+            "title": "Product Id",
+            "type": "string",
+            "x-zeromerma-id-representation": "JSON_STRING"
+          },
+          "product_name": {
+            "title": "Product Name",
+            "type": "string"
+          },
+          "remaining_quantity": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Remaining Quantity",
+            "type": "string",
+            "x-zeromerma-decimal-representation": "JSON_STRING"
+          }
+        },
+        "required": [
+          "product_id",
+          "product_code",
+          "product_name",
+          "lot_id",
+          "lot_code",
+          "expires_at",
+          "remaining_quantity",
+          "is_inventory_tracked",
+          "lot_tracking_enabled"
+        ],
+        "title": "ReturnPhysicalOptionView",
+        "type": "object"
+      },
       "ReturnProductOptionView": {
         "properties": {
           "code": {
@@ -45460,6 +47644,13 @@
             "title": "Line Total Amount",
             "type": "string",
             "x-zeromerma-decimal-representation": "JSON_STRING"
+          },
+          "physical_options": {
+            "items": {
+              "$ref": "#/components/schemas/ReturnPhysicalOptionView"
+            },
+            "title": "Physical Options",
+            "type": "array"
           },
           "product_class_code": {
             "title": "Product Class Code",
@@ -46329,9 +48520,12 @@
       },
       "SaleReturnCommittedLineView": {
         "properties": {
-          "disposition_code": {
-            "title": "Disposition Code",
-            "type": "string"
+          "allocations": {
+            "items": {
+              "$ref": "#/components/schemas/ReturnDispositionAllocationView"
+            },
+            "title": "Allocations",
+            "type": "array"
           },
           "id": {
             "format": "uuid",
@@ -46365,10 +48559,6 @@
             "type": "string",
             "x-zeromerma-decimal-representation": "JSON_STRING"
           },
-          "returned_product_name_snapshot": {
-            "title": "Returned Product Name Snapshot",
-            "type": "string"
-          },
           "returned_quantity": {
             "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
             "title": "Returned Quantity",
@@ -46381,11 +48571,10 @@
           "line_number",
           "original_sale_line_id",
           "original_catalog_name_snapshot",
-          "returned_product_name_snapshot",
+          "allocations",
           "returned_quantity",
           "refund_unit_price",
-          "refund_line_total_amount",
-          "disposition_code"
+          "refund_line_total_amount"
         ],
         "title": "SaleReturnCommittedLineView",
         "type": "object"
@@ -46753,6 +48942,95 @@
         "title": "TerminalOperationView",
         "type": "object"
       },
+      "TicketAttributionOptionView": {
+        "properties": {
+          "available_quantity": {
+            "anyOf": [
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string",
+                "x-zeromerma-decimal-representation": "JSON_STRING"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Available Quantity"
+          },
+          "expires_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string",
+                "x-zeromerma-instant-format": "ISO8601_DATETIME"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expires At"
+          },
+          "is_inventory_tracked": {
+            "title": "Is Inventory Tracked",
+            "type": "boolean"
+          },
+          "lot_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Lot Code"
+          },
+          "lot_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string",
+                "x-zeromerma-id-representation": "JSON_STRING"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Lot Id"
+          },
+          "lot_tracking_enabled": {
+            "title": "Lot Tracking Enabled",
+            "type": "boolean"
+          },
+          "product_code": {
+            "title": "Product Code",
+            "type": "string"
+          },
+          "product_id": {
+            "format": "uuid",
+            "title": "Product Id",
+            "type": "string",
+            "x-zeromerma-id-representation": "JSON_STRING"
+          },
+          "product_name": {
+            "title": "Product Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "product_id",
+          "product_code",
+          "product_name",
+          "lot_id",
+          "lot_code",
+          "expires_at",
+          "available_quantity",
+          "is_inventory_tracked",
+          "lot_tracking_enabled"
+        ],
+        "title": "TicketAttributionOptionView",
+        "type": "object"
+      },
       "TicketDetailResponse": {
         "properties": {
           "branch": {
@@ -46894,6 +49172,17 @@
       },
       "TicketLineItemView": {
         "properties": {
+          "attribution_options": {
+            "items": {
+              "$ref": "#/components/schemas/TicketAttributionOptionView"
+            },
+            "title": "Attribution Options",
+            "type": "array"
+          },
+          "capture_mode": {
+            "title": "Capture Mode",
+            "type": "string"
+          },
           "id": {
             "format": "uuid",
             "title": "Id",
@@ -46910,9 +49199,22 @@
             "title": "Name",
             "type": "string"
           },
+          "physical_attributions": {
+            "items": {
+              "$ref": "#/components/schemas/TicketPhysicalAttributionView"
+            },
+            "title": "Physical Attributions",
+            "type": "array"
+          },
           "quantity": {
             "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
             "title": "Quantity",
+            "type": "string",
+            "x-zeromerma-decimal-representation": "JSON_STRING"
+          },
+          "remaining_attribution_quantity": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Remaining Attribution Quantity",
             "type": "string",
             "x-zeromerma-decimal-representation": "JSON_STRING"
           },
@@ -46933,7 +49235,11 @@
           "name",
           "quantity",
           "unit_price",
-          "line_total_amount"
+          "line_total_amount",
+          "capture_mode",
+          "remaining_attribution_quantity",
+          "attribution_options",
+          "physical_attributions"
         ],
         "title": "TicketLineItemView",
         "type": "object"
@@ -47139,6 +49445,56 @@
         "title": "TicketPaymentSummaryView",
         "type": "object"
       },
+      "TicketPhysicalAttributionView": {
+        "properties": {
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string",
+            "x-zeromerma-id-representation": "JSON_STRING"
+          },
+          "inventory_movement_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string",
+                "x-zeromerma-id-representation": "JSON_STRING"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Inventory Movement Id"
+          },
+          "occurred_at": {
+            "format": "date-time",
+            "title": "Occurred At",
+            "type": "string",
+            "x-zeromerma-instant-format": "ISO8601_DATETIME"
+          },
+          "product_id": {
+            "format": "uuid",
+            "title": "Product Id",
+            "type": "string",
+            "x-zeromerma-id-representation": "JSON_STRING"
+          },
+          "quantity": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Quantity",
+            "type": "string",
+            "x-zeromerma-decimal-representation": "JSON_STRING"
+          }
+        },
+        "required": [
+          "id",
+          "product_id",
+          "quantity",
+          "inventory_movement_id",
+          "occurred_at"
+        ],
+        "title": "TicketPhysicalAttributionView",
+        "type": "object"
+      },
       "TicketReprintRequest": {
         "properties": {
           "workstation_code": {
@@ -47295,6 +49651,13 @@
       "TransferCommandLineView": {
         "additionalProperties": false,
         "properties": {
+          "lots": {
+            "items": {
+              "$ref": "#/components/schemas/TransferLotProgressView"
+            },
+            "title": "Lots",
+            "type": "array"
+          },
           "pending_quantity": {
             "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
             "title": "Pending Quantity",
@@ -47313,6 +49676,13 @@
             "type": "string",
             "x-zeromerma-decimal-representation": "JSON_STRING"
           },
+          "returned_quantity": {
+            "default": "0",
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Returned Quantity",
+            "type": "string",
+            "x-zeromerma-decimal-representation": "JSON_STRING"
+          },
           "sent_quantity": {
             "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
             "title": "Sent Quantity",
@@ -47324,6 +49694,13 @@
             "title": "Shipment Line Id",
             "type": "string",
             "x-zeromerma-id-representation": "JSON_STRING"
+          },
+          "waste_quantity": {
+            "default": "0",
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Waste Quantity",
+            "type": "string",
+            "x-zeromerma-decimal-representation": "JSON_STRING"
           }
         },
         "required": [
@@ -47407,6 +49784,19 @@
             ],
             "title": "Receipt Id"
           },
+          "resolution_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string",
+                "x-zeromerma-id-representation": "JSON_STRING"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Resolution Id"
+          },
           "status": {
             "title": "Status",
             "type": "string"
@@ -47488,6 +49878,13 @@
               "$ref": "#/components/schemas/OperationDocumentView"
             },
             "title": "Receipts",
+            "type": "array"
+          },
+          "resolutions": {
+            "items": {
+              "$ref": "#/components/schemas/TransferResolutionView"
+            },
+            "title": "Resolutions",
             "type": "array"
           },
           "shipment": {
@@ -47731,6 +50128,150 @@
         "title": "TransferDocumentSummaryView",
         "type": "object"
       },
+      "TransferLotAllocationRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "lot_id": {
+            "format": "uuid",
+            "title": "Lot Id",
+            "type": "string",
+            "x-zeromerma-id-representation": "JSON_STRING"
+          },
+          "quantity": {
+            "anyOf": [
+              {
+                "exclusiveMinimum": 0.0,
+                "type": "number"
+              },
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*(?:\\d{0,9}|(?=[\\d.]{1,13}0*$)\\d{0,9}\\.\\d{0,3}0*$)",
+                "type": "string",
+                "x-zeromerma-decimal-representation": "JSON_STRING"
+              }
+            ],
+            "title": "Quantity",
+            "x-zeromerma-decimal-input-representation": "JSON_NUMBER_OR_STRING"
+          }
+        },
+        "required": [
+          "lot_id",
+          "quantity"
+        ],
+        "title": "TransferLotAllocationRequest",
+        "type": "object"
+      },
+      "TransferLotProgressView": {
+        "additionalProperties": false,
+        "properties": {
+          "expires_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string",
+                "x-zeromerma-instant-format": "ISO8601_DATETIME"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expires At"
+          },
+          "lot_code": {
+            "title": "Lot Code",
+            "type": "string"
+          },
+          "lot_id": {
+            "format": "uuid",
+            "title": "Lot Id",
+            "type": "string",
+            "x-zeromerma-id-representation": "JSON_STRING"
+          },
+          "pending_quantity": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Pending Quantity",
+            "type": "string",
+            "x-zeromerma-decimal-representation": "JSON_STRING"
+          },
+          "received_quantity": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Received Quantity",
+            "type": "string",
+            "x-zeromerma-decimal-representation": "JSON_STRING"
+          },
+          "returned_quantity": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Returned Quantity",
+            "type": "string",
+            "x-zeromerma-decimal-representation": "JSON_STRING"
+          },
+          "sent_quantity": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Sent Quantity",
+            "type": "string",
+            "x-zeromerma-decimal-representation": "JSON_STRING"
+          },
+          "waste_quantity": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Waste Quantity",
+            "type": "string",
+            "x-zeromerma-decimal-representation": "JSON_STRING"
+          }
+        },
+        "required": [
+          "lot_id",
+          "lot_code",
+          "expires_at",
+          "sent_quantity",
+          "received_quantity",
+          "returned_quantity",
+          "waste_quantity",
+          "pending_quantity"
+        ],
+        "title": "TransferLotProgressView",
+        "type": "object"
+      },
+      "TransferLotQuantityView": {
+        "additionalProperties": false,
+        "properties": {
+          "expires_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string",
+                "x-zeromerma-instant-format": "ISO8601_DATETIME"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expires At"
+          },
+          "lot_code": {
+            "title": "Lot Code",
+            "type": "string"
+          },
+          "lot_id": {
+            "format": "uuid",
+            "title": "Lot Id",
+            "type": "string",
+            "x-zeromerma-id-representation": "JSON_STRING"
+          },
+          "quantity": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Quantity",
+            "type": "string",
+            "x-zeromerma-decimal-representation": "JSON_STRING"
+          }
+        },
+        "required": [
+          "lot_id",
+          "lot_code",
+          "expires_at",
+          "quantity"
+        ],
+        "title": "TransferLotQuantityView",
+        "type": "object"
+      },
       "TransferQuantitySummaryView": {
         "properties": {
           "expected_total_quantity": {
@@ -47915,12 +50456,26 @@
             "x-zeromerma-decimal-representation": "JSON_STRING"
           },
           "workstation_code": {
-            "title": "Workstation Code",
-            "type": "string"
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Workstation Code"
           },
           "workstation_name": {
-            "title": "Workstation Name",
-            "type": "string"
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Workstation Name"
           }
         },
         "required": [
@@ -48056,6 +50611,20 @@
             "title": "Expected Quantity",
             "x-zeromerma-decimal-input-representation": "JSON_NUMBER_OR_STRING"
           },
+          "lot_allocations": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/TransferLotAllocationRequest"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Lot Allocations"
+          },
           "notes": {
             "anyOf": [
               {
@@ -48152,6 +50721,213 @@
           "lines"
         ],
         "title": "TransferReceiveRequest",
+        "type": "object"
+      },
+      "TransferResolutionLineRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "lot_allocations": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/TransferLotAllocationRequest"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Lot Allocations"
+          },
+          "quantity": {
+            "anyOf": [
+              {
+                "exclusiveMinimum": 0.0,
+                "type": "number"
+              },
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*(?:\\d{0,9}|(?=[\\d.]{1,13}0*$)\\d{0,9}\\.\\d{0,3}0*$)",
+                "type": "string",
+                "x-zeromerma-decimal-representation": "JSON_STRING"
+              }
+            ],
+            "title": "Quantity",
+            "x-zeromerma-decimal-input-representation": "JSON_NUMBER_OR_STRING"
+          },
+          "shipment_line_id": {
+            "format": "uuid",
+            "title": "Shipment Line Id",
+            "type": "string",
+            "x-zeromerma-id-representation": "JSON_STRING"
+          }
+        },
+        "required": [
+          "shipment_line_id",
+          "quantity"
+        ],
+        "title": "TransferResolutionLineRequest",
+        "type": "object"
+      },
+      "TransferResolutionLineView": {
+        "properties": {
+          "lots": {
+            "items": {
+              "$ref": "#/components/schemas/TransferLotQuantityView"
+            },
+            "title": "Lots",
+            "type": "array"
+          },
+          "product_id": {
+            "format": "uuid",
+            "title": "Product Id",
+            "type": "string",
+            "x-zeromerma-id-representation": "JSON_STRING"
+          },
+          "quantity": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Quantity",
+            "type": "string",
+            "x-zeromerma-decimal-representation": "JSON_STRING"
+          },
+          "shipment_line_id": {
+            "format": "uuid",
+            "title": "Shipment Line Id",
+            "type": "string",
+            "x-zeromerma-id-representation": "JSON_STRING"
+          },
+          "unit_of_measure": {
+            "title": "Unit Of Measure",
+            "type": "string"
+          }
+        },
+        "required": [
+          "shipment_line_id",
+          "product_id",
+          "quantity",
+          "unit_of_measure"
+        ],
+        "title": "TransferResolutionLineView",
+        "type": "object"
+      },
+      "TransferResolutionView": {
+        "properties": {
+          "actor_id": {
+            "format": "uuid",
+            "title": "Actor Id",
+            "type": "string",
+            "x-zeromerma-id-representation": "JSON_STRING"
+          },
+          "branch_id": {
+            "format": "uuid",
+            "title": "Branch Id",
+            "type": "string",
+            "x-zeromerma-id-representation": "JSON_STRING"
+          },
+          "destination_location": {
+            "title": "Destination Location",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string",
+            "x-zeromerma-id-representation": "JSON_STRING"
+          },
+          "kind": {
+            "enum": [
+              "RETURN_TO_ORIGIN",
+              "SEND_TO_WASTE"
+            ],
+            "title": "Kind",
+            "type": "string"
+          },
+          "lines": {
+            "items": {
+              "$ref": "#/components/schemas/TransferResolutionLineView"
+            },
+            "title": "Lines",
+            "type": "array"
+          },
+          "occurred_at": {
+            "format": "date-time",
+            "title": "Occurred At",
+            "type": "string",
+            "x-zeromerma-instant-format": "ISO8601_DATETIME"
+          },
+          "reason": {
+            "title": "Reason",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "kind",
+          "destination_location",
+          "branch_id",
+          "reason",
+          "actor_id",
+          "occurred_at",
+          "lines"
+        ],
+        "title": "TransferResolutionView",
+        "type": "object"
+      },
+      "TransferResolveRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "cash_session_id": {
+            "format": "uuid",
+            "title": "Cash Session Id",
+            "type": "string",
+            "x-zeromerma-id-representation": "JSON_STRING"
+          },
+          "destination_location": {
+            "default": "QUARANTINE",
+            "enum": [
+              "BACKROOM",
+              "QUARANTINE"
+            ],
+            "title": "Destination Location",
+            "type": "string"
+          },
+          "kind": {
+            "enum": [
+              "RETURN_TO_ORIGIN",
+              "SEND_TO_WASTE"
+            ],
+            "title": "Kind",
+            "type": "string"
+          },
+          "lines": {
+            "items": {
+              "$ref": "#/components/schemas/TransferResolutionLineRequest"
+            },
+            "minItems": 1,
+            "title": "Lines",
+            "type": "array"
+          },
+          "reason": {
+            "maxLength": 500,
+            "minLength": 1,
+            "title": "Reason",
+            "type": "string"
+          },
+          "workstation_code": {
+            "maxLength": 64,
+            "minLength": 1,
+            "title": "Workstation Code",
+            "type": "string"
+          }
+        },
+        "required": [
+          "kind",
+          "reason",
+          "lines",
+          "workstation_code",
+          "cash_session_id"
+        ],
+        "title": "TransferResolveRequest",
         "type": "object"
       },
       "WasteCommitRequest": {
@@ -61857,6 +64633,498 @@
         "x-zeromerma-operation-id-policy": "FASTAPI_STABLE_GENERATED"
       }
     },
+    "/v1/admin/inventory-dispositions": {
+      "post": {
+        "operationId": "create_disposition_v1_admin_inventory_dispositions_post",
+        "parameters": [
+          {
+            "description": "A globally unique UUIDv7 identifying this business intention.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": true,
+            "schema": {
+              "description": "A globally unique UUIDv7 identifying this business intention.",
+              "maxLength": 36,
+              "minLength": 36,
+              "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-7[0-9a-fA-F]{3}-[89aAbB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$",
+              "title": "Idempotency-Key",
+              "type": "string"
+            }
+          },
+          {
+            "description": "UUID for this HTTP attempt. Missing, duplicate or invalid IDs are replaced.",
+            "in": "header",
+            "name": "X-Request-ID",
+            "required": false,
+            "schema": {
+              "format": "uuid",
+              "type": "string",
+              "x-zeromerma-id-representation": "JSON_STRING"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/InventoryDispositionRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InventoryDispositionResult"
+                }
+              }
+            },
+            "description": "Successful Response",
+            "headers": {
+              "Idempotency-Replayed": {
+                "$ref": "#/components/headers/IdempotencyReplayed"
+              },
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/CorrelationId"
+              },
+              "X-Request-ID": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Bad Request",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/CorrelationId"
+              },
+              "X-Request-ID": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Authentication Required",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/CorrelationId"
+              },
+              "X-Request-ID": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Forbidden",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/CorrelationId"
+              },
+              "X-Request-ID": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/CorrelationId"
+              },
+              "X-Request-ID": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/CorrelationId"
+              },
+              "X-Request-ID": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Validation Error",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/CorrelationId"
+              },
+              "X-Request-ID": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "423": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Session Locked",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/CorrelationId"
+              },
+              "X-Request-ID": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Login Rate Limited",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/CorrelationId"
+              },
+              "X-Request-ID": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Internal Server Error",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/CorrelationId"
+              },
+              "X-Request-ID": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "PosSessionCookie": []
+          },
+          {
+            "BackofficeSessionCookie": []
+          }
+        ],
+        "summary": "Create Disposition",
+        "tags": [
+          "inventory-dispositions"
+        ],
+        "x-authorization-policy": "explicit-deny-by-default",
+        "x-required-capabilities": [],
+        "x-zeromerma-operation-id-policy": "FASTAPI_STABLE_GENERATED"
+      }
+    },
+    "/v1/admin/inventory-dispositions/confirmations/{idempotency_key}": {
+      "get": {
+        "operationId": "recover_disposition_v1_admin_inventory_dispositions_confirmations__idempotency_key__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "idempotency_key",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Idempotency Key",
+              "type": "string",
+              "x-zeromerma-id-representation": "JSON_STRING"
+            }
+          },
+          {
+            "in": "query",
+            "name": "branch_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Branch Id",
+              "type": "string",
+              "x-zeromerma-id-representation": "JSON_STRING"
+            }
+          },
+          {
+            "in": "query",
+            "name": "kind",
+            "required": true,
+            "schema": {
+              "enum": [
+                "RETURN_CORRECTION",
+                "QUARANTINE_RELEASE"
+              ],
+              "title": "Kind",
+              "type": "string"
+            }
+          },
+          {
+            "description": "UUID for this HTTP attempt. Missing, duplicate or invalid IDs are replaced.",
+            "in": "header",
+            "name": "X-Request-ID",
+            "required": false,
+            "schema": {
+              "format": "uuid",
+              "type": "string",
+              "x-zeromerma-id-representation": "JSON_STRING"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InventoryDispositionResult"
+                }
+              }
+            },
+            "description": "Successful Response",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/CorrelationId"
+              },
+              "X-Request-ID": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Bad Request",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/CorrelationId"
+              },
+              "X-Request-ID": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Authentication Required",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/CorrelationId"
+              },
+              "X-Request-ID": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Forbidden",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/CorrelationId"
+              },
+              "X-Request-ID": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/CorrelationId"
+              },
+              "X-Request-ID": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/CorrelationId"
+              },
+              "X-Request-ID": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Validation Error",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/CorrelationId"
+              },
+              "X-Request-ID": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "423": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Session Locked",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/CorrelationId"
+              },
+              "X-Request-ID": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Login Rate Limited",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/CorrelationId"
+              },
+              "X-Request-ID": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Internal Server Error",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/CorrelationId"
+              },
+              "X-Request-ID": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "PosSessionCookie": []
+          },
+          {
+            "BackofficeSessionCookie": []
+          }
+        ],
+        "summary": "Recover Disposition",
+        "tags": [
+          "inventory-dispositions"
+        ],
+        "x-authorization-policy": "explicit-deny-by-default",
+        "x-required-capabilities": [],
+        "x-zeromerma-operation-id-policy": "FASTAPI_STABLE_GENERATED"
+      }
+    },
     "/v1/admin/inventory/adjustments": {
       "post": {
         "operationId": "create_admin_inventory_adjustment_v1_admin_inventory_adjustments_post",
@@ -67013,7 +70281,7 @@
               "enum": [
                 "create",
                 "update",
-                "start",
+                "release",
                 "complete",
                 "cancel"
               ],
@@ -68249,9 +71517,9 @@
         "x-zeromerma-operation-id-policy": "FASTAPI_STABLE_GENERATED"
       }
     },
-    "/v1/admin/production/{production_id}/start": {
+    "/v1/admin/production/{production_id}/release": {
       "post": {
-        "operationId": "start_admin_production_v1_admin_production__production_id__start_post",
+        "operationId": "release_admin_production_v1_admin_production__production_id__release_post",
         "parameters": [
           {
             "in": "path",
@@ -68294,7 +71562,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/AdminProductionStartRequest"
+                "$ref": "#/components/schemas/AdminProductionReleaseRequest"
               }
             }
           },
@@ -68493,7 +71761,7 @@
             "BackofficeSessionCookie": []
           }
         ],
-        "summary": "Start Admin Production",
+        "summary": "Release Admin Production",
         "tags": [
           "admin-production"
         ],
@@ -70527,7 +73795,8 @@
                 "direct-entry",
                 "confirm",
                 "receive",
-                "cancel"
+                "cancel",
+                "reverse-receipt"
               ],
               "title": "Command Code",
               "type": "string"
@@ -72262,6 +75531,264 @@
         "x-authorization-policy": "explicit-deny-by-default",
         "x-required-capabilities": [
           "purchases.receive"
+        ],
+        "x-zeromerma-operation-id-policy": "FASTAPI_STABLE_GENERATED"
+      }
+    },
+    "/v1/admin/purchases/{purchase_id}/reverse-receipt": {
+      "post": {
+        "operationId": "reverse_admin_purchase_receipt_v1_admin_purchases__purchase_id__reverse_receipt_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "purchase_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Purchase Id",
+              "type": "string",
+              "x-zeromerma-id-representation": "JSON_STRING"
+            }
+          },
+          {
+            "description": "A globally unique UUIDv7 identifying this business intention.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": true,
+            "schema": {
+              "description": "A globally unique UUIDv7 identifying this business intention.",
+              "maxLength": 36,
+              "minLength": 36,
+              "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-7[0-9a-fA-F]{3}-[89aAbB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$",
+              "title": "Idempotency-Key",
+              "type": "string"
+            }
+          },
+          {
+            "description": "UUID for this HTTP attempt. Missing, duplicate or invalid IDs are replaced.",
+            "in": "header",
+            "name": "X-Request-ID",
+            "required": false,
+            "schema": {
+              "format": "uuid",
+              "type": "string",
+              "x-zeromerma-id-representation": "JSON_STRING"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AdminPurchaseReverseReceiptRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PurchaseCommandResultView"
+                }
+              }
+            },
+            "description": "Successful Response",
+            "headers": {
+              "Idempotency-Replayed": {
+                "$ref": "#/components/headers/IdempotencyReplayed"
+              },
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/CorrelationId"
+              },
+              "X-Request-ID": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Bad Request",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/CorrelationId"
+              },
+              "X-Request-ID": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Authentication Required",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/CorrelationId"
+              },
+              "X-Request-ID": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Forbidden",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/CorrelationId"
+              },
+              "X-Request-ID": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/CorrelationId"
+              },
+              "X-Request-ID": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict",
+            "headers": {
+              "Idempotency-Replayed": {
+                "$ref": "#/components/headers/IdempotencyReplayed"
+              },
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/CorrelationId"
+              },
+              "X-Request-ID": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Validation Error",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/CorrelationId"
+              },
+              "X-Request-ID": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "423": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Session Locked",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/CorrelationId"
+              },
+              "X-Request-ID": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Login Rate Limited",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/CorrelationId"
+              },
+              "X-Request-ID": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Internal Server Error",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/CorrelationId"
+              },
+              "X-Request-ID": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "PosSessionCookie": []
+          },
+          {
+            "BackofficeSessionCookie": []
+          }
+        ],
+        "summary": "Reverse Admin Purchase Receipt",
+        "tags": [
+          "admin-purchases"
+        ],
+        "x-authorization-policy": "explicit-deny-by-default",
+        "x-required-capabilities": [
+          "purchases.cancel"
         ],
         "x-zeromerma-operation-id-policy": "FASTAPI_STABLE_GENERATED"
       }
@@ -80514,6 +84041,16 @@
             }
           },
           {
+            "in": "query",
+            "name": "pending_physical_only",
+            "required": false,
+            "schema": {
+              "default": false,
+              "title": "Pending Physical Only",
+              "type": "boolean"
+            }
+          },
+          {
             "description": "UUID for this HTTP attempt. Missing, duplicate or invalid IDs are replaced.",
             "in": "header",
             "name": "X-Request-ID",
@@ -87241,7 +90778,9 @@
                 "update",
                 "dispatch",
                 "receive",
-                "cancel"
+                "cancel",
+                "resolve_return",
+                "resolve_waste"
               ],
               "title": "Command Code",
               "type": "string"
@@ -88733,6 +92272,264 @@
           }
         ],
         "summary": "Receive Admin Transfer",
+        "tags": [
+          "admin-transfers"
+        ],
+        "x-authorization-policy": "explicit-deny-by-default",
+        "x-required-capabilities": [
+          "transfers.execute"
+        ],
+        "x-zeromerma-operation-id-policy": "FASTAPI_STABLE_GENERATED"
+      }
+    },
+    "/v1/admin/transfers/{transfer_id}/resolve": {
+      "post": {
+        "operationId": "resolve_admin_transfer_v1_admin_transfers__transfer_id__resolve_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "transfer_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Transfer Id",
+              "type": "string",
+              "x-zeromerma-id-representation": "JSON_STRING"
+            }
+          },
+          {
+            "description": "A globally unique UUIDv7 identifying this business intention.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": true,
+            "schema": {
+              "description": "A globally unique UUIDv7 identifying this business intention.",
+              "maxLength": 36,
+              "minLength": 36,
+              "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-7[0-9a-fA-F]{3}-[89aAbB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$",
+              "title": "Idempotency-Key",
+              "type": "string"
+            }
+          },
+          {
+            "description": "UUID for this HTTP attempt. Missing, duplicate or invalid IDs are replaced.",
+            "in": "header",
+            "name": "X-Request-ID",
+            "required": false,
+            "schema": {
+              "format": "uuid",
+              "type": "string",
+              "x-zeromerma-id-representation": "JSON_STRING"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AdminTransferResolveRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TransferCommandResultView"
+                }
+              }
+            },
+            "description": "Successful Response",
+            "headers": {
+              "Idempotency-Replayed": {
+                "$ref": "#/components/headers/IdempotencyReplayed"
+              },
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/CorrelationId"
+              },
+              "X-Request-ID": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Bad Request",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/CorrelationId"
+              },
+              "X-Request-ID": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Authentication Required",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/CorrelationId"
+              },
+              "X-Request-ID": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Forbidden",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/CorrelationId"
+              },
+              "X-Request-ID": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/CorrelationId"
+              },
+              "X-Request-ID": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict",
+            "headers": {
+              "Idempotency-Replayed": {
+                "$ref": "#/components/headers/IdempotencyReplayed"
+              },
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/CorrelationId"
+              },
+              "X-Request-ID": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Validation Error",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/CorrelationId"
+              },
+              "X-Request-ID": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "423": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Session Locked",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/CorrelationId"
+              },
+              "X-Request-ID": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Login Rate Limited",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/CorrelationId"
+              },
+              "X-Request-ID": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Internal Server Error",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/CorrelationId"
+              },
+              "X-Request-ID": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "PosSessionCookie": []
+          },
+          {
+            "BackofficeSessionCookie": []
+          }
+        ],
+        "summary": "Resolve Admin Transfer",
         "tags": [
           "admin-transfers"
         ],
@@ -93586,6 +97383,254 @@
           }
         ],
         "summary": "List Admin Waste Reasons",
+        "tags": [
+          "admin-waste"
+        ],
+        "x-authorization-policy": "explicit-deny-by-default",
+        "x-required-capabilities": [
+          "waste.view"
+        ],
+        "x-zeromerma-operation-id-policy": "FASTAPI_STABLE_GENERATED"
+      }
+    },
+    "/v1/admin/waste/stock": {
+      "get": {
+        "operationId": "get_admin_waste_stock_v1_admin_waste_stock_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "branch_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Branch Id",
+              "type": "string",
+              "x-zeromerma-id-representation": "JSON_STRING"
+            }
+          },
+          {
+            "in": "query",
+            "name": "product_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Product Id",
+              "type": "string",
+              "x-zeromerma-id-representation": "JSON_STRING"
+            }
+          },
+          {
+            "in": "query",
+            "name": "location_code",
+            "required": true,
+            "schema": {
+              "title": "Location Code",
+              "type": "string"
+            }
+          },
+          {
+            "description": "UUID for this HTTP attempt. Missing, duplicate or invalid IDs are replaced.",
+            "in": "header",
+            "name": "X-Request-ID",
+            "required": false,
+            "schema": {
+              "format": "uuid",
+              "type": "string",
+              "x-zeromerma-id-representation": "JSON_STRING"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminWasteStockView"
+                }
+              }
+            },
+            "description": "Successful Response",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/CorrelationId"
+              },
+              "X-Request-ID": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Bad Request",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/CorrelationId"
+              },
+              "X-Request-ID": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Authentication Required",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/CorrelationId"
+              },
+              "X-Request-ID": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Forbidden",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/CorrelationId"
+              },
+              "X-Request-ID": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/CorrelationId"
+              },
+              "X-Request-ID": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/CorrelationId"
+              },
+              "X-Request-ID": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Validation Error",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/CorrelationId"
+              },
+              "X-Request-ID": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "423": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Session Locked",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/CorrelationId"
+              },
+              "X-Request-ID": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Login Rate Limited",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/CorrelationId"
+              },
+              "X-Request-ID": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Internal Server Error",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/CorrelationId"
+              },
+              "X-Request-ID": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "PosSessionCookie": []
+          },
+          {
+            "BackofficeSessionCookie": []
+          }
+        ],
+        "summary": "Get Admin Waste Stock",
         "tags": [
           "admin-waste"
         ],
@@ -114935,6 +118980,520 @@
         "x-zeromerma-operation-id-policy": "FASTAPI_STABLE_GENERATED"
       }
     },
+    "/v1/sales/{sale_id}/attribute-inventory": {
+      "post": {
+        "operationId": "attribute_inventory_v1_sales__sale_id__attribute_inventory_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "sale_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Sale Id",
+              "type": "string",
+              "x-zeromerma-id-representation": "JSON_STRING"
+            }
+          },
+          {
+            "description": "A globally unique UUIDv7 identifying this business intention.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": true,
+            "schema": {
+              "description": "A globally unique UUIDv7 identifying this business intention.",
+              "maxLength": 36,
+              "minLength": 36,
+              "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-7[0-9a-fA-F]{3}-[89aAbB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$",
+              "title": "Idempotency-Key",
+              "type": "string"
+            }
+          },
+          {
+            "description": "UUID for this HTTP attempt. Missing, duplicate or invalid IDs are replaced.",
+            "in": "header",
+            "name": "X-Request-ID",
+            "required": false,
+            "schema": {
+              "format": "uuid",
+              "type": "string",
+              "x-zeromerma-id-representation": "JSON_STRING"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ClassAttributionRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ClassAttributionResult"
+                }
+              }
+            },
+            "description": "Successful Response",
+            "headers": {
+              "Idempotency-Replayed": {
+                "$ref": "#/components/headers/IdempotencyReplayed"
+              },
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/CorrelationId"
+              },
+              "X-Request-ID": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Bad Request",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/CorrelationId"
+              },
+              "X-Request-ID": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Authentication Required",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/CorrelationId"
+              },
+              "X-Request-ID": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Forbidden",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/CorrelationId"
+              },
+              "X-Request-ID": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/CorrelationId"
+              },
+              "X-Request-ID": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/CorrelationId"
+              },
+              "X-Request-ID": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Validation Error",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/CorrelationId"
+              },
+              "X-Request-ID": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "423": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Session Locked",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/CorrelationId"
+              },
+              "X-Request-ID": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Login Rate Limited",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/CorrelationId"
+              },
+              "X-Request-ID": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Internal Server Error",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/CorrelationId"
+              },
+              "X-Request-ID": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "PosSessionCookie": []
+          },
+          {
+            "BackofficeSessionCookie": []
+          }
+        ],
+        "summary": "Attribute Inventory",
+        "tags": [
+          "inventory-attribution"
+        ],
+        "x-authorization-policy": "explicit-deny-by-default",
+        "x-required-capabilities": [
+          "pos.operate"
+        ],
+        "x-zeromerma-operation-id-policy": "FASTAPI_STABLE_GENERATED"
+      }
+    },
+    "/v1/sales/{sale_id}/inventory-attributions/{idempotency_key}": {
+      "get": {
+        "operationId": "recover_attribution_v1_sales__sale_id__inventory_attributions__idempotency_key__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "sale_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Sale Id",
+              "type": "string",
+              "x-zeromerma-id-representation": "JSON_STRING"
+            }
+          },
+          {
+            "in": "path",
+            "name": "idempotency_key",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Idempotency Key",
+              "type": "string",
+              "x-zeromerma-id-representation": "JSON_STRING"
+            }
+          },
+          {
+            "in": "query",
+            "name": "workstation_code",
+            "required": true,
+            "schema": {
+              "title": "Workstation Code",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "cash_session_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Cash Session Id",
+              "type": "string",
+              "x-zeromerma-id-representation": "JSON_STRING"
+            }
+          },
+          {
+            "description": "UUID for this HTTP attempt. Missing, duplicate or invalid IDs are replaced.",
+            "in": "header",
+            "name": "X-Request-ID",
+            "required": false,
+            "schema": {
+              "format": "uuid",
+              "type": "string",
+              "x-zeromerma-id-representation": "JSON_STRING"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ClassAttributionResult"
+                }
+              }
+            },
+            "description": "Successful Response",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/CorrelationId"
+              },
+              "X-Request-ID": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Bad Request",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/CorrelationId"
+              },
+              "X-Request-ID": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Authentication Required",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/CorrelationId"
+              },
+              "X-Request-ID": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Forbidden",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/CorrelationId"
+              },
+              "X-Request-ID": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/CorrelationId"
+              },
+              "X-Request-ID": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/CorrelationId"
+              },
+              "X-Request-ID": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Validation Error",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/CorrelationId"
+              },
+              "X-Request-ID": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "423": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Session Locked",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/CorrelationId"
+              },
+              "X-Request-ID": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Login Rate Limited",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/CorrelationId"
+              },
+              "X-Request-ID": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Internal Server Error",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/CorrelationId"
+              },
+              "X-Request-ID": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "PosSessionCookie": []
+          },
+          {
+            "BackofficeSessionCookie": []
+          }
+        ],
+        "summary": "Recover Attribution",
+        "tags": [
+          "inventory-attribution"
+        ],
+        "x-authorization-policy": "explicit-deny-by-default",
+        "x-required-capabilities": [
+          "pos.operate"
+        ],
+        "x-zeromerma-operation-id-policy": "FASTAPI_STABLE_GENERATED"
+      }
+    },
     "/v1/tickets": {
       "get": {
         "operationId": "list_tickets_v1_tickets_get",
@@ -115910,7 +120469,9 @@
             "schema": {
               "enum": [
                 "dispatch",
-                "receive"
+                "receive",
+                "resolve_return",
+                "resolve_waste"
               ],
               "title": "Command Code",
               "type": "string"
@@ -117698,6 +122259,264 @@
           }
         ],
         "summary": "Receive Transfer",
+        "tags": [
+          "transfers"
+        ],
+        "x-authorization-policy": "explicit-deny-by-default",
+        "x-required-capabilities": [
+          "transfers.execute"
+        ],
+        "x-zeromerma-operation-id-policy": "FASTAPI_STABLE_GENERATED"
+      }
+    },
+    "/v1/transfers/{transfer_id}/resolve": {
+      "post": {
+        "operationId": "resolve_pos_transfer_v1_transfers__transfer_id__resolve_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "transfer_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Transfer Id",
+              "type": "string",
+              "x-zeromerma-id-representation": "JSON_STRING"
+            }
+          },
+          {
+            "description": "A globally unique UUIDv7 identifying this business intention.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": true,
+            "schema": {
+              "description": "A globally unique UUIDv7 identifying this business intention.",
+              "maxLength": 36,
+              "minLength": 36,
+              "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-7[0-9a-fA-F]{3}-[89aAbB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$",
+              "title": "Idempotency-Key",
+              "type": "string"
+            }
+          },
+          {
+            "description": "UUID for this HTTP attempt. Missing, duplicate or invalid IDs are replaced.",
+            "in": "header",
+            "name": "X-Request-ID",
+            "required": false,
+            "schema": {
+              "format": "uuid",
+              "type": "string",
+              "x-zeromerma-id-representation": "JSON_STRING"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TransferResolveRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TransferCommandResultView"
+                }
+              }
+            },
+            "description": "Successful Response",
+            "headers": {
+              "Idempotency-Replayed": {
+                "$ref": "#/components/headers/IdempotencyReplayed"
+              },
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/CorrelationId"
+              },
+              "X-Request-ID": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Bad Request",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/CorrelationId"
+              },
+              "X-Request-ID": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Authentication Required",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/CorrelationId"
+              },
+              "X-Request-ID": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Forbidden",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/CorrelationId"
+              },
+              "X-Request-ID": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/CorrelationId"
+              },
+              "X-Request-ID": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict",
+            "headers": {
+              "Idempotency-Replayed": {
+                "$ref": "#/components/headers/IdempotencyReplayed"
+              },
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/CorrelationId"
+              },
+              "X-Request-ID": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Validation Error",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/CorrelationId"
+              },
+              "X-Request-ID": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "423": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Session Locked",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/CorrelationId"
+              },
+              "X-Request-ID": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Login Rate Limited",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/CorrelationId"
+              },
+              "X-Request-ID": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Internal Server Error",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/CorrelationId"
+              },
+              "X-Request-ID": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "PosSessionCookie": []
+          },
+          {
+            "BackofficeSessionCookie": []
+          }
+        ],
+        "summary": "Resolve Pos Transfer",
         "tags": [
           "transfers"
         ],

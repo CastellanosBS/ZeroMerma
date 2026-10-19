@@ -34,12 +34,15 @@ from zeromerma_api.modules.transfers.application.admin_schemas import (
     AdminTransferUpdateRequest,
 )
 from zeromerma_api.modules.transfers.application.admin_services import AdminTransferService
+from zeromerma_api.modules.transfers.application.physical_workflow import resolve as resolve_transit
 from zeromerma_api.modules.transfers.application.schemas import (
+    AdminTransferResolveRequest,
     PosTransferCommandCode,
     TransferCommandCode,
     TransferCommandResultView,
     TransferDispatchCommitRequest,
     TransferReceiveRequest,
+    TransferResolveRequest,
 )
 from zeromerma_api.modules.transfers.application.services import TransferCommandService
 from zeromerma_api.modules.transfers.domain.exceptions import (
@@ -53,8 +56,9 @@ TransferAdminCommand = (
     | AdminTransferDispatchRequest
     | AdminTransferReceiveRequest
     | AdminTransferCancelRequest
+    | AdminTransferResolveRequest
 )
-TransferPosCommand = TransferDispatchCommitRequest | TransferReceiveRequest
+TransferPosCommand = TransferDispatchCommitRequest | TransferReceiveRequest | TransferResolveRequest
 TRANSFER_RESPONSE_POLICY = ResponsePolicy(snapshot_model=TransferCommandResultView)
 
 
@@ -85,6 +89,12 @@ def _authorize(
     require_branches(
         current, transfer_capability(code), [context.branch_id, *context.related_branch_ids]
     )
+    if code in {"resolve_return", "resolve_waste"}:
+        require_branches(
+            current,
+            "transfers.cancel" if code == "resolve_return" else "waste.manage",
+            [context.branch_id, *context.related_branch_ids],
+        )
     branch_ids = {context.branch_id, *context.related_branch_ids}
     existing = set(session.scalars(select(Branch.id).where(Branch.id.in_(branch_ids))).all())
     if existing != branch_ids:
@@ -105,6 +115,10 @@ class TransferCommandServiceWrapper:
         request_id: str | None,
         transfer_id: UUID | None = None,
     ) -> IdempotencyResult:
+        if isinstance(command, TransferResolveRequest) and command_code != (
+            "resolve_return" if command.kind == "RETURN_TO_ORIGIN" else "resolve_waste"
+        ):
+            raise IdempotencyBoundaryError("The resolution kind does not match its command.")
         if (command_code == "dispatch") != isinstance(command, TransferDispatchCommitRequest) or (
             command_code == "dispatch"
         ) != (transfer_id is None):
@@ -159,6 +173,17 @@ class TransferCommandServiceWrapper:
             else:
                 if transfer_id is None:
                     raise IdempotencyBoundaryError("A receipt requires its shipment.")
+                if isinstance(command, TransferResolveRequest):
+                    result = resolve_transit(
+                        current,
+                        transfer_id=transfer_id,
+                        user=current_user,
+                        command=command,
+                        request_id=request_id,
+                    )
+                    return CommandResult(
+                        200, result, resource_type="transfer", resource_id=str(result.id)
+                    )
                 result = service.receive_transfer(
                     current,
                     current_user=current_user,
@@ -197,12 +222,18 @@ class TransferCommandServiceWrapper:
         request_id: str | None,
         transfer_id: UUID | None = None,
     ) -> IdempotencyResult:
+        if isinstance(command, AdminTransferResolveRequest) and command_code != (
+            "resolve_return" if command.kind == "RETURN_TO_ORIGIN" else "resolve_waste"
+        ):
+            raise IdempotencyBoundaryError("The resolution kind does not match its command.")
         types = {
             "create": AdminTransferCreateRequest,
             "update": AdminTransferUpdateRequest,
             "dispatch": AdminTransferDispatchRequest,
             "receive": AdminTransferReceiveRequest,
             "cancel": AdminTransferCancelRequest,
+            "resolve_return": AdminTransferResolveRequest,
+            "resolve_waste": AdminTransferResolveRequest,
         }
         if type(command) is not types[command_code] or (command_code == "create") != (
             transfer_id is None
@@ -255,6 +286,14 @@ class TransferCommandServiceWrapper:
                         current,
                         current_user=current_user,
                         transfer_id=transfer_id,
+                        command=command,
+                        request_id=request_id,
+                    )
+                elif isinstance(command, AdminTransferResolveRequest):
+                    result = resolve_transit(
+                        current,
+                        transfer_id=transfer_id,
+                        user=current_user,
                         command=command,
                         request_id=request_id,
                     )

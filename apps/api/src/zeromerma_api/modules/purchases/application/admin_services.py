@@ -6,7 +6,7 @@ from datetime import UTC, datetime
 from decimal import Decimal
 
 from pydantic import TypeAdapter
-from sqlalchemy import select
+from sqlalchemy import or_, select
 from sqlalchemy.orm import InstrumentedAttribute, Session
 
 from zeromerma_api.modules.audit.application.service import AuditRecorder
@@ -24,14 +24,22 @@ from zeromerma_api.modules.identity.application.actions import restrict_actions
 from zeromerma_api.modules.identity.application.schemas import AuthenticatedUser
 from zeromerma_api.modules.identity.application.visibility import operational_user_predicate
 from zeromerma_api.modules.identity.infrastructure.models import User
+from zeromerma_api.modules.inventory.application.lots import load_movement_lots
 from zeromerma_api.modules.inventory.application.mutations import (
     InventoryBalanceKey,
     LockedInventoryBalances,
+    create_inventory_lot,
     lock_inventory_balances,
 )
 from zeromerma_api.modules.inventory.domain.constants import (
     INVENTORY_LOCATION_BACKROOM,
     INVENTORY_MOVEMENT_TYPE_PURCHASE_RECEIPT,
+)
+from zeromerma_api.modules.inventory.domain.quantities import (
+    InventoryLotQuantity,
+    convert_quantity,
+    exact_decimal,
+    inventory_calculation,
 )
 from zeromerma_api.modules.inventory.infrastructure.models import (
     InventoryMovement,
@@ -57,9 +65,12 @@ from zeromerma_api.modules.purchases.application.admin_schemas import (
     AdminPurchaseMetricsView,
     AdminPurchaseOverviewView,
     AdminPurchaseReceiptLineInput,
+    AdminPurchaseReceiptLineView,
     AdminPurchaseReceiptSummaryView,
+    AdminPurchaseReceiptView,
     AdminPurchaseReceiveRequest,
     AdminPurchaseRelatedDocumentView,
+    AdminPurchaseReverseReceiptRequest,
     AdminPurchaseStatus,
     AdminPurchaseSupplierContextView,
     AdminPurchaseType,
@@ -98,6 +109,7 @@ from zeromerma_api.modules.purchases.infrastructure.models import (
     PurchaseDocumentLine,
     PurchaseReceipt,
     PurchaseReceiptLine,
+    PurchaseReceiptReversal,
 )
 from zeromerma_api.modules.suppliers.domain.constants import (
     SUPPLIER_PAYMENT_TERMS_CREDIT,
@@ -408,6 +420,7 @@ class AdminPurchaseService:
         purchase_lines = [
             AdminPurchaseLineInput(
                 notes=line.notes,
+                source_unit_of_measure=line.source_unit_of_measure,
                 ordered_quantity=line.received_quantity,
                 product_id=line.product_id,
                 unit_cost=line.unit_cost,
@@ -423,6 +436,8 @@ class AdminPurchaseService:
             receipt_lines.append(
                 AdminPurchaseReceiptLineInput(
                     notes=command_line.notes,
+                    lot_code=command_line.lot_code,
+                    expires_at=command_line.expires_at,
                     purchase_line_id=stored_line.id,
                     received_quantity=command_line.received_quantity,
                     unit_cost=command_line.unit_cost,
@@ -507,6 +522,127 @@ class AdminPurchaseService:
         session.flush()
         return self.get_purchase_detail(session, purchase_id=document.id)
 
+    @inventory_calculation
+    def reverse_receipt(
+        self,
+        session: Session,
+        *,
+        command: AdminPurchaseReverseReceiptRequest,
+        current_user: AuthenticatedUser,
+        purchase_id: uuid.UUID,
+        request_id: str | None,
+    ) -> AdminPurchaseDetailView:
+        document = self._get_document(session, purchase_id)
+        receipt = session.scalar(
+            select(PurchaseReceipt)
+            .where(
+                PurchaseReceipt.id == command.receipt_id,
+                PurchaseReceipt.purchase_document_id == document.id,
+            )
+            .with_for_update()
+        )
+        if receipt is None:
+            raise PurchaseNotFoundError("Purchase receipt was not found.")
+        if (
+            session.scalar(
+                select(PurchaseReceiptReversal.id).where(
+                    PurchaseReceiptReversal.purchase_receipt_id == receipt.id
+                )
+            )
+            is not None
+        ):
+            raise PurchaseValidationError("The receipt has already been reversed.")
+        lines = list(
+            session.scalars(
+                select(PurchaseReceiptLine)
+                .where(PurchaseReceiptLine.purchase_receipt_id == receipt.id)
+                .order_by(PurchaseReceiptLine.product_id, PurchaseReceiptLine.line_number)
+            )
+        )
+        originals = {
+            movement.source_line_id: movement
+            for movement in session.scalars(
+                select(InventoryMovement)
+                .where(
+                    InventoryMovement.source_document_type == PURCHASE_RECEIPT_SOURCE_DOCUMENT_TYPE,
+                    InventoryMovement.source_document_id == receipt.id,
+                )
+            )
+        }
+        load_movement_lots(session, list(originals.values()))
+        if any(line.received_quantity > ZERO and line.id not in originals for line in lines):
+            raise PurchaseValidationError(
+                "Receipt reversal requires its original causal movements."
+            )
+        balances = lock_inventory_balances(
+            session,
+            (
+                InventoryBalanceKey(
+                    document.receiving_branch_id, line.product_id, INVENTORY_LOCATION_BACKROOM
+                )
+                for line in lines
+                if line.received_quantity > ZERO
+            ),
+        )
+        reversal = PurchaseReceiptReversal(
+            id=uuid.uuid4(),
+            purchase_receipt_id=receipt.id,
+            created_by_user_id=current_user.id,
+            reason=command.reason,
+        )
+        session.add(reversal)
+        for line in lines:
+            if line.received_quantity == ZERO:
+                continue
+            original = originals[line.id]
+            balances.apply_delta(
+                InventoryBalanceKey(
+                    document.receiving_branch_id, line.product_id, INVENTORY_LOCATION_BACKROOM
+                ),
+                delta=-line.received_quantity_base,
+                movement_type="REVERSAL",
+                unit_of_measure=line.base_unit_of_measure,
+                source_document_type="PURCHASE_RECEIPT_REVERSAL",
+                source_document_id=reversal.id,
+                source_line_id=line.id,
+                causal_effect_code=f"PURCHASE_RECEIPT_REVERSED:{line.id}",
+                reversal_of_movement_id=original.id,
+                lot_allocations=[
+                    InventoryLotQuantity(item.lot_id, item.quantity)
+                    for item in original.lot_allocations
+                ]
+                or None,
+                source_quantity=line.received_quantity,
+                source_uom=line.source_unit_of_measure,
+                conversion_factor=line.conversion_factor,
+                cost_evidence_reference=f"purchase_receipt_line:{line.id}",
+                operator_user_id=current_user.id,
+                reason=command.reason,
+                notes=None,
+            )
+            purchase_line = session.get(PurchaseDocumentLine, line.purchase_line_id)
+            assert purchase_line is not None
+            purchase_line.received_quantity -= line.received_quantity
+        document.status = (
+            PURCHASE_STATUS_PARTIALLY_RECEIVED
+            if any(line.received_quantity > ZERO for line in self._get_lines(session, document.id))
+            else PURCHASE_STATUS_ORDERED
+        )
+        self._record_change(
+            session,
+            action="admin.purchase.receipt_reversed",
+            branch_id=document.receiving_branch_id,
+            current_user=current_user,
+            document=document,
+            event_name="admin.purchase.receipt_reversed.v1",
+            request_id=request_id,
+            receipt=receipt,
+            additional_metadata={"reversal_id": str(reversal.id), "reason": command.reason},
+        )
+        session.flush()
+        return self.get_purchase_detail(session, purchase_id=document.id)
+
+    @inventory_calculation
     def _receive_document(
         self,
         session: Session,
@@ -549,11 +685,18 @@ class AdminPurchaseService:
             purchase_document_id=document.id,
             received_by_user_id=current_user.id,
             notes=command.notes,
+            has_discrepancy=any(
+                item.received_quantity
+                != lines_by_id[item.purchase_line_id].ordered_quantity
+                - lines_by_id[item.purchase_line_id].received_quantity
+                for item in command.lines
+            ),
         )
         session.add(receipt)
         session.flush()
 
         products = self._products_by_id(session, {line.product_id for line in lines})
+        self._validate_active_products(products)
         balances = lock_inventory_balances(
             session,
             (
@@ -595,7 +738,28 @@ class AdminPurchaseService:
                 if command_line.unit_cost is not None
                 else purchase_line.unit_cost
             )
+            conversion = (
+                convert_quantity(
+                    command_line.received_quantity,
+                    purchase_line.source_unit_of_measure,
+                    purchase_line.unit_of_measure,
+                    purchase_line.conversion_factor,
+                )
+                if command_line.received_quantity > ZERO
+                else None
+            )
+            base_cost = exact_decimal(
+                (unit_cost / purchase_line.conversion_factor).quantize(Decimal("0.00000001")),
+                scale=8,
+                precision=18,
+            )
             receipt_line = PurchaseReceiptLine(
+                id=uuid.uuid4(),
+                source_unit_of_measure=purchase_line.source_unit_of_measure,
+                conversion_factor=purchase_line.conversion_factor,
+                received_quantity_base=conversion.quantity_base if conversion else ZERO,
+                base_unit_of_measure=purchase_line.unit_of_measure,
+                base_unit_cost=base_cost,
                 discrepancy_reason=command_line.discrepancy_reason,
                 line_number=purchase_line.line_number,
                 notes=command_line.notes,
@@ -605,11 +769,28 @@ class AdminPurchaseService:
                 received_quantity=command_line.received_quantity,
                 unit_cost=unit_cost,
             )
+            product = products[purchase_line.product_id]
+            if command_line.received_quantity > ZERO and product.lot_tracking_enabled:
+                if not (command_line.lot_code or "").strip():
+                    raise PurchaseValidationError(
+                        "A supplier lot code is required for this product."
+                    )
+                lot = create_inventory_lot(
+                    session,
+                    product_id=product.id,
+                    lot_code=(command_line.lot_code or "").strip(),
+                    expires_at=command_line.expires_at,
+                    source_document_type=PURCHASE_RECEIPT_SOURCE_DOCUMENT_TYPE,
+                    source_document_id=receipt.id,
+                    source_line_id=receipt_line.id,
+                    branch_id=branch.id,
+                    operator_user_id=current_user.id,
+                )
+                receipt_line.lot_id = lot.id
             session.add(receipt_line)
             purchase_line.received_quantity = (
                 Decimal(purchase_line.received_quantity) + command_line.received_quantity
             )
-            purchase_line.unit_cost = unit_cost
             product = products[purchase_line.product_id]
             if command_line.received_quantity > ZERO:
                 self._apply_receipt_inventory(
@@ -617,8 +798,9 @@ class AdminPurchaseService:
                     branch=branch,
                     current_user=current_user,
                     line=purchase_line,
+                    receipt_line=receipt_line,
                     product=product,
-                    quantity=command_line.received_quantity,
+                    quantity=receipt_line.received_quantity_base,
                     receipt=receipt,
                     reason=command_line.discrepancy_reason,
                     notes=command_line.notes,
@@ -628,6 +810,7 @@ class AdminPurchaseService:
                     product=product,
                     supplier=supplier,
                     unit_cost=unit_cost,
+                    source_uom=purchase_line.source_unit_of_measure,
                 )
             # Preserve supplier relation updates before processing another product line.
             session.flush()
@@ -662,6 +845,7 @@ class AdminPurchaseService:
         branch: Branch,
         current_user: AuthenticatedUser,
         line: PurchaseDocumentLine,
+        receipt_line: PurchaseReceiptLine,
         notes: str | None,
         product: Product,
         quantity: Decimal,
@@ -676,6 +860,20 @@ class AdminPurchaseService:
             operator_user_id=current_user.id,
             reason=reason or "Supplier receipt",
             source_document_id=receipt.id,
+            source_line_id=receipt_line.id,
+            causal_effect_code=f"PURCHASE_RECEIPT:{receipt_line.id}",
+            lot_allocations=[
+                InventoryLotQuantity(receipt_line.lot_id, receipt_line.received_quantity_base)
+            ]
+            if receipt_line.lot_id
+            else None,
+            source_quantity=receipt_line.received_quantity,
+            source_uom=receipt_line.source_unit_of_measure,
+            conversion_factor=receipt_line.conversion_factor,
+            total_cost=exact_decimal(
+                receipt_line.received_quantity * receipt_line.unit_cost, scale=8, precision=24
+            ),
+            cost_evidence_reference=f"purchase_receipt_line:{receipt_line.id}",
             source_document_type=PURCHASE_RECEIPT_SOURCE_DOCUMENT_TYPE,
             unit_of_measure=line.unit_of_measure,
         )
@@ -776,6 +974,14 @@ class AdminPurchaseService:
         warnings = self._build_warnings(session, row)
         receipt_lines = self._receipt_lines_for_document(session, row.document.id)
         movements = self._inventory_movements(session, row.receipts)
+        reversals = {
+            item.purchase_receipt_id: item
+            for item in session.scalars(
+                select(PurchaseReceiptReversal).where(
+                    PurchaseReceiptReversal.purchase_receipt_id.in_([r.id for r in row.receipts])
+                )
+            )
+        }
         return AdminPurchaseDetailView(
             available_actions=restrict_actions(
                 session,
@@ -792,6 +998,9 @@ class AdminPurchaseService:
                         PURCHASE_STATUS_PARTIALLY_RECEIVED,
                     },
                     can_view_movements=True,
+                    can_reverse_receipt=any(
+                        receipt.id not in reversals for receipt in row.receipts
+                    ),
                 ),
                 {
                     "can_cancel": "purchases.cancel",
@@ -799,13 +1008,21 @@ class AdminPurchaseService:
                     "can_edit": "purchases.manage",
                     "can_receive": "purchases.receive",
                     "can_view_movements": "inventory.view",
+                    "can_reverse_receipt": "purchases.cancel",
                 },
                 branch_ids=(row.branch.id,),
                 global_only=False,
             ),
             cost_summary=AdminPurchaseCostSummaryView(
                 currency=row.supplier.default_currency,
-                received_total=self._received_total(row.lines),
+                received_total=sum(
+                    (
+                        line.received_quantity * line.unit_cost
+                        for line in receipt_lines
+                        if line.purchase_receipt_id not in reversals
+                    ),
+                    ZERO,
+                ),
                 subtotal=self._document_total(row.lines),
                 taxes=None,
                 total=self._document_total(row.lines),
@@ -814,6 +1031,8 @@ class AdminPurchaseService:
                 integration_available=True,
                 movements=[
                     AdminPurchaseInventoryMovementView(
+                        unit_cost=movement.unit_cost,
+                        total_cost=movement.total_cost,
                         balance_after=movement.balance_after,
                         branch_id=movement.branch_id,
                         direction=movement.direction,
@@ -832,6 +1051,42 @@ class AdminPurchaseService:
                 if movements
                 else "No hay movimientos de inventario vinculados a esta compra.",
             ),
+            receipts=[
+                AdminPurchaseReceiptView(
+                    id=receipt.id,
+                    folio=receipt.folio,
+                    received_at=receipt.received_at,
+                    lines=[
+                        AdminPurchaseReceiptLineView(
+                            id=line.id,
+                            product_id=line.product_id,
+                            lot_id=line.lot_id,
+                            received_quantity=line.received_quantity,
+                            source_unit_of_measure=line.source_unit_of_measure,
+                            conversion_factor=line.conversion_factor,
+                            received_quantity_base=line.received_quantity_base,
+                            base_unit_of_measure=line.base_unit_of_measure,
+                            source_unit_cost=line.unit_cost,
+                            base_unit_cost=line.base_unit_cost,
+                        )
+                        for line in receipt_lines
+                        if line.purchase_receipt_id == receipt.id
+                    ],
+                    received_total=sum(
+                        (
+                            line.received_quantity * line.unit_cost
+                            for line in receipt_lines
+                            if line.purchase_receipt_id == receipt.id
+                        ),
+                        ZERO,
+                    ),
+                    reversal_id=reversals[receipt.id].id if receipt.id in reversals else None,
+                    reversal_reason=reversals[receipt.id].reason
+                    if receipt.id in reversals
+                    else None,
+                )
+                for receipt in row.receipts
+            ],
             lines=self._line_views(session, row.lines, receipt_lines, row.supplier.id),
             overview=AdminPurchaseOverviewView(
                 branch_id=row.branch.id,
@@ -941,6 +1196,9 @@ class AdminPurchaseService:
                     else None,
                     unit_cost=line.unit_cost,
                     unit_of_measure=line.unit_of_measure,
+                    source_unit_of_measure=line.source_unit_of_measure,
+                    conversion_factor=line.conversion_factor,
+                    ordered_quantity_base=line.ordered_quantity_base,
                 )
             )
         return views
@@ -987,9 +1245,14 @@ class AdminPurchaseService:
             ],
             products=[
                 AdminPurchaseFilterOptionView(
-                    id=product.id, label=f"{product.name} - {product.code}"
+                    id=product.id,
+                    label=f"{product.name} - {product.code}",
+                    base_uom=product.unit_of_measure,
+                    purchase_uom=product.purchase_unit_of_measure,
+                    conversion_factor=product.purchase_conversion_factor,
                 )
                 for product in products
+                if product.is_active and product.is_purchasable
             ],
             statuses=[
                 AdminPurchaseFilterOptionView(id=status, label=_status_label(status))
@@ -1143,7 +1406,9 @@ class AdminPurchaseService:
         return products
 
     def _validate_active_products(self, products: dict[uuid.UUID, Product]) -> None:
-        if any(not product.is_active for product in products.values()):
+        if any(
+            not product.is_active or not product.is_purchasable for product in products.values()
+        ):
             raise PurchaseValidationError("Products must be active for purchase entries.")
 
     def _replace_lines(
@@ -1159,8 +1424,22 @@ class AdminPurchaseService:
         session.flush()
         for index, line in enumerate(lines, start=1):
             product = products[line.product_id]
+            source_uom = line.source_unit_of_measure or product.unit_of_measure
+            factor = (
+                product.purchase_conversion_factor
+                if source_uom.strip().upper() != product.unit_of_measure.strip().upper()
+                and source_uom.strip().upper()
+                == (product.purchase_unit_of_measure or "").strip().upper()
+                else None
+            )
+            conversion = convert_quantity(
+                line.ordered_quantity, source_uom, product.unit_of_measure, factor
+            )
             session.add(
                 PurchaseDocumentLine(
+                    source_unit_of_measure=conversion.source_uom,
+                    conversion_factor=conversion.conversion_factor,
+                    ordered_quantity_base=conversion.quantity_base,
                     line_number=index,
                     notes=line.notes,
                     ordered_quantity=line.ordered_quantity,
@@ -1171,7 +1450,7 @@ class AdminPurchaseService:
                     purchase_document_id=document.id,
                     received_quantity=ZERO,
                     unit_cost=line.unit_cost,
-                    unit_of_measure=product.unit_of_measure,
+                    unit_of_measure=conversion.base_uom,
                 )
             )
         session.flush()
@@ -1243,8 +1522,19 @@ class AdminPurchaseService:
             session.execute(
                 select(InventoryMovement)
                 .where(
-                    InventoryMovement.source_document_type == PURCHASE_RECEIPT_SOURCE_DOCUMENT_TYPE,
-                    InventoryMovement.source_document_id.in_(receipt_ids),
+                    or_(
+                        (
+                            InventoryMovement.source_document_type
+                            == PURCHASE_RECEIPT_SOURCE_DOCUMENT_TYPE
+                        )
+                        & InventoryMovement.source_document_id.in_(receipt_ids),
+                        (InventoryMovement.source_document_type == "PURCHASE_RECEIPT_REVERSAL")
+                        & InventoryMovement.source_document_id.in_(
+                            select(PurchaseReceiptReversal.id).where(
+                                PurchaseReceiptReversal.purchase_receipt_id.in_(receipt_ids)
+                            )
+                        ),
+                    ),
                 )
                 .order_by(InventoryMovement.occurred_at.asc()),
             )
@@ -1272,7 +1562,13 @@ class AdminPurchaseService:
         return search.lower() in haystack
 
     def _update_supplier_last_known_price(
-        self, session: Session, *, product: Product, supplier: Supplier, unit_cost: Decimal
+        self,
+        session: Session,
+        *,
+        product: Product,
+        supplier: Supplier,
+        unit_cost: Decimal,
+        source_uom: str,
     ) -> None:
         relation = session.execute(
             select(SupplierProduct).where(
@@ -1289,7 +1585,7 @@ class AdminPurchaseService:
         relation.currency = supplier.default_currency
         relation.is_active = True
         relation.last_known_price = unit_cost
-        relation.purchase_uom = relation.purchase_uom or product.unit_of_measure
+        relation.purchase_uom = source_uom
 
     def _record_change(
         self,
@@ -1302,6 +1598,7 @@ class AdminPurchaseService:
         event_name: str,
         request_id: str | None,
         receipt: PurchaseReceipt | None = None,
+        additional_metadata: dict[str, object] | None = None,
     ) -> None:
         owner = execution(session)
         if owner is None or owner.record is None:
@@ -1316,6 +1613,7 @@ class AdminPurchaseService:
             "receipt_id": str(receipt.id) if receipt else None,
             "status": document.status,
             "supplier_id": str(document.supplier_id),
+            **(additional_metadata or {}),
         }
         self._audit_recorder.record(
             session,
@@ -1419,11 +1717,6 @@ class AdminPurchaseService:
     def _document_total(self, lines: list[PurchaseDocumentLine]) -> Decimal:
         return sum(
             (Decimal(line.ordered_quantity) * Decimal(line.unit_cost) for line in lines), ZERO
-        )
-
-    def _received_total(self, lines: list[PurchaseDocumentLine]) -> Decimal:
-        return sum(
-            (Decimal(line.received_quantity) * Decimal(line.unit_cost) for line in lines), ZERO
         )
 
     def _ordered_quantity(self, lines: list[PurchaseDocumentLine]) -> Decimal:

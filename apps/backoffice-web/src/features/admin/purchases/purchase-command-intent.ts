@@ -2,6 +2,7 @@ import { ApiError, createCommandIntentionCoordinator, type paths } from "@zerome
 import { useBackofficeAuthStore } from "../../auth/backoffice-auth-store";
 import {
   cancelAdminPurchase,
+  reverseAdminPurchaseReceipt,
   confirmAdminPurchase,
   createAdminDirectEntry,
   createAdminPurchase,
@@ -14,6 +15,7 @@ import {
 import type {
   AdminDirectEntryPayload,
   AdminPurchaseCancelPayload,
+  AdminPurchaseReverseReceiptPayload,
   AdminPurchasePayload,
   AdminPurchaseReceiptPayload,
 } from "./types";
@@ -32,6 +34,7 @@ export type PurchaseIntentionPayload =
   | { commandCode: "update"; body: PurchaseUpdatePayload }
   | { commandCode: "receive"; body: AdminPurchaseReceiptPayload }
   | { commandCode: "cancel"; body: AdminPurchaseCancelPayload }
+  | { commandCode: "reverse-receipt"; body: AdminPurchaseReverseReceiptPayload }
   | { commandCode: "confirm" };
 
 export const PURCHASE_INTENTION_SCOPE = "purchases";
@@ -46,9 +49,16 @@ export const purchaseIntentions = createCommandIntentionCoordinator<
   nullableFields: ["purchaseId"],
   scope: () => PURCHASE_INTENTION_SCOPE,
   validateContext: (context) =>
-    ["create", "direct-entry", "update", "confirm", "receive", "cancel"].includes(
-      context.commandCode,
-    ) && ["create", "direct-entry"].includes(context.commandCode) === (context.purchaseId === null),
+    [
+      "create",
+      "direct-entry",
+      "update",
+      "confirm",
+      "receive",
+      "cancel",
+      "reverse-receipt",
+    ].includes(context.commandCode) &&
+    ["create", "direct-entry"].includes(context.commandCode) === (context.purchaseId === null),
   send: (context, payload, key) => {
     if (context.commandCode !== payload.commandCode)
       throw new Error("El comando de compra cambió.");
@@ -59,6 +69,8 @@ export const purchaseIntentions = createCommandIntentionCoordinator<
       return updateAdminPurchase(context.purchaseId, payload.body, key);
     if (payload.commandCode === "receive")
       return receiveAdminPurchase(context.purchaseId, payload.body, key);
+    if (payload.commandCode === "reverse-receipt")
+      return reverseAdminPurchaseReceipt(context.purchaseId, payload.body, key);
     if (payload.commandCode === "cancel")
       return cancelAdminPurchase(context.purchaseId, payload.body, key);
     return confirmAdminPurchase(context.purchaseId, key);

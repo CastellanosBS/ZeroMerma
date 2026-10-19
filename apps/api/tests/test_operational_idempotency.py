@@ -32,7 +32,11 @@ from zeromerma_api.modules.corrections.infrastructure.models import (
     CorrectionDocumentLine,
 )
 from zeromerma_api.modules.idempotency.infrastructure.models import IdempotencyRecord
-from zeromerma_api.modules.identity.infrastructure.models import User, UserBranchAssignment
+from zeromerma_api.modules.identity.infrastructure.models import (
+    User,
+    UserBranchAssignment,
+)
+from zeromerma_api.modules.identity.infrastructure.session_models import AuthSession
 from zeromerma_api.modules.inventory.infrastructure.models import (
     InventoryAdjustment,
     InventoryBalance,
@@ -43,6 +47,7 @@ from zeromerma_api.modules.outbox.application.service import OutboxWriter
 from zeromerma_api.modules.outbox.infrastructure.models import OutboxEvent
 from zeromerma_api.testing.authorization import owner_headers
 from zeromerma_api.testing.idempotency import new_idempotency_key
+from zeromerma_api.testing.inventory import seed_test_inventory
 from zeromerma_api.testing.sessions import login_headers
 from zeromerma_api.testing.transfer_operators import transfer_cashier_email
 
@@ -102,6 +107,17 @@ def _setup(client: TestClient, kind: str) -> tuple[dict[str, str], dict[str, Any
         )
         assert stock.status_code == 201, stock.text
         return headers, {**body, "reason_code": "DAMAGED"}
+    with SessionLocal() as session:
+        actor_id = session.scalar(select(User.id).where(User.email == SEED_USER_EMAIL))
+        assert actor_id
+        seed_test_inventory(
+            session,
+            branch_id=UUID(branch),
+            actor_user_id=actor_id,
+            product_quantities={UUID(product): Decimal(100)},
+            location_code="BACKROOM",
+            fixture_reference="Physical idempotency command prerequisites",
+        )
     headers = login_headers(
         client,
         email=SEED_USER_EMAIL,
@@ -223,7 +239,16 @@ def test_physical_command_replays_minimal_snapshot_and_recovers_without_effects(
             )
             assert session.get(InventoryMovement, UUID(movement_id)) is not None
         if kind in {"counter", "pos-waste", "correction"}:
-            assert session.scalar(select(func.count()).select_from(InventoryMovement)) == 0
+            effects = list(
+                session.scalars(
+                    select(InventoryMovement).where(
+                        InventoryMovement.idempotency_record_id == record.id
+                    )
+                )
+            )
+            assert len(effects) == 2
+            assert {effect.direction for effect in effects} == {"IN", "OUT"}
+            assert effects[0].quantity == effects[1].quantity
     changed = deepcopy(body)
     changed["notes"] = "Different command"
     conflict = _post(client, kind, headers, changed, key)
@@ -358,7 +383,7 @@ def test_correction_competing_keys_cannot_exceed_original_remainder(client: Test
         assert session.scalar(select(func.count()).select_from(CorrectionDocument)) == 1
 
 
-def test_correction_aggregates_duplicate_request_lines_and_rejects_changed_units(
+def test_correction_aggregates_duplicate_lines_and_preserves_frozen_product_units(
     client: TestClient,
 ) -> None:
     headers, body = _setup(client, "correction")
@@ -369,11 +394,15 @@ def test_correction_aggregates_duplicate_request_lines_and_rejects_changed_units
     with SessionLocal() as session:
         product = session.get(Product, UUID(line["product_id"]))
         assert product is not None
+        original_unit = product.unit_of_measure
         product.unit_of_measure = "KG"
-        session.commit()
+        with pytest.raises(IntegrityError, match="base unit with physical evidence"):
+            session.commit()
+        session.rollback()
+        assert session.get(Product, UUID(line["product_id"])).unit_of_measure == original_unit
     body["lines"] = [line]
-    rejected = _post(client, "correction", headers, body, new_idempotency_key())
-    assert rejected.status_code == 400, rejected.text
+    corrected = _post(client, "correction", headers, body, new_idempotency_key())
+    assert corrected.status_code == 201, corrected.text
 
 
 @pytest.mark.parametrize("kind", ["admin-waste", "adjustment"])
@@ -389,7 +418,7 @@ def test_physical_command_unknown_branch_is_rejected_before_reservation(
 
 
 @pytest.mark.parametrize("revoked_branch", ["original", "corrected"])
-def test_correction_replay_and_recovery_revalidate_original_related_branches(
+def test_dispatched_destination_correction_rejects_and_revalidates_both_branch_scopes(
     client: TestClient, revoked_branch: str
 ) -> None:
     headers, opening_body = _setup(client, "counter")
@@ -415,22 +444,11 @@ def test_correction_replay_and_recovery_revalidate_original_related_branches(
         "lines": [],
     }
     key = new_idempotency_key()
-    committed = _post(client, "correction", headers, body, key)
-    assert committed.status_code == 201, committed.text
-    with SessionLocal() as session:
-        record = session.scalars(
-            select(IdempotencyRecord).where(IdempotencyRecord.idempotency_key == UUID(key))
-        ).one()
-        assert set(record.context_data["related_branch_ids"]) == {str(original), str(corrected)}
-        # Recovery must use the admitted scope even after the original workflow changes state.
-        document = session.get(OperationDocument, UUID(body["target_document_id"]))
-        assert document is not None
-        document.status = "CANCELLED"
-        session.commit()
-    replay = _post(client, "correction", headers, body, key)
-    assert replay.status_code == 201 and replay.json() == committed.json()
-    recovered = _recover(client, "correction", headers, body, key)
-    assert recovered.status_code == 200 and recovered.json() == committed.json()
+    before = _counts()
+    rejected = _post(client, "correction", headers, body, key)
+    assert rejected.status_code == 409, rejected.text
+    assert "explicit transit return or waste resolution" in rejected.json()["message"]
+    assert _counts() == before
     with SessionLocal() as session:
         actor = session.scalars(select(User).where(User.email == SEED_USER_EMAIL)).one()
         membership = session.scalars(
@@ -450,19 +468,63 @@ def test_correction_replay_and_recovery_revalidate_original_related_branches(
         workstation_code=SEED_WORKSTATION_CODE,
     )
     before = _counts()
-    for response in (
+    denied = _post(client, "correction", headers, body, key)
+    expected_status, expected_code = (
+        (404, "NOT_FOUND") if revoked_branch == "original" else (403, "FORBIDDEN")
+    )
+    assert denied.status_code == expected_status, denied.text
+    assert denied.json()["code"] == expected_code
+    assert _counts() == {**before, "audit_log": before["audit_log"] + 1}
+    with SessionLocal() as session:
+        denial = session.scalars(
+            select(AuditLog).where(
+                AuditLog.action == "authorization.denied",
+                AuditLog.request_id == denied.json()["request_id"],
+            )
+        ).one()
+        assert denial.metadata_["reason"] == "CAPABILITY_SCOPE_OR_RESOURCE_UNAVAILABLE"
+        document = session.get(OperationDocument, UUID(body["target_document_id"]))
+        assert document is not None
+        assert document.status == "IN_TRANSIT" and document.destination_branch_id == original
+        assert (
+            session.scalar(
+                select(func.count())
+                .select_from(IdempotencyRecord)
+                .where(IdempotencyRecord.idempotency_key == UUID(key))
+            )
+            == 0
+        )
+
+
+def test_revoked_original_branch_session_cannot_replay_or_recover_correction(
+    client: TestClient,
+) -> None:
+    headers, body = _setup(client, "correction")
+    key = new_idempotency_key()
+    committed = _post(client, "correction", headers, body, key)
+    assert committed.status_code == 201, committed.text
+    replay = _post(client, "correction", headers, body, key)
+    recovered = _recover(client, "correction", headers, body, key)
+    assert replay.status_code == 201 and recovered.status_code == 200
+    assert replay.json() == recovered.json() == committed.json()
+    with SessionLocal() as session:
+        actor = session.scalars(select(User).where(User.email == SEED_USER_EMAIL)).one()
+        branch_id = session.scalars(select(Branch.id).where(Branch.code == "MAIN")).one()
+        membership = session.scalars(
+            select(UserBranchAssignment).where(
+                UserBranchAssignment.user_id == actor.id,
+                UserBranchAssignment.branch_id == branch_id,
+            )
+        ).one()
+        membership.is_active = False
+        session.commit()
+        sessions = session.scalars(select(AuthSession).where(AuthSession.user_id == actor.id)).all()
+        assert sessions and all(record.status == "REVOKED" for record in sessions)
+    before = _counts()
+    for denied in (
         _post(client, "correction", headers, body, key),
         _recover(client, "correction", headers, body, key),
     ):
-        assert response.status_code == 403, response.text
-        assert response.json()["code"] == "FORBIDDEN"
-    assert _counts() == {**before, "audit_log": before["audit_log"] + 2}
-    with SessionLocal() as session:
-        denials = session.scalars(
-            select(AuditLog).where(
-                AuditLog.actor_id == actor.id, AuditLog.action == "authorization.denied"
-            )
-        ).all()
-        assert len(denials) == 2
-        assert {record.metadata_["method"] for record in denials} == {"GET", "POST"}
-        assert all(record.metadata_["result"] == "denied" for record in denials)
+        assert denied.status_code == 401, denied.text
+        assert denied.json()["code"] == "SESSION_REVOKED"
+    assert _counts() == before

@@ -79,6 +79,10 @@ export interface AdminInputSupplyListItem {
   isActive: boolean;
   isInventoryTracked: boolean;
   isPurchasable: boolean;
+  isSellable?: boolean;
+  isUsableAsInput?: boolean;
+  lotTrackingEnabled?: boolean;
+  expiryRequired?: boolean;
   lastMovementAt?: string | null;
   lastPurchaseCost?: string | null;
   name: string;
@@ -217,6 +221,10 @@ export interface AdminInputSupplyPayload {
   isActive: boolean;
   isInventoryTracked: boolean;
   isPurchasable: boolean;
+  isSellable?: boolean;
+  isUsableAsInput?: boolean;
+  lotTrackingEnabled?: boolean;
+  expiryRequired?: boolean;
   minimumStock?: string | null;
   name: string;
   preferredOrderQuantity?: string | null;

@@ -213,7 +213,7 @@ def test_admin_transfer_validates_same_branch_empty_lines_and_stock(client: Test
         json={},
     )
     assert dispatch_without_stock.status_code == 400
-    assert "Origin stock is insufficient" in dispatch_without_stock.json()["message"]
+    assert "Inventory stock is insufficient" in dispatch_without_stock.json()["message"]
 
 
 def test_admin_transfer_dispatch_writes_inventory_movements_audit_and_outbox(

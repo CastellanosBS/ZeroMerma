@@ -52,6 +52,10 @@ export interface AdminProductReadiness {
 }
 
 export interface AdminProduct {
+  isSellable?: boolean;
+  isUsableAsInput?: boolean;
+  lotTrackingEnabled?: boolean;
+  expiryRequired?: boolean;
   availability: AdminProductAvailabilitySummary;
   branchAvailability: AdminProductBranchAvailability[];
   brandId?: string | null;
@@ -74,6 +78,10 @@ export interface AdminProduct {
 }
 
 export interface AdminProductCreatePayload {
+  isSellable?: boolean;
+  isUsableAsInput?: boolean;
+  lotTrackingEnabled?: boolean;
+  expiryRequired?: boolean;
   captureMode?: AdminProductCaptureMode;
   code: string;
   name: string;
@@ -85,6 +93,10 @@ export interface AdminProductCreatePayload {
 }
 
 export interface AdminProductUpdatePayload {
+  isSellable?: boolean;
+  isUsableAsInput?: boolean;
+  lotTrackingEnabled?: boolean;
+  expiryRequired?: boolean;
   captureMode?: AdminProductCaptureMode;
   code?: string;
   name?: string;

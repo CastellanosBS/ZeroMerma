@@ -203,7 +203,19 @@ const returnDetailPayload = {
   related_documents: [],
   returned_lines: [
     {
-      disposition_code: "WASTE",
+      allocations: [
+        {
+          id: "allocation-1",
+          returned_product_id: "product-1",
+          returned_product_code_snapshot: "CONCHA",
+          returned_product_name_snapshot: "Concha",
+          quantity: "1.000",
+          disposition_code: "SEND_TO_WASTE",
+          lot_id: null,
+          inventory_movement_id: null,
+        },
+      ],
+      original_catalog_name_snapshot: "Concha",
       id: "return-line-1",
       line_status: "RETURNED",
       original_quantity: "2.000",
@@ -319,7 +331,7 @@ describe("admin returns corrections api", () => {
 
     expect(returns.items[0]?.folio).toBe("DEV-123");
     expect(corrections.items[0]?.folio).toBe("COR-123");
-    expect(returnDetail.returnedLines[0]?.productName).toBe("Concha");
+    expect(returnDetail.returnedLines[0]?.originalCatalogName).toBe("Concha");
     expect(returnDetail.refundImpact.linkedCashMovementId).toBe(
       returnDetailPayload.refund_impact.linked_cash_movement_id,
     );

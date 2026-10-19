@@ -1,8 +1,17 @@
-export type AdminPurchaseStatus = "DRAFT" | "ORDERED" | "PARTIALLY_RECEIVED" | "RECEIVED" | "CANCELLED";
+import type { components } from "@zeromerma/api-client";
+export type AdminPurchaseStatus =
+  | "DRAFT"
+  | "ORDERED"
+  | "PARTIALLY_RECEIVED"
+  | "RECEIVED"
+  | "CANCELLED";
 export type AdminPurchaseType = "PURCHASE" | "DIRECT_ENTRY";
 export type AdminPurchaseWarningSeverity = "info" | "warning" | "critical";
 
 export interface AdminPurchaseFilterOption {
+  baseUom?: string | null;
+  purchaseUom?: string | null;
+  conversionFactor?: string | null;
   id: string;
   label: string;
 }
@@ -138,6 +147,9 @@ export interface AdminPurchaseBranch {
 }
 
 export interface AdminPurchaseLine {
+  sourceUnitOfMeasure?: string;
+  conversionFactor?: string;
+  orderedQuantityBase?: string;
   discrepancy: string;
   discrepancyReason?: string | null;
   lineStatus: string;
@@ -175,6 +187,8 @@ export interface AdminPurchaseCostSummary {
 }
 
 export interface AdminPurchaseInventoryMovement {
+  unitCost?: string | null;
+  totalCost?: string | null;
   balanceAfter?: string | null;
   branchId: string;
   direction: string;
@@ -202,6 +216,7 @@ export interface AdminPurchaseRelatedDocument {
 }
 
 export interface AdminPurchaseAvailableActions {
+  canReverseReceipt?: boolean;
   canCancel: boolean;
   canConfirm: boolean;
   canEdit: boolean;
@@ -210,6 +225,7 @@ export interface AdminPurchaseAvailableActions {
 }
 
 export interface AdminPurchaseDetail {
+  receipts?: components["schemas"]["AdminPurchaseReceiptView"][];
   availableActions: AdminPurchaseAvailableActions;
   costSummary: AdminPurchaseCostSummary;
   inventoryImpact: AdminPurchaseInventoryImpact;
@@ -223,6 +239,7 @@ export interface AdminPurchaseDetail {
 }
 
 export interface AdminPurchaseLinePayload {
+  sourceUnitOfMeasure?: string | null;
   notes?: string | null;
   orderedQuantity: string;
   productId: string;
@@ -242,6 +259,9 @@ export interface AdminPurchasePayload {
 }
 
 export interface AdminDirectEntryLinePayload {
+  lotCode?: string | null;
+  expiresAt?: string | null;
+  sourceUnitOfMeasure?: string | null;
   notes?: string | null;
   productId: string;
   receivedQuantity: string;
@@ -260,6 +280,8 @@ export interface AdminDirectEntryPayload {
 }
 
 export interface AdminPurchaseReceiptLinePayload {
+  lotCode?: string | null;
+  expiresAt?: string | null;
   discrepancyReason?: string | null;
   notes?: string | null;
   purchaseLineId: string;
@@ -275,3 +297,6 @@ export interface AdminPurchaseReceiptPayload {
 export interface AdminPurchaseCancelPayload {
   reason?: string | null;
 }
+
+export type AdminPurchaseReverseReceiptPayload =
+  components["schemas"]["AdminPurchaseReverseReceiptRequest"];

@@ -38,7 +38,7 @@ import {
 } from "../production-command-intent";
 import { useProductionIntention } from "../use-production-intention";
 
-type WorkflowMode = "cancel" | "complete" | "create" | "edit" | "start";
+type WorkflowMode = "cancel" | "complete" | "create" | "edit" | "release";
 
 const defaultFilters: AdminProductionListFilters = {
   page: 1,
@@ -211,15 +211,15 @@ export function AdminProductionPage() {
     mutationFn: async ({
       context,
       payload,
-      startNow,
+      releaseNow,
     }: {
       context: ProductionIntentionContext;
       payload: ProductionCommandPayload;
-      startNow?: boolean;
+      releaseNow?: boolean;
     }) => {
       const generation = useBackofficeAuthStore.getState().generation;
       return beginProductionCommand(context, payload, observedKey.current, {
-        startNow: startNow ?? false,
+        releaseNow: releaseNow ?? false,
         onCreated: confirmed,
         canContinue: () => {
           const auth = useBackofficeAuthStore.getState();
@@ -345,18 +345,18 @@ export function AdminProductionPage() {
     payload: ProductionCommandPayload,
     branchId: string,
     productionId: string | null,
-    startNow = false,
+    releaseNow = false,
   ) {
     if (!user || !isAuthenticated || isSubmitting) return;
     setFeedback(null);
     actionMutation.mutate({
       context: { userId: user.id, branchId, productionId, commandCode },
       payload,
-      startNow,
+      releaseNow,
     });
   }
-  function handleCreate(payload: AdminProductionCreatePayload, startNow: boolean) {
-    submit("create", toCreateApiPayload(payload), payload.branchId, null, startNow);
+  function handleCreate(payload: AdminProductionCreatePayload, releaseNow: boolean) {
+    submit("create", toCreateApiPayload(payload), payload.branchId, null, releaseNow);
   }
   function handleUpdate(payload: AdminProductionUpdatePayload) {
     if (workflowProduction && workflowProductionId)
@@ -367,10 +367,10 @@ export function AdminProductionPage() {
         workflowProductionId,
       );
   }
-  function handleStart(notes?: string | null) {
+  function handleRelease(notes?: string | null) {
     if (workflowProduction && workflowProductionId)
       submit(
-        "start",
+        "release",
         { notes: notes ?? null },
         workflowProduction.overview.branchId,
         workflowProductionId,
@@ -385,11 +385,11 @@ export function AdminProductionPage() {
         workflowProductionId,
       );
   }
-  function handleCancelProduction(reason?: string | null) {
+  function handleCancelProduction(reason: string | null, noPhysicalEffectsConfirmed: boolean) {
     if (workflowProduction && workflowProductionId)
       submit(
         "cancel",
-        { reason: reason ?? null },
+        { reason: reason ?? null, no_physical_effects_confirmed: noPhysicalEffectsConfirmed },
         workflowProduction.overview.branchId,
         workflowProductionId,
       );
@@ -499,7 +499,7 @@ export function AdminProductionPage() {
             onClose={closeWorkflow}
             onComplete={handleComplete}
             onCreate={handleCreate}
-            onStart={handleStart}
+            onRelease={handleRelease}
             onUpdate={handleUpdate}
           />
         ) : null}
@@ -521,7 +521,7 @@ export function AdminProductionPage() {
             onOpenRecipe={handleOpenRecipe}
             onPageChange={handlePageChange}
             onSelectProduction={handleSelectProduction}
-            onStart={(production) => openWorkflowFromList("start", production)}
+            onRelease={(production) => openWorkflowFromList("release", production)}
           />
           <AdminProductionDetailPanel
             errorMessage={detailErrorMessage}
@@ -536,7 +536,7 @@ export function AdminProductionPage() {
             onOpenInventory={handleOpenInventory}
             onOpenProduct={handleOpenProduct}
             onOpenRecipe={handleOpenRecipe}
-            onStart={(production) => openWorkflowFromDetail("start", production)}
+            onRelease={(production) => openWorkflowFromDetail("release", production)}
           />
         </div>
       </div>

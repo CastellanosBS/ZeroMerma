@@ -16,4 +16,3 @@ class WasteReasonNotFoundError(OperationError):
 
 class OpenShiftOperationRequiredError(OperationError):
     """Raised when a workstation shift is required for a physical operation."""
-

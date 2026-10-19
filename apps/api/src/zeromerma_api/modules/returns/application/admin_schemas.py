@@ -8,6 +8,7 @@ from pydantic import BaseModel
 
 from zeromerma_api.modules.audit.application.schemas import AuditSummaryView
 from zeromerma_api.modules.financial_ledger.application.refund_schemas import FinancialRefundView
+from zeromerma_api.modules.returns.application.schemas import ReturnDispositionAllocationView
 
 
 class AdminReturnCorrectionFilterOptionView(BaseModel):
@@ -104,15 +105,12 @@ class AdminReturnOriginalTicketView(BaseModel):
 class AdminReturnedLineView(BaseModel):
     id: UUID
     original_sale_line_id: UUID
-    product_name: str
-    product_code: str
-    product_class_name: str
-    product_class_code: str
+    original_catalog_name_snapshot: str
     original_quantity: Decimal
     returned_quantity: Decimal
     unit_price: Decimal
     refund_amount: Decimal
-    disposition_code: str
+    allocations: list[ReturnDispositionAllocationView]
     line_status: str
 
 

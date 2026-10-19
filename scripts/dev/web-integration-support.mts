@@ -346,11 +346,13 @@ export async function dropNextOperationalCommandResponse(
           "/v1/admin/production",
           "/v1/admin/waste",
           "/v1/admin/inventory/adjustments",
+          "/v1/admin/inventory-dispositions",
         ].includes(path) ||
         [
           `^/v1/(returns|orders)/${id}/refund-settlements$`,
-          `^/v1/transfers/${id}/receive$`,
-          `^/v1/admin/transfers/${id}/(dispatch|receive|cancel)$`,
+          `^/v1/sales/${id}/attribute-inventory$`,
+          `^/v1/transfers/${id}/(receive|resolve)$`,
+          `^/v1/admin/transfers/${id}/(dispatch|receive|cancel|resolve)$`,
           `^/v1/admin/purchases/${id}/(confirm|receive|cancel)$`,
           `^/v1/admin/production/${id}/(start|complete|cancel)$`,
         ].some((pattern) => new RegExp(pattern).test(path));
@@ -374,10 +376,19 @@ export async function dropNextOperationalCommandResponse(
         if (route.request().method() !== method)
           throw new Error("The operational method does not match its allowlisted command.");
         const response = await route.fetch({ maxRedirects: 0 });
-        if (![200, 201].includes(response.status()))
+        if (![200, 201].includes(response.status())) {
+          const failure: unknown = await response.json().catch(() => null);
+          const message =
+            failure !== null &&
+            typeof failure === "object" &&
+            "message" in failure &&
+            typeof failure.message === "string"
+              ? ` ${sanitize(failure.message)}`
+              : "";
           throw new Error(
-            `Expected a real committed operational command, received ${response.status()}.`,
+            `Expected a real committed operational command, received ${response.status()}.${message}`,
           );
+        }
         evidence.push({
           method,
           path: path.replace(/[0-9a-f]{8}-[0-9a-f-]{27,}/gi, "{id}"),

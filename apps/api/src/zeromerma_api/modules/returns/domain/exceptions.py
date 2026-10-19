@@ -15,4 +15,3 @@ class SaleReturnValidationError(SaleReturnError):
 
 class SaleReturnConflictError(SaleReturnError):
     """Raised when the workstation or session state makes returns unsafe."""
-

@@ -9,6 +9,7 @@ import {
   hasReturnDraftMissingRefundMethod,
   hasReturnDraftMissingReason,
   isReturnDraftLineValid,
+  setReturnDraftLineAllocations,
   setReturnDraftLineDisposition,
   setReturnDraftLineExactProduct,
   setReturnDraftLineQuantityText,
@@ -59,6 +60,61 @@ const productDirectLine: ReturnableSaleLineView = {
 };
 
 describe("returns model", () => {
+  it("splits physical dispositions without multiplying the economic refund", () => {
+    const [line] = addReturnDraftLine([], productDirectLine);
+    const split = setReturnDraftLineAllocations([line!], line!.originalSaleLineId, [
+      { ...line!.allocations[0]!, quantityText: "0.4" },
+      {
+        ...line!.allocations[0]!,
+        key: "second",
+        quantityText: "0.6",
+        disposition_code: "SEND_TO_WASTE",
+      },
+    ]);
+    expect(getReturnDraftTotalRefundCents(split)).toBe(1800);
+    expect(buildReturnCommitLines(split)[0]?.allocations.map((item) => item.quantity)).toEqual([
+      "0.4",
+      "0.6",
+    ]);
+    const mismatch = setReturnDraftLineQuantityText(split, line!.originalSaleLineId, "0.5");
+    expect(isReturnDraftLineValid(mismatch[0]!)).toBe(false);
+    expect(() => buildReturnCommitLines(mismatch)).toThrow(/sumar/);
+  });
+
+  it("requires the original lot and inspection for restock but accepts unidentified quarantine", () => {
+    const [line] = addReturnDraftLine([], {
+      ...productDirectLine,
+      physical_options: [
+        {
+          product_id: "product-coca",
+          product_code: "COCA-355",
+          product_name: "Coca-Cola",
+          lot_id: "original-lot",
+          lot_code: "LOT-1",
+          expires_at: "2026-12-01T00:00:00Z",
+          remaining_quantity: "1",
+          is_inventory_tracked: true,
+          lot_tracking_enabled: true,
+        },
+      ],
+    });
+    expect(isReturnDraftLineValid(line!)).toBe(true);
+    const restock = setReturnDraftLineAllocations([line!], line!.originalSaleLineId, [
+      {
+        ...line!.allocations[0]!,
+        disposition_code: "RESTOCK_COUNTER",
+        restock_safe_acknowledged: true,
+      },
+    ]);
+    expect(isReturnDraftLineValid(restock[0]!)).toBe(false);
+    const identified = setReturnDraftLineAllocations(restock, line!.originalSaleLineId, [
+      {
+        ...restock[0]!.allocations[0]!,
+        lot_id: "original-lot",
+      },
+    ]);
+    expect(isReturnDraftLineValid(identified[0]!)).toBe(true);
+  });
   it("creates draft lines with full remaining quantity and computes refund total", () => {
     const draftLines = addReturnDraftLine([], classCaptureLine);
     const mixedLines = addReturnDraftLine(draftLines, productDirectLine);
@@ -76,16 +132,24 @@ describe("returns model", () => {
       [draftLine!],
       draftLine!.originalSaleLineId,
       "product-concha-van",
-      "Vanilla Concha",
     );
-    expect(isReturnDraftLineValid(linesWithExactProduct[0]!)).toBe(false);
+    expect(isReturnDraftLineValid(linesWithExactProduct[0]!)).toBe(true);
 
     const linesReadyToCommit = setReturnDraftLineDisposition(
       linesWithExactProduct,
       draftLine!.originalSaleLineId,
       "RESTOCK_COUNTER",
     );
-    expect(isReturnDraftLineValid(linesReadyToCommit[0]!)).toBe(true);
+    expect(isReturnDraftLineValid(linesReadyToCommit[0]!)).toBe(false);
+    const inspected = setReturnDraftLineAllocations(
+      linesReadyToCommit,
+      draftLine!.originalSaleLineId,
+      linesReadyToCommit[0]!.allocations.map((allocation) => ({
+        ...allocation,
+        restock_safe_acknowledged: true,
+      })),
+    );
+    expect(isReturnDraftLineValid(inspected[0]!)).toBe(true);
   });
 
   it("builds commit payload and blocks over-return in the draft", () => {
@@ -101,12 +165,19 @@ describe("returns model", () => {
     const correctedLines = setReturnDraftLineDisposition(
       setReturnDraftLineQuantityText(draftLines, productDirectLine.id, "1"),
       productDirectLine.id,
-      "RESTOCK_COUNTER",
+      "QUARANTINE",
     );
     expect(buildReturnCommitLines(correctedLines)).toEqual([
       {
-        disposition_code: "RESTOCK_COUNTER",
-        exact_product_id: undefined,
+        allocations: [
+          {
+            exact_product_id: "product-coca",
+            quantity: "1",
+            disposition_code: "QUARANTINE",
+            lot_id: null,
+            restock_safe_acknowledged: false,
+          },
+        ],
         original_sale_line_id: "sale-line-direct",
         returned_quantity: "1",
       },
@@ -133,7 +204,6 @@ describe("returns model", () => {
       }),
     ).toEqual([
       "Selecciona el producto exacto requerido.",
-      "Define el destino fisico de cada linea.",
       "Selecciona un motivo para continuar.",
       "Selecciona el metodo de reembolso.",
     ]);

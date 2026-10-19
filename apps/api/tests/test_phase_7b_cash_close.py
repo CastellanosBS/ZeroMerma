@@ -33,6 +33,7 @@ from zeromerma_api.modules.identity.infrastructure.models import User
 from zeromerma_api.modules.outbox.infrastructure.models import OutboxEvent
 from zeromerma_api.modules.sales.infrastructure.models import SaleLine
 from zeromerma_api.testing.idempotency import current_cash_session_id, new_idempotency_key
+from zeromerma_api.testing.inventory import seed_test_inventory
 from zeromerma_api.testing.sessions import login_headers
 
 
@@ -103,7 +104,22 @@ def _seed_counter_baseline(lines: list[tuple[str, str]]) -> None:
                     bucket_code="COUNTER",
                 )
             )
+        branch_id, actor_id = branch.id, user.id
+        quantities = {
+            session.scalar(select(Product.id).where(Product.code == code)): Decimal(qty)
+            for code, qty in lines
+            if Decimal(qty) > 0
+        }
         session.commit()
+        if quantities:
+            seed_test_inventory(
+                session,
+                branch_id=branch_id,
+                actor_user_id=actor_id,
+                product_quantities=quantities,
+                location_code="COUNTER",
+                fixture_reference="cash-close-physical-opening",
+            )
 
 
 def _confirm_sale(

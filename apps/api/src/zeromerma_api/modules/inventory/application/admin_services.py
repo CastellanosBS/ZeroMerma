@@ -32,6 +32,7 @@ from zeromerma_api.modules.inventory.application.admin_schemas import (
     AdminInventoryListItemView,
     AdminInventoryListResponse,
     AdminInventoryLocationCode,
+    AdminInventoryLotView,
     AdminInventoryMetricsView,
     AdminInventoryMovementDirection,
     AdminInventoryMovementsResponse,
@@ -47,6 +48,7 @@ from zeromerma_api.modules.inventory.application.admin_schemas import (
 )
 from zeromerma_api.modules.inventory.application.mutations import (
     InventoryBalanceKey,
+    create_inventory_lot,
     lock_inventory_balances,
 )
 from zeromerma_api.modules.inventory.domain.constants import (
@@ -70,6 +72,14 @@ from zeromerma_api.modules.inventory.domain.constants import (
 from zeromerma_api.modules.inventory.domain.exceptions import (
     InventoryNotFoundError,
     InventoryValidationError,
+)
+from zeromerma_api.modules.inventory.domain.quantities import (
+    InventoryLotQuantity,
+    inventory_calculation,
+)
+from zeromerma_api.modules.inventory.infrastructure.lot_models import (
+    InventoryLot,
+    InventoryLotBalance,
 )
 from zeromerma_api.modules.inventory.infrastructure.models import (
     InventoryAdjustment,
@@ -100,6 +110,8 @@ LOCATION_LABELS = {
     INVENTORY_LOCATION_COUNTER: "Mostrador",
     INVENTORY_LOCATION_IN_TRANSIT: "En transito",
     INVENTORY_LOCATION_WASTE: "Merma / descarte",
+    "QUARANTINE": "Cuarentena",
+    "WIP": "En proceso",
 }
 
 PRODUCT_KIND_LABELS = {
@@ -204,6 +216,7 @@ class AdminInventoryService:
             total=total,
         )
 
+    @inventory_calculation
     def create_adjustment(
         self,
         session: Session,
@@ -234,6 +247,33 @@ class AdminInventoryService:
             adjustment_type=command.adjustment_type,
             quantity=command.quantity,
         )
+        selected_lot = session.get(InventoryLot, command.lot_id) if command.lot_id else None
+        if command.lot_id is not None and (
+            selected_lot is None or selected_lot.product_id != product.id
+        ):
+            raise InventoryValidationError("The selected lot does not belong to this product.")
+        if product.lot_tracking_enabled and command.adjustment_type == "SET_COUNTED":
+            if selected_lot is None:
+                raise InventoryValidationError(
+                    "A controlled stock count must identify its exact lot."
+                )
+            lot_balance = session.scalar(
+                select(InventoryLotBalance).where(
+                    InventoryLotBalance.branch_id == key.branch_id,
+                    InventoryLotBalance.product_id == key.product_id,
+                    InventoryLotBalance.location_code == key.location_code,
+                    InventoryLotBalance.lot_id == selected_lot.id,
+                )
+            )
+            new_quantity = (
+                previous_quantity
+                + command.quantity
+                - (lot_balance.quantity_on_hand if lot_balance else Decimal(0))
+            )
+        if not product.lot_tracking_enabled and (
+            command.lot_id is not None or command.lot_code is not None
+        ):
+            raise InventoryValidationError("This product does not use lot adjustments.")
         movement_quantity = abs(new_quantity - previous_quantity)
         if movement_quantity <= 0:
             raise InventoryValidationError("Adjustment must change inventory quantity.")
@@ -253,6 +293,27 @@ class AdminInventoryService:
         session.add(adjustment)
         session.flush()
 
+        if command.lot_code is not None:
+            if new_quantity < previous_quantity:
+                raise InventoryValidationError("An outflow must use existing lot evidence.")
+            selected_lot = create_inventory_lot(
+                session,
+                product_id=product.id,
+                lot_code=command.lot_code,
+                expires_at=command.expires_at,
+                source_document_type=INVENTORY_ADJUSTMENT_SOURCE_DOCUMENT_TYPE,
+                source_document_id=adjustment.id,
+                source_line_id=None,
+                branch_id=branch.id,
+                operator_user_id=current_user.id,
+            )
+        if (
+            product.lot_tracking_enabled
+            and new_quantity > previous_quantity
+            and selected_lot is None
+        ):
+            raise InventoryValidationError("A tracked increase requires its actual lot and expiry.")
+
         movement = balances.apply_delta(
             key,
             delta=new_quantity - previous_quantity,
@@ -264,7 +325,13 @@ class AdminInventoryService:
             source_document_id=adjustment.id,
             source_document_type=INVENTORY_ADJUSTMENT_SOURCE_DOCUMENT_TYPE,
             unit_of_measure=product.unit_of_measure,
-            allow_negative=True,
+            allow_negative=command.allow_negative,
+            causal_effect_code=f"adjustment:{adjustment.id}",
+            unit_cost=command.unit_cost,
+            cost_evidence_reference=command.cost_evidence_reference,
+            lot_allocations=[InventoryLotQuantity(selected_lot.id, movement_quantity)]
+            if selected_lot
+            else None,
         )
         session.flush()
 
@@ -282,6 +349,11 @@ class AdminInventoryService:
             "product_id": str(product.id),
             "quantity": str(command.quantity),
             "reason": command.reason,
+            "allow_negative": command.allow_negative,
+            "lot_id": str(selected_lot.id) if selected_lot else None,
+            "unit_cost": str(movement.unit_cost) if movement.unit_cost is not None else None,
+            "total_cost": str(movement.total_cost) if movement.total_cost is not None else None,
+            "cost_evidence_reference": movement.cost_evidence_reference,
         }
         self._audit_recorder.record(
             session,
@@ -446,7 +518,7 @@ class AdminInventoryService:
         warnings = self._build_warnings(row)
         warning_state = self._warning_state(warnings)
         return AdminInventoryListItemView(
-            available_quantity=row.balance.quantity_on_hand,
+            available_quantity=row.balance.quantity_available,
             balance_id=row.balance.id,
             branch_id=row.branch.id,
             branch_is_active=row.branch.is_active,
@@ -467,13 +539,14 @@ class AdminInventoryService:
             ),
             product_name=row.product.name,
             quantity_on_hand=row.balance.quantity_on_hand,
-            reserved_quantity=None,
+            reserved_quantity=row.balance.quantity_reserved,
             stock_state=self._stock_state(row),
             unit_of_measure=row.product.unit_of_measure,
             warning_state=warning_state,
             warnings=warnings,
         )
 
+    @inventory_calculation
     def _to_detail(self, session: Session, row: _InventoryRow) -> AdminInventoryDetailView:
         movements = (
             session.execute(
@@ -511,24 +584,51 @@ class AdminInventoryService:
                 ),
                 standard_cost=row.product.standard_cost,
                 unit_of_measure=row.product.unit_of_measure,
+                lot_tracking_enabled=row.product.lot_tracking_enabled,
+                expiry_required=row.product.expiry_required,
             ),
             related_actions=AdminInventoryRelatedActionsView(),
             stock_breakdown=AdminInventoryStockBreakdownView(
-                available_quantity=row.balance.quantity_on_hand,
+                available_quantity=row.balance.quantity_available,
                 estimated_value=estimated_value,
                 in_transit_quantity=None,
                 quantity_on_hand=row.balance.quantity_on_hand,
-                reserved_quantity=None,
+                reserved_quantity=row.balance.quantity_reserved,
                 unit_of_measure=row.product.unit_of_measure,
+                valuation_status="KNOWN" if estimated_value is not None else "UNAVAILABLE",
             ),
             stock_state=self._stock_state(row),
             warnings=warnings,
+            lots=[
+                AdminInventoryLotView(
+                    id=lot.id,
+                    lot_code=lot.lot_code,
+                    expires_at=lot.expires_at,
+                    unidentified=lot.unidentified,
+                    quantity_on_hand=balance.quantity_on_hand,
+                    quantity_reserved=balance.quantity_reserved,
+                    available_quantity=balance.quantity_on_hand - balance.quantity_reserved,
+                )
+                for balance, lot in session.execute(
+                    select(InventoryLotBalance, InventoryLot)
+                    .join(InventoryLot, InventoryLot.id == InventoryLotBalance.lot_id)
+                    .where(
+                        InventoryLotBalance.branch_id == row.branch.id,
+                        InventoryLotBalance.product_id == row.product.id,
+                        InventoryLotBalance.location_code == row.balance.location_code,
+                    )
+                    .order_by(InventoryLot.expires_at.asc().nulls_last(), InventoryLot.id)
+                )
+            ],
         )
 
+    @inventory_calculation
     def _build_metrics(self, rows: list[_InventoryRow]) -> AdminInventoryMetricsView:
         return AdminInventoryMetricsView(
-            estimated_value=sum(
-                ((self._estimated_value(row) or Decimal("0")) for row in rows), Decimal("0")
+            estimated_value=(
+                sum((row.balance.inventory_value or Decimal(0) for row in rows), Decimal(0))
+                if all(row.balance.inventory_value is not None for row in rows)
+                else None
             ),
             negative_stock=sum(1 for row in rows if row.balance.quantity_on_hand < 0),
             products_with_stock=sum(1 for row in rows if row.balance.quantity_on_hand > 0),
@@ -613,11 +713,11 @@ class AdminInventoryService:
                     severity="info",
                 ),
             )
-        if row.product.standard_cost is None and row.balance.quantity_on_hand != 0:
+        if row.balance.inventory_value is None and row.balance.quantity_on_hand != 0:
             warnings.append(
                 AdminInventoryWarningView(
-                    code="missing_standard_cost",
-                    message="No hay costo estandar para estimar valor de inventario.",
+                    code="valuation_unavailable",
+                    message="Falta evidencia de costo para determinar el valor del inventario.",
                     severity="info",
                 ),
             )
@@ -735,9 +835,7 @@ class AdminInventoryService:
         return row.last_movement_at < datetime.now(tz=UTC) - timedelta(days=STALE_MOVEMENT_DAYS)
 
     def _estimated_value(self, row: _InventoryRow) -> Decimal | None:
-        if row.product.standard_cost is None:
-            return None
-        return Decimal(row.balance.quantity_on_hand) * Decimal(row.product.standard_cost)
+        return row.balance.inventory_value
 
 
 def _normalize_optional(value: str | None) -> str | None:

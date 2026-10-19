@@ -6,18 +6,22 @@ import { useMemo, useState } from "react";
 import type {
   AdminDirectEntryPayload,
   AdminPurchaseCancelPayload,
+  AdminPurchaseReverseReceiptPayload,
   AdminPurchaseDetail,
   AdminPurchaseFilterOptions,
   AdminPurchasePayload,
   AdminPurchaseReceiptPayload,
 } from "../types";
 
-type WorkflowMode = "purchase" | "direct" | "receive" | "cancel";
+type WorkflowMode = "purchase" | "direct" | "receive" | "cancel" | "reverse";
 
 const inputClassName =
   "h-9 w-full min-w-0 rounded-2xl border border-[var(--ui-color-border)] bg-white px-3 text-sm font-medium text-slate-950 outline-none transition placeholder:text-slate-400 focus:border-[var(--ui-color-info)] focus:ring-4 focus:ring-[var(--ui-color-ring)] disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-500";
 
 interface EditableLine {
+  sourceUnitOfMeasure: string;
+  lotCode: string;
+  expiresAt: string;
   notes: string;
   productId: string;
   quantity: string;
@@ -25,6 +29,8 @@ interface EditableLine {
 }
 
 interface ReceiptLineState {
+  lotCode: string;
+  expiresAt: string;
   discrepancyReason: string;
   notes: string;
   purchaseLineId: string;
@@ -37,6 +43,7 @@ interface AdminPurchaseWorkflowPanelProps {
   isSubmitting?: boolean;
   mode: WorkflowMode;
   onClose: () => void;
+  onSubmitReverseReceipt?: (payload: AdminPurchaseReverseReceiptPayload) => void;
   onSubmitCancel: (payload: AdminPurchaseCancelPayload) => void;
   onSubmitDirectEntry: (payload: AdminDirectEntryPayload) => void;
   onSubmitPurchase: (payload: AdminPurchasePayload) => void;
@@ -47,6 +54,9 @@ interface AdminPurchaseWorkflowPanelProps {
 
 function newLine(): EditableLine {
   return {
+    sourceUnitOfMeasure: "",
+    lotCode: "",
+    expiresAt: "",
     notes: "",
     productId: "",
     quantity: "1.000",
@@ -65,6 +75,7 @@ export function AdminPurchaseWorkflowPanel({
   mode,
   onClose,
   onSubmitCancel,
+  onSubmitReverseReceipt,
   onSubmitDirectEntry,
   onSubmitPurchase,
   onSubmitReceipt,
@@ -73,7 +84,7 @@ export function AdminPurchaseWorkflowPanel({
 }: AdminPurchaseWorkflowPanelProps) {
   const actor = useBackofficeAuthorization();
   const actionCapability: PermissionCode =
-    mode === "cancel"
+    mode === "cancel" || mode === "reverse"
       ? "purchases.cancel"
       : mode === "receive"
         ? "purchases.receive"
@@ -85,6 +96,9 @@ export function AdminPurchaseWorkflowPanel({
   const [notes, setNotes] = useState("");
   const [confirmNow, setConfirmNow] = useState(mode === "direct");
   const [lines, setLines] = useState<EditableLine[]>([newLine()]);
+  const [reversalReceiptId, setReversalReceiptId] = useState(
+    purchase?.receipts?.find((receipt) => !receipt.reversal_id)?.id ?? "",
+  );
   const [cancelReason, setCancelReason] = useState("");
   const [formError, setFormError] = useState<string | null>(null);
   const [receiptLines, setReceiptLines] = useState<ReceiptLineState[]>(
@@ -92,6 +106,8 @@ export function AdminPurchaseWorkflowPanel({
       purchase?.lines
         .filter((line) => Number(line.pendingQuantity) > 0)
         .map((line) => ({
+          lotCode: "",
+          expiresAt: "",
           discrepancyReason: "",
           notes: "",
           purchaseLineId: line.purchaseLineId,
@@ -101,6 +117,7 @@ export function AdminPurchaseWorkflowPanel({
   );
 
   const title = {
+    reverse: "Revertir recepción",
     cancel: "Cancelar compra",
     direct: "Nueva entrada directa",
     purchase: "Nueva compra",
@@ -108,6 +125,7 @@ export function AdminPurchaseWorkflowPanel({
   }[mode];
 
   const primaryLabel = {
+    reverse: "Confirmar reversa",
     cancel: "Confirmar cancelacion",
     direct: "Confirmar entrada",
     purchase: confirmNow ? "Confirmar compra" : "Guardar borrador",
@@ -171,6 +189,14 @@ export function AdminPurchaseWorkflowPanel({
     )
       return;
     setFormError(null);
+    if (mode === "reverse") {
+      if (!reversalReceiptId || !cancelReason.trim()) {
+        setFormError("Selecciona una recepción e indica el motivo.");
+        return;
+      }
+      onSubmitReverseReceipt?.({ receipt_id: reversalReceiptId, reason: cancelReason.trim() });
+      return;
+    }
     if (mode === "cancel") {
       if (!cancelReason.trim()) {
         setFormError("Captura un motivo de cancelacion.");
@@ -210,6 +236,8 @@ export function AdminPurchaseWorkflowPanel({
           discrepancyReason: line.discrepancyReason.trim() || null,
           notes: line.notes.trim() || null,
           purchaseLineId: line.purchaseLineId,
+          lotCode: line.lotCode.trim() || null,
+          expiresAt: line.expiresAt ? new Date(line.expiresAt).toISOString() : null,
           receivedQuantity: line.receivedQuantity,
           unitCost: line.unitCost || null,
         })),
@@ -233,6 +261,9 @@ export function AdminPurchaseWorkflowPanel({
           notes: line.notes.trim() || null,
           productId: line.productId,
           receivedQuantity: line.quantity,
+          sourceUnitOfMeasure: line.sourceUnitOfMeasure || null,
+          lotCode: line.lotCode.trim() || null,
+          expiresAt: line.expiresAt ? new Date(line.expiresAt).toISOString() : null,
           unitCost: line.unitCost,
         })),
         notes: notes.trim() || null,
@@ -249,6 +280,7 @@ export function AdminPurchaseWorkflowPanel({
       lines: lines.map((line) => ({
         notes: line.notes.trim() || null,
         orderedQuantity: line.quantity,
+        sourceUnitOfMeasure: line.sourceUnitOfMeasure || null,
         productId: line.productId,
         unitCost: line.unitCost,
       })),
@@ -284,7 +316,38 @@ export function AdminPurchaseWorkflowPanel({
           </p>
         ) : null}
 
-        {mode === "cancel" ? (
+        {mode === "reverse" ? (
+          <div className="grid gap-2">
+            <label>
+              Recepción
+              <select
+                className={inputClassName}
+                value={reversalReceiptId}
+                onChange={(event) => setReversalReceiptId(event.target.value)}
+              >
+                {purchase?.receipts
+                  ?.filter((receipt) => !receipt.reversal_id)
+                  .map((receipt) => (
+                    <option key={receipt.id} value={receipt.id}>
+                      {receipt.folio}
+                    </option>
+                  ))}
+              </select>
+            </label>
+            <label>
+              Motivo de reversa
+              <input
+                className={inputClassName}
+                value={cancelReason}
+                onChange={(event) => setCancelReason(event.target.value)}
+              />
+            </label>
+            <p>
+              Se conserva la recepción original y se registra su compensación. El stock disponible
+              debe permitirla.
+            </p>
+          </div>
+        ) : mode === "cancel" ? (
           <label className="grid gap-1 text-xs font-semibold uppercase tracking-[0.1em] text-slate-500">
             Motivo de cancelacion
             <input
@@ -315,6 +378,31 @@ export function AdminPurchaseWorkflowPanel({
                     >
                       {sourceLine?.productName}
                     </p>
+                    <p>
+                      Unidad: {sourceLine?.sourceUnitOfMeasure ?? sourceLine?.unitOfMeasure}; factor
+                      a base: {sourceLine?.conversionFactor ?? "1"}
+                    </p>
+                    <label>
+                      Lote del proveedor
+                      <input
+                        className={inputClassName}
+                        value={line.lotCode}
+                        onChange={(event) =>
+                          patchReceiptLine(index, { lotCode: event.target.value })
+                        }
+                      />
+                    </label>
+                    <label>
+                      Caducidad
+                      <input
+                        className={inputClassName}
+                        type="datetime-local"
+                        value={line.expiresAt}
+                        onChange={(event) =>
+                          patchReceiptLine(index, { expiresAt: event.target.value })
+                        }
+                      />
+                    </label>
                     <div className="grid gap-2 md:grid-cols-3">
                       <label className="grid gap-1 text-xs font-semibold uppercase tracking-[0.1em] text-slate-500">
                         Pendiente
@@ -463,6 +551,58 @@ export function AdminPurchaseWorkflowPanel({
                       ))}
                     </select>
                   </label>
+                  <label>
+                    Unidad de recepción
+                    <select
+                      className={inputClassName}
+                      value={line.sourceUnitOfMeasure}
+                      onChange={(event) =>
+                        patchLine(index, { sourceUnitOfMeasure: event.target.value })
+                      }
+                    >
+                      <option value="">
+                        Unidad base (
+                        {options.products.find((product) => product.id === line.productId)
+                          ?.baseUom ?? "selecciona producto"}
+                        )
+                      </option>
+                      {options.products.find((product) => product.id === line.productId)
+                        ?.purchaseUom ? (
+                        <option
+                          value={
+                            options.products.find((product) => product.id === line.productId)
+                              ?.purchaseUom ?? ""
+                          }
+                        >
+                          {
+                            options.products.find((product) => product.id === line.productId)
+                              ?.purchaseUom
+                          }
+                        </option>
+                      ) : null}
+                    </select>
+                  </label>
+                  {mode === "direct" ? (
+                    <>
+                      <label>
+                        Lote del proveedor
+                        <input
+                          className={inputClassName}
+                          value={line.lotCode}
+                          onChange={(event) => patchLine(index, { lotCode: event.target.value })}
+                        />
+                      </label>
+                      <label>
+                        Caducidad
+                        <input
+                          className={inputClassName}
+                          type="datetime-local"
+                          value={line.expiresAt}
+                          onChange={(event) => patchLine(index, { expiresAt: event.target.value })}
+                        />
+                      </label>
+                    </>
+                  ) : null}
                   <div className="grid gap-2 md:grid-cols-3">
                     <label className="grid gap-1 text-xs font-semibold uppercase tracking-[0.1em] text-slate-500">
                       {mode === "direct" ? "Cantidad recibida" : "Cantidad ordenada"}
@@ -519,7 +659,7 @@ export function AdminPurchaseWorkflowPanel({
           </div>
         )}
 
-        {mode !== "cancel" ? (
+        {mode !== "cancel" && mode !== "reverse" ? (
           <label className="grid gap-1 text-xs font-semibold uppercase tracking-[0.1em] text-slate-500">
             Notas
             <textarea

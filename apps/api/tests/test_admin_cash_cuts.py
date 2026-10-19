@@ -3,6 +3,7 @@ from __future__ import annotations
 from decimal import Decimal
 
 from fastapi.testclient import TestClient
+from return_fixtures import seed_return_stock
 from sqlalchemy import select
 
 from zeromerma_api.bootstrap.seed_local import (
@@ -57,6 +58,7 @@ def _get_category_code(code: str) -> str:
 
 
 def _confirm_direct_sale(client: TestClient) -> dict[str, object]:
+    seed_return_stock(product_codes=(SEED_PRODUCT_COCA_355_CODE,), quantity=Decimal(1))
     headers = _cashier_headers(client)
     cash_session_id = current_cash_session_id(
         client, headers=headers, workstation_code=SEED_WORKSTATION_CODE
@@ -111,7 +113,14 @@ def _commit_return(client: TestClient, *, sale_id: str) -> dict[str, object]:
                 {
                     "original_sale_line_id": line_id,
                     "returned_quantity": "1.000",
-                    "disposition_code": "RESTOCK_COUNTER",
+                    "allocations": [
+                        {
+                            "exact_product_id": _get_product_id(SEED_PRODUCT_COCA_355_CODE),
+                            "quantity": "1.000",
+                            "disposition_code": "RESTOCK_COUNTER",
+                            "restock_safe_acknowledged": True,
+                        }
+                    ],
                 }
             ],
         },
@@ -164,7 +173,13 @@ def _commit_cash_close_with_difference(client: TestClient) -> dict[str, object]:
         json={
             "cash_session_id": cash_command_cash_session_id,
             "workstation_code": SEED_WORKSTATION_CODE,
-            "counter_empty_confirmed": True,
+            "counter_empty_confirmed": False,
+            "counted_product_lines": [
+                {
+                    "product_id": _get_product_id(SEED_PRODUCT_COCA_355_CODE),
+                    "counted_quantity": "1.000",
+                }
+            ],
             "counted_payment_methods": [
                 {"payment_method_code": "CASH", "counted_amount": str(counted_cash)}
             ],

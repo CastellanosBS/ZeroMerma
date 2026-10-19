@@ -2,12 +2,14 @@ from __future__ import annotations
 
 from datetime import datetime
 from decimal import Decimal
-from typing import Literal
+from typing import Literal, Self
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import AwareDatetime, BaseModel, ConfigDict, Field, field_validator, model_validator
 
-AdminInventoryLocationCode = Literal["BACKROOM", "COUNTER", "IN_TRANSIT", "WASTE"]
+AdminInventoryLocationCode = Literal[
+    "BACKROOM", "COUNTER", "IN_TRANSIT", "WASTE", "QUARANTINE", "WIP"
+]
 AdminInventoryProductKind = Literal["FINISHED_GOOD", "RAW_MATERIAL", "CONSUMABLE", "DISPOSABLE"]
 AdminInventoryProductStatus = Literal["active", "inactive"]
 AdminInventoryStockState = Literal["in_stock", "out_of_stock", "low_stock", "negative_stock"]
@@ -99,6 +101,8 @@ class AdminInventoryProductView(BaseModel):
     product_kind: AdminInventoryProductKind
     standard_cost: Decimal | None = None
     unit_of_measure: str
+    lot_tracking_enabled: bool
+    expiry_required: bool
 
 
 class AdminInventoryBranchLocationView(BaseModel):
@@ -117,6 +121,8 @@ class AdminInventoryStockBreakdownView(BaseModel):
     quantity_on_hand: Decimal
     reserved_quantity: Decimal | None = None
     unit_of_measure: str
+    valuation_status: Literal["KNOWN", "UNAVAILABLE"]
+    valuation_method: Literal["WEIGHTED_AVERAGE"] = "WEIGHTED_AVERAGE"
 
 
 class AdminInventoryMovementSummaryView(BaseModel):
@@ -153,6 +159,16 @@ class AdminInventoryMovementView(BaseModel):
     unit_of_measure: str
 
 
+class AdminInventoryLotView(BaseModel):
+    id: UUID
+    lot_code: str
+    expires_at: datetime | None
+    unidentified: bool
+    quantity_on_hand: Decimal
+    quantity_reserved: Decimal
+    available_quantity: Decimal
+
+
 class AdminInventoryDetailView(BaseModel):
     balance_id: UUID
     branch_location: AdminInventoryBranchLocationView
@@ -163,6 +179,7 @@ class AdminInventoryDetailView(BaseModel):
     stock_breakdown: AdminInventoryStockBreakdownView
     stock_state: AdminInventoryStockState
     warnings: list[AdminInventoryWarningView]
+    lots: list[AdminInventoryLotView]
 
 
 class AdminInventoryMovementsResponse(BaseModel):
@@ -176,12 +193,30 @@ class AdminInventoryAdjustmentRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     adjustment_type: AdminInventoryAdjustmentType
+    allow_negative: bool = False
     branch_id: UUID
     location_code: AdminInventoryLocationCode = "BACKROOM"
     notes: str | None = Field(default=None, max_length=500)
     product_id: UUID
-    quantity: Decimal = Field(gt=0, max_digits=12, decimal_places=3)
+    quantity: Decimal = Field(ge=0, max_digits=12, decimal_places=3)
     reason: str = Field(min_length=1, max_length=160)
+    lot_id: UUID | None = None
+    lot_code: str | None = Field(default=None, min_length=1, max_length=120)
+    expires_at: AwareDatetime | None = None
+    unit_cost: Decimal | None = Field(default=None, ge=0, max_digits=18, decimal_places=8)
+    cost_evidence_reference: str | None = Field(default=None, min_length=1, max_length=240)
+
+    @model_validator(mode="after")
+    def validate_inventory_evidence(self) -> Self:
+        if self.adjustment_type != "SET_COUNTED" and self.quantity == 0:
+            raise ValueError("An increase or decrease requires a positive quantity.")
+        if self.lot_id is not None and (self.lot_code is not None or self.expires_at is not None):
+            raise ValueError("An existing lot cannot redefine its immutable metadata.")
+        if self.expires_at is not None and self.lot_code is None:
+            raise ValueError("Expiry requires the new lot code.")
+        if (self.unit_cost is None) != (self.cost_evidence_reference is None):
+            raise ValueError("Documented cost and its evidence must be supplied together.")
+        return self
 
     @field_validator("reason")
     @classmethod

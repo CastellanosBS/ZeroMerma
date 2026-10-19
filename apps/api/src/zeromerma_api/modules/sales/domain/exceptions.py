@@ -20,4 +20,3 @@ class UnsupportedPaymentMethodError(SaleError):
 
 class InsufficientCashPaymentError(SaleError):
     """Raised when cash tendered does not cover the sale total."""
-

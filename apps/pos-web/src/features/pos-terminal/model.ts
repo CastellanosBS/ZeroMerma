@@ -41,7 +41,13 @@ export interface PendingSelection {
   captureMode: string;
   editingLine: PosCartLine | null;
   productClass: PosCatalogClassView;
-  product: PosCatalogProductView | null;
+  product:
+    | (Pick<
+        PosCatalogProductView,
+        "id" | "code" | "name" | "quick_name" | "display_order" | "unit_price" | "currency_code"
+      > &
+        Partial<Pick<PosCatalogProductView, "available_quantity">>)
+    | null;
   quantityText: string;
 }
 
@@ -312,6 +318,9 @@ export function selectProductForPending(
   if (state.pendingSelection === null) {
     throw new Error("Selecciona una clase antes de elegir un producto.");
   }
+  if (product.available_quantity !== null && Number(product.available_quantity) <= 0) {
+    throw new Error("Este producto no tiene existencias disponibles para venta.");
+  }
 
   return {
     ...state,
@@ -356,7 +365,7 @@ export function beginEditingCartLine(
           name: line.productName ?? line.catalogNameSnapshot,
           quick_name: line.productName ?? line.catalogNameSnapshot,
           unit_price: line.unitPriceText,
-        } satisfies PosCatalogProductView)
+        } satisfies NonNullable<PendingSelection["product"]>)
       : null;
 
   return {
@@ -503,6 +512,17 @@ export function addPendingSelectionToCart(state: PosTerminalSnapshot): PosTermin
 
   const nextLine = buildCartLine(state.pendingSelection, quantityMilliUnits);
   const existingLine = state.cartLines.find((line) => line.key === nextLine.key);
+  const available = state.pendingSelection.product?.available_quantity;
+  if (
+    available !== null &&
+    available !== undefined &&
+    quantityMilliUnits + (existingLine?.quantityMilliUnits ?? 0) >
+      (parseQuantityToMilliUnits(available) ?? 0)
+  ) {
+    throw new Error(
+      "La cantidad supera las existencias disponibles consultadas. Actualiza el catalogo.",
+    );
+  }
   const nextCartLines = existingLine
     ? state.cartLines.map((line) =>
         line.key === nextLine.key ? mergeCartLines(line, nextLine) : line,

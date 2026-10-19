@@ -12,7 +12,8 @@ function formatStatus(status: AdminProductionStatus): string {
     CANCELLED: "Cancelada",
     COMPLETED: "Completada",
     DRAFT: "Pendiente",
-    IN_PROGRESS: "En proceso",
+    RELEASED: "Plan liberado",
+    PENDING_RECONCILIATION: "Pendiente de conciliación",
   };
   return labels[status];
 }
@@ -35,7 +36,7 @@ function statusTone(status: AdminProductionStatus): "critical" | "neutral" | "su
   if (status === "COMPLETED") {
     return "success";
   }
-  if (status === "IN_PROGRESS") {
+  if (status === "RELEASED") {
     return "warning";
   }
   return "neutral";
@@ -86,7 +87,7 @@ interface AdminProductionTableProps {
   onOpenRecipe: (productId: string) => void;
   onPageChange: (page: number) => void;
   onSelectProduction: (item: AdminProductionListItem) => void;
-  onStart: (item: AdminProductionListItem) => void;
+  onRelease: (item: AdminProductionListItem) => void;
   page: number;
   pageSize: number;
   productions: AdminProductionListItem[];
@@ -105,7 +106,7 @@ export function AdminProductionTable({
   onOpenRecipe,
   onPageChange,
   onSelectProduction,
-  onStart,
+  onRelease,
   page,
   pageSize,
   productions,
@@ -208,12 +209,12 @@ export function AdminProductionTable({
 
                   <button
                     className="min-w-0 text-left focus:outline-none focus:ring-4 focus:ring-[var(--ui-color-ring)]"
-                    title={`Inicio: ${formatDate(item.startedAt)}. Cierre: ${formatDate(item.completedAt)}`}
+                    title={`Inicio: ${formatDate(item.releasedAt)}. Cierre: ${formatDate(item.completedAt)}`}
                     type="button"
                     onClick={() => onSelectProduction(item)}
                   >
                     <span className="block truncate text-sm font-semibold text-slate-900">
-                      {formatDate(item.startedAt)}
+                      {formatDate(item.releasedAt)}
                     </span>
                     <span className="mt-0.5 block truncate text-xs text-slate-500">
                       Cierre {formatDate(item.completedAt)}
@@ -270,12 +271,12 @@ export function AdminProductionTable({
                           className="rounded-full border border-[var(--ui-color-border)] bg-white px-2 py-1 font-semibold text-[var(--ui-color-info)] transition hover:bg-[var(--ui-color-surface-tint)] focus:outline-none focus:ring-4 focus:ring-[var(--ui-color-ring)] disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-400"
                           disabled={isSubmitting}
                           type="button"
-                          onClick={() => onStart(item)}
+                          onClick={() => onRelease(item)}
                         >
                           Iniciar
                         </AdminActionButton>
                       ) : null}
-                      {item.status === "IN_PROGRESS" ? (
+                      {item.status === "RELEASED" || item.status === "PENDING_RECONCILIATION" ? (
                         <AdminActionButton
                           capability="production.execute"
                           branchIds={[item.branchId]}
@@ -287,7 +288,9 @@ export function AdminProductionTable({
                           Completar
                         </AdminActionButton>
                       ) : null}
-                      {item.status === "DRAFT" || item.status === "IN_PROGRESS" ? (
+                      {item.status === "DRAFT" ||
+                      item.status === "RELEASED" ||
+                      item.status === "PENDING_RECONCILIATION" ? (
                         <AdminActionButton
                           capability="production.cancel"
                           branchIds={[item.branchId]}

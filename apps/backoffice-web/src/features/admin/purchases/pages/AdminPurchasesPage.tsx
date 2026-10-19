@@ -71,7 +71,7 @@ const emptyPurchaseList: AdminPurchaseListResponse = {
   total: 0,
 };
 
-type WorkflowMode = "purchase" | "direct" | "receive" | "cancel";
+type WorkflowMode = "purchase" | "direct" | "receive" | "cancel" | "reverse";
 
 function getInitialFilters(): AdminPurchaseListFilters {
   if (typeof window === "undefined") {
@@ -277,6 +277,17 @@ export function AdminPurchasesPage() {
     }) => begin({ commandCode: "cancel", body: payload }, branchFor(purchaseId), purchaseId),
   });
 
+  const reverseReceiptMutation = useMutation({
+    ...mutationOptions,
+    mutationFn: (payload: import("../types").AdminPurchaseReverseReceiptPayload) => {
+      if (!selectedPurchaseId) throw new Error("Selecciona la compra original.");
+      return begin(
+        { commandCode: "reverse-receipt", body: payload },
+        branchFor(selectedPurchaseId),
+        selectedPurchaseId,
+      );
+    },
+  });
   const recoveryMutation = useMutation({
     ...mutationOptions,
 
@@ -322,7 +333,8 @@ export function AdminPurchasesPage() {
     directEntryMutation.isPending ||
     receiveMutation.isPending ||
     confirmMutation.isPending ||
-    cancelMutation.isPending;
+    cancelMutation.isPending ||
+    reverseReceiptMutation.isPending;
   const pageStatusLabel = purchasesQuery.isLoading
     ? "Validando API"
     : purchaseList.isBackendConnected
@@ -495,6 +507,7 @@ export function AdminPurchasesPage() {
             purchase={purchaseDetail}
             onClose={() => setWorkflowMode(null)}
             onSubmitCancel={handleSubmitCancel}
+            onSubmitReverseReceipt={(payload) => reverseReceiptMutation.mutate(payload)}
             onSubmitDirectEntry={(payload) => {
               if (!isAuthenticated || isSubmitting) {
                 return;
@@ -543,6 +556,7 @@ export function AdminPurchasesPage() {
             onOpenProduct={handleOpenProduct}
             onOpenSupplier={handleOpenSupplier}
             onReceive={(purchase) => handleOpenWorkflow("receive", purchase)}
+            onReverseReceipt={(purchase) => handleOpenWorkflow("reverse", purchase)}
           />
         </div>
       </div>

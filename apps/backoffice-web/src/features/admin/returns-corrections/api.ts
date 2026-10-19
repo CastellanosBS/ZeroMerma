@@ -38,7 +38,11 @@ export const adminCorrectionsBackendContract: AdminCorrectionsBackendContract = 
   printEndpoint: null,
 };
 
-function appendOptionalParam(params: URLSearchParams, key: string, value: string | null | undefined) {
+function appendOptionalParam(
+  params: URLSearchParams,
+  key: string,
+  value: string | null | undefined,
+) {
   if (!value || value === "all") {
     return;
   }
@@ -61,7 +65,9 @@ function mapReturnsContract(
 }
 
 function mapCorrectionsContract(
-  contract: ApiCorrectionsListResponse["backend_contract"] | ApiCorrectionDetail["backend_contract"],
+  contract:
+    | ApiCorrectionsListResponse["backend_contract"]
+    | ApiCorrectionDetail["backend_contract"],
 ): AdminCorrectionsBackendContract {
   return {
     createEndpoint: contract.create_endpoint ?? null,
@@ -71,7 +77,9 @@ function mapCorrectionsContract(
   };
 }
 
-function mapReturnFilterOptions(options: ApiReturnsListResponse["filter_options"]): AdminReturnFilterOptions {
+function mapReturnFilterOptions(
+  options: ApiReturnsListResponse["filter_options"],
+): AdminReturnFilterOptions {
   return {
     branches: options.branches.map(mapOption),
     operators: options.operators.map(mapOption),
@@ -161,7 +169,9 @@ function mapReturnsListFromApi(response: ApiReturnsListResponse): AdminReturnsLi
   };
 }
 
-function mapCorrectionsListFromApi(response: ApiCorrectionsListResponse): AdminCorrectionsListResponse {
+function mapCorrectionsListFromApi(
+  response: ApiCorrectionsListResponse,
+): AdminCorrectionsListResponse {
   return {
     backendContract: mapCorrectionsContract(response.backend_contract),
     filterOptions: mapCorrectionFilterOptions(response.filter_options),
@@ -223,7 +233,10 @@ function mapReturnDetailFromApi(response: ApiReturnDetail): AdminReturnDetail {
       workstationName: response.overview.workstation_name,
     },
     refundImpact: {
-      cashImpactAmount: response.refund_impact.cash_impact_amount == null ? null : String(response.refund_impact.cash_impact_amount),
+      cashImpactAmount:
+        response.refund_impact.cash_impact_amount == null
+          ? null
+          : String(response.refund_impact.cash_impact_amount),
       cashSessionId: response.refund_impact.cash_session_id,
       currencyCode: response.refund_impact.currency_code,
       linkedCashMovementId: response.refund_impact.linked_cash_movement_id ?? null,
@@ -240,15 +253,12 @@ function mapReturnDetailFromApi(response: ApiReturnDetail): AdminReturnDetail {
       status: document.status,
     })),
     returnedLines: response.returned_lines.map((line) => ({
-      dispositionCode: line.disposition_code,
       id: line.id,
       lineStatus: line.line_status,
       originalQuantity: String(line.original_quantity),
       originalSaleLineId: line.original_sale_line_id,
-      productClassCode: line.product_class_code,
-      productClassName: line.product_class_name,
-      productCode: line.product_code,
-      productName: line.product_name,
+      originalCatalogName: line.original_catalog_name_snapshot,
+      allocations: line.allocations,
       refundAmount: String(line.refund_amount),
       returnedQuantity: String(line.returned_quantity),
       unitPrice: String(line.unit_price),
@@ -283,7 +293,9 @@ function mapCorrectionDetailFromApi(response: ApiCorrectionDetail): AdminCorrect
       inventoryEffect: response.net_effect.inventory_effect,
       netEffect: response.net_effect.net_effect,
       totalAmountAffected:
-        response.net_effect.total_amount_affected == null ? null : String(response.net_effect.total_amount_affected),
+        response.net_effect.total_amount_affected == null
+          ? null
+          : String(response.net_effect.total_amount_affected),
       totalUnitsAffected: String(response.net_effect.total_units_affected),
     },
     originalDocument: {
@@ -390,9 +402,7 @@ export function fetchAdminReturnDetail(returnId: string): Promise<AdminReturnDet
   }).then(mapReturnDetailFromApi);
 }
 
-export function fetchAdminCorrectionDetail(
-  correctionId: string,
-): Promise<AdminCorrectionDetail> {
+export function fetchAdminCorrectionDetail(correctionId: string): Promise<AdminCorrectionDetail> {
   return requestJson<ApiCorrectionDetail>({
     path: `/v1/admin/returns-corrections/corrections/${correctionId}`,
   }).then(mapCorrectionDetailFromApi);

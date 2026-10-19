@@ -27,7 +27,7 @@ from zeromerma_api.modules.production.application.admin_schemas import (
     AdminProductionCreateRequest,
     AdminProductionDetailView,
     AdminProductionListResponse,
-    AdminProductionStartRequest,
+    AdminProductionReleaseRequest,
     AdminProductionUpdateRequest,
     ProductionCommandCode,
     ProductionCommandResultView,
@@ -184,14 +184,14 @@ def update_admin_production(
 
 
 @admin_router.post(
-    "/{production_id}/start",
+    "/{production_id}/release",
     response_model=ProductionCommandResultView,
     status_code=200,
     responses={200: _REPLAY_RESPONSE},
 )
-def start_admin_production(
+def release_admin_production(
     production_id: UUID,
-    command: AdminProductionStartRequest,
+    command: AdminProductionReleaseRequest,
     request: Request,
     current_user: Annotated[AuthenticatedUser, Depends(_require_backoffice_user)],
     session: Annotated[Session, Depends(get_session)],
@@ -200,7 +200,7 @@ def start_admin_production(
     try:
         result = ProductionIdempotencyService().execute(
             session,
-            command_code="start",
+            command_code="release",
             command=command,
             current_user=current_user,
             key=key,
