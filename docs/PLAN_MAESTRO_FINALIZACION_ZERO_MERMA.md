@@ -382,6 +382,13 @@ conciliación ni las 19 brechas de idempotencia administrativa. La aceptación
 integrada se establece mediante las ocho etapas Foundation y **Foundation
 required** del commit inmutable entregado; SHA y enlace acompañan la entrega.
 
+El primer CI completo de 040 pasó siete etapas y 1.093 de 1.095 pruebas backend.
+Los dos fallos revelaron limpieza de contexto sobre una conexión invalidada y
+una aplicación de prueba sin el middleware canónico. Se corrigieron y validaron
+en bases aisladas: 11/11 pruebas de contexto/desconexión y 23/23 de autorización.
+El registro de validación conserva ese CI fallido y la reproducción del defecto;
+no los presenta como aceptación del commit corregido.
+
 ## 1. Resumen ejecutivo
 
 ZeroMerma posee una base adecuada para evolucionar sin reescritura: monolito modular, FastAPI/SQLAlchemy/PostgreSQL, POS y Backoffice separados, OpenAPI generado, precisión decimal, auditoría y outbox transaccionales. La auditoría activa demostró que una parte importante de ventas, pagos, pedidos, documentos y administración es real. También demostró defectos sistémicos: el POS no alimenta el inventario canónico; el pago de pedido no entra en caja/corte; el worker no procesa eventos; la trazabilidad de identidad/origen es incorrecta; y varias superficies administrativas son simuladas o incompletas.

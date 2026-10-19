@@ -44,6 +44,7 @@ from zeromerma_api.modules.outbox.infrastructure.models import OutboxEvent
 from zeromerma_api.modules.suppliers.infrastructure.models import Supplier
 from zeromerma_api.presentation.access_policy import ENDPOINT_POLICIES, install_access_policies
 from zeromerma_api.presentation.errors import install_error_handlers
+from zeromerma_api.presentation.operation_context import OperationContextMiddleware
 from zeromerma_api.testing.idempotency import new_idempotency_key
 from zeromerma_api.testing.sessions import fixture_session_headers
 
@@ -600,6 +601,7 @@ def test_denial_audit_commits_only_after_all_flushed_business_writes_are_rolled_
 
     install_access_policies(router)
     app = FastAPI()
+    app.add_middleware(OperationContextMiddleware)
     app.include_router(router)
     install_error_handlers(app)
     headers = _headers(actor)
@@ -613,6 +615,7 @@ def test_denial_audit_commits_only_after_all_flushed_business_writes_are_rolled_
             json={"secret": "must-not-be-audited"},
         )
     assert response.status_code == 403
+    assert response.headers["X-Request-ID"] == "710f66b3-98c4-5a6c-b002-ff29c73aec5e"
     with SessionLocal() as session:
         assert session.scalar(select(func.count(InventoryBalance.id))) == 0
         assert session.scalar(select(func.count(OutboxEvent.id))) == outbox_before
@@ -625,6 +628,8 @@ def test_denial_audit_commits_only_after_all_flushed_business_writes_are_rolled_
         assert record.action == "authorization.denied"
         assert record.actor_id == actor.id
         assert record.request_id == "710f66b3-98c4-5a6c-b002-ff29c73aec5e"
+        assert str(record.correlation_id) == response.headers["X-Correlation-ID"]
+        assert record.source_app == "BACKOFFICE"
         assert record.metadata_["required_capabilities"] == ["inventory.adjust"]
         assert (
             record.metadata_["authorization"]["authorization_version"]

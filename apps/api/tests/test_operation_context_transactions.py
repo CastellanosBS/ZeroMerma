@@ -9,6 +9,7 @@ from uuid import uuid4
 
 import pytest
 from sqlalchemy import func, select
+from sqlalchemy.exc import DBAPIError
 from sqlalchemy.orm import Session
 
 from zeromerma_api.core.operation_context import (
@@ -193,6 +194,66 @@ def test_reused_session_uses_the_next_request_context_after_root_end(commit_firs
             session.rollback()
         finally:
             request_operation.reset(token)
+
+
+def test_disconnected_savepoint_preserves_error_and_next_transaction_context() -> None:
+    original, interrupted, healthy = (
+        _context(SourceApp.POS),
+        _context(SourceApp.BACKOFFICE),
+        _context(SourceApp.API),
+    )
+    carrier = RequestOperation(original)
+    token = request_operation.set(carrier)
+    try:
+        with SessionLocal() as session:
+            _assert_context(session, carrier, original)
+            connection = session.connection()
+            original_error: DBAPIError | None = None
+            with pytest.raises(DBAPIError) as failure:
+                with session.begin_nested():
+                    bind_operation_context(session, interrupted)
+                    _assert_new_trace_pair(session, interrupted)
+                    backend_pid = session.scalar(select(func.pg_backend_pid()))
+                    with SessionLocal() as controller:
+                        assert controller.scalar(select(func.pg_terminate_backend(backend_pid)))
+                    try:
+                        session.execute(select(1))
+                    except DBAPIError as error:
+                        original_error = error
+                        raise
+            assert failure.value is original_error
+            assert original_error.connection_invalidated
+            assert connection.invalidated
+            # Cleanup must restore snapshots without issuing SQL on the dead transaction.
+            assert get_operation_context(session) == carrier.context == original
+            session.rollback()
+            assert not session.in_transaction()
+
+            next_carrier = RequestOperation(healthy)
+            next_token = request_operation.set(next_carrier)
+            try:
+                _assert_context(session, next_carrier, healthy)
+                _assert_new_trace_pair(session, healthy)
+                session.commit()
+                assert carrier.context == original
+            finally:
+                request_operation.reset(next_token)
+        with SessionLocal() as observer:
+            for model in (AuditLog, OutboxEvent):
+                assert (
+                    observer.scalar(
+                        select(model.id).where(model.operation_id == interrupted.operation_id)
+                    )
+                    is None
+                )
+                row = observer.scalars(
+                    select(model).where(model.operation_id == healthy.operation_id)
+                ).one()
+                assert row.correlation_id == healthy.correlation_id
+                assert row.request_id == healthy.request_id
+                assert row.source_app == healthy.source_app
+    finally:
+        request_operation.reset(token)
 
 
 @pytest.mark.parametrize("authenticated", [False, True])

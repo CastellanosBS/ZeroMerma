@@ -100,10 +100,12 @@ def _after_soft_rollback(session: Session, previous_transaction: SessionTransact
         if (
             isinstance(connection, Connection)
             and not connection.closed
+            and not connection.invalidated
             and connection.in_transaction()
         ):
             # Session's nested context manager is still unwinding at this callback.
-            # Use its already-owned connection, without acquiring a new transaction.
+            # Use its live owned connection only: an invalidated connection cannot
+            # restore GUCs, and reconnecting would mask the original database failure.
             _apply(connection, context)
     else:
         session.info.pop(_CONTEXT, None)

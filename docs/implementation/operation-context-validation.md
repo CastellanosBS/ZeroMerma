@@ -63,6 +63,8 @@ Counts are per run; overlapping reruns must not be added as unique coverage.
 | `.tmp/validation-published/operation-context/migration-final/6543ed4033b24e3ba1e2f2c3899b647a/operation-context.xml` | 3/3, 13.605 s, after historical/raw outbox version was explicitly set to 0. |
 | `.tmp/validation-published/trace-worker/trace-worker-unit.xml` and `trace-worker-final/trace-worker-postgres-final.xml` | Initial 28 worker unit tests; final PostgreSQL 5/5 in 3.736 s, run `86ef3d73f6b24a62bd566fc113efd971`. |
 | Final worker/logging and API runtime-security command output | 80 passed in 15.29 s: 29 worker unit tests plus 51 API security cases, after restricting structured log extras to the explicit allowlist. This final additional unit case is not represented by the earlier 28-case XML. |
+| `.tmp/validation-published/operation-context/ci-denial-fix/0a196df489ce4018ba62cea72f3524d3/operation-context.xml` | 23/23 authorization tests, 57.32 s. The isolated denial app installs the canonical middleware and verifies response/audit correlation and authenticated source. |
+| `.tmp/validation-published/operation-context/disconnect-final/774aa050826b45eb93e3762ff70ded23/operation-context.xml` | 11/11, 21.07 s: all ten context transaction cases and the original idempotency disconnect regression. The new real-disconnect case failed before the fix (run `2fb0a3e591aa415a8c8b98234e3e4ce4`, 6.55 s), then passed while proving original exception identity, memory restoration, rollback of interrupted traces and safe reuse of the same session. |
 
 The migration and HTTP diagnostic attempts are retained as failures. Contract
 normalization was corrected to use uniform UUID request parameters and remain
@@ -73,6 +75,19 @@ Whole-repository Ruff passed. The functional validator passed 333 operations,
 nineteen administrative idempotency gaps and two availability trace gaps.
 These observations do not establish production load, migration-lock duration or
 an end-to-end delivery guarantee.
+
+The first immutable CI run, `39204296401` on
+`aaabeb472f17430965eae707153f62cfc973fe2d`, passed seven stages but failed Backend:
+1,093 of 1,095 cases passed. A real PostgreSQL disconnect exposed savepoint
+cleanup attempting to reapply settings on an invalidated connection, masking the
+original database exception. The second failure was an isolated denial-test app
+missing the canonical context middleware. This failed run is retained as
+diagnostic evidence; it is not acceptance of the corrected commit.
+The correction restores in-memory snapshots but skips PostgreSQL settings on an
+invalidated connection, preserving the original database exception. Both failed
+cases passed in the focused runs above; full-repository Ruff and mypy across 356
+source files also passed. Integrated acceptance still requires the corrected
+immutable commit's complete CI run.
 
 ## Validation commands
 
