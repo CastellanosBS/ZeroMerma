@@ -615,6 +615,9 @@ class AdminPurchaseService:
                     supplier=supplier,
                     unit_cost=unit_cost,
                 )
+            # A later line may lock and refresh the same balance. Preserve this line's
+            # stock and supplier relation before that read, within the command transaction.
+            session.flush()
 
         receipt.has_discrepancy = has_discrepancy
         document.received_at = receipt.received_at

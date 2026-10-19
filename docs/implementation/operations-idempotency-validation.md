@@ -64,7 +64,10 @@ POS history includes the shipment ID for each individual receipt and pending tot
 represent the remaining quantity.
 
 Purchase receipts lock the document and relevant balances, including safe first-row
-creation under the unique balance constraint. Production completion locks its batch
+creation under the unique balance constraint. Each receipt line flushes its stock
+and supplier-price changes inside the command transaction before another line can
+refresh the same product balance. Distinct lines for one product therefore accumulate
+correctly and create at most one supplier-product relation. Production completion locks its batch
 and inventory balances in product order. Corrections lock the target document and
 account for committed deltas; an original shipment with receipts cannot be corrected
 as if it were still unreceived. These are the protections needed by these commands;
@@ -119,7 +122,7 @@ evidence and is not represented as a passing suite.
 
 | Validation                                                                    | Executed result                                                                                                                |
 | ----------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------ |
-| Purchases, corrected PostgreSQL suite with confirmation-permission cases      | 33 passed                                                                                                                      |
+| Purchases, complete PostgreSQL suite including repeated-product receipts      | 40 passed                                                                                                                      |
 | Missing purchase branches and existing shared callers                         | 7 passed in a separate run                                                                                                     |
 | Transfers, expanded PostgreSQL coverage across dedicated and existing callers | 54 passed across final scoped runs                                                                                             |
 | Shared historical cash-context authorization                                  | 5 passed                                                                                                                       |
@@ -159,6 +162,20 @@ defaults when options arrive and preserve explicit selections. Focused regressio
 cover delayed options and refreshes; real-browser acceptance is recorded above. Two existing POS component cases also
 needed to await observable asynchronous completion before cleanup; the final full
 Web run passed all 719 unit cases and all 11 mocked-browser scenarios.
+
+Final independent review found a repeated-product purchase regression: with
+autoflush disabled, refreshing the balance for a second receipt line discarded the
+first line's pending increment. A missing supplier-product relation could also be
+added twice. Four PostgreSQL regressions reproduced both failures for direct entry
+and ordinary receipt before the fix. Flushing each completed line inside the same
+command transaction corrected both cases; the complete 40-case purchase suite then
+passed, including exact replay/recovery without additional effects.
+
+The first hosted Web stage exposed the same premature asynchronous assertion in
+the POS shipment component test. Shipment and receipt tests now await observable
+success and completed mutations before cleanup. Their ten focused cases and the
+repeated full Web stage passed (719 unit cases and 11 mocked-browser scenarios).
+Hosted acceptance still requires the delivered immutable commit.
 
 Reproducible entry points (with the pinned toolchain activated):
 

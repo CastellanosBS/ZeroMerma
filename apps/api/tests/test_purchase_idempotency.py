@@ -44,6 +44,7 @@ from zeromerma_api.modules.purchases.infrastructure.models import (
     PurchaseReceipt,
     PurchaseReceiptLine,
 )
+from zeromerma_api.modules.suppliers.infrastructure.models import SupplierProduct
 from zeromerma_api.testing.authorization import TEST_OWNER_EMAIL, owner_headers
 from zeromerma_api.testing.idempotency import new_idempotency_key
 
@@ -434,3 +435,102 @@ def test_purchase_crash_rolls_back_document_effects_and_reservation(
             _domain(code, body, key, purchase_id)
     assert _effects() == before
     assert _domain(code, body, key, purchase_id).status_code in {200, 201}
+
+
+@pytest.mark.parametrize("code", ["direct-entry", "receive"])
+@pytest.mark.parametrize("existing_supplier_product", [True, False])
+def test_receipt_lines_for_same_product_accumulate_stock_before_replay(
+    client: TestClient, code: str, existing_supplier_product: bool
+) -> None:
+    headers, body, _, branch = _setup(client, "create")
+    product_id = body["lines"][0]["product_id"]
+    supplier_id = body["supplier_id"]
+    body["lines"] = [
+        {**body["lines"][0], "ordered_quantity": "2.000", "unit_cost": "12.5000"},
+        {**body["lines"][0], "ordered_quantity": "3.000", "unit_cost": "17.5000"},
+    ]
+    initial_stock = client.post(
+        "/v1/admin/inventory/adjustments",
+        headers={**headers, "Idempotency-Key": new_idempotency_key()},
+        json={
+            "adjustment_type": "INCREASE",
+            "branch_id": branch,
+            "location_code": "BACKROOM",
+            "product_id": product_id,
+            "quantity": "10.000",
+            "reason": "Opening stock for repeated product receipt",
+        },
+    )
+    assert initial_stock.status_code == 201, initial_stock.text
+    if not existing_supplier_product:
+        with SessionLocal() as session:
+            relation = session.scalars(
+                select(SupplierProduct).where(
+                    SupplierProduct.supplier_id == UUID(supplier_id),
+                    SupplierProduct.product_id == UUID(product_id),
+                )
+            ).one()
+            session.delete(relation)
+            session.commit()
+    purchase_id = None
+    if code == "direct-entry":
+        body.pop("confirm_now")
+        for line in body["lines"]:
+            line["received_quantity"] = line.pop("ordered_quantity")
+    else:
+        created = _post(client, "create", headers, body, new_idempotency_key())
+        assert created.status_code == 201, created.text
+        purchase_id = created.json()["id"]
+        assert len({line["purchase_line_id"] for line in created.json()["lines"]}) == 2
+        body = {
+            "lines": [
+                {
+                    "purchase_line_id": line["purchase_line_id"],
+                    "received_quantity": line["ordered_quantity"],
+                }
+                for line in created.json()["lines"]
+            ]
+        }
+    key = new_idempotency_key()
+    committed = _post(client, code, headers, body, key, purchase_id)
+    assert committed.status_code == (201 if code == "direct-entry" else 200), committed.text
+    result = committed.json()
+    assert result["status"] == "RECEIVED"
+    assert len({line["purchase_line_id"] for line in result["lines"]}) == 2
+    assert {line["product_id"] for line in result["lines"]} == {product_id}
+    assert sorted(Decimal(line["received_quantity"]) for line in result["lines"]) == [
+        Decimal("2"),
+        Decimal("3"),
+    ]
+    with SessionLocal() as session:
+        assert session.scalar(
+            select(InventoryBalance.quantity_on_hand).where(
+                InventoryBalance.product_id == UUID(product_id),
+                InventoryBalance.branch_id == UUID(branch),
+                InventoryBalance.location_code == "BACKROOM",
+            )
+        ) == Decimal("15")
+        movements = session.execute(
+            select(InventoryMovement.quantity, InventoryMovement.balance_after)
+            .where(
+                InventoryMovement.id.in_([UUID(item) for item in result["inventory_movement_ids"]])
+            )
+            .order_by(InventoryMovement.balance_after)
+        ).all()
+        assert movements == [(Decimal("2"), Decimal("12")), (Decimal("3"), Decimal("15"))]
+        relation = session.scalars(
+            select(SupplierProduct).where(
+                SupplierProduct.supplier_id == UUID(supplier_id),
+                SupplierProduct.product_id == UUID(product_id),
+            )
+        ).one()
+        assert relation.last_known_price == Decimal("17.5000")
+    effects = _effects()
+    replay = _post(client, code, headers, body, key, purchase_id)
+    recovered = _recover(client, code, headers, key, branch)
+    assert replay.status_code == committed.status_code
+    assert recovered.status_code == 200
+    assert replay.json() == recovered.json() == result
+    assert replay.headers["Idempotency-Replayed"] == "true"
+    assert recovered.headers["Idempotency-Replayed"] == "true"
+    assert _effects() == effects

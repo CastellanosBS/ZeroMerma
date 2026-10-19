@@ -464,6 +464,7 @@ function renderUi() {
       queries: { retry: false },
     },
   });
+  queryClients.push(queryClient);
   const container = document.createElement("div");
   document.body.appendChild(container);
 
@@ -519,6 +520,7 @@ async function selectPendingShipmentWithKeyboard(container: HTMLElement) {
 }
 
 let mountedRoots: Array<() => void> = [];
+let queryClients: QueryClient[] = [];
 
 beforeEach(() => {
   localStorage.clear();
@@ -556,13 +558,26 @@ beforeEach(() => {
   });
 });
 
-afterEach(() => {
-  for (const unmount of mountedRoots) {
-    unmount();
+afterEach(async () => {
+  try {
+    await act(async () => {
+      await vi.waitFor(() => {
+        for (const queryClient of queryClients) {
+          expect(queryClient.isMutating()).toBe(0);
+        }
+      });
+    });
+  } finally {
+    for (const unmount of mountedRoots) {
+      unmount();
+    }
+    mountedRoots = [];
+    queryClients = [];
+    transferIntentions.forgetBodies();
+    document.body.innerHTML = "";
+    vi.restoreAllMocks();
+    vi.unstubAllGlobals();
   }
-  mountedRoots = [];
-  document.body.innerHTML = "";
-  vi.restoreAllMocks();
 });
 
 describe("TransferReceiptScreen", () => {
@@ -674,7 +689,11 @@ describe("TransferReceiptScreen", () => {
 
     const dialogConfirmButton = findButtonByExactText(view.container, "Confirmar");
     click(dialogConfirmButton ?? null);
-    await flush();
+    await act(async () => {
+      await vi.waitFor(() =>
+        expect(showSuccessMock).toHaveBeenCalledWith("Recepcion registrada. Folio ENV-000001."),
+      );
+    });
 
     expect(receiveTransfer).toHaveBeenCalledWith(
       "transfer-1",
