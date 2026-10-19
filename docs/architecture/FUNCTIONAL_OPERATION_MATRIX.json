@@ -14,7 +14,9 @@
     "apps/pos-web/src",
     "apps/backoffice-web/src",
     "docs/DECISIONES_ZERO_MERMA.md",
-    "docs/PLAN_MAESTRO_FINALIZACION_ZERO_MERMA.md"
+    "docs/PLAN_MAESTRO_FINALIZACION_ZERO_MERMA.md",
+    "docs/architecture/transaction-boundaries.md",
+    "docs/architecture/TRANSACTION_BOUNDARY_MATRIX.json"
   ],
   "classification_definitions": {
     "implementation_state": [
@@ -7945,8 +7947,8 @@
       ],
       "domain_or_use_case_symbol": "me",
       "router_business_logic_present": false,
-      "transaction_owner": "SessionService and canonical request database unit of work",
-      "transaction_boundary": "Session state, user security changes, audit and outbox commit atomically; failed authentication commits only security evidence",
+      "transaction_owner": "get_session read-transaction cleanup; SessionService.authenticate owns only its terminal security-rejection branches",
+      "transaction_boundary": "Successful query has no domain commit. Authentication may explicitly persist terminal security state before rejecting; the request dependency rolls back remaining work and closes.",
       "persistence": "READ_ONLY",
       "external_side_effect": "Secure HttpOnly cookie response; no external provider",
       "reads_entities": [
@@ -8012,7 +8014,9 @@
         "apps/api/src/zeromerma_api/modules/identity/presentation/router.py#me",
         "apps/api/src/zeromerma_api/modules/identity/application/session_services.py",
         "apps/api/src/zeromerma_api/modules/identity/presentation/dependencies.py",
-        "apps/api/alembic/versions/20261018_0041_auth_sessions.py"
+        "apps/api/alembic/versions/20261018_0041_auth_sessions.py",
+        "docs/architecture/transaction-boundaries.md",
+        "docs/architecture/TRANSACTION_BOUNDARY_MATRIX.json"
       ]
     },
     {
@@ -25572,8 +25576,8 @@
       ],
       "domain_or_use_case_symbol": "login",
       "router_business_logic_present": false,
-      "transaction_owner": "SessionService and canonical request database unit of work",
-      "transaction_boundary": "Session state, user security changes, audit and outbox commit atomically; failed authentication commits only security evidence",
+      "transaction_owner": "zeromerma_api.modules.identity.application.session_services.SessionService.login",
+      "transaction_boundary": "Explicit service commit with rollback_on_failure; intentional failed-authentication/rate-limit/security evidence may commit before rejection. Unexpected failures roll back unfinished work, never already committed state.",
       "persistence": "WRITE",
       "external_side_effect": "Secure HttpOnly cookie response; no external provider",
       "reads_entities": [
@@ -25644,7 +25648,9 @@
         "apps/api/src/zeromerma_api/modules/identity/presentation/router.py#login",
         "apps/api/src/zeromerma_api/modules/identity/application/session_services.py",
         "apps/api/src/zeromerma_api/modules/identity/presentation/dependencies.py",
-        "apps/api/alembic/versions/20261018_0041_auth_sessions.py"
+        "apps/api/alembic/versions/20261018_0041_auth_sessions.py",
+        "docs/architecture/transaction-boundaries.md",
+        "docs/architecture/TRANSACTION_BOUNDARY_MATRIX.json"
       ]
     },
     {
@@ -28586,8 +28592,8 @@
       ],
       "domain_or_use_case_symbol": "current_session",
       "router_business_logic_present": false,
-      "transaction_owner": "SessionService and canonical request database unit of work",
-      "transaction_boundary": "Session state, user security changes, audit and outbox commit atomically; failed authentication commits only security evidence",
+      "transaction_owner": "zeromerma_api.modules.identity.presentation.router.current_session",
+      "transaction_boundary": "Explicit endpoint commit around participant-only session helpers; rollback_on_error cleans unfinished work. The request dependency never commits implicitly.",
       "persistence": "READ_ONLY",
       "external_side_effect": "Secure HttpOnly cookie response; no external provider",
       "reads_entities": [
@@ -28653,7 +28659,9 @@
         "apps/api/src/zeromerma_api/modules/identity/presentation/router.py#current_session",
         "apps/api/src/zeromerma_api/modules/identity/application/session_services.py",
         "apps/api/src/zeromerma_api/modules/identity/presentation/dependencies.py",
-        "apps/api/alembic/versions/20261018_0041_auth_sessions.py"
+        "apps/api/alembic/versions/20261018_0041_auth_sessions.py",
+        "docs/architecture/transaction-boundaries.md",
+        "docs/architecture/TRANSACTION_BOUNDARY_MATRIX.json"
       ]
     },
     {
@@ -28694,8 +28702,8 @@
       ],
       "domain_or_use_case_symbol": "session_activity",
       "router_business_logic_present": false,
-      "transaction_owner": "SessionService and canonical request database unit of work",
-      "transaction_boundary": "Session state, user security changes, audit and outbox commit atomically; failed authentication commits only security evidence",
+      "transaction_owner": "zeromerma_api.modules.identity.presentation.router.session_activity",
+      "transaction_boundary": "Explicit endpoint commit around participant-only session helpers; rollback_on_error cleans unfinished work. The request dependency never commits implicitly.",
       "persistence": "WRITE",
       "external_side_effect": "Secure HttpOnly cookie response; no external provider",
       "reads_entities": [
@@ -28761,7 +28769,9 @@
         "apps/api/src/zeromerma_api/modules/identity/presentation/router.py#session_activity",
         "apps/api/src/zeromerma_api/modules/identity/application/session_services.py",
         "apps/api/src/zeromerma_api/modules/identity/presentation/dependencies.py",
-        "apps/api/alembic/versions/20261018_0041_auth_sessions.py"
+        "apps/api/alembic/versions/20261018_0041_auth_sessions.py",
+        "docs/architecture/transaction-boundaries.md",
+        "docs/architecture/TRANSACTION_BOUNDARY_MATRIX.json"
       ]
     },
     {
@@ -28802,8 +28812,8 @@
       ],
       "domain_or_use_case_symbol": "lock_session",
       "router_business_logic_present": false,
-      "transaction_owner": "SessionService and canonical request database unit of work",
-      "transaction_boundary": "Session state, user security changes, audit and outbox commit atomically; failed authentication commits only security evidence",
+      "transaction_owner": "zeromerma_api.modules.identity.application.session_services.SessionService.lock",
+      "transaction_boundary": "Explicit service commit with rollback_on_failure; intentional failed-authentication/rate-limit/security evidence may commit before rejection. Unexpected failures roll back unfinished work, never already committed state.",
       "persistence": "WRITE",
       "external_side_effect": "Secure HttpOnly cookie response; no external provider",
       "reads_entities": [
@@ -28871,7 +28881,9 @@
         "apps/api/src/zeromerma_api/modules/identity/presentation/router.py#lock_session",
         "apps/api/src/zeromerma_api/modules/identity/application/session_services.py",
         "apps/api/src/zeromerma_api/modules/identity/presentation/dependencies.py",
-        "apps/api/alembic/versions/20261018_0041_auth_sessions.py"
+        "apps/api/alembic/versions/20261018_0041_auth_sessions.py",
+        "docs/architecture/transaction-boundaries.md",
+        "docs/architecture/TRANSACTION_BOUNDARY_MATRIX.json"
       ]
     },
     {
@@ -28912,8 +28924,8 @@
       ],
       "domain_or_use_case_symbol": "reauthenticate_session",
       "router_business_logic_present": false,
-      "transaction_owner": "SessionService and canonical request database unit of work",
-      "transaction_boundary": "Session state, user security changes, audit and outbox commit atomically; failed authentication commits only security evidence",
+      "transaction_owner": "zeromerma_api.modules.identity.application.session_services.SessionService.reauthenticate",
+      "transaction_boundary": "Explicit service commit with rollback_on_failure; intentional failed-authentication/rate-limit/security evidence may commit before rejection. Unexpected failures roll back unfinished work, never already committed state.",
       "persistence": "WRITE",
       "external_side_effect": "Secure HttpOnly cookie response; no external provider",
       "reads_entities": [
@@ -28984,7 +28996,9 @@
         "apps/api/src/zeromerma_api/modules/identity/presentation/router.py#reauthenticate_session",
         "apps/api/src/zeromerma_api/modules/identity/application/session_services.py",
         "apps/api/src/zeromerma_api/modules/identity/presentation/dependencies.py",
-        "apps/api/alembic/versions/20261018_0041_auth_sessions.py"
+        "apps/api/alembic/versions/20261018_0041_auth_sessions.py",
+        "docs/architecture/transaction-boundaries.md",
+        "docs/architecture/TRANSACTION_BOUNDARY_MATRIX.json"
       ]
     },
     {
@@ -29025,8 +29039,8 @@
       ],
       "domain_or_use_case_symbol": "logout_session",
       "router_business_logic_present": false,
-      "transaction_owner": "SessionService and canonical request database unit of work",
-      "transaction_boundary": "Session state, user security changes, audit and outbox commit atomically; failed authentication commits only security evidence",
+      "transaction_owner": "zeromerma_api.modules.identity.application.session_services.SessionService.logout",
+      "transaction_boundary": "Explicit service commit with rollback_on_failure; intentional failed-authentication/rate-limit/security evidence may commit before rejection. Unexpected failures roll back unfinished work, never already committed state.",
       "persistence": "WRITE",
       "external_side_effect": "Secure HttpOnly cookie response; no external provider",
       "reads_entities": [
@@ -29094,7 +29108,9 @@
         "apps/api/src/zeromerma_api/modules/identity/presentation/router.py#logout_session",
         "apps/api/src/zeromerma_api/modules/identity/application/session_services.py",
         "apps/api/src/zeromerma_api/modules/identity/presentation/dependencies.py",
-        "apps/api/alembic/versions/20261018_0041_auth_sessions.py"
+        "apps/api/alembic/versions/20261018_0041_auth_sessions.py",
+        "docs/architecture/transaction-boundaries.md",
+        "docs/architecture/TRANSACTION_BOUNDARY_MATRIX.json"
       ]
     },
     {
@@ -29135,8 +29151,8 @@
       ],
       "domain_or_use_case_symbol": "list_own_sessions",
       "router_business_logic_present": false,
-      "transaction_owner": "SessionService and canonical request database unit of work",
-      "transaction_boundary": "Session state, user security changes, audit and outbox commit atomically; failed authentication commits only security evidence",
+      "transaction_owner": "get_session read-transaction cleanup; SessionService.authenticate owns only its terminal security-rejection branches",
+      "transaction_boundary": "Successful query has no domain commit. Authentication may explicitly persist terminal security state before rejecting; the request dependency rolls back remaining work and closes.",
       "persistence": "READ_ONLY",
       "external_side_effect": "Secure HttpOnly cookie response; no external provider",
       "reads_entities": [
@@ -29202,7 +29218,9 @@
         "apps/api/src/zeromerma_api/modules/identity/presentation/router.py#list_own_sessions",
         "apps/api/src/zeromerma_api/modules/identity/application/session_services.py",
         "apps/api/src/zeromerma_api/modules/identity/presentation/dependencies.py",
-        "apps/api/alembic/versions/20261018_0041_auth_sessions.py"
+        "apps/api/alembic/versions/20261018_0041_auth_sessions.py",
+        "docs/architecture/transaction-boundaries.md",
+        "docs/architecture/TRANSACTION_BOUNDARY_MATRIX.json"
       ]
     },
     {
@@ -29243,8 +29261,8 @@
       ],
       "domain_or_use_case_symbol": "revoke_own_session",
       "router_business_logic_present": false,
-      "transaction_owner": "SessionService and canonical request database unit of work",
-      "transaction_boundary": "Session state, user security changes, audit and outbox commit atomically; failed authentication commits only security evidence",
+      "transaction_owner": "zeromerma_api.modules.identity.presentation.router.revoke_own_session",
+      "transaction_boundary": "Explicit endpoint commit around participant-only session helpers; rollback_on_error cleans unfinished work. The request dependency never commits implicitly.",
       "persistence": "WRITE",
       "external_side_effect": "Secure HttpOnly cookie response; no external provider",
       "reads_entities": [
@@ -29312,7 +29330,9 @@
         "apps/api/src/zeromerma_api/modules/identity/presentation/router.py#revoke_own_session",
         "apps/api/src/zeromerma_api/modules/identity/application/session_services.py",
         "apps/api/src/zeromerma_api/modules/identity/presentation/dependencies.py",
-        "apps/api/alembic/versions/20261018_0041_auth_sessions.py"
+        "apps/api/alembic/versions/20261018_0041_auth_sessions.py",
+        "docs/architecture/transaction-boundaries.md",
+        "docs/architecture/TRANSACTION_BOUNDARY_MATRIX.json"
       ]
     },
     {
@@ -29353,8 +29373,8 @@
       ],
       "domain_or_use_case_symbol": "revoke_other_sessions",
       "router_business_logic_present": false,
-      "transaction_owner": "SessionService and canonical request database unit of work",
-      "transaction_boundary": "Session state, user security changes, audit and outbox commit atomically; failed authentication commits only security evidence",
+      "transaction_owner": "zeromerma_api.modules.identity.presentation.router.revoke_other_sessions",
+      "transaction_boundary": "Explicit endpoint commit around participant-only session helpers; rollback_on_error cleans unfinished work. The request dependency never commits implicitly.",
       "persistence": "WRITE",
       "external_side_effect": "Secure HttpOnly cookie response; no external provider",
       "reads_entities": [
@@ -29422,7 +29442,9 @@
         "apps/api/src/zeromerma_api/modules/identity/presentation/router.py#revoke_other_sessions",
         "apps/api/src/zeromerma_api/modules/identity/application/session_services.py",
         "apps/api/src/zeromerma_api/modules/identity/presentation/dependencies.py",
-        "apps/api/alembic/versions/20261018_0041_auth_sessions.py"
+        "apps/api/alembic/versions/20261018_0041_auth_sessions.py",
+        "docs/architecture/transaction-boundaries.md",
+        "docs/architecture/TRANSACTION_BOUNDARY_MATRIX.json"
       ]
     },
     {
@@ -29463,8 +29485,8 @@
       ],
       "domain_or_use_case_symbol": "change_own_password",
       "router_business_logic_present": false,
-      "transaction_owner": "SessionService and canonical request database unit of work",
-      "transaction_boundary": "Session state, user security changes, audit and outbox commit atomically; failed authentication commits only security evidence",
+      "transaction_owner": "zeromerma_api.modules.identity.application.session_services.SessionService.change_password",
+      "transaction_boundary": "Explicit service commit with rollback_on_failure; intentional failed-authentication/rate-limit/security evidence may commit before rejection. Unexpected failures roll back unfinished work, never already committed state.",
       "persistence": "WRITE",
       "external_side_effect": "Secure HttpOnly cookie response; no external provider",
       "reads_entities": [
@@ -29535,7 +29557,9 @@
         "apps/api/src/zeromerma_api/modules/identity/presentation/router.py#change_own_password",
         "apps/api/src/zeromerma_api/modules/identity/application/session_services.py",
         "apps/api/src/zeromerma_api/modules/identity/presentation/dependencies.py",
-        "apps/api/alembic/versions/20261018_0041_auth_sessions.py"
+        "apps/api/alembic/versions/20261018_0041_auth_sessions.py",
+        "docs/architecture/transaction-boundaries.md",
+        "docs/architecture/TRANSACTION_BOUNDARY_MATRIX.json"
       ]
     },
     {
@@ -29574,8 +29598,8 @@
       ],
       "domain_or_use_case_symbol": "complete_password_reset",
       "router_business_logic_present": false,
-      "transaction_owner": "SessionService and canonical request database unit of work",
-      "transaction_boundary": "Session state, user security changes, audit and outbox commit atomically; failed authentication commits only security evidence",
+      "transaction_owner": "zeromerma_api.modules.identity.application.session_services.SessionService.complete_password_reset",
+      "transaction_boundary": "Explicit service commit with rollback_on_failure; intentional failed-authentication/rate-limit/security evidence may commit before rejection. Unexpected failures roll back unfinished work, never already committed state.",
       "persistence": "WRITE",
       "external_side_effect": "Secure HttpOnly cookie response; no external provider",
       "reads_entities": [
@@ -29646,7 +29670,9 @@
         "apps/api/src/zeromerma_api/modules/identity/presentation/router.py#complete_password_reset",
         "apps/api/src/zeromerma_api/modules/identity/application/session_services.py",
         "apps/api/src/zeromerma_api/modules/identity/presentation/dependencies.py",
-        "apps/api/alembic/versions/20261018_0041_auth_sessions.py"
+        "apps/api/alembic/versions/20261018_0041_auth_sessions.py",
+        "docs/architecture/transaction-boundaries.md",
+        "docs/architecture/TRANSACTION_BOUNDARY_MATRIX.json"
       ]
     },
     {
@@ -29799,8 +29825,8 @@
       ],
       "domain_or_use_case_symbol": "revoke_user_session",
       "router_business_logic_present": false,
-      "transaction_owner": "SessionService and canonical request database unit of work",
-      "transaction_boundary": "Session state, user security changes, audit and outbox commit atomically; failed authentication commits only security evidence",
+      "transaction_owner": "zeromerma_api.modules.identity.presentation.router.revoke_user_session",
+      "transaction_boundary": "Explicit endpoint commit around participant-only session helpers; rollback_on_error cleans unfinished work. The request dependency never commits implicitly.",
       "persistence": "WRITE",
       "external_side_effect": "Secure HttpOnly cookie response; no external provider",
       "reads_entities": [
@@ -29868,7 +29894,9 @@
         "apps/api/src/zeromerma_api/modules/identity/presentation/router.py#revoke_user_session",
         "apps/api/src/zeromerma_api/modules/identity/application/session_services.py",
         "apps/api/src/zeromerma_api/modules/identity/presentation/dependencies.py",
-        "apps/api/alembic/versions/20261018_0041_auth_sessions.py"
+        "apps/api/alembic/versions/20261018_0041_auth_sessions.py",
+        "docs/architecture/transaction-boundaries.md",
+        "docs/architecture/TRANSACTION_BOUNDARY_MATRIX.json"
       ]
     },
     {
@@ -38351,7 +38379,25 @@
     "policy_source": "apps/api/src/zeromerma_api/presentation/access_policy.py#ENDPOINT_POLICIES",
     "domain_scope_source": "apps/api/src/zeromerma_api/db/access_scope.py#bind_authorization_scope",
     "identity_tests": "27 unique administrative/lifecycle tests passed locally, including explicit assignment grant/revoke with previous/current audit; dedicated approval UI remains077.",
-    "release_readiness": "Not asserted. ZM-FIN-033 through ZM-FIN-035 adopts DEC-07 for 23 assigned economic commands and nine read-only recovery routes. ZM-FIN-036 through ZM-FIN-038 verifies the common cash admission and inventory mutation boundaries, without completing order-payment ledger integration ZM-FIN-042 or declaring the data-integrity gate complete. The 19 administrative idempotency gaps assigned to ZM-FIN-077, ZM-FIN-080 and ZM-FIN-085 remain open, together with transaction review, financial/physical ledger, reconciliation, worker, functional, deployment and product UI gaps, including purchase PATCH GAP-0991.",
+    "release_readiness": "Not asserted. ZM-FIN-033 through ZM-FIN-035 adopts DEC-07 for 23 assigned economic commands and nine read-only recovery routes. ZM-FIN-036 through ZM-FIN-038 verifies the common cash admission and inventory mutation boundaries, without completing order-payment ledger integration ZM-FIN-042 or declaring the data-integrity gate complete. The 19 administrative idempotency gaps assigned to ZM-FIN-077, ZM-FIN-080 and ZM-FIN-085 remain open, together with later transaction/workflow gaps (including product availability ZM-FIN-068), financial/physical ledger, reconciliation, worker, functional, deployment and product UI gaps, including purchase PATCH GAP-0991. ZM-FIN-039 verifies explicit ownership and failure cleanup locally; it does not complete those later gaps or product readiness.",
     "policy_count_context": "The 228 policies record the historical ZM-FIN-015 through ZM-FIN-022 authorization acceptance, not the current endpoint count; current inventory is described by api_operations and openapi_comparison."
+  },
+  "transaction_boundary_evidence": {
+    "task": "ZM-FIN-039",
+    "state": "LOCAL_VALIDATION_COMPLETE",
+    "ownership_matrix": "docs/architecture/TRANSACTION_BOUNDARY_MATRIX.json",
+    "convention": "docs/architecture/transaction-boundaries.md",
+    "validation_record": "docs/implementation/transaction-boundary-validation.md",
+    "scope": "Explicit root owners, participant-only helpers, failure cleanup without implicit commit, exact unique-constraint translation and intentional security-evidence transactions.",
+    "preserved_boundaries": [
+      "Existing idempotency and concurrency protocols",
+      "ZM-FIN-040 correlation and equipment-maintenance pre-flush identifier",
+      "ZM-FIN-042 order-payment ledger",
+      "POS physical ledger and worker processing gaps",
+      "19 administrative idempotency gaps assigned to 077/080/085",
+      "GAP-0991 and reconciliation gaps",
+      "GAP-0920 remains a later 068 unavailable product-branch schema workflow"
+    ],
+    "verification_notes": "Four ownership gates passed against 162 transaction sites, 93 explicit-commit symbols and 32 executor delegators. Combined PostgreSQL passed 76/76; three subsequent tests passed after first-INSERT exception-boundary fixes (79 unique dedicated cases across separate runs). Seven-file regression passed 134/134. Verified immutable-commit Foundation SHA and workflow link accompany delivery. No downstream gap is closed."
   }
 }

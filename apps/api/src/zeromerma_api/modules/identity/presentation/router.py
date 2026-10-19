@@ -8,6 +8,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response,
 from sqlalchemy.orm import Session
 
 from zeromerma_api.db.session import get_session
+from zeromerma_api.db.transactions import rollback_on_error
 from zeromerma_api.modules.identity.application.admin_role_schemas import (
     AdminPermissionsResponse,
     AdminRoleCreateRequest,
@@ -173,9 +174,11 @@ def current_session(
     session: Annotated[Session, Depends(get_session)],
     response: Response,
 ) -> LoginResponse:
-    response.headers["Cache-Control"] = "no-store"
-    session.commit()
-    return authentication.response()
+    with rollback_on_error(session):
+        response.headers["Cache-Control"] = "no-store"
+        result = authentication.response()
+        session.commit()
+        return result
 
 
 @router.post("/activity", response_model=AuthSessionView)
@@ -183,9 +186,10 @@ def session_activity(
     authentication: Annotated[SessionAuthentication, Depends(get_current_authentication)],
     session: Annotated[Session, Depends(get_session)],
 ) -> AuthSessionView:
-    result = SessionService().activity(session, authentication)
-    session.commit()
-    return result
+    with rollback_on_error(session):
+        result = SessionService().activity(session, authentication)
+        session.commit()
+        return result
 
 
 @router.post("/lock", response_model=AuthSessionView)
@@ -245,8 +249,11 @@ def revoke_own_session(
     authentication: Annotated[SessionAuthentication, Depends(get_current_authentication)],
     session: Annotated[Session, Depends(get_session)],
 ) -> None:
-    SessionService().revoke_sessions(session, user_id=authentication.user.id, target_id=session_id)
-    session.commit()
+    with rollback_on_error(session):
+        SessionService().revoke_sessions(
+            session, user_id=authentication.user.id, target_id=session_id
+        )
+        session.commit()
     if session_id == authentication.record.id:
         _clear_session_cookie(response, cast(IdentitySurface, authentication.record.audience))
 
@@ -256,10 +263,11 @@ def revoke_other_sessions(
     authentication: Annotated[SessionAuthentication, Depends(get_current_authentication)],
     session: Annotated[Session, Depends(get_session)],
 ) -> None:
-    SessionService().revoke_sessions(
-        session, user_id=authentication.user.id, except_id=authentication.record.id
-    )
-    session.commit()
+    with rollback_on_error(session):
+        SessionService().revoke_sessions(
+            session, user_id=authentication.user.id, except_id=authentication.record.id
+        )
+        session.commit()
 
 
 @router.post("/password/change", status_code=204)
@@ -324,11 +332,12 @@ def revoke_user_session(
 ) -> None:
     from zeromerma_api.modules.identity.application.privileged_access import require_user_scope
 
-    require_user_scope(session, current_user, "users.manage", user_id)
-    SessionService().revoke_sessions(
-        session, user_id=user_id, target_id=session_id, reason="ADMIN_REVOKED"
-    )
-    session.commit()
+    with rollback_on_error(session):
+        require_user_scope(session, current_user, "users.manage", user_id)
+        SessionService().revoke_sessions(
+            session, user_id=user_id, target_id=session_id, reason="ADMIN_REVOKED"
+        )
+        session.commit()
 
 
 @admin_router.post("/{user_id}/password-reset", response_model=PasswordResetCredentialView)

@@ -9,6 +9,7 @@ from sqlalchemy import and_, func, or_, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
+from zeromerma_api.db.transactions import is_unique_violation, rollback_on_failure
 from zeromerma_api.modules.audit.application.service import AuditRecorder
 from zeromerma_api.modules.branches.infrastructure.models import Branch, Brand
 from zeromerma_api.modules.catalog.application.admin_schemas import (
@@ -212,6 +213,7 @@ class AdminProductCatalogService:
         row = self._get_product_row(session, product_id)
         return self._to_product_view(row.product, row.product_class, row.brand)
 
+    @rollback_on_failure
     def create_product(
         self,
         session: Session,
@@ -260,11 +262,13 @@ class AdminProductCatalogService:
             )
             session.commit()
         except IntegrityError as error:
-            session.rollback()
+            if not is_unique_violation(error, "uq_products_code"):
+                raise
             raise AdminProductValidationError("Product code must be unique.") from error
 
         return self.get_product_detail(session, product_id=product.id)
 
+    @rollback_on_failure
     def update_product(
         self,
         session: Session,
@@ -319,7 +323,8 @@ class AdminProductCatalogService:
             )
             session.commit()
         except IntegrityError as error:
-            session.rollback()
+            if not is_unique_violation(error, "uq_products_code"):
+                raise
             raise AdminProductValidationError(
                 "Product update violates catalog integrity."
             ) from error
@@ -654,6 +659,7 @@ class AdminProductClassCatalogService:
         row = self._get_class_row(session, class_id)
         return self._to_class_view(session, row, include_products=True)
 
+    @rollback_on_failure
     def create_class(
         self,
         session: Session,
@@ -702,11 +708,13 @@ class AdminProductClassCatalogService:
             )
             session.commit()
         except IntegrityError as error:
-            session.rollback()
+            if not is_unique_violation(error, "uq_product_classes_code"):
+                raise
             raise AdminProductValidationError("Product class code must be unique.") from error
 
         return self.get_class_detail(session, class_id=product_class.id)
 
+    @rollback_on_failure
     def update_class(
         self,
         session: Session,
@@ -768,7 +776,8 @@ class AdminProductClassCatalogService:
             )
             session.commit()
         except IntegrityError as error:
-            session.rollback()
+            if not is_unique_violation(error, "uq_product_classes_code"):
+                raise
             raise AdminProductValidationError(
                 "Product class update violates catalog integrity."
             ) from error
@@ -1690,6 +1699,7 @@ class AdminRecipeCostCatalogService:
             recipe_versions=versions,
         )
 
+    @rollback_on_failure
     def create_recipe(
         self,
         session: Session,
@@ -1738,11 +1748,13 @@ class AdminRecipeCostCatalogService:
             )
             session.commit()
         except IntegrityError as error:
-            session.rollback()
+            if not is_unique_violation(error, "uq_recipe_inputs_recipe_product"):
+                raise
             raise AdminProductValidationError("Recipe violates catalog integrity.") from error
 
         return self.get_product_recipe_detail(session, product_id=product.id)
 
+    @rollback_on_failure
     def activate_recipe(
         self,
         session: Session,
@@ -1766,6 +1778,7 @@ class AdminRecipeCostCatalogService:
         session.commit()
         return self.get_product_recipe_detail(session, product_id=recipe.product_id)
 
+    @rollback_on_failure
     def duplicate_recipe(
         self,
         session: Session,
@@ -1819,13 +1832,15 @@ class AdminRecipeCostCatalogService:
             )
             session.commit()
         except IntegrityError as error:
-            session.rollback()
+            if not is_unique_violation(error, "uq_recipe_inputs_recipe_product"):
+                raise
             raise AdminProductValidationError(
                 "Recipe duplicate violates catalog integrity."
             ) from error
 
         return self.get_product_recipe_detail(session, product_id=new_recipe.product_id)
 
+    @rollback_on_failure
     def apply_recipe_cost_to_product(
         self,
         session: Session,

@@ -18,6 +18,7 @@ from zeromerma_api.db.access_scope import (
     scoped_session_capabilities,
     session_allows_capabilities,
 )
+from zeromerma_api.db.transactions import rollback_on_failure
 from zeromerma_api.modules.audit.application.service import AuditRecorder
 from zeromerma_api.modules.branches.infrastructure.models import Branch, Workstation
 from zeromerma_api.modules.cash_close.infrastructure.models import CashSessionClose
@@ -210,6 +211,7 @@ class AdminReportService:
             raise ReportUnavailableError("This report does not have a preview builder.")
         return builder(session, definition, normalized_filters)
 
+    @rollback_on_failure
     def export_report(
         self,
         session: Session,

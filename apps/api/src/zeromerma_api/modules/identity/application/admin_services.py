@@ -11,6 +11,7 @@ from sqlalchemy import func, select, true
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
+from zeromerma_api.db.transactions import is_unique_violation, rollback_on_failure
 from zeromerma_api.modules.audit.application.service import AuditRecorder
 from zeromerma_api.modules.audit.infrastructure.models import AuditLog
 from zeromerma_api.modules.branches.infrastructure.models import Branch, Workstation
@@ -244,6 +245,7 @@ class AdminUserService:
         context = self._get_context(session, user_id)
         return self._to_detail(session, context, current_user=current_user)
 
+    @rollback_on_failure
     def create_user(
         self,
         session: Session,
@@ -309,13 +311,15 @@ class AdminUserService:
             ensure_superadmin_remains(session)
             session.commit()
         except IntegrityError as error:
-            session.rollback()
-            raise UserValidationError("Email must be unique.") from error
+            if is_unique_violation(error, "uq_users_email"):
+                raise UserValidationError("Email must be unique.") from error
+            raise
 
         return self._to_detail(
             session, self._get_context(session, user.id), current_user=current_user
         )
 
+    @rollback_on_failure
     def update_user(
         self,
         session: Session,
@@ -398,13 +402,15 @@ class AdminUserService:
             ensure_superadmin_remains(session)
             session.commit()
         except IntegrityError as error:
-            session.rollback()
-            raise UserValidationError("Email must be unique.") from error
+            if is_unique_violation(error, "uq_users_email"):
+                raise UserValidationError("Email must be unique.") from error
+            raise
 
         return self._to_detail(
             session, self._get_context(session, user.id), current_user=current_user
         )
 
+    @rollback_on_failure
     def change_status(
         self,
         session: Session,
@@ -451,6 +457,7 @@ class AdminUserService:
             session, self._get_context(session, user.id), current_user=current_user
         )
 
+    @rollback_on_failure
     def lock_user(
         self,
         session: Session,
@@ -493,6 +500,7 @@ class AdminUserService:
             session, self._get_context(session, user.id), current_user=current_user
         )
 
+    @rollback_on_failure
     def unlock_user(
         self,
         session: Session,
@@ -531,6 +539,7 @@ class AdminUserService:
             session, self._get_context(session, user.id), current_user=current_user
         )
 
+    @rollback_on_failure
     def add_branch_assignment(
         self,
         session: Session,
@@ -603,6 +612,7 @@ class AdminUserService:
             session, self._get_context(session, user.id), current_user=current_user
         )
 
+    @rollback_on_failure
     def deactivate_branch_assignment(
         self,
         session: Session,
@@ -650,6 +660,7 @@ class AdminUserService:
             session, self._get_context(session, user.id), current_user=current_user
         )
 
+    @rollback_on_failure
     def set_default_branch_assignment(
         self,
         session: Session,
@@ -693,6 +704,7 @@ class AdminUserService:
             session, self._get_context(session, user.id), current_user=current_user
         )
 
+    @rollback_on_failure
     def assign_role(
         self,
         session: Session,
@@ -741,6 +753,7 @@ class AdminUserService:
             session, self._get_context(session, user.id), current_user=current_user
         )
 
+    @rollback_on_failure
     def remove_role(
         self,
         session: Session,

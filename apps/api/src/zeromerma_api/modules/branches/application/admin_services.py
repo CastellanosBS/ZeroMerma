@@ -9,6 +9,7 @@ from sqlalchemy import func, or_, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
+from zeromerma_api.db.transactions import is_unique_violation, rollback_on_failure
 from zeromerma_api.modules.audit.application.service import AuditRecorder
 from zeromerma_api.modules.branches.application.admin_schemas import (
     AdminBranchAvailableActionsView,
@@ -168,6 +169,7 @@ class AdminBranchService:
         row = self._get_row(session, branch_id)
         return self._to_detail(session, row)
 
+    @rollback_on_failure
     def create_branch(
         self,
         session: Session,
@@ -212,11 +214,13 @@ class AdminBranchService:
             )
             session.commit()
         except IntegrityError as error:
-            session.rollback()
+            if not is_unique_violation(error, "uq_branches_code"):
+                raise
             raise BranchValidationError("Branch code must be unique.") from error
 
         return self.get_branch_detail(session, branch_id=branch.id)
 
+    @rollback_on_failure
     def update_branch(
         self,
         session: Session,
@@ -287,7 +291,8 @@ class AdminBranchService:
             )
             session.commit()
         except IntegrityError as error:
-            session.rollback()
+            if not is_unique_violation(error, "uq_branches_code"):
+                raise
             raise BranchValidationError("Branch code must be unique.") from error
 
         return self.get_branch_detail(session, branch_id=branch.id)
@@ -776,6 +781,7 @@ class AdminWorkstationService:
         row = self._get_row(session, workstation_id)
         return self._to_detail(session, row)
 
+    @rollback_on_failure
     def create_workstation(
         self,
         session: Session,
@@ -808,11 +814,13 @@ class AdminWorkstationService:
             )
             session.commit()
         except IntegrityError as error:
-            session.rollback()
+            if not is_unique_violation(error, "uq_workstations_code"):
+                raise
             raise WorkstationValidationError("Workstation code must be unique.") from error
 
         return self.get_workstation_detail(session, workstation_id=workstation.id)
 
+    @rollback_on_failure
     def update_workstation(
         self,
         session: Session,
@@ -889,7 +897,8 @@ class AdminWorkstationService:
             )
             session.commit()
         except IntegrityError as error:
-            session.rollback()
+            if not is_unique_violation(error, "uq_workstations_code"):
+                raise
             raise WorkstationValidationError("Workstation code must be unique.") from error
 
         return self.get_workstation_detail(session, workstation_id=workstation.id)

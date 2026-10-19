@@ -9,6 +9,7 @@ from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
+from zeromerma_api.db.transactions import is_unique_violation, rollback_on_failure
 from zeromerma_api.modules.audit.application.service import AuditRecorder
 from zeromerma_api.modules.branches.infrastructure.models import Branch
 from zeromerma_api.modules.catalog.application.inputs_supplies_schemas import (
@@ -185,6 +186,7 @@ class AdminInputSupplyService:
     ) -> AdminInputSupplyDetailView:
         return self._to_detail(session, self._get_context(session, product_id))
 
+    @rollback_on_failure
     def create_item(
         self,
         session: Session,
@@ -236,11 +238,15 @@ class AdminInputSupplyService:
             )
             session.commit()
         except IntegrityError as error:
-            session.rollback()
+            if not is_unique_violation(
+                error, "uq_products_code", "uq_supplier_products_supplier_product"
+            ):
+                raise
             raise AdminInputSupplyValidationError("Input code must be unique.") from error
 
         return self.get_item_detail(session, product_id=product.id)
 
+    @rollback_on_failure
     def update_item(
         self,
         session: Session,
@@ -289,13 +295,17 @@ class AdminInputSupplyService:
             )
             session.commit()
         except IntegrityError as error:
-            session.rollback()
+            if not is_unique_violation(
+                error, "uq_products_code", "uq_supplier_products_supplier_product"
+            ):
+                raise
             raise AdminInputSupplyValidationError(
                 "Input update violates catalog integrity."
             ) from error
 
         return self.get_item_detail(session, product_id=product.id)
 
+    @rollback_on_failure
     def change_status(
         self,
         session: Session,
@@ -321,6 +331,7 @@ class AdminInputSupplyService:
         session.commit()
         return self.get_item_detail(session, product_id=product.id)
 
+    @rollback_on_failure
     def upsert_supplier_relation(
         self,
         session: Session,
@@ -353,6 +364,7 @@ class AdminInputSupplyService:
         session.commit()
         return self.get_item_detail(session, product_id=product.id)
 
+    @rollback_on_failure
     def update_supplier_relation(
         self,
         session: Session,

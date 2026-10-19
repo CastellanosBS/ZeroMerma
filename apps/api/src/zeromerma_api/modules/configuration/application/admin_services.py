@@ -11,6 +11,7 @@ from sqlalchemy import delete, select
 from sqlalchemy.orm import Session
 
 from zeromerma_api.core.config import ApiSettings, get_settings
+from zeromerma_api.db.transactions import rollback_on_failure
 from zeromerma_api.modules.audit.application.service import AuditRecorder
 from zeromerma_api.modules.configuration.application.admin_schemas import (
     AdminSettingCategoryView,
@@ -156,6 +157,7 @@ class AdminSettingService:
             warnings=warnings,
         )
 
+    @rollback_on_failure
     def update_setting(
         self,
         session: Session,
@@ -214,6 +216,7 @@ class AdminSettingService:
         session.commit()
         return self.get_setting_detail(session, key=definition.key)
 
+    @rollback_on_failure
     def reset_setting(
         self,
         session: Session,

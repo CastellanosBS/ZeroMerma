@@ -17,6 +17,7 @@ from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.orm import Session
 from sqlalchemy.sql.elements import ColumnElement
 
+from zeromerma_api.db.transactions import rollback_on_failure
 from zeromerma_api.modules.audit.application.service import AuditRecorder
 from zeromerma_api.modules.branches.infrastructure.models import Branch
 from zeromerma_api.modules.identity.application.admin_role_schemas import (
@@ -650,6 +651,7 @@ class _ExecutionArguments(TypedDict):
 
 
 class PrivilegedAccessService:
+    @rollback_on_failure
     def propose(
         self,
         session: Session,
@@ -715,6 +717,7 @@ class PrivilegedAccessService:
         _require_superadmin(session, current_user.id, cast(PrivilegedOperation, change.operation))
         return PrivilegedChangeView.model_validate(change)
 
+    @rollback_on_failure
     def approve(
         self,
         session: Session,

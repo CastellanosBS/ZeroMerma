@@ -12,6 +12,7 @@ from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
+from zeromerma_api.db.transactions import is_unique_violation, rollback_on_failure
 from zeromerma_api.modules.audit.application.service import AuditRecorder
 from zeromerma_api.modules.branches.infrastructure.models import Branch
 from zeromerma_api.modules.identity.application.actions import restrict_actions
@@ -378,6 +379,7 @@ class AdminEquipmentMaintenanceService:
     ) -> AdminEquipmentDetailView:
         return self._to_detail(session, self._get_row(session, equipment_id))
 
+    @rollback_on_failure
     def create_equipment(
         self,
         session: Session,
@@ -414,33 +416,37 @@ class AdminEquipmentMaintenanceService:
             serial_number=command.serial_number,
             warranty_expires_at=command.warranty_expires_at,
         )
-        session.add(equipment)
-        session.flush()
-        self._record_equipment_change(
-            session,
-            action=AUDIT_ACTION_EQUIPMENT_CREATED,
-            actor_id=current_user.id,
-            branch_id=branch.id,
-            equipment=equipment,
-            request_id=request_id,
-        )
-        self._append_equipment_event(
-            session,
-            event_name=OUTBOX_EVENT_EQUIPMENT_CREATED_V1,
-            equipment=equipment,
-            branch=branch,
-        )
-        if self._is_high_risk_equipment(equipment):
-            self._record_high_risk_alert(session, current_user.id, branch.id, equipment, request_id)
-
         try:
+            session.add(equipment)
+            session.flush()
+            self._record_equipment_change(
+                session,
+                action=AUDIT_ACTION_EQUIPMENT_CREATED,
+                actor_id=current_user.id,
+                branch_id=branch.id,
+                equipment=equipment,
+                request_id=request_id,
+            )
+            self._append_equipment_event(
+                session,
+                event_name=OUTBOX_EVENT_EQUIPMENT_CREATED_V1,
+                equipment=equipment,
+                branch=branch,
+            )
+            if self._is_high_risk_equipment(equipment):
+                self._record_high_risk_alert(
+                    session, current_user.id, branch.id, equipment, request_id
+                )
+
             session.commit()
         except IntegrityError as error:
-            session.rollback()
+            if not is_unique_violation(error, "uq_equipment_assets_code"):
+                raise
             raise EquipmentMaintenanceValidationError("Equipment code already exists.") from error
 
         return self._to_detail(session, self._get_row(session, equipment.id))
 
+    @rollback_on_failure
     def update_equipment(
         self,
         session: Session,
@@ -494,6 +500,7 @@ class AdminEquipmentMaintenanceService:
         session.commit()
         return self._to_detail(session, self._get_row(session, equipment.id))
 
+    @rollback_on_failure
     def change_equipment_status(
         self,
         session: Session,
@@ -552,6 +559,7 @@ class AdminEquipmentMaintenanceService:
         session.commit()
         return self._to_detail(session, self._get_row(session, equipment_id))
 
+    @rollback_on_failure
     def create_maintenance(
         self,
         session: Session,
@@ -640,6 +648,7 @@ class AdminEquipmentMaintenanceService:
         session.commit()
         return self._to_detail(session, self._get_row(session, row.equipment.id))
 
+    @rollback_on_failure
     def start_maintenance(
         self,
         session: Session,
@@ -676,6 +685,7 @@ class AdminEquipmentMaintenanceService:
         session.commit()
         return self._to_detail(session, self._get_row(session, row.equipment.id))
 
+    @rollback_on_failure
     def complete_maintenance(
         self,
         session: Session,
@@ -734,6 +744,7 @@ class AdminEquipmentMaintenanceService:
         session.commit()
         return self._to_detail(session, self._get_row(session, row.equipment.id))
 
+    @rollback_on_failure
     def cancel_maintenance(
         self,
         session: Session,

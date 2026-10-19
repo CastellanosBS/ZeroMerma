@@ -25,6 +25,7 @@ from zeromerma_api.modules.idempotency.application.context import (
     CommandExecution,
     assert_clean_entry,
     command_execution,
+    execution,
     metadata_access,
 )
 from zeromerma_api.modules.idempotency.application.responses import (
@@ -77,15 +78,19 @@ class IdempotencyExecutor:
     removes service-owned commits explicitly; it does not wrap unchanged committing services.
     """
 
-    def __init__(
-        self, *, lock_timeout_ms: int = 1000, command_lock_timeout_ms: int = 5000
-    ) -> None:
+    def __init__(self, *, lock_timeout_ms: int = 1000, command_lock_timeout_ms: int = 5000) -> None:
         if not 1 <= lock_timeout_ms <= 60000:
             raise ValueError("The key contention timeout must be between 1 and 60000 milliseconds.")
         self.lock_timeout_ms = lock_timeout_ms
         if not 1 <= command_lock_timeout_ms <= 60000:
             raise ValueError("The command lock timeout must be between 1 and 60000 milliseconds.")
         self.command_lock_timeout_ms = command_lock_timeout_ms
+
+    @staticmethod
+    def _assert_unowned_entry(session: Session) -> None:
+        if execution(session) is not None:
+            raise IdempotencyBoundaryError("Nested idempotent commands are not supported.")
+        assert_clean_entry(session)
 
     def recover(
         self,
@@ -98,7 +103,7 @@ class IdempotencyExecutor:
         response_policy: ResponsePolicy,
     ) -> IdempotencyResult:
         """Recover an existing result without admitting a command or receiving its body."""
-        assert_clean_entry(session)
+        self._assert_unowned_entry(session)
         parsed_key = parse_idempotency_key(key)
         validate_policy(response_policy)
         owner = CommandExecution(session.get_transaction() or session.begin())
@@ -155,7 +160,7 @@ class IdempotencyExecutor:
         request_id: str | None = None,
         fingerprint_version: int = 1,
     ) -> IdempotencyResult:
-        assert_clean_entry(session)
+        self._assert_unowned_entry(session)
         parsed_key = parse_idempotency_key(key)
         validate_policy(response_policy)
         transaction = session.get_transaction() or session.begin()
@@ -412,7 +417,7 @@ class IdempotencyExecutor:
         now: datetime | None = None,
         limit: int = 100,
     ) -> int:
-        assert_clean_entry(session)
+        self._assert_unowned_entry(session)
         owner = CommandExecution(session.get_transaction() or session.begin(), maintenance=True)
         try:
             with command_execution(session, owner):
@@ -448,54 +453,45 @@ class IdempotencyExecutor:
                 "Cleanup requires a bounded, reconstructible response policy."
             )
         cutoff = now or datetime.now(UTC)
-        try:
+        with metadata_access(session):
+            records = list(
+                session.scalars(
+                    select(IdempotencyRecord)
+                    .where(
+                        IdempotencyRecord.operation_code == operation_code,
+                        IdempotencyRecord.response_schema_version == response_policy.schema_version,
+                        IdempotencyRecord.status.in_(["COMPLETED", "REJECTED"]),
+                        IdempotencyRecord.response_payload.is_not(None),
+                        IdempotencyRecord.response_reference.is_not(None),
+                        IdempotencyRecord.response_expires_at <= cutoff,
+                    )
+                    .order_by(IdempotencyRecord.response_expires_at, IdempotencyRecord.id)
+                    .limit(limit)
+                    .with_for_update(skip_locked=True)
+                )
+            )
+        for record in records:
+            if response_policy.reference_model is None:
+                raise IdempotencyBoundaryError("Cleanup requires a declared immutable reference.")
+            reference = response_policy.reference_model.model_validate(record.response_reference)
+            model = (
+                response_policy.rejection_model
+                if record.error_code
+                else response_policy.snapshot_model
+            )
+            restored = safe_snapshot(response_policy.restore(session, reference), model)
+            if (
+                restored != record.response_payload
+                or response_fingerprint(restored) != record.response_fingerprint
+            ):
+                raise IdempotencyBoundaryError(
+                    "The reference does not preserve the original logical result."
+                )
             with metadata_access(session):
-                records = list(
-                    session.scalars(
-                        select(IdempotencyRecord)
-                        .where(
-                            IdempotencyRecord.operation_code == operation_code,
-                            IdempotencyRecord.response_schema_version
-                            == response_policy.schema_version,
-                            IdempotencyRecord.status.in_(["COMPLETED", "REJECTED"]),
-                            IdempotencyRecord.response_payload.is_not(None),
-                            IdempotencyRecord.response_reference.is_not(None),
-                            IdempotencyRecord.response_expires_at <= cutoff,
-                        )
-                        .order_by(IdempotencyRecord.response_expires_at, IdempotencyRecord.id)
-                        .limit(limit)
-                        .with_for_update(skip_locked=True)
-                    )
+                session.execute(
+                    update(IdempotencyRecord)
+                    .where(IdempotencyRecord.id == record.id)
+                    .values(response_payload=None, updated_at=datetime.now(UTC))
+                    .execution_options(synchronize_session=False)
                 )
-            for record in records:
-                if response_policy.reference_model is None:
-                    raise IdempotencyBoundaryError(
-                        "Cleanup requires a declared immutable reference."
-                    )
-                reference = response_policy.reference_model.model_validate(
-                    record.response_reference
-                )
-                model = (
-                    response_policy.rejection_model
-                    if record.error_code
-                    else response_policy.snapshot_model
-                )
-                restored = safe_snapshot(response_policy.restore(session, reference), model)
-                if (
-                    restored != record.response_payload
-                    or response_fingerprint(restored) != record.response_fingerprint
-                ):
-                    raise IdempotencyBoundaryError(
-                        "The reference does not preserve the original logical result."
-                    )
-                with metadata_access(session):
-                    session.execute(
-                        update(IdempotencyRecord)
-                        .where(IdempotencyRecord.id == record.id)
-                        .values(response_payload=None, updated_at=datetime.now(UTC))
-                        .execution_options(synchronize_session=False)
-                    )
-            return len(records)
-        except BaseException:
-            session.rollback()
-            raise
+        return len(records)

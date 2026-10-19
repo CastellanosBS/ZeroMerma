@@ -10,6 +10,7 @@ from sqlalchemy.engine import RowMapping
 from sqlalchemy.orm import Session
 from sqlalchemy.sql.elements import ColumnElement
 
+from zeromerma_api.db.transactions import rollback_on_failure
 from zeromerma_api.modules.audit.application.service import AuditRecorder
 from zeromerma_api.modules.branches.infrastructure.models import Branch, Workstation
 from zeromerma_api.modules.identity.application.schemas import AuthenticatedUser
@@ -325,6 +326,7 @@ class AdminSalesTicketService:
             related_documents=self._get_related_documents(session, ticket_id=ticket_id),
         )
 
+    @rollback_on_failure
     def reprint_ticket(
         self,
         session: Session,

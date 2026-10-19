@@ -12,6 +12,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import InstrumentedAttribute, Session, aliased
 from sqlalchemy.sql.elements import ColumnElement
 
+from zeromerma_api.db.transactions import is_unique_violation, rollback_on_failure
 from zeromerma_api.modules.audit.application.service import AuditRecorder
 from zeromerma_api.modules.branches.infrastructure.models import Branch, Workstation
 from zeromerma_api.modules.cash.infrastructure.models import CashSession
@@ -244,6 +245,7 @@ class AdminReconciliationService:
             raise CashCloseNotFoundError("Reconciliation record was not found.")
         return self._to_detail(session, row=row)
 
+    @rollback_on_failure
     def create_reconciliation(
         self,
         session: Session,
@@ -338,13 +340,15 @@ class AdminReconciliationService:
                 )
             session.commit()
         except IntegrityError as error:
-            session.rollback()
+            if not is_unique_violation(error, "uq_financial_reconciliations_source_method"):
+                raise
             raise CashCloseValidationError(
                 "A reconciliation already exists for this source document."
             ) from error
 
         return self.get_reconciliation_detail(session, reconciliation_id=record.id)
 
+    @rollback_on_failure
     def resolve_reconciliation(
         self,
         session: Session,

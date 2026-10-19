@@ -305,6 +305,46 @@ Se mantienen las 19 brechas de idempotencia administrativa de 077/080/085,
 no declara el producto terminado ni listo para operar con datos reales. El
 siguiente paso planificado es **ZM-FIN-039**, revisión de límites transaccionales.
 
+### 0.11 Registro de ejecución — ZM-FIN-039
+
+El bloque parte de `864f5ba0670d191d578760f74fb0f44c004277fe` en la rama
+`codex/zm-fin-039-transaction-boundaries`. La implementación está congelada:
+inventaría al dueño de cada transacción, incorpora limpieza explícita de fallos
+sin autocommit, acota la traducción de errores de integridad y comprueba la
+persistencia del login y la composición de servicios. Los cuatro gates estáticos
+de ownership pasaron, junto con 76 casos PostgreSQL en una ejecución conjunta
+(20 de núcleo, 45 de identidad y 11 administrativos). Después se ampliaron tres
+fronteras de captura para incluir el primer flush de INSERT, y sus tres pruebas
+PostgreSQL nuevas pasaron: 79 casos dedicados únicos entre dos ejecuciones.
+La regresión amplia de siete archivos pasó sus 134 casos, sin fallos, errores ni
+omitidos. La implementación y validación local están completas; los 79 casos
+dedicados conservan la procedencia de sus dos ejecuciones y no se presentan como
+una sola corrida. Ruff global, mypy sobre 353 fuentes, contratos de 257 operaciones
+y la matriz de 333 operaciones también pasaron.
+
+La referencia histórica de la tarea a `AuthService.login` ya fue reemplazada por
+`SessionService.login`, que en la base aceptada ya persistía `last_login_at`.
+039 confirma esa persistencia con una prueba directa; no atribuye un arreglo nuevo
+a un commit omitido que no se encontró en las rutas revisadas.
+
+La [convención transaccional](architecture/transaction-boundaries.md) distingue
+dueños, participantes, savepoints, consultas y evidencia de seguridad independiente.
+La [matriz de límites](architecture/TRANSACTION_BOUNDARY_MATRIX.json) inventaría los
+sitios de `commit`, `rollback`, `flush`, `begin` y `begin_nested` en API y worker,
+incluidos CLI, seed y helpers de pruebas expresamente identificados. El
+[registro de validación](implementation/transaction-boundary-validation.md) mantiene
+los resultados locales reales. El SHA y enlace de la CI verificada acompañan la
+entrega integrada; el registro no presume el resultado de una ejecución futura.
+
+No se introduce migración ni cambio de contrato. Se conservan los locks de
+036–038, el rechazo idempotente terminal y la auditoría independiente de denegación;
+un rollback inesperado no puede dejar efectos de negocio parciales. Continúan
+pendientes la correlación de 040 —incluido el identificador de mantenimiento usado
+antes del flush—, el ledger de pedidos de 042, los efectos físicos POS y el worker
+funcional. Se mantienen las 19 brechas administrativas de idempotencia, `GAP-0991`
+y las brechas de conciliación. La entrega exige las ocho etapas Foundation y
+**Foundation required** del SHA publicado, sin presumir el resultado de una CI futura.
+
 ## 1. Resumen ejecutivo
 
 ZeroMerma posee una base adecuada para evolucionar sin reescritura: monolito modular, FastAPI/SQLAlchemy/PostgreSQL, POS y Backoffice separados, OpenAPI generado, precisión decimal, auditoría y outbox transaccionales. La auditoría activa demostró que una parte importante de ventas, pagos, pedidos, documentos y administración es real. También demostró defectos sistémicos: el POS no alimenta el inventario canónico; el pago de pedido no entra en caja/corte; el worker no procesa eventos; la trazabilidad de identidad/origen es incorrecta; y varias superficies administrativas son simuladas o incompletas.

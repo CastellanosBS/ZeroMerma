@@ -20,5 +20,11 @@ SessionLocal = create_session_factory(engine)
 
 
 def get_session() -> Generator[Session, None, None]:
+    """Own request-session cleanup; each command explicitly owns its commit."""
     with SessionLocal() as session:
-        yield session
+        try:
+            yield session
+        finally:
+            # Read transactions and unfinished mutations must never become implicit commits.
+            if session.in_transaction():
+                session.rollback()

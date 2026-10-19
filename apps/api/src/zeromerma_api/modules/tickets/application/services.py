@@ -10,6 +10,7 @@ from sqlalchemy import Select, String, cast, exists, func, or_, select
 from sqlalchemy.engine import RowMapping
 from sqlalchemy.orm import Session
 
+from zeromerma_api.db.transactions import rollback_on_failure
 from zeromerma_api.modules.audit.application.service import AuditRecorder
 from zeromerma_api.modules.branches.application.access import (
     WorkstationAccessService,
@@ -277,6 +278,7 @@ class TicketsCommandService:
         self._sale_query_service = sale_query_service or SaleQueryService()
         self._audit_recorder = audit_recorder or AuditRecorder()
 
+    @rollback_on_failure
     def reprint_ticket(
         self,
         session: Session,
@@ -320,8 +322,7 @@ class TicketsCommandService:
                 "workstation_code": workstation_code,
             },
         )
-        session.commit()
-        return _to_ticket_detail_response(
+        response = _to_ticket_detail_response(
             sale_detail,
             context=context,
             return_summary=_get_ticket_return_summary_by_sale_ids(
@@ -329,6 +330,8 @@ class TicketsCommandService:
                 sale_ids=[ticket_id],
             ).get(ticket_id),
         )
+        session.commit()
+        return response
 
 
 def _apply_scope_filters(

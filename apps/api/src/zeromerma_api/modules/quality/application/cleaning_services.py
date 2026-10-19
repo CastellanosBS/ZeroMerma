@@ -10,6 +10,7 @@ from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
+from zeromerma_api.db.transactions import is_unique_violation, rollback_on_failure
 from zeromerma_api.modules.audit.application.service import AuditRecorder
 from zeromerma_api.modules.branches.infrastructure.models import Branch
 from zeromerma_api.modules.identity.application.actions import restrict_actions
@@ -291,6 +292,7 @@ class AdminCleaningLogService:
     ) -> AdminCleaningLogDetailView:
         return self._to_detail(session, self._get_row(session, cleaning_log_id))
 
+    @rollback_on_failure
     def create_log(
         self,
         session: Session,
@@ -367,30 +369,14 @@ class AdminCleaningLogService:
             task_name=str(task_name),
             task_template_id=template.id if template else None,
         )
-        session.add(log)
-        session.flush()
+        try:
+            session.add(log)
+            session.flush()
 
-        self._replace_checklist(session, log.id, checklist_inputs)
-        self._record_change(
-            session,
-            action=AUDIT_ACTION_CLEANING_LOG_CREATED,
-            actor_id=current_user.id,
-            branch_id=branch.id,
-            log=log,
-            request_id=request_id,
-        )
-        self._append_event(
-            session,
-            event_name=OUTBOX_EVENT_CLEANING_LOG_CREATED_V1,
-            log=log,
-            branch=branch,
-        )
-        if self._is_high_risk_log(log):
-            self._record_high_risk_alert(session, current_user.id, branch.id, log, request_id)
-        if should_complete:
+            self._replace_checklist(session, log.id, checklist_inputs)
             self._record_change(
                 session,
-                action=AUDIT_ACTION_CLEANING_LOG_COMPLETED,
+                action=AUDIT_ACTION_CLEANING_LOG_CREATED,
                 actor_id=current_user.id,
                 branch_id=branch.id,
                 log=log,
@@ -398,15 +384,32 @@ class AdminCleaningLogService:
             )
             self._append_event(
                 session,
-                event_name=OUTBOX_EVENT_CLEANING_LOG_COMPLETED_V1,
+                event_name=OUTBOX_EVENT_CLEANING_LOG_CREATED_V1,
                 log=log,
                 branch=branch,
             )
+            if self._is_high_risk_log(log):
+                self._record_high_risk_alert(session, current_user.id, branch.id, log, request_id)
+            if should_complete:
+                self._record_change(
+                    session,
+                    action=AUDIT_ACTION_CLEANING_LOG_COMPLETED,
+                    actor_id=current_user.id,
+                    branch_id=branch.id,
+                    log=log,
+                    request_id=request_id,
+                )
+                self._append_event(
+                    session,
+                    event_name=OUTBOX_EVENT_CLEANING_LOG_COMPLETED_V1,
+                    log=log,
+                    branch=branch,
+                )
 
-        try:
             session.commit()
         except IntegrityError as error:
-            session.rollback()
+            if not is_unique_violation(error, "uq_cleaning_logs_folio"):
+                raise
             raise CleaningLogValidationError("Cleaning log could not be saved.") from error
 
         return self._to_detail(
@@ -421,6 +424,7 @@ class AdminCleaningLogService:
             ),
         )
 
+    @rollback_on_failure
     def complete_log(
         self,
         session: Session,
@@ -500,6 +504,7 @@ class AdminCleaningLogService:
         session.commit()
         return self._to_detail(session, self._get_row(session, cleaning_log_id))
 
+    @rollback_on_failure
     def cancel_log(
         self,
         session: Session,

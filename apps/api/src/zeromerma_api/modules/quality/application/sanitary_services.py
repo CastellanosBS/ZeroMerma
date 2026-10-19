@@ -11,6 +11,7 @@ from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
+from zeromerma_api.db.transactions import is_unique_violation, rollback_on_failure
 from zeromerma_api.modules.audit.application.service import AuditRecorder
 from zeromerma_api.modules.branches.infrastructure.models import Branch
 from zeromerma_api.modules.identity.application.actions import restrict_actions
@@ -321,6 +322,7 @@ class AdminSanitaryVerificationService:
     ) -> AdminSanitaryVerificationDetailView:
         return self._to_detail(session, self._get_row(session, verification_id))
 
+    @rollback_on_failure
     def create_verification(
         self,
         session: Session,
@@ -407,28 +409,14 @@ class AdminSanitaryVerificationService:
             template_id=template.id if template else None,
             template_name=str(template_name),
         )
-        session.add(verification)
-        session.flush()
+        try:
+            session.add(verification)
+            session.flush()
 
-        self._replace_checklist(session, verification.id, checklist_inputs)
-        self._record_change(
-            session,
-            action=AUDIT_ACTION_SANITARY_VERIFICATION_CREATED,
-            actor_id=current_user.id,
-            branch_id=branch.id,
-            verification=verification,
-            request_id=request_id,
-        )
-        self._append_event(
-            session,
-            event_name=OUTBOX_EVENT_SANITARY_VERIFICATION_CREATED_V1,
-            verification=verification,
-            branch=branch,
-        )
-        if should_complete:
+            self._replace_checklist(session, verification.id, checklist_inputs)
             self._record_change(
                 session,
-                action=AUDIT_ACTION_SANITARY_VERIFICATION_COMPLETED,
+                action=AUDIT_ACTION_SANITARY_VERIFICATION_CREATED,
                 actor_id=current_user.id,
                 branch_id=branch.id,
                 verification=verification,
@@ -436,19 +424,34 @@ class AdminSanitaryVerificationService:
             )
             self._append_event(
                 session,
-                event_name=OUTBOX_EVENT_SANITARY_VERIFICATION_COMPLETED_V1,
+                event_name=OUTBOX_EVENT_SANITARY_VERIFICATION_CREATED_V1,
                 verification=verification,
                 branch=branch,
             )
-        if self._is_high_risk_verification(verification):
-            self._record_high_risk_alert(
-                session, current_user.id, branch.id, verification, request_id
-            )
+            if should_complete:
+                self._record_change(
+                    session,
+                    action=AUDIT_ACTION_SANITARY_VERIFICATION_COMPLETED,
+                    actor_id=current_user.id,
+                    branch_id=branch.id,
+                    verification=verification,
+                    request_id=request_id,
+                )
+                self._append_event(
+                    session,
+                    event_name=OUTBOX_EVENT_SANITARY_VERIFICATION_COMPLETED_V1,
+                    verification=verification,
+                    branch=branch,
+                )
+            if self._is_high_risk_verification(verification):
+                self._record_high_risk_alert(
+                    session, current_user.id, branch.id, verification, request_id
+                )
 
-        try:
             session.commit()
         except IntegrityError as error:
-            session.rollback()
+            if not is_unique_violation(error, "uq_sanitary_verifications_folio"):
+                raise
             raise SanitaryVerificationValidationError(
                 "Sanitary verification could not be saved."
             ) from error
@@ -465,6 +468,7 @@ class AdminSanitaryVerificationService:
             ),
         )
 
+    @rollback_on_failure
     def start_verification(
         self,
         session: Session,
@@ -501,6 +505,7 @@ class AdminSanitaryVerificationService:
         session.commit()
         return self._to_detail(session, self._get_row(session, verification_id))
 
+    @rollback_on_failure
     def complete_verification(
         self,
         session: Session,
@@ -601,6 +606,7 @@ class AdminSanitaryVerificationService:
         session.commit()
         return self._to_detail(session, self._get_row(session, verification_id))
 
+    @rollback_on_failure
     def cancel_verification(
         self,
         session: Session,

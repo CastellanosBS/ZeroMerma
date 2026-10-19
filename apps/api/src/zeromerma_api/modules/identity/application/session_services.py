@@ -13,6 +13,7 @@ from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.orm import Session
 
 from zeromerma_api.core.config import ApiSettings, get_settings
+from zeromerma_api.db.transactions import rollback_on_failure
 from zeromerma_api.modules.audit.application.service import AuditRecorder
 from zeromerma_api.modules.branches.infrastructure.models import Branch, Workstation
 from zeromerma_api.modules.cash.infrastructure.models import CashSession
@@ -145,7 +146,7 @@ class SessionService:
 
     def _rate_attempt(
         self, session: Session, *, account: str, ip: str, now: datetime, request_id: str | None
-    ) -> None:
+    ) -> HTTPException | None:
         limits = [
             (
                 "account:" + secret_hash(account.strip().lower()),
@@ -168,8 +169,7 @@ class SessionService:
             ).one()
             if limit.blocked_until is not None and limit.blocked_until > now:
                 self._event(session, "login.rate_limited", user_id=None, request_id=request_id)
-                session.commit()
-                raise auth_error(
+                return auth_error(
                     429, "LOGIN_RATE_LIMITED", "Too many authentication attempts. Try again later."
                 )
             if now >= limit.window_started_at + timedelta(
@@ -184,12 +184,13 @@ class SessionService:
                     seconds=self.settings.auth_login_block_seconds
                 )
                 self._event(session, "login.rate_limited", user_id=None, request_id=request_id)
-                session.commit()
-                raise auth_error(
+                return auth_error(
                     429, "LOGIN_RATE_LIMITED", "Too many authentication attempts. Try again later."
                 )
         session.flush()
+        return None
 
+    @rollback_on_failure
     def login(
         self, session: Session, command: LoginRequest, *, ip: str, request_id: str | None
     ) -> SessionAuthentication:
@@ -203,7 +204,12 @@ class SessionService:
         normalized_email = command.email.strip().lower()
         user = session.scalar(select(User).where(User.email == normalized_email).with_for_update())
         now = datetime.now(UTC)
-        self._rate_attempt(session, account=normalized_email, ip=ip, now=now, request_id=request_id)
+        rejection = self._rate_attempt(
+            session, account=normalized_email, ip=ip, now=now, request_id=request_id
+        )
+        if rejection is not None:
+            session.commit()
+            raise rejection
         valid_password = self.password_hasher.verify_password(
             command.password, user.password_hash if user else _DUMMY_PASSWORD_HASH
         )
@@ -227,12 +233,14 @@ class SessionService:
             )
         set_audit_context(session, user.id, request_id)
         try:
-            authentication = self.create_session(
-                session,
-                user=user,
-                audience=command.audience,
-                workstation_code=command.workstation_code,
-            )
+            # Keep rejected context attempts durable without committing a partial replacement.
+            with session.begin_nested():
+                authentication = self.create_session(
+                    session,
+                    user=user,
+                    audience=command.audience,
+                    workstation_code=command.workstation_code,
+                )
         except HTTPException:
             self._event(
                 session,
@@ -357,6 +365,7 @@ class SessionService:
         session.flush()
         return SessionAuthentication(record=record, user=resolved_user, credential=credential)
 
+    @rollback_on_failure
     def authenticate(
         self,
         session: Session,
@@ -457,6 +466,7 @@ class SessionService:
         session.flush()
         return AuthSessionView.model_validate(record)
 
+    @rollback_on_failure
     def lock(self, session: Session, authentication: SessionAuthentication) -> AuthSessionView:
         if authentication.record.audience != "POS":
             raise auth_error(409, "CONFLICT", "Only POS sessions support locking.")
@@ -464,6 +474,7 @@ class SessionService:
         session.commit()
         return AuthSessionView.model_validate(authentication.record)
 
+    @rollback_on_failure
     def reauthenticate(
         self,
         session: Session,
@@ -475,9 +486,12 @@ class SessionService:
     ) -> SessionAuthentication:
         user = session.get(User, authentication.user.id)
         now = datetime.now(UTC)
-        self._rate_attempt(
+        rejection = self._rate_attempt(
             session, account=authentication.user.email, ip=ip, now=now, request_id=request_id
         )
+        if rejection is not None:
+            session.commit()
+            raise rejection
         if user is None or not self.password_hasher.verify_password(password, user.password_hash):
             self._event(
                 session,
@@ -505,7 +519,6 @@ class SessionService:
             now + timedelta(minutes=IDLE_MINUTES[cast(IdentitySurface, record.audience)]),
             record.absolute_expires_at,
         )
-        authentication.credential = credential
         self._event(
             session,
             "session.reauthentication_succeeded",
@@ -514,6 +527,7 @@ class SessionService:
             request_id=request_id,
         )
         session.commit()
+        authentication.credential = credential
         return authentication
 
     @staticmethod
@@ -523,6 +537,7 @@ class SessionService:
             record.revoked_at = now
             record.revocation_reason = reason
 
+    @rollback_on_failure
     def logout(
         self, session: Session, authentication: SessionAuthentication, request_id: str | None
     ) -> None:
@@ -592,6 +607,7 @@ class SessionService:
             self._revoke(record, reason, datetime.now(UTC))
         session.flush()
 
+    @rollback_on_failure
     def change_password(
         self,
         session: Session,
@@ -603,13 +619,16 @@ class SessionService:
         ip: str,
     ) -> None:
         user = session.get(User, authentication.user.id)
-        self._rate_attempt(
+        rejection = self._rate_attempt(
             session,
             account=authentication.user.email,
             ip=ip,
             now=datetime.now(UTC),
             request_id=request_id,
         )
+        if rejection is not None:
+            session.commit()
+            raise rejection
         if user is None or not self.password_hasher.verify_password(
             current_password, user.password_hash
         ):
@@ -630,6 +649,7 @@ class SessionService:
         self._event(session, "password.changed", user_id=user.id, request_id=request_id)
         session.commit()
 
+    @rollback_on_failure
     def issue_password_reset(
         self,
         session: Session,
@@ -710,6 +730,7 @@ class SessionService:
         session.commit()
         return PasswordResetCredentialView(reset_token=credential, expires_at=expires_at)
 
+    @rollback_on_failure
     def complete_password_reset(
         self,
         session: Session,
@@ -726,13 +747,16 @@ class SessionService:
             .with_for_update()
         )
         now = datetime.now(UTC)
-        self._rate_attempt(
+        rejection = self._rate_attempt(
             session,
             account="password-reset:" + secret_hash(credential),
             ip=ip,
             now=now,
             request_id=request_id,
         )
+        if rejection is not None:
+            session.commit()
+            raise rejection
         if row is None or row.consumed_at is not None or row.expires_at <= now:
             self._event(session, "password.reset_failed", user_id=None, request_id=request_id)
             session.commit()

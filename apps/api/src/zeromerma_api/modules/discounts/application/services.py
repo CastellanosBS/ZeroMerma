@@ -12,6 +12,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from zeromerma_api.core.config import ApiSettings, get_settings
+from zeromerma_api.db.transactions import is_unique_violation, rollback_on_failure
 from zeromerma_api.modules.audit.application.service import AuditRecorder
 from zeromerma_api.modules.audit.application.visibility import (
     AuditVisibilityQueryService,
@@ -212,6 +213,7 @@ class AdminCommercialDiscountService:
     ) -> AdminCommercialDiscountView:
         return self._to_discount_view(session, self._get_discount(session, discount_id))
 
+    @rollback_on_failure
     def create_discount(
         self,
         session: Session,
@@ -271,11 +273,13 @@ class AdminCommercialDiscountService:
             )
             session.commit()
         except IntegrityError as error:
-            session.rollback()
+            if not is_unique_violation(error, "uq_commercial_discounts_code"):
+                raise
             raise OperationalDiscountValidationError("Discount code must be unique.") from error
 
         return self.get_discount_detail(session, discount_id=discount.id)
 
+    @rollback_on_failure
     def update_discount(
         self,
         session: Session,
@@ -375,7 +379,8 @@ class AdminCommercialDiscountService:
             )
             session.commit()
         except IntegrityError as error:
-            session.rollback()
+            if not is_unique_violation(error, "uq_commercial_discounts_code"):
+                raise
             raise OperationalDiscountValidationError(
                 "Discount update violates commercial rules."
             ) from error

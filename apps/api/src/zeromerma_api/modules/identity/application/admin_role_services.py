@@ -11,6 +11,7 @@ from sqlalchemy import func, select, true
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
+from zeromerma_api.db.transactions import is_unique_violation, rollback_on_failure
 from zeromerma_api.modules.audit.application.service import AuditRecorder
 from zeromerma_api.modules.audit.infrastructure.models import AuditLog
 from zeromerma_api.modules.branches.infrastructure.models import Branch
@@ -241,6 +242,7 @@ class AdminRoleService:
             current_user=current_user,
         )
 
+    @rollback_on_failure
     def create_role(
         self,
         session: Session,
@@ -292,13 +294,15 @@ class AdminRoleService:
             ensure_superadmin_remains(session)
             session.commit()
         except IntegrityError as error:
-            session.rollback()
-            raise RoleValidationError("Role code must be unique.") from error
+            if is_unique_violation(error, "uq_roles_code"):
+                raise RoleValidationError("Role code must be unique.") from error
+            raise
 
         return self._to_detail(
             session, self._get_context(session, role.id), current_user=current_user
         )
 
+    @rollback_on_failure
     def update_role(
         self,
         session: Session,
@@ -410,6 +414,7 @@ class AdminRoleService:
             session, self._get_context(session, role.id), current_user=current_user
         )
 
+    @rollback_on_failure
     def change_status(
         self,
         session: Session,
@@ -478,6 +483,7 @@ class AdminRoleService:
             session, self._get_context(session, role.id), current_user=current_user
         )
 
+    @rollback_on_failure
     def assign_role_to_user(
         self,
         session: Session,
@@ -521,6 +527,7 @@ class AdminRoleService:
             session, self._get_context(session, role.id), current_user=current_user
         )
 
+    @rollback_on_failure
     def remove_role_from_user(
         self,
         session: Session,

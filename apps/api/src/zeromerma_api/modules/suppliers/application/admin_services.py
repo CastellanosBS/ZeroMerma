@@ -8,6 +8,7 @@ from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
+from zeromerma_api.db.transactions import is_unique_violation, rollback_on_failure
 from zeromerma_api.modules.audit.application.service import AuditRecorder
 from zeromerma_api.modules.branches.infrastructure.models import Branch
 from zeromerma_api.modules.catalog.domain.constants import (
@@ -205,6 +206,7 @@ class AdminSupplierService:
     ) -> AdminSupplierDetailView:
         return self._to_detail(session, self._get_row(session, supplier_id))
 
+    @rollback_on_failure
     def create_supplier(
         self,
         session: Session,
@@ -264,11 +266,19 @@ class AdminSupplierService:
             )
             session.commit()
         except IntegrityError as error:
-            session.rollback()
+            if not is_unique_violation(
+                error,
+                "uq_suppliers_code",
+                "uq_suppliers_tax_id",
+                "uq_supplier_products_supplier_product",
+                "uq_supplier_branches_supplier_branch",
+            ):
+                raise
             raise SupplierValidationError("Supplier code or tax id must be unique.") from error
 
         return self.get_supplier_detail(session, supplier_id=supplier.id)
 
+    @rollback_on_failure
     def update_supplier(
         self,
         session: Session,
@@ -324,11 +334,19 @@ class AdminSupplierService:
             )
             session.commit()
         except IntegrityError as error:
-            session.rollback()
+            if not is_unique_violation(
+                error,
+                "uq_suppliers_code",
+                "uq_suppliers_tax_id",
+                "uq_supplier_products_supplier_product",
+                "uq_supplier_branches_supplier_branch",
+            ):
+                raise
             raise SupplierValidationError("Supplier code or tax id must be unique.") from error
 
         return self.get_supplier_detail(session, supplier_id=supplier.id)
 
+    @rollback_on_failure
     def change_status(
         self,
         session: Session,
@@ -356,6 +374,7 @@ class AdminSupplierService:
         session.commit()
         return self.get_supplier_detail(session, supplier_id=supplier.id)
 
+    @rollback_on_failure
     def create_contact(
         self,
         session: Session,
@@ -378,6 +397,7 @@ class AdminSupplierService:
         session.commit()
         return self.get_supplier_detail(session, supplier_id=supplier.id)
 
+    @rollback_on_failure
     def update_contact(
         self,
         session: Session,
@@ -408,6 +428,7 @@ class AdminSupplierService:
         session.commit()
         return self.get_supplier_detail(session, supplier_id=supplier.id)
 
+    @rollback_on_failure
     def upsert_product_relation(
         self,
         session: Session,
@@ -436,6 +457,7 @@ class AdminSupplierService:
         session.commit()
         return self.get_supplier_detail(session, supplier_id=supplier.id)
 
+    @rollback_on_failure
     def update_product_relation(
         self,
         session: Session,
@@ -468,6 +490,7 @@ class AdminSupplierService:
         session.commit()
         return self.get_supplier_detail(session, supplier_id=supplier.id)
 
+    @rollback_on_failure
     def upsert_branch_relation(
         self,
         session: Session,

@@ -10,6 +10,7 @@ from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
+from zeromerma_api.db.transactions import is_unique_violation, rollback_on_failure
 from zeromerma_api.modules.audit.application.service import AuditRecorder
 from zeromerma_api.modules.branches.infrastructure.models import Branch
 from zeromerma_api.modules.identity.application.actions import restrict_actions
@@ -248,6 +249,7 @@ class AdminIncidentService:
     def get_detail(self, session: Session, *, incident_id: uuid.UUID) -> AdminIncidentDetailView:
         return self._to_detail(session, self._get_row(session, incident_id))
 
+    @rollback_on_failure
     def create_incident(
         self,
         session: Session,
@@ -296,6 +298,8 @@ class AdminIncidentService:
         try:
             session.flush()
         except IntegrityError as error:
+            if not is_unique_violation(error, "uq_quality_incidents_folio"):
+                raise
             raise IncidentValidationError("Incident folio could not be generated.") from error
 
         if command.notes:
@@ -322,6 +326,7 @@ class AdminIncidentService:
         session.commit()
         return self._to_detail(session, self._get_row(session, incident.id))
 
+    @rollback_on_failure
     def update_incident(
         self,
         session: Session,
@@ -381,6 +386,7 @@ class AdminIncidentService:
         session.commit()
         return self._to_detail(session, self._get_row(session, incident_id))
 
+    @rollback_on_failure
     def add_follow_up(
         self,
         session: Session,
@@ -422,6 +428,7 @@ class AdminIncidentService:
         session.commit()
         return self._to_detail(session, self._get_row(session, incident_id))
 
+    @rollback_on_failure
     def change_status(
         self,
         session: Session,
@@ -469,6 +476,7 @@ class AdminIncidentService:
         session.commit()
         return self._to_detail(session, self._get_row(session, incident_id))
 
+    @rollback_on_failure
     def resolve_incident(
         self,
         session: Session,
@@ -512,6 +520,7 @@ class AdminIncidentService:
         session.commit()
         return self._to_detail(session, self._get_row(session, incident_id))
 
+    @rollback_on_failure
     def reopen_incident(
         self,
         session: Session,
