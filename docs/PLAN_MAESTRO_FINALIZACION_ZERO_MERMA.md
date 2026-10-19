@@ -6244,7 +6244,7 @@ Al terminar, reporta: resumen técnico; archivos modificados; migraciones; cambi
 | **5. Hallazgo relacionado** | Funcionalidad ausente; ZM-ASYNC-006; ZMA-ASYNC-001. |
 | **6. Módulos afectados** | Tickets, notifications, worker/outbox, POS y privacy. |
 | **7. Archivos/áreas a inspeccionar** | UI de ticket; eventos de ticket; proveedores de email/SMS; settings y consentimientos. |
-| **8. Dependencias previas** | ZM-FIN-007, ZM-FIN-059, ZM-FIN-073–076, ZM-FIN-128 y proveedor aprobado. |
+| **8. Dependencias previas** | ZM-FIN-007, ZM-FIN-059, ZM-FIN-087–090, ZM-FIN-128 y proveedor aprobado. |
 | **9. Cambios a implementar** | Capturar el destino mínimo y resolver propósito, aviso y base/consentimiento mediante ZM-FIN-128 cuando corresponda; publicar evento; handler idempotente; estados queued/sent/failed; retry manual; redacción y retención. |
 | **10. Restricciones arquitectónicas** | Conservar el monolito modular, FastAPI/SQLAlchemy/PostgreSQL, POS y Backoffice separados, OpenAPI como contrato fuente, tipos Decimal/Numeric, auditoría y outbox transaccionales. No introducir microservicios, repositorios paralelos, tipos de dominio manuales en frontend ni una reescritura amplia. |
 | **11. Decisiones a conservar** | Compatibilidad con la arquitectura vigente, la experiencia táctil del POS, el cliente generado y la trazabilidad por usuario, sucursal, caja, estación y turno. |
@@ -6276,7 +6276,7 @@ Email/SMS de tickets está ausente y el worker aún no tiene consumidores reales
 Funcionalidad ausente; ZM-ASYNC-006; ZMA-ASYNC-001.
 
 **Dependencias que puedes asumir terminadas**
-ZM-FIN-007, ZM-FIN-059, ZM-FIN-073–076, ZM-FIN-128 y proveedor aprobado.
+ZM-FIN-007, ZM-FIN-059, ZM-FIN-087–090, ZM-FIN-128 y proveedor aprobado.
 
 **Inspección inicial obligatoria**
 Inspecciona eventos disponibles, UI de ticket, settings y cualquier placeholder de email/SMS.
