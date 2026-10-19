@@ -6,6 +6,7 @@ from typing import Any
 
 from fastapi import FastAPI
 
+from zeromerma_api.modules.hardware.domain.commands import DeviceCommandResult
 from zeromerma_api.modules.idempotency.presentation.http import add_idempotency_contract
 
 CONTRACT_SCHEMA_VERSION = "1.0.0"
@@ -54,6 +55,12 @@ def normalize_contract_schema(schema: dict[str, Any]) -> dict[str, Any]:
     normalized["x-zeromerma-source"] = "FASTAPI_PYDANTIC"
     add_idempotency_contract(normalized)
     components = normalized.setdefault("components", {})
+    # The loopback runtime uses the same Python-owned protocol. Export its response
+    # model without inventing an API endpoint or a handwritten TypeScript contract.
+    components.setdefault("schemas", {})["DeviceCommandResult"] = {
+        **DeviceCommandResult.model_json_schema(ref_template="#/components/schemas/{model}"),
+        "x-zeromerma-transport": "PAIRED_LOCAL_DEVICE_RUNTIME",
+    }
     components.setdefault("parameters", {})["RequestId"] = {
         "name": "X-Request-ID",
         "in": "header",

@@ -18,6 +18,7 @@ from zeromerma_api.modules.identity.application.actions import restrict_actions
 from zeromerma_api.modules.identity.infrastructure.models import User
 from zeromerma_api.modules.orders.application.admin_schemas import (
     AdminOrderAvailableActionsView,
+    AdminOrderCancelRequest,
     AdminOrderCustomerView,
     AdminOrderDetailView,
     AdminOrderFilterOptionsView,
@@ -30,6 +31,10 @@ from zeromerma_api.modules.orders.application.admin_schemas import (
     AdminOrdersBackendContractView,
     AdminOrdersListResponse,
     AdminOrderTimelineEventView,
+)
+from zeromerma_api.modules.orders.application.commitment import (
+    current_order_time,
+    materialize_commitment,
 )
 from zeromerma_api.modules.orders.application.financial_services import (
     order_payment_financial_references,
@@ -130,6 +135,8 @@ class AdminOrdersService:
                 CustomerOrder.customer_name,
                 CustomerOrder.customer_phone,
                 CustomerOrder.requested_for_at,
+                CustomerOrder.production_commit_at,
+                CustomerOrder.production_committed_at,
                 CustomerOrder.total_amount,
                 CustomerOrder.advance_amount,
                 CustomerOrder.remaining_balance_amount,
@@ -167,7 +174,7 @@ class AdminOrdersService:
             .limit(normalized_page_size)
         ).mappings()
         metrics = self._build_metrics(session, conditions)
-        now = datetime.now(tz=UTC)
+        now = current_order_time(session)
 
         return AdminOrdersListResponse(
             backend_contract=_backend_contract(),
@@ -199,6 +206,12 @@ class AdminOrdersService:
                 "Solo los pedidos pendientes se pueden marcar como listos para entrega."
             )
         now = datetime.now(tz=UTC)
+        if not materialize_commitment(
+            session, order=order, actor_id=actor_id, request_id=request_id
+        ):
+            raise OrderStateConflictError(
+                "ORDER_NOT_COMMITTED: Aún no llega el compromiso productivo."
+            )
         apply_order_inventory(session, order=order, actor_id=actor_id, action="reserve")
         order.status = ORDER_STATUS_READY
         order.updated_at_utc = now
@@ -280,6 +293,8 @@ class AdminOrdersService:
                 "folio": _build_order_folio(order.id),
                 "source": "backoffice",
                 "status": ORDER_STATUS_DELIVERED,
+                "order_version": order.version,
+                "recognized_revenue_amount": str(order.total_amount),
                 "settlement_amount": "0.00",
             },
         )
@@ -293,6 +308,8 @@ class AdminOrdersService:
                 "folio": _build_order_folio(order.id),
                 "source": "backoffice",
                 "status": ORDER_STATUS_DELIVERED,
+                "order_version": order.version,
+                "recognized_revenue_amount": str(order.total_amount),
                 "branch_id": str(order.branch_id),
                 "delivered_by_user_id": str(actor_id),
                 "settlement_amount": "0.00",
@@ -311,14 +328,18 @@ class AdminOrdersService:
         order_id: uuid.UUID,
         request_id: str | None,
         trace: OrderCommandTrace,
+        command: AdminOrderCancelRequest,
     ) -> OrderCommandResultView:
         order = _get_order(session, order_id=order_id, for_update=True)
-        if order.status == ORDER_STATUS_DELIVERED:
-            raise OrderStateConflictError("No se puede cancelar un pedido que ya fue entregado.")
-        if order.status == ORDER_STATUS_CANCELED:
-            raise OrderStateConflictError("Este pedido ya fue cancelado.")
-        now = datetime.now(tz=UTC)
-        refund_amount = _get_cancellation_refund_amount(order, effective_at=now)
+        if order.status not in {ORDER_STATUS_PENDING, ORDER_STATUS_READY}:
+            raise OrderStateConflictError("El pedido ya tiene un estado terminal.")
+        now = current_order_time(session)
+        materialize_commitment(
+            session, order=order, actor_id=actor_id, request_id=request_id, decision_at=now
+        )
+        refund_amount = _get_cancellation_refund_amount(
+            order, effective_at=now, responsibility=command.cancellation_responsibility
+        )
         if refund_amount > ZERO_MONEY:
             raise OrderStateConflictError(
                 "La cancelacion requiere reembolso de anticipo. "
@@ -329,7 +350,8 @@ class AdminOrdersService:
         order.remaining_balance_amount = ZERO_MONEY
         order.canceled_at = now
         order.canceled_by_user_id = actor_id
-        order.cancellation_reason = "Cancelado desde Backoffice."
+        order.cancellation_reason = command.cancellation_reason.strip()
+        order.cancellation_responsibility = command.cancellation_responsibility
         order.updated_at_utc = now
         resolved_request_id = request_id or str(uuid.uuid4())
         session.flush()
@@ -348,6 +370,8 @@ class AdminOrdersService:
                 "source": "backoffice",
                 "status": ORDER_STATUS_CANCELED,
                 "cancellation_refund_eligible": False,
+                "cancellation_reason": order.cancellation_reason,
+                "cancellation_responsibility": order.cancellation_responsibility,
                 "cancellation_refund_amount": "0.00",
             },
         )
@@ -364,6 +388,8 @@ class AdminOrdersService:
                 "branch_id": str(order.branch_id),
                 "canceled_by_user_id": str(actor_id),
                 "cancellation_refund_eligible": False,
+                "cancellation_reason": order.cancellation_reason,
+                "cancellation_responsibility": order.cancellation_responsibility,
                 "cancellation_refund_amount": "0.00",
                 "refund_payments": [],
                 "canceled_at_utc": now.isoformat(),
@@ -425,9 +451,16 @@ class AdminOrdersService:
                         ),
                         ZERO_MONEY,
                     ).label("outstanding_balance_amount"),
-                    func.count(case((CustomerOrder.status == ORDER_STATUS_CANCELED, 1))).label(
-                        "canceled_orders"
-                    ),
+                    func.count(
+                        case(
+                            (
+                                CustomerOrder.status.in_(
+                                    [ORDER_STATUS_CANCELED, "EXPIRED", "NO_SHOW"]
+                                ),
+                                1,
+                            )
+                        )
+                    ).label("canceled_orders"),
                 ).where(*conditions)
             )
             .mappings()
@@ -502,7 +535,9 @@ def _build_order_conditions(
         order_id_prefix = normalized_search.removeprefix("ped-")
         conditions.append(
             or_(
-                func.lower(cast(CustomerOrder.id, String)).like(f"{order_id_prefix}%"),
+                func.replace(func.lower(cast(CustomerOrder.id, String)), "-", "").like(
+                    f"{order_id_prefix.replace('-', '')}%"
+                ),
                 func.lower(cast(CustomerOrder.id, String)).contains(normalized_search),
                 func.lower(CustomerOrder.customer_name).contains(normalized_search),
                 func.lower(CustomerOrder.customer_phone).contains(normalized_search),
@@ -514,19 +549,19 @@ def _build_order_conditions(
 def _payment_state_condition(payment_state: str) -> ColumnElement[bool]:
     if payment_state == PAYMENT_STATE_NO_DEPOSIT:
         return and_(
-            CustomerOrder.status != ORDER_STATUS_CANCELED,
+            CustomerOrder.status.not_in([ORDER_STATUS_CANCELED, "EXPIRED", "NO_SHOW"]),
             CustomerOrder.advance_amount == ZERO_MONEY,
             CustomerOrder.remaining_balance_amount > ZERO_MONEY,
         )
     if payment_state == PAYMENT_STATE_PARTIAL_DEPOSIT:
         return and_(
-            CustomerOrder.status != ORDER_STATUS_CANCELED,
+            CustomerOrder.status.not_in([ORDER_STATUS_CANCELED, "EXPIRED", "NO_SHOW"]),
             CustomerOrder.advance_amount > ZERO_MONEY,
             CustomerOrder.remaining_balance_amount > ZERO_MONEY,
         )
     if payment_state == PAYMENT_STATE_PAID:
         return and_(
-            CustomerOrder.status != ORDER_STATUS_CANCELED,
+            CustomerOrder.status.not_in([ORDER_STATUS_CANCELED, "EXPIRED", "NO_SHOW"]),
             CustomerOrder.remaining_balance_amount == ZERO_MONEY,
         )
     if payment_state == PAYMENT_STATE_BALANCE_PENDING:
@@ -534,7 +569,7 @@ def _payment_state_condition(payment_state: str) -> ColumnElement[bool]:
             CustomerOrder.status.in_([ORDER_STATUS_PENDING, ORDER_STATUS_READY]),
             CustomerOrder.remaining_balance_amount > ZERO_MONEY,
         )
-    return CustomerOrder.status == ORDER_STATUS_CANCELED
+    return CustomerOrder.status.in_([ORDER_STATUS_CANCELED, "EXPIRED", "NO_SHOW"])
 
 
 def _build_filter_options(session: Session) -> AdminOrderFilterOptionsView:
@@ -597,6 +632,8 @@ def _map_order_list_item(
         customer_name=str(record["customer_name"]),
         customer_phone=record["customer_phone"],
         requested_for_at=record["requested_for_at"],
+        production_commit_at=record["production_commit_at"],
+        production_committed_at=record["production_committed_at"],
         status=status,
         payment_state=payment_state,
         total_amount=_quantize_money(record["total_amount"]),
@@ -628,6 +665,8 @@ def _get_record_cancellation_refund_amount(
     effective_at: datetime,
 ) -> Decimal:
     pseudo_order = CustomerOrder(
+        production_commit_at=record["production_commit_at"],
+        production_committed_at=record["production_committed_at"],
         id=record["id"],
         branch_id=record["branch_id"],
         workstation_id_created=record["workstation_id"],
@@ -676,7 +715,7 @@ def _build_order_detail(session: Session, order: CustomerOrder) -> AdminOrderDet
         .tuples()
         .all()
     )
-    now = datetime.now(tz=UTC)
+    now = current_order_time(session)
     refund_amount = _get_cancellation_refund_amount(order, effective_at=now)
     financial_references = order_payment_financial_references(
         session, order_id=order.id, branch_id=order.branch_id
@@ -790,10 +829,15 @@ def _build_available_actions(
     return restrict_actions(
         session,
         AdminOrderAvailableActionsView(
-            can_mark_ready=order.status == ORDER_STATUS_PENDING,
+            can_mark_ready=(
+                order.status == ORDER_STATUS_PENDING
+                and order.production_commit_at is not None
+                and current_order_time(session) >= order.production_commit_at
+            ),
             can_deliver=can_deliver_without_payment,
             can_cancel=(
                 order.status in {ORDER_STATUS_PENDING, ORDER_STATUS_READY}
+                and order.production_commit_at is not None
                 and refund_amount == ZERO_MONEY
             ),
             can_capture_balance=False,
@@ -901,7 +945,7 @@ def _derive_payment_state(
     advance_amount: Decimal,
     remaining_balance_amount: Decimal,
 ) -> str:
-    if status == ORDER_STATUS_CANCELED:
+    if status in {ORDER_STATUS_CANCELED, "EXPIRED", "NO_SHOW"}:
         return PAYMENT_STATE_CANCELED
     if remaining_balance_amount == ZERO_MONEY:
         return PAYMENT_STATE_PAID
@@ -928,4 +972,6 @@ def _status_label(status: str) -> str:
         ORDER_STATUS_READY: "Listo",
         ORDER_STATUS_DELIVERED: "Entregado",
         ORDER_STATUS_CANCELED: "Cancelado",
+        "EXPIRED": "Expirado",
+        "NO_SHOW": "No se presentó",
     }.get(status, status)

@@ -10,6 +10,10 @@ class SaleValidationError(SaleError):
     """Raised when a sale confirmation request is invalid."""
 
 
+class SalePriceChangedError(SaleError):
+    """The cashier must review the current catalog before a new confirmation."""
+
+
 class OpenCashSessionRequiredError(SaleError):
     """Raised when the operator does not have an open cash session."""
 

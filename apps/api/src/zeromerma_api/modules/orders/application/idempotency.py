@@ -32,15 +32,18 @@ from zeromerma_api.modules.identity.application.session_services import (
     SessionAuthentication,
     auth_error,
 )
+from zeromerma_api.modules.orders.application.admin_schemas import AdminOrderCancelRequest
 from zeromerma_api.modules.orders.application.admin_services import AdminOrdersService, _get_order
 from zeromerma_api.modules.orders.application.schemas import (
     AdminOrderCommandCode,
+    AmendCustomerOrderRequest,
     CancelCustomerOrderRequest,
     CreateCustomerOrderRequest,
     DeliverCustomerOrderRequest,
     OrderActionRequest,
     OrderCommandCode,
     OrderCommandResultView,
+    PayCustomerOrderRequest,
 )
 from zeromerma_api.modules.orders.application.services import (
     OrderCommandTrace,
@@ -55,6 +58,8 @@ ORDER_COMMAND_OPERATIONS: dict[OrderCommandCode, str] = {
     "mark-ready": "order.mark_ready",
     "deliver": "order.deliver",
     "cancel": "order.cancel",
+    "pay": "order.pay",
+    "amend": "order.amend",
 }
 ORDER_COMMAND_RESPONSE_POLICY = ResponsePolicy(snapshot_model=OrderCommandResultView)
 PosOrderCommand = (
@@ -62,6 +67,8 @@ PosOrderCommand = (
     | OrderActionRequest
     | DeliverCustomerOrderRequest
     | CancelCustomerOrderRequest
+    | PayCustomerOrderRequest
+    | AmendCustomerOrderRequest
 )
 
 
@@ -94,6 +101,8 @@ class OrdersIdempotencyService:
             "mark-ready": OrderActionRequest,
             "deliver": DeliverCustomerOrderRequest,
             "cancel": CancelCustomerOrderRequest,
+            "pay": PayCustomerOrderRequest,
+            "amend": AmendCustomerOrderRequest,
         }[command_code]
         if type(command) is not expected_type or (command_code == "create") != (order_id is None):
             raise IdempotencyBoundaryError("The order command does not match its operation.")
@@ -135,6 +144,7 @@ class OrdersIdempotencyService:
             )
 
         def action(current: Session) -> CommandResult:
+            nonlocal prepared
             trace = self._trace(current, command_code, key)
             owner = execution(current)
             if owner is None or owner.record is None:
@@ -153,6 +163,9 @@ class OrdersIdempotencyService:
             if isinstance(command, CreateCustomerOrderRequest):
                 if prepared is None:
                     raise IdempotencyBoundaryError("Order creation requires validated preparation.")
+                prepared = self._commands.prepare_create_order(
+                    current, current_user=current_user, command=command
+                )
                 result = self._commands.create_order(
                     current,
                     current_user=current_user,
@@ -163,7 +176,18 @@ class OrdersIdempotencyService:
                 )
             else:
                 assert order_id is not None
-                if isinstance(command, OrderActionRequest):
+                if isinstance(command, (PayCustomerOrderRequest, AmendCustomerOrderRequest)):
+                    from zeromerma_api.modules.orders.application.lifecycle import execute_lifecycle
+
+                    result = execute_lifecycle(
+                        current,
+                        current_user=current_user,
+                        order_id=order_id,
+                        command=command,
+                        trace=trace,
+                        request_id=request_id,
+                    )
+                elif isinstance(command, OrderActionRequest):
                     result = self._commands.mark_ready(
                         current,
                         current_user=current_user,
@@ -220,7 +244,13 @@ class OrdersIdempotencyService:
         order_id: UUID,
         key: UUID,
         request_id: str | None,
+        cancellation: AdminOrderCancelRequest | None = None,
     ) -> IdempotencyResult:
+        if (command_code == "cancel") != (cancellation is not None):
+            raise IdempotencyBoundaryError(
+                "Cancellation requires explicit responsibility and reason."
+            )
+
         def resolve_context(current: Session, saved: CommandContext | None) -> CommandContext:
             branch_id = (
                 saved.branch_id if saved else _get_order(current, order_id=order_id).branch_id
@@ -230,18 +260,29 @@ class OrdersIdempotencyService:
             )
 
         def action(current: Session) -> CommandResult:
-            method = {
-                "mark-ready": self._admin.mark_ready,
-                "deliver": self._admin.deliver_order,
-                "cancel": self._admin.cancel_order,
-            }[command_code]
-            result = method(
-                current,
-                actor_id=current_user.id,
-                order_id=order_id,
-                request_id=request_id,
-                trace=self._trace(current, command_code, key),
-            )
+            if command_code == "cancel":
+                assert cancellation is not None
+                result = self._admin.cancel_order(
+                    current,
+                    actor_id=current_user.id,
+                    order_id=order_id,
+                    request_id=request_id,
+                    trace=self._trace(current, command_code, key),
+                    command=cancellation,
+                )
+            else:
+                method = (
+                    self._admin.mark_ready
+                    if command_code == "mark-ready"
+                    else self._admin.deliver_order
+                )
+                result = method(
+                    current,
+                    actor_id=current_user.id,
+                    order_id=order_id,
+                    request_id=request_id,
+                    trace=self._trace(current, command_code, key),
+                )
             return CommandResult(
                 status_code=200,
                 snapshot=result,
@@ -253,7 +294,7 @@ class OrdersIdempotencyService:
             session,
             key=key,
             operation_code=ORDER_COMMAND_OPERATIONS[command_code],
-            payload={"order_id": order_id},
+            payload={"order_id": order_id, "cancellation": cancellation},
             resolve_context=resolve_context,
             authorize=lambda current, context: self._authorize(
                 current, current_user, context, command_code

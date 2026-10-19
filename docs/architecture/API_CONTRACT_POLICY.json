@@ -1112,6 +1112,13 @@
   },
   "frontend": {
     "feature_level_fetch_allowed": false,
+    "paired_device_transport": {
+      "path": "apps/pos-web/src/lib/local-hardware-transport.ts",
+      "origin": "http://127.0.0.1:17651",
+      "authority": "Backend-issued signed grant; cookies omitted",
+      "contracts": "Backend-owned SignedDeviceCommand and DeviceCommandResult exported in canonical OpenAPI",
+      "scope": "Only /commands and /commands/status; no business API routes or provider payment protocol"
+    },
     "generated_type_source": "packages/api-client/src/generated/schema.ts",
     "manual_wire_contracts_allowed": false,
     "raw_http_baseline_count": 158,

@@ -49,6 +49,7 @@ import { useCurrentCashSessionQuery } from "../cash-session-open/queries";
 import { posInputClass } from "../pos-theme/theme";
 import { useStatusMessageStore } from "../status-messages/store";
 import { writeTicketToPrintWindow } from "./print";
+import { HardwareReceiptAction } from "./hardware-receipt-action";
 import { useTicketDetailQuery, useTicketsBootstrapQuery, useTicketsListQuery } from "./queries";
 import { reprintTicket } from "./tickets-api";
 import { InventoryAttributionPanel } from "./inventory-attribution-panel";
@@ -229,7 +230,7 @@ function getTicketConsoleStateLabel(state: TicketConsoleState): string {
     case "REPRINTING":
       return "Reimprimiendo";
     case "REPRINT_SUCCESS":
-      return "Reimpresion enviada";
+      return "Dialogo de impresion abierto";
     case "REPRINT_ERROR":
       return "Error de reimpresion";
     default:
@@ -311,6 +312,10 @@ export function TicketSummaryPanel({
       footer={
         selectedTicket ? (
           <div className="grid gap-2">
+            {selectedTicket.receipt ? (
+              <HardwareReceiptAction key={selectedTicket.id} receipt={selectedTicket.receipt}
+                workstationCode={appEnv.VITE_POS_WORKSTATION_CODE} />
+            ) : null}
             <PrintAction
               disabled={
                 isReprintPending ||
@@ -654,7 +659,7 @@ export function TicketsScreen() {
         .then((ticketDetail) => {
           writeTicketToPrintWindow(printWindow, ticketDetail);
           setReprintFeedback({ kind: "success", ticketId: ticketDetail.id });
-          showSuccess("Reimpresion enviada.");
+          showSuccess("Documento abierto para imprimir. Confirma la salida en la impresora.");
         })
         .catch((error) => {
           printWindow.close();

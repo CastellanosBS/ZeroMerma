@@ -1,5 +1,5 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { isCommandIntentionPending } from "@zeromerma/api-client";
+import { isCommandIntentionPending, type components } from "@zeromerma/api-client";
 import { Navigate } from "@tanstack/react-router";
 import { DialogBody, DialogFooter, DialogHeader, DialogSurface } from "@zeromerma/ui";
 import {
@@ -13,6 +13,9 @@ import {
 } from "react";
 
 import { useAppShellRightPanel } from "../../components/app-shell-right-panel";
+import { PosModal } from "../../components/pos-modal";
+import { OrderLifecyclePanel } from "./order-lifecycle-panel";
+import { orderDateTimeLabel, orderDateTimeToUtc } from "./order-date-time";
 import { CapturedProductLineRow } from "../../components/captured-product-lines";
 import { CatalogSelectionCard } from "../../components/catalog-selection-card";
 import { OrderPaymentHistory } from "./order-payment-history";
@@ -89,7 +92,7 @@ import {
 import { posInputClass, posOutlineButtonClass, posPrimaryButtonClass } from "../pos-theme/theme";
 import { useStatusMessageStore } from "../status-messages/store";
 import { getOrderDeliveryActionLabel } from "./delivery-action-labels";
-import type { OrderCommandCode } from "./orders-api";
+import { quoteOrder, type OrderCommandCode } from "./orders-api";
 import { orderIntentions, type OrderCommandPayload } from "./order-command-intent";
 import { useOrderDraftIdentity, useOrderIntention } from "./use-order-intention";
 import {
@@ -151,6 +154,8 @@ const ORDER_STATUS_OPTIONS = [
   { label: "Listos para entrega", status: "READY" },
   { label: "Entregados", status: "DELIVERED" },
   { label: "Cancelados", status: "CANCELED" },
+  { label: "Expirados", status: "EXPIRED" },
+  { label: "No se presentaron", status: "NO_SHOW" },
 ] as const;
 
 const PAYMENT_METHOD_OPTIONS = [
@@ -352,6 +357,10 @@ function getStatusLabel(status: string): string {
       return "Entregado";
     case "CANCELED":
       return "Cancelado";
+    case "EXPIRED":
+      return "Expirado";
+    case "NO_SHOW":
+      return "No se presentó";
     default:
       return status;
   }
@@ -395,6 +404,8 @@ function getStatusVisualConfig(status: string) {
         tableRowClass: "pos-order-status-row pos-order-status-row--delivered",
       };
     case "CANCELED":
+    case "EXPIRED":
+    case "NO_SHOW":
       return {
         badgeClass:
           "border border-[var(--ui-color-danger-soft)] bg-[var(--ui-color-danger-soft)] text-[var(--ui-color-danger)]",
@@ -515,7 +526,10 @@ function getOrderUrgency(
   label: string | null;
   tone: "muted" | "warning" | "primary";
 } {
-  if (!order.requested_for_at || order.status === "DELIVERED" || order.status === "CANCELED") {
+  if (
+    !order.requested_for_at ||
+    ["DELIVERED", "CANCELED", "EXPIRED", "NO_SHOW"].includes(order.status)
+  ) {
     return { label: null, tone: "muted" };
   }
 
@@ -589,6 +603,10 @@ function getOrderEmptyListDescription({
       return "No hay pedidos entregados en esta vista operativa.";
     case "CANCELED":
       return "No hay pedidos cancelados en esta vista operativa.";
+    case "EXPIRED":
+      return "No hay pedidos expirados en esta vista operativa.";
+    case "NO_SHOW":
+      return "No hay pedidos sin recoger en esta vista operativa.";
     default:
       return "No hay pedidos pendientes para esta consulta.";
   }
@@ -633,18 +651,50 @@ export function OrderActionConfirmDialog({
 }: {
   isPending: boolean;
   onCancel: () => void;
-  onConfirm: () => void;
+  onConfirm: (
+    resolution?: Pick<
+      CancelCustomerOrderRequest,
+      "cancellation_reason" | "cancellation_responsibility" | "terminal_status"
+    >,
+  ) => void;
   state: OrderActionDialogState | null;
 }) {
+  const [reason, setReason] = useState("");
+  const [responsibility, setResponsibility] = useState<"CUSTOMER" | "MERCHANT">("CUSTOMER");
+  const [terminalStatus, setTerminalStatus] = useState<"CANCELED" | "EXPIRED" | "NO_SHOW">(
+    "CANCELED",
+  );
+  useEffect(() => {
+    setReason("");
+    setResponsibility("CUSTOMER");
+    setTerminalStatus("CANCELED");
+  }, [state]);
   if (state === null) {
     return null;
   }
 
   const order = "order" in state ? state.order : null;
   const isCancel = state.kind === "cancel";
+  const confirm = () => {
+    if (isPending || (isCancel && reason.trim().length < 4)) return;
+    onConfirm(
+      isCancel
+        ? {
+            cancellation_reason: reason.trim(),
+            cancellation_responsibility: responsibility,
+            terminal_status: terminalStatus,
+          }
+        : undefined,
+    );
+  };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/35 p-4 backdrop-blur-[2px]">
+    <PosModal
+      label={isCancel ? "Cancelar pedido" : "Descartar borrador"}
+      onClose={onCancel}
+      onConfirm={confirm}
+      busy={isPending}
+    >
       <DialogSurface className="w-full max-w-md">
         <DialogHeader
           action={
@@ -689,12 +739,49 @@ export function OrderActionConfirmDialog({
                     El pedido se cancelara de forma inmediata.
                   </p>
                   <p className="mt-1">
-                    {order.cancellation_refund_eligible
-                      ? `Se reembolsara el anticipo de ${formatCurrency(order.cancellation_refund_amount)} y se registrara el movimiento en caja.`
+                    {responsibility === "MERCHANT" || order.cancellation_refund_eligible
+                      ? "Corresponde devolver el pago acumulado. El resultado mostrará lo confirmado y cualquier reembolso pendiente."
                       : (parseMoneyToCents(order.advance_amount) ?? 0) > 0
-                        ? "El anticipo no se reembolsa porque la cancelacion ocurre despues del umbral de un dia previo a la entrega."
+                        ? "La cancelación del cliente después del compromiso productivo retiene el pago; no reconoce una venta entregada."
                         : "No hay anticipo por devolver."}
                   </p>
+                  <label className="grid gap-1">
+                    Responsable
+                    <select
+                      aria-label="Responsable de cancelacion"
+                      value={responsibility}
+                      onChange={(event) =>
+                        setResponsibility(event.target.value as "CUSTOMER" | "MERCHANT")
+                      }
+                    >
+                      <option value="CUSTOMER">Cliente</option>
+                      <option value="MERCHANT">Panadería</option>
+                    </select>
+                  </label>
+                  <label className="grid gap-1">
+                    Resultado
+                    <select
+                      aria-label="Resultado del pedido"
+                      value={terminalStatus}
+                      onChange={(event) =>
+                        setTerminalStatus(event.target.value as typeof terminalStatus)
+                      }
+                    >
+                      <option value="CANCELED">Cancelado</option>
+                      <option value="EXPIRED">Expirado</option>
+                      <option value="NO_SHOW">No se presentó</option>
+                    </select>
+                  </label>
+                  <label className="grid gap-1">
+                    Motivo
+                    <textarea
+                      aria-label="Motivo de cancelacion"
+                      value={reason}
+                      onChange={(event) => setReason(event.target.value)}
+                      minLength={4}
+                      maxLength={240}
+                    />
+                  </label>
                 </div>
               ) : null}
             </>
@@ -716,8 +803,8 @@ export function OrderActionConfirmDialog({
           </Button>
           <Button
             className={cn("h-10 px-4", posPrimaryButtonClass)}
-            disabled={isPending}
-            onClick={onConfirm}
+            disabled={isPending || (isCancel && reason.trim().length < 4)}
+            onClick={confirm}
             type="button"
           >
             {isPending
@@ -730,7 +817,7 @@ export function OrderActionConfirmDialog({
           </Button>
         </DialogFooter>
       </DialogSurface>
-    </div>
+    </PosModal>
   );
 }
 
@@ -1681,7 +1768,10 @@ function OrdersDecisionPanel({
             </div>
           </div>
         </div>
-        <OrderPaymentHistory payments={orderDetail.payments} />
+        <OrderPaymentHistory
+          payments={orderDetail.payments}
+          workstationCode={bootstrap?.workstation.code}
+        />
         {orderDetail.financial_refund ? (
           <RefundSettlementPanel key={orderDetail.id} refund={orderDetail.financial_refund} />
         ) : null}
@@ -1979,6 +2069,10 @@ export function OrdersScreen() {
   const [deliveryMixedCardAmountText, setDeliveryMixedCardAmountText] = useState("");
   const [deliveryReceivedAmountText, setDeliveryReceivedAmountText] = useState("");
   const [orderActionDialog, setOrderActionDialog] = useState<OrderActionDialogState | null>(null);
+  const [showLifecycle, setShowLifecycle] = useState(false);
+  const [createQuote, setCreateQuote] = useState<components["schemas"]["OrderQuoteView"] | null>(
+    null,
+  );
   const [hasNegativeAdvanceAttempt, setHasNegativeAdvanceAttempt] = useState(false);
   const [selectionErrorMessage, setSelectionErrorMessage] = useState<string | null>(null);
   const [draftState, setDraftState] = useState(createInitialOrderCreateDraftState());
@@ -2131,16 +2225,10 @@ export function OrdersScreen() {
       buildRequestedForInput(nextRequestedForDraft).trim().length > 0,
     [customerPhone, hasCustomerName],
   );
-  const requestedForLabel = useMemo(() => {
-    if (requestedForInput.trim().length === 0) {
-      return "Sin fecha de recoleccion";
-    }
-
-    return formatLocalDateTime(
-      new Date(requestedForInput).toISOString(),
-      ordersBootstrapQuery.data?.branch.timezone ?? "America/Hermosillo",
-    );
-  }, [ordersBootstrapQuery.data?.branch.timezone, requestedForInput]);
+  const requestedForLabel = useMemo(
+    () => orderDateTimeLabel(requestedForInput, ordersBootstrapQuery.data?.branch.timezone),
+    [ordersBootstrapQuery.data?.branch.timezone, requestedForInput],
+  );
 
   useEffect(() => {
     if (areCustomerDetailsComplete || draftState.controlState === CONTROL_STATE_CLASS_SELECTION) {
@@ -2446,7 +2534,7 @@ export function OrdersScreen() {
   }
 
   const createOrderMutation = useMutation({
-    mutationFn: async () => {
+    mutationFn: async (confirmed: boolean) => {
       if (!isAuthenticated || ordersBootstrapQuery.data === undefined) {
         throw new Error("Se requiere autenticacion y contexto para registrar pedidos.");
       }
@@ -2467,12 +2555,15 @@ export function OrdersScreen() {
       }
 
       const payload: CreateCustomerOrderRequest = {
+        quote_fingerprint: createQuote?.quote_fingerprint ?? "",
         cash_session_id: currentCashSessionQuery.data!.id,
         workstation_code: ordersBootstrapQuery.data.workstation.code,
         customer_name: customerName.trim(),
         customer_phone: customerPhone.trim().length > 0 ? customerPhone.trim() : null,
         requested_for_at:
-          requestedForInput.trim().length > 0 ? new Date(requestedForInput).toISOString() : null,
+          requestedForInput.trim().length > 0
+            ? orderDateTimeToUtc(requestedForInput, ordersBootstrapQuery.data.branch.timezone)
+            : null,
         notes: orderNotes.trim().length > 0 ? orderNotes.trim() : null,
         items: buildCreateOrderItems(draftState.lines),
         advance_amount: advanceCents > 0 ? formatMoneyFromCents(advanceCents) : "0.00",
@@ -2484,10 +2575,23 @@ export function OrdersScreen() {
           paymentMethodCode: advancePaymentMethodCode,
         }),
       };
-
+      if (!confirmed) {
+        if (!payload.requested_for_at) throw new Error("Selecciona la fecha de entrega.");
+        setCreateQuote(
+          await quoteOrder({
+            workstation_code: payload.workstation_code,
+            items: payload.items,
+            requested_for_at: payload.requested_for_at,
+          }),
+        );
+        return null;
+      }
+      if (!createQuote) throw new Error("Revisa primero la cotización del pedido.");
       return beginCommand("create", payload);
     },
     onSuccess: async (orderDetail) => {
+      if (!orderDetail) return;
+      setCreateQuote(null);
       void refreshOrdersData(orderDetail.id);
       setSelectedStatus(orderDetail.status);
       setSelectedOrderId(orderDetail.id);
@@ -2593,14 +2697,19 @@ export function OrdersScreen() {
   });
 
   const cancelMutation = useMutation({
-    mutationFn: async () => {
+    mutationFn: async (
+      resolution: Pick<
+        CancelCustomerOrderRequest,
+        "cancellation_reason" | "cancellation_responsibility" | "terminal_status"
+      >,
+    ) => {
       if (!isAuthenticated || ordersBootstrapQuery.data === undefined || selectedOrderId === null) {
         throw new Error("Selecciona un pedido antes de cancelarlo.");
       }
 
       const payload: CancelCustomerOrderRequest = {
         cash_session_id: currentCashSessionQuery.data!.id,
-        cancellation_reason: "Cancelacion operativa desde POS",
+        ...resolution,
         workstation_code: ordersBootstrapQuery.data.workstation.code,
       };
 
@@ -2714,7 +2823,7 @@ export function OrdersScreen() {
         }
         mode={mode}
         onCreateOrder={() => {
-          void createOrderMutation.mutate();
+          void createOrderMutation.mutate(false);
         }}
         onDismissDeliverySettlementFlow={() => {
           setDeliveryPaymentMethodCode("");
@@ -3066,6 +3175,11 @@ export function OrdersScreen() {
               >
                 Nuevo pedido
               </PosButton>
+              {orderDetailQuery.data && currentCashSessionQuery.data ? (
+                <PosButton onClick={() => setShowLifecycle(true)} type="button" variant="neutral">
+                  Abonos y cambios
+                </PosButton>
+              ) : null}
             </>
           ) : (
             <PosButton onClick={() => setMode("list")} type="button" variant="neutral">
@@ -3662,7 +3776,7 @@ export function OrdersScreen() {
         onCancel={() => {
           setOrderActionDialog(null);
         }}
-        onConfirm={() => {
+        onConfirm={(resolution) => {
           if (orderActionDialog === null) {
             return;
           }
@@ -3673,10 +3787,71 @@ export function OrdersScreen() {
             return;
           }
 
-          void cancelMutation.mutate();
+          if (resolution) void cancelMutation.mutate(resolution);
         }}
         state={orderActionDialog}
       />
+      {showLifecycle &&
+      mode === "list" &&
+      orderDetailQuery.data &&
+      ordersBootstrapQuery.data &&
+      currentCashSessionQuery.data &&
+      user ? (
+        <PosModal
+          label="Seguimiento del pedido"
+          onClose={() => setShowLifecycle(false)}
+          busy={isCommandIntentionPending(orderIntention.metadata)}
+        >
+          <DialogSurface className="max-h-[85vh] w-full max-w-2xl overflow-y-auto p-4">
+            <OrderLifecyclePanel
+              key={`${orderDetailQuery.data.id}:${orderDetailQuery.data.version}`}
+              order={orderDetailQuery.data}
+              workstationCode={ordersBootstrapQuery.data.workstation.code}
+              pending={isCommandIntentionPending(orderIntention.metadata)}
+              onCommand={(code, payload) => beginCommand(code, payload, orderDetailQuery.data!.id)}
+              cashSessionId={currentCashSessionQuery.data.id}
+              onChanged={() => void refreshOrdersData(orderDetailQuery.data!.id)}
+            />
+            <Button
+              disabled={isCommandIntentionPending(orderIntention.metadata)}
+              onClick={() => setShowLifecycle(false)}
+            >
+              Cerrar seguimiento
+            </Button>
+          </DialogSurface>
+        </PosModal>
+      ) : null}
+      {createQuote ? (
+        <PosModal
+          label="Revisar pedido"
+          onClose={() => setCreateQuote(null)}
+          onConfirm={() => createOrderMutation.mutate(true)}
+          busy={createOrderMutation.isPending}
+        >
+          <DialogSurface className="w-full max-w-lg p-5">
+            <h2 className="text-lg font-semibold">Revisar pedido</h2>
+            <p>Total confirmado: {formatCurrency(createQuote.total_amount)}</p>
+            <p>Anticipo mínimo: {formatCurrency(createQuote.minimum_advance_amount)}</p>
+            <p>
+              Compromiso productivo:{" "}
+              {formatLocalDateTime(createQuote.production_commit_at, createQuote.branch_timezone)}
+            </p>
+            <p>
+              Antes del compromiso, la cancelación del cliente devuelve el pago completo. Después se
+              retiene. Si la panadería cancela, corresponde devolver el pago completo.
+            </p>
+            <Button
+              disabled={createOrderMutation.isPending}
+              onClick={() => createOrderMutation.mutate(true)}
+            >
+              Confirmar pedido cotizado
+            </Button>
+            <Button disabled={createOrderMutation.isPending} onClick={() => setCreateQuote(null)}>
+              Volver al borrador
+            </Button>
+          </DialogSurface>
+        </PosModal>
+      ) : null}
     </ContinuousWorkspaceSheet>
   );
 }

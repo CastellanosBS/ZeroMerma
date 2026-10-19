@@ -22,6 +22,7 @@ from zeromerma_api.modules.financial_ledger.infrastructure import models as fina
 from zeromerma_api.modules.financial_ledger.infrastructure import (
     reconciliation_models as financial_reconciliation_models,
 )
+from zeromerma_api.modules.hardware.infrastructure import models as hardware_models
 from zeromerma_api.modules.idempotency.infrastructure import models as idempotency_models
 from zeromerma_api.modules.identity.infrastructure import models as identity_models
 from zeromerma_api.modules.identity.infrastructure import (
@@ -47,6 +48,7 @@ from zeromerma_api.modules.quality.infrastructure import models as quality_model
 from zeromerma_api.modules.returns.infrastructure import models as returns_models
 from zeromerma_api.modules.sales.infrastructure import models as sales_models
 from zeromerma_api.modules.suppliers.infrastructure import models as suppliers_models
+from zeromerma_api.modules.tickets.infrastructure import models as receipt_models
 from zeromerma_api.modules.transfers.infrastructure import models as transfer_models
 from zeromerma_api.testing.database_safety import (
     TEST_CONFIRMATION_VARIABLE,
@@ -72,6 +74,8 @@ TEST_GUARD_VARIABLES = (
 )
 
 _ = (
+    hardware_models,
+    receipt_models,
     identity_session_models,
     audit_models,
     branch_models,

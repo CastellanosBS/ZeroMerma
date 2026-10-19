@@ -35,6 +35,8 @@ from zeromerma_api.modules.returns.infrastructure.models import SaleReturn, Sale
 from zeromerma_api.modules.sales.application.schemas import SaleDetailView
 from zeromerma_api.modules.sales.application.services import SaleQueryService
 from zeromerma_api.modules.sales.infrastructure.models import Sale, SaleLine, SalePayment
+from zeromerma_api.modules.tickets.application.receipt_schemas import OperationalReceiptView
+from zeromerma_api.modules.tickets.application.receipts import read_receipt
 from zeromerma_api.modules.tickets.application.schemas import (
     TicketAttributionOptionView,
     TicketDetailResponse,
@@ -49,8 +51,8 @@ from zeromerma_api.modules.tickets.application.schemas import (
     TicketsListResponse,
 )
 from zeromerma_api.modules.tickets.domain.constants import (
-    AUDIT_ACTION_TICKET_REPRINTED,
-    OUTBOX_EVENT_TICKET_REPRINTED_V1,
+    AUDIT_ACTION_TICKET_REPRINT_REQUESTED,
+    OUTBOX_EVENT_TICKET_REPRINT_REQUESTED_V1,
     TICKET_RESOURCE_TYPE,
     TICKET_RETURN_STATUS_FULLY_RETURNED,
     TICKET_RETURN_STATUS_NOT_RETURNED,
@@ -274,6 +276,7 @@ class TicketsQueryService:
 
         return _to_ticket_detail_response(
             sale_detail,
+            receipt=read_receipt(session, "SALE", ticket_id),
             context=context,
             inventory=read_attribution_projections(
                 session,
@@ -333,10 +336,13 @@ class TicketsCommandService:
         if sale_detail.branch_id != context.branch_id:
             raise TicketNotFoundError("El ticket no existe en la sucursal actual.")
 
+        receipt = read_receipt(session, "SALE", ticket_id)
+        if receipt is None:
+            raise TicketConflictError("Este ticket historico no conserva un documento inmutable.")
         self._audit_recorder.record(
             session,
             actor_id=current_user.id,
-            action=AUDIT_ACTION_TICKET_REPRINTED,
+            action=AUDIT_ACTION_TICKET_REPRINT_REQUESTED,
             resource_type=TICKET_RESOURCE_TYPE,
             resource_id=str(ticket_id),
             branch_id=context.branch_id,
@@ -347,13 +353,14 @@ class TicketsCommandService:
                 "ticket_id": str(ticket_id),
                 "folio": _build_ticket_folio(ticket_id),
                 "workstation_code": workstation_code,
+                "physical_outcome": "NOT_CONFIRMED",
             },
         )
         self._outbox_writer.append(
             session,
             aggregate_type=TICKET_RESOURCE_TYPE,
             aggregate_id=str(ticket_id),
-            event_name=OUTBOX_EVENT_TICKET_REPRINTED_V1,
+            event_name=OUTBOX_EVENT_TICKET_REPRINT_REQUESTED_V1,
             actor_id=current_user.id,
             branch_id=context.branch_id,
             workstation_id=context.workstation_id,
@@ -362,6 +369,7 @@ class TicketsCommandService:
         )
         response = _to_ticket_detail_response(
             sale_detail,
+            receipt=receipt,
             context=context,
             inventory=read_attribution_projections(
                 session,
@@ -411,7 +419,7 @@ def _apply_search_filters(
     if normalized_query is None:
         return statement
 
-    sale_id_prefix = normalized_query.removeprefix("tck-")
+    sale_id_prefix = normalized_query.removeprefix("tck-").replace("-", "")
     line_match = exists(
         select(SaleLine.id).where(
             SaleLine.sale_id == Sale.id,
@@ -420,7 +428,7 @@ def _apply_search_filters(
     )
     return statement.where(
         or_(
-            func.lower(cast(Sale.id, String)).like(f"{sale_id_prefix}%"),
+            func.replace(func.lower(cast(Sale.id, String)), "-", "").like(f"{sale_id_prefix}%"),
             func.lower(cast(Sale.id, String)).contains(normalized_query),
             func.lower(User.full_name).contains(normalized_query),
             line_match,
@@ -459,6 +467,7 @@ def _require_open_cash_session(
 def _to_ticket_detail_response(
     sale_detail: SaleDetailView,
     *,
+    receipt: OperationalReceiptView | None,
     context: WorkstationContext,
     inventory: dict[uuid.UUID, AttributionProjection],
     return_summary: dict[str, Decimal | int | str] | None = None,
@@ -471,6 +480,8 @@ def _to_ticket_detail_response(
         "returned_amount": ZERO_MONEY,
     }
     return TicketDetailResponse(
+        receipt=receipt,
+        can_reprint=receipt is not None,
         id=sale_detail.id,
         folio=_build_ticket_folio(sale_detail.id),
         status=sale_detail.status,
@@ -661,7 +672,7 @@ def _get_ticket_return_summary_by_sale_ids(
 
 
 def _build_ticket_folio(ticket_id: uuid.UUID) -> str:
-    return f"TCK-{str(ticket_id).split('-', maxsplit=1)[0].upper()}"
+    return f"TCK-{ticket_id.hex.upper()}"
 
 
 def _get_branch_brand_key(branch_code: str) -> str:

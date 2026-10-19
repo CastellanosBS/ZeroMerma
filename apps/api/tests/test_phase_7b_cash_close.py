@@ -164,6 +164,8 @@ def test_cash_close_reconciliation_endpoint_and_preview_auto_resolve(client: Tes
         client,
         lines=[
             {
+                "expected_unit_price": "3.00",
+                "expected_currency_code": "MXN",
                 "capture_mode": "CLASS_CAPTURE",
                 "product_class_id": _get_product_class_id(SEED_PRODUCT_CLASS_BOLILLO_CODE),
                 "quantity": "2",
@@ -175,6 +177,8 @@ def test_cash_close_reconciliation_endpoint_and_preview_auto_resolve(client: Tes
         client,
         lines=[
             {
+                "expected_unit_price": "18.00",
+                "expected_currency_code": "MXN",
                 "capture_mode": "PRODUCT_DIRECT",
                 "product_id": _get_product_id(SEED_PRODUCT_COCA_355_CODE),
                 "quantity": "1",
@@ -263,6 +267,8 @@ def test_cash_close_commit_blocks_unresolved_class_capture_mismatch(
         client,
         lines=[
             {
+                "expected_unit_price": "3.00",
+                "expected_currency_code": "MXN",
                 "capture_mode": "CLASS_CAPTURE",
                 "product_class_id": _get_product_class_id(SEED_PRODUCT_CLASS_BOLILLO_CODE),
                 "quantity": "2",
@@ -310,6 +316,8 @@ def test_cash_close_commit_with_empty_counter_registers_zero_bread_count(
         client,
         lines=[
             {
+                "expected_unit_price": "3.00",
+                "expected_currency_code": "MXN",
                 "capture_mode": "CLASS_CAPTURE",
                 "product_class_id": _get_product_class_id(SEED_PRODUCT_CLASS_BOLILLO_CODE),
                 "quantity": "2",
@@ -444,6 +452,8 @@ def test_cash_close_commit_with_manual_override_and_auto_discrepancy_resolution(
         client,
         lines=[
             {
+                "expected_unit_price": "12.00",
+                "expected_currency_code": "MXN",
                 "capture_mode": "CLASS_CAPTURE",
                 "product_class_id": _get_product_class_id(SEED_PRODUCT_CLASS_PAN_DULCE_CODE),
                 "quantity": "2",

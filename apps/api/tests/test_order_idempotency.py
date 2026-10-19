@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from concurrent.futures import ThreadPoolExecutor
+from contextlib import nullcontext
 from copy import deepcopy
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal
@@ -15,7 +16,7 @@ from uuid import UUID, uuid4
 
 import pytest
 from fastapi.testclient import TestClient
-from order_fixtures import seed_order_stock
+from order_fixtures import committed_order_clock, order_clock, quote_order_payload, seed_order_stock
 from sqlalchemy import func, select
 
 from zeromerma_api.bootstrap.seed_local import (
@@ -130,7 +131,7 @@ def _setup(
     with SessionLocal() as session:
         cash_id = UUID(opened.json()["id"])
         products = dict(session.execute(select(Product.code, Product.id)).all())
-    return headers, {
+    body = {
         "workstation_code": workstation,
         "cash_session_id": str(cash_id),
         "customer_name": "Private order customer",
@@ -144,6 +145,7 @@ def _setup(
         "advance_amount": "20.00",
         "advance_payment_method_code": "CASH",
     }
+    return headers, quote_order_payload(client, headers, body)
 
 
 def _path(surface: str, action: str, order_id: str | None = None) -> str:
@@ -160,11 +162,18 @@ def _post(
     order_id: str | None = None,
     surface: str = "POS",
 ) -> Any:
-    return client.post(
-        _path(surface, action, order_id),
-        headers={**headers, "Idempotency-Key": key},
-        json=body,
+    # These transition fixtures explicitly simulate the configured production cutoff.
+    clock = (
+        committed_order_clock(order_id)
+        if action == "mark-ready" or (surface == "BACKOFFICE" and action == "cancel")
+        else nullcontext()
     )
+    with clock:
+        return client.post(
+            _path(surface, action, order_id),
+            headers={**headers, "Idempotency-Key": key},
+            json=body,
+        )
 
 
 def _context(body: dict[str, Any]) -> dict[str, str]:
@@ -195,9 +204,7 @@ def _prepare(
     if action == "create":
         return headers, create, None, branch_id
     if surface == "BACKOFFICE":
-        create["advance_amount"] = "34.00" if action == "deliver" else "0.00"
-        if action != "deliver":
-            create["advance_payment_method_code"] = None
+        create["advance_amount"] = "34.00" if action == "deliver" else "20.00"
     created = _post(client, headers, "create", create, new_idempotency_key())
     assert created.status_code == 201
     order_id = created.json()["id"]
@@ -209,8 +216,21 @@ def _prepare(
             body.update(settlement_amount="14.00", settlement_payment_method_code="CASH")
     elif action == "cancel":
         body["cancellation_reason"] = "Customer requested cancellation"
+        body["cancellation_responsibility"] = "CUSTOMER"
     if surface == "BACKOFFICE":
-        return owner_headers(), {}, order_id, branch_id
+        return (
+            owner_headers(),
+            (
+                {
+                    name: body[name]
+                    for name in ("cancellation_reason", "cancellation_responsibility")
+                }
+                if action == "cancel"
+                else {}
+            ),
+            order_id,
+            branch_id,
+        )
     return headers, body, order_id, branch_id
 
 
@@ -311,8 +331,11 @@ def test_every_order_command_replays_its_original_result_without_effects(
     assert recovered.json() == first.json()
     assert _state() == after
     assert after[0]["idempotency_records"] == before["idempotency_records"] + 1
-    assert after[0]["audit_log"] == before["audit_log"] + 1
-    assert after[0]["outbox_events"] == before["outbox_events"] + 1
+    new_traces = (
+        2 if action == "mark-ready" or (surface == "BACKOFFICE" and action == "cancel") else 1
+    )
+    assert after[0]["audit_log"] == before["audit_log"] + new_traces
+    assert after[0]["outbox_events"] == before["outbox_events"] + new_traces
     # Delivery consumes each tracked item once; ready only reserves its physical stock.
     assert after[0]["cash_movements"] == before["cash_movements"]
     assert after[0]["inventory_movements"] == before["inventory_movements"] + (
@@ -386,6 +409,7 @@ def test_advance_settlement_and_refund_legs_are_not_duplicated(
                 ]
         else:
             payload["cancellation_reason"] = "Requested refund before cutoff"
+            payload["cancellation_responsibility"] = "CUSTOMER"
         key = new_idempotency_key()
         result = _post(client, headers, final_action, payload, key, order_id)
         assert result.status_code == 200
@@ -453,7 +477,8 @@ def test_identical_create_payload_with_distinct_keys_is_two_intentions(client: T
     second = _post(client, headers, "create", body, new_idempotency_key())
     assert first.status_code == second.status_code == 201
     assert first.json()["id"] != second.json()["id"]
-    assert _counts()["customer_orders"] == _counts()["idempotency_records"] == 2
+    assert _counts()["customer_orders"] == 2
+    assert _counts()["idempotency_records"] == 3
 
 
 @pytest.mark.parametrize("change", ["customer", "quantity", "payment", "cash_session"])
@@ -491,7 +516,11 @@ def test_order_target_and_command_have_independent_identities(client: TestClient
         client,
         headers,
         "cancel",
-        {**action, "cancellation_reason": "Cancellation requested"},
+        {
+            **action,
+            "cancellation_reason": "Cancellation requested",
+            "cancellation_responsibility": "CUSTOMER",
+        },
         key,
         first["id"],
     )
@@ -727,7 +756,6 @@ def test_recovery_checks_actor_surface_station_cash_and_current_authority(
 
 def test_cancel_only_operator_can_recover_without_manage_or_view(client: TestClient) -> None:
     headers, body = _setup(client)
-    body.update(advance_amount="0.00", advance_payment_method_code=None)
     created = _post(client, headers, "create", body, new_idempotency_key()).json()
     with SessionLocal() as session:
         original = session.scalars(select(User).where(User.email == SEED_USER_EMAIL)).one()
@@ -768,7 +796,18 @@ def test_cancel_only_operator_can_recover_without_manage_or_view(client: TestCli
         audience="BACKOFFICE",
     )
     key = new_idempotency_key()
-    canceled = _post(client, limited, "cancel", {}, key, created["id"], "BACKOFFICE")
+    canceled = _post(
+        client,
+        limited,
+        "cancel",
+        {
+            "cancellation_reason": "Explicit customer cancellation",
+            "cancellation_responsibility": "CUSTOMER",
+        },
+        key,
+        created["id"],
+        "BACKOFFICE",
+    )
     assert canceled.status_code == 200
     assert (
         _recover(
@@ -929,7 +968,8 @@ def test_same_key_contention_and_uncommitted_recovery_are_bounded(
     replay = _domain_command(headers, "create", body, key)
     assert not first.replayed and replay.replayed
     assert replay.payload == first.payload
-    assert _counts()["customer_orders"] == _counts()["idempotency_records"] == 1
+    assert _counts()["customer_orders"] == 1
+    assert _counts()["idempotency_records"] == 2  # Policy configuration plus creation.
 
 
 @pytest.mark.parametrize(
@@ -959,7 +999,11 @@ def test_order_lock_serializes_competing_payments_and_cross_surface_transitions(
         if rival_surface == "POS"
         else dict(context)
     )
-    cancel = {**context, "cancellation_reason": "Concurrent cancellation requested"}
+    cancel = {
+        **context,
+        "cancellation_reason": "Concurrent merchant cancellation requested",
+        "cancellation_responsibility": "MERCHANT",
+    }
     winner_body = deliver if winner == "deliver" else cancel
     if rival_surface == "POS":
         rival_station = "POS-ORDER-RACE-02"
@@ -1059,7 +1103,11 @@ def test_unrelated_orders_do_not_share_a_command_lock(
             barrier.wait(timeout=15)
         return result
 
-    with monkeypatch.context() as patch, ThreadPoolExecutor(max_workers=2) as pool:
+    with (
+        order_clock(datetime.now(UTC) + timedelta(days=2, hours=1)),
+        monkeypatch.context() as patch,
+        ThreadPoolExecutor(max_workers=2) as pool,
+    ):
         patch.setattr(OutboxWriter, "append", meet)
         futures = [
             pool.submit(
@@ -1092,12 +1140,8 @@ def test_simultaneous_http_retries_return_one_order_and_payment(client: TestClie
     assert all(response.status_code == 201 for response in responses)
     assert all(response.json() == responses[0].json() for response in responses)
     assert sum(response.headers["Idempotency-Replayed"] == "false" for response in responses) == 1
-    assert (
-        _counts()["customer_orders"]
-        == _counts()["customer_order_payments"]
-        == _counts()["idempotency_records"]
-        == 1
-    )
+    assert _counts()["customer_orders"] == _counts()["customer_order_payments"] == 1
+    assert _counts()["idempotency_records"] == 2
 
 
 def test_order_command_latency_is_observed_without_a_production_sla(

@@ -15493,6 +15493,31 @@
         "title": "AdminOrderAvailableActionsView",
         "type": "object"
       },
+      "AdminOrderCancelRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "cancellation_reason": {
+            "maxLength": 240,
+            "minLength": 4,
+            "title": "Cancellation Reason",
+            "type": "string"
+          },
+          "cancellation_responsibility": {
+            "enum": [
+              "CUSTOMER",
+              "MERCHANT"
+            ],
+            "title": "Cancellation Responsibility",
+            "type": "string"
+          }
+        },
+        "required": [
+          "cancellation_reason",
+          "cancellation_responsibility"
+        ],
+        "title": "AdminOrderCancelRequest",
+        "type": "object"
+      },
       "AdminOrderCustomerView": {
         "properties": {
           "name": {
@@ -15835,6 +15860,32 @@
           "payment_state": {
             "title": "Payment State",
             "type": "string"
+          },
+          "production_commit_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string",
+                "x-zeromerma-instant-format": "ISO8601_DATETIME"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Production Commit At"
+          },
+          "production_committed_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string",
+                "x-zeromerma-instant-format": "ISO8601_DATETIME"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Production Committed At"
           },
           "remaining_balance_amount": {
             "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
@@ -26813,6 +26864,16 @@
           "printable_ticket": {
             "$ref": "#/components/schemas/AdminSalesTicketPrintableView"
           },
+          "receipt": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/OperationalReceiptView"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "related_documents": {
             "items": {
               "$ref": "#/components/schemas/AdminSalesTicketRelatedDocumentView"
@@ -36414,6 +36475,71 @@
         "title": "AdminWorkstationsListResponse",
         "type": "object"
       },
+      "AmendCustomerOrderRequest": {
+        "properties": {
+          "additional_payments": {
+            "items": {
+              "$ref": "#/components/schemas/CreateCustomerOrderAdvancePaymentRequest"
+            },
+            "title": "Additional Payments",
+            "type": "array"
+          },
+          "cash_session_id": {
+            "format": "uuid",
+            "title": "Cash Session Id",
+            "type": "string",
+            "x-zeromerma-id-representation": "JSON_STRING"
+          },
+          "expected_version": {
+            "minimum": 1.0,
+            "title": "Expected Version",
+            "type": "integer"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/CreateCustomerOrderItemRequest"
+            },
+            "minItems": 1,
+            "title": "Items",
+            "type": "array"
+          },
+          "quote_fingerprint": {
+            "maxLength": 64,
+            "minLength": 64,
+            "title": "Quote Fingerprint",
+            "type": "string"
+          },
+          "reason": {
+            "maxLength": 240,
+            "minLength": 4,
+            "title": "Reason",
+            "type": "string"
+          },
+          "requested_for_at": {
+            "format": "date-time",
+            "title": "Requested For At",
+            "type": "string",
+            "x-zeromerma-instant-format": "ISO8601_DATETIME"
+          },
+          "workstation_code": {
+            "maxLength": 64,
+            "minLength": 1,
+            "title": "Workstation Code",
+            "type": "string"
+          }
+        },
+        "required": [
+          "workstation_code",
+          "requested_for_at",
+          "items",
+          "cash_session_id",
+          "expected_version",
+          "quote_fingerprint",
+          "reason"
+        ],
+        "title": "AmendCustomerOrderRequest",
+        "type": "object"
+      },
       "ApiErrorResponse": {
         "additionalProperties": false,
         "properties": {
@@ -37114,11 +37240,29 @@
             "title": "Cancellation Reason",
             "type": "string"
           },
+          "cancellation_responsibility": {
+            "enum": [
+              "CUSTOMER",
+              "MERCHANT"
+            ],
+            "title": "Cancellation Responsibility",
+            "type": "string"
+          },
           "cash_session_id": {
             "format": "uuid",
             "title": "Cash Session Id",
             "type": "string",
             "x-zeromerma-id-representation": "JSON_STRING"
+          },
+          "terminal_status": {
+            "default": "CANCELED",
+            "enum": [
+              "CANCELED",
+              "EXPIRED",
+              "NO_SHOW"
+            ],
+            "title": "Terminal Status",
+            "type": "string"
           },
           "workstation_code": {
             "maxLength": 64,
@@ -37130,7 +37274,8 @@
         "required": [
           "workstation_code",
           "cash_session_id",
-          "cancellation_reason"
+          "cancellation_reason",
+          "cancellation_responsibility"
         ],
         "title": "CancelCustomerOrderRequest",
         "type": "object"
@@ -39438,12 +39583,33 @@
         "type": "object"
       },
       "ConfirmSaleLineRequest": {
+        "additionalProperties": false,
         "properties": {
           "capture_mode": {
             "maxLength": 32,
             "minLength": 1,
             "title": "Capture Mode",
             "type": "string"
+          },
+          "expected_currency_code": {
+            "pattern": "^[A-Z]{3}$",
+            "title": "Expected Currency Code",
+            "type": "string"
+          },
+          "expected_unit_price": {
+            "anyOf": [
+              {
+                "minimum": 0.0,
+                "type": "number"
+              },
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*(?:\\d{0,10}|(?=[\\d.]{1,13}0*$)\\d{0,10}\\.\\d{0,2}0*$)",
+                "type": "string",
+                "x-zeromerma-decimal-representation": "JSON_STRING"
+              }
+            ],
+            "title": "Expected Unit Price",
+            "x-zeromerma-decimal-input-representation": "JSON_NUMBER_OR_STRING"
           },
           "product_class_id": {
             "anyOf": [
@@ -39489,7 +39655,9 @@
         },
         "required": [
           "capture_mode",
-          "quantity"
+          "quantity",
+          "expected_unit_price",
+          "expected_currency_code"
         ],
         "title": "ConfirmSaleLineRequest",
         "type": "object"
@@ -39526,6 +39694,7 @@
         "type": "object"
       },
       "ConfirmSaleRequest": {
+        "additionalProperties": false,
         "properties": {
           "cash_session_id": {
             "format": "uuid",
@@ -40975,6 +41144,12 @@
             ],
             "title": "Notes"
           },
+          "quote_fingerprint": {
+            "maxLength": 64,
+            "minLength": 64,
+            "title": "Quote Fingerprint",
+            "type": "string"
+          },
           "requested_for_at": {
             "anyOf": [
               {
@@ -40999,7 +41174,8 @@
           "workstation_code",
           "cash_session_id",
           "customer_name",
-          "items"
+          "items",
+          "quote_fingerprint"
         ],
         "title": "CreateCustomerOrderRequest",
         "type": "object"
@@ -41192,6 +41368,11 @@
           "branch": {
             "$ref": "#/components/schemas/BranchSummary"
           },
+          "can_amend": {
+            "default": false,
+            "title": "Can Amend",
+            "type": "boolean"
+          },
           "can_cancel": {
             "title": "Can Cancel",
             "type": "boolean"
@@ -41202,6 +41383,11 @@
           },
           "can_mark_ready": {
             "title": "Can Mark Ready",
+            "type": "boolean"
+          },
+          "can_pay": {
+            "default": false,
+            "title": "Can Pay",
             "type": "boolean"
           },
           "canceled_at": {
@@ -41247,6 +41433,17 @@
           "cancellation_refund_eligible": {
             "title": "Cancellation Refund Eligible",
             "type": "boolean"
+          },
+          "cancellation_responsibility": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cancellation Responsibility"
           },
           "created_at_utc": {
             "format": "date-time",
@@ -41344,6 +41541,39 @@
             "title": "Payments",
             "type": "array"
           },
+          "production_commit_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string",
+                "x-zeromerma-instant-format": "ISO8601_DATETIME"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Production Commit At"
+          },
+          "production_committed_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string",
+                "x-zeromerma-instant-format": "ISO8601_DATETIME"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Production Committed At"
+          },
+          "recognized_revenue_amount": {
+            "default": "0.00",
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Recognized Revenue Amount",
+            "type": "string",
+            "x-zeromerma-decimal-representation": "JSON_STRING"
+          },
           "remaining_balance_amount": {
             "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
             "title": "Remaining Balance Amount",
@@ -41367,6 +41597,13 @@
             "title": "Requires Settlement On Delivery",
             "type": "boolean"
           },
+          "retained_amount": {
+            "default": "0.00",
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Retained Amount",
+            "type": "string",
+            "x-zeromerma-decimal-representation": "JSON_STRING"
+          },
           "status": {
             "title": "Status",
             "type": "string"
@@ -41383,11 +41620,23 @@
             "type": "string",
             "x-zeromerma-decimal-representation": "JSON_STRING"
           },
+          "unapplied_amount": {
+            "default": "0.00",
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Unapplied Amount",
+            "type": "string",
+            "x-zeromerma-decimal-representation": "JSON_STRING"
+          },
           "updated_at_utc": {
             "format": "date-time",
             "title": "Updated At Utc",
             "type": "string",
             "x-zeromerma-instant-format": "ISO8601_DATETIME"
+          },
+          "version": {
+            "default": 0,
+            "title": "Version",
+            "type": "integer"
           },
           "workstation_created": {
             "$ref": "#/components/schemas/WorkstationSummary"
@@ -41653,6 +41902,16 @@
             "title": "Payment Type",
             "type": "string"
           },
+          "receipt": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/OperationalReceiptView"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "recorded_at_utc": {
             "format": "date-time",
             "title": "Recorded At Utc",
@@ -41785,6 +42044,146 @@
         ],
         "title": "DeliverCustomerOrderSettlementPaymentRequest",
         "type": "object"
+      },
+      "DeviceCommand": {
+        "additionalProperties": false,
+        "properties": {
+          "binding_version": {
+            "minimum": 1.0,
+            "title": "Binding Version",
+            "type": "integer"
+          },
+          "branch_id": {
+            "format": "uuid",
+            "title": "Branch Id",
+            "type": "string",
+            "x-zeromerma-id-representation": "JSON_STRING"
+          },
+          "cash_entry_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string",
+                "x-zeromerma-id-representation": "JSON_STRING"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cash Entry Id"
+          },
+          "device_id": {
+            "format": "uuid",
+            "title": "Device Id",
+            "type": "string",
+            "x-zeromerma-id-representation": "JSON_STRING"
+          },
+          "environment": {
+            "enum": [
+              "SANDBOX",
+              "PRODUCTION"
+            ],
+            "title": "Environment",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string",
+            "x-zeromerma-id-representation": "JSON_STRING"
+          },
+          "kind": {
+            "enum": [
+              "PRINT",
+              "OPEN_DRAWER"
+            ],
+            "title": "Kind",
+            "type": "string"
+          },
+          "origin": {
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Origin",
+            "type": "string"
+          },
+          "protocol_version": {
+            "const": 1,
+            "default": 1,
+            "title": "Protocol Version",
+            "type": "integer"
+          },
+          "receipt": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/OperationalReceiptView"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "workstation_id": {
+            "format": "uuid",
+            "title": "Workstation Id",
+            "type": "string",
+            "x-zeromerma-id-representation": "JSON_STRING"
+          }
+        },
+        "required": [
+          "id",
+          "kind",
+          "branch_id",
+          "workstation_id",
+          "device_id",
+          "binding_version",
+          "environment",
+          "origin"
+        ],
+        "title": "DeviceCommand",
+        "type": "object"
+      },
+      "DeviceCommandResult": {
+        "additionalProperties": false,
+        "properties": {
+          "command_id": {
+            "format": "uuid",
+            "title": "Command Id",
+            "type": "string",
+            "x-zeromerma-id-representation": "JSON_STRING"
+          },
+          "evidence_reference": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Evidence Reference"
+          },
+          "state": {
+            "enum": [
+              "QUEUED",
+              "PROCESSING",
+              "ACKNOWLEDGED",
+              "PRINTED",
+              "OPENED",
+              "UNAVAILABLE",
+              "UNKNOWN"
+            ],
+            "title": "State",
+            "type": "string"
+          }
+        },
+        "required": [
+          "command_id",
+          "state"
+        ],
+        "title": "DeviceCommandResult",
+        "type": "object",
+        "x-zeromerma-transport": "PAIRED_LOCAL_DEVICE_RUNTIME"
       },
       "DiscountControlsView": {
         "properties": {
@@ -42198,6 +42597,194 @@
         "title": "FinancialRefundView",
         "type": "object"
       },
+      "HardwareBindingView": {
+        "properties": {
+          "enabled": {
+            "title": "Enabled",
+            "type": "boolean"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string",
+            "x-zeromerma-id-representation": "JSON_STRING"
+          },
+          "kind": {
+            "enum": [
+              "PRINTER",
+              "DRAWER"
+            ],
+            "title": "Kind",
+            "type": "string"
+          },
+          "support_status": {
+            "enum": [
+              "PENDING_VALIDATION",
+              "REGISTERED"
+            ],
+            "title": "Support Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "kind",
+          "enabled",
+          "support_status"
+        ],
+        "title": "HardwareBindingView",
+        "type": "object"
+      },
+      "HardwareBootstrapView": {
+        "properties": {
+          "blockers": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Blockers",
+            "type": "array"
+          },
+          "branch_id": {
+            "format": "uuid",
+            "title": "Branch Id",
+            "type": "string",
+            "x-zeromerma-id-representation": "JSON_STRING"
+          },
+          "browser_print_fallback": {
+            "const": "UNCERTIFIED",
+            "default": "UNCERTIFIED",
+            "title": "Browser Print Fallback",
+            "type": "string"
+          },
+          "devices": {
+            "items": {
+              "$ref": "#/components/schemas/HardwareBindingView"
+            },
+            "title": "Devices",
+            "type": "array"
+          },
+          "manual_drawer_opening_enabled": {
+            "const": false,
+            "default": false,
+            "title": "Manual Drawer Opening Enabled",
+            "type": "boolean"
+          },
+          "workstation_id": {
+            "format": "uuid",
+            "title": "Workstation Id",
+            "type": "string",
+            "x-zeromerma-id-representation": "JSON_STRING"
+          }
+        },
+        "required": [
+          "workstation_id",
+          "branch_id",
+          "devices",
+          "blockers"
+        ],
+        "title": "HardwareBootstrapView",
+        "type": "object"
+      },
+      "HardwareCommandAcknowledgement": {
+        "additionalProperties": false,
+        "properties": {
+          "command_id": {
+            "format": "uuid",
+            "title": "Command Id",
+            "type": "string",
+            "x-zeromerma-id-representation": "JSON_STRING"
+          },
+          "grant": {
+            "$ref": "#/components/schemas/SignedDeviceCommand"
+          },
+          "physical_outcome": {
+            "const": "NOT_CONFIRMED",
+            "default": "NOT_CONFIRMED",
+            "title": "Physical Outcome",
+            "type": "string"
+          }
+        },
+        "required": [
+          "command_id",
+          "grant"
+        ],
+        "title": "HardwareCommandAcknowledgement",
+        "type": "object"
+      },
+      "HardwareCommandRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "binding_id": {
+            "format": "uuid",
+            "title": "Binding Id",
+            "type": "string",
+            "x-zeromerma-id-representation": "JSON_STRING"
+          },
+          "cash_entry_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string",
+                "x-zeromerma-id-representation": "JSON_STRING"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cash Entry Id"
+          },
+          "kind": {
+            "enum": [
+              "PRINT",
+              "OPEN_DRAWER"
+            ],
+            "title": "Kind",
+            "type": "string"
+          },
+          "receipt_source_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string",
+                "x-zeromerma-id-representation": "JSON_STRING"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Receipt Source Id"
+          },
+          "receipt_source_kind": {
+            "anyOf": [
+              {
+                "enum": [
+                  "SALE",
+                  "ORDER_PAYMENT",
+                  "RETURN"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Receipt Source Kind"
+          },
+          "workstation_code": {
+            "maxLength": 64,
+            "minLength": 1,
+            "title": "Workstation Code",
+            "type": "string"
+          }
+        },
+        "required": [
+          "workstation_code",
+          "binding_id",
+          "kind"
+        ],
+        "title": "HardwareCommandRequest",
+        "type": "object"
+      },
       "HealthResponse": {
         "properties": {
           "environment": {
@@ -42490,6 +43077,50 @@
         "type": "object"
       },
       "JsonValue": {},
+      "LocalReadinessResponse": {
+        "properties": {
+          "browser_offline_mutations": {
+            "const": false,
+            "default": false,
+            "title": "Browser Offline Mutations",
+            "type": "boolean"
+          },
+          "database": {
+            "enum": [
+              "READY",
+              "UNAVAILABLE"
+            ],
+            "title": "Database",
+            "type": "string"
+          },
+          "internet": {
+            "const": "UNKNOWN",
+            "default": "UNKNOWN",
+            "title": "Internet",
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "READY",
+              "UNAVAILABLE"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "transactional_mode": {
+            "const": "LOCAL_FIRST",
+            "default": "LOCAL_FIRST",
+            "title": "Transactional Mode",
+            "type": "string"
+          }
+        },
+        "required": [
+          "status",
+          "database"
+        ],
+        "title": "LocalReadinessResponse",
+        "type": "object"
+      },
       "LoginRequest": {
         "additionalProperties": false,
         "properties": {
@@ -44572,6 +45203,156 @@
         "title": "OperationalPaymentScopeView",
         "type": "object"
       },
+      "OperationalReceiptView": {
+        "additionalProperties": false,
+        "properties": {
+          "change_amount": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d{0,2}0*$",
+            "title": "Change Amount",
+            "type": "string",
+            "x-zeromerma-decimal-representation": "JSON_STRING"
+          },
+          "context": {
+            "$ref": "#/components/schemas/ReceiptContextView"
+          },
+          "currency_code": {
+            "default": "MXN",
+            "pattern": "^[A-Z]{3}$",
+            "title": "Currency Code",
+            "type": "string"
+          },
+          "discount_amount": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d{0,2}0*$",
+            "title": "Discount Amount",
+            "type": "string",
+            "x-zeromerma-decimal-representation": "JSON_STRING"
+          },
+          "fiscal_document": {
+            "const": false,
+            "default": false,
+            "title": "Fiscal Document",
+            "type": "boolean"
+          },
+          "folio": {
+            "title": "Folio",
+            "type": "string"
+          },
+          "lines": {
+            "items": {
+              "$ref": "#/components/schemas/ReceiptLineView"
+            },
+            "title": "Lines",
+            "type": "array"
+          },
+          "occurred_at": {
+            "format": "date-time",
+            "title": "Occurred At",
+            "type": "string",
+            "x-zeromerma-instant-format": "ISO8601_DATETIME"
+          },
+          "payments": {
+            "items": {
+              "$ref": "#/components/schemas/ReceiptPaymentView"
+            },
+            "title": "Payments",
+            "type": "array"
+          },
+          "pending_amount": {
+            "anyOf": [
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d{0,2}0*$",
+                "type": "string",
+                "x-zeromerma-decimal-representation": "JSON_STRING"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pending Amount"
+          },
+          "provider_receipt": {
+            "const": false,
+            "default": false,
+            "title": "Provider Receipt",
+            "type": "boolean"
+          },
+          "related_document_folio": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Related Document Folio"
+          },
+          "schema_version": {
+            "const": 1,
+            "default": 1,
+            "title": "Schema Version",
+            "type": "integer"
+          },
+          "seller": {
+            "$ref": "#/components/schemas/ReceiptSellerView"
+          },
+          "settled_amount": {
+            "anyOf": [
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d{0,2}0*$",
+                "type": "string",
+                "x-zeromerma-decimal-representation": "JSON_STRING"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Settled Amount"
+          },
+          "source_id": {
+            "format": "uuid",
+            "title": "Source Id",
+            "type": "string",
+            "x-zeromerma-id-representation": "JSON_STRING"
+          },
+          "source_kind": {
+            "enum": [
+              "SALE",
+              "ORDER_PAYMENT",
+              "RETURN"
+            ],
+            "title": "Source Kind",
+            "type": "string"
+          },
+          "subtotal_amount": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d{0,2}0*$",
+            "title": "Subtotal Amount",
+            "type": "string",
+            "x-zeromerma-decimal-representation": "JSON_STRING"
+          },
+          "total_amount": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d{0,2}0*$",
+            "title": "Total Amount",
+            "type": "string",
+            "x-zeromerma-decimal-representation": "JSON_STRING"
+          }
+        },
+        "required": [
+          "source_kind",
+          "source_id",
+          "folio",
+          "occurred_at",
+          "context",
+          "subtotal_amount",
+          "discount_amount",
+          "total_amount",
+          "change_amount",
+          "lines",
+          "payments"
+        ],
+        "title": "OperationalReceiptView",
+        "type": "object"
+      },
       "OperationsBootstrapResponse": {
         "properties": {
           "branch": {
@@ -44979,7 +45760,9 @@
               "PENDING",
               "READY",
               "DELIVERED",
-              "CANCELED"
+              "CANCELED",
+              "EXPIRED",
+              "NO_SHOW"
             ],
             "title": "Status",
             "type": "string"
@@ -45017,6 +45800,217 @@
           "payments"
         ],
         "title": "OrderCommandResultView",
+        "type": "object"
+      },
+      "OrderPolicyRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "lead_time_minutes": {
+            "maximum": 525600.0,
+            "minimum": 0.0,
+            "title": "Lead Time Minutes",
+            "type": "integer"
+          },
+          "reason": {
+            "maxLength": 240,
+            "minLength": 4,
+            "title": "Reason",
+            "type": "string"
+          }
+        },
+        "required": [
+          "lead_time_minutes",
+          "reason"
+        ],
+        "title": "OrderPolicyRequest",
+        "type": "object"
+      },
+      "OrderPolicyView": {
+        "additionalProperties": false,
+        "properties": {
+          "branch_id": {
+            "format": "uuid",
+            "title": "Branch Id",
+            "type": "string",
+            "x-zeromerma-id-representation": "JSON_STRING"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string",
+            "x-zeromerma-id-representation": "JSON_STRING"
+          },
+          "lead_time_minutes": {
+            "title": "Lead Time Minutes",
+            "type": "integer"
+          },
+          "reason": {
+            "title": "Reason",
+            "type": "string"
+          },
+          "version": {
+            "title": "Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "branch_id",
+          "version",
+          "lead_time_minutes",
+          "reason"
+        ],
+        "title": "OrderPolicyView",
+        "type": "object"
+      },
+      "OrderQuoteLineView": {
+        "properties": {
+          "line_total_amount": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Line Total Amount",
+            "type": "string",
+            "x-zeromerma-decimal-representation": "JSON_STRING"
+          },
+          "product_id": {
+            "format": "uuid",
+            "title": "Product Id",
+            "type": "string",
+            "x-zeromerma-id-representation": "JSON_STRING"
+          },
+          "quantity": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Quantity",
+            "type": "string",
+            "x-zeromerma-decimal-representation": "JSON_STRING"
+          },
+          "unit_price": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Unit Price",
+            "type": "string",
+            "x-zeromerma-decimal-representation": "JSON_STRING"
+          }
+        },
+        "required": [
+          "product_id",
+          "quantity",
+          "unit_price",
+          "line_total_amount"
+        ],
+        "title": "OrderQuoteLineView",
+        "type": "object"
+      },
+      "OrderQuoteRequest": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/CreateCustomerOrderItemRequest"
+            },
+            "minItems": 1,
+            "title": "Items",
+            "type": "array"
+          },
+          "requested_for_at": {
+            "format": "date-time",
+            "title": "Requested For At",
+            "type": "string",
+            "x-zeromerma-instant-format": "ISO8601_DATETIME"
+          },
+          "workstation_code": {
+            "maxLength": 64,
+            "minLength": 1,
+            "title": "Workstation Code",
+            "type": "string"
+          }
+        },
+        "required": [
+          "workstation_code",
+          "requested_for_at",
+          "items"
+        ],
+        "title": "OrderQuoteRequest",
+        "type": "object"
+      },
+      "OrderQuoteView": {
+        "properties": {
+          "branch_id": {
+            "format": "uuid",
+            "title": "Branch Id",
+            "type": "string",
+            "x-zeromerma-id-representation": "JSON_STRING"
+          },
+          "branch_timezone": {
+            "title": "Branch Timezone",
+            "type": "string"
+          },
+          "currency_code": {
+            "title": "Currency Code",
+            "type": "string"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/OrderQuoteLineView"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "lead_time_minutes": {
+            "title": "Lead Time Minutes",
+            "type": "integer"
+          },
+          "minimum_advance_amount": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Minimum Advance Amount",
+            "type": "string",
+            "x-zeromerma-decimal-representation": "JSON_STRING"
+          },
+          "policy_id": {
+            "format": "uuid",
+            "title": "Policy Id",
+            "type": "string",
+            "x-zeromerma-id-representation": "JSON_STRING"
+          },
+          "policy_version": {
+            "title": "Policy Version",
+            "type": "integer"
+          },
+          "production_commit_at": {
+            "format": "date-time",
+            "title": "Production Commit At",
+            "type": "string",
+            "x-zeromerma-instant-format": "ISO8601_DATETIME"
+          },
+          "quote_fingerprint": {
+            "title": "Quote Fingerprint",
+            "type": "string"
+          },
+          "requested_for_at": {
+            "format": "date-time",
+            "title": "Requested For At",
+            "type": "string",
+            "x-zeromerma-instant-format": "ISO8601_DATETIME"
+          },
+          "total_amount": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Total Amount",
+            "type": "string",
+            "x-zeromerma-decimal-representation": "JSON_STRING"
+          }
+        },
+        "required": [
+          "quote_fingerprint",
+          "policy_id",
+          "policy_version",
+          "lead_time_minutes",
+          "branch_id",
+          "branch_timezone",
+          "requested_for_at",
+          "production_commit_at",
+          "currency_code",
+          "total_amount",
+          "minimum_advance_amount",
+          "items"
+        ],
+        "title": "OrderQuoteView",
         "type": "object"
       },
       "OrderStatusCounterView": {
@@ -45441,6 +46435,37 @@
           "new_password"
         ],
         "title": "PasswordResetRequest",
+        "type": "object"
+      },
+      "PayCustomerOrderRequest": {
+        "properties": {
+          "cash_session_id": {
+            "format": "uuid",
+            "title": "Cash Session Id",
+            "type": "string",
+            "x-zeromerma-id-representation": "JSON_STRING"
+          },
+          "payments": {
+            "items": {
+              "$ref": "#/components/schemas/CreateCustomerOrderAdvancePaymentRequest"
+            },
+            "minItems": 1,
+            "title": "Payments",
+            "type": "array"
+          },
+          "workstation_code": {
+            "maxLength": 64,
+            "minLength": 1,
+            "title": "Workstation Code",
+            "type": "string"
+          }
+        },
+        "required": [
+          "workstation_code",
+          "cash_session_id",
+          "payments"
+        ],
+        "title": "PayCustomerOrderRequest",
         "type": "object"
       },
       "PaymentsBootstrapResponse": {
@@ -46566,6 +47591,281 @@
           "password"
         ],
         "title": "ReauthenticationRequest",
+        "type": "object"
+      },
+      "ReceiptContextView": {
+        "additionalProperties": false,
+        "properties": {
+          "actor_id": {
+            "format": "uuid",
+            "title": "Actor Id",
+            "type": "string",
+            "x-zeromerma-id-representation": "JSON_STRING"
+          },
+          "actor_name": {
+            "title": "Actor Name",
+            "type": "string"
+          },
+          "branch_code": {
+            "title": "Branch Code",
+            "type": "string"
+          },
+          "branch_id": {
+            "format": "uuid",
+            "title": "Branch Id",
+            "type": "string",
+            "x-zeromerma-id-representation": "JSON_STRING"
+          },
+          "branch_name": {
+            "title": "Branch Name",
+            "type": "string"
+          },
+          "cash_session_id": {
+            "format": "uuid",
+            "title": "Cash Session Id",
+            "type": "string",
+            "x-zeromerma-id-representation": "JSON_STRING"
+          },
+          "timezone": {
+            "title": "Timezone",
+            "type": "string"
+          },
+          "workstation_code": {
+            "title": "Workstation Code",
+            "type": "string"
+          },
+          "workstation_id": {
+            "format": "uuid",
+            "title": "Workstation Id",
+            "type": "string",
+            "x-zeromerma-id-representation": "JSON_STRING"
+          },
+          "workstation_name": {
+            "title": "Workstation Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "branch_id",
+          "branch_code",
+          "branch_name",
+          "timezone",
+          "workstation_id",
+          "workstation_code",
+          "workstation_name",
+          "actor_id",
+          "actor_name",
+          "cash_session_id"
+        ],
+        "title": "ReceiptContextView",
+        "type": "object"
+      },
+      "ReceiptLineView": {
+        "additionalProperties": false,
+        "properties": {
+          "discount_amount": {
+            "default": "0.00",
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d{0,2}0*$",
+            "title": "Discount Amount",
+            "type": "string",
+            "x-zeromerma-decimal-representation": "JSON_STRING"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "quantity": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d{0,3}0*$",
+            "title": "Quantity",
+            "type": "string",
+            "x-zeromerma-decimal-representation": "JSON_STRING"
+          },
+          "sequence": {
+            "minimum": 1.0,
+            "title": "Sequence",
+            "type": "integer"
+          },
+          "total_amount": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d{0,2}0*$",
+            "title": "Total Amount",
+            "type": "string",
+            "x-zeromerma-decimal-representation": "JSON_STRING"
+          },
+          "unit_price": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d{0,2}0*$",
+            "title": "Unit Price",
+            "type": "string",
+            "x-zeromerma-decimal-representation": "JSON_STRING"
+          }
+        },
+        "required": [
+          "sequence",
+          "name",
+          "quantity",
+          "unit_price",
+          "total_amount"
+        ],
+        "title": "ReceiptLineView",
+        "type": "object"
+      },
+      "ReceiptPaymentView": {
+        "additionalProperties": false,
+        "properties": {
+          "amount": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d{0,2}0*$",
+            "title": "Amount",
+            "type": "string",
+            "x-zeromerma-decimal-representation": "JSON_STRING"
+          },
+          "change_amount": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d{0,2}0*$",
+            "title": "Change Amount",
+            "type": "string",
+            "x-zeromerma-decimal-representation": "JSON_STRING"
+          },
+          "execution_mode": {
+            "enum": [
+              "LOCAL",
+              "ACCOUNTING_ONLY",
+              "PROVIDER_INTEGRATED",
+              "MANUAL_FALLBACK"
+            ],
+            "title": "Execution Mode",
+            "type": "string"
+          },
+          "method": {
+            "enum": [
+              "CASH",
+              "CARD",
+              "TRANSFER"
+            ],
+            "title": "Method",
+            "type": "string"
+          },
+          "tendered_amount": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d{0,2}0*$",
+            "title": "Tendered Amount",
+            "type": "string",
+            "x-zeromerma-decimal-representation": "JSON_STRING"
+          }
+        },
+        "required": [
+          "method",
+          "execution_mode",
+          "amount",
+          "tendered_amount",
+          "change_amount"
+        ],
+        "title": "ReceiptPaymentView",
+        "type": "object"
+      },
+      "ReceiptPrintAcknowledgement": {
+        "additionalProperties": false,
+        "properties": {
+          "physical_outcome": {
+            "const": "NOT_CONFIRMED",
+            "default": "NOT_CONFIRMED",
+            "title": "Physical Outcome",
+            "type": "string"
+          },
+          "print_command_id": {
+            "format": "uuid",
+            "title": "Print Command Id",
+            "type": "string",
+            "x-zeromerma-id-representation": "JSON_STRING"
+          },
+          "receipt": {
+            "$ref": "#/components/schemas/OperationalReceiptView"
+          }
+        },
+        "required": [
+          "receipt",
+          "print_command_id"
+        ],
+        "title": "ReceiptPrintAcknowledgement",
+        "type": "object"
+      },
+      "ReceiptPrintRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "reason": {
+            "maxLength": 240,
+            "minLength": 3,
+            "title": "Reason",
+            "type": "string"
+          },
+          "workstation_code": {
+            "maxLength": 64,
+            "minLength": 1,
+            "title": "Workstation Code",
+            "type": "string"
+          }
+        },
+        "required": [
+          "workstation_code",
+          "reason"
+        ],
+        "title": "ReceiptPrintRequest",
+        "type": "object"
+      },
+      "ReceiptSellerView": {
+        "additionalProperties": false,
+        "properties": {
+          "address": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Address"
+          },
+          "configuration_status": {
+            "default": "UNCONFIGURED",
+            "enum": [
+              "UNCONFIGURED",
+              "CONFIGURED"
+            ],
+            "title": "Configuration Status",
+            "type": "string"
+          },
+          "fiscal_regime": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fiscal Regime"
+          },
+          "legal_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Legal Name"
+          },
+          "tax_identifier": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tax Identifier"
+          }
+        },
+        "title": "ReceiptSellerView",
         "type": "object"
       },
       "RefundSettlementRequest": {
@@ -48669,6 +49969,16 @@
             "title": "Reason Name",
             "type": "string"
           },
+          "receipt": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/OperationalReceiptView"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "refund_method_code": {
             "title": "Refund Method Code",
             "type": "string"
@@ -48701,6 +50011,39 @@
           "lines"
         ],
         "title": "SaleReturnDetailResponse",
+        "type": "object"
+      },
+      "SignedDeviceCommand": {
+        "additionalProperties": false,
+        "properties": {
+          "command": {
+            "$ref": "#/components/schemas/DeviceCommand"
+          },
+          "expires_at": {
+            "format": "date-time",
+            "title": "Expires At",
+            "type": "string",
+            "x-zeromerma-instant-format": "ISO8601_DATETIME"
+          },
+          "issued_at": {
+            "format": "date-time",
+            "title": "Issued At",
+            "type": "string",
+            "x-zeromerma-instant-format": "ISO8601_DATETIME"
+          },
+          "signature": {
+            "pattern": "^[a-f0-9]{64}$",
+            "title": "Signature",
+            "type": "string"
+          }
+        },
+        "required": [
+          "command",
+          "issued_at",
+          "expires_at",
+          "signature"
+        ],
+        "title": "SignedDeviceCommand",
         "type": "object"
       },
       "TerminalBootstrapView": {
@@ -49103,6 +50446,16 @@
             },
             "title": "Payments",
             "type": "array"
+          },
+          "receipt": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/OperationalReceiptView"
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "return_count": {
             "title": "Return Count",
@@ -51308,6 +52661,230 @@
           }
         },
         "summary": "Health",
+        "tags": [
+          "health"
+        ],
+        "x-zeromerma-operation-id-policy": "FASTAPI_STABLE_GENERATED"
+      }
+    },
+    "/ready": {
+      "get": {
+        "description": "Observe local writable authority without depending on external Internet services.",
+        "operationId": "local_readiness_ready_get",
+        "parameters": [
+          {
+            "description": "UUID for this HTTP attempt. Missing, duplicate or invalid IDs are replaced.",
+            "in": "header",
+            "name": "X-Request-ID",
+            "required": false,
+            "schema": {
+              "format": "uuid",
+              "type": "string",
+              "x-zeromerma-id-representation": "JSON_STRING"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LocalReadinessResponse"
+                }
+              }
+            },
+            "description": "Successful Response",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/CorrelationId"
+              },
+              "X-Request-ID": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Bad Request",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/CorrelationId"
+              },
+              "X-Request-ID": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Authentication Required",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/CorrelationId"
+              },
+              "X-Request-ID": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Forbidden",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/CorrelationId"
+              },
+              "X-Request-ID": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/CorrelationId"
+              },
+              "X-Request-ID": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/CorrelationId"
+              },
+              "X-Request-ID": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Validation Error",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/CorrelationId"
+              },
+              "X-Request-ID": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "423": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Session Locked",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/CorrelationId"
+              },
+              "X-Request-ID": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Login Rate Limited",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/CorrelationId"
+              },
+              "X-Request-ID": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Internal Server Error",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/CorrelationId"
+              },
+              "X-Request-ID": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LocalReadinessResponse"
+                }
+              }
+            },
+            "description": "Service Unavailable",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/CorrelationId"
+              },
+              "X-Request-ID": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          }
+        },
+        "summary": "Local Readiness",
         "tags": [
           "health"
         ],
@@ -66731,6 +68308,738 @@
         "x-zeromerma-operation-id-policy": "FASTAPI_STABLE_GENERATED"
       }
     },
+    "/v1/admin/orders/commitment-policies/{branch_id}": {
+      "get": {
+        "operationId": "get_order_commitment_policy_v1_admin_orders_commitment_policies__branch_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "branch_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Branch Id",
+              "type": "string",
+              "x-zeromerma-id-representation": "JSON_STRING"
+            }
+          },
+          {
+            "description": "UUID for this HTTP attempt. Missing, duplicate or invalid IDs are replaced.",
+            "in": "header",
+            "name": "X-Request-ID",
+            "required": false,
+            "schema": {
+              "format": "uuid",
+              "type": "string",
+              "x-zeromerma-id-representation": "JSON_STRING"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/OrderPolicyView"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "title": "Response Get Order Commitment Policy V1 Admin Orders Commitment Policies  Branch Id  Get"
+                }
+              }
+            },
+            "description": "Successful Response",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/CorrelationId"
+              },
+              "X-Request-ID": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Bad Request",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/CorrelationId"
+              },
+              "X-Request-ID": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Authentication Required",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/CorrelationId"
+              },
+              "X-Request-ID": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Forbidden",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/CorrelationId"
+              },
+              "X-Request-ID": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/CorrelationId"
+              },
+              "X-Request-ID": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/CorrelationId"
+              },
+              "X-Request-ID": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Validation Error",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/CorrelationId"
+              },
+              "X-Request-ID": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "423": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Session Locked",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/CorrelationId"
+              },
+              "X-Request-ID": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Login Rate Limited",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/CorrelationId"
+              },
+              "X-Request-ID": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Internal Server Error",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/CorrelationId"
+              },
+              "X-Request-ID": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "PosSessionCookie": []
+          },
+          {
+            "BackofficeSessionCookie": []
+          }
+        ],
+        "summary": "Get Order Commitment Policy",
+        "tags": [
+          "admin-orders"
+        ],
+        "x-authorization-policy": "explicit-deny-by-default",
+        "x-required-capabilities": [
+          "orders.manage"
+        ],
+        "x-zeromerma-operation-id-policy": "FASTAPI_STABLE_GENERATED"
+      },
+      "post": {
+        "operationId": "configure_order_commitment_policy_v1_admin_orders_commitment_policies__branch_id__post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "branch_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Branch Id",
+              "type": "string",
+              "x-zeromerma-id-representation": "JSON_STRING"
+            }
+          },
+          {
+            "description": "A globally unique UUIDv7 identifying this business intention.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": true,
+            "schema": {
+              "description": "A globally unique UUIDv7 identifying this business intention.",
+              "maxLength": 36,
+              "minLength": 36,
+              "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-7[0-9a-fA-F]{3}-[89aAbB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$",
+              "title": "Idempotency-Key",
+              "type": "string"
+            }
+          },
+          {
+            "description": "UUID for this HTTP attempt. Missing, duplicate or invalid IDs are replaced.",
+            "in": "header",
+            "name": "X-Request-ID",
+            "required": false,
+            "schema": {
+              "format": "uuid",
+              "type": "string",
+              "x-zeromerma-id-representation": "JSON_STRING"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OrderPolicyRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OrderPolicyView"
+                }
+              }
+            },
+            "description": "Successful Response",
+            "headers": {
+              "Idempotency-Replayed": {
+                "$ref": "#/components/headers/IdempotencyReplayed"
+              },
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/CorrelationId"
+              },
+              "X-Request-ID": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Bad Request",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/CorrelationId"
+              },
+              "X-Request-ID": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Authentication Required",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/CorrelationId"
+              },
+              "X-Request-ID": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Forbidden",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/CorrelationId"
+              },
+              "X-Request-ID": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/CorrelationId"
+              },
+              "X-Request-ID": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/CorrelationId"
+              },
+              "X-Request-ID": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Validation Error",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/CorrelationId"
+              },
+              "X-Request-ID": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "423": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Session Locked",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/CorrelationId"
+              },
+              "X-Request-ID": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Login Rate Limited",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/CorrelationId"
+              },
+              "X-Request-ID": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Internal Server Error",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/CorrelationId"
+              },
+              "X-Request-ID": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "PosSessionCookie": []
+          },
+          {
+            "BackofficeSessionCookie": []
+          }
+        ],
+        "summary": "Configure Order Commitment Policy",
+        "tags": [
+          "admin-orders"
+        ],
+        "x-authorization-policy": "explicit-deny-by-default",
+        "x-required-capabilities": [
+          "orders.manage"
+        ],
+        "x-zeromerma-operation-id-policy": "FASTAPI_STABLE_GENERATED"
+      }
+    },
+    "/v1/admin/orders/commitment-policies/{branch_id}/confirmations/{idempotency_key}": {
+      "get": {
+        "operationId": "recover_order_commitment_policy_v1_admin_orders_commitment_policies__branch_id__confirmations__idempotency_key__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "branch_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Branch Id",
+              "type": "string",
+              "x-zeromerma-id-representation": "JSON_STRING"
+            }
+          },
+          {
+            "in": "path",
+            "name": "idempotency_key",
+            "required": true,
+            "schema": {
+              "maxLength": 36,
+              "minLength": 36,
+              "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-7[0-9a-fA-F]{3}-[89aAbB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$",
+              "title": "Idempotency Key",
+              "type": "string"
+            }
+          },
+          {
+            "description": "UUID for this HTTP attempt. Missing, duplicate or invalid IDs are replaced.",
+            "in": "header",
+            "name": "X-Request-ID",
+            "required": false,
+            "schema": {
+              "format": "uuid",
+              "type": "string",
+              "x-zeromerma-id-representation": "JSON_STRING"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OrderPolicyView"
+                }
+              }
+            },
+            "description": "Successful Response",
+            "headers": {
+              "Idempotency-Replayed": {
+                "$ref": "#/components/headers/IdempotencyReplayed"
+              },
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/CorrelationId"
+              },
+              "X-Request-ID": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Bad Request",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/CorrelationId"
+              },
+              "X-Request-ID": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Authentication Required",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/CorrelationId"
+              },
+              "X-Request-ID": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Forbidden",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/CorrelationId"
+              },
+              "X-Request-ID": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/CorrelationId"
+              },
+              "X-Request-ID": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/CorrelationId"
+              },
+              "X-Request-ID": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Validation Error",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/CorrelationId"
+              },
+              "X-Request-ID": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "423": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Session Locked",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/CorrelationId"
+              },
+              "X-Request-ID": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Login Rate Limited",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/CorrelationId"
+              },
+              "X-Request-ID": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Internal Server Error",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/CorrelationId"
+              },
+              "X-Request-ID": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "PosSessionCookie": []
+          },
+          {
+            "BackofficeSessionCookie": []
+          }
+        ],
+        "summary": "Recover Order Commitment Policy",
+        "tags": [
+          "admin-orders"
+        ],
+        "x-authorization-policy": "explicit-deny-by-default",
+        "x-required-capabilities": [
+          "orders.manage"
+        ],
+        "x-zeromerma-operation-id-policy": "FASTAPI_STABLE_GENERATED"
+      }
+    },
     "/v1/admin/orders/{order_id}": {
       "get": {
         "operationId": "get_admin_order_detail_v1_admin_orders__order_id__get",
@@ -67004,7 +69313,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/AdminOrderActionRequest"
+                "$ref": "#/components/schemas/AdminOrderCancelRequest"
               }
             }
           },
@@ -107161,6 +109470,944 @@
         "x-zeromerma-operation-id-policy": "FASTAPI_STABLE_GENERATED"
       }
     },
+    "/v1/hardware/bootstrap": {
+      "get": {
+        "operationId": "bootstrap_v1_hardware_bootstrap_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "workstation_code",
+            "required": true,
+            "schema": {
+              "minLength": 1,
+              "title": "Workstation Code",
+              "type": "string"
+            }
+          },
+          {
+            "description": "UUID for this HTTP attempt. Missing, duplicate or invalid IDs are replaced.",
+            "in": "header",
+            "name": "X-Request-ID",
+            "required": false,
+            "schema": {
+              "format": "uuid",
+              "type": "string",
+              "x-zeromerma-id-representation": "JSON_STRING"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HardwareBootstrapView"
+                }
+              }
+            },
+            "description": "Successful Response",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/CorrelationId"
+              },
+              "X-Request-ID": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Bad Request",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/CorrelationId"
+              },
+              "X-Request-ID": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Authentication Required",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/CorrelationId"
+              },
+              "X-Request-ID": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Forbidden",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/CorrelationId"
+              },
+              "X-Request-ID": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/CorrelationId"
+              },
+              "X-Request-ID": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/CorrelationId"
+              },
+              "X-Request-ID": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Validation Error",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/CorrelationId"
+              },
+              "X-Request-ID": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "423": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Session Locked",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/CorrelationId"
+              },
+              "X-Request-ID": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Login Rate Limited",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/CorrelationId"
+              },
+              "X-Request-ID": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Internal Server Error",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/CorrelationId"
+              },
+              "X-Request-ID": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "PosSessionCookie": []
+          },
+          {
+            "BackofficeSessionCookie": []
+          }
+        ],
+        "summary": "Bootstrap",
+        "tags": [
+          "hardware"
+        ],
+        "x-authorization-policy": "explicit-deny-by-default",
+        "x-required-capabilities": [
+          "pos.operate"
+        ],
+        "x-zeromerma-operation-id-policy": "FASTAPI_STABLE_GENERATED"
+      }
+    },
+    "/v1/hardware/commands": {
+      "post": {
+        "operationId": "request_command_v1_hardware_commands_post",
+        "parameters": [
+          {
+            "description": "A globally unique UUIDv7 identifying this business intention.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": true,
+            "schema": {
+              "description": "A globally unique UUIDv7 identifying this business intention.",
+              "maxLength": 36,
+              "minLength": 36,
+              "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-7[0-9a-fA-F]{3}-[89aAbB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$",
+              "title": "Idempotency-Key",
+              "type": "string"
+            }
+          },
+          {
+            "description": "UUID for this HTTP attempt. Missing, duplicate or invalid IDs are replaced.",
+            "in": "header",
+            "name": "X-Request-ID",
+            "required": false,
+            "schema": {
+              "format": "uuid",
+              "type": "string",
+              "x-zeromerma-id-representation": "JSON_STRING"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/HardwareCommandRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HardwareCommandAcknowledgement"
+                }
+              }
+            },
+            "description": "Successful Response",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/CorrelationId"
+              },
+              "X-Request-ID": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Bad Request",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/CorrelationId"
+              },
+              "X-Request-ID": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Authentication Required",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/CorrelationId"
+              },
+              "X-Request-ID": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Forbidden",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/CorrelationId"
+              },
+              "X-Request-ID": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/CorrelationId"
+              },
+              "X-Request-ID": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/CorrelationId"
+              },
+              "X-Request-ID": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Validation Error",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/CorrelationId"
+              },
+              "X-Request-ID": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "423": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Session Locked",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/CorrelationId"
+              },
+              "X-Request-ID": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Login Rate Limited",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/CorrelationId"
+              },
+              "X-Request-ID": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Internal Server Error",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/CorrelationId"
+              },
+              "X-Request-ID": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "PosSessionCookie": []
+          },
+          {
+            "BackofficeSessionCookie": []
+          }
+        ],
+        "summary": "Request Command",
+        "tags": [
+          "hardware"
+        ],
+        "x-authorization-policy": "explicit-deny-by-default",
+        "x-required-capabilities": [],
+        "x-zeromerma-operation-id-policy": "FASTAPI_STABLE_GENERATED"
+      }
+    },
+    "/v1/hardware/commands/by-key/{idempotency_key}": {
+      "get": {
+        "operationId": "recover_command_v1_hardware_commands_by_key__idempotency_key__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "idempotency_key",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Idempotency Key",
+              "type": "string",
+              "x-zeromerma-id-representation": "JSON_STRING"
+            }
+          },
+          {
+            "in": "query",
+            "name": "workstation_code",
+            "required": true,
+            "schema": {
+              "minLength": 1,
+              "title": "Workstation Code",
+              "type": "string"
+            }
+          },
+          {
+            "description": "UUID for this HTTP attempt. Missing, duplicate or invalid IDs are replaced.",
+            "in": "header",
+            "name": "X-Request-ID",
+            "required": false,
+            "schema": {
+              "format": "uuid",
+              "type": "string",
+              "x-zeromerma-id-representation": "JSON_STRING"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HardwareCommandAcknowledgement"
+                }
+              }
+            },
+            "description": "Successful Response",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/CorrelationId"
+              },
+              "X-Request-ID": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Bad Request",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/CorrelationId"
+              },
+              "X-Request-ID": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Authentication Required",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/CorrelationId"
+              },
+              "X-Request-ID": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Forbidden",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/CorrelationId"
+              },
+              "X-Request-ID": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/CorrelationId"
+              },
+              "X-Request-ID": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/CorrelationId"
+              },
+              "X-Request-ID": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Validation Error",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/CorrelationId"
+              },
+              "X-Request-ID": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "423": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Session Locked",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/CorrelationId"
+              },
+              "X-Request-ID": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Login Rate Limited",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/CorrelationId"
+              },
+              "X-Request-ID": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Internal Server Error",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/CorrelationId"
+              },
+              "X-Request-ID": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "PosSessionCookie": []
+          },
+          {
+            "BackofficeSessionCookie": []
+          }
+        ],
+        "summary": "Recover Command",
+        "tags": [
+          "hardware"
+        ],
+        "x-authorization-policy": "explicit-deny-by-default",
+        "x-required-capabilities": [],
+        "x-zeromerma-operation-id-policy": "FASTAPI_STABLE_GENERATED"
+      }
+    },
+    "/v1/hardware/commands/{command_id}/authorization": {
+      "get": {
+        "operationId": "renew_authorization_v1_hardware_commands__command_id__authorization_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "command_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Command Id",
+              "type": "string",
+              "x-zeromerma-id-representation": "JSON_STRING"
+            }
+          },
+          {
+            "in": "query",
+            "name": "workstation_code",
+            "required": true,
+            "schema": {
+              "minLength": 1,
+              "title": "Workstation Code",
+              "type": "string"
+            }
+          },
+          {
+            "description": "UUID for this HTTP attempt. Missing, duplicate or invalid IDs are replaced.",
+            "in": "header",
+            "name": "X-Request-ID",
+            "required": false,
+            "schema": {
+              "format": "uuid",
+              "type": "string",
+              "x-zeromerma-id-representation": "JSON_STRING"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HardwareCommandAcknowledgement"
+                }
+              }
+            },
+            "description": "Successful Response",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/CorrelationId"
+              },
+              "X-Request-ID": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Bad Request",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/CorrelationId"
+              },
+              "X-Request-ID": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Authentication Required",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/CorrelationId"
+              },
+              "X-Request-ID": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Forbidden",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/CorrelationId"
+              },
+              "X-Request-ID": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/CorrelationId"
+              },
+              "X-Request-ID": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/CorrelationId"
+              },
+              "X-Request-ID": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Validation Error",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/CorrelationId"
+              },
+              "X-Request-ID": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "423": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Session Locked",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/CorrelationId"
+              },
+              "X-Request-ID": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Login Rate Limited",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/CorrelationId"
+              },
+              "X-Request-ID": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Internal Server Error",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/CorrelationId"
+              },
+              "X-Request-ID": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "PosSessionCookie": []
+          },
+          {
+            "BackofficeSessionCookie": []
+          }
+        ],
+        "summary": "Renew Authorization",
+        "tags": [
+          "hardware"
+        ],
+        "x-authorization-policy": "explicit-deny-by-default",
+        "x-required-capabilities": [],
+        "x-zeromerma-operation-id-policy": "FASTAPI_STABLE_GENERATED"
+      }
+    },
     "/v1/operations/bootstrap": {
       "get": {
         "operationId": "get_operations_bootstrap_v1_operations_bootstrap_get",
@@ -110766,7 +114013,9 @@
                 "create",
                 "mark-ready",
                 "deliver",
-                "cancel"
+                "cancel",
+                "pay",
+                "amend"
               ],
               "title": "Command Code",
               "type": "string"
@@ -111017,6 +114266,233 @@
         ],
         "x-authorization-policy": "explicit-deny-by-default",
         "x-required-capabilities": [],
+        "x-zeromerma-operation-id-policy": "FASTAPI_STABLE_GENERATED"
+      }
+    },
+    "/v1/orders/quote": {
+      "post": {
+        "operationId": "quote_customer_order_v1_orders_quote_post",
+        "parameters": [
+          {
+            "description": "UUID for this HTTP attempt. Missing, duplicate or invalid IDs are replaced.",
+            "in": "header",
+            "name": "X-Request-ID",
+            "required": false,
+            "schema": {
+              "format": "uuid",
+              "type": "string",
+              "x-zeromerma-id-representation": "JSON_STRING"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OrderQuoteRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OrderQuoteView"
+                }
+              }
+            },
+            "description": "Successful Response",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/CorrelationId"
+              },
+              "X-Request-ID": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Bad Request",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/CorrelationId"
+              },
+              "X-Request-ID": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Authentication Required",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/CorrelationId"
+              },
+              "X-Request-ID": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Forbidden",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/CorrelationId"
+              },
+              "X-Request-ID": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/CorrelationId"
+              },
+              "X-Request-ID": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/CorrelationId"
+              },
+              "X-Request-ID": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Validation Error",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/CorrelationId"
+              },
+              "X-Request-ID": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "423": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Session Locked",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/CorrelationId"
+              },
+              "X-Request-ID": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Login Rate Limited",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/CorrelationId"
+              },
+              "X-Request-ID": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Internal Server Error",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/CorrelationId"
+              },
+              "X-Request-ID": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "PosSessionCookie": []
+          },
+          {
+            "BackofficeSessionCookie": []
+          }
+        ],
+        "summary": "Quote Customer Order",
+        "tags": [
+          "orders"
+        ],
+        "x-authorization-policy": "explicit-deny-by-default",
+        "x-required-capabilities": [
+          "orders.manage"
+        ],
         "x-zeromerma-operation-id-policy": "FASTAPI_STABLE_GENERATED"
       }
     },
@@ -111508,6 +114984,261 @@
         "x-authorization-policy": "explicit-deny-by-default",
         "x-required-capabilities": [
           "orders.view"
+        ],
+        "x-zeromerma-operation-id-policy": "FASTAPI_STABLE_GENERATED"
+      }
+    },
+    "/v1/orders/{order_id}/amend": {
+      "post": {
+        "operationId": "amend_customer_order_v1_orders__order_id__amend_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "order_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Order Id",
+              "type": "string",
+              "x-zeromerma-id-representation": "JSON_STRING"
+            }
+          },
+          {
+            "description": "A globally unique UUIDv7 identifying this business intention.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": true,
+            "schema": {
+              "description": "A globally unique UUIDv7 identifying this business intention.",
+              "maxLength": 36,
+              "minLength": 36,
+              "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-7[0-9a-fA-F]{3}-[89aAbB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$",
+              "title": "Idempotency-Key",
+              "type": "string"
+            }
+          },
+          {
+            "description": "UUID for this HTTP attempt. Missing, duplicate or invalid IDs are replaced.",
+            "in": "header",
+            "name": "X-Request-ID",
+            "required": false,
+            "schema": {
+              "format": "uuid",
+              "type": "string",
+              "x-zeromerma-id-representation": "JSON_STRING"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AmendCustomerOrderRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OrderCommandResultView"
+                }
+              }
+            },
+            "description": "Successful Response",
+            "headers": {
+              "Idempotency-Replayed": {
+                "$ref": "#/components/headers/IdempotencyReplayed"
+              },
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/CorrelationId"
+              },
+              "X-Request-ID": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Bad Request",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/CorrelationId"
+              },
+              "X-Request-ID": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Authentication Required",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/CorrelationId"
+              },
+              "X-Request-ID": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Forbidden",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/CorrelationId"
+              },
+              "X-Request-ID": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/CorrelationId"
+              },
+              "X-Request-ID": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/CorrelationId"
+              },
+              "X-Request-ID": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Validation Error",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/CorrelationId"
+              },
+              "X-Request-ID": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "423": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Session Locked",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/CorrelationId"
+              },
+              "X-Request-ID": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Login Rate Limited",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/CorrelationId"
+              },
+              "X-Request-ID": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Internal Server Error",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/CorrelationId"
+              },
+              "X-Request-ID": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "PosSessionCookie": []
+          },
+          {
+            "BackofficeSessionCookie": []
+          }
+        ],
+        "summary": "Amend Customer Order",
+        "tags": [
+          "orders"
+        ],
+        "x-authorization-policy": "explicit-deny-by-default",
+        "x-required-capabilities": [
+          "orders.manage"
         ],
         "x-zeromerma-operation-id-policy": "FASTAPI_STABLE_GENERATED"
       }
@@ -112267,6 +115998,261 @@
           }
         ],
         "summary": "Mark Order Ready",
+        "tags": [
+          "orders"
+        ],
+        "x-authorization-policy": "explicit-deny-by-default",
+        "x-required-capabilities": [
+          "orders.manage"
+        ],
+        "x-zeromerma-operation-id-policy": "FASTAPI_STABLE_GENERATED"
+      }
+    },
+    "/v1/orders/{order_id}/payments": {
+      "post": {
+        "operationId": "pay_customer_order_v1_orders__order_id__payments_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "order_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Order Id",
+              "type": "string",
+              "x-zeromerma-id-representation": "JSON_STRING"
+            }
+          },
+          {
+            "description": "A globally unique UUIDv7 identifying this business intention.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": true,
+            "schema": {
+              "description": "A globally unique UUIDv7 identifying this business intention.",
+              "maxLength": 36,
+              "minLength": 36,
+              "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-7[0-9a-fA-F]{3}-[89aAbB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$",
+              "title": "Idempotency-Key",
+              "type": "string"
+            }
+          },
+          {
+            "description": "UUID for this HTTP attempt. Missing, duplicate or invalid IDs are replaced.",
+            "in": "header",
+            "name": "X-Request-ID",
+            "required": false,
+            "schema": {
+              "format": "uuid",
+              "type": "string",
+              "x-zeromerma-id-representation": "JSON_STRING"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PayCustomerOrderRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OrderCommandResultView"
+                }
+              }
+            },
+            "description": "Successful Response",
+            "headers": {
+              "Idempotency-Replayed": {
+                "$ref": "#/components/headers/IdempotencyReplayed"
+              },
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/CorrelationId"
+              },
+              "X-Request-ID": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Bad Request",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/CorrelationId"
+              },
+              "X-Request-ID": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Authentication Required",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/CorrelationId"
+              },
+              "X-Request-ID": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Forbidden",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/CorrelationId"
+              },
+              "X-Request-ID": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/CorrelationId"
+              },
+              "X-Request-ID": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/CorrelationId"
+              },
+              "X-Request-ID": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Validation Error",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/CorrelationId"
+              },
+              "X-Request-ID": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "423": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Session Locked",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/CorrelationId"
+              },
+              "X-Request-ID": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Login Rate Limited",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/CorrelationId"
+              },
+              "X-Request-ID": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Internal Server Error",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/CorrelationId"
+              },
+              "X-Request-ID": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "PosSessionCookie": []
+          },
+          {
+            "BackofficeSessionCookie": []
+          }
+        ],
+        "summary": "Pay Customer Order",
         "tags": [
           "orders"
         ],
@@ -119979,6 +123965,531 @@
         "x-required-capabilities": [
           "sales_tickets.view"
         ],
+        "x-zeromerma-operation-id-policy": "FASTAPI_STABLE_GENERATED"
+      }
+    },
+    "/v1/tickets/receipts/{source_kind}/{source_id}/print-request": {
+      "post": {
+        "operationId": "print_receipt_v1_tickets_receipts__source_kind___source_id__print_request_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "source_kind",
+            "required": true,
+            "schema": {
+              "enum": [
+                "SALE",
+                "ORDER_PAYMENT",
+                "RETURN"
+              ],
+              "title": "Source Kind",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "source_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Source Id",
+              "type": "string",
+              "x-zeromerma-id-representation": "JSON_STRING"
+            }
+          },
+          {
+            "description": "A globally unique UUIDv7 identifying this business intention.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": true,
+            "schema": {
+              "description": "A globally unique UUIDv7 identifying this business intention.",
+              "maxLength": 36,
+              "minLength": 36,
+              "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-7[0-9a-fA-F]{3}-[89aAbB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$",
+              "title": "Idempotency-Key",
+              "type": "string"
+            }
+          },
+          {
+            "description": "UUID for this HTTP attempt. Missing, duplicate or invalid IDs are replaced.",
+            "in": "header",
+            "name": "X-Request-ID",
+            "required": false,
+            "schema": {
+              "format": "uuid",
+              "type": "string",
+              "x-zeromerma-id-representation": "JSON_STRING"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReceiptPrintRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReceiptPrintAcknowledgement"
+                }
+              }
+            },
+            "description": "Successful Response",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/CorrelationId"
+              },
+              "X-Request-ID": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Bad Request",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/CorrelationId"
+              },
+              "X-Request-ID": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Authentication Required",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/CorrelationId"
+              },
+              "X-Request-ID": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Forbidden",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/CorrelationId"
+              },
+              "X-Request-ID": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/CorrelationId"
+              },
+              "X-Request-ID": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/CorrelationId"
+              },
+              "X-Request-ID": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Validation Error",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/CorrelationId"
+              },
+              "X-Request-ID": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "423": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Session Locked",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/CorrelationId"
+              },
+              "X-Request-ID": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Login Rate Limited",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/CorrelationId"
+              },
+              "X-Request-ID": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Internal Server Error",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/CorrelationId"
+              },
+              "X-Request-ID": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "PosSessionCookie": []
+          },
+          {
+            "BackofficeSessionCookie": []
+          }
+        ],
+        "summary": "Print Receipt",
+        "tags": [
+          "tickets"
+        ],
+        "x-authorization-policy": "explicit-deny-by-default",
+        "x-required-capabilities": [],
+        "x-zeromerma-operation-id-policy": "FASTAPI_STABLE_GENERATED"
+      }
+    },
+    "/v1/tickets/receipts/{source_kind}/{source_id}/print-requests/{idempotency_key}": {
+      "get": {
+        "operationId": "recover_print_receipt_v1_tickets_receipts__source_kind___source_id__print_requests__idempotency_key__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "source_kind",
+            "required": true,
+            "schema": {
+              "enum": [
+                "SALE",
+                "ORDER_PAYMENT",
+                "RETURN"
+              ],
+              "title": "Source Kind",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "source_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Source Id",
+              "type": "string",
+              "x-zeromerma-id-representation": "JSON_STRING"
+            }
+          },
+          {
+            "in": "path",
+            "name": "idempotency_key",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Idempotency Key",
+              "type": "string",
+              "x-zeromerma-id-representation": "JSON_STRING"
+            }
+          },
+          {
+            "in": "query",
+            "name": "workstation_code",
+            "required": true,
+            "schema": {
+              "minLength": 1,
+              "title": "Workstation Code",
+              "type": "string"
+            }
+          },
+          {
+            "description": "UUID for this HTTP attempt. Missing, duplicate or invalid IDs are replaced.",
+            "in": "header",
+            "name": "X-Request-ID",
+            "required": false,
+            "schema": {
+              "format": "uuid",
+              "type": "string",
+              "x-zeromerma-id-representation": "JSON_STRING"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReceiptPrintAcknowledgement"
+                }
+              }
+            },
+            "description": "Successful Response",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/CorrelationId"
+              },
+              "X-Request-ID": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Bad Request",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/CorrelationId"
+              },
+              "X-Request-ID": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Authentication Required",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/CorrelationId"
+              },
+              "X-Request-ID": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Forbidden",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/CorrelationId"
+              },
+              "X-Request-ID": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/CorrelationId"
+              },
+              "X-Request-ID": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/CorrelationId"
+              },
+              "X-Request-ID": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Validation Error",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/CorrelationId"
+              },
+              "X-Request-ID": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "423": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Session Locked",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/CorrelationId"
+              },
+              "X-Request-ID": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Login Rate Limited",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/CorrelationId"
+              },
+              "X-Request-ID": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Internal Server Error",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/CorrelationId"
+              },
+              "X-Request-ID": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "PosSessionCookie": []
+          },
+          {
+            "BackofficeSessionCookie": []
+          }
+        ],
+        "summary": "Recover Print Receipt",
+        "tags": [
+          "tickets"
+        ],
+        "x-authorization-policy": "explicit-deny-by-default",
+        "x-required-capabilities": [],
         "x-zeromerma-operation-id-policy": "FASTAPI_STABLE_GENERATED"
       }
     },

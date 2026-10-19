@@ -4,6 +4,7 @@ import { useMemo } from "react";
 import { PosButton, PosSectionTitle, PosStatusBadge } from "../../../components/pos-foundations";
 import { SearchIcon, XIcon } from "../../../components/pos-icons";
 import { cn } from "../../../lib/utils";
+import { PosModal } from "../../../components/pos-modal";
 import {
   formatShortcutChordLabel,
 } from "./keyboard-shortcut-registry-context";
@@ -26,7 +27,7 @@ export function KeyboardHelpOverlay() {
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-start justify-center bg-slate-950/35 px-4 py-10 backdrop-blur-[2px]">
+    <PosModal label="Atajos del POS" onClose={closeHelp}>
       <DialogSurface className="w-full max-w-3xl overflow-hidden rounded-[28px] border border-[var(--pos-shell-border)] bg-white shadow-[var(--ui-shadow-overlay)]">
         <DialogHeader
           action={
@@ -86,6 +87,6 @@ export function KeyboardHelpOverlay() {
           </PosButton>
         </DialogFooter>
       </DialogSurface>
-    </div>
+    </PosModal>
   );
 }

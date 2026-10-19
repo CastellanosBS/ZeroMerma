@@ -500,6 +500,23 @@ checkout and verified artifacts; this entry does not substitute for that evidenc
 or declare a production gate complete. No product shelf life or catalog enrollment
 is assumed.
 
+### 0.17 POS block execution — ZM-FIN-056–067
+
+Implementation continues on `codex/zm-fin-056-067-pos` from the accepted inventory
+base. The [POS validation record](implementation/pos-block-validation.md) separates
+implemented sale/order/receipt/connectivity behavior, focused test evidence and
+remaining dependencies. The block is not fully complete: 060 requires the approved
+communication provider and privacy/worker dependencies; 064 requires actual device
+adapters and physical installation acceptance; 065 requires the BBVA technical
+contract and integrated checkout flow. 057/067 retain those applicable external
+acceptance limits. No owner lead time, device model or provider is inferred.
+
+The single migration chain adds 0054–0056; no normal local database is migrated.
+Order lead time is explicit versioned configuration with no runtime default.
+Final technical delivery requires all eight Foundation stages and the aggregate
+check for the exact delivered commit. Earlier accepted runs are not evidence for
+these changes. This entry does not declare a production or pilot gate complete.
+
 ## 1. Resumen ejecutivo
 
 ZeroMerma posee una base adecuada para evolucionar sin reescritura: monolito modular, FastAPI/SQLAlchemy/PostgreSQL, POS y Backoffice separados, OpenAPI generado, precisión decimal, auditoría y outbox transaccionales. La auditoría activa demostró que una parte importante de ventas, pagos, pedidos, documentos y administración es real. También demostró defectos sistémicos: el POS no alimenta el inventario canónico; el pago de pedido no entra en caja/corte; el worker no procesa eventos; la trazabilidad de identidad/origen es incorrecta; y varias superficies administrativas son simuladas o incompletas.

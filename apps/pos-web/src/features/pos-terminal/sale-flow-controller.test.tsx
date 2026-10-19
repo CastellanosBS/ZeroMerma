@@ -6,6 +6,7 @@ import { afterEach, describe, expect, it } from "vitest";
 
 import {
   CARD_PAYMENT_METHOD_CODE,
+  CASH_PAYMENT_METHOD_CODE,
   CONTROL_STATE_PAYMENT_CAPTURE,
   MIXED_PAYMENT_METHOD_CODE,
 } from "./model";
@@ -22,6 +23,7 @@ import {
 type HookApi = ReturnType<typeof useSaleFlowController>;
 
 function renderHookHarness(props: {
+  cartVersion?: object;
   cartLineCount: number;
   controlState: typeof CONTROL_STATE_PAYMENT_CAPTURE;
   hasCompletedSale: boolean;
@@ -43,6 +45,10 @@ function renderHookHarness(props: {
   });
 
   return {
+    rerender(next: typeof props) {
+      props = next;
+      act(() => root.render(<Harness />));
+    },
     getApi() {
       if (api === null) {
         throw new Error("Hook api not ready");
@@ -70,6 +76,70 @@ afterEach(() => {
 });
 
 describe("sale flow controller", () => {
+  it.each([300, 600])("invalidates a confirmed CARD review when cart identity changes at total %i", (nextTotal) => {
+    const original = {};
+    const props = { cartVersion: original, cartLineCount: 1, controlState: CONTROL_STATE_PAYMENT_CAPTURE, hasCompletedSale: false, totalAmountCents: 300 } as const;
+    const harness = renderHookHarness(props);
+    mounted.push(() => harness.unmount());
+    act(() => harness.getApi().switchPaymentMethod(CARD_PAYMENT_METHOD_CODE));
+    act(() => { harness.getApi().confirmAmount(300); });
+    expect(harness.getApi().hasCurrentCartConfirmation(original, 300)).toBe(true);
+    const updated = {};
+    // This guard is also used synchronously, before React has committed the new cart.
+    expect(harness.getApi().hasCurrentCartConfirmation(updated, nextTotal)).toBe(false);
+    harness.rerender({ ...props, cartVersion: updated, totalAmountCents: nextTotal });
+    expect(harness.getApi().state.mode).toBe(SALE_FLOW_PAYMENT_AMOUNT_CAPTURE);
+    expect(harness.getApi().state.cartReviewRequired).toBe(true);
+    expect(harness.getApi().hasCurrentCartConfirmation(updated, nextTotal)).toBe(false);
+    act(() => { harness.getApi().confirmAmount(nextTotal); });
+    expect(harness.getApi().hasCurrentCartConfirmation(updated, nextTotal)).toBe(true);
+    expect(harness.getApi().state.cartReviewRequired).toBe(false);
+  });
+
+  it("discards prior mixed legs when the reviewed cart changes", () => {
+    const props = { cartVersion: {}, cartLineCount: 1, controlState: CONTROL_STATE_PAYMENT_CAPTURE, hasCompletedSale: false, totalAmountCents: 300 } as const;
+    const harness = renderHookHarness(props);
+    mounted.push(() => harness.unmount());
+    act(() => {
+      harness.getApi().switchPaymentMethod(MIXED_PAYMENT_METHOD_CODE);
+      harness.getApi().updateMixedCurrentLegAmountText("1.00");
+    });
+    act(() => { harness.getApi().confirmAmount(300); });
+    expect(harness.getApi().state.mixedConfirmedLegs).toHaveLength(1);
+    harness.rerender({ ...props, cartVersion: {}, totalAmountCents: 600 });
+    expect(harness.getApi().state.mixedConfirmedLegs).toHaveLength(0);
+    expect(harness.getApi().state.cashReceivedText).toBe("");
+    expect(harness.getApi().state.mixedCurrentLegAmountText).toBe("");
+  });
+  it("allows a cash leg to fund change after a card leg", () => {
+    const harness = renderHookHarness({cartLineCount: 1, controlState: CONTROL_STATE_PAYMENT_CAPTURE, hasCompletedSale: false, totalAmountCents: 300});
+    mounted.push(() => harness.unmount());
+    act(() => {
+      harness.getApi().switchPaymentMethod(MIXED_PAYMENT_METHOD_CODE);
+      harness.getApi().setMixedCurrentLegMethodCode(CARD_PAYMENT_METHOD_CODE);
+      harness.getApi().updateMixedCurrentLegAmountText("2.00");
+    });
+    act(() => { expect(harness.getApi().confirmAmount(300)).toEqual({ok: true}); });
+    act(() => {
+      harness.getApi().setMixedCurrentLegMethodCode(CASH_PAYMENT_METHOD_CODE);
+      harness.getApi().updateMixedCurrentLegAmountText("5.00");
+    });
+    act(() => { expect(harness.getApi().confirmAmount(300)).toEqual({ok: true}); });
+    expect(harness.getApi().state.mode).toBe(SALE_FLOW_AMOUNT_CONFIRMED);
+    expect(harness.getApi().paymentComputation.changeAmountCents).toBe(400);
+  });
+
+  it("rejects a card leg that exceeds the remaining amount", () => {
+    const harness = renderHookHarness({cartLineCount: 1, controlState: CONTROL_STATE_PAYMENT_CAPTURE, hasCompletedSale: false, totalAmountCents: 300});
+    mounted.push(() => harness.unmount());
+    act(() => {
+      harness.getApi().switchPaymentMethod(MIXED_PAYMENT_METHOD_CODE);
+      harness.getApi().setMixedCurrentLegMethodCode(CARD_PAYMENT_METHOD_CODE);
+      harness.getApi().updateMixedCurrentLegAmountText("3.01");
+    });
+    act(() => { expect(harness.getApi().confirmAmount(300).ok).toBe(false); });
+    expect(harness.getApi().state.mixedConfirmedLegs).toHaveLength(0);
+  });
   it("accepts the payment intent combo within the timing window", () => {
     expect(isPaymentIntentComboReady(1_000, 1_250)).toBe(true);
     expect(isPaymentIntentComboReady(1_000, 1_301)).toBe(false);

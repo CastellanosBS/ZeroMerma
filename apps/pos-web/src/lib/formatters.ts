@@ -37,6 +37,18 @@ export function formatRecordStatus(status: string | null | undefined, fallback =
     return fallback;
   }
 
+  const labels: Record<string, string> = {
+    ACTIVE: "Activo", OPEN: "Abierto", CLOSED: "Cerrado", LOCKED: "Bloqueado",
+    DRAFT: "Borrador", PENDING: "Pendiente", CONFIRMED: "Confirmado", POSTED: "Registrado",
+    READY: "Listo", DELIVERED: "Entregado", CANCELED: "Cancelado", EXPIRED: "Vencido",
+    NO_SHOW: "Cliente no acudió", REJECTED: "Rechazado", FAILED: "Fallido", UNKNOWN: "Por verificar",
+    IN_TRANSIT: "En tránsito", PARTIALLY_RECEIVED: "Recibido parcialmente", RECEIVED: "Recibido",
+    COMPLETED: "Completado", RESOLVED: "Resuelto", RETURNED: "Devuelto", WASTED: "En merma",
+    PARTIALLY_REFUNDED: "Reembolsado parcialmente", REFUNDED: "Reembolsado",
+  };
+  const label = labels[normalizedStatus.toUpperCase()];
+  if (label) return label;
+
   return normalizedStatus
     .toLowerCase()
     .split(/[_\s-]+/)

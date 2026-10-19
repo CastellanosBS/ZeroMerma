@@ -49,11 +49,13 @@ class SalePricingService:
         quantity: Decimal,
     ) -> PricedSaleLine:
         product_class = session.execute(
-            select(ProductClass).where(
+            select(ProductClass)
+            .where(
                 ProductClass.id == product_class_id,
                 ProductClass.is_active.is_(True),
                 ProductClass.is_sellable.is_(True),
             )
+            .with_for_update(read=True)
         ).scalar_one_or_none()
         if product_class is None:
             raise ProductClassNotFoundError("Product class was not found.")
@@ -100,6 +102,7 @@ class SalePricingService:
                 ProductClass.is_active.is_(True),
                 ProductClass.is_sellable.is_(True),
             )
+            .with_for_update(read=True)
         ).one_or_none()
         if row is None:
             raise ProductNotFoundError("Product was not found.")

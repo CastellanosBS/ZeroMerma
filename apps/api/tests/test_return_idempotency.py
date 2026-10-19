@@ -118,8 +118,16 @@ def _sale(
             "workstation_code": workstation,
             "cash_session_id": cash_id,
             "lines": [
-                {"capture_mode": "PRODUCT_DIRECT", "product_id": str(product), "quantity": "4"},
                 {
+                    "expected_unit_price": "18.00",
+                    "expected_currency_code": "MXN",
+                    "capture_mode": "PRODUCT_DIRECT",
+                    "product_id": str(product),
+                    "quantity": "4",
+                },
+                {
+                    "expected_unit_price": "12.00",
+                    "expected_currency_code": "MXN",
                     "capture_mode": "CLASS_CAPTURE",
                     "product_class_id": str(product_class),
                     "quantity": "2",

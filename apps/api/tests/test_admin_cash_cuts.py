@@ -73,6 +73,8 @@ def _confirm_direct_sale(client: TestClient) -> dict[str, object]:
             "workstation_code": SEED_WORKSTATION_CODE,
             "lines": [
                 {
+                    "expected_unit_price": "18.00",
+                    "expected_currency_code": "MXN",
                     "capture_mode": "PRODUCT_DIRECT",
                     "product_id": _get_product_id(SEED_PRODUCT_COCA_355_CODE),
                     "quantity": "1",

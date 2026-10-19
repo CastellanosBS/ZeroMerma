@@ -50,6 +50,10 @@ test("lost committed sale response recovers after reload and another tab cannot 
   const fault = await dropNextSaleConfirmationResponse(page, environment.apiUrl, network);
   await page.getByRole("button", { name: /^Cobrar(?:\s+Enter)?$/ }).click();
   const originalRequest = await post;
+  expect(originalRequest.postDataJSON().lines[0]).toMatchObject({
+    expected_unit_price: "12.00",
+    expected_currency_code: "MXN",
+  });
   const committed = (await fault.committed) as components["schemas"]["SaleConfirmationView"];
   const key = originalRequest.headers()["idempotency-key"];
   expect(key).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/);
@@ -109,9 +113,13 @@ test("lost committed sale response recovers after reload and another tab cannot 
   await page.getByRole("button", { name: /Pan dulce/ }).click();
   await page.getByRole("textbox", { name: "Cantidad", exact: true }).fill("1");
   await page.getByRole("button", { name: "Agregar", exact: true }).click();
-  await page.getByLabel("Dinero recibido").click();
-  await page.getByLabel("Dinero recibido").fill("100");
-  await page.getByLabel("Dinero recibido").press("Enter");
+  await page.getByRole("button", { name: /Mixto \(registro\)/ }).click();
+  await page.getByRole("button", { name: /\* Tarjeta/ }).click();
+  await page.getByLabel("Monto del tramo").fill("2.00");
+  await page.getByLabel("Monto del tramo").press("Enter");
+  await page.getByRole("button", { name: /\/ Efectivo/ }).click();
+  await page.getByLabel("Monto del tramo").fill("20.00");
+  await page.getByLabel("Monto del tramo").press("Enter");
   const next = page.waitForResponse(
     (response) =>
       new URL(response.url()).pathname === "/v1/sales/confirm" &&
@@ -121,7 +129,14 @@ test("lost committed sale response recovers after reload and another tab cannot 
   const nextResponse = await next;
   expect(nextResponse.status()).toBe(201);
   expect(nextResponse.request().headers()["idempotency-key"]).not.toBe(key);
-  expect((await nextResponse.json()).id).not.toBe(committed.id);
+  const mixed = (await nextResponse.json()) as components["schemas"]["SaleConfirmationView"];
+  expect(mixed.id).not.toBe(committed.id);
+  expect(Number(mixed.total_amount)).toBe(12);
+  expect(Number(mixed.change_amount)).toBe(10);
+  expect(mixed.payments).toEqual(expect.arrayContaining([
+    expect.objectContaining({ payment_method_code: "CARD", applied_amount: "2.00" }),
+    expect.objectContaining({ payment_method_code: "CASH", applied_amount: "10.00", change_amount: "10.00" }),
+  ]));
   await otherTab.close();
 
   await page.goto(`/tickets?ticketId=${committed.id}`);
@@ -192,6 +207,9 @@ test("lost committed sale response recovers after reload and another tab cannot 
   expect(ticketResponse.status()).toBe(200);
   const ticket = (await ticketResponse.json()) as components["schemas"]["TicketDetailResponse"];
   expect(ticket.total_amount).toBe(committed.total_amount);
+  expect(ticket.receipt?.source_id).toBe(committed.id);
+  expect(ticket.receipt?.total_amount).toBe(committed.total_amount);
+  expect(ticket.receipt?.folio).toBe(ticket.folio);
   expect(ticket.lines[0]!.physical_attributions).toHaveLength(2);
   expect(
     network.filter((entry) => entry.method === "POST" && entry.path === "/v1/sales/confirm"),

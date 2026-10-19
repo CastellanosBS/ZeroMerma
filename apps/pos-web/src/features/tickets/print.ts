@@ -1,6 +1,8 @@
 import type { TicketDetailResponse } from "../../lib/api-contracts";
 import { writePrintableDocument } from "../../lib/browser-print";
-import { formatCurrency, formatLocalDateTime } from "../../lib/formatters";
+import { formatLocalDateTime } from "../../lib/formatters";
+
+type Receipt = NonNullable<TicketDetailResponse["receipt"]>;
 
 type TicketPrintVariant = "reprint" | "sale";
 
@@ -38,13 +40,9 @@ function getPaymentMethodLabel(code: string): string {
   }
 }
 
-function parseMoney(value: string): number {
-  const parsed = Number(value);
-  return Number.isFinite(parsed) ? parsed : 0;
-}
-
-function formatMoney(value: string | number): string {
-  return formatCurrency(typeof value === "number" ? value.toFixed(2) : value).replace(/\s/g, "");
+function formatMoney(value: string | number, currencyCode: string): string {
+  return new Intl.NumberFormat("es-MX", { style: "currency", currency: currencyCode,
+    minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(Number(value)).replace(/\s/g, "");
 }
 
 function fitText(value: string, width: number): string {
@@ -62,7 +60,7 @@ function rightText(value: string, width: number): string {
     return normalized.padStart(width, " ");
   }
 
-  return normalized.slice(normalized.length - width);
+  return normalized;
 }
 
 function centerText(value: string): string {
@@ -124,10 +122,10 @@ function wrapText(value: string, width: number): string[] {
   return lines.length > 0 ? lines : [""];
 }
 
-function productLineRows(line: TicketDetailResponse["lines"][number]): string[] {
+function productLineRows(line: Receipt["lines"][number], currencyCode: string): string[] {
   const quantity = formatQuantity(line.quantity);
-  const unitPrice = formatMoney(line.unit_price);
-  const amount = formatMoney(line.line_total_amount);
+  const unitPrice = formatMoney(line.unit_price, currencyCode);
+  const amount = formatMoney(line.total_amount, currencyCode);
   const nameLines = wrapText(line.name, PRODUCT_NAME_WIDTH);
   const [firstName = "", ...restNames] = nameLines;
 
@@ -137,61 +135,78 @@ function productLineRows(line: TicketDetailResponse["lines"][number]): string[] 
   ];
 }
 
-function buildTicketText(ticket: TicketDetailResponse, variant: TicketPrintVariant): string {
-  const subtotal = parseMoney(ticket.subtotal_amount);
-  const total = parseMoney(ticket.total_amount);
-  const discount = Math.max(subtotal - total, 0);
-  const internalReference = ticket.id.slice(0, 8).toUpperCase();
-
+function buildTicketText(receipt: Receipt, variant: TicketPrintVariant): string {
+  const context = receipt.context;
+  const currencyCode = receipt.currency_code ?? "MXN";
+  const money = (value: string | number) => formatMoney(value, currencyCode);
+  const seller = receipt.seller ?? { configuration_status: "UNCONFIGURED" };
+  const title = receipt.source_kind === "RETURN" ? "COMPROBANTE DE DEVOLUCION"
+    : receipt.source_kind === "ORDER_PAYMENT" ? "PAGO DE PEDIDO" : "NOTA DE VENTA";
   const rows: string[] = [
-    centerText(ticket.branch.name.toUpperCase()),
-    centerText(variant === "reprint" ? "REIMPRESION" : "NOTA DE VENTA"),
-    "RFC: No configurado",
-    "Regimen fiscal: No configurado",
-    `Sucursal: ${ticket.branch.name}`,
-    "Direccion: No configurada",
+    ...wrapText(context.branch_name.toUpperCase(), LINE_WIDTH).map(centerText),
+    centerText(variant === "reprint" ? "REIMPRESION" : title),
+    ...wrapText(`Vendedor: ${seller.legal_name ?? "No configurado"}`, LINE_WIDTH),
+    ...wrapText(`RFC: ${seller.tax_identifier ?? "No configurado"}`, LINE_WIDTH),
+    ...wrapText(`Regimen fiscal: ${seller.fiscal_regime ?? "No configurado"}`, LINE_WIDTH),
+    ...wrapText(`Sucursal: ${context.branch_name}`, LINE_WIDTH),
+    ...wrapText(`Direccion: ${seller.address ?? "No configurada"}`, LINE_WIDTH),
+    ...(seller.configuration_status === "UNCONFIGURED" ? ["Identidad fiscal pendiente de configurar."] : []),
     separator(),
-    `Ticket: ${ticket.folio}`,
-    `Fecha: ${formatLocalDateTime(ticket.confirmed_at, ticket.branch.timezone)}`,
-    `Caja: ${ticket.workstation.name}`,
-    `Cajero: ${ticket.operator.full_name}`,
-    `Turno: ${ticket.cash_session_id.slice(0, 8).toUpperCase()}`,
+    ...wrapText(`Ticket: ${receipt.folio}`, LINE_WIDTH),
+    `Fecha: ${formatLocalDateTime(receipt.occurred_at, context.timezone)}`,
+    ...wrapText(`Caja: ${context.workstation_name}`, LINE_WIDTH),
+    ...wrapText(`Cajero: ${context.actor_name}`, LINE_WIDTH),
+    `Turno: ${context.cash_session_id.slice(0, 8).toUpperCase()}`,
+    `Moneda: ${currencyCode}`,
+    ...(receipt.related_document_folio ? wrapText(`Documento: ${receipt.related_document_folio}`, LINE_WIDTH) : []),
     separator(),
     " Cant Producto             P.Unit  Importe",
     separator(),
-    ...ticket.lines.flatMap(productLineRows),
+    ...receipt.lines.flatMap((line) => productLineRows(line, currencyCode)),
     separator(),
-    keyValue("Subtotal", formatMoney(ticket.subtotal_amount)),
-    keyValue("Descuento", formatMoney(discount)),
-    keyValue("TOTAL", formatMoney(ticket.total_amount)),
+    keyValue("Subtotal", money(receipt.subtotal_amount)),
+    keyValue("Descuento", money(receipt.discount_amount)),
+    keyValue("TOTAL", money(receipt.total_amount)),
     "",
-    ...ticket.payments.map((payment) =>
-      keyValue(`Pago ${getPaymentMethodLabel(payment.payment_method_code)}`, formatMoney(payment.tendered_amount)),
-    ),
-    keyValue("Cambio", formatMoney(ticket.change_amount)),
+    ...receipt.payments.flatMap((payment) => [
+      keyValue(`Pago ${getPaymentMethodLabel(payment.method)}`, money(payment.amount)),
+      ...(payment.execution_mode === "ACCOUNTING_ONLY" ? ["Registro de cobro externo."] : []),
+      ...(payment.method === "CASH" ? [keyValue("Efectivo recibido", money(payment.tendered_amount))] : []),
+    ]),
+    keyValue("Cambio", money(receipt.change_amount)),
+    ...(receipt.settled_amount != null ? [keyValue("Reembolsado", money(receipt.settled_amount))] : []),
+    ...(receipt.pending_amount != null ? [keyValue("Pendiente", money(receipt.pending_amount)),
+      "Importes al emitir este comprobante."] : []),
     separator(),
-    "Este ticket es comprobante de compra.",
+    "Comprobante operativo de ZeroMerma.",
     "No sustituye un CFDI.",
-    "Solicite su factura con este folio.",
+    "No es un comprobante emitido por BBVA.",
     "",
     "Gracias por su compra.",
-    `Referencia: ${internalReference}`,
-    `QR: ${ticket.id}`,
+    ...wrapText(`Referencia: ${receipt.source_id}`, LINE_WIDTH),
   ];
-
   return rows.join("\n");
 }
-
 export function buildTicketPrintDocument(
   ticket: TicketDetailResponse,
   options?: {
     variant?: TicketPrintVariant;
   },
 ): string {
+  if (!ticket.receipt) {
+    throw new Error("Este ticket no conserva un documento inmutable para imprimir.");
+  }
+  return buildOperationalReceiptPrintDocument(ticket.receipt, options);
+}
+
+export function buildOperationalReceiptPrintDocument(
+  receipt: Receipt,
+  options?: { variant?: TicketPrintVariant },
+): string {
   const variant = options?.variant ?? "reprint";
   const documentTitle =
-    variant === "sale" ? `Ticket ${ticket.folio}` : `Reimpresion ${ticket.folio}`;
-  const ticketText = buildTicketText(ticket, variant);
+    variant === "sale" ? `Ticket ${receipt.folio}` : `Reimpresion ${receipt.folio}`;
+  const ticketText = buildTicketText(receipt, variant);
 
   return `<!doctype html>
 <html lang="es-MX">

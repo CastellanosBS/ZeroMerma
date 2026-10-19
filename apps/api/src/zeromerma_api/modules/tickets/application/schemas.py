@@ -9,6 +9,7 @@ from pydantic import BaseModel, Field
 from zeromerma_api.modules.branches.application.schemas import BranchSummary, WorkstationSummary
 from zeromerma_api.modules.cash.application.schemas import CashSessionView
 from zeromerma_api.modules.identity.application.schemas import AuthenticatedUser
+from zeromerma_api.modules.tickets.application.receipt_schemas import OperationalReceiptView
 
 
 class TicketScopeView(BaseModel):
@@ -109,6 +110,7 @@ class TicketPaymentDetailView(BaseModel):
 
 
 class TicketDetailResponse(BaseModel):
+    receipt: OperationalReceiptView | None = None
     id: UUID
     folio: str
     status: str

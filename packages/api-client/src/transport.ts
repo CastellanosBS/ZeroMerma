@@ -10,6 +10,7 @@ export interface ApiRequestOptions {
   headers?: HeadersInit;
   method?: "DELETE" | "GET" | "PATCH" | "POST" | "PUT";
   path: string;
+  signal?: AbortSignal;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -85,6 +86,7 @@ export async function requestApiJson<TResponse>({
   headers,
   method = "GET",
   path,
+  signal,
 }: ApiRequestOptions): Promise<TResponse> {
   const requestHeaders = new Headers(headers);
 
@@ -108,6 +110,7 @@ export async function requestApiJson<TResponse>({
     method,
     headers: requestHeaders,
     body: body === undefined ? undefined : JSON.stringify(body),
+    signal,
   });
 
   if (!response.ok) {

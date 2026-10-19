@@ -215,6 +215,7 @@ def _frontend_contract_audit(root: Path) -> tuple[list[str], list[str]]:
     unjustified_fetch: list[str] = []
     unjustified_manual: list[str] = []
     allowed_fetch = {Path("packages/api-client/src/transport.ts")}
+    device_transport = Path("apps/pos-web/src/lib/local-hardware-transport.ts")
     source_roots = (
         root / "apps/pos-web/src",
         root / "apps/backoffice-web/src",
@@ -226,10 +227,24 @@ def _frontend_contract_audit(root: Path) -> tuple[list[str], list[str]]:
         for path in sorted((*source_root.rglob("*.ts"), *source_root.rglob("*.tsx"))):
             relative = path.relative_to(root)
             text = path.read_text(encoding="utf-8")
+            # The paired loopback device runtime has a different authentication
+            # protocol (signed grants, no API cookies). Its bounded transport still
+            # consumes backend-generated models and cannot become another API client.
+            local_device_transport = relative == device_transport and all(
+                marker in text
+                for marker in (
+                    'from "@zeromerma/api-client"',
+                    '["SignedDeviceCommand"]',
+                    '["DeviceCommandResult"]',
+                    'fetch(`http://127.0.0.1:17651/commands${consult ? "/status" : ""}`',
+                    'credentials: "omit"',
+                )
+            ) and len(FETCH_CALL.findall(text)) == 1
             if (
                 ".test." not in path.name
                 and FETCH_CALL.search(text)
                 and relative not in allowed_fetch
+                and not local_device_transport
             ):
                 unjustified_fetch.append(str(relative).replace("\\", "/"))
             if REQUEST_JSON_CALL.search(text) and relative not in allowed_fetch:

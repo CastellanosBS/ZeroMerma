@@ -2,9 +2,10 @@ from __future__ import annotations
 
 from datetime import datetime
 from decimal import Decimal
+from typing import Literal
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 
 from zeromerma_api.modules.financial_ledger.application.refund_schemas import FinancialRefundView
 
@@ -42,6 +43,8 @@ class AdminOrderFilterOptionsView(BaseModel):
 
 
 class AdminOrderListItemView(BaseModel):
+    production_commit_at: datetime | None = None
+    production_committed_at: datetime | None = None
     id: UUID
     folio: str
     customer_name: str
@@ -182,3 +185,9 @@ class AdminOrderDetailView(BaseModel):
 
 class AdminOrderActionRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
+
+
+class AdminOrderCancelRequest(AdminOrderActionRequest):
+    model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
+    cancellation_reason: str = Field(min_length=4, max_length=240)
+    cancellation_responsibility: Literal["CUSTOMER", "MERCHANT"]

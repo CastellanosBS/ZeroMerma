@@ -9,6 +9,7 @@ from uuid import UUID, uuid4
 
 import pytest
 from fastapi.testclient import TestClient
+from order_fixtures import committed_order_clock, quote_order_payload
 from sqlalchemy import func, select
 from test_cash_concurrency import _baseline
 from test_cash_concurrency import _setup as setup_concurrent_order
@@ -70,8 +71,8 @@ def _create(
     headers: dict[str, str],
     context: dict[str, str],
     *,
-    amount: str = "0.00",
-    method: str | None = None,
+    amount: str = "3.00",
+    method: str | None = "CASH",
     legs: list[dict[str, str]] | None = None,
     quantity: str = "2",
 ) -> Any:
@@ -93,15 +94,19 @@ def _create(
         client,
         headers,
         "/v1/orders",
-        {
-            **context,
-            "customer_name": "Financial acceptance fixture",
-            "requested_for_at": (datetime.now(UTC) + timedelta(days=3)).isoformat(),
-            "items": [{"product_id": str(product_id), "quantity": quantity}],
-            "advance_amount": amount,
-            "advance_payment_method_code": method,
-            "advance_payments": legs or [],
-        },
+        quote_order_payload(
+            client,
+            headers,
+            {
+                **context,
+                "customer_name": "Financial acceptance fixture",
+                "requested_for_at": (datetime.now(UTC) + timedelta(days=3)).isoformat(),
+                "items": [{"product_id": str(product_id), "quantity": quantity}],
+                "advance_amount": amount,
+                "advance_payment_method_code": method,
+                "advance_payments": legs or [],
+            },
+        ),
     )
 
 
@@ -169,16 +174,23 @@ def test_audited_missing_six_pesos_reconciles_to_527_in_pos_and_backoffice(
         {
             **context,
             "lines": [
-                {"capture_mode": "CLASS_CAPTURE", "product_class_id": class_id, "quantity": "7"}
+                {
+                    "expected_unit_price": "3.00",
+                    "expected_currency_code": "MXN",
+                    "capture_mode": "CLASS_CAPTURE",
+                    "product_class_id": class_id,
+                    "quantity": "7",
+                }
             ],
             "payments": [{"payment_method_code": "CASH", "tendered_amount": "21.00"}],
         },
     )
     assert sale["total_amount"] == "21.00"
-    _post(client, headers, f"/v1/orders/{order['id']}/mark-ready", context)
+    with committed_order_clock(order["id"]):
+        _post(client, headers, f"/v1/orders/{order['id']}/mark-ready", context)
     payment_body = {
         **context,
-        "settlement_amount": "6.00",
+        "settlement_amount": "3.00",
         "settlement_payment_method_code": "CASH",
     }
     key = new_idempotency_key()
@@ -203,16 +215,19 @@ def test_audited_missing_six_pesos_reconciles_to_527_in_pos_and_backoffice(
     assert closed["cash_variance_amount"] == "0.00"
     with SessionLocal() as session:
         operation = session.scalars(
-            select(FinancialOperation).where(FinancialOperation.subject_id == UUID(order["id"]))
+            select(FinancialOperation).where(
+                FinancialOperation.subject_id == UUID(order["id"]),
+                FinancialOperation.kind == "ORDER_SETTLEMENT",
+            )
         ).one()
         entry = session.scalars(
             select(FinancialEntry).where(FinancialEntry.financial_operation_id == operation.id)
         ).one()
         assert operation.subject_id == UUID(order["id"])
-        assert str(operation.source_id) == paid.json()["payments"][0]["id"]
+        assert str(operation.source_id) == paid.json()["payments"][1]["id"]
         assert entry.financial_operation_id == operation.id
         assert str(entry.cash_session_id) == context["cash_session_id"]
-        assert entry.amount == Decimal("6.00")
+        assert entry.amount == Decimal("3.00")
         assert session.scalar(select(func.count()).select_from(CashMovement)) == 0
         assert session.scalar(select(func.count()).select_from(Sale)) == 1
     admin = owner_headers()
@@ -226,8 +241,9 @@ def test_audited_missing_six_pesos_reconciles_to_527_in_pos_and_backoffice(
     assert flow.json()["summary"]["cash_total"] == "27.00"
     assert flow.json()["summary"]["order_collections_total"] == "6.00"
     order_rows = [row for row in flow.json()["items"] if row["source_type"] == "ORDER_PAYMENT"]
-    assert len(order_rows) == 1
-    row = order_rows[0]
+    assert len(order_rows) == 2
+    assert sum(Decimal(row["amount"]) for row in order_rows) == Decimal("6.00")
+    row = next(row for row in order_rows if row["financial_entry_id"] == str(entry.id))
     assert row["financial_entry_id"] == str(entry.id)
     assert row["financial_operation_id"] == str(operation.id)
     detail = client.get(f"/v1/admin/cash-flow/{row['id']}", headers=admin)
@@ -236,7 +252,7 @@ def test_audited_missing_six_pesos_reconciles_to_527_in_pos_and_backoffice(
     assert detail.json()["source_document_context"]["order_id"] == order["id"]
     assert cut.json()["expected_vs_counted"]["cash_sales_amount"] == "21.00"
     assert cut.json()["expected_vs_counted"]["cash_order_collections_amount"] == "6.00"
-    assert len(cut.json()["order_payments"]) == 1
+    assert len(cut.json()["order_payments"]) == 2
 
 
 @pytest.mark.parametrize(
@@ -291,6 +307,7 @@ def test_order_advance_and_cash_first_refund_use_actual_methods_without_becoming
         {
             **context,
             "cancellation_reason": "Customer requested a confirmed refund",
+            "cancellation_responsibility": "CUSTOMER",
         },
     )
     summary = _summary(client, headers)
@@ -350,11 +367,16 @@ def test_later_order_payment_belongs_to_its_actual_turn_and_preserves_old_close(
     )
     second = {"workstation_code": SEED_WORKSTATION_CODE, "cash_session_id": opened["id"]}
     if action == "deliver":
-        _post(client, headers, f"/v1/orders/{order['id']}/mark-ready", second)
+        with committed_order_clock(order["id"]):
+            _post(client, headers, f"/v1/orders/{order['id']}/mark-ready", second)
         body = {**second, "settlement_amount": "3.00", "settlement_payment_method_code": "CASH"}
         expected = "103.00"
     else:
-        body = {**second, "cancellation_reason": "Refund performed in a later turn"}
+        body = {
+            **second,
+            "cancellation_reason": "Refund performed in a later turn",
+            "cancellation_responsibility": "CUSTOMER",
+        }
         expected = "97.00"
     _post(client, headers, f"/v1/orders/{order['id']}/{action}", body)
     assert _summary(client, headers)["expected_cash_amount"] == expected

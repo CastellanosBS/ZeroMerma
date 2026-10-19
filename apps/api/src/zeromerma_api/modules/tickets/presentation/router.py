@@ -6,6 +6,7 @@ from typing import Annotated
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
+from fastapi.responses import Response
 from sqlalchemy.orm import Session
 
 from zeromerma_api.db.session import get_session
@@ -15,6 +16,10 @@ from zeromerma_api.modules.branches.domain.exceptions import (
     BranchInactiveError,
     WorkstationInactiveError,
     WorkstationNotFoundError,
+)
+from zeromerma_api.modules.idempotency.presentation.http import (
+    idempotency_response,
+    require_idempotency_key,
 )
 from zeromerma_api.modules.identity.application.schemas import AuthenticatedUser
 from zeromerma_api.modules.identity.application.services import user_can_access_surface
@@ -26,6 +31,14 @@ from zeromerma_api.modules.tickets.application.admin_schemas import (
     AdminSalesTicketsListResponse,
 )
 from zeromerma_api.modules.tickets.application.admin_services import AdminSalesTicketService
+from zeromerma_api.modules.tickets.application.print_requests import (
+    ReceiptKind,
+    ReceiptPrintAcknowledgement,
+    ReceiptPrintCommand,
+    ReceiptPrintRequest,
+    recover_receipt_print,
+    request_receipt_print,
+)
 from zeromerma_api.modules.tickets.application.schemas import (
     TicketDetailResponse,
     TicketReprintRequest,
@@ -198,6 +211,58 @@ def get_ticket_detail(
         )
     except (BranchAccessError, TicketError) as error:
         raise _to_http_exception(error) from error
+
+
+@router.post(
+    "/receipts/{source_kind}/{source_id}/print-request", response_model=ReceiptPrintAcknowledgement
+)
+def print_receipt(
+    source_kind: ReceiptKind,
+    source_id: UUID,
+    payload: ReceiptPrintRequest,
+    request: Request,
+    current_user: Annotated[AuthenticatedUser, Depends(get_current_user)],
+    session: Annotated[Session, Depends(get_session)],
+    key: Annotated[UUID, Depends(require_idempotency_key)],
+) -> Response:
+    return idempotency_response(
+        request_receipt_print(
+            session,
+            current_user=current_user,
+            command=ReceiptPrintCommand(
+                **payload.model_dump(), source_kind=source_kind, source_id=source_id
+            ),
+            key=key,
+            request_id=request.headers.get("X-Request-ID"),
+        ),
+        request,
+    )
+
+
+@router.get(
+    "/receipts/{source_kind}/{source_id}/print-requests/{idempotency_key}",
+    response_model=ReceiptPrintAcknowledgement,
+)
+def recover_print_receipt(
+    source_kind: ReceiptKind,
+    source_id: UUID,
+    idempotency_key: UUID,
+    workstation_code: Annotated[str, Query(min_length=1)],
+    request: Request,
+    current_user: Annotated[AuthenticatedUser, Depends(get_current_user)],
+    session: Annotated[Session, Depends(get_session)],
+) -> Response:
+    return idempotency_response(
+        recover_receipt_print(
+            session,
+            current_user=current_user,
+            source_kind=source_kind,
+            source_id=source_id,
+            workstation_code=workstation_code,
+            key=idempotency_key,
+        ),
+        request,
+    )
 
 
 @router.post("/{ticket_id}/reprint", response_model=TicketDetailResponse)

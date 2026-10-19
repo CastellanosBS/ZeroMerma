@@ -7,6 +7,8 @@ const mocks = vi.hoisted(() => ({
   ready: vi.fn(),
   deliver: vi.fn(),
   cancel: vi.fn(),
+  pay: vi.fn(),
+  amend: vi.fn(),
   recover: vi.fn(),
 }));
 vi.mock("./orders-api", () => ({
@@ -14,6 +16,8 @@ vi.mock("./orders-api", () => ({
   markOrderReady: mocks.ready,
   deliverOrder: mocks.deliver,
   cancelOrder: mocks.cancel,
+  payOrder: mocks.pay,
+  amendOrder: mocks.amend,
   recoverOrderCommand: mocks.recover,
 }));
 const context: OrderIntentionContext = {
@@ -36,7 +40,7 @@ beforeEach(() => {
   Object.values(mocks).forEach((mock) => mock.mockReset().mockResolvedValue({ id: "order" }));
 });
 afterEach(() => vi.unstubAllGlobals());
-it.each(["create", "mark-ready", "deliver", "cancel"] as const)(
+it.each(["create", "mark-ready", "deliver", "cancel", "pay", "amend"] as const)(
   "retains the original %s identity and body on a failed response",
   async (commandCode) => {
     const mock =
@@ -46,7 +50,11 @@ it.each(["create", "mark-ready", "deliver", "cancel"] as const)(
           ? mocks.ready
           : commandCode === "deliver"
             ? mocks.deliver
-            : mocks.cancel;
+            : commandCode === "pay"
+              ? mocks.pay
+              : commandCode === "amend"
+                ? mocks.amend
+                : mocks.cancel;
     const commandContext = {
       ...context,
       commandCode,

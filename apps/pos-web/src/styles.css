@@ -2,6 +2,70 @@
 @tailwind components;
 @tailwind utilities;
 
+.pos-runtime {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  height: 100dvh;
+}
+
+.pos-runtime-content {
+  min-height: 0;
+  min-width: 0;
+  overflow: auto;
+}
+
+.pos-connectivity {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.25rem 0.75rem;
+  background: #fffbeb;
+  color: #713f12;
+  font-size: 0.8125rem;
+}
+
+.pos-connectivity[data-ready="true"] {
+  background: #ecfdf5;
+  color: #065f46;
+}
+
+.pos-connectivity button {
+  flex-shrink: 0;
+  min-height: 44px;
+  padding-inline: 0.5rem;
+  text-decoration: underline;
+}
+
+.pos-modal > * {
+  flex-shrink: 0;
+  max-width: 100%;
+}
+
+.pos-runtime :where(button, a, input, select, textarea, [tabindex]):focus-visible {
+  outline: 2px solid #245f91;
+  outline-offset: 2px;
+}
+
+@media (pointer: coarse) {
+  .pos-runtime :where(button, summary, input:not([type="checkbox"]):not([type="radio"]), select) {
+    min-height: 44px;
+    min-width: 44px;
+  }
+}
+
+@media (max-width: 639px) {
+  .pos-connectivity { flex-wrap: wrap; gap: 0.125rem; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pos-runtime *, .pos-runtime *::before, .pos-runtime *::after {
+    transition: none !important;
+    animation: none !important;
+    scroll-behavior: auto !important;
+  }
+}
+
 :root {
   --background: 0 0% 100%;
   --foreground: 160 24% 12%;

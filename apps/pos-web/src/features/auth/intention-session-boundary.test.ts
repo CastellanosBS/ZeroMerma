@@ -134,7 +134,7 @@ const cases = [
         {
           cash_session_id: "cash",
           workstation_code: "POS-01",
-          lines: [{ capture_mode: "CLASS_CAPTURE", product_class_id: "class", quantity: "1" }],
+          lines: [{ capture_mode: "CLASS_CAPTURE", product_class_id: "class", quantity: "1", expected_unit_price: "3.00", expected_currency_code: "MXN" }],
           payments: [{ payment_method_code: "CASH", tendered_amount: "3" }],
         },
         null,

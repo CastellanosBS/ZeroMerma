@@ -15,5 +15,5 @@ VALID_TICKET_SCOPES = {
 }
 
 TICKET_RESOURCE_TYPE = "sale_ticket"
-AUDIT_ACTION_TICKET_REPRINTED = "ticket.reprinted"
-OUTBOX_EVENT_TICKET_REPRINTED_V1 = "ticket.reprinted.v1"
+AUDIT_ACTION_TICKET_REPRINT_REQUESTED = "ticket.reprint_requested"
+OUTBOX_EVENT_TICKET_REPRINT_REQUESTED_V1 = "ticket.reprint_requested.v1"

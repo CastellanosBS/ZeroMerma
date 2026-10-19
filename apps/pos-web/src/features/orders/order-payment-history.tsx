@@ -1,10 +1,13 @@
 import type { CustomerOrderDetailResponse } from "../../lib/api-contracts";
 import { formatCurrency } from "../../lib/formatters";
+import { ReceiptPrintButton } from "../tickets/receipt-print-button";
 
 export function OrderPaymentHistory({
   payments,
+  workstationCode,
 }: {
   payments: CustomerOrderDetailResponse["payments"];
+  workstationCode?: string;
 }) {
   if (payments.length === 0) return null;
   const labels: Record<string, string> = {
@@ -57,6 +60,7 @@ export function OrderPaymentHistory({
                 </p>
               )}
             </details>
+            <ReceiptPrintButton receipt={payment.receipt} workstationCode={workstationCode} />
           </div>
         ))}
       </div>

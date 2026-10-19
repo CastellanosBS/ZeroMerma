@@ -18,6 +18,7 @@ from uuid import UUID
 
 import pytest
 from fastapi.testclient import TestClient
+from order_fixtures import committed_order_clock, quote_order_payload
 from sqlalchemy import func, select
 
 from zeromerma_api.bootstrap.seed_local import (
@@ -231,6 +232,8 @@ def _setup(
         **context,
         "lines": [
             {
+                "expected_unit_price": "18.00",
+                "expected_currency_code": "MXN",
                 "capture_mode": "PRODUCT_DIRECT",
                 "product_id": str(products[SEED_PRODUCT_COCA_355_CODE]),
                 "quantity": "2",
@@ -283,6 +286,7 @@ def _setup(
             "advance_amount": "20.00",
             "advance_payment_method_code": payment,
         }
+        create = quote_order_payload(client, headers, create)
         body = create
         if kind in {"deliver", "cancel"}:
             created = _post(client, headers, "/v1/orders", create)
@@ -290,14 +294,19 @@ def _setup(
             if kind == "deliver":
                 _baseline(opened["id"], SEED_PRODUCT_BOLILLO_STD_CODE, 4)
                 _baseline(opened["id"], SEED_PRODUCT_CAFE_AMERICANO_CODE, 1)
-                _post(client, headers, f"/v1/orders/{order_id}/mark-ready", context)
+                with committed_order_clock(order_id):
+                    _post(client, headers, f"/v1/orders/{order_id}/mark-ready", context)
                 body = {
                     **context,
                     "settlement_amount": created["remaining_balance_amount"],
                     "settlement_payment_method_code": payment,
                 }
             else:
-                body = {**context, "cancellation_reason": "Concurrency fixture cancellation"}
+                body = {
+                    **context,
+                    "cancellation_reason": "Concurrency fixture cancellation",
+                    "cancellation_responsibility": "CUSTOMER",
+                }
     close = {
         **context,
         "close_mode": "WITH_COUNT",
@@ -619,7 +628,13 @@ def test_class_sale_is_attributed_only_when_it_precedes_the_locked_close(
     unsold_product_id = sale.body["lines"][0]["product_id"]
     product_id, class_id = _baseline(sale.body["cash_session_id"], SEED_PRODUCT_CONCHA_VAN_CODE, 3)
     sale.body["lines"] = [
-        {"capture_mode": "CLASS_CAPTURE", "product_class_id": class_id, "quantity": "1"}
+        {
+            "expected_unit_price": "12.00",
+            "expected_currency_code": "MXN",
+            "capture_mode": "CLASS_CAPTURE",
+            "product_class_id": class_id,
+            "quantity": "1",
+        }
     ]
     sale.body["payments"] = [{"payment_method_code": "CASH", "tendered_amount": "12.00"}]
     close.body.update(

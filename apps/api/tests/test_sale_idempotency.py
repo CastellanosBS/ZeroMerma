@@ -123,8 +123,20 @@ def _setup(
         "workstation_code": workstation,
         "cash_session_id": str(cash_id),
         "lines": [
-            {"capture_mode": "CLASS_CAPTURE", "product_class_id": str(class_id), "quantity": "1"},
-            {"capture_mode": "PRODUCT_DIRECT", "product_id": str(product_id), "quantity": "1"},
+            {
+                "expected_unit_price": "12.00",
+                "expected_currency_code": "MXN",
+                "capture_mode": "CLASS_CAPTURE",
+                "product_class_id": str(class_id),
+                "quantity": "1",
+            },
+            {
+                "expected_unit_price": "18.00",
+                "expected_currency_code": "MXN",
+                "capture_mode": "PRODUCT_DIRECT",
+                "product_id": str(product_id),
+                "quantity": "1",
+            },
         ],
         "payments": [{"payment_method_code": "CASH", "tendered_amount": "50.00"}],
     }

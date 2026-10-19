@@ -9,6 +9,7 @@ import {
   recoverAdminOrderCommand,
   sendAdminOrderCommand,
   type OrderCommandResultView,
+  type AdminOrderCommandPayload,
 } from "./api";
 
 export type AdminOrderCommandCode =
@@ -23,7 +24,7 @@ export type AdminOrderIntentionMetadata = CommandIntentionMetadata<AdminOrderInt
 export const ADMIN_ORDER_INTENTION_SCOPE = "orders";
 export const adminOrderIntentions = createCommandIntentionCoordinator<
   AdminOrderIntentionContext,
-  Record<string, never>,
+  AdminOrderCommandPayload,
   OrderCommandResultView
 >({
   storagePrefix: "zeromerma-admin-order-intention:",
@@ -31,8 +32,8 @@ export const adminOrderIntentions = createCommandIntentionCoordinator<
   contextFields: ["userId", "branchId", "orderId", "commandCode"],
   scope: () => ADMIN_ORDER_INTENTION_SCOPE,
   validateContext: (context) => ["mark-ready", "deliver", "cancel"].includes(context.commandCode),
-  send: (context, _payload, key) =>
-    sendAdminOrderCommand(context.commandCode, context.orderId, key),
+  send: (context, payload, key) =>
+    sendAdminOrderCommand(context.commandCode, context.orderId, key, payload),
   recover: async (metadata) => {
     const result = await recoverAdminOrderCommand(
       metadata.commandCode,

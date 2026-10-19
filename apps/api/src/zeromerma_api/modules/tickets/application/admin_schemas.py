@@ -6,6 +6,8 @@ from uuid import UUID
 
 from pydantic import BaseModel, Field
 
+from zeromerma_api.modules.tickets.application.receipt_schemas import OperationalReceiptView
+
 
 class AdminSalesTicketFilterOptionView(BaseModel):
     id: str
@@ -165,6 +167,7 @@ class AdminSalesTicketPrintableView(BaseModel):
 
 
 class AdminSalesTicketDetailView(BaseModel):
+    receipt: OperationalReceiptView | None = None
     overview: AdminSalesTicketOverviewView
     operational_context: AdminSalesTicketOperationalContextView
     lines: list[AdminSalesTicketLineView]

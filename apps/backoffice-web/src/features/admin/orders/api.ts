@@ -282,22 +282,25 @@ export function fetchAdminOrderDetail(orderId: string): Promise<AdminOrderDetail
 }
 
 export type OrderCommandResultView = components["schemas"]["OrderCommandResultView"];
+export type AdminOrderCancelRequest = components["schemas"]["AdminOrderCancelRequest"];
+export type AdminOrderCommandPayload = AdminOrderCancelRequest | Record<string, never>;
 export function markAdminOrderReady(orderId: string, key: string): Promise<OrderCommandResultView> {
   return sendAdminOrderCommand("mark-ready", orderId, key);
 }
 export function deliverAdminOrder(orderId: string, key: string): Promise<OrderCommandResultView> {
   return sendAdminOrderCommand("deliver", orderId, key);
 }
-export function cancelAdminOrder(orderId: string, key: string): Promise<OrderCommandResultView> {
-  return sendAdminOrderCommand("cancel", orderId, key);
+export function cancelAdminOrder(orderId: string, key: string, payload: AdminOrderCancelRequest): Promise<OrderCommandResultView> {
+  return sendAdminOrderCommand("cancel", orderId, key, payload);
 }
 export function sendAdminOrderCommand(
   commandCode: "mark-ready" | "deliver" | "cancel",
   orderId: string,
   key: string,
+  payload: AdminOrderCommandPayload = {},
 ): Promise<OrderCommandResultView> {
   return requestJson<OrderCommandResultView>({
-    body: {},
+    body: payload,
     method: "POST",
     path: `/v1/admin/orders/${encodeURIComponent(orderId)}/${commandCode}`,
     headers: { "Idempotency-Key": key },

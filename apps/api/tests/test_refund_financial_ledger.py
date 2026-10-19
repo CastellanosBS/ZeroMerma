@@ -394,6 +394,7 @@ def test_order_cancel_creates_obligation_and_only_actual_refund_payments(
             "workstation_code": body["workstation_code"],
             "cash_session_id": body["cash_session_id"],
             "cancellation_reason": "Requested by customer",
+            "cancellation_responsibility": "CUSTOMER",
         },
     )
     assert canceled.status_code == 200

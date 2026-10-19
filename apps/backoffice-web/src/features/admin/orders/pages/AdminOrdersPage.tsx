@@ -6,7 +6,9 @@ import { toBackofficeErrorMessage } from "../../../../lib/api";
 import { useBackofficeAuthStore } from "../../../auth/backoffice-auth-store";
 import { AdminPageHeader } from "../../components/AdminPageHeader";
 import { adminOrdersBackendContract, fetchAdminOrderDetail, fetchAdminOrders } from "../api";
-import type { OrderCommandResultView } from "../api";
+import type { OrderCommandResultView, AdminOrderCommandPayload } from "../api";
+import { AdminOrderCancellationForm } from "../components/AdminOrderCancellationForm";
+import { OrderCommitmentPolicyPanel } from "../components/OrderCommitmentPolicyPanel";
 import {
   adminOrderIntentions,
   type AdminOrderCommandCode,
@@ -144,6 +146,8 @@ export function AdminOrdersPage() {
   const [feedback, setFeedback] = useState<{ tone: "success" | "error"; message: string } | null>(
     null,
   );
+  const [cancellation, setCancellation] = useState<{ context: AdminOrderIntentionContext; folio: string } | null>(null);
+  useEffect(() => { setCancellation(null); }, [user?.id]);
 
   const ordersQuery = useQuery({
     enabled: isAuthenticated,
@@ -166,14 +170,15 @@ export function AdminOrdersPage() {
   });
 
   function confirmed(result: OrderCommandResultView) {
+    setCancellation(null);
     setSelectedOrderId(result.id);
     setFeedback({ tone: "success", message: `${result.folio}: operación confirmada.` });
     // Detail refresh is read-only and cannot turn a confirmed command into a retry.
     void queryClient.invalidateQueries({ queryKey: ["admin", "orders"] });
   }
   const actionMutation = useMutation({
-    mutationFn: (context: AdminOrderIntentionContext) =>
-      adminOrderIntentions.begin(context, {}, observedKey.current),
+    mutationFn: ({ context, payload }: { context: AdminOrderIntentionContext; payload: AdminOrderCommandPayload }) =>
+      adminOrderIntentions.begin(context, payload, observedKey.current),
     onError: (error) => {
       setFeedback({
         tone: "error",
@@ -248,7 +253,12 @@ export function AdminOrdersPage() {
     }
     setFeedback(null);
     const branchId = "overview" in order ? order.overview.branchId : order.branchId;
-    actionMutation.mutate({ commandCode: kind, orderId, branchId, userId: user.id });
+    const context = { commandCode: kind, orderId, branchId, userId: user.id };
+    if (kind === "cancel") {
+      setCancellation({ context, folio: "overview" in order ? order.overview.folio : order.folio });
+      return;
+    }
+    actionMutation.mutate({ context, payload: {} });
   }
 
   return (
@@ -263,6 +273,18 @@ export function AdminOrdersPage() {
       />
 
       <div className="flex min-h-0 min-w-0 flex-1 flex-col gap-2.5 overflow-hidden p-3">
+        <OrderCommitmentPolicyPanel branches={orderList.filterOptions.branches} />
+        {cancellation ? <AdminOrderCancellationForm
+          key={cancellation.context.orderId}
+          folio={cancellation.folio}
+          busy={actionMutation.isPending || isCommandIntentionPending(intention.metadata)}
+          onCancel={() => setCancellation(null)}
+          onConfirm={payload => {
+            if (cancellation.context.userId !== user?.id || actionMutation.isPending || intention.error || isCommandIntentionPending(intention.metadata)) return;
+            setFeedback(null);
+            actionMutation.mutate({ context: cancellation.context, payload });
+          }}
+        /> : null}
         {intention.error || isCommandIntentionPending(intention.metadata) ? (
           <section role="alert" className="rounded-xl border border-amber-400 bg-amber-50 p-3">
             <h2>Pedido pendiente de confirmar</h2>

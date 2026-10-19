@@ -17,6 +17,7 @@ import { CLASS_CAPTURE_MODE } from "./model";
 import { PosCheckoutPanel } from "./pos-checkout-panel";
 import { usePosTerminalStore } from "./store";
 import { forgetSaleIntentionBodies } from "./sale-confirmation-intent";
+import { ApiError } from "../../lib/http";
 
 (
   globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }
@@ -28,6 +29,11 @@ const getTicketDetailMock = vi.fn();
 const showSuccessMock = vi.fn();
 const showWarningMock = vi.fn();
 const writeTicketToPrintWindowMock = vi.fn();
+const refreshCartPricesMock = vi.fn();
+
+vi.mock("./refresh-cart-prices", () => ({
+  refreshCartPrices: (...args: unknown[]) => refreshCartPricesMock(...args),
+}));
 
 vi.mock("./pos-terminal-api", () => ({
   confirmPosSale: (...args: unknown[]) => confirmPosSaleMock(...args),
@@ -43,7 +49,7 @@ vi.mock("../tickets/print", () => ({
 }));
 
 vi.mock("../status-messages/store", () => ({
-  useStatusMessageStore: (
+  useStatusMessageStore: Object.assign((
     selector: (state: {
       showSuccess: typeof showSuccessMock;
       showWarning: typeof showWarningMock;
@@ -52,7 +58,7 @@ vi.mock("../status-messages/store", () => ({
     selector({
       showSuccess: showSuccessMock,
       showWarning: showWarningMock,
-    }),
+    }), { setState: vi.fn() }),
 }));
 
 function renderUi(element: React.ReactElement) {
@@ -200,6 +206,7 @@ afterEach(() => {
   showSuccessMock.mockReset();
   showWarningMock.mockReset();
   writeTicketToPrintWindowMock.mockReset();
+  refreshCartPricesMock.mockReset();
   vi.restoreAllMocks();
   act(() => {
     usePosAuthStore.getState().clearSession();
@@ -208,6 +215,130 @@ afterEach(() => {
 });
 
 describe("PosCheckoutPanel", () => {
+  it("rejects a stale confirm handler when the cart changes before React renders", async () => {
+    act(() => {
+      usePosAuthStore.setState({ isAuthenticated: true, phase: "ready" });
+      seedTicket();
+    });
+    const view = renderUi(<PosCheckoutPanel bootstrap={bootstrap} cashSession={cashSession} />);
+    mountedRoots.push(view.unmount);
+    act(() => Array.from(view.container.querySelectorAll("button"))
+      .find((button) => button.textContent?.includes("Tarjeta (registro)"))!.click());
+    dispatchKey(window, "Enter");
+    const confirm = Array.from(view.container.querySelectorAll("button"))
+      .find((button) => button.textContent?.trim() === "Cobrar")!;
+    await act(async () => {
+      const store = usePosTerminalStore.getState();
+      store.incrementLineQuantity(store.cartLines[0].key);
+      confirm.click();
+    });
+    expect(confirmPosSaleMock).not.toHaveBeenCalled();
+    expect(showWarningMock).toHaveBeenCalledWith("El ticket cambió. Revisa y confirma el importe antes de cobrar.");
+    expect(usePosTerminalStore.getState().cartMutationBlocked).toBe(false);
+  });
+
+  it("requires a fresh CARD review after a quantity change and freezes the exact draft through lost acknowledgment", async () => {
+    let rejectSale!: (error: Error) => void;
+    confirmPosSaleMock.mockImplementation(() => new Promise((_resolve, reject) => { rejectSale = reject; }));
+    act(() => {
+      usePosAuthStore.setState({ isAuthenticated: true, phase: "ready" });
+      seedTicket();
+    });
+    const view = renderUi(<PosCheckoutPanel bootstrap={bootstrap} cashSession={cashSession} />);
+    mountedRoots.push(view.unmount);
+    act(() => {
+      Array.from(view.container.querySelectorAll("button"))
+        .find((button) => button.textContent?.includes("Tarjeta (registro)"))!.click();
+    });
+    dispatchKey(window, "Enter");
+    expect((view.container.querySelector('[aria-label="Solicitar ticket"]') as HTMLButtonElement).disabled).toBe(false);
+    act(() => (view.container.querySelector('[aria-label="Sumar cantidad de Bolillo"]') as HTMLButtonElement).click());
+    expect(usePosTerminalStore.getState().cartLines[0].quantityMilliUnits).toBe(2000);
+    expect(view.container.textContent).toContain("Verifica el importe realmente cobrado en la terminal");
+    expect((view.container.querySelector('[aria-label="Solicitar ticket"]') as HTMLButtonElement).disabled).toBe(true);
+    dispatchKey(window, "Enter");
+    expect(confirmPosSaleMock).not.toHaveBeenCalled();
+    const original = usePosTerminalStore.getState().cartLines;
+    dispatchKey(window, "Enter");
+    expect(usePosTerminalStore.getState().cartMutationBlocked).toBe(true);
+    expect((view.container.querySelector('[aria-label="Sumar cantidad de Bolillo"]') as HTMLButtonElement).disabled).toBe(true);
+    act(() => {
+      const store = usePosTerminalStore.getState();
+      store.incrementLineQuantity(original[0].key);
+      store.removeLine(original[0].key);
+      store.clearCart();
+    });
+    await act(async () => { await Promise.resolve(); });
+    expect(confirmPosSaleMock).toHaveBeenCalledTimes(1);
+    expect(confirmPosSaleMock.mock.calls[0][0].payments).toEqual([{ payment_method_code: "CARD", tendered_amount: "6" }]);
+    expect(usePosTerminalStore.getState().cartLines).toBe(original);
+    await act(async () => { rejectSale(new Error("Acknowledgment lost")); });
+    expect(view.container.textContent).toContain("Resultado de venta pendiente");
+    act(() => {
+      const store = usePosTerminalStore.getState();
+      store.incrementLineQuantity(original[0].key);
+      store.removeLine(original[0].key);
+      store.clearCart();
+    });
+    expect(usePosTerminalStore.getState().cartLines).toBe(original);
+    expect(usePosTerminalStore.getState().cartMutationBlocked).toBe(true);
+    recoverSaleMock.mockResolvedValue(createSaleDetail({ total_amount: "6.00" }));
+    await act(async () => {
+      Array.from(view.container.querySelectorAll("button")).find((button) => button.textContent === "Recuperar venta")!.click();
+    });
+    expect(usePosTerminalStore.getState().cartLines).toHaveLength(0);
+    expect(usePosTerminalStore.getState().cartMutationBlocked).toBe(false);
+    expect(confirmPosSaleMock).toHaveBeenCalledTimes(1);
+  });
+
+  it.each(["changed-price", "inactive-product"])(
+    "keeps price review reachable after Escape and never resubmits automatically: %s",
+    async (scenario) => {
+      confirmPosSaleMock.mockRejectedValue(new ApiError(409, "El precio cambió.", {
+        code: "SALE_PRICE_CHANGED", message: "El precio cambió.", details: null,
+        request_id: null, field_errors: null,
+      }));
+      act(() => {
+        usePosAuthStore.setState({ isAuthenticated: true, phase: "ready" });
+        seedTicket();
+      });
+      const view = renderUi(<PosCheckoutPanel bootstrap={bootstrap} cashSession={cashSession} />);
+      mountedRoots.push(view.unmount);
+      const button = (label: string) => Array.from(view.container.querySelectorAll("button"))
+        .find((entry) => entry.textContent?.trim() === label)!;
+      act(() => button("Cobrar").click());
+      await act(async () => { await new Promise((resolve) => window.setTimeout(resolve, 0)); });
+      const input = view.container.querySelector('input[aria-label="Dinero recibido"]') as HTMLInputElement;
+      setInputValue(input, "3.00");
+      dispatchKey(input, "Enter");
+      dispatchKey(window, "Enter");
+      await act(async () => { await new Promise((resolve) => window.setTimeout(resolve, 0)); });
+      expect(confirmPosSaleMock).toHaveBeenCalledTimes(1);
+      expect(button("Reintentar").disabled).toBe(true);
+      dispatchKey(window, "Escape");
+      expect(button("Actualizar precios y revisar")).toBeDefined();
+      if (scenario === "changed-price") {
+        refreshCartPricesMock.mockResolvedValue(usePosTerminalStore.getState().cartLines.map(
+          (line) => ({ ...line, unitPriceText: "4.00", unitPriceCents: 400 }),
+        ));
+      } else {
+        refreshCartPricesMock.mockRejectedValue(new Error("Retira Bolillo: ya no está disponible en el catálogo."));
+      }
+      await act(async () => button("Actualizar precios y revisar").click());
+      expect(confirmPosSaleMock).toHaveBeenCalledTimes(1);
+      if (scenario === "changed-price") {
+        expect(usePosTerminalStore.getState().cartLines[0].unitPriceText).toBe("4.00");
+        expect(button("Actualizar precios y revisar")).toBeUndefined();
+        expect(showWarningMock).toHaveBeenCalledWith("Precios actualizados. Revisa el total y captura nuevamente el cobro.");
+      } else {
+        expect(button("Actualizar precios y revisar").disabled).toBe(false);
+        act(() => (view.container.querySelector('button[aria-label="Eliminar Bolillo"]') as HTMLButtonElement).click());
+        expect(usePosTerminalStore.getState().cartLines).toHaveLength(0);
+        expect(button("Actualizar precios y revisar")).toBeUndefined();
+      }
+    },
+  );
+
   const retained = {
     key: "019a4000-0000-7000-8000-000000000001",
     userId: "user-1",
@@ -361,7 +492,7 @@ describe("PosCheckoutPanel", () => {
     expect(view.container.textContent).toContain("Registro de pago con tarjeta");
     expect(view.container.textContent).toContain("Solo registra el medio de pago");
     expect(view.container.textContent).toContain("no autoriza ni captura");
-    expect(view.container.textContent).toContain("DEC-14");
+    expect(view.container.textContent).toContain("Confirma el cobro en la terminal");
     expect(view.container.textContent).not.toContain("Pago autorizado");
     expect(view.container.querySelector('input[aria-label="Dinero recibido"]')).toBeNull();
 

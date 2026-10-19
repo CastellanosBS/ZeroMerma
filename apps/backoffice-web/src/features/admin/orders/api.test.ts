@@ -213,7 +213,8 @@ describe("admin orders API", () => {
     const detail = await fetchAdminOrderDetail("order-1");
     await markAdminOrderReady("order-1", "key-ready");
     await deliverAdminOrder("order-1", "key-deliver");
-    await cancelAdminOrder("order-1", "key-cancel");
+    const cancellation = { cancellation_reason: "Cliente solicita cancelación", cancellation_responsibility: "CUSTOMER" as const };
+    await cancelAdminOrder("order-1", "key-cancel", cancellation);
 
     expect(list.total).toBe(1);
     expect(detail.lines[0].productName).toBe("Concha");
@@ -233,7 +234,8 @@ describe("admin orders API", () => {
         .slice(2)
         .map(([, init]) => (init?.headers as Headers).get("Idempotency-Key")),
     ).toEqual(["key-ready", "key-deliver", "key-cancel"]);
-    expect(fetchMock.mock.calls.slice(2).every(([, init]) => init?.body === "{}")).toBe(true);
+    expect(fetchMock.mock.calls.slice(2, 4).every(([, init]) => init?.body === "{}")).toBe(true);
+    expect(fetchMock.mock.calls[4]?.[1]?.body).toBe(JSON.stringify(cancellation));
     fetchMock.mockRestore();
   });
 });

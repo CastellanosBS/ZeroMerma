@@ -43,6 +43,7 @@ from zeromerma_api.modules.identity.domain.constants import IDENTITY_SURFACE_BAC
 from zeromerma_api.modules.identity.presentation.dependencies import get_current_user
 from zeromerma_api.modules.orders.application.admin_schemas import (
     AdminOrderActionRequest,
+    AdminOrderCancelRequest,
     AdminOrderDetailView,
     AdminOrdersListResponse,
 )
@@ -50,6 +51,7 @@ from zeromerma_api.modules.orders.application.admin_services import AdminOrdersS
 from zeromerma_api.modules.orders.application.idempotency import OrdersIdempotencyService
 from zeromerma_api.modules.orders.application.schemas import (
     AdminOrderCommandCode,
+    AmendCustomerOrderRequest,
     CancelCustomerOrderRequest,
     CreateCustomerOrderRequest,
     CustomerOrderDetailResponse,
@@ -57,10 +59,15 @@ from zeromerma_api.modules.orders.application.schemas import (
     OrderActionRequest,
     OrderCommandCode,
     OrderCommandResultView,
+    OrderPolicyRequest,
+    OrderPolicyView,
+    OrderQuoteRequest,
+    OrderQuoteView,
     OrdersBootstrapResponse,
     OrdersCatalogResponse,
     OrdersClassProductsResponse,
     OrdersListResponse,
+    PayCustomerOrderRequest,
 )
 from zeromerma_api.modules.orders.application.services import (
     OrdersQueryService,
@@ -77,6 +84,147 @@ admin_router = APIRouter(prefix="/v1/admin/orders", tags=["admin-orders"])
 _REPLAY_RESPONSE = {
     "headers": {"Idempotency-Replayed": {"$ref": "#/components/headers/IdempotencyReplayed"}}
 }
+
+
+@router.post("/quote", response_model=OrderQuoteView)
+def quote_customer_order(
+    payload: OrderQuoteRequest,
+    current_user: Annotated[AuthenticatedUser, Depends(get_current_user)],
+    session: Annotated[Session, Depends(get_session)],
+) -> OrderQuoteView:
+    from zeromerma_api.modules.branches.application.access import WorkstationAccessService
+    from zeromerma_api.modules.orders.application.commitment import quote_order
+
+    try:
+        context = WorkstationAccessService().resolve_context(
+            session, user_id=current_user.id, workstation_code=payload.workstation_code
+        )
+        return quote_order(session, branch_id=context.branch_id, request=payload)
+    except (BranchAccessError, CatalogError, OrderError) as error:
+        raise _to_http_exception(error) from error
+
+
+@admin_router.get("/commitment-policies/{branch_id}", response_model=OrderPolicyView | None)
+def get_order_commitment_policy(
+    branch_id: UUID,
+    current_user: Annotated[AuthenticatedUser, Depends(get_current_user)],
+    session: Annotated[Session, Depends(get_session)],
+) -> OrderPolicyView | None:
+    from zeromerma_api.modules.identity.application.authorization import require_branches
+    from zeromerma_api.modules.orders.application.policies import read_policy
+
+    _require_backoffice_user(current_user)
+    require_branches(current_user, "orders.manage", [branch_id])
+    return read_policy(session, branch_id)
+
+
+@admin_router.post(
+    "/commitment-policies/{branch_id}",
+    response_model=OrderPolicyView,
+    status_code=201,
+    responses={201: _REPLAY_RESPONSE},
+)
+def configure_order_commitment_policy(
+    branch_id: UUID,
+    payload: OrderPolicyRequest,
+    request: Request,
+    current_user: Annotated[AuthenticatedUser, Depends(get_current_user)],
+    session: Annotated[Session, Depends(get_session)],
+    key: Annotated[UUID, Depends(require_idempotency_key)],
+) -> Response:
+    from zeromerma_api.modules.orders.application.policies import configure_policy
+
+    _require_backoffice_user(current_user)
+    try:
+        result = configure_policy(
+            session,
+            branch_id=branch_id,
+            command=payload,
+            current_user=current_user,
+            key=key,
+            request_id=request.headers.get("X-Request-ID"),
+        )
+        return idempotency_response(result, request)
+    except OrderError as error:
+        raise _to_http_exception(error) from error
+
+
+@admin_router.get(
+    "/commitment-policies/{branch_id}/confirmations/{idempotency_key}",
+    response_model=OrderPolicyView,
+    responses={200: _REPLAY_RESPONSE},
+)
+def recover_order_commitment_policy(
+    branch_id: UUID,
+    idempotency_key: Annotated[
+        str, Path(min_length=36, max_length=36, pattern=IDEMPOTENCY_KEY_PATTERN)
+    ],
+    request: Request,
+    current_user: Annotated[AuthenticatedUser, Depends(get_current_user)],
+    session: Annotated[Session, Depends(get_session)],
+) -> Response:
+    from zeromerma_api.modules.orders.application.policies import recover_policy
+
+    _require_backoffice_user(current_user)
+    result = recover_policy(
+        session,
+        branch_id=branch_id,
+        current_user=current_user,
+        key=parse_idempotency_key(idempotency_key),
+    )
+    return idempotency_response(replace(result, status_code=200), request)
+
+
+@router.post(
+    "/{order_id}/payments", response_model=OrderCommandResultView, responses={200: _REPLAY_RESPONSE}
+)
+def pay_customer_order(
+    order_id: UUID,
+    payload: PayCustomerOrderRequest,
+    request: Request,
+    current_user: Annotated[AuthenticatedUser, Depends(get_current_user)],
+    session: Annotated[Session, Depends(get_session)],
+    key: Annotated[UUID, Depends(require_idempotency_key)],
+) -> Response:
+    try:
+        result = OrdersIdempotencyService().execute_pos(
+            session,
+            current_user=current_user,
+            command_code="pay",
+            command=payload,
+            key=key,
+            order_id=order_id,
+            request_id=request.headers.get("X-Request-ID"),
+        )
+        return idempotency_response(result, request)
+    except (BranchAccessError, CatalogError, OrderError) as error:
+        raise _to_http_exception(error) from error
+
+
+@router.post(
+    "/{order_id}/amend", response_model=OrderCommandResultView, responses={200: _REPLAY_RESPONSE}
+)
+def amend_customer_order(
+    order_id: UUID,
+    payload: AmendCustomerOrderRequest,
+    request: Request,
+    current_user: Annotated[AuthenticatedUser, Depends(get_current_user)],
+    session: Annotated[Session, Depends(get_session)],
+    key: Annotated[UUID, Depends(require_idempotency_key)],
+) -> Response:
+    try:
+        result = OrdersIdempotencyService().execute_pos(
+            session,
+            current_user=current_user,
+            command_code="amend",
+            command=payload,
+            key=key,
+            order_id=order_id,
+            request_id=request.headers.get("X-Request-ID"),
+        )
+        return idempotency_response(result, request)
+    except (BranchAccessError, CatalogError, OrderError) as error:
+        raise _to_http_exception(error) from error
 
 
 def _require_backoffice_user(current_user: AuthenticatedUser) -> AuthenticatedUser:
@@ -266,7 +414,7 @@ def deliver_admin_order(
 )
 def cancel_admin_order(
     order_id: UUID,
-    payload: AdminOrderActionRequest,
+    payload: AdminOrderCancelRequest,
     request: Request,
     current_user: Annotated[AuthenticatedUser, Depends(get_current_user)],
     session: Annotated[Session, Depends(get_session)],
@@ -278,6 +426,7 @@ def cancel_admin_order(
             session,
             current_user=current_user,
             command_code="cancel",
+            cancellation=payload,
             key=key,
             order_id=order_id,
             request_id=request.headers.get("X-Request-ID"),

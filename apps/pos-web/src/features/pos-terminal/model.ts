@@ -745,6 +745,8 @@ export function buildConfirmSaleRequest(
     if (line.captureMode === CLASS_CAPTURE_MODE) {
       return {
         capture_mode: line.captureMode,
+        expected_unit_price: line.unitPriceText,
+        expected_currency_code: line.currencyCode,
         product_class_id: line.productClassId!,
         quantity: formatQuantityFromMilliUnits(line.quantityMilliUnits),
       };
@@ -752,6 +754,8 @@ export function buildConfirmSaleRequest(
 
     return {
       capture_mode: line.captureMode,
+      expected_unit_price: line.unitPriceText,
+      expected_currency_code: line.currencyCode,
       product_id: line.productId!,
       quantity: formatQuantityFromMilliUnits(line.quantityMilliUnits),
     };
@@ -811,7 +815,7 @@ export function buildConfirmSaleRequest(
       throw new Error("La parte sin efectivo no puede exceder el total.");
     }
 
-    if (confirmedMixedTotalCents !== totalAmountCents) {
+    if (confirmedMixedTotalCents < totalAmountCents) {
       throw new Error("El reparto mixto no cubre el total.");
     }
 

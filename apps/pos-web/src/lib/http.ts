@@ -2,6 +2,7 @@ import { ApiError, requestApiJson, type SessionResponse } from "@zeromerma/api-c
 
 import { appEnv } from "../env";
 import { usePosAuthStore } from "../features/auth/auth-store";
+import { markLocalConnectionUnreachable, requireLocalBackendForCommand } from "../features/connectivity/connectivity-state";
 
 export { ApiError };
 
@@ -20,6 +21,14 @@ export async function requestJson<TResponse>({
   path,
 }: RequestJsonOptions): Promise<TResponse> {
   const generation = usePosAuthStore.getState().generation;
+  if (method !== "GET" && !path.startsWith("/v1/auth/")) {
+    await requireLocalBackendForCommand();
+    if (usePosAuthStore.getState().generation !== generation) {
+      throw new Error("La sesión cambió. Verifica la sesión antes de continuar.");
+    }
+  }
+  const controller = new AbortController();
+  const timeout = globalThis.setTimeout(() => controller.abort(), 15_000);
   try {
   return await requestApiJson<TResponse>({
     surface: "POS",
@@ -29,8 +38,18 @@ export async function requestJson<TResponse>({
     headers,
     method,
     path,
+    signal: controller.signal,
   });
   } catch (error) {
+    if (!(error instanceof ApiError)) {
+      markLocalConnectionUnreachable();
+      if (!path.startsWith("/v1/auth/")) {
+        throw new Error(method === "GET"
+          ? "No fue posible consultar el servidor local. Verifica la conexión y vuelve a consultar."
+          : "No se pudo confirmar el resultado de la operación enviada. Consulta su referencia antes de reintentar; no vuelvas a cobrar.",
+        { cause: error });
+      }
+    }
     if (error instanceof ApiError && usePosAuthStore.getState().generation === generation && path !== "/v1/auth/login") {
       if (error.statusCode === 401 && error.error?.code !== "INVALID_CREDENTIALS") usePosAuthStore.getState().clearSession();
       if (error.statusCode === 423) usePosAuthStore.getState().markLocked();
@@ -48,6 +67,8 @@ export async function requestJson<TResponse>({
       }
     }
     throw error;
+  } finally {
+    globalThis.clearTimeout(timeout);
   }
 }
 

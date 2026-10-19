@@ -12,6 +12,7 @@ from zeromerma_api.modules.branches.application.schemas import BranchSummary, Wo
 from zeromerma_api.modules.cash.application.schemas import CashSessionView
 from zeromerma_api.modules.financial_ledger.application.refund_schemas import FinancialRefundView
 from zeromerma_api.modules.identity.application.schemas import AuthenticatedUser
+from zeromerma_api.modules.tickets.application.receipt_schemas import OperationalReceiptView
 
 
 class ReturnScopeView(BaseModel):
@@ -301,6 +302,7 @@ class SaleReturnCommittedLineView(BaseModel):
 
 
 class SaleReturnDetailResponse(BaseModel):
+    receipt: OperationalReceiptView | None = None
     financial_refund: FinancialRefundView | None = None
     id: UUID
     folio: str

@@ -2,6 +2,11 @@ import { create } from "zustand";
 import { removeLegacyAuthStorage, type AuthSessionView, type SessionResponse } from "@zeromerma/api-client";
 import { queryClient } from "../../lib/query-client";
 import { usePosTerminalStore } from "../pos-terminal/store";
+import { useStatusMessageStore } from "../status-messages/store";
+
+function clearSensitiveMessages() {
+  useStatusMessageStore.setState({ messages: [] });
+}
 
 type SessionPhase = "restoring" | "ready" | "signedOut" | "locked" | "passwordChange";
 interface PosAuthState {
@@ -36,6 +41,7 @@ export const usePosAuthStore = create<PosAuthState>()((set, get) => ({
     const identityChanged = previous.session?.id !== response.session.id ||
       previous.user?.authorization_version !== response.user.authorization_version;
     if (identityChanged || (phase !== "ready" && previous.phase === "ready")) {
+      clearSensitiveMessages();
       void queryClient.cancelQueries();
       queryClient.clear();
       if (identityChanged) usePosTerminalStore.getState().reset();
@@ -46,21 +52,25 @@ export const usePosAuthStore = create<PosAuthState>()((set, get) => ({
   },
   updateSession: (session) => set({ session }),
   requireVerification: () => {
+    clearSensitiveMessages();
     void queryClient.cancelQueries();
     queryClient.clear();
     set({ phase: "restoring", isAuthenticated: false, generation: get().generation + 1 });
   },
   markLocked: () => {
+    clearSensitiveMessages();
     void queryClient.cancelQueries();
     queryClient.clear();
     set({ phase: "locked", isAuthenticated: false, generation: get().generation + 1 });
   },
   requirePasswordChange: () => {
+    clearSensitiveMessages();
     void queryClient.cancelQueries();
     queryClient.clear();
     set({ phase: "passwordChange", isAuthenticated: false, generation: get().generation + 1 });
   },
   clearSession: () => {
+    clearSensitiveMessages();
     void queryClient.cancelQueries();
     queryClient.clear();
     usePosTerminalStore.getState().reset();

@@ -15,4 +15,3 @@ class TicketValidationError(TicketError):
 
 class TicketConflictError(TicketError):
     """Raised when the cashier cannot operate tickets in the current session state."""
-

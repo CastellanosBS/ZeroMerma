@@ -30,8 +30,8 @@ test("real order advance survives a lost creation response, reload and a duplica
     .getByPlaceholder("Nombre del cliente", { exact: true })
     .fill("Integration order customer");
   await page.getByPlaceholder("Telefono", { exact: true }).fill("6620000000");
-  const tomorrow = new Date(Date.now() + 86400000).toISOString().slice(0, 10);
-  await page.getByLabel("Fecha de recoleccion").fill(tomorrow);
+  const deliveryDate = new Date(Date.now() + 3 * 86400000).toISOString().slice(0, 10);
+  await page.getByLabel("Fecha de recoleccion").fill(deliveryDate);
   const catalog = page.waitForResponse((response) =>
     /\/v1\/orders\/classes\/[^/]+\/products$/.test(new URL(response.url()).pathname),
   );
@@ -50,6 +50,8 @@ test("real order advance survives a lost creation response, reload and a duplica
     (request) => new URL(request.url()).pathname === "/v1/orders" && request.method() === "POST",
   );
   await page.getByRole("button", { name: /^Guardar pedido(?:\s+Enter)?$/ }).click();
+  await expect(page.getByRole("dialog", { name: "Revisar pedido" })).toBeVisible();
+  await page.getByRole("button", { name: "Confirmar pedido cotizado", exact: true }).click();
   const request = await outgoing;
   const key = request.headers()["idempotency-key"];
   const committed = (await fault.committed) as components["schemas"]["OrderCommandResultView"];
@@ -96,19 +98,24 @@ test("real order advance survives a lost creation response, reload and a duplica
     network.filter((entry) => entry.method === "POST" && entry.path === "/v1/orders"),
   ).toHaveLength(1);
   await page.getByRole("row").filter({ hasText: committed.folio }).click();
-  const ready = page.waitForResponse(
+  await page.getByRole("button", { name: "Abonos y cambios", exact: true }).click();
+  await page.getByRole("button", { name: "Modificar pedido", exact: true }).click();
+  await page.getByLabel("Motivo de modificación").fill("Synthetic explicit commercial revision");
+  await page.getByRole("button", { name: "Cotizar modificación", exact: true }).click();
+  const amended = page.waitForResponse(
     (response) =>
-      new URL(response.url()).pathname === `/v1/orders/${committed.id}/mark-ready` &&
+      new URL(response.url()).pathname === `/v1/orders/${committed.id}/amend` &&
       response.request().method() === "POST",
   );
-  await page.getByRole("button", { name: "Marcar listo para entrega", exact: true }).click();
-  const readyResponse = await ready;
-  expect(readyResponse.status()).toBe(200);
-  expect(readyResponse.request().headers()["idempotency-key"]).not.toBe(key);
-  const readyResult = await readyResponse.json();
-  expect(readyResult.id).toBe(committed.id);
-  expect(readyResult.payments).toEqual(committed.payments);
-  expect(readyResult.status).toBe("READY");
+  await page.getByRole("button", { name: "Confirmar nueva versión", exact: true }).click();
+  const amendedResponse = await amended;
+  expect(amendedResponse.status()).toBe(200);
+  expect(amendedResponse.request().headers()["idempotency-key"]).not.toBe(key);
+  const amendedResult = await amendedResponse.json();
+  expect(amendedResult.id).toBe(committed.id);
+  expect(amendedResult.payments).toEqual(committed.payments);
+  expect(amendedResult.status).toBe("PENDING");
+  await page.getByRole("button", { name: "Cerrar seguimiento", exact: true }).click();
   await other.close();
 
   const detailResponse = await page.request.get(
@@ -119,6 +126,8 @@ test("real order advance survives a lost creation response, reload and a duplica
   const detail =
     (await detailResponse.json()) as components["schemas"]["CustomerOrderDetailResponse"];
   expect(detail.payments).toHaveLength(1);
+  expect(detail.version).toBe(2);
+  expect(detail.can_mark_ready).toBe(false);
   expect(detail.payments[0]!.id).toBe(committed.payments[0]!.id);
   expect(detail.payments[0]!.financial_entry_id).toBeTruthy();
   expect(detail.payments[0]!.financial_operation_id).toBeTruthy();
@@ -145,7 +154,7 @@ test("real order advance survives a lost creation response, reload and a duplica
   ).toBeVisible();
   await expect(
     decisionPanel.getByRole("button", { name: "Entregar pedido", exact: true }),
-  ).toBeVisible();
+  ).toHaveCount(0);
   await page.goto("/cerrar-turno");
   await expect(page.getByRole("heading", { name: "Cierre de turno", exact: true })).toBeVisible();
   await page.getByRole("button", { name: "No sobró pan", exact: true }).click();

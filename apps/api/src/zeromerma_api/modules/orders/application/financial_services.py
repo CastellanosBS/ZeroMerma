@@ -153,6 +153,9 @@ def record_order_payment(
     )
     session.add(entry)
     session.flush()
+    from zeromerma_api.modules.orders.application.receipts import persist_order_payment_receipt
+
+    persist_order_payment_receipt(session, payment)
     return OrderPaymentFinancialReference(payment.id, operation.id, entry.id)
 
 

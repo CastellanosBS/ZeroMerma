@@ -43,6 +43,7 @@ from zeromerma_api.modules.sales.domain.exceptions import (
     OpenCashSessionRequiredError,
     SaleError,
     SaleNotFoundError,
+    SalePriceChangedError,
     SaleValidationError,
     UnsupportedPaymentMethodError,
 )
@@ -51,6 +52,11 @@ router = APIRouter(prefix="/v1/sales", tags=["sales"])
 
 
 def _to_http_exception(error: Exception) -> HTTPException:
+    if isinstance(error, SalePriceChangedError):
+        return HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail={"code": "SALE_PRICE_CHANGED", "message": str(error)},
+        )
     if isinstance(
         error,
         (

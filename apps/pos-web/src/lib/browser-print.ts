@@ -11,17 +11,13 @@ export function openBrowserPrintWindow(options?: {
 export function writePrintableDocument(
   printWindow: Window,
   documentHtml: string,
-  options?: {
-    printDelayMs?: number;
-  },
 ): void {
   printWindow.document.open();
   printWindow.document.write(documentHtml);
   printWindow.document.close();
 
-  const printDelayMs = options?.printDelayMs ?? 120;
-  window.setTimeout(() => {
-    printWindow.focus();
-    printWindow.print();
-  }, printDelayMs);
+  // Keep adapter errors in the caller's exception boundary. The browser waits for
+  // document loading itself; a delayed timer would report success before failure.
+  printWindow.focus();
+  printWindow.print();
 }

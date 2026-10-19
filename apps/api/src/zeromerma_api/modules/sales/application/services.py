@@ -55,6 +55,7 @@ from zeromerma_api.modules.sales.domain.exceptions import (
     InsufficientCashPaymentError,
     OpenCashSessionRequiredError,
     SaleNotFoundError,
+    SalePriceChangedError,
     SaleValidationError,
     UnsupportedPaymentMethodError,
 )
@@ -64,6 +65,7 @@ from zeromerma_api.modules.sales.infrastructure.models import (
     SaleLine,
     SalePayment,
 )
+from zeromerma_api.modules.tickets.application.receipts import snapshot_sale
 
 MONEY_QUANTIZER = Decimal("0.01")
 
@@ -571,6 +573,7 @@ class SaleCommandService:
             sale_id=sale.id,
             user_id=current_user.id,
         )
+        snapshot_sale(session, detail)
         return SaleConfirmationView.model_validate(
             detail.model_dump(exclude={"operator_email", "operator_full_name"})
         )
@@ -582,7 +585,14 @@ class SaleCommandService:
         command: ConfirmSaleRequest,
     ) -> Sequence[PricedSaleLine]:
         priced_lines: list[PricedSaleLine] = []
-        for line in command.lines:
+        ordered = sorted(
+            enumerate(command.lines),
+            key=lambda pair: (
+                pair[1].capture_mode,
+                str(pair[1].product_id or pair[1].product_class_id),
+            ),
+        )
+        for _index, line in ordered:
             if line.capture_mode == "CLASS_CAPTURE":
                 if line.product_class_id is None:
                     raise SaleValidationError("CLASS_CAPTURE line is missing product_class_id.")
@@ -605,6 +615,21 @@ class SaleCommandService:
                 )
             )
 
+        priced_lines = [
+            priced
+            for _index, priced in sorted(
+                zip((index for index, _line in ordered), priced_lines, strict=True)
+            )
+        ]
+        for requested, priced in zip(command.lines, priced_lines, strict=True):
+            if (
+                requested.expected_unit_price != priced.unit_price
+                or requested.expected_currency_code != priced.currency_code
+            ):
+                raise SalePriceChangedError(
+                    "El precio o la moneda cambió. No se registró la venta. "
+                    "Actualiza el catálogo y revisa los productos y el cobro antes de confirmar."
+                )
         return priced_lines
 
 

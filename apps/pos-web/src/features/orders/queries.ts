@@ -92,6 +92,19 @@ export function useOrderDetailQuery(orderId: string | null) {
         workstationCode: appEnv.VITE_POS_WORKSTATION_CODE,
       }),
     enabled: isAuthenticated && orderId !== null,
+    refetchInterval: (query) => {
+      const order = query.state.data;
+      if (
+        !order ||
+        order.status !== "PENDING" ||
+        order.can_mark_ready ||
+        !order.production_commit_at
+      )
+        return false;
+      // Refresh server authority at commitment; the browser never changes order state itself.
+      const remaining = new Date(order.production_commit_at).getTime() - Date.now();
+      return Math.max(1_000, Math.min(60_000, remaining + 250));
+    },
   });
 }
 

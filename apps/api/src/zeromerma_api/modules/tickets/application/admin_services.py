@@ -54,14 +54,16 @@ from zeromerma_api.modules.tickets.application.admin_schemas import (
     AdminSalesTicketRelatedDocumentView,
     AdminSalesTicketsListResponse,
 )
+from zeromerma_api.modules.tickets.application.receipts import read_receipt
 from zeromerma_api.modules.tickets.domain.constants import (
-    AUDIT_ACTION_TICKET_REPRINTED,
-    OUTBOX_EVENT_TICKET_REPRINTED_V1,
+    AUDIT_ACTION_TICKET_REPRINT_REQUESTED,
+    OUTBOX_EVENT_TICKET_REPRINT_REQUESTED_V1,
     TICKET_RESOURCE_TYPE,
     TICKET_RETURN_STATUS_FULLY_RETURNED,
     TICKET_RETURN_STATUS_NOT_RETURNED,
     TICKET_RETURN_STATUS_PARTIALLY_RETURNED,
 )
+from zeromerma_api.modules.tickets.domain.exceptions import TicketConflictError
 
 ADMIN_TICKETS_PAGE_SIZE_MAX = 100
 ZERO_MONEY = Decimal("0.00")
@@ -304,7 +306,9 @@ class AdminSalesTicketService:
             )
         }
 
+        receipt = read_receipt(session, "SALE", ticket_id)
         return AdminSalesTicketDetailView(
+            receipt=receipt,
             overview=AdminSalesTicketOverviewView(
                 id=type_cast(uuid.UUID, sale_record["id"]),
                 folio=build_ticket_folio(type_cast(uuid.UUID, sale_record["id"])),
@@ -391,11 +395,13 @@ class AdminSalesTicketService:
                 for row in payment_records
             ],
             printable_ticket=AdminSalesTicketPrintableView(
-                can_reprint=True,
-                preview_available=False,
+                can_reprint=receipt is not None,
+                preview_available=receipt is not None,
                 note=(
-                    "La reimpresion registra auditoria; la vista imprimible "
-                    "se conectara al contrato de impresion."
+                    "Documento inmutable disponible; abrir el dialogo del navegador "
+                    "no confirma impresion fisica."
+                    if receipt is not None
+                    else "Documento historico sin snapshot inmutable."
                 ),
             ),
             related_documents=self._get_related_documents(session, ticket_id=ticket_id),
@@ -411,10 +417,12 @@ class AdminSalesTicketService:
         ticket_id: uuid.UUID,
     ) -> AdminSalesTicketDetailView:
         detail = self.get_ticket_detail(session, ticket_id=ticket_id)
+        if detail.receipt is None:
+            raise TicketConflictError("Este ticket historico no conserva un documento inmutable.")
         self._audit_recorder.record(
             session,
             actor_id=current_user.id,
-            action=AUDIT_ACTION_TICKET_REPRINTED,
+            action=AUDIT_ACTION_TICKET_REPRINT_REQUESTED,
             resource_type=TICKET_RESOURCE_TYPE,
             resource_id=str(ticket_id),
             branch_id=detail.operational_context.branch_id,
@@ -423,13 +431,14 @@ class AdminSalesTicketService:
                 "ticket_id": str(ticket_id),
                 "folio": detail.overview.folio,
                 "source": "backoffice",
+                "physical_outcome": "NOT_CONFIRMED",
             },
         )
         self._outbox_writer.append(
             session,
             aggregate_type=TICKET_RESOURCE_TYPE,
             aggregate_id=str(ticket_id),
-            event_name=OUTBOX_EVENT_TICKET_REPRINTED_V1,
+            event_name=OUTBOX_EVENT_TICKET_REPRINT_REQUESTED_V1,
             actor_id=current_user.id,
             branch_id=detail.operational_context.branch_id,
             payload={"ticket_id": str(ticket_id)},
@@ -502,7 +511,7 @@ class AdminSalesTicketService:
                 )
         normalized_search = _normalize_search(search)
         if normalized_search:
-            sale_id_query = normalized_search.removeprefix("tck-")
+            sale_id_query = normalized_search.removeprefix("tck-").replace("-", "")
             line_match = exists(
                 select(SaleLine.id).where(
                     SaleLine.sale_id == Sale.id,
@@ -514,7 +523,9 @@ class AdminSalesTicketService:
             )
             conditions.append(
                 or_(
-                    func.lower(cast(Sale.id, String)).like(f"{sale_id_query}%"),
+                    func.replace(func.lower(cast(Sale.id, String)), "-", "").like(
+                        f"{sale_id_query}%"
+                    ),
                     func.lower(cast(Sale.id, String)).contains(sale_id_query),
                     func.lower(User.full_name).contains(normalized_search),
                     func.lower(Branch.name).contains(normalized_search),
@@ -737,7 +748,7 @@ class AdminSalesTicketService:
             AdminSalesTicketRelatedDocumentView(
                 id=type_cast(uuid.UUID, row["id"]),
                 document_type="return",
-                folio=f"DEV-{str(row['id']).split('-', maxsplit=1)[0].upper()}",
+                folio=f"DEV-{type_cast(uuid.UUID, row['id']).hex.upper()}",
                 status=type_cast(str, row["status"]),
                 amount=type_cast(Decimal, row["total_refund_amount"]),
                 occurred_at=type_cast(datetime, row["created_at_utc"]),
@@ -748,7 +759,7 @@ class AdminSalesTicketService:
 
 
 def build_ticket_folio(ticket_id: uuid.UUID) -> str:
-    return f"TCK-{str(ticket_id).split('-', maxsplit=1)[0].upper()}"
+    return f"TCK-{ticket_id.hex.upper()}"
 
 
 def _to_list_item(

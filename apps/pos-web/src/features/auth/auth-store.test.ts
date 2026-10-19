@@ -2,6 +2,7 @@ import type { SessionResponse } from "@zeromerma/api-client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { queryClient } from "../../lib/query-client";
 import { usePosAuthStore as auth } from "./auth-store";
+import { useStatusMessageStore } from "../status-messages/store";
 
 function response(id = "actor-1", version = "v1"): SessionResponse {
   return {
@@ -17,6 +18,18 @@ beforeEach(() => {
 afterEach(() => { auth.getState().clearSession(); vi.unstubAllGlobals(); });
 
 describe("server session cache boundary", () => {
+  it("removes sensitive notifications and action callbacks at every session boundary", () => {
+    for (const boundary of ["clearSession", "markLocked", "requireVerification", "requirePasswordChange"] as const) {
+      auth.getState().setSession(response());
+      useStatusMessageStore.getState().showError("Customer private operation");
+      auth.getState()[boundary]();
+      expect(useStatusMessageStore.getState().messages).toEqual([]);
+    }
+    auth.getState().setSession(response());
+    useStatusMessageStore.getState().showError("Previous operator operation");
+    auth.getState().setSession(response("another-operator"));
+    expect(useStatusMessageStore.getState().messages).toEqual([]);
+  });
   it("clears reads and authorization when the actor or authorization version changes", () => {
     auth.getState().setSession(response());
     queryClient.setQueryData(["admin", "users"], { private: "previous actor" });

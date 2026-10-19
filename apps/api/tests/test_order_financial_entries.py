@@ -9,7 +9,7 @@ from uuid import UUID, uuid4
 
 import pytest
 from fastapi.testclient import TestClient
-from order_fixtures import seed_order_stock
+from order_fixtures import committed_order_clock, quote_order_payload, seed_order_stock
 from sqlalchemy import and_, func, or_, select
 
 from zeromerma_api.bootstrap.seed_local import (
@@ -106,6 +106,7 @@ def _create_body(context: dict[str, str], product_id: str) -> dict[str, Any]:
         "requested_for_at": (datetime.now(UTC) + timedelta(days=3)).isoformat(),
         "items": [{"product_id": product_id, "quantity": "2"}],
         "advance_amount": "0.00",
+        "quote_fingerprint": "0" * 64,
     }
 
 
@@ -160,12 +161,17 @@ def test_unsupported_order_payment_currency_is_a_domain_rejection_without_partia
         assert product is not None
         product.currency_code = "USD"
         session.commit()
+    body = quote_order_payload(
+        client,
+        headers,
+        {**_create_body(context, product_id), **_payment("CASH", "3.00", "advance")},
+    )
     before = _state()
     response = _post(
         client,
         headers,
         "/v1/orders",
-        {**_create_body(context, product_id), **_payment("CASH", "3.00", "advance")},
+        body,
     )
     assert response.status_code == 400
     assert "MXN" in response.json()["message"]
@@ -179,17 +185,25 @@ def _prepare(
     create = _create_body(context, product_id)
     if action in {"create", "cancel"}:
         create.update(_payment(method, "3.00", "advance"))
+    else:
+        create.update(_payment("CASH", "3.00", "advance"))
+    create = quote_order_payload(client, headers, create)
     if action == "create":
         return headers, context, "/v1/orders", create
     created = _post(client, headers, "/v1/orders", create)
     assert created.status_code == 201
     order_id = created.json()["id"]
     if action == "deliver":
-        ready = _post(client, headers, f"/v1/orders/{order_id}/mark-ready", context)
+        with committed_order_clock(order_id):
+            ready = _post(client, headers, f"/v1/orders/{order_id}/mark-ready", context)
         assert ready.status_code == 200
-        body = {**context, **_payment(method, "6.00", "settlement")}
+        body = {**context, **_payment(method, "3.00", "settlement")}
     else:
-        body = {**context, "cancellation_reason": "Customer requested refund"}
+        body = {
+            **context,
+            "cancellation_reason": "Customer requested refund",
+            "cancellation_responsibility": "CUSTOMER",
+        }
     return headers, context, f"/v1/orders/{order_id}/{action}", body
 
 
@@ -428,7 +442,11 @@ def test_nonfinancial_transitions_do_not_create_facts_and_legacy_detail_does_not
     client: TestClient,
 ) -> None:
     headers, context, product_id = _setup(client)
-    create = _create_body(context, product_id)
+    create = quote_order_payload(
+        client,
+        headers,
+        {**_create_body(context, product_id), **_payment("CASH", "3.00", "advance")},
+    )
     created = _post(client, headers, "/v1/orders", create)
     assert created.status_code == 201
     order_id = UUID(created.json()["id"])
@@ -444,10 +462,10 @@ def test_nonfinancial_transitions_do_not_create_facts_and_legacy_detail_does_not
         payment = CustomerOrderPayment(
             id=uuid4(),
             customer_order_id=order_id,
-            sequence=1,
+            sequence=2,
             payment_type="ADVANCE",
             payment_method_code="CASH",
-            amount=Decimal("6.00"),
+            amount=Decimal("3.00"),
             currency_code="MXN",
             cash_session_id=cash.id,
             workstation_id=cash.workstation_id,
@@ -457,9 +475,10 @@ def test_nonfinancial_transitions_do_not_create_facts_and_legacy_detail_does_not
         session.add(payment)
         session.commit()
     admin = owner_headers()
-    for action in ("mark-ready", "deliver"):
-        response = _post(client, admin, f"/v1/admin/orders/{order_id}/{action}", {})
-        assert response.status_code == 200
+    with committed_order_clock(order_id):
+        for action in ("mark-ready", "deliver"):
+            response = _post(client, admin, f"/v1/admin/orders/{order_id}/{action}", {})
+            assert response.status_code == 200
     for url, auth, params in (
         (f"/v1/orders/{order_id}", headers, {"workstation_code": SEED_WORKSTATION_CODE}),
         (f"/v1/admin/orders/{order_id}", admin, {}),
@@ -468,8 +487,8 @@ def test_nonfinancial_transitions_do_not_create_facts_and_legacy_detail_does_not
         assert response.status_code == 200
         payload = response.json()
         rows = payload.get("order", payload)["payments"]
-        assert len(rows) == 1
-        assert rows[0]["financial_operation_id"] is None
-        assert rows[0]["financial_entry_id"] is None
-        assert rows[0]["cash_session_id"] == context["cash_session_id"]
+        assert len(rows) == 2
+        assert rows[1]["financial_operation_id"] is None
+        assert rows[1]["financial_entry_id"] is None
+        assert rows[1]["cash_session_id"] == context["cash_session_id"]
     assert _state()[0][3:5] == financial_counts_before

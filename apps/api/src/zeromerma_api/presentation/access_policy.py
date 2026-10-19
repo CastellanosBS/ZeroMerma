@@ -34,6 +34,53 @@ class EndpointPolicy:
 # Each method/path is deliberate. Unlisted operations are denied, never inferred.
 # Shared masters have no branch owner: mutations require explicit GLOBAL (DEC-04).
 ENDPOINT_POLICIES: dict[tuple[str, str], EndpointPolicy] = {
+    ("GET", "/v1/hardware/bootstrap"): EndpointPolicy(("pos.operate",), "POS"),
+    ("GET", "/v1/hardware/commands/by-key/{idempotency_key}"): EndpointPolicy(
+        (), "POS", exception_reason="Hardware recovery rechecks source capability and ownership."
+    ),
+    (
+        "GET",
+        "/v1/tickets/receipts/{source_kind}/{source_id}/print-requests/{idempotency_key}",
+    ): EndpointPolicy(
+        (), "POS", exception_reason="Print recovery rechecks the source capability and branch."
+    ),
+    ("GET", "/v1/hardware/commands/{command_id}/authorization"): EndpointPolicy(
+        (),
+        "POS",
+        exception_reason="HardwareService checks source capability and command ownership.",
+    ),
+    ("POST", "/v1/hardware/commands"): EndpointPolicy(
+        (),
+        "POS",
+        mutation=True,
+        exception_reason="Hardware commands validate source capability and station binding.",
+    ),
+    ("GET", "/ready"): EndpointPolicy(
+        (), None, exception_reason="Public bounded local readiness discloses no business data."
+    ),
+    ("POST", "/v1/tickets/receipts/{source_kind}/{source_id}/print-request"): EndpointPolicy(
+        (),
+        "POS",
+        mutation=True,
+        exception_reason="Receipt print requests authorize the immutable source kind and branch.",
+    ),
+    ("POST", "/v1/orders/quote"): EndpointPolicy(("orders.manage",), "POS"),
+    ("POST", "/v1/orders/{order_id}/payments"): EndpointPolicy(
+        ("orders.manage",), "POS", mutation=True
+    ),
+    ("POST", "/v1/orders/{order_id}/amend"): EndpointPolicy(
+        ("orders.manage",), "POS", mutation=True
+    ),
+    ("GET", "/v1/admin/orders/commitment-policies/{branch_id}"): EndpointPolicy(
+        ("orders.manage",), "BACKOFFICE"
+    ),
+    (
+        "GET",
+        "/v1/admin/orders/commitment-policies/{branch_id}/confirmations/{idempotency_key}",
+    ): EndpointPolicy(("orders.manage",), "BACKOFFICE"),
+    ("POST", "/v1/admin/orders/commitment-policies/{branch_id}"): EndpointPolicy(
+        ("orders.manage",), "BACKOFFICE", mutation=True
+    ),
     ("POST", "/v1/admin/inventory-dispositions"): EndpointPolicy(
         (),
         "BACKOFFICE",

@@ -51,7 +51,8 @@ try {
           Invoke-ZeroMermaUv run --frozen --project apps/worker python -m zeromerma_worker --once --skip-db-check
         }
         "Migrations" {
-          & (Join-Path $PSScriptRoot "run-migration-validation.ps1") -Mode Full
+          & (Join-Path $PSScriptRoot "run-migration-validation.ps1") -Mode Full `
+            -JUnitPath (Join-Path $evidenceDirectory "migrations.xml")
         }
         "Contracts" {
           Invoke-ZeroMermaUv run --frozen python scripts/dev/check-functional-operation-matrix.py

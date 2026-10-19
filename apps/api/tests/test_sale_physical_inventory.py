@@ -103,6 +103,8 @@ def _sale(
     key: str | None = None,
 ) -> Any:
     line = {
+        "expected_unit_price": "12.00" if class_sale else "18.00",
+        "expected_currency_code": "MXN",
         "capture_mode": "CLASS_CAPTURE" if class_sale else "PRODUCT_DIRECT",
         "quantity": quantity,
         "product_class_id" if class_sale else "product_id": context[

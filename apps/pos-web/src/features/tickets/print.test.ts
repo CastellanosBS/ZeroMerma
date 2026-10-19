@@ -5,7 +5,7 @@ import { buildTicketPrintDocument } from "./print";
 
 const ticketFixture: TicketDetailResponse = {
   id: "8ad4f881-faa9-41c7-aeb9-41d44f7cfb0b",
-  folio: "TCK-8AD4F881",
+  folio: "TCK-8AD4F881FAA941C7AEB941D44F7CFB0B",
   status: "CONFIRMED",
   confirmed_at: "2026-04-12T18:00:00Z",
   branch: {
@@ -67,18 +67,90 @@ const ticketFixture: TicketDetailResponse = {
   can_reprint: true,
 };
 
+ticketFixture.receipt = {
+  schema_version: 1,
+  source_kind: "SALE",
+  source_id: ticketFixture.id,
+  folio: ticketFixture.folio,
+  occurred_at: ticketFixture.confirmed_at,
+  context: {
+    branch_id: ticketFixture.branch.id,
+    branch_code: "MAIN",
+    branch_name: "Original Branch",
+    timezone: "America/Hermosillo",
+    workstation_id: ticketFixture.workstation.id,
+    workstation_code: "POS-01",
+    workstation_name: "Original Register",
+    actor_id: ticketFixture.operator.id,
+    actor_name: "Original Cashier",
+    cash_session_id: ticketFixture.cash_session_id,
+  },
+  seller: { legal_name: null, tax_identifier: null, fiscal_regime: null, address: null,
+    configuration_status: "UNCONFIGURED" },
+  currency_code: "MXN",
+  subtotal_amount: "42.00",
+  discount_amount: "0.00",
+  total_amount: "42.00",
+  change_amount: "8.00",
+  lines: [{ sequence: 1, name: "Pan dulce", quantity: "2.000", unit_price: "12.00",
+    total_amount: "24.00", discount_amount: "0.00" }],
+  payments: [{ method: "CASH", execution_mode: "LOCAL", amount: "42.00",
+    tendered_amount: "50.00", change_amount: "8.00" }],
+  fiscal_document: false,
+  provider_receipt: false,
+};
+
 describe("ticket print document", () => {
   it("renders a printable receipt with folio and line items", () => {
     const document = buildTicketPrintDocument(ticketFixture);
 
-    expect(document).toContain("TCK-8AD4F881");
+    expect(document).toContain("TCK-8AD4F881FAA941C7AEB941D44F7CFB0B");
     expect(document).toContain("Pan dulce");
     expect(document).toContain("REIMPRESION");
     expect(document).toContain("Efectivo");
     expect(document).toContain("@page");
     expect(document).toContain("80mm");
     expect(document).toContain("RFC: No configurado");
-    expect(document).toContain("Este ticket es comprobante de compra.");
+    expect(document).toContain("Comprobante operativo de ZeroMerma.");
     expect(document).toContain("No sustituye un CFDI.");
+    expect(document).toContain("No es un comprobante emitido por BBVA.");
+    expect(document).not.toContain("QR:");
+  });
+
+  it("prints the original document after live catalog, operator and branch changes", () => {
+    const document = buildTicketPrintDocument({ ...ticketFixture,
+      branch: { ...ticketFixture.branch, name: "Changed Branch" },
+      operator: { ...ticketFixture.operator, full_name: "Changed Cashier" },
+      total_amount: "999.00", lines: [], payments: [], returned_amount: "42.00" });
+    expect(document).toContain("ORIGINAL BRANCH");
+    expect(document).toContain("Original Cashier");
+    expect(document).toContain("Pan dulce");
+    expect(document).not.toContain("Changed");
+    expect(document).not.toContain("999.00");
+  });
+
+  it("refuses to fabricate an original when the historical snapshot is missing", () => {
+    expect(() => buildTicketPrintDocument({ ...ticketFixture, receipt: null })).toThrow("inmutable");
+  });
+
+  it("uses the frozen currency and never clips large amounts", () => {
+    const receipt = structuredClone(ticketFixture.receipt!);
+    receipt.currency_code = "USD";
+    receipt.lines[0]!.total_amount = "12345678.90";
+    const document = buildTicketPrintDocument({ ...ticketFixture, receipt });
+    expect(document).toContain("Moneda: USD");
+    expect(document).toContain("12,345,678.90");
+  });
+
+  it("escapes long special-character names and distinguishes external card registration", () => {
+    const receipt = structuredClone(ticketFixture.receipt!);
+    receipt.lines[0]!.name = 'Pastel <script> & chocolate con decoración de cumpleaños muy largo';
+    receipt.payments = [{ method: "CARD", execution_mode: "ACCOUNTING_ONLY", amount: "42.00",
+      tendered_amount: "42.00", change_amount: "0.00" }];
+    const document = buildTicketPrintDocument({ ...ticketFixture, receipt });
+    expect(document).toContain("&lt;script&gt;");
+    expect(document).not.toContain("<script>");
+    expect(document).toContain("cumpleaños");
+    expect(document).toContain("Registro de cobro externo.");
   });
 });

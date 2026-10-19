@@ -5,6 +5,7 @@ import { useTransferDraftIdentity, useTransferIntention } from "./use-transfer-i
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Navigate } from "@tanstack/react-router";
 import { DialogBody, DialogFooter, DialogHeader, DialogSurface } from "@zeromerma/ui";
+import { PosModal } from "../../components/pos-modal";
 import {
   useCallback,
   useEffect,
@@ -692,7 +693,7 @@ function TransferDispatchConfirmationDialog({
   ];
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/25 p-4">
+    <PosModal label="Confirmar envío a sucursal" onClose={onCancel} onConfirm={onConfirm} busy={isPending}>
       <DialogSurface className="w-full max-w-2xl">
         <DialogHeader>
           <div className="min-w-0">
@@ -774,7 +775,7 @@ function TransferDispatchConfirmationDialog({
           </Button>
         </DialogFooter>
       </DialogSurface>
-    </div>
+    </PosModal>
   );
 }
 

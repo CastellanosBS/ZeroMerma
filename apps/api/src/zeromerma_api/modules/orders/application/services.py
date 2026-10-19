@@ -31,6 +31,13 @@ from zeromerma_api.modules.financial_ledger.domain.money import FinancialModelEr
 from zeromerma_api.modules.identity.application.schemas import AuthenticatedUser
 from zeromerma_api.modules.identity.infrastructure.models import User
 from zeromerma_api.modules.operations.domain.constants import BRANCH_BRAND_MAPPING
+from zeromerma_api.modules.orders.application.commitment import (
+    current_order_time,
+    materialize_commitment,
+    quote_order,
+    save_revision,
+    validate_quote,
+)
 from zeromerma_api.modules.orders.application.financial_services import (
     order_payment_financial_references,
     record_order_payment,
@@ -49,6 +56,8 @@ from zeromerma_api.modules.orders.application.schemas import (
     DeliverCustomerOrderSettlementPaymentRequest,
     OrderActionRequest,
     OrderCommandResultView,
+    OrderQuoteRequest,
+    OrderQuoteView,
     OrdersBootstrapResponse,
     OrdersCatalogClassView,
     OrdersCatalogProductView,
@@ -85,6 +94,7 @@ from zeromerma_api.modules.orders.infrastructure.models import (
     CustomerOrderPayment,
 )
 from zeromerma_api.modules.outbox.application.service import OutboxWriter
+from zeromerma_api.modules.tickets.application.receipts import read_receipt
 
 MONEY_QUANTIZER = Decimal("0.01")
 ZERO_MONEY = Decimal("0.00")
@@ -93,6 +103,8 @@ ORDER_STATUS_SEQUENCE = [
     ORDER_STATUS_READY,
     ORDER_STATUS_DELIVERED,
     ORDER_STATUS_CANCELED,
+    "EXPIRED",
+    "NO_SHOW",
 ]
 
 
@@ -118,6 +130,7 @@ class PreparedOrderAdvancePayment:
 
 @dataclass(frozen=True)
 class PreparedOrderCreation:
+    quote: OrderQuoteView
     context: WorkstationContext
     cash_session: CashSession
     items: Sequence[PreparedOrderItem]
@@ -274,7 +287,9 @@ class OrdersQueryService:
             order_id_prefix = normalized_query.removeprefix("ped-")
             statement = statement.where(
                 or_(
-                    func.lower(cast(CustomerOrder.id, String)).like(f"{order_id_prefix}%"),
+                    func.replace(func.lower(cast(CustomerOrder.id, String)), "-", "").like(
+                        f"{order_id_prefix.replace('-', '')}%"
+                    ),
                     func.lower(cast(CustomerOrder.id, String)).contains(normalized_query),
                     func.lower(CustomerOrder.customer_name).contains(normalized_query),
                     func.lower(CustomerOrder.customer_phone).contains(normalized_query),
@@ -516,7 +531,21 @@ class OrdersCommandService:
             sum((item.line_total_amount for item in prepared_items), ZERO_MONEY)
         )
         total_amount = subtotal_amount
+        if command.requested_for_at is None:
+            raise OrderValidationError("Selecciona una fecha de entrega para cotizar el pedido.")
+        quote = quote_order(
+            session,
+            branch_id=context.branch_id,
+            request=OrderQuoteRequest(
+                workstation_code=command.workstation_code,
+                requested_for_at=command.requested_for_at,
+                items=command.items,
+            ),
+        )
+        validate_quote(quote, command.quote_fingerprint)
         advance_amount = _quantize_money(command.advance_amount)
+        if advance_amount < quote.minimum_advance_amount:
+            raise OrderValidationError("El anticipo debe cubrir al menos el 50% del pedido.")
         if advance_amount > total_amount:
             raise OrderValidationError("El anticipo no puede ser mayor al total del pedido.")
         if advance_amount > ZERO_MONEY:
@@ -541,6 +570,7 @@ class OrdersCommandService:
             prepared_advance_payments = []
         remaining_balance_amount = _quantize_money(total_amount - advance_amount)
         return PreparedOrderCreation(
+            quote=quote,
             context=context,
             cash_session=cash_session,
             items=prepared_items,
@@ -574,6 +604,7 @@ class OrdersCommandService:
         resolved_request_id = request_id or str(uuid.uuid4())
 
         order = CustomerOrder(
+            version=0,
             branch_id=context.branch_id,
             workstation_id_created=context.workstation_id,
             created_by_user_id=current_user.id,
@@ -612,6 +643,13 @@ class OrdersCommandService:
                 )
             )
 
+        save_revision(
+            session,
+            order=order,
+            quote=prepared.quote,
+            actor_id=current_user.id,
+            reason="Order confirmation",
+        )
         financial_references = []
         for sequence, payment in enumerate(prepared_advance_payments, start=1):
             financial_references.append(
@@ -740,6 +778,12 @@ class OrdersCommandService:
                 "Solo los pedidos pendientes se pueden marcar como listos para entrega."
             )
 
+        if not materialize_commitment(
+            session, order=order, actor_id=current_user.id, request_id=request_id
+        ):
+            raise OrderStateConflictError(
+                "ORDER_NOT_COMMITTED: Aún no llega el compromiso productivo."
+            )
         apply_order_inventory(session, order=order, actor_id=current_user.id, action="reserve")
         order.status = ORDER_STATUS_READY
         order.updated_at_utc = datetime.now(tz=UTC)
@@ -891,6 +935,8 @@ class OrdersCommandService:
                 "workstation_code": context.workstation_code,
                 "cash_session_id": str(cash_session.id),
                 "status": ORDER_STATUS_DELIVERED,
+                "order_version": order.version,
+                "recognized_revenue_amount": str(order.total_amount),
                 "settlement_amount": str(settlement_amount),
                 "settlement_payment_method_code": settlement_payment_method,
                 "settlement_payment_count": len(prepared_settlement_payments),
@@ -906,6 +952,8 @@ class OrdersCommandService:
                 "order_id": str(order.id),
                 "folio": _build_order_folio(order.id),
                 "status": ORDER_STATUS_DELIVERED,
+                "order_version": order.version,
+                "recognized_revenue_amount": str(order.total_amount),
                 "branch_id": str(context.branch_id),
                 "branch_code": context.branch_code,
                 "workstation_id": str(context.workstation_id),
@@ -949,14 +997,20 @@ class OrdersCommandService:
         order = _get_order_for_branch(
             session, order_id=order_id, branch_id=context.branch_id, for_update=True
         )
-        if order.status == ORDER_STATUS_DELIVERED:
-            raise OrderStateConflictError("No se puede cancelar un pedido que ya fue entregado.")
-        if order.status == ORDER_STATUS_CANCELED:
-            raise OrderStateConflictError("Este pedido ya fue cancelado.")
-        canceled_at = datetime.now(tz=UTC)
+        if order.status not in {ORDER_STATUS_PENDING, ORDER_STATUS_READY}:
+            raise OrderStateConflictError("El pedido ya tiene un estado terminal.")
+        canceled_at = current_order_time(session)
+        materialize_commitment(
+            session,
+            order=order,
+            actor_id=current_user.id,
+            request_id=request_id,
+            decision_at=canceled_at,
+        )
         cancellation_refund_amount = _get_cancellation_refund_amount(
             order,
             effective_at=canceled_at,
+            responsibility=command.cancellation_responsibility,
         )
         cancellation_refund_eligible = cancellation_refund_amount > ZERO_MONEY
         financial_refund = None
@@ -982,9 +1036,8 @@ class OrdersCommandService:
                 raise OrderStateConflictError(str(error)) from error
 
         apply_order_inventory(session, order=order, actor_id=current_user.id, action="release")
-        order.status = ORDER_STATUS_CANCELED
-        if cancellation_refund_eligible:
-            order.advance_amount = ZERO_MONEY
+        order.status = command.terminal_status
+        order.cancellation_responsibility = command.cancellation_responsibility
         order.remaining_balance_amount = ZERO_MONEY
         order.canceled_at = canceled_at
         order.canceled_by_user_id = current_user.id
@@ -1007,7 +1060,8 @@ class OrdersCommandService:
                 "branch_code": context.branch_code,
                 "workstation_code": context.workstation_code,
                 "cash_session_id": str(cash_session.id),
-                "status": ORDER_STATUS_CANCELED,
+                "status": order.status,
+                "responsibility": order.cancellation_responsibility,
                 "cancellation_reason": order.cancellation_reason,
                 "cancellation_refund_eligible": cancellation_refund_eligible,
                 "cancellation_refund_amount": str(cancellation_refund_amount),
@@ -1025,7 +1079,8 @@ class OrdersCommandService:
             payload={
                 "order_id": str(order.id),
                 "folio": _build_order_folio(order.id),
-                "status": ORDER_STATUS_CANCELED,
+                "status": order.status,
+                "responsibility": order.cancellation_responsibility,
                 "branch_id": str(context.branch_id),
                 "branch_code": context.branch_code,
                 "workstation_id": str(context.workstation_id),
@@ -1113,6 +1168,7 @@ def _prepare_order_items(
             ProductClass.is_active.is_(True),
             ProductClass.is_sellable.is_(True),
         )
+        .with_for_update(read=True, of=(Product, ProductClass))
     ).mappings()
     products_by_id = {record["id"]: record for record in product_records}
 
@@ -1193,12 +1249,40 @@ def _build_order_detail(session: Session, order: CustomerOrder) -> CustomerOrder
 
     advance_amount = _quantize_money(order.advance_amount)
     remaining_balance_amount = _quantize_money(order.remaining_balance_amount)
+    decision_at = current_order_time(session)
     cancellation_refund_amount = _get_cancellation_refund_amount(
         order,
-        effective_at=datetime.now(tz=UTC),
+        effective_at=decision_at,
     )
 
     return CustomerOrderDetailResponse(
+        version=order.version,
+        production_commit_at=order.production_commit_at,
+        production_committed_at=order.production_committed_at,
+        cancellation_responsibility=order.cancellation_responsibility,
+        can_amend=(
+            order.status == ORDER_STATUS_PENDING
+            and order.production_commit_at is not None
+            and order.production_committed_at is None
+            and decision_at < order.production_commit_at
+        ),
+        can_pay=(
+            order.status in {ORDER_STATUS_PENDING, ORDER_STATUS_READY}
+            and remaining_balance_amount > 0
+            and order.production_commit_at is not None
+        ),
+        recognized_revenue_amount=order.total_amount
+        if order.status == ORDER_STATUS_DELIVERED
+        else ZERO_MONEY,
+        retained_amount=(
+            order.advance_amount
+            if order.status in {"CANCELED", "EXPIRED", "NO_SHOW"}
+            and find_refund(session, source_type="ORDER_CANCELLATION", source_id=order.id) is None
+            else ZERO_MONEY
+        ),
+        unapplied_amount=order.advance_amount
+        if order.status in {"PENDING", "READY"}
+        else ZERO_MONEY,
         financial_refund=find_refund(session, source_type="ORDER_CANCELLATION", source_id=order.id),
         id=order.id,
         folio=_build_order_folio(order.id),
@@ -1257,6 +1341,7 @@ def _build_order_detail(session: Session, order: CustomerOrder) -> CustomerOrder
         ],
         payments=[
             CustomerOrderPaymentView(
+                receipt=read_receipt(session, "ORDER_PAYMENT", payment.id),
                 id=payment.id,
                 sequence=payment.sequence,
                 payment_type=payment.payment_type,
@@ -1273,9 +1358,14 @@ def _build_order_detail(session: Session, order: CustomerOrder) -> CustomerOrder
             )
             for payment, recorded_by_full_name in payment_records
         ],
-        can_mark_ready=order.status == ORDER_STATUS_PENDING,
+        can_mark_ready=(
+            order.status == ORDER_STATUS_PENDING
+            and order.production_commit_at is not None
+            and decision_at >= order.production_commit_at
+        ),
         can_deliver=order.status == ORDER_STATUS_READY,
-        can_cancel=order.status in {ORDER_STATUS_PENDING, ORDER_STATUS_READY},
+        can_cancel=order.production_commit_at is not None
+        and order.status in {ORDER_STATUS_PENDING, ORDER_STATUS_READY},
         requires_settlement_on_delivery=(
             order.status == ORDER_STATUS_READY and remaining_balance_amount > ZERO_MONEY
         ),
@@ -1360,7 +1450,7 @@ def _get_branch_brand_key(branch_code: str) -> str:
 
 
 def _build_order_folio(order_id: uuid.UUID) -> str:
-    return f"PED-{str(order_id).split('-', maxsplit=1)[0].upper()}"
+    return f"PED-{order_id.hex.upper()}"
 
 
 def _normalize_query(value: str | None) -> str | None:
@@ -1519,16 +1609,18 @@ def _get_cancellation_refund_amount(
     order: CustomerOrder,
     *,
     effective_at: datetime,
+    responsibility: str = "CUSTOMER",
 ) -> Decimal:
     advance_amount = _quantize_money(order.advance_amount)
     if advance_amount == ZERO_MONEY:
         return ZERO_MONEY
     if order.status not in {ORDER_STATUS_PENDING, ORDER_STATUS_READY}:
         return ZERO_MONEY
-    if order.requested_for_at is None:
+    if order.production_commit_at is None:
         return ZERO_MONEY
-    refund_cutoff = order.requested_for_at - timedelta(days=1)
-    if effective_at > refund_cutoff:
+    if responsibility == "MERCHANT":
+        return advance_amount
+    if order.production_committed_at is not None or effective_at >= order.production_commit_at:
         return ZERO_MONEY
     return advance_amount
 

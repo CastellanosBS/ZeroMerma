@@ -429,7 +429,7 @@ vi.mock("../cash-session-open/queries", () => ({
 }));
 
 vi.mock("../status-messages/store", () => ({
-  useStatusMessageStore: (
+  useStatusMessageStore: Object.assign((
     selector: (state: {
       showError: typeof showErrorMock;
       showSuccess: typeof showSuccessMock;
@@ -438,7 +438,7 @@ vi.mock("../status-messages/store", () => ({
     selector({
       showError: showErrorMock,
       showSuccess: showSuccessMock,
-    }),
+    }), { setState: vi.fn() }),
 }));
 
 vi.mock("./queries", () => ({

@@ -636,11 +636,11 @@ def _is_partial_return(session: Session, *, sale_id: uuid.UUID) -> bool:
 
 
 def _build_sale_folio(sale_id: uuid.UUID) -> str:
-    return f"TCK-{str(sale_id).split('-', maxsplit=1)[0].upper()}"
+    return f"TCK-{sale_id.hex.upper()}"
 
 
 def _build_return_folio(return_id: uuid.UUID) -> str:
-    return f"DEV-{str(return_id).split('-', maxsplit=1)[0].upper()}"
+    return f"DEV-{return_id.hex.upper()}"
 
 
 def _normalize_search(value: str | None) -> str | None:

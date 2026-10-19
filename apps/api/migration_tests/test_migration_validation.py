@@ -52,7 +52,7 @@ from zeromerma_api.testing.database_safety import (
 REPO_ROOT = Path(__file__).resolve().parents[3]
 VERSIONS_DIR = REPO_ROOT / "apps" / "api" / "alembic" / "versions"
 ALEMBIC_INI = REPO_ROOT / "apps" / "api" / "alembic.ini"
-CANONICAL_HEAD = "20261019_0053_purchase_prod"
+CANONICAL_HEAD = "20261019_0056_hardware"
 EXPECTED_POSTGRES_MAJOR = 16
 TEST_CONTAINER_VARIABLE = "ZEROMERMA_TEST_CONTAINER_NAME"
 
@@ -61,7 +61,7 @@ KNOWN_NAMING_ONLY = "KNOWN_NAMING_ONLY"
 KNOWN_MODEL_OBJECT = "KNOWN_MODEL_OBJECT"
 REAL_SCHEMA_DRIFT = "REAL_SCHEMA_DRIFT"
 UNKNOWN_SCHEMA_DRIFT = "UNKNOWN_SCHEMA_DRIFT"
-DRIFT_BASELINE_VERSION = "2026-10-19.zm-fin-055.1"
+DRIFT_BASELINE_VERSION = "2026-10-19.zm-fin-067.1"
 
 
 @dataclass(frozen=True, order=True, slots=True)
@@ -925,6 +925,64 @@ KNOWN_DB_ONLY_CHECKS: frozenset[CheckConstraintFingerprint] = frozenset(
 )
 KNOWN_MODEL_CHECKS: frozenset[ModelCheckFingerprint] = frozenset(
     {
+        # Reviewed 0054-0056 declarations and PostgreSQL 16 reflection, not accepted drift.
+        ModelCheckFingerprint(
+            "public",
+            "receipt_snapshots",
+            "ck_receipt_snapshots_ck_receipt_kind",
+            "ck_receipt_snapshots_ck_receipt_kind",
+            "ck_receipt_snapshots_ck_receipt_kind",
+            "source_kind IN ('SALE','ORDER_PAYMENT','RETURN')",
+            "source_kind::text = ANY (ARRAY['SALE'::character varying, "
+            "'ORDER_PAYMENT'::character varying, 'RETURN'::character varying]::text[])",
+        ),
+        ModelCheckFingerprint(
+            "public",
+            "hardware_device_bindings",
+            "ck_hardware_device_bindings_ck_hardware_binding_kind",
+            "ck_hardware_device_bindings_ck_hardware_binding_kind",
+            "ck_hardware_device_bindings_ck_hardware_binding_kind",
+            "kind IN ('PRINTER','DRAWER')",
+            "kind::text = ANY (ARRAY['PRINTER'::character varying, "
+            "'DRAWER'::character varying]::text[])",
+        ),
+        ModelCheckFingerprint(
+            "public",
+            "hardware_device_bindings",
+            "ck_hardware_device_bindings_ck_hardware_binding_version",
+            "ck_hardware_device_bindings_ck_hardware_binding_version",
+            "ck_hardware_device_bindings_ck_hardware_binding_version",
+            "version > 0",
+            "version > 0",
+        ),
+        ModelCheckFingerprint(
+            "public",
+            "hardware_device_bindings",
+            "ck_hardware_device_bindings_ck_hardware_environment",
+            "ck_hardware_device_bindings_ck_hardware_environment",
+            "ck_hardware_device_bindings_ck_hardware_environment",
+            "environment IN ('SANDBOX','PRODUCTION')",
+            "environment::text = ANY (ARRAY['SANDBOX'::character varying, "
+            "'PRODUCTION'::character varying]::text[])",
+        ),
+        ModelCheckFingerprint(
+            "public",
+            "order_commitment_policies",
+            "ck_order_commitment_policies_ck_order_commitment_policy_version",
+            "ck_order_commitment_policies_ck_order_commitment_policy_version",
+            "ck_order_commitment_policies_ck_order_commitment_policy_version",
+            "version > 0",
+            "version > 0",
+        ),
+        ModelCheckFingerprint(
+            "public",
+            "order_commitment_policies",
+            "ck_order_commitment_policies_ck_order_commitment_policy_lead_time",
+            "ck_order_commitment_policies_ck_order_commitment_policy_29bc",
+            "ck_order_commitment_policies_ck_order_commitment_policy_29bc",
+            "lead_time_minutes >= 0",
+            "lead_time_minutes >= 0",
+        ),
         ModelCheckFingerprint(
             "public",
             "class_inventory_attributions",
@@ -2773,11 +2831,12 @@ KNOWN_MODEL_CHECKS: frozenset[ModelCheckFingerprint] = frozenset(
             "ck_customer_orders_ck_customer_orders_status_valid",
             "ck_customer_orders_ck_customer_orders_status_valid",
             "ck_customer_orders_ck_customer_orders_status_valid",
-            "status IN ('PENDING', 'READY', 'DELIVERED', 'CANCELED')",
+            "status IN ('PENDING', 'READY', 'DELIVERED', 'CANCELED', 'EXPIRED', 'NO_SHOW')",
             (
                 "status::text = ANY (ARRAY['PENDING'::character varying, "
                 "'READY'::character varying, 'DELIVERED'::character varyi"
-                "ng, 'CANCELED'::character varying]::text[])"
+                "ng, 'CANCELED'::character varying, 'EXPIRED'::character varying, "
+                "'NO_SHOW'::character varying]::text[])"
             ),
         ),
         ModelCheckFingerprint(
@@ -4267,6 +4326,7 @@ MODEL_MODULES = (
     "zeromerma_api.modules.discounts.infrastructure.models",
     "zeromerma_api.modules.financial_ledger.infrastructure.models",
     "zeromerma_api.modules.financial_ledger.infrastructure.reconciliation_models",
+    "zeromerma_api.modules.hardware.infrastructure.models",
     "zeromerma_api.modules.idempotency.infrastructure.models",
     "zeromerma_api.modules.identity.infrastructure.models",
     "zeromerma_api.modules.identity.infrastructure.privileged_models",
@@ -4283,6 +4343,7 @@ MODEL_MODULES = (
     "zeromerma_api.modules.returns.infrastructure.models",
     "zeromerma_api.modules.sales.infrastructure.models",
     "zeromerma_api.modules.suppliers.infrastructure.models",
+    "zeromerma_api.modules.tickets.infrastructure.models",
 )
 
 
@@ -5923,7 +5984,7 @@ def test_drift_classifier_accepts_only_exact_known_fingerprints() -> None:
     assert len(KNOWN_DB_ONLY_INDEXES) == 75
     assert len(KNOWN_DB_ONLY_DEFAULTS) == 51
     assert len(KNOWN_DB_ONLY_CHECKS) == 6
-    assert len(KNOWN_MODEL_CHECKS) == 263
+    assert len(KNOWN_MODEL_CHECKS) == 269
     assert len(KNOWN_MODEL_INDEXES) == 4
     assert (
         sum(item.expected_database_name != item.database_name for item in KNOWN_MODEL_CHECKS) == 82
@@ -6758,8 +6819,8 @@ def test_static_graph() -> None:
     for row in inventory:
         _emit("REVISION", row)
     _emit("GRAPH", graph)
-    assert graph["revision_count"] == 53
-    assert graph["unique_revision_count"] == 53
+    assert graph["revision_count"] == 56
+    assert graph["unique_revision_count"] == 56
     assert graph["duplicate_revisions"] == []
     assert graph["roots"] == ["0001_foundation_schema"]
     assert graph["heads"] == [CANONICAL_HEAD]
@@ -6768,7 +6829,7 @@ def test_static_graph() -> None:
     assert graph["unreachable"] == []
     assert graph["branches"] == {}
     assert graph["merge_revisions"] == []
-    assert len(_topological_revisions(inventory)) == 53
+    assert len(_topological_revisions(inventory)) == 56
 
 
 def test_financial_ledger_transition_is_empty_preserves_history_and_protects_evidence() -> None:
@@ -7359,6 +7420,245 @@ def test_inventory_block_downgrade_guards_preserve_evidence_and_schema(
                     "case": case,
                     "target_revision": target,
                     "ending_revision": CANONICAL_HEAD,
+                    "rows_schema_triggers_preserved": True,
+                    "result": "PASS",
+                },
+            )
+
+
+def _insert_pos_migration_order(
+    connection: Connection, identity: Mapping[str, uuid.UUID]
+) -> uuid.UUID:
+    now = datetime.now(UTC)
+    order_id = uuid.uuid4()
+    _insert_row(
+        connection,
+        "customer_orders",
+        {
+            "id": order_id,
+            "branch_id": identity["branch"],
+            "workstation_id_created": identity["workstation"],
+            "created_by_user_id": identity["user"],
+            "active_cash_session_id": identity["cash_session"],
+            "status": "PENDING",
+            "customer_name": "Synthetic POS migration fixture",
+            "requested_for_at": now + timedelta(days=2),
+            "currency_code": "MXN",
+            "subtotal_amount": Decimal("12.30"),
+            "total_amount": Decimal("12.30"),
+            "advance_amount": Decimal("12.30"),
+            "remaining_balance_amount": Decimal("0.00"),
+            "created_at_utc": now,
+            "updated_at_utc": now,
+        },
+    )
+    return order_id
+
+
+def test_pos_block_transition_preserves_history_without_fabricating_evidence() -> None:
+    with _root_runtime() as (root_config, root_engine):
+        with _temporary_database(root_engine, root_config, "pos_transition") as (config, engine):
+            _upgrade(engine, config, "20261019_0053_purchase_prod")
+            with engine.begin() as connection:
+                assert_authorized_destructive_connection(connection, config)
+                identity = _insert_identity(connection, "pos-transition")
+                _insert_catalog(connection, "POS-CLASS", "POS-PRODUCT")
+                _insert_sale(connection, identity)
+                order_id = _insert_pos_migration_order(connection, identity)
+            with engine.connect() as connection:
+                tables = sorted(set(inspect(connection).get_table_names()) - {"alembic_version"})
+                queries = {
+                    table: text(
+                        "SELECT md5(coalesce(string_agg(row_to_json(t)::text, '|' "
+                        "ORDER BY row_to_json(t)::text), '')) FROM (SELECT "
+                        + ", ".join(f'"{column}"' for column in sorted(_columns(connection, table)))
+                        + f" FROM {table}) t"
+                    )
+                    for table in tables
+                }
+                before = {table: connection.scalar(query) for table, query in queries.items()}
+            _upgrade(engine, config, "head")
+            with engine.connect() as connection:
+                assert_authorized_destructive_connection(connection, config)
+                assert {
+                    table: connection.scalar(query) for table, query in queries.items()
+                } == before
+                for table in (
+                    "receipt_snapshots",
+                    "order_commitment_policies",
+                    "order_revisions",
+                    "order_production_commitments",
+                    "hardware_device_bindings",
+                    "hardware_command_intents",
+                ):
+                    assert connection.scalar(text(f"SELECT count(*) FROM {table}")) == 0
+                historical = connection.execute(
+                    text(
+                        "SELECT version, production_commit_at, production_committed_at, "
+                        "cancellation_responsibility FROM customer_orders WHERE id=:id"
+                    ),
+                    {"id": order_id},
+                ).one()
+                assert tuple(historical) == (0, None, None, None)
+                connection.commit()
+                command.downgrade(
+                    _alembic_config(connection, config), "20261019_0053_purchase_prod"
+                )
+                assert {
+                    table: connection.scalar(query) for table, query in queries.items()
+                } == before
+            _upgrade(engine, config, "head")
+            assert _current_revision(engine, config) == CANONICAL_HEAD
+            _emit(
+                "POS_TRANSITION",
+                {
+                    "history_preserved": True,
+                    "fabricated_evidence": 0,
+                    "empty_downgrade": "PASS",
+                    "ending_revision": CANONICAL_HEAD,
+                },
+            )
+
+
+@pytest.mark.parametrize(
+    "case,target,message",
+    [
+        ("receipt", "20261019_0053_purchase_prod", "Cannot discard issued receipts"),
+        ("order", "20261019_0054_receipts", "order evidence cannot be discarded"),
+        ("hardware", "20261019_0055_order_lifecycle", "Cannot discard physical command identities"),
+    ],
+)
+def test_pos_block_immutable_evidence_and_downgrade_guards(
+    case: str, target: str, message: str
+) -> None:
+    with _root_runtime() as (root_config, root_engine):
+        with _temporary_database(root_engine, root_config, "pos_guard") as (config, engine):
+            _upgrade(engine, config, "head")
+            now = datetime.now(UTC)
+            with engine.begin() as connection:
+                assert_authorized_destructive_connection(connection, config)
+                identity = _insert_identity(connection, f"pos-{case}")
+                common = {"id": uuid.uuid4(), "branch_id": identity["branch"]}
+                if case == "receipt":
+                    tables = ("receipt_snapshots",)
+                    _insert_row(
+                        connection,
+                        tables[0],
+                        {
+                            **common,
+                            "workstation_id": identity["workstation"],
+                            "source_kind": "SALE",
+                            "source_id": uuid.uuid4(),
+                            "document": json.dumps({"source": "SYNTHETIC_MIGRATION_ACCEPTANCE"}),
+                            "document_sha256": "a" * 64,
+                            "created_at": now,
+                        },
+                    )
+                elif case == "order":
+                    tables = (
+                        "order_commitment_policies",
+                        "order_revisions",
+                        "order_production_commitments",
+                    )
+                    order_id = _insert_pos_migration_order(connection, identity)
+                    policy_id, revision_id = uuid.uuid4(), uuid.uuid4()
+                    _insert_row(
+                        connection,
+                        tables[0],
+                        {
+                            **common,
+                            "id": policy_id,
+                            "version": 1,
+                            "lead_time_minutes": 1440,
+                            "reason": "Synthetic migration acceptance only",
+                            "created_by_user_id": identity["user"],
+                            "created_at": now,
+                        },
+                    )
+                    _insert_row(
+                        connection,
+                        tables[1],
+                        {
+                            **common,
+                            "id": revision_id,
+                            "order_id": order_id,
+                            "version": 1,
+                            "policy_id": policy_id,
+                            "quote_fingerprint": "b" * 64,
+                            "snapshot": json.dumps({"source": "SYNTHETIC_MIGRATION_ACCEPTANCE"}),
+                            "confirmed_at": now,
+                            "confirmed_by_user_id": identity["user"],
+                        },
+                    )
+                    _insert_row(
+                        connection,
+                        tables[2],
+                        {
+                            **common,
+                            "order_id": order_id,
+                            "revision_id": revision_id,
+                            "effective_at": now,
+                            "recorded_at": now,
+                            "actor_id": identity["user"],
+                        },
+                    )
+                else:
+                    tables = ("hardware_command_intents",)
+                    binding_id = uuid.uuid4()
+                    _insert_row(
+                        connection,
+                        "hardware_device_bindings",
+                        {
+                            **common,
+                            "id": binding_id,
+                            "workstation_id": identity["workstation"],
+                            "kind": "PRINTER",
+                            "adapter_code": "synthetic-test",
+                            "adapter_version": "1",
+                            "environment": "SANDBOX",
+                            "origin": "https://fixture.invalid",
+                            "certification_evidence_id": uuid.uuid4(),
+                            "version": 1,
+                            "is_active": False,
+                        },
+                    )
+                    _insert_row(
+                        connection,
+                        tables[0],
+                        {
+                            **common,
+                            "workstation_id": identity["workstation"],
+                            "binding_id": binding_id,
+                            "actor_id": identity["user"],
+                            "cash_entry_id": None,
+                            "command": json.dumps({"source": "SYNTHETIC_MIGRATION_ACCEPTANCE"}),
+                            "created_at": now,
+                        },
+                    )
+            with engine.connect() as connection:
+                assert_authorized_destructive_connection(connection, config)
+                before = _financial_guard_snapshot(connection)
+                for table in tables:
+                    for statement in (f"UPDATE {table} SET id=id", f"DELETE FROM {table}"):
+                        with pytest.raises(DBAPIError, match="immutable"):
+                            with connection.begin_nested():
+                                connection.execute(text(statement))
+                assert _financial_guard_snapshot(connection) == before
+            with pytest.raises(DBAPIError, match=message):
+                with engine.connect() as connection:
+                    assert_authorized_destructive_connection(connection, config)
+                    connection.commit()
+                    command.downgrade(_alembic_config(connection, config), target)
+            assert _current_revision(engine, config) == CANONICAL_HEAD
+            with engine.connect() as connection:
+                assert _financial_guard_snapshot(connection) == before
+            _emit(
+                "POS_DOWNGRADE_GUARD",
+                {
+                    "case": case,
+                    "target_revision": target,
+                    "ending_revision": CANONICAL_HEAD,
+                    "immutable_tables_checked": list(tables),
                     "rows_schema_triggers_preserved": True,
                     "result": "PASS",
                 },

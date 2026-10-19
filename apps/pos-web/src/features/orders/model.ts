@@ -404,6 +404,9 @@ export function getOrderAdvanceValidationMessage({
     }
   }
 
+  if (lines.length > 0 && advanceCents < Math.ceil(subtotalCents / 2)) {
+    return "El anticipo debe cubrir al menos el 50% del pedido.";
+  }
   return null;
 }
 

@@ -286,7 +286,9 @@ def test_pos_reprint_failure_leaves_no_audit_and_same_session_can_retry(
         with SessionLocal() as verification:
             assert (
                 verification.scalar(
-                    select(func.count(AuditLog.id)).where(AuditLog.action == "ticket.reprinted")
+                    select(func.count(AuditLog.id)).where(
+                        AuditLog.action == "ticket.reprint_requested"
+                    )
                 )
                 == 0
             )
@@ -294,7 +296,7 @@ def test_pos_reprint_failure_leaves_no_audit_and_same_session_can_retry(
     with SessionLocal() as verification:
         assert (
             verification.scalar(
-                select(func.count(AuditLog.id)).where(AuditLog.action == "ticket.reprinted")
+                select(func.count(AuditLog.id)).where(AuditLog.action == "ticket.reprint_requested")
             )
             == 1
         )

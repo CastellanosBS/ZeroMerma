@@ -229,7 +229,7 @@ vi.mock("../pos-shell/keyboard", async () => {
 });
 
 vi.mock("../status-messages/store", () => ({
-  useStatusMessageStore: (
+  useStatusMessageStore: Object.assign((
     selector: (state: {
       showError: typeof showErrorMock;
       showSuccess: typeof showSuccessMock;
@@ -238,7 +238,7 @@ vi.mock("../status-messages/store", () => ({
     selector({
       showError: showErrorMock,
       showSuccess: showSuccessMock,
-    }),
+    }), { setState: vi.fn() }),
 }));
 
 function buildUserOptions(records: DiscountRecord[]) {

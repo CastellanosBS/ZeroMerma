@@ -15,10 +15,13 @@ import {
   createOrder,
   deliverOrder,
   markOrderReady,
+  payOrder,
+  amendOrder,
   recoverOrderCommand,
   type OrderCommandCode,
   type OrderCommandResultView,
 } from "./orders-api";
+import type { components } from "@zeromerma/api-client";
 
 export interface OrderIntentionContext {
   userId: string;
@@ -34,6 +37,8 @@ export type OrderCommandPayload =
   | CreateCustomerOrderRequest
   | OrderActionRequest
   | DeliverCustomerOrderRequest
+  | components["schemas"]["PayCustomerOrderRequest"]
+  | components["schemas"]["AmendCustomerOrderRequest"]
   | CancelCustomerOrderRequest;
 export const ORDER_INTENTION_STORAGE_PREFIX = "zeromerma-order-intention:";
 export const orderIntentions = createCommandIntentionCoordinator<
@@ -55,7 +60,7 @@ export const orderIntentions = createCommandIntentionCoordinator<
   nullableFields: ["orderId"],
   scope: (context) => context.workstationId,
   validateContext: (context) =>
-    ["create", "mark-ready", "deliver", "cancel"].includes(context.commandCode) &&
+    ["create", "mark-ready", "deliver", "cancel", "pay", "amend"].includes(context.commandCode) &&
     (context.commandCode === "create" ? context.orderId === null : context.orderId !== null),
   send: (context, payload, idempotencyKey) => {
     if (context.commandCode === "create")
@@ -66,6 +71,16 @@ export const orderIntentions = createCommandIntentionCoordinator<
     const args = { orderId: context.orderId!, payload, idempotencyKey };
     if (context.commandCode === "mark-ready") return markOrderReady(args);
     if (context.commandCode === "deliver") return deliverOrder(args);
+    if (context.commandCode === "pay")
+      return payOrder({
+        ...args,
+        payload: payload as components["schemas"]["PayCustomerOrderRequest"],
+      });
+    if (context.commandCode === "amend")
+      return amendOrder({
+        ...args,
+        payload: payload as components["schemas"]["AmendCustomerOrderRequest"],
+      });
     return cancelOrder({ ...args, payload: payload as CancelCustomerOrderRequest });
   },
   recover: async (metadata) => {

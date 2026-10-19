@@ -24,6 +24,10 @@ export function mockSessionResponse(): SessionResponse {
 }
 
 export async function installMockCookieSession(page: Page, initiallyAuthenticated = false) {
+  await page.route("**/ready", route => route.fulfill({ json: {
+    status: "READY", database: "READY", internet: "UNKNOWN",
+    transactional_mode: "LOCAL_FIRST", browser_offline_mutations: false,
+  } }));
   let authenticated = initiallyAuthenticated;
   let locked = false;
   await page.route("**/v1/auth/**", async route => {

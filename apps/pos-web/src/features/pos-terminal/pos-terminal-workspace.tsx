@@ -60,7 +60,8 @@ function useDebouncedValue(value: string, delayMs: number): string {
 export function PosTerminalWorkspace() {
   const workstationId = usePosAuthStore((state) => state.session?.workstation_id ?? "");
   const intention = useSaleIntention(workstationId);
-  if (intention.error || isSaleIntentionPending(intention.metadata)) {
+  const cartMutationBlocked = usePosTerminalStore((state) => state.cartMutationBlocked);
+  if (cartMutationBlocked || intention.error || isSaleIntentionPending(intention.metadata)) {
     return (
       <OperationalStatus
         title="Venta pendiente de resolver"

@@ -150,6 +150,8 @@ def test_cash_close_summary_aggregates_movements_and_pending_class_capture(
         client,
         lines=[
             {
+                "expected_unit_price": "12.00",
+                "expected_currency_code": "MXN",
                 "capture_mode": "CLASS_CAPTURE",
                 "product_class_id": _get_product_class_id(SEED_PRODUCT_CLASS_PAN_DULCE_CODE),
                 "quantity": "2",
@@ -161,6 +163,8 @@ def test_cash_close_summary_aggregates_movements_and_pending_class_capture(
         client,
         lines=[
             {
+                "expected_unit_price": "18.00",
+                "expected_currency_code": "MXN",
                 "capture_mode": "PRODUCT_DIRECT",
                 "product_id": _get_product_id(SEED_PRODUCT_COCA_355_CODE),
                 "quantity": "1",
@@ -207,6 +211,8 @@ def test_cash_close_preview_is_read_only_and_computes_variance_from_payment_meth
         client,
         lines=[
             {
+                "expected_unit_price": "12.00",
+                "expected_currency_code": "MXN",
                 "capture_mode": "CLASS_CAPTURE",
                 "product_class_id": _get_product_class_id(SEED_PRODUCT_CLASS_PAN_DULCE_CODE),
                 "quantity": "2",

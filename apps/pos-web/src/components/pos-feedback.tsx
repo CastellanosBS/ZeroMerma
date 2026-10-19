@@ -4,6 +4,7 @@ import {
   DialogHeader,
   DialogSurface,
 } from "@zeromerma/ui";
+import { PosModal } from "./pos-modal";
 import type { ReactNode } from "react";
 
 import type {
@@ -455,7 +456,7 @@ export function PosConfirmationDialog({
   const confirmVariant = confirmation.tone === "danger" ? "danger" : "primary";
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/25 p-4">
+    <PosModal label={confirmation.title} onClose={onCancel} onConfirm={onConfirm} busy={isPending}>
       <DialogSurface className="w-full max-w-md">
         <DialogHeader>
           <div className="min-w-0">
@@ -481,7 +482,7 @@ export function PosConfirmationDialog({
           </PosButton>
         </DialogFooter>
       </DialogSurface>
-    </div>
+    </PosModal>
   );
 }
 

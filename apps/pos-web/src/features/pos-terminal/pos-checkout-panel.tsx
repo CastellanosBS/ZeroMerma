@@ -21,7 +21,7 @@ import {
 } from "../../components/pos-icons";
 import { Button } from "../../components/ui/button";
 import type { CashSessionView, PosBootstrapResponse } from "../../lib/api-contracts";
-import { toOperationalErrorMessage } from "../../lib/http";
+import { ApiError, toOperationalErrorMessage } from "../../lib/http";
 import { openBrowserPrintWindow } from "../../lib/browser-print";
 import { formatCurrency } from "../../lib/formatters";
 import { isEditableTarget } from "../../lib/keyboard-shortcuts";
@@ -59,10 +59,13 @@ import {
   beginSaleConfirmation,
   hasSaleIntentionBody,
   isSaleIntentionPending,
+  readSaleIntention,
   recoverSaleConfirmation,
   retrySaleConfirmation,
 } from "./sale-confirmation-intent";
 import { useSaleIntention } from "./use-sale-intention";
+import { refreshCartPrices } from "./refresh-cart-prices";
+import { usePosAuthStore } from "../auth/auth-store";
 import { usePosTerminalStore } from "./store";
 import { posInputClass, posOutlineButtonClass, posPrimaryButtonClass } from "../pos-theme/theme";
 
@@ -104,6 +107,7 @@ function getPaymentMethodShortcutLabel(code: PosPaymentMethodCode): string {
 
 function TicketLineRow({
   amount,
+  disabled,
   editingQuantityText,
   inputRef,
   isEditing,
@@ -120,6 +124,7 @@ function TicketLineRow({
   quantity,
 }: {
   amount: string;
+  disabled: boolean;
   editingQuantityText: string;
   inputRef: Ref<HTMLInputElement>;
   isEditing: boolean;
@@ -152,6 +157,7 @@ function TicketLineRow({
       <div className="flex items-center gap-0 rounded-md border border-[var(--pos-shell-border)] bg-[var(--pos-shell-muted)] px-0.5 py-0.5">
         <button
           aria-label={`Restar cantidad de ${name}`}
+          disabled={disabled}
           className="flex h-7 w-7 items-center justify-center rounded-sm text-slate-900 transition hover:bg-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--pos-ring)]"
           onClick={(event) => {
             event.stopPropagation();
@@ -165,6 +171,7 @@ function TicketLineRow({
           {isEditing ? (
             <input
               aria-label={`Cantidad de ${name}`}
+              disabled={disabled}
               className={cn(
                 "h-7 w-full rounded-sm px-1 text-center text-[13px] font-semibold text-slate-950 [font-variant-numeric:tabular-nums]",
                 posInputClass,
@@ -192,6 +199,7 @@ function TicketLineRow({
           ) : (
             <button
               aria-label={`Editar cantidad de ${name}`}
+              disabled={disabled}
               className="h-7 w-full rounded-sm px-1 text-center text-[13px] font-semibold text-slate-950 transition hover:bg-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--pos-ring)] [font-variant-numeric:tabular-nums]"
               onClick={(event) => {
                 event.stopPropagation();
@@ -205,6 +213,7 @@ function TicketLineRow({
         </div>
         <button
           aria-label={`Sumar cantidad de ${name}`}
+          disabled={disabled}
           className="flex h-7 w-7 items-center justify-center rounded-sm text-slate-900 transition hover:bg-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--pos-ring)]"
           onClick={(event) => {
             event.stopPropagation();
@@ -222,6 +231,7 @@ function TicketLineRow({
 
       <button
         aria-label={`Eliminar ${name}`}
+        disabled={disabled}
         className="flex h-7 w-7 items-center justify-center rounded-md text-[var(--ui-color-danger)] transition hover:bg-[var(--ui-color-danger-soft)] hover:text-[var(--ui-color-danger)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--pos-ring)]"
         onClick={(event) => {
           event.stopPropagation();
@@ -263,7 +273,7 @@ function PaymentMethodButton({
 }
 
 const EXTERNAL_PAYMENT_PENDING_NOTE =
-  "Solo registra el medio de pago. ZeroMerma no autoriza ni captura con terminal o proveedor; integracion externa pendiente de DEC-14.";
+  "Solo registra el medio de pago. ZeroMerma no autoriza ni captura con la terminal. Confirma el cobro en la terminal antes de registrarlo aquí.";
 
 function CheckoutMetricTile({
   icon,
@@ -387,6 +397,8 @@ export function PosCheckoutPanel({
   const [editingQuantityText, setEditingQuantityText] = useState("");
   const [ticketInlineError, setTicketInlineError] = useState<string | null>(null);
   const submitting = useRef(false);
+  const [priceReviewRequired, setPriceReviewRequired] = useState(false);
+  const [refreshingPrices, setRefreshingPrices] = useState(false);
   const intention = useSaleIntention(bootstrap.workstation.id);
   const previousIntention = useRef(intention.metadata);
   const draftObservedKey = usePosTerminalStore((state) => state.saleDraftIntentionKey);
@@ -400,6 +412,7 @@ export function PosCheckoutPanel({
     cashSessionId: cashSession?.id ?? "",
   };
   const cartLines = usePosTerminalStore((state) => state.cartLines);
+  const cartMutationBlocked = usePosTerminalStore((state) => state.cartMutationBlocked);
   const controlState = usePosTerminalStore((state) => state.controlState);
   const incrementLineQuantity = usePosTerminalStore((state) => state.incrementLineQuantity);
   const decrementLineQuantity = usePosTerminalStore((state) => state.decrementLineQuantity);
@@ -411,7 +424,11 @@ export function PosCheckoutPanel({
   const setLineQuantity = usePosTerminalStore((state) => state.setLineQuantity);
   const totalAmountCents = getCartTotalCents(cartLines);
   const hasTicket = cartLines.length > 0;
+  useEffect(() => {
+    if (!hasTicket) setPriceReviewRequired(false);
+  }, [hasTicket]);
   const saleFlow = useSaleFlowController({
+    cartVersion: cartLines,
     cartLineCount: cartLines.length,
     controlState,
     hasCompletedSale: false,
@@ -491,7 +508,7 @@ export function PosCheckoutPanel({
       : formatDisplayAmount(paymentComputation.capturedAmountCents);
   const effectiveResultValueText =
     saleFlow.state.paymentMethodCode === CARD_PAYMENT_METHOD_CODE
-      ? "Cubierto"
+      ? "Verificar en terminal"
       : saleFlow.state.mode === SALE_FLOW_AMOUNT_CONFIRMED
         ? paymentComputation.changeAmountCents > 0
           ? formatDisplayAmount(paymentComputation.changeAmountCents)
@@ -503,7 +520,7 @@ export function PosCheckoutPanel({
             : "$0.00";
   const effectiveResultTone =
     saleFlow.state.paymentMethodCode === CARD_PAYMENT_METHOD_CODE
-      ? "positive"
+      ? "warning"
       : saleFlow.state.mode === SALE_FLOW_AMOUNT_CONFIRMED
         ? "positive"
         : paymentComputation.previewRemainingAmountCents > 0
@@ -775,10 +792,21 @@ export function PosCheckoutPanel({
         return;
       }
 
-      if (submitting.current || confirmSaleMutation.isPending || intention.error) {
+      if (submitting.current || confirmSaleMutation.isPending || intention.error || priceReviewRequired || refreshingPrices) {
         return;
       }
+      const terminal = usePosTerminalStore.getState();
+      if (action === "confirm") {
+        if (terminal.cartMutationBlocked) return;
+        if (!saleFlow.hasCurrentCartConfirmation(terminal.cartLines, getCartTotalCents(terminal.cartLines))) {
+          saleFlow.invalidateCartReview();
+          showWarning("El ticket cambió. Revisa y confirma el importe antes de cobrar.");
+          return;
+        }
+      }
+      const authGeneration = usePosAuthStore.getState().generation;
       submitting.current = true;
+      terminal.setSaleSubmissionPending(true);
 
       confirmSaleMutation.reset();
       setPaymentInlineError(null);
@@ -792,6 +820,10 @@ export function PosCheckoutPanel({
 
       try {
         const sale = await confirmSaleMutation.mutateAsync(action);
+        if (usePosAuthStore.getState().generation !== authGeneration) {
+          printWindow?.close();
+          return;
+        }
         saleFlow.clearPrintFailure();
         const shouldPrintTicket = action === "confirm" && saleFlow.state.ticketRequested;
         const successMessage =
@@ -799,7 +831,7 @@ export function PosCheckoutPanel({
             ? `Venta registrada. Cambio ${formatDisplayAmount(parseMoneyToCents(String(sale.change_amount)) ?? 0)}.`
             : "Venta registrada.";
 
-        clearCart();
+        usePosTerminalStore.getState().clearConfirmedSale();
         saleFlow.resetAfterFinish();
 
         if (shouldPrintTicket) {
@@ -817,6 +849,10 @@ export function PosCheckoutPanel({
         }
       } catch (error) {
         printWindow?.close();
+        if (usePosAuthStore.getState().generation !== authGeneration) return;
+        if (error instanceof ApiError && error.error?.code === "SALE_PRICE_CHANGED") {
+          setPriceReviewRequired(true);
+        }
         saleFlow.registerRecoverableError({
           kind: "operation",
           message: toOperationalErrorMessage(
@@ -827,22 +863,34 @@ export function PosCheckoutPanel({
         });
       } finally {
         submitting.current = false;
+        if (usePosAuthStore.getState().generation === authGeneration) {
+          const terminal = usePosTerminalStore.getState();
+          // Read the coordinator synchronously: a lost acknowledgment must keep the draft frozen.
+          try {
+            terminal.observeSaleIntention(readSaleIntention(bootstrap.workstation.id));
+            terminal.setSaleSubmissionPending(false);
+          } catch {
+            // Corrupt recovery metadata requires resolution; do not unlock an uncertain draft.
+          }
+        }
       }
     },
     [
-      clearCart,
+      bootstrap.workstation.id,
       confirmSaleMutation,
       printTicketForSale,
       saleFlow,
       showSuccess,
       showWarning,
       intention.error,
+      priceReviewRequired,
+      refreshingPrices,
     ],
   );
 
   useEffect(() => {
     function handleCheckoutKeyboard(event: KeyboardEvent) {
-      if (event.defaultPrevented || pendingIntention || intention.error) {
+      if (event.defaultPrevented || usePosTerminalStore.getState().cartMutationBlocked || pendingIntention || intention.error) {
         return;
       }
 
@@ -1069,6 +1117,37 @@ export function PosCheckoutPanel({
           </span>
         </div>
 
+        {saleFlow.state.cartReviewRequired && (
+          <PosInlineValidationMessage tone="warning">
+            El ticket cambió. Revisa y confirma el nuevo importe.
+            {saleFlow.state.paymentMethodCode !== CASH_PAYMENT_METHOD_CODE &&
+              " Verifica el importe realmente cobrado en la terminal antes de confirmar; este registro no corrige ni cancela un cargo bancario."}
+          </PosInlineValidationMessage>
+        )}
+        {priceReviewRequired ? (
+          <PosInlineValidationMessage tone="warning" action={
+            <Button disabled={refreshingPrices} onClick={async () => {
+              const original = usePosTerminalStore.getState().cartLines;
+              const generation = usePosAuthStore.getState().generation;
+              setRefreshingPrices(true);
+              try {
+                const updated = await refreshCartPrices(bootstrap.workstation.code, original);
+                if (usePosAuthStore.getState().generation !== generation || !usePosTerminalStore.getState().replaceReviewedPrices(original, updated)) {
+                  throw new Error("La selección o sesión cambió. Vuelve a revisar los productos.");
+                }
+                setPriceReviewRequired(false);
+                saleFlow.resetAfterFinish();
+                saleFlow.enterPaymentCapture();
+                showWarning("Precios actualizados. Revisa el total y captura nuevamente el cobro.");
+              } catch (error) {
+                showWarning(toOperationalErrorMessage(error, "No se pudieron consultar los precios."));
+              } finally { setRefreshingPrices(false); }
+            }} type="button">{refreshingPrices ? "Consultando precios…" : "Actualizar precios y revisar"}</Button>
+          }>
+            Revisa los productos del ticket y elimina los que ya no estén disponibles. Actualiza los precios antes de cobrar.
+          </PosInlineValidationMessage>
+        ) : null}
+
         {isClearCartConfirming ? (
           <div className="grid gap-2 rounded-lg border border-[var(--ui-color-danger-soft)] bg-[var(--ui-color-danger-soft)] px-3 py-2">
             <p className="text-sm font-medium text-[var(--ui-color-danger)]">
@@ -1084,6 +1163,7 @@ export function PosCheckoutPanel({
               </Button>
               <Button
                 className={cn("h-8 px-2.5 text-xs", posPrimaryButtonClass)}
+                disabled={cartMutationBlocked}
                 onClick={() => {
                   clearCart();
                   setIsClearCartConfirming(false);
@@ -1098,7 +1178,7 @@ export function PosCheckoutPanel({
           <div className="flex flex-wrap items-center justify-end gap-1.5">
             <Button
               className={cn("h-8 px-2.5 text-xs", posOutlineButtonClass)}
-              disabled={!hasTicket || saleFlow.state.mode === SALE_FLOW_PROCESSING}
+              disabled={!hasTicket || cartMutationBlocked || saleFlow.state.mode === SALE_FLOW_PROCESSING}
               onClick={repeatLastLine}
               type="button"
             >
@@ -1106,7 +1186,7 @@ export function PosCheckoutPanel({
             </Button>
             <Button
               className={cn("h-8 px-2.5 text-xs", posOutlineButtonClass)}
-              disabled={!hasTicket || saleFlow.state.mode === SALE_FLOW_PROCESSING}
+              disabled={!hasTicket || cartMutationBlocked || saleFlow.state.mode === SALE_FLOW_PROCESSING}
               onClick={() => setIsClearCartConfirming(true)}
               type="button"
             >
@@ -1129,6 +1209,7 @@ export function PosCheckoutPanel({
               {cartLines.map((line) => (
                 <TicketLineRow
                   amount={formatDisplayAmount(getLineTotalCents(line))}
+                  disabled={cartMutationBlocked}
                   editingQuantityText={
                     editingLineKey === line.key ? editingQuantityText : line.quantityText
                   }
@@ -1482,6 +1563,7 @@ export function PosCheckoutPanel({
               action={
                 <div className="flex items-center gap-2">
                   <Button
+                    disabled={priceReviewRequired || refreshingPrices}
                     className={cn("h-8 px-2.5 text-xs", posOutlineButtonClass)}
                     onClick={() =>
                       saleFlow.clearRecoverableError(
@@ -1496,6 +1578,7 @@ export function PosCheckoutPanel({
                       : "Volver al cobro"}
                   </Button>
                   <Button
+                    disabled={priceReviewRequired || refreshingPrices}
                     className={cn("h-8 px-2.5 text-xs", posPrimaryButtonClass)}
                     onClick={() =>
                       saleFlow.state.recoverableError?.retryMode === SALE_FLOW_AMOUNT_CONFIRMED
@@ -1548,6 +1631,7 @@ export function PosCheckoutPanel({
               }
               data-shortcut-tone="inverted"
               disabled={
+                priceReviewRequired || refreshingPrices ||
                 saleFlow.state.mode === SALE_FLOW_PROCESSING ||
                 (!canEnterPayment &&
                   !isEditablePaymentState &&

@@ -73,6 +73,8 @@ def _confirm_sale(client: TestClient) -> str:
             "workstation_code": SEED_WORKSTATION_CODE,
             "lines": [
                 {
+                    "expected_unit_price": "12.00",
+                    "expected_currency_code": "MXN",
                     "capture_mode": "CLASS_CAPTURE",
                     "product_class_id": _get_product_class_id(SEED_PRODUCT_CLASS_PAN_DULCE_CODE),
                     "quantity": "2",

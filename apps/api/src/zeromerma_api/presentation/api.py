@@ -45,6 +45,7 @@ from zeromerma_api.modules.discounts.presentation.router import (
 from zeromerma_api.modules.discounts.presentation.router import (
     router as discounts_router,
 )
+from zeromerma_api.modules.hardware.presentation.router import router as hardware_router
 from zeromerma_api.modules.identity.presentation.router import admin_router as admin_users_router
 from zeromerma_api.modules.identity.presentation.router import (
     roles_admin_router as admin_roles_router,
@@ -105,6 +106,7 @@ from zeromerma_api.presentation.health import router as health_router
 
 api_router = APIRouter()
 api_router.include_router(health_router)
+api_router.include_router(hardware_router)
 api_router.include_router(dev_audit_router)
 api_router.include_router(identity_router)
 api_router.include_router(admin_users_router)

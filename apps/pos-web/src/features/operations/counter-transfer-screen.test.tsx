@@ -375,7 +375,7 @@ vi.mock("../corrections/queries", () => ({
 }));
 
 vi.mock("../status-messages/store", () => ({
-  useStatusMessageStore: (
+  useStatusMessageStore: Object.assign((
     selector: (state: {
       showError: typeof showErrorMock;
       showSuccess: typeof showSuccessMock;
@@ -386,7 +386,7 @@ vi.mock("../status-messages/store", () => ({
       showError: showErrorMock,
       showSuccess: showSuccessMock,
       showWarning: showWarningMock,
-    }),
+    }), { setState: vi.fn() }),
 }));
 
 vi.mock("./queries", () => ({

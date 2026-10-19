@@ -69,9 +69,10 @@ test("real partial refund survives a lost response, reload and another tab and r
     data: {
       workstation_code: station,
       cash_session_id: cash.id,
-      lines: [{ capture_mode: "PRODUCT_DIRECT", product_id: product.id, quantity: "3" }],
+      lines: [{ capture_mode: "PRODUCT_DIRECT", product_id: product.id, quantity: "3",
+        expected_unit_price: product.unit_price, expected_currency_code: product.currency_code }],
       payments: [{ payment_method_code: "CASH", tendered_amount: "1000.00" }],
-    },
+    } satisfies components["schemas"]["ConfirmSaleRequest"],
   });
   expect(saleResponse.status()).toBe(201);
   const sale = (await saleResponse.json()) as components["schemas"]["SaleConfirmationView"];
@@ -262,9 +263,10 @@ test("real partial refund survives a lost response, reload and another tab and r
     data: {
       workstation_code: station,
       cash_session_id: cash.id,
-      lines: [{ capture_mode: "PRODUCT_DIRECT", product_id: product.id, quantity: "1" }],
+      lines: [{ capture_mode: "PRODUCT_DIRECT", product_id: product.id, quantity: "1",
+        expected_unit_price: product.unit_price, expected_currency_code: product.currency_code }],
       payments: [{ payment_method_code: "CASH", tendered_amount: "1000.00" }],
-    },
+    } satisfies components["schemas"]["ConfirmSaleRequest"],
   });
   expect(replenished.status()).toBe(201);
   const settlementPath = `/v1/returns/${committed.id}/refund-settlements`;

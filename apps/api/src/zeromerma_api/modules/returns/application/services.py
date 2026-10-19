@@ -105,6 +105,13 @@ from zeromerma_api.modules.sales.domain.constants import (
 )
 from zeromerma_api.modules.sales.domain.exceptions import SaleNotFoundError
 from zeromerma_api.modules.sales.infrastructure.models import Sale, SaleLine
+from zeromerma_api.modules.tickets.application.receipt_schemas import (
+    OperationalReceiptView,
+    ReceiptContextView,
+    ReceiptLineView,
+    ReceiptPaymentView,
+)
+from zeromerma_api.modules.tickets.application.receipts import persist_receipt, read_receipt
 
 MAX_RETURN_SEARCH_RESULTS = 80
 MONEY_QUANTIZER = Decimal("0.01")
@@ -778,6 +785,7 @@ class ReturnsQueryService:
         ).scalars()
 
         return SaleReturnDetailResponse(
+            receipt=read_receipt(session, "RETURN", sale_return.id),
             id=sale_return.id,
             folio=_build_return_folio(sale_return.id),
             original_sale_id=original_sale.id,
@@ -1282,6 +1290,58 @@ class ReturnsCommandService:
                 headers={"request_id": resolved_request_id, **trace},
             )
         session.flush()
+        persist_receipt(
+            session,
+            OperationalReceiptView(
+                source_kind="RETURN",
+                source_id=sale_return.id,
+                currency_code=sale_detail.currency_code,
+                folio=_build_return_folio(sale_return.id),
+                occurred_at=created_at,
+                related_document_folio=_build_sale_folio(sale_detail.id),
+                context=ReceiptContextView(
+                    branch_id=context.branch_id,
+                    branch_code=context.branch_code,
+                    branch_name=context.branch_name,
+                    timezone=context.branch_timezone,
+                    workstation_id=context.workstation_id,
+                    workstation_code=context.workstation_code,
+                    workstation_name=context.workstation_name,
+                    actor_id=current_user.id,
+                    actor_name=current_user.full_name,
+                    cash_session_id=current_open_cash_session.id,
+                ),
+                subtotal_amount=total_refund_amount,
+                discount_amount=Decimal("0.00"),
+                total_amount=total_refund_amount,
+                change_amount=Decimal("0.00"),
+                settled_amount=financial_refund.amount_settled,
+                pending_amount=financial_refund.amount_pending,
+                lines=[
+                    ReceiptLineView(
+                        sequence=index,
+                        name=line.original_catalog_name_snapshot,
+                        quantity=line.returned_quantity,
+                        unit_price=line.refund_unit_price,
+                        total_amount=line.refund_line_total_amount,
+                    )
+                    for index, line in enumerate(prepared_lines, start=1)
+                ],
+                payments=[
+                    ReceiptPaymentView.model_validate(
+                        {
+                            "method": entry.payment_method_code,
+                            "execution_mode": entry.execution_mode,
+                            "amount": entry.amount,
+                            "tendered_amount": entry.amount,
+                            "change_amount": Decimal("0.00"),
+                        }
+                    )
+                    for entry in financial_refund.entries
+                    if entry.state == "CONFIRMED"
+                ],
+            ),
+        )
         return _build_commit_result(
             session, sale_return=sale_return, financial_refund=financial_refund
         )
@@ -1740,11 +1800,11 @@ def _apply_search_filters(
 
 
 def _build_sale_folio(sale_id: uuid.UUID) -> str:
-    return f"TCK-{str(sale_id).split('-', maxsplit=1)[0].upper()}"
+    return f"TCK-{sale_id.hex.upper()}"
 
 
 def _build_return_folio(return_id: uuid.UUID) -> str:
-    return f"DEV-{str(return_id).split('-', maxsplit=1)[0].upper()}"
+    return f"DEV-{return_id.hex.upper()}"
 
 
 def _get_branch_brand_key(branch_code: str) -> str:

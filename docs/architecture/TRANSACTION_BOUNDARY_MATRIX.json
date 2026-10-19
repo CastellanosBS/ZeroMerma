@@ -2702,6 +2702,56 @@
       ]
     },
     {
+      "path": "apps/api/src/zeromerma_api/modules/orders/application/commitment.py",
+      "symbol": "materialize_commitment",
+      "calls": [
+        {
+          "method": "flush",
+          "receiver": "session",
+          "count": 1
+        }
+      ],
+      "role": "PARTICIPANT",
+      "owner": "group:IDEMPOTENT_COMMAND",
+      "ownership_group": "IDEMPOTENT_COMMAND",
+      "entry_points": [
+        "apps/api/src/zeromerma_api/modules/orders/application/commitment.py#materialize_commitment"
+      ],
+      "cleanup": {
+        "kind": "CALLER_OWNS_ROLLBACK",
+        "reference": "group:IDEMPOTENT_COMMAND"
+      },
+      "evidence_refs": [
+        "apps/api/unit_tests/test_transaction_ownership.py",
+        "apps/api/tests/test_order_lifecycle.py"
+      ]
+    },
+    {
+      "path": "apps/api/src/zeromerma_api/modules/orders/application/commitment.py",
+      "symbol": "save_revision",
+      "calls": [
+        {
+          "method": "flush",
+          "receiver": "session",
+          "count": 2
+        }
+      ],
+      "role": "PARTICIPANT",
+      "owner": "group:IDEMPOTENT_COMMAND",
+      "ownership_group": "IDEMPOTENT_COMMAND",
+      "entry_points": [
+        "apps/api/src/zeromerma_api/modules/orders/application/commitment.py#save_revision"
+      ],
+      "cleanup": {
+        "kind": "CALLER_OWNS_ROLLBACK",
+        "reference": "group:IDEMPOTENT_COMMAND"
+      },
+      "evidence_refs": [
+        "apps/api/unit_tests/test_transaction_ownership.py",
+        "apps/api/tests/test_order_lifecycle.py"
+      ]
+    },
+    {
       "path": "apps/api/src/zeromerma_api/modules/orders/application/financial_services.py",
       "symbol": "record_order_payment",
       "calls": [
@@ -2724,6 +2774,31 @@
       "evidence_refs": [
         "apps/api/unit_tests/test_transaction_ownership.py",
         "apps/api/tests/test_order_financial_entries.py"
+      ]
+    },
+    {
+      "path": "apps/api/src/zeromerma_api/modules/orders/application/lifecycle.py",
+      "symbol": "execute_lifecycle",
+      "calls": [
+        {
+          "method": "flush",
+          "receiver": "session",
+          "count": 2
+        }
+      ],
+      "role": "PARTICIPANT",
+      "owner": "group:IDEMPOTENT_COMMAND",
+      "ownership_group": "IDEMPOTENT_COMMAND",
+      "entry_points": [
+        "apps/api/src/zeromerma_api/modules/orders/application/lifecycle.py#execute_lifecycle"
+      ],
+      "cleanup": {
+        "kind": "CALLER_OWNS_ROLLBACK",
+        "reference": "group:IDEMPOTENT_COMMAND"
+      },
+      "evidence_refs": [
+        "apps/api/unit_tests/test_transaction_ownership.py",
+        "apps/api/tests/test_order_lifecycle.py"
       ]
     },
     {
@@ -4169,6 +4244,31 @@
       ]
     },
     {
+      "path": "apps/api/src/zeromerma_api/modules/tickets/application/receipts.py",
+      "symbol": "persist_receipt",
+      "calls": [
+        {
+          "method": "flush",
+          "receiver": "session",
+          "count": 1
+        }
+      ],
+      "role": "PARTICIPANT",
+      "owner": "group:IDEMPOTENT_COMMAND",
+      "ownership_group": "IDEMPOTENT_COMMAND",
+      "entry_points": [
+        "apps/api/src/zeromerma_api/modules/tickets/application/receipts.py#persist_receipt"
+      ],
+      "cleanup": {
+        "kind": "CALLER_OWNS_ROLLBACK",
+        "reference": "group:IDEMPOTENT_COMMAND"
+      },
+      "evidence_refs": [
+        "apps/api/unit_tests/test_transaction_ownership.py",
+        "apps/api/tests/test_tickets_module.py"
+      ]
+    },
+    {
       "path": "apps/api/src/zeromerma_api/modules/tickets/application/services.py",
       "symbol": "TicketsCommandService.reprint_ticket",
       "calls": [
@@ -4713,6 +4813,7 @@
         "apps/api/src/zeromerma_api/modules/discounts/application/idempotency.py#OperationalDiscountCommitService.commit",
         "apps/api/src/zeromerma_api/modules/financial_ledger/application/reconciliation.py#apply_financial_import_row",
         "apps/api/src/zeromerma_api/modules/financial_ledger/application/refund_commands.py#RefundSettlementService.settle",
+        "apps/api/src/zeromerma_api/modules/hardware/application/services.py#HardwareService.admit",
         "apps/api/src/zeromerma_api/modules/idempotency/application/service.py#IdempotencyExecutor.execute",
         "apps/api/src/zeromerma_api/modules/inventory/application/attribution_commands.py#commit_class_attribution",
         "apps/api/src/zeromerma_api/modules/inventory/application/dispositions.py#commit_disposition",
@@ -4721,12 +4822,14 @@
         "apps/api/src/zeromerma_api/modules/operations/application/idempotency.py#OperationCommitService.commit",
         "apps/api/src/zeromerma_api/modules/orders/application/idempotency.py#OrdersIdempotencyService.execute_admin",
         "apps/api/src/zeromerma_api/modules/orders/application/idempotency.py#OrdersIdempotencyService.execute_pos",
+        "apps/api/src/zeromerma_api/modules/orders/application/policies.py#configure_policy",
         "apps/api/src/zeromerma_api/modules/payment_terminal/application/services.py#PaymentTerminalService.admit",
         "apps/api/src/zeromerma_api/modules/payments/application/idempotency.py#OperationalPaymentCommitService.commit",
         "apps/api/src/zeromerma_api/modules/production/application/idempotency.py#ProductionIdempotencyService.execute",
         "apps/api/src/zeromerma_api/modules/purchases/application/idempotency.py#PurchaseCommandService.execute",
         "apps/api/src/zeromerma_api/modules/returns/application/idempotency.py#ReturnCommitService.commit",
         "apps/api/src/zeromerma_api/modules/sales/application/idempotency.py#SaleConfirmationService.confirm",
+        "apps/api/src/zeromerma_api/modules/tickets/application/print_requests.py#request_receipt_print",
         "apps/api/src/zeromerma_api/modules/transfers/application/idempotency.py#TransferCommandServiceWrapper.execute_admin",
         "apps/api/src/zeromerma_api/modules/transfers/application/idempotency.py#TransferCommandServiceWrapper.execute_pos",
         "apps/api/src/zeromerma_api/modules/waste/application/idempotency.py#AdminWasteCommitService.commit"
@@ -4747,6 +4850,7 @@
         "apps/api/src/zeromerma_api/modules/financial_ledger/application/recording.py#record_confirmed_entry",
         "apps/api/src/zeromerma_api/modules/financial_ledger/application/refund_commands.py#RefundSettlementService.settle",
         "apps/api/src/zeromerma_api/modules/financial_ledger/application/refunds.py#settle_refund_cash",
+        "apps/api/src/zeromerma_api/modules/hardware/application/services.py#HardwareService.admit.action",
         "apps/api/src/zeromerma_api/modules/idempotency/application/service.py#IdempotencyExecutor._reserve",
         "apps/api/src/zeromerma_api/modules/inventory/application/admin_services.py#AdminInventoryService.create_adjustment",
         "apps/api/src/zeromerma_api/modules/inventory/application/class_inventory.py#attribute_class_inventory",
@@ -4759,12 +4863,17 @@
         "apps/api/src/zeromerma_api/modules/inventory/application/mutations.py#lock_inventory_balances",
         "apps/api/src/zeromerma_api/modules/inventory/application/reconciliation.py#apply_inventory_reconciliation_row",
         "apps/api/src/zeromerma_api/modules/inventory/application/reconciliation.py#apply_inventory_reconciliation_row.action",
+        "apps/api/src/zeromerma_api/modules/operations/application/physical_inventory.py#apply_operation_inventory",
         "apps/api/src/zeromerma_api/modules/operations/application/services.py#OperationsCommandService.commit_counter_transfer",
         "apps/api/src/zeromerma_api/modules/operations/application/services.py#OperationsCommandService.commit_waste_record",
         "apps/api/src/zeromerma_api/modules/orders/application/admin_services.py#AdminOrdersService.cancel_order",
         "apps/api/src/zeromerma_api/modules/orders/application/admin_services.py#AdminOrdersService.deliver_order",
         "apps/api/src/zeromerma_api/modules/orders/application/admin_services.py#AdminOrdersService.mark_ready",
+        "apps/api/src/zeromerma_api/modules/orders/application/commitment.py#materialize_commitment",
+        "apps/api/src/zeromerma_api/modules/orders/application/commitment.py#save_revision",
         "apps/api/src/zeromerma_api/modules/orders/application/financial_services.py#record_order_payment",
+        "apps/api/src/zeromerma_api/modules/orders/application/lifecycle.py#execute_lifecycle",
+        "apps/api/src/zeromerma_api/modules/orders/application/policies.py#configure_policy.action",
         "apps/api/src/zeromerma_api/modules/orders/application/services.py#OrdersCommandService.cancel_order",
         "apps/api/src/zeromerma_api/modules/orders/application/services.py#OrdersCommandService.create_order",
         "apps/api/src/zeromerma_api/modules/orders/application/services.py#OrdersCommandService.deliver_order",
@@ -4788,6 +4897,9 @@
         "apps/api/src/zeromerma_api/modules/returns/application/physical_inventory.py#apply_return_inventory",
         "apps/api/src/zeromerma_api/modules/returns/application/services.py#ReturnsCommandService.commit_return",
         "apps/api/src/zeromerma_api/modules/sales/application/services.py#SaleCommandService.confirm_sale",
+        "apps/api/src/zeromerma_api/modules/tickets/application/print_requests.py#request_receipt_print.action",
+        "apps/api/src/zeromerma_api/modules/tickets/application/receipts.py#persist_receipt",
+        "apps/api/src/zeromerma_api/modules/tickets/application/receipts.py#snapshot_sale",
         "apps/api/src/zeromerma_api/modules/transfers/application/admin_services.py#AdminTransferService._replace_lines",
         "apps/api/src/zeromerma_api/modules/transfers/application/admin_services.py#AdminTransferService.create_transfer",
         "apps/api/src/zeromerma_api/modules/transfers/application/admin_services.py#AdminTransferService.receive_transfer",
@@ -4797,14 +4909,16 @@
         "apps/api/src/zeromerma_api/modules/transfers/application/services.py#TransferCommandService.commit_dispatch",
         "apps/api/src/zeromerma_api/modules/transfers/application/services.py#TransferCommandService.receive_transfer",
         "apps/api/src/zeromerma_api/modules/transfers/application/workflow.py#command_snapshot",
-        "apps/api/src/zeromerma_api/modules/waste/application/admin_services.py#AdminWasteService.create_waste",
-        "apps/api/src/zeromerma_api/modules/operations/application/physical_inventory.py#apply_operation_inventory"
+        "apps/api/src/zeromerma_api/modules/waste/application/admin_services.py#AdminWasteService.create_waste"
       ],
       "atomic_effects": [
         "idempotency identity and terminal acknowledgement",
         "canonical financial and physical effects, including frozen quantities, conversion, weighted-average cost and FEFO allocations",
         "reservation/release/consumption events and reconciled projections",
-        "required audit and outbox"
+        "required audit and outbox",
+        "explicit branch order policy versions, frozen commercial revisions and lifecycle events",
+        "immutable economic receipt snapshots",
+        "separate post-economic-commit print requests and hardware intentions; no physical success assertion"
       ],
       "allowed_savepoints": [
         "action deterministic rejection",
@@ -5363,6 +5477,27 @@
       ],
       "failure_behavior": "Commit the durable claim before the provider call, release database locks, then reconcile authoritative evidence in a separate guarded transaction. Any incomplete local transaction rolls back; uncertain provider outcomes retain the same identity.",
       "post_commit": "No provider call is retried as a new charge after UNKNOWN; read the same provider operation. Evidence and local terminal state are durable before acknowledgement."
+    },
+    {
+      "id": "LOCAL_READINESS_READ_ONLY",
+      "description": "Bounded independent local database probe; no economic command or Internet dependency.",
+      "entry_points": [
+        "apps/api/src/zeromerma_api/presentation/health.py#local_readiness"
+      ],
+      "owners": [
+        "apps/api/src/zeromerma_api/presentation/health.py#readiness_session"
+      ],
+      "participants": [
+        "apps/api/src/zeromerma_api/presentation/health.py#local_readiness"
+      ],
+      "atomic_effects": [],
+      "allowed_savepoints": [],
+      "failure_behavior": "Session context closes and rolls back its unfinished SELECT transaction; bounded pool/connect/statement timeouts prevent waiting indefinitely on command capacity. SQLAlchemy failures become sanitized UNAVAILABLE.",
+      "post_commit": "No commit, business mutation, retry queue or external network call. Writable-primary readiness is an observation, not a guarantee of the next command outcome.",
+      "evidence_refs": [
+        "apps/api/tests/test_local_readiness.py"
+      ],
+      "verification": "FIVE_FOCUSED_LOCAL_CASES_PASSED; physical deployment and full block acceptance remain separate"
     }
   ],
   "read_only_boundaries": [
@@ -5380,6 +5515,31 @@
       "entry_point": "apps/worker/src/zeromerma_worker/outbox/poller.py#OutboxPoller.poll_once",
       "owner": "group:WORKER_READ_ONLY",
       "rule": "Read-only Engine.begin transaction; row locks end before logging and no durable processing state exists."
+    },
+    {
+      "entry_point": "apps/api/src/zeromerma_api/presentation/health.py#local_readiness",
+      "owner": "group:LOCAL_READINESS_READ_ONLY",
+      "rule": "Only PostgreSQL recovery/read-only settings are observed. Session closure discards the read transaction; the bounded probe pool is separate from command capacity."
+    },
+    {
+      "entry_point": "apps/api/src/zeromerma_api/modules/orders/application/commitment.py#quote_order",
+      "owner": "group:REQUEST_CLEANUP",
+      "rule": "Read-only commercial quote. Creating or revising a commitment revalidates its fingerprint inside the command transaction."
+    },
+    {
+      "entry_point": "apps/api/src/zeromerma_api/modules/orders/application/policies.py#recover_policy",
+      "owner": "group:IDEMPOTENT_RECOVERY",
+      "rule": "Recover the exact authorized policy-version acknowledgement by original intention; never create another version."
+    },
+    {
+      "entry_point": "apps/api/src/zeromerma_api/modules/hardware/application/services.py#HardwareService.renew_authorization",
+      "owner": "group:REQUEST_CLEANUP",
+      "rule": "Reauthorize the existing stored device command against current actor, branch, workstation and registered binding. Does not create a new intention or confirm physical output."
+    },
+    {
+      "entry_point": "apps/api/src/zeromerma_api/modules/tickets/application/receipts.py#read_receipt",
+      "owner": "group:REQUEST_CLEANUP",
+      "rule": "Read and integrity-check the stored immutable receipt; do not fabricate historical snapshots."
     }
   ],
   "verification": {
@@ -5467,5 +5627,41 @@
     ],
     "verification": "Four ownership gates passed; 25 unique producer cases passed across 24 initial and three final cases with overlap. Final context/authentication cleanup regression passed 10/10; storage/audit passed 13 unique cases. Full local results and diagnostic runs are recorded in operation-context-validation.md.",
     "preserved_039_record": "The existing verification object and retained_boundaries record the historical 039 acceptance. The 040 correlation and maintenance-identifier follow-up is implemented and verified separately by this extension; later boundaries remain open."
+  },
+  "pos_feature_complete_extension": {
+    "tasks": [
+      "ZM-FIN-056",
+      "ZM-FIN-057",
+      "ZM-FIN-058",
+      "ZM-FIN-059",
+      "ZM-FIN-060",
+      "ZM-FIN-061",
+      "ZM-FIN-062",
+      "ZM-FIN-063",
+      "ZM-FIN-064",
+      "ZM-FIN-065",
+      "ZM-FIN-066",
+      "ZM-FIN-067"
+    ],
+    "migrations": [
+      "apps/api/alembic/versions/20261019_0054_receipt_snapshots.py",
+      "apps/api/alembic/versions/20261019_0055_order_lifecycle.py",
+      "apps/api/alembic/versions/20261019_0056_hardware_intents.py"
+    ],
+    "ownership_rule": "IdempotencyExecutor remains the only root owner of adopted order, receipt-print and hardware-intention commands. New helper flushes participate in that transaction; audit, outbox and acknowledgement are atomic with their local facts. A hardware call happens after economic confirmation and cannot roll it back.",
+    "migration_rule": "Alembic owns schema migrations outside the runtime scanner roots. New immutable receipt, order-policy/revision and hardware-intention data are not fabricated for history. Downgrade guards and migration acceptance require their own isolated evidence.",
+    "readiness_rule": "Local readiness is an independent read-only observer, never a financial owner or a browser offline queue. Failure after an admitted POST remains uncertain until the original intention is recovered.",
+    "physical_boundary": "A persisted print request, signed command or browser print dialog does not establish printed paper, an opened drawer or successful external payment. Device/provider certification and operational acceptance remain external evidence.",
+    "evidence_refs": [
+      "apps/api/unit_tests/test_transaction_ownership.py",
+      "apps/api/tests/test_order_lifecycle.py",
+      "apps/api/tests/test_admin_orders.py",
+      "apps/api/tests/test_tickets_module.py",
+      "apps/api/tests/test_hardware_commands.py",
+      "apps/api/tests/test_local_readiness.py",
+      "apps/pos-web/e2e/connectivity-accessibility.spec.ts"
+    ],
+    "verification": "IMPLEMENTED_LOCAL_ACCEPTANCE_IN_PROGRESS; referenced test files identify coverage and do not by themselves prove successful full-block execution.",
+    "preserved_acceptance": "The top-level ZM-FIN-039 verification and ZM-FIN-040 extension retain their historical scope and evidence. They are not claims of validation for migrations 0054-0056 or the new POS block."
   }
 }

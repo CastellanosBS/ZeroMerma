@@ -4,7 +4,7 @@ from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 
 from fastapi.testclient import TestClient
-from order_fixtures import seed_order_stock
+from order_fixtures import committed_order_clock, quote_order_payload, seed_order_stock
 from sqlalchemy import select
 
 from zeromerma_api.bootstrap.seed_local import (
@@ -57,7 +57,7 @@ def _get_product_id(code: str) -> str:
 def _create_order(
     client: TestClient,
     *,
-    advance_amount: str = "0.00",
+    advance_amount: str = "17.00",
     advance_payment_method_code: str | None = None,
     customer_name: str = "Cliente Backoffice",
     requested_for_at: str | None = None,
@@ -81,6 +81,7 @@ def _create_order(
     cash_session_id = current_cash_session_id(
         client, headers=command_headers, workstation_code=SEED_WORKSTATION_CODE
     )
+    payload = quote_order_payload(client, command_headers, payload)
     response = client.post(
         "/v1/orders",
         headers={**command_headers, "Idempotency-Key": new_idempotency_key()},
@@ -94,7 +95,7 @@ def test_admin_orders_list_filters_and_metrics_use_real_orders(client: TestClien
     _open_cash_session(client)
     order = _create_order(
         client,
-        advance_amount="10.00",
+        advance_amount="17.00",
         advance_payment_method_code="CASH",
         customer_name="Cliente Consulta Admin",
     )
@@ -114,7 +115,7 @@ def test_admin_orders_list_filters_and_metrics_use_real_orders(client: TestClien
     assert payload["total"] == 1
     assert payload["items"][0]["id"] == order["id"]
     assert payload["items"][0]["payment_state"] == "PARTIAL_DEPOSIT"
-    assert Decimal(str(payload["metrics"]["deposits_received_amount"])) == Decimal("10.00")
+    assert Decimal(str(payload["metrics"]["deposits_received_amount"])) == Decimal("17.00")
     assert payload["filter_options"]["branches"]
     assert payload["filter_options"]["statuses"]
 
@@ -125,7 +126,7 @@ def test_admin_order_detail_includes_lines_payments_timeline_and_actions(
     _open_cash_session(client)
     order = _create_order(
         client,
-        advance_amount="10.00",
+        advance_amount="17.00",
         advance_payment_method_code="CARD",
         customer_name="Cliente Detalle Admin",
     )
@@ -139,7 +140,7 @@ def test_admin_order_detail_includes_lines_payments_timeline_and_actions(
     assert len(payload["lines"]) == 2
     assert payload["payments"][0]["payment_type"] == "ADVANCE"
     assert payload["timeline"][0]["key"] == "created"
-    assert payload["available_actions"]["can_mark_ready"] is True
+    assert payload["available_actions"]["can_mark_ready"] is False
     assert payload["available_actions"]["can_capture_balance"] is False
 
 
@@ -154,15 +155,16 @@ def test_admin_order_can_mark_ready_and_deliver_when_paid_without_mutating_pos_f
         customer_name="Cliente Pagado Admin",
     )
 
-    ready_response = client.post(
-        f"/v1/admin/orders/{order['id']}/mark-ready",
-        headers={
-            "Idempotency-Key": new_idempotency_key(),
-            **_admin_headers(client),
-            "X-Request-ID": "d08a9ce4-78e2-5240-94db-db68e14e4b47",
-        },
-        json={},
-    )
+    with committed_order_clock(order["id"]):
+        ready_response = client.post(
+            f"/v1/admin/orders/{order['id']}/mark-ready",
+            headers={
+                "Idempotency-Key": new_idempotency_key(),
+                **_admin_headers(client),
+                "X-Request-ID": "d08a9ce4-78e2-5240-94db-db68e14e4b47",
+            },
+            json={},
+        )
     assert ready_response.status_code == 200
     assert ready_response.json()["status"] == "READY"
 
@@ -205,15 +207,16 @@ def test_admin_order_blocks_financial_actions_and_cancels_non_refundable_order(
     _open_cash_session(client)
     balance_order = _create_order(
         client,
-        advance_amount="5.00",
+        advance_amount="17.00",
         advance_payment_method_code="CASH",
         customer_name="Cliente Saldo Admin",
     )
-    ready_response = client.post(
-        f"/v1/admin/orders/{balance_order['id']}/mark-ready",
-        headers={**_admin_headers(client), "Idempotency-Key": new_idempotency_key()},
-        json={},
-    )
+    with committed_order_clock(balance_order["id"]):
+        ready_response = client.post(
+            f"/v1/admin/orders/{balance_order['id']}/mark-ready",
+            headers={**_admin_headers(client), "Idempotency-Key": new_idempotency_key()},
+            json={},
+        )
     assert ready_response.status_code == 200
 
     deliver_response = client.post(
@@ -227,30 +230,36 @@ def test_admin_order_blocks_financial_actions_and_cancels_non_refundable_order(
     refundable_cancel_response = client.post(
         f"/v1/admin/orders/{balance_order['id']}/cancel",
         headers={**_admin_headers(client), "Idempotency-Key": new_idempotency_key()},
-        json={},
+        json={
+            "cancellation_reason": "The merchant cannot fulfill the order",
+            "cancellation_responsibility": "MERCHANT",
+        },
     )
     assert refundable_cancel_response.status_code == 409
     assert "reembolso" in refundable_cancel_response.json()["message"]
 
     non_refundable_order = _create_order(
         client,
-        advance_amount="5.00",
+        advance_amount="17.00",
         advance_payment_method_code="CARD",
         customer_name="Cliente Cancelacion Admin",
-        requested_for_at=(datetime.now(tz=UTC) + timedelta(hours=8)).isoformat(),
     )
-    cancel_response = client.post(
-        f"/v1/admin/orders/{non_refundable_order['id']}/cancel",
-        headers={
-            "Idempotency-Key": new_idempotency_key(),
-            **_admin_headers(client),
-            "X-Request-ID": "367e3602-8f8c-57a5-a3a8-d80c98398241",
-        },
-        json={},
-    )
+    with committed_order_clock(non_refundable_order["id"]):
+        cancel_response = client.post(
+            f"/v1/admin/orders/{non_refundable_order['id']}/cancel",
+            headers={
+                "Idempotency-Key": new_idempotency_key(),
+                **_admin_headers(client),
+                "X-Request-ID": "367e3602-8f8c-57a5-a3a8-d80c98398241",
+            },
+            json={
+                "cancellation_reason": "Customer canceled after production commitment",
+                "cancellation_responsibility": "CUSTOMER",
+            },
+        )
 
     assert cancel_response.status_code == 200
     payload = cancel_response.json()
     assert payload["status"] == "CANCELED"
-    assert Decimal(str(payload["advance_amount"])) == Decimal("5.00")
+    assert Decimal(str(payload["advance_amount"])) == Decimal("17.00")
     assert Decimal(str(payload["remaining_balance_amount"])) == Decimal("0.00")

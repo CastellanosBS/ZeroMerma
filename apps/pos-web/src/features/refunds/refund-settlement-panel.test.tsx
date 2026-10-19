@@ -79,13 +79,26 @@ it("prints the obligation separately from money already delivered", () => {
     reason_name: "Requested",
     total_refund_amount: "100.00",
     financial_refund: refund,
+    receipt: {
+      source_kind: "RETURN", source_id: "return-1", folio: "DEV-1",
+      occurred_at: "2026-10-19T18:00:00Z",
+      context: { branch_name: "Branch", timezone: "America/Hermosillo", workstation_name: "Caja",
+        actor_name: "Operator", cash_session_id: "shift-1" },
+      seller: { configuration_status: "UNCONFIGURED" },
+      subtotal_amount: "100.00", discount_amount: "0.00", total_amount: "100.00",
+      change_amount: "0.00", settled_amount: "40.00", pending_amount: "60.00",
+      lines: [], payments: [{ method: "CASH", execution_mode: "LOCAL", amount: "40.00",
+        tendered_amount: "40.00", change_amount: "0.00" }],
+    },
   } as unknown as SaleReturnDetailResponse;
   const html = buildReturnReceiptDocument(detail);
   expect(html).not.toContain("Total reembolsado");
-  expect(html).toContain("Entrega confirmada</span><span>$40.00");
-  expect(html).toContain("Pendiente de entregar</span><span>$60.00");
-  const historical = buildReturnReceiptDocument({ ...detail, financial_refund: null });
-  expect(historical).toContain("Sin evidencia financiera");
+  expect(html).toContain("Reembolsado:");
+  expect(html).toContain("$40.00");
+  expect(html).toContain("Pendiente:");
+  expect(html).toContain("$60.00");
+  expect(buildReturnReceiptDocument({ ...detail, financial_refund: null })).toBe(html);
+  expect(() => buildReturnReceiptDocument({ ...detail, receipt: null })).toThrow("inmutable");
 });
 
 it("mounts recovery after a lost response and reload without issuing another POST", async () => {

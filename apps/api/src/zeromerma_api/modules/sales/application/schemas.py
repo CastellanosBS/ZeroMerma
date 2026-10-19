@@ -13,10 +13,14 @@ from zeromerma_api.modules.catalog.domain.constants import (
 
 
 class ConfirmSaleLineRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     capture_mode: str = Field(min_length=1, max_length=32)
     product_class_id: UUID | None = None
     product_id: UUID | None = None
     quantity: Decimal = Field(gt=Decimal("0"), max_digits=12, decimal_places=3)
+    expected_unit_price: Decimal = Field(ge=Decimal("0"), max_digits=12, decimal_places=2)
+    expected_currency_code: str = Field(pattern=r"^[A-Z]{3}$")
 
     @model_validator(mode="after")
     def validate_reference_shape(self) -> ConfirmSaleLineRequest:
@@ -51,10 +55,21 @@ class ConfirmSalePaymentRequest(BaseModel):
 
 
 class ConfirmSaleRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     workstation_code: str = Field(min_length=1, max_length=64)
     cash_session_id: UUID
     lines: list[ConfirmSaleLineRequest] = Field(min_length=1)
     payments: list[ConfirmSalePaymentRequest] = Field(min_length=1)
+
+    @model_validator(mode="after")
+    def reject_duplicate_lines(self) -> ConfirmSaleRequest:
+        references = [
+            (line.capture_mode, line.product_id or line.product_class_id) for line in self.lines
+        ]
+        if len(set(references)) != len(references):
+            raise ValueError("Combine quantities for each catalog reference into one sale line.")
+        return self
 
 
 class SaleLineView(BaseModel):

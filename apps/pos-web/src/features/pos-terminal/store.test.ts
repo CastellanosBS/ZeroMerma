@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 
 import type { PosCatalogClassView, PosCatalogProductView } from "../../lib/api-contracts";
+import { usePosTerminalStore } from "./store";
+import type { SaleIntentionMetadata } from "./sale-confirmation-intent";
 import {
   addPendingSelectionToCart,
   beginEditingCartLine,
@@ -97,6 +99,42 @@ function addClassLine(quantityText: string) {
 }
 
 describe("pos terminal model", () => {
+  it.each(["PENDING", "UNKNOWN", "CONFLICT"] as const)("freezes cart commands for %s until canonical rejection or confirmation", (status) => {
+    const store = usePosTerminalStore.getState();
+    store.reset();
+    store.selectClass(bolilloClass);
+    store.setQuantityText("1");
+    store.addPendingLine();
+    store.observeSaleIntention(null);
+    const original = usePosTerminalStore.getState().cartLines;
+    const metadata: SaleIntentionMetadata = {
+      key: "019a4000-0000-7000-8000-000000000001", payloadDigest: "a".repeat(64),
+      userId: "user-1", branchId: "branch-1", workstationId: "station-1", workstationCode: "POS-01", cashSessionId: "cash-1", status,
+    };
+    store.setSaleSubmissionPending(true);
+    store.observeSaleIntention(null);
+    expect(usePosTerminalStore.getState().cartMutationBlocked).toBe(true);
+    store.observeSaleIntention(metadata);
+    store.setSaleSubmissionPending(false);
+    store.incrementLineQuantity(original[0].key);
+    store.decrementLineQuantity(original[0].key);
+    store.setLineQuantity(original[0].key, "9");
+    store.removeLine(original[0].key);
+    store.clearCart();
+    store.repeatLastLine();
+    store.selectClass(classCaptureClass);
+    store.setQuantityText("9");
+    store.addPendingLine();
+    expect(store.replaceReviewedPrices(original, [])).toBe(false);
+    expect(usePosTerminalStore.getState().cartLines).toBe(original);
+    store.observeSaleIntention({ ...metadata, status: "REJECTED" });
+    expect(usePosTerminalStore.getState().cartMutationBlocked).toBe(false);
+    store.incrementLineQuantity(original[0].key);
+    expect(usePosTerminalStore.getState().cartLines[0].quantityMilliUnits).toBe(2000);
+    store.observeSaleIntention({ ...metadata, key: "019a4000-0000-7000-8000-000000000002", status: "CONFIRMED" });
+    expect(usePosTerminalStore.getState().cartLines).toHaveLength(0);
+    store.reset();
+  });
   it("rejects unavailable direct products and quantities beyond the consulted balance", () => {
     const initial = beginSelectionFromClass(createInitialPosTerminalState(), productDirectClass);
     expect(() =>
@@ -187,6 +225,8 @@ describe("pos terminal model", () => {
     expect(request.lines).toEqual([
       {
         capture_mode: PRODUCT_DIRECT_MODE,
+        expected_unit_price: "18.00",
+        expected_currency_code: "MXN",
         product_id: "product-coca-355",
         quantity: "1",
       },

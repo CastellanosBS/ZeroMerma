@@ -29,6 +29,19 @@ async function renderBoundary() {
 }
 
 describe("session verification UI", () => {
+  it("bounds cached access when the workstation clock is behind the server", async () => {
+    const response = mockSessionResponse();
+    vi.setSystemTime(new Date("2020-01-01T12:00:00Z"));
+    const fetchMock = vi.fn().mockResolvedValueOnce(new Response(JSON.stringify(response)))
+      .mockRejectedValueOnce(new Error("LAN unavailable"));
+    vi.stubGlobal("fetch", fetchMock);
+    await renderBoundary();
+    await act(async () => { await vi.advanceTimersByTimeAsync(1_800_001); });
+    expect(container.textContent).not.toContain("Protected business data");
+    expect(auth.getState().phase).toBe("restoring");
+    expect(fetchMock.mock.calls.every(([, options]) => options.method === "GET")).toBe(true);
+  });
+
   it("keeps the 30-minute server deadline and hides business data when it expires offline", async () => {
     const response = mockSessionResponse();
     expect(Date.parse(response.session.idle_expires_at) - Date.now()).toBe(1_800_000);

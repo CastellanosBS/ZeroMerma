@@ -93,7 +93,13 @@ def _setup(client: TestClient, kind: str) -> tuple[dict[str, str], dict[str, Any
             )
         body.update(
             lines=[
-                {"capture_mode": "PRODUCT_DIRECT", "product_id": str(product_id), "quantity": "2"}
+                {
+                    "expected_unit_price": "18.00",
+                    "expected_currency_code": "MXN",
+                    "capture_mode": "PRODUCT_DIRECT",
+                    "product_id": str(product_id),
+                    "quantity": "2",
+                }
             ],
             payments=[{"payment_method_code": "CASH", "tendered_amount": "50.00"}],
         )

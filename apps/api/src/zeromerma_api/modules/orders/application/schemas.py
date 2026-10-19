@@ -11,6 +11,7 @@ from zeromerma_api.modules.branches.application.schemas import BranchSummary, Wo
 from zeromerma_api.modules.cash.application.schemas import CashSessionView
 from zeromerma_api.modules.financial_ledger.application.refund_schemas import FinancialRefundView
 from zeromerma_api.modules.identity.application.schemas import AuthenticatedUser
+from zeromerma_api.modules.tickets.application.receipt_schemas import OperationalReceiptView
 
 
 class OrderStatusCounterView(BaseModel):
@@ -100,6 +101,7 @@ class CreateCustomerOrderRequest(BaseModel):
     )
     advance_payment_method_code: str | None = Field(default=None, max_length=40)
     advance_payments: list[CreateCustomerOrderAdvancePaymentRequest] = Field(default_factory=list)
+    quote_fingerprint: str = Field(min_length=64, max_length=64)
 
     @field_validator("customer_name")
     @classmethod
@@ -149,6 +151,8 @@ class CancelCustomerOrderRequest(BaseModel):
     workstation_code: str = Field(min_length=1, max_length=64)
     cash_session_id: UUID
     cancellation_reason: str = Field(min_length=4, max_length=240)
+    cancellation_responsibility: Literal["CUSTOMER", "MERCHANT"]
+    terminal_status: Literal["CANCELED", "EXPIRED", "NO_SHOW"] = "CANCELED"
 
     @field_validator("cancellation_reason")
     @classmethod
@@ -159,7 +163,7 @@ class CancelCustomerOrderRequest(BaseModel):
         return normalized
 
 
-OrderCommandCode = Literal["create", "mark-ready", "deliver", "cancel"]
+OrderCommandCode = Literal["create", "mark-ready", "deliver", "cancel", "pay", "amend"]
 AdminOrderCommandCode = Literal["mark-ready", "deliver", "cancel"]
 
 
@@ -182,7 +186,7 @@ class OrderCommandResultView(BaseModel):
 
     id: UUID
     folio: str
-    status: Literal["PENDING", "READY", "DELIVERED", "CANCELED"]
+    status: Literal["PENDING", "READY", "DELIVERED", "CANCELED", "EXPIRED", "NO_SHOW"]
     branch_id: UUID
     currency_code: str
     subtotal_amount: Decimal
@@ -234,6 +238,7 @@ class CustomerOrderItemView(BaseModel):
 
 
 class CustomerOrderPaymentView(BaseModel):
+    receipt: OperationalReceiptView | None = None
     id: UUID
     sequence: int
     payment_type: str
@@ -282,3 +287,70 @@ class CustomerOrderDetailResponse(BaseModel):
     can_deliver: bool
     can_cancel: bool
     requires_settlement_on_delivery: bool
+    version: int = 0
+    production_commit_at: datetime | None = None
+    production_committed_at: datetime | None = None
+    cancellation_responsibility: str | None = None
+    can_amend: bool = False
+    can_pay: bool = False
+    recognized_revenue_amount: Decimal = Decimal("0.00")
+    retained_amount: Decimal = Decimal("0.00")
+    unapplied_amount: Decimal = Decimal("0.00")
+
+
+class OrderQuoteRequest(BaseModel):
+    workstation_code: str = Field(min_length=1, max_length=64)
+    requested_for_at: AwareDatetime
+    items: list[CreateCustomerOrderItemRequest] = Field(min_length=1)
+
+
+class OrderQuoteLineView(BaseModel):
+    product_id: UUID
+    quantity: Decimal
+    unit_price: Decimal
+    line_total_amount: Decimal
+
+
+class OrderQuoteView(BaseModel):
+    quote_fingerprint: str
+    policy_id: UUID
+    policy_version: int
+    lead_time_minutes: int
+    branch_id: UUID
+    branch_timezone: str
+    requested_for_at: datetime
+    production_commit_at: datetime
+    currency_code: str
+    total_amount: Decimal
+    minimum_advance_amount: Decimal
+    items: list[OrderQuoteLineView]
+
+
+class PayCustomerOrderRequest(OrderActionRequest):
+    payments: list[CreateCustomerOrderAdvancePaymentRequest] = Field(min_length=1)
+
+
+class AmendCustomerOrderRequest(OrderQuoteRequest):
+    model_config = ConfigDict(str_strip_whitespace=True)
+    cash_session_id: UUID
+    expected_version: int = Field(ge=1)
+    quote_fingerprint: str = Field(min_length=64, max_length=64)
+    reason: str = Field(min_length=4, max_length=240)
+    additional_payments: list[CreateCustomerOrderAdvancePaymentRequest] = Field(
+        default_factory=list
+    )
+
+
+class OrderPolicyRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
+    lead_time_minutes: int = Field(ge=0, le=525600)
+    reason: str = Field(min_length=4, max_length=240)
+
+
+class OrderPolicyView(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    id: UUID
+    branch_id: UUID
+    version: int
+    lead_time_minutes: int
+    reason: str

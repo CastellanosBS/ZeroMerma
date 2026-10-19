@@ -148,6 +148,8 @@ def test_class_capture_sale_confirmation_writes_financial_fact_audit_and_outbox_
             "workstation_code": SEED_WORKSTATION_CODE,
             "lines": [
                 {
+                    "expected_unit_price": "12.00",
+                    "expected_currency_code": "MXN",
                     "capture_mode": "CLASS_CAPTURE",
                     "product_class_id": _get_product_class_id(SEED_PRODUCT_CLASS_PAN_DULCE_CODE),
                     "quantity": "2",
@@ -244,6 +246,8 @@ def test_product_direct_sale_confirmation_uses_product_reference_and_direct_assi
             "workstation_code": SEED_WORKSTATION_CODE,
             "lines": [
                 {
+                    "expected_unit_price": "18.00",
+                    "expected_currency_code": "MXN",
                     "capture_mode": "PRODUCT_DIRECT",
                     "product_id": _get_product_id(SEED_PRODUCT_COCA_355_CODE),
                     "quantity": "1",
@@ -284,11 +288,15 @@ def test_mixed_sale_confirmation_supports_class_capture_and_product_direct_lines
             "workstation_code": SEED_WORKSTATION_CODE,
             "lines": [
                 {
+                    "expected_unit_price": "12.00",
+                    "expected_currency_code": "MXN",
                     "capture_mode": "CLASS_CAPTURE",
                     "product_class_id": _get_product_class_id(SEED_PRODUCT_CLASS_PAN_DULCE_CODE),
                     "quantity": "2",
                 },
                 {
+                    "expected_unit_price": "38.00",
+                    "expected_currency_code": "MXN",
                     "capture_mode": "PRODUCT_DIRECT",
                     "product_id": _get_product_id(SEED_PRODUCT_REBANADA_TRES_LECHES_CODE),
                     "quantity": "1",
@@ -332,6 +340,8 @@ def test_sale_confirmation_supports_card_payment_without_cash_movement(
             "workstation_code": SEED_WORKSTATION_CODE,
             "lines": [
                 {
+                    "expected_unit_price": "18.00",
+                    "expected_currency_code": "MXN",
                     "capture_mode": "PRODUCT_DIRECT",
                     "product_id": _get_product_id(SEED_PRODUCT_COCA_355_CODE),
                     "quantity": "1",
@@ -399,6 +409,8 @@ def test_sale_confirmation_supports_mixed_cash_and_card_payment(
             "workstation_code": SEED_WORKSTATION_CODE,
             "lines": [
                 {
+                    "expected_unit_price": "12.00",
+                    "expected_currency_code": "MXN",
                     "capture_mode": "CLASS_CAPTURE",
                     "product_class_id": _get_product_class_id(SEED_PRODUCT_CLASS_PAN_DULCE_CODE),
                     "quantity": "2",
@@ -492,6 +504,8 @@ def test_sale_confirmation_rejects_removed_other_payment_method(
             "workstation_code": SEED_WORKSTATION_CODE,
             "lines": [
                 {
+                    "expected_unit_price": "3.00",
+                    "expected_currency_code": "MXN",
                     "capture_mode": "CLASS_CAPTURE",
                     "product_class_id": _get_product_class_id(SEED_PRODUCT_CLASS_BOLILLO_CODE),
                     "quantity": "2",
@@ -537,6 +551,8 @@ def test_sale_confirmation_rejects_insufficient_cash(client: TestClient) -> None
             "workstation_code": SEED_WORKSTATION_CODE,
             "lines": [
                 {
+                    "expected_unit_price": "12.00",
+                    "expected_currency_code": "MXN",
                     "capture_mode": "CLASS_CAPTURE",
                     "product_class_id": _get_product_class_id(SEED_PRODUCT_CLASS_PAN_DULCE_CODE),
                     "quantity": "1",
@@ -568,6 +584,8 @@ def test_sale_confirmation_requires_open_cash_session(client: TestClient) -> Non
             "workstation_code": SEED_WORKSTATION_CODE,
             "lines": [
                 {
+                    "expected_unit_price": "18.00",
+                    "expected_currency_code": "MXN",
                     "capture_mode": "PRODUCT_DIRECT",
                     "product_id": _get_product_id(SEED_PRODUCT_COCA_355_CODE),
                     "quantity": "1",

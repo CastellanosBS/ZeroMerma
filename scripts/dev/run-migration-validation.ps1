@@ -1,7 +1,8 @@
 [CmdletBinding()]
 param(
   [ValidateSet("Fast", "Full")]
-  [string]$Mode = "Fast"
+  [string]$Mode = "Fast",
+  [string]$JUnitPath
 )
 
 Set-StrictMode -Version 3.0
@@ -23,6 +24,10 @@ else {
     "${migrationTests}::test_fresh_schema_drift_and_seed",
     "-s"
   )
+}
+
+if ($JUnitPath) {
+  $testTargets += "--junitxml=$JUnitPath"
 }
 
 Push-Location $repoRoot

@@ -6,7 +6,7 @@ from uuid import UUID, uuid4
 from zoneinfo import ZoneInfo
 
 from fastapi.testclient import TestClient
-from order_fixtures import seed_order_stock
+from order_fixtures import committed_order_clock, quote_order_payload, seed_order_stock
 from sqlalchemy import select
 
 from zeromerma_api.bootstrap.seed_local import (
@@ -77,12 +77,18 @@ def _read_order_detail(
     return response.json()
 
 
+def _post_after_commit(client, path, **kwargs):
+    """Advance the order clock explicitly for committed transition scenarios."""
+    with committed_order_clock(path.split("/")[3]):
+        return client.post(path, **kwargs)
+
+
 def _create_order(
     client: TestClient,
     *,
     customer_name: str = "Cliente Pedidos",
-    advance_amount: str = "0.00",
-    advance_payment_method_code: str | None = None,
+    advance_amount: str = "20.00",
+    advance_payment_method_code: str | None = "CASH",
     advance_payments: list[dict[str, str]] | None = None,
     requested_for_at: str | None = None,
 ) -> dict[str, object]:
@@ -121,7 +127,9 @@ def _create_order(
             **command_headers,
             "X-Request-ID": str(uuid4()),
         },
-        json={**payload, "cash_session_id": cash_session_id},
+        json=quote_order_payload(
+            client, command_headers, {**payload, "cash_session_id": cash_session_id}
+        ),
     )
     assert response.status_code == 201
     return _read_order_detail(client, order_id=response.json()["id"], headers=command_headers)
@@ -143,7 +151,7 @@ def test_orders_bootstrap_catalog_and_class_products_follow_current_branch_conte
     assert bootstrap_payload["branch_brand_key"] == "EL_MEJOR_PAN"
     assert bootstrap_payload["current_open_cash_session"] is None
     assert bootstrap_payload["can_create_order"] is False
-    assert [entry["count"] for entry in bootstrap_payload["status_counters"]] == [0, 0, 0, 0]
+    assert [entry["count"] for entry in bootstrap_payload["status_counters"]] == [0, 0, 0, 0, 0, 0]
 
     catalog_response = client.get(
         "/v1/orders/catalog",
@@ -187,7 +195,7 @@ def test_create_order_lists_and_details_with_advance_payment_audit_and_outbox(
     assert Decimal(str(payload["remaining_balance_amount"])) == Decimal("14.00")
     assert payload["payments"][0]["payment_type"] == "ADVANCE"
     assert payload["payments"][0]["payment_method_code"] == "CASH"
-    assert payload["can_mark_ready"] is True
+    assert payload["can_mark_ready"] is False
     assert payload["can_deliver"] is False
     assert payload["can_cancel"] is True
     assert payload["cancellation_refund_eligible"] is True
@@ -321,7 +329,7 @@ def test_order_lifecycle_marks_ready_and_delivers_with_final_settlement(client: 
     created_order = _create_order(
         client,
         customer_name="Cliente Entrega",
-        advance_amount="10.00",
+        advance_amount="20.00",
         advance_payment_method_code="CARD",
     )
 
@@ -329,7 +337,8 @@ def test_order_lifecycle_marks_ready_and_delivers_with_final_settlement(client: 
     cash_session_id = current_cash_session_id(
         client, headers=command_headers, workstation_code=SEED_WORKSTATION_CODE
     )
-    ready_response = client.post(
+    ready_response = _post_after_commit(
+        client,
         f"/v1/orders/{created_order['id']}/mark-ready",
         headers={
             "Idempotency-Key": new_idempotency_key(),
@@ -360,7 +369,7 @@ def test_order_lifecycle_marks_ready_and_delivers_with_final_settlement(client: 
         json={
             "cash_session_id": cash_session_id,
             "workstation_code": SEED_WORKSTATION_CODE,
-            "settlement_amount": "24.00",
+            "settlement_amount": "14.00",
             "settlement_payment_method_code": "CASH",
         },
     )
@@ -399,11 +408,12 @@ def test_order_lifecycle_marks_ready_and_delivers_with_final_settlement(client: 
         )
 
     assert [payment.payment_method_code for payment in payment_records] == ["CARD", "CASH"]
-    assert [event.event_name for event in outbox_events] == [
+    assert {event.event_name for event in outbox_events} == {
         "order.created.v1",
+        "order.production_committed.v1",
         "order.ready.v1",
         "order.delivered.v1",
-    ]
+    }
 
 
 def test_order_delivery_records_mixed_final_settlement_as_cash_and_card(client: TestClient) -> None:
@@ -411,7 +421,7 @@ def test_order_delivery_records_mixed_final_settlement_as_cash_and_card(client: 
     created_order = _create_order(
         client,
         customer_name="Cliente Entrega Mixta",
-        advance_amount="10.00",
+        advance_amount="20.00",
         advance_payment_method_code="CARD",
     )
 
@@ -419,7 +429,8 @@ def test_order_delivery_records_mixed_final_settlement_as_cash_and_card(client: 
     cash_session_id = current_cash_session_id(
         client, headers=command_headers, workstation_code=SEED_WORKSTATION_CODE
     )
-    ready_response = client.post(
+    ready_response = _post_after_commit(
+        client,
         f"/v1/orders/{created_order['id']}/mark-ready",
         headers={**command_headers, "Idempotency-Key": new_idempotency_key()},
         json={"cash_session_id": cash_session_id, "workstation_code": SEED_WORKSTATION_CODE},
@@ -440,11 +451,11 @@ def test_order_delivery_records_mixed_final_settlement_as_cash_and_card(client: 
         json={
             "cash_session_id": cash_session_id,
             "workstation_code": SEED_WORKSTATION_CODE,
-            "settlement_amount": "24.00",
+            "settlement_amount": "14.00",
             "settlement_payment_method_code": "MIXED",
             "settlement_payments": [
                 {"payment_method_code": "CASH", "amount": "9.00"},
-                {"payment_method_code": "CARD", "amount": "15.00"},
+                {"payment_method_code": "CARD", "amount": "5.00"},
             ],
         },
     )
@@ -457,9 +468,9 @@ def test_order_delivery_records_mixed_final_settlement_as_cash_and_card(client: 
         "CARD",
     ]
     assert [Decimal(str(entry["amount"])) for entry in delivered_payload["payments"]] == [
-        Decimal("10.00"),
+        Decimal("20.00"),
         Decimal("9.00"),
-        Decimal("15.00"),
+        Decimal("5.00"),
     ]
 
     with SessionLocal() as session:
@@ -493,7 +504,7 @@ def test_order_delivery_rejects_mixed_settlement_without_cash_and_card_breakdown
     created_order = _create_order(
         client,
         customer_name="Cliente Entrega Mixta Invalida",
-        advance_amount="10.00",
+        advance_amount="20.00",
         advance_payment_method_code="CARD",
     )
 
@@ -501,7 +512,8 @@ def test_order_delivery_rejects_mixed_settlement_without_cash_and_card_breakdown
     cash_session_id = current_cash_session_id(
         client, headers=command_headers, workstation_code=SEED_WORKSTATION_CODE
     )
-    ready_response = client.post(
+    ready_response = _post_after_commit(
+        client,
         f"/v1/orders/{created_order['id']}/mark-ready",
         headers={**command_headers, "Idempotency-Key": new_idempotency_key()},
         json={"cash_session_id": cash_session_id, "workstation_code": SEED_WORKSTATION_CODE},
@@ -518,9 +530,9 @@ def test_order_delivery_rejects_mixed_settlement_without_cash_and_card_breakdown
         json={
             "cash_session_id": cash_session_id,
             "workstation_code": SEED_WORKSTATION_CODE,
-            "settlement_amount": "24.00",
+            "settlement_amount": "14.00",
             "settlement_payment_method_code": "MIXED",
-            "settlement_payments": [{"payment_method_code": "CASH", "amount": "24.00"}],
+            "settlement_payments": [{"payment_method_code": "CASH", "amount": "14.00"}],
         },
     )
     assert deliver_response.status_code == 400
@@ -540,21 +552,25 @@ def test_order_creation_rejects_removed_other_payment_method(client: TestClient)
     response = client.post(
         "/v1/orders",
         headers={**command_headers, "Idempotency-Key": new_idempotency_key()},
-        json={
-            "cash_session_id": cash_session_id,
-            "workstation_code": SEED_WORKSTATION_CODE,
-            "customer_name": "Cliente Metodo Invalido",
-            "customer_phone": "6621234567",
-            "requested_for_at": "2026-04-11T18:30:00-07:00",
-            "items": [
-                {
-                    "product_id": _get_product_id(SEED_PRODUCT_BOLILLO_STD_CODE),
-                    "quantity": "2",
-                }
-            ],
-            "advance_amount": "2.00",
-            "advance_payment_method_code": "OTHER",
-        },
+        json=quote_order_payload(
+            client,
+            command_headers,
+            {
+                "cash_session_id": cash_session_id,
+                "workstation_code": SEED_WORKSTATION_CODE,
+                "customer_name": "Cliente Metodo Invalido",
+                "customer_phone": "6621234567",
+                "requested_for_at": (datetime.now(UTC) + timedelta(days=3)).isoformat(),
+                "items": [
+                    {
+                        "product_id": _get_product_id(SEED_PRODUCT_BOLILLO_STD_CODE),
+                        "quantity": "2",
+                    }
+                ],
+                "advance_amount": "3.00",
+                "advance_payment_method_code": "OTHER",
+            },
+        ),
     )
 
     assert response.status_code == 400
@@ -573,22 +589,26 @@ def test_order_creation_rejects_mixed_advance_without_cash_and_card_breakdown(
     response = client.post(
         "/v1/orders",
         headers={**command_headers, "Idempotency-Key": new_idempotency_key()},
-        json={
-            "cash_session_id": cash_session_id,
-            "workstation_code": SEED_WORKSTATION_CODE,
-            "customer_name": "Cliente Mixto Invalido",
-            "customer_phone": "6621234567",
-            "requested_for_at": "2026-04-11T18:30:00-07:00",
-            "items": [
-                {
-                    "product_id": _get_product_id(SEED_PRODUCT_BOLILLO_STD_CODE),
-                    "quantity": "2",
-                }
-            ],
-            "advance_amount": "2.00",
-            "advance_payment_method_code": "MIXED",
-            "advance_payments": [{"payment_method_code": "CASH", "amount": "2.00"}],
-        },
+        json=quote_order_payload(
+            client,
+            command_headers,
+            {
+                "cash_session_id": cash_session_id,
+                "workstation_code": SEED_WORKSTATION_CODE,
+                "customer_name": "Cliente Mixto Invalido",
+                "customer_phone": "6621234567",
+                "requested_for_at": (datetime.now(UTC) + timedelta(days=3)).isoformat(),
+                "items": [
+                    {
+                        "product_id": _get_product_id(SEED_PRODUCT_BOLILLO_STD_CODE),
+                        "quantity": "2",
+                    }
+                ],
+                "advance_amount": "3.00",
+                "advance_payment_method_code": "MIXED",
+                "advance_payments": [{"payment_method_code": "CASH", "amount": "3.00"}],
+            },
+        ),
     )
 
     assert response.status_code == 400
@@ -601,7 +621,7 @@ def test_cancel_refunds_advance_when_order_is_canceled_before_cutoff(client: Tes
     refundable_order = _create_order(
         client,
         customer_name="Cliente Reembolso Anticipado",
-        advance_amount="5.00",
+        advance_amount="20.00",
         advance_payment_method_code="CASH",
         requested_for_at=(datetime.now(tz=UTC) + timedelta(days=2)).isoformat(),
     )
@@ -609,12 +629,6 @@ def test_cancel_refunds_advance_when_order_is_canceled_before_cutoff(client: Tes
     cash_session_id = current_cash_session_id(
         client, headers=command_headers, workstation_code=SEED_WORKSTATION_CODE
     )
-    ready_response = client.post(
-        f"/v1/orders/{refundable_order['id']}/mark-ready",
-        headers={**command_headers, "Idempotency-Key": new_idempotency_key()},
-        json={"cash_session_id": cash_session_id, "workstation_code": SEED_WORKSTATION_CODE},
-    )
-    assert ready_response.status_code == 200
     command_headers = _authorization_header(client)
     cash_session_id = current_cash_session_id(
         client, headers=command_headers, workstation_code=SEED_WORKSTATION_CODE
@@ -630,12 +644,13 @@ def test_cancel_refunds_advance_when_order_is_canceled_before_cutoff(client: Tes
             "cash_session_id": cash_session_id,
             "workstation_code": SEED_WORKSTATION_CODE,
             "cancellation_reason": "Cliente cancelo con anticipacion.",
+            "cancellation_responsibility": "CUSTOMER",
         },
     )
     assert cancel_response.status_code == 200
     canceled_payload = cancel_response.json()
     assert canceled_payload["status"] == "CANCELED"
-    assert Decimal(str(canceled_payload["advance_amount"])) == Decimal("0.00")
+    assert Decimal(str(canceled_payload["advance_amount"])) == Decimal("20.00")
     assert Decimal(str(canceled_payload["remaining_balance_amount"])) == Decimal("0.00")
 
     with SessionLocal() as session:
@@ -662,18 +677,18 @@ def test_cancel_refunds_advance_when_order_is_canceled_before_cutoff(client: Tes
         ).scalar_one()
 
     assert [(record.payment_type, Decimal(str(record.amount))) for record in payment_records] == [
-        ("ADVANCE", Decimal("5.00")),
-        ("REFUND", Decimal("5.00")),
+        ("ADVANCE", Decimal("20.00")),
+        ("REFUND", Decimal("20.00")),
     ]
     assert audit_record.request_id == "5763a435-9abc-5abd-9823-975cf7e9700d"
     assert audit_record.metadata_["cancellation_reason"] == "Cliente cancelo con anticipacion."
     assert audit_record.metadata_["cancellation_refund_eligible"] is True
-    assert audit_record.metadata_["cancellation_refund_amount"] == "5.00"
+    assert audit_record.metadata_["cancellation_refund_amount"] == "20.00"
     assert outbox_event.payload["cancellation_reason"] == "Cliente cancelo con anticipacion."
     assert outbox_event.payload["cancellation_refund_eligible"] is True
-    assert outbox_event.payload["cancellation_refund_amount"] == "5.00"
+    assert outbox_event.payload["cancellation_refund_amount"] == "20.00"
     assert outbox_event.payload["refund_payments"] == [
-        {"payment_method_code": "CASH", "amount": "5.00"}
+        {"payment_method_code": "CASH", "amount": "20.00"}
     ]
 
 
@@ -683,21 +698,23 @@ def test_cancel_keeps_advance_when_order_is_canceled_after_cutoff(client: TestCl
     late_cancel_order = _create_order(
         client,
         customer_name="Cliente Cancelacion Tardia",
-        advance_amount="5.00",
+        advance_amount="20.00",
         advance_payment_method_code="CASH",
-        requested_for_at=(datetime.now(tz=UTC) + timedelta(hours=8)).isoformat(),
+        requested_for_at=(datetime.now(tz=UTC) + timedelta(days=2)).isoformat(),
     )
     command_headers = _authorization_header(client)
     cash_session_id = current_cash_session_id(
         client, headers=command_headers, workstation_code=SEED_WORKSTATION_CODE
     )
-    cancel_response = client.post(
+    cancel_response = _post_after_commit(
+        client,
         f"/v1/orders/{late_cancel_order['id']}/cancel",
         headers={**command_headers, "Idempotency-Key": new_idempotency_key()},
         json={
             "cash_session_id": cash_session_id,
             "workstation_code": SEED_WORKSTATION_CODE,
             "cancellation_reason": "Cancelacion fuera de plazo.",
+            "cancellation_responsibility": "CUSTOMER",
         },
     )
     assert cancel_response.status_code == 200
@@ -705,7 +722,7 @@ def test_cancel_keeps_advance_when_order_is_canceled_after_cutoff(client: TestCl
         client, order_id=cancel_response.json()["id"], headers=command_headers
     )
     assert canceled_payload["status"] == "CANCELED"
-    assert Decimal(str(canceled_payload["advance_amount"])) == Decimal("5.00")
+    assert Decimal(str(canceled_payload["advance_amount"])) == Decimal("20.00")
     assert Decimal(str(canceled_payload["remaining_balance_amount"])) == Decimal("0.00")
     assert canceled_payload["cancellation_reason"] == "Cancelacion fuera de plazo."
 
@@ -721,7 +738,7 @@ def test_cancel_keeps_advance_when_order_is_canceled_after_cutoff(client: TestCl
         )
 
     assert [(record.payment_type, Decimal(str(record.amount))) for record in payment_records] == [
-        ("ADVANCE", Decimal("5.00"))
+        ("ADVANCE", Decimal("20.00"))
     ]
 
 
@@ -746,6 +763,7 @@ def test_cancel_rules_still_block_delivered_orders_and_allow_safe_cancel(
             "cash_session_id": cash_session_id,
             "workstation_code": SEED_WORKSTATION_CODE,
             "cancellation_reason": "Cliente ya no requiere el pedido.",
+            "cancellation_responsibility": "CUSTOMER",
         },
     )
     assert cancel_response.status_code == 200
@@ -760,7 +778,8 @@ def test_cancel_rules_still_block_delivered_orders_and_allow_safe_cancel(
     cash_session_id = current_cash_session_id(
         client, headers=command_headers, workstation_code=SEED_WORKSTATION_CODE
     )
-    ready_response = client.post(
+    ready_response = _post_after_commit(
+        client,
         f"/v1/orders/{delivered_order['id']}/mark-ready",
         headers={**command_headers, "Idempotency-Key": new_idempotency_key()},
         json={"cash_session_id": cash_session_id, "workstation_code": SEED_WORKSTATION_CODE},
@@ -776,7 +795,7 @@ def test_cancel_rules_still_block_delivered_orders_and_allow_safe_cancel(
         json={
             "cash_session_id": cash_session_id,
             "workstation_code": SEED_WORKSTATION_CODE,
-            "settlement_amount": "34.00",
+            "settlement_amount": "14.00",
             "settlement_payment_method_code": "CARD",
         },
     )
@@ -793,10 +812,11 @@ def test_cancel_rules_still_block_delivered_orders_and_allow_safe_cancel(
             "cash_session_id": cash_session_id,
             "workstation_code": SEED_WORKSTATION_CODE,
             "cancellation_reason": "Intento invalido tras entrega.",
+            "cancellation_responsibility": "CUSTOMER",
         },
     )
     assert delivered_cancel_response.status_code == 409
-    assert "ya fue entregado" in delivered_cancel_response.json()["message"]
+    assert "estado terminal" in delivered_cancel_response.json()["message"]
 
     with SessionLocal() as session:
         audit_record = session.execute(

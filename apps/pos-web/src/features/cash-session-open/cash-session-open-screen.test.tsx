@@ -62,9 +62,9 @@ vi.mock("../pos-bootstrap/queries", () => ({
 }));
 
 vi.mock("../status-messages/store", () => ({
-  useStatusMessageStore: (
+  useStatusMessageStore: Object.assign((
     selector: (state: { showSuccess: typeof statusMessageMocks.showSuccess }) => unknown,
-  ) => selector({ showSuccess: statusMessageMocks.showSuccess }),
+  ) => selector({ showSuccess: statusMessageMocks.showSuccess }), { setState: vi.fn() }),
 }));
 
 vi.mock("./cash-session-api", () => ({

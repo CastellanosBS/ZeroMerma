@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useReducer } from "react";
+import { useCallback, useEffect, useMemo, useReducer, useRef } from "react";
 
 import {
   CARD_PAYMENT_METHOD_CODE,
@@ -47,6 +47,7 @@ export interface SaleFlowRecoverableError {
 }
 
 interface SaleFlowControllerState {
+  cartReviewRequired: boolean;
   cashReceivedText: string;
   mixedConfirmedLegs: PosMixedPaymentLeg[];
   mixedCurrentLegAmountText: string;
@@ -70,6 +71,7 @@ function createDraftResetState(
 }
 
 type SaleFlowAction =
+  | { type: "INVALIDATE_CART_REVIEW"; cartLineCount: number; controlState: PosControlState; hasCompletedSale: boolean }
   | { type: "SYNC_CONTEXT"; cartLineCount: number; controlState: PosControlState; hasCompletedSale: boolean }
   | { type: "ARM_PAYMENT_INTENT"; now: number }
   | { type: "CLEAR_PAYMENT_INTENT" }
@@ -105,6 +107,7 @@ export interface SaleFlowPaymentComputation {
 
 function createInitialSaleFlowControllerState(): SaleFlowControllerState {
   return {
+    cartReviewRequired: false,
     cashReceivedText: "",
     mixedConfirmedLegs: [],
     mixedCurrentLegAmountText: "",
@@ -171,6 +174,15 @@ function reduceSaleFlowControllerState(
   action: SaleFlowAction,
 ): SaleFlowControllerState {
   switch (action.type) {
+    case "INVALIDATE_CART_REVIEW":
+      return createDraftResetState({
+        mode: getSelectionMode(action),
+        paymentMethodCode: state.paymentMethodCode,
+        cartReviewRequired: action.cartLineCount > 0 && (
+          state.cartReviewRequired || state.mode === SALE_FLOW_AMOUNT_CONFIRMED ||
+          state.mode === SALE_FLOW_RECOVERABLE_ERROR || state.mixedConfirmedLegs.length > 0
+        ),
+      });
     case "SYNC_CONTEXT": {
       const nextSelectionMode = getSelectionMode(action);
       if (action.hasCompletedSale) {
@@ -274,12 +286,14 @@ function reduceSaleFlowControllerState(
     case "CONFIRM_AMOUNT":
       return {
         ...state,
+        cartReviewRequired: false,
         mode: SALE_FLOW_AMOUNT_CONFIRMED,
         recoverableError: null,
       };
     case "CONFIRM_MIXED_LEG":
       return {
         ...state,
+        cartReviewRequired: action.remainingAfterConfirmCents > 0 && state.cartReviewRequired,
         mixedConfirmedLegs: mergeMixedLegs(state.mixedConfirmedLegs, action.leg),
         mixedCurrentLegAmountText: "",
         mixedCurrentLegMethodCode:
@@ -384,11 +398,13 @@ export function isPaymentIntentComboReady(
 }
 
 export function useSaleFlowController({
+  cartVersion,
   cartLineCount,
   controlState,
   hasCompletedSale,
   totalAmountCents,
 }: {
+  cartVersion?: object;
   cartLineCount: number;
   controlState: PosControlState;
   hasCompletedSale: boolean;
@@ -399,6 +415,17 @@ export function useSaleFlowController({
     undefined,
     createInitialSaleFlowControllerState,
   );
+  const confirmedCart = useRef<{ version: object | undefined; total: number } | null>(null);
+  const previousCart = useRef({ version: cartVersion, total: totalAmountCents });
+  const invalidateCartReview = useCallback(() => {
+    confirmedCart.current = null;
+    dispatch({ type: "INVALIDATE_CART_REVIEW", cartLineCount, controlState, hasCompletedSale });
+  }, [cartLineCount, controlState, hasCompletedSale]);
+  useEffect(() => {
+    const previous = previousCart.current;
+    previousCart.current = { version: cartVersion, total: totalAmountCents };
+    if (previous.version !== cartVersion || previous.total !== totalAmountCents) invalidateCartReview();
+  }, [cartVersion, totalAmountCents, invalidateCartReview]);
 
   useEffect(() => {
     dispatch({
@@ -566,6 +593,7 @@ export function useSaleFlowController({
   const confirmAmount = useCallback(
     (totalAmountCents: number): { ok: true } | { error: string; ok: false } => {
       if (state.paymentMethodCode === CARD_PAYMENT_METHOD_CODE) {
+        confirmedCart.current = { version: cartVersion, total: totalAmountCents };
         dispatch({ type: "CONFIRM_AMOUNT" });
         return { ok: true };
       }
@@ -583,13 +611,15 @@ export function useSaleFlowController({
           };
         }
 
+        confirmedCart.current = { version: cartVersion, total: totalAmountCents };
         dispatch({ type: "CONFIRM_AMOUNT" });
         return { ok: true };
       }
 
       const currentLegAmountCents = parseMoneyToCents(state.mixedCurrentLegAmountText) ?? 0;
       const confirmedTotals = computeMixedPaymentTotals(state.mixedConfirmedLegs);
-      if (confirmedTotals.totalAmountCents === totalAmountCents && currentLegAmountCents === 0) {
+      if (confirmedTotals.totalAmountCents >= totalAmountCents && currentLegAmountCents === 0) {
+        confirmedCart.current = { version: cartVersion, total: totalAmountCents };
         dispatch({ type: "CONFIRM_AMOUNT" });
         return { ok: true };
       }
@@ -599,14 +629,18 @@ export function useSaleFlowController({
       }
 
       const remainingBeforeCurrentLegCents = totalAmountCents - confirmedTotals.totalAmountCents;
-      if (currentLegAmountCents > remainingBeforeCurrentLegCents) {
+      if (
+        state.mixedCurrentLegMethodCode !== CASH_PAYMENT_METHOD_CODE &&
+        currentLegAmountCents > remainingBeforeCurrentLegCents
+      ) {
         return {
           error: `Este tramo excede el restante. Quedan $${(remainingBeforeCurrentLegCents / 100).toFixed(2)} por cubrir.`,
           ok: false,
         };
       }
 
-      const nextRemainingCents = remainingBeforeCurrentLegCents - currentLegAmountCents;
+      const nextRemainingCents = Math.max(remainingBeforeCurrentLegCents - currentLegAmountCents, 0);
+      if (nextRemainingCents === 0) confirmedCart.current = { version: cartVersion, total: totalAmountCents };
       dispatch({
         type: "CONFIRM_MIXED_LEG",
         leg: {
@@ -621,6 +655,7 @@ export function useSaleFlowController({
       return { ok: true };
     },
     [
+      cartVersion,
       state.cashReceivedText,
       state.mixedConfirmedLegs,
       state.mixedCurrentLegAmountText,
@@ -630,6 +665,9 @@ export function useSaleFlowController({
   );
 
   return {
+    invalidateCartReview,
+    hasCurrentCartConfirmation: (version: object | undefined, total: number) =>
+      confirmedCart.current?.version === version && confirmedCart.current?.total === total,
     armPaymentIntentCombo,
     buildPaymentDraft,
     clearPaymentIntentCombo,

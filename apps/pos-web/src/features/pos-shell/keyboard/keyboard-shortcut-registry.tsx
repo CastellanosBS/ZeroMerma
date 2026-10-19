@@ -153,6 +153,7 @@ export function KeyboardShortcutRegistry({ children }: PropsWithChildren) {
 
   useEffect(() => {
     function handleKeyboard(event: KeyboardEvent) {
+      if (event.defaultPrevented || document.querySelector("[data-pos-modal='true']")) return;
       if (matchesHelpShortcut(event)) {
         event.preventDefault();
         toggleHelp();
@@ -164,6 +165,8 @@ export function KeyboardShortcutRegistry({ children }: PropsWithChildren) {
         closeHelp();
         return;
       }
+
+      if (isHelpOpen) return;
 
       const chord = getKeyboardEventChord(event);
 

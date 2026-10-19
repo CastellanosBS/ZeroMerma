@@ -34,6 +34,19 @@ CLIENT = (ROOT / VALIDATOR.CLIENT_PATH).read_text(encoding="utf-8")
 POLICY = json.loads((ROOT / VALIDATOR.POLICY_PATH).read_text(encoding="utf-8"))
 
 
+def test_local_hardware_result_is_generated_from_the_backend_without_a_fake_http_route() -> None:
+    from zeromerma_api.modules.hardware.domain.commands import DeviceCommandResult
+
+    actual = SCHEMA["components"]["schemas"]["DeviceCommandResult"]
+    expected = DeviceCommandResult.model_json_schema()
+    assert actual["required"] == expected["required"]
+    assert actual["additionalProperties"] is False
+    assert actual["properties"]["state"] == expected["properties"]["state"]
+    assert actual["x-zeromerma-transport"] == "PAIRED_LOCAL_DEVICE_RUNTIME"
+    assert "DeviceCommandResult:" in CLIENT
+    assert not any(path.startswith("/v1/hardware/protocol") for path in SCHEMA["paths"])
+
+
 def _validation_errors(schema: dict[str, Any], client: str = CLIENT) -> list[str]:
     errors, _ = VALIDATOR.validate_contract(schema, client, POLICY, ROOT)
     return cast(list[str], errors)
@@ -602,6 +615,28 @@ def test_openapi_operation_without_generated_coverage_is_rejected() -> None:
         "OpenAPI operations missing generated coverage" in error
         for error in _validation_errors(SCHEMA, changed_client)
     )
+
+
+@pytest.mark.parametrize("change", ["NONE", "ORIGIN", "COOKIES", "SECOND_FETCH", "CONTRACT"])
+def test_device_transport_exception_is_bound_to_loopback_and_generated_models(
+    tmp_path: Path, change: str
+) -> None:
+    relative = Path("apps/pos-web/src/lib/local-hardware-transport.ts")
+    source = (ROOT / relative).read_text(encoding="utf-8")
+    if change == "ORIGIN":
+        source = source.replace("http://127.0.0.1:17651", "https://example.invalid")
+    elif change == "COOKIES":
+        source = source.replace('credentials: "omit"', 'credentials: "include"')
+    elif change == "SECOND_FETCH":
+        source += '\nfetch("/v1/sales/confirm");\n'
+    elif change == "CONTRACT":
+        source = source.replace('["DeviceCommandResult"]', '["ManualResult"]')
+    target = tmp_path / relative
+    target.parent.mkdir(parents=True)
+    target.write_text(source, encoding="utf-8")
+    raw_http, manual_types = VALIDATOR._frontend_contract_audit(tmp_path)
+    assert raw_http == ([] if change == "NONE" else [relative.as_posix()])
+    assert manual_types == []
 
 
 def test_feature_raw_http_and_manual_contract_source_are_rejected(tmp_path: Path) -> None:

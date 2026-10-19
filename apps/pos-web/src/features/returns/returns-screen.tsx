@@ -38,7 +38,7 @@ import type {
   ReturnableSaleLineView,
   SaleReturnDetailResponse,
 } from "../../lib/api-contracts";
-import { openBrowserPrintWindow } from "../../lib/browser-print";
+import { ReceiptPrintButton } from "../tickets/receipt-print-button";
 import {
   formatCompactLocalDateTime,
   formatCurrency,
@@ -69,7 +69,7 @@ import {
   type ReturnDraftLine,
   type ReturnDraftState,
 } from "./model";
-import { writeReturnReceiptToPrintWindow } from "./print";
+
 import { returnIntentions } from "./return-command-intent";
 import { useReturnDraftIdentity, useReturnIntention } from "./use-return-intention";
 import {
@@ -751,13 +751,13 @@ function ReturnSummaryPanel({
 
 function ReturnHistoryDetailPanel({
   onNewReturn,
-  onPrintReceipt,
+  workstationCode,
   onViewTicket,
   returnDetail,
   selectedHistoryRecord,
 }: {
   onNewReturn: () => void;
-  onPrintReceipt: () => void;
+  workstationCode: string;
   onViewTicket: () => void;
   returnDetail: SaleReturnDetailResponse | null;
   selectedHistoryRecord: ReturnHistoryListItemView | null;
@@ -787,9 +787,7 @@ function ReturnHistoryDetailPanel({
       description={`Ticket original ${returnDetail.original_sale_folio}`}
       footer={
         <div className="grid gap-2">
-          <PosButton onClick={onPrintReceipt} type="button">
-            Reimprimir comprobante
-          </PosButton>
+          <ReceiptPrintButton receipt={returnDetail.receipt} workstationCode={workstationCode} />
           <div className="grid grid-cols-2 gap-2">
             <PosButton onClick={onViewTicket} type="button" variant="neutral">
               Ver ticket
@@ -1447,19 +1445,7 @@ export function ReturnsScreen() {
         ) : null}
         <ReturnHistoryDetailPanel
           onNewReturn={handleNewReturn}
-          onPrintReceipt={() => {
-            if (!selectedHistoryReturn) {
-              return;
-            }
-
-            const printWindow = openBrowserPrintWindow();
-            if (!printWindow) {
-              showError("No se pudo abrir la ventana de impresion.");
-              return;
-            }
-
-            writeReturnReceiptToPrintWindow(printWindow, selectedHistoryReturn);
-          }}
+          workstationCode={appEnv.VITE_POS_WORKSTATION_CODE}
           onViewTicket={() => {
             if (!selectedHistoryReturn) {
               return;

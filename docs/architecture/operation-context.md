@@ -135,12 +135,16 @@ boundaries. They add no handler or external action:
 | `admin.supplier.branch.updated.v1` | Supplier/branch IDs and active state |
 | `admin.setting.updated.v1`, `.reset.v1` | Setting key and scope; no old/new value or change note |
 | `admin.report.exported.v1` | Report code, format and row count; no rows or filters |
-| `ticket.reprinted.v1` | Ticket ID; no printable body or customer/operator personal fields |
+| `ticket.reprint_requested.v1` | Ticket ID; no printable body or customer/operator personal fields |
 
 The report event records the generated export operation, not receipt by another
 party. The ticket event follows the existing audit action name and records an
 accepted application reprint request; it does not certify successful physical
 printing. Transport or printer failures after commit cannot undo these records.
+New receipt and device requests use `receipt.print_requested.v1` and
+`hardware.command_requested.v1` respectively. Their durable identities authorize
+a later physical attempt and retain `NOT_CONFIRMED` as the physical outcome;
+they do not repeat the original economic operation or certify device output.
 
 - 087 implements durable outbox processing, leases, retries and dead letters.
 - 093 builds the full event catalog and deterministic analytical projections.

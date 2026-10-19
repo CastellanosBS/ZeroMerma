@@ -1,10 +1,13 @@
 from __future__ import annotations
 
 from decimal import Decimal
+from uuid import UUID
 
+import pytest
 from fastapi.testclient import TestClient
 from return_fixtures import seed_return_stock
-from sqlalchemy import select
+from sqlalchemy import func, select, text
+from sqlalchemy.exc import DBAPIError
 
 from zeromerma_api.bootstrap.seed_local import (
     SEED_PRODUCT_CLASS_PAN_DULCE_CODE,
@@ -15,9 +18,12 @@ from zeromerma_api.bootstrap.seed_local import (
 )
 from zeromerma_api.db.session import SessionLocal
 from zeromerma_api.modules.audit.infrastructure.models import AuditLog
+from zeromerma_api.modules.branches.infrastructure.models import Branch, Workstation
 from zeromerma_api.modules.catalog.infrastructure.models import Product, ProductClass
+from zeromerma_api.modules.identity.infrastructure.models import User
 from zeromerma_api.modules.returns.infrastructure.models import SaleReturn
 from zeromerma_api.modules.sales.infrastructure.models import Sale
+from zeromerma_api.modules.tickets.infrastructure.models import ReceiptSnapshot
 from zeromerma_api.testing.idempotency import current_cash_session_id, new_idempotency_key
 from zeromerma_api.testing.sessions import login_headers
 
@@ -72,11 +78,15 @@ def _confirm_sale(client: TestClient) -> dict[str, object]:
             "workstation_code": SEED_WORKSTATION_CODE,
             "lines": [
                 {
+                    "expected_unit_price": "12.00",
+                    "expected_currency_code": "MXN",
                     "capture_mode": "CLASS_CAPTURE",
                     "product_class_id": _get_product_class_id(SEED_PRODUCT_CLASS_PAN_DULCE_CODE),
                     "quantity": "2",
                 },
                 {
+                    "expected_unit_price": "18.00",
+                    "expected_currency_code": "MXN",
                     "capture_mode": "PRODUCT_DIRECT",
                     "product_id": _get_product_id(SEED_PRODUCT_COCA_355_CODE),
                     "quantity": "1",
@@ -172,7 +182,7 @@ def test_ticket_detail_and_reprint_are_available_in_current_branch_context(
         ).scalar_one()
         audit_record = session.execute(
             select(AuditLog).where(
-                AuditLog.action == "ticket.reprinted",
+                AuditLog.action == "ticket.reprint_requested",
                 AuditLog.resource_id == str(sale_record.id),
             )
         ).scalar_one()
@@ -266,3 +276,107 @@ def test_ticket_visual_state_updates_after_sale_return(client: TestClient) -> No
         ).scalar_one()
 
     assert sale_return.reason_code == "WRONG_ITEM"
+
+
+def test_receipt_is_frozen_when_current_branch_station_and_actor_change(client: TestClient) -> None:
+    _open_cash_session(client)
+    sale = _confirm_sale(client)
+    headers = _authorization_header(client)
+    url = f"/v1/tickets/{sale['id']}?workstation_code={SEED_WORKSTATION_CODE}"
+    before = client.get(url, headers=headers).json()["receipt"]
+    assert before["source_kind"] == "SALE"
+    assert before["folio"] == f"TCK-{UUID(sale['id']).hex.upper()}"
+    assert before["currency_code"] == "MXN"
+    assert before["seller"]["configuration_status"] == "UNCONFIGURED"
+    assert before["fiscal_document"] is False
+    assert before["provider_receipt"] is False
+    with SessionLocal.begin() as session:
+        session.get(Branch, UUID(sale["branch_id"])).name = "Renamed branch"
+        session.get(Workstation, UUID(sale["workstation_id"])).name = "Renamed station"
+        session.get(User, UUID(sale["operator_id"])).full_name = "Renamed actor"
+    after = client.get(url, headers=headers)
+    assert after.status_code == 200
+    assert after.json()["receipt"] == before
+    reprint = client.post(
+        f"/v1/tickets/{sale['id']}/reprint",
+        headers=headers,
+        json={"workstation_code": SEED_WORKSTATION_CODE},
+    )
+    assert reprint.status_code == 200
+    assert reprint.json()["receipt"] == before
+
+
+def test_receipt_cannot_be_updated_or_deleted_in_database(client: TestClient) -> None:
+    _open_cash_session(client)
+    sale = _confirm_sale(client)
+    for statement in (
+        "UPDATE receipt_snapshots SET document_sha256 = repeat('0',64) WHERE source_id = :id",
+        "DELETE FROM receipt_snapshots WHERE source_id = :id",
+    ):
+        with pytest.raises(DBAPIError, match="Receipt snapshots are immutable"):
+            with SessionLocal.begin() as session:
+                session.execute(text(statement), {"id": sale["id"]})
+
+
+def test_receipt_print_request_replay_only_audits_one_physical_intention(
+    client: TestClient,
+) -> None:
+    _open_cash_session(client)
+    sale = _confirm_sale(client)
+    headers = {**_authorization_header(client), "Idempotency-Key": new_idempotency_key()}
+    url = f"/v1/tickets/receipts/SALE/{sale['id']}/print-request"
+    payload = {"workstation_code": SEED_WORKSTATION_CODE, "reason": "Customer requested a copy"}
+    first = client.post(url, headers=headers, json=payload)
+    assert first.status_code == 200, first.text
+    replay = client.post(url, headers=headers, json=payload)
+    assert replay.status_code == 200, replay.text
+    assert replay.headers["Idempotency-Replayed"] == "true"
+    assert replay.json() == first.json()
+    assert first.json()["physical_outcome"] == "NOT_CONFIRMED"
+    recovered = client.get(
+        f"/v1/tickets/receipts/SALE/{sale['id']}/print-requests/"
+        f"{headers['Idempotency-Key']}?workstation_code={SEED_WORKSTATION_CODE}",
+        headers=headers,
+    )
+    assert recovered.status_code == 200, recovered.text
+    assert recovered.json() == first.json()
+    with SessionLocal() as session:
+        assert session.scalar(select(func.count(Sale.id))) == 1
+        assert session.scalar(select(func.count(ReceiptSnapshot.id))) == 1
+        assert (
+            session.scalar(
+                select(func.count(AuditLog.id)).where(
+                    AuditLog.action == "receipt.print_requested",
+                    AuditLog.resource_id == sale["id"],
+                )
+            )
+            == 1
+        )
+    changed = client.post(url, headers=headers, json={**payload, "reason": "Different intention"})
+    assert changed.status_code == 409
+
+
+def test_missing_historical_receipt_is_not_fabricated_on_read_or_reprint(
+    client, monkeypatch
+) -> None:
+    from zeromerma_api.modules.sales.application import services
+
+    monkeypatch.setattr(services, "snapshot_sale", lambda *_args: None)
+    _open_cash_session(client)
+    sale = _confirm_sale(client)
+    headers = _authorization_header(client)
+    response = client.get(
+        f"/v1/tickets/{sale['id']}?workstation_code={SEED_WORKSTATION_CODE}",
+        headers=headers,
+    )
+    assert response.status_code == 200
+    assert response.json()["receipt"] is None
+    assert response.json()["can_reprint"] is False
+    response = client.post(
+        f"/v1/tickets/{sale['id']}/reprint",
+        headers=headers,
+        json={"workstation_code": SEED_WORKSTATION_CODE},
+    )
+    assert response.status_code == 409
+    with SessionLocal() as session:
+        assert session.scalar(select(func.count(ReceiptSnapshot.id))) == 0

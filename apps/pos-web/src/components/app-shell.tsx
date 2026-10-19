@@ -14,6 +14,7 @@ import {
 } from "react";
 
 import { AppShellRightPanelContext } from "./app-shell-right-panel";
+import { PosModal } from "./pos-modal";
 import { AppShellSidebar } from "./app-shell-sidebar";
 import { InlineNotice, RightPanelBlock } from "./pos-module-primitives";
 import { TrainingModeBanner } from "./training-mode-banner";
@@ -230,7 +231,7 @@ function CommandPalette({
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-start justify-center bg-slate-950/30 px-4 py-10 backdrop-blur-[2px]">
+    <PosModal label="Acciones rápidas" onClose={onClose}>
       <div className="w-full max-w-2xl overflow-hidden rounded-[28px] border border-[var(--pos-shell-border)] bg-white shadow-[var(--ui-shadow-overlay)]">
         <div className="flex items-center gap-3 border-b border-[var(--pos-shell-border)] px-5 py-4">
           <span className="flex h-10 w-10 items-center justify-center rounded-2xl bg-[var(--pos-primary-soft)] text-[var(--pos-primary)]">
@@ -251,6 +252,7 @@ function CommandPalette({
             value={query}
           />
           <Button
+            aria-label="Cerrar acciones rápidas"
             className={cn("h-11 w-11 p-0", posOutlineButtonClass)}
             onClick={onClose}
             size="icon"
@@ -297,7 +299,7 @@ function CommandPalette({
           </div>
         </div>
       </div>
-    </div>
+    </PosModal>
   );
 }
 
@@ -659,7 +661,7 @@ function AppShellFrame({ bootstrap, cashSession, children, onSignOut, onLock }: 
 
   return (
     <div
-      className="flex h-[100dvh] flex-col overflow-hidden bg-[var(--pos-shell-bg)] text-slate-950"
+      className="flex h-full min-h-0 flex-col overflow-hidden bg-[var(--pos-shell-bg)] text-slate-950"
       data-pos-brand={branchTheme.brandKey}
       data-pos-workstation="true"
       style={branchTheme.style}

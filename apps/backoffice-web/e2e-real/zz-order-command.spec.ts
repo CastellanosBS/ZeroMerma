@@ -6,6 +6,7 @@ test("real administrative transition recovers a lost response after reload witho
   page,
   network,
 }) => {
+  test.setTimeout(120_000);
   const station = process.env.ZM_E2E_ORDER_WORKSTATION_CODE!;
   const posOrigin = new URL(process.env.ZM_E2E_POS_URL!).origin;
   const login = await page.request.post(`${environment.apiUrl}/v1/auth/login`, {
@@ -52,6 +53,20 @@ test("real administrative transition recovers a lost response after reload witho
   const product = (
     (await productsResponse.json()) as components["schemas"]["OrdersClassProductsResponse"]
   ).products[0]!;
+  // The guarded integration seed explicitly configures a synthetic 1440-minute policy.
+  // Confirm before its cutoff, then observe real server time cross that cutoff below.
+  const quoteRequest: components["schemas"]["OrderQuoteRequest"] = {
+    workstation_code: station,
+    requested_for_at: new Date(Date.now() + 86_400_000 + 30_000).toISOString(),
+    items: [{ product_id: product.id, quantity: "1" }],
+  };
+  const quoted = await page.request.post(`${environment.apiUrl}/v1/orders/quote`, {
+    headers,
+    data: quoteRequest,
+  });
+  expect(quoted.status()).toBe(200);
+  const quote = (await quoted.json()) as components["schemas"]["OrderQuoteView"];
+  expect(quote.lead_time_minutes).toBe(1440);
   const created = await page.request.post(`${environment.apiUrl}/v1/orders`, {
     headers: { ...headers, "Idempotency-Key": createIdempotencyKey() },
     data: {
@@ -59,9 +74,10 @@ test("real administrative transition recovers a lost response after reload witho
       cash_session_id: cash!.id,
       customer_name: "Integration administrative order",
       customer_phone: "6620000001",
-      requested_for_at: new Date(Date.now() + 86400000).toISOString(),
-      items: [{ product_id: product.id, quantity: "1" }],
-      advance_amount: product.unit_price,
+      requested_for_at: quoteRequest.requested_for_at,
+      items: quoteRequest.items,
+      quote_fingerprint: quote.quote_fingerprint,
+      advance_amount: quote.total_amount,
       advance_payment_method_code: "CASH",
     },
   });
@@ -124,6 +140,14 @@ test("real administrative transition recovers a lost response after reload witho
   await page.getByLabel("Contraseña", { exact: true }).fill(environment.password);
   await page.getByRole("button", { name: "Entrar al backoffice" }).click();
   await expect(page).not.toHaveURL(/\/login$/);
+  await expect.poll(async () => {
+    const detail = await page.request.get(`${environment.apiUrl}/v1/admin/orders/${order.id}`, {
+      headers: { Origin: environment.baseUrl, "X-ZeroMerma-Surface": "BACKOFFICE" },
+    });
+    expect(detail.status()).toBe(200);
+    return ((await detail.json()) as components["schemas"]["AdminOrderDetailView"])
+      .available_actions.can_mark_ready;
+  }, { timeout: 60_000, intervals: [500, 1_000, 2_000] }).toBe(true);
   await page.goto("/admin/pedidos");
   await page
     .getByRole("article")

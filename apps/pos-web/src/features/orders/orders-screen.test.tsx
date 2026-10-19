@@ -284,7 +284,7 @@ describe("Orders shared operational surfaces", () => {
     expect(selectedOrderOutput.textContent).toBe("order-3");
   });
 
-  it("confirms cancellation without asking for a reason", () => {
+  it("requires a cause and preserves explicit cancellation responsibility", () => {
     const onConfirm = vi.fn();
     const onCancel = vi.fn();
 
@@ -312,10 +312,16 @@ describe("Orders shared operational surfaces", () => {
     const confirmButton = Array.from(view.container.querySelectorAll("button")).find((button) =>
       button.textContent?.includes("Confirmar cancelacion"),
     ) as HTMLButtonElement;
+    expect(confirmButton.disabled).toBe(true);
+    setInputValue(view.container.querySelector("textarea")!, "Cliente solicita cancelación");
     expect(confirmButton.disabled).toBe(false);
-    expect(view.container.querySelector("textarea")).toBeNull();
 
     act(() => confirmButton.click());
     expect(onConfirm).toHaveBeenCalledOnce();
+    expect(onConfirm).toHaveBeenCalledWith({
+      cancellation_reason: "Cliente solicita cancelación",
+      cancellation_responsibility: "CUSTOMER",
+      terminal_status: "CANCELED",
+    });
   });
 });

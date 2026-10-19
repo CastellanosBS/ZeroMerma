@@ -909,7 +909,13 @@ def test_counted_close_replay_preserves_real_class_attributions_and_baseline(
             "workstation_code": SEED_WORKSTATION_CODE,
             "cash_session_id": body["cash_session_id"],
             "lines": [
-                {"capture_mode": "CLASS_CAPTURE", "product_class_id": class_id, "quantity": "1"}
+                {
+                    "expected_unit_price": "12.00",
+                    "expected_currency_code": "MXN",
+                    "capture_mode": "CLASS_CAPTURE",
+                    "product_class_id": class_id,
+                    "quantity": "1",
+                }
             ],
             "payments": [{"payment_method_code": "CASH", "tendered_amount": "100.00"}],
         },

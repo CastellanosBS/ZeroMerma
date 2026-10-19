@@ -79,6 +79,7 @@ def main(argv: Sequence[str] = ()) -> None:
             UserRoleAssignment,
             UserRoleAssignmentBranchScope,
         )
+        from zeromerma_api.modules.orders.infrastructure.models import OrderCommitmentPolicy
         from zeromerma_api.testing.inventory import seed_test_inventory
 
         with Session(engine) as session:
@@ -206,6 +207,16 @@ def main(argv: Sequence[str] = ()) -> None:
             )
             session.add_all([order_operator, order_role])
             session.flush()
+            # Explicit synthetic browser policy; this guarded harness never configures a business.
+            session.add(
+                OrderCommitmentPolicy(
+                    branch_id=branch.id,
+                    version=1,
+                    lead_time_minutes=1440,
+                    reason="Explicit synthetic browser order policy",
+                    created_by_user_id=order_operator.id,
+                )
+            )
             order_capabilities = {
                 "cash_finance.view",
                 "orders.view",

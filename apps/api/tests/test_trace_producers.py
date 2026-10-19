@@ -144,6 +144,8 @@ def _prepare(client: TestClient, kind: str) -> _Case:
                 "workstation_code": SEED_WORKSTATION_CODE,
                 "lines": [
                     {
+                        "expected_unit_price": "18.00",
+                        "expected_currency_code": "MXN",
                         "capture_mode": "PRODUCT_DIRECT",
                         "product_id": str(product_id),
                         "quantity": "1",
@@ -158,7 +160,7 @@ def _prepare(client: TestClient, kind: str) -> _Case:
                 f"/v1/admin/sales/tickets/{sale['id']}/reprint",
                 {},
                 headers,
-                "ticket.reprinted.v1",
+                "ticket.reprint_requested.v1",
                 branch_id=branch_id,
             )
         return _Case(
@@ -166,7 +168,7 @@ def _prepare(client: TestClient, kind: str) -> _Case:
             f"/v1/tickets/{sale['id']}/reprint",
             {"workstation_code": SEED_WORKSTATION_CODE},
             pos_headers,
-            "ticket.reprinted.v1",
+            "ticket.reprint_requested.v1",
             branch_id=branch_id,
             source_app="POS",
             workstation_id=uuid.UUID(opened["workstation_id"]),

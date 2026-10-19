@@ -36,6 +36,40 @@ export function getOrdersBootstrap(workstationCode: string): Promise<OrdersBoots
   });
 }
 
+export function quoteOrder(payload: components["schemas"]["OrderQuoteRequest"]) {
+  return requestJson<components["schemas"]["OrderQuoteView"]>({
+    method: "POST",
+    path: "/v1/orders/quote",
+    body: payload,
+  });
+}
+
+export function payOrder(args: {
+  orderId: string;
+  payload: components["schemas"]["PayCustomerOrderRequest"];
+  idempotencyKey: string;
+}) {
+  return requestJson<OrderCommandResultView>({
+    method: "POST",
+    path: `/v1/orders/${encodeURIComponent(args.orderId)}/payments`,
+    body: args.payload,
+    headers: { "Idempotency-Key": args.idempotencyKey },
+  });
+}
+
+export function amendOrder(args: {
+  orderId: string;
+  payload: components["schemas"]["AmendCustomerOrderRequest"];
+  idempotencyKey: string;
+}) {
+  return requestJson<OrderCommandResultView>({
+    method: "POST",
+    path: `/v1/orders/${encodeURIComponent(args.orderId)}/amend`,
+    body: args.payload,
+    headers: { "Idempotency-Key": args.idempotencyKey },
+  });
+}
+
 export function listOrders({
   dateFrom,
   dateTo,

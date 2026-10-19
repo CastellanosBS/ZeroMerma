@@ -1,6 +1,7 @@
 import { Outlet, useRouterState } from "@tanstack/react-router";
 
 import { PosSessionBoundary } from "../features/auth/PosSessionBoundary";
+import { ConnectivityBoundary } from "../features/connectivity/connectivity-boundary";
 
 import { StatusMessagesViewport } from "../components/status-messages";
 import { PosProtectedLayout } from "../features/pos-bootstrap/pos-protected-layout";
@@ -31,5 +32,5 @@ function ContentLayout() {
 }
 
 export function RootLayout() {
-  return <PosSessionBoundary><ContentLayout /></PosSessionBoundary>;
+  return <ConnectivityBoundary><PosSessionBoundary><ContentLayout /></PosSessionBoundary></ConnectivityBoundary>;
 }
