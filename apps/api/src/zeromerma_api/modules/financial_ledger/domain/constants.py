@@ -1,0 +1,114 @@
+from __future__ import annotations
+
+from enum import StrEnum
+
+
+class OperationKind(StrEnum):
+    CASH_OPENING = "CASH_OPENING"
+    SALE_COLLECTION = "SALE_COLLECTION"
+    ORDER_ADVANCE = "ORDER_ADVANCE"
+    ORDER_SETTLEMENT = "ORDER_SETTLEMENT"
+    SALE_REFUND = "SALE_REFUND"
+    ORDER_REFUND = "ORDER_REFUND"
+    OPERATIONAL_PAYMENT = "OPERATIONAL_PAYMENT"
+    OPERATIONAL_CHARGE = "OPERATIONAL_CHARGE"
+    CASH_DEPOSIT = "CASH_DEPOSIT"
+    CASH_WITHDRAWAL = "CASH_WITHDRAWAL"
+    TECHNICAL_REVERSAL = "TECHNICAL_REVERSAL"
+    OPENING_OBLIGATION = "OPENING_OBLIGATION"
+
+
+class EntryState(StrEnum):
+    PENDING = "PENDING"
+    PROCESSING = "PROCESSING"
+    UNKNOWN = "UNKNOWN"
+    CONFIRMED = "CONFIRMED"
+    REJECTED = "REJECTED"
+    CANCELLED = "CANCELLED"
+
+
+class PaymentMethod(StrEnum):
+    CASH = "CASH"
+    CARD = "CARD"
+
+
+class Direction(StrEnum):
+    IN = "IN"
+    OUT = "OUT"
+
+
+class ExecutionMode(StrEnum):
+    LOCAL = "LOCAL"
+    ACCOUNTING_ONLY = "ACCOUNTING_ONLY"
+    PROVIDER_INTEGRATED = "PROVIDER_INTEGRATED"
+    MANUAL_FALLBACK = "MANUAL_FALLBACK"
+
+
+class EvidenceKind(StrEnum):
+    LOCAL_CASH = "LOCAL_CASH"
+    EXTERNAL_RECORDING = "EXTERNAL_RECORDING"
+    PROVIDER_CAPTURE = "PROVIDER_CAPTURE"
+    PROVIDER_REFUND = "PROVIDER_REFUND"
+    PROVIDER_REJECTION = "PROVIDER_REJECTION"
+    PROVIDER_VOID = "PROVIDER_VOID"
+    MANUAL_RECONCILIATION = "MANUAL_RECONCILIATION"
+
+
+class ObligationKind(StrEnum):
+    RECEIVABLE = "RECEIVABLE"
+    PAYABLE = "PAYABLE"
+    CUSTOMER_ADVANCE = "CUSTOMER_ADVANCE"
+
+
+class OperationState(StrEnum):
+    PENDING = "PENDING"
+    PROCESSING = "PROCESSING"
+    UNKNOWN = "UNKNOWN"
+    PARTIALLY_SETTLED = "PARTIALLY_SETTLED"
+    COMPLETED = "COMPLETED"
+    REJECTED = "REJECTED"
+    CANCELLED = "CANCELLED"
+    PARTIALLY_REVERSED = "PARTIALLY_REVERSED"
+    REVERSED = "REVERSED"
+    OPENING_RECORDED = "OPENING_RECORDED"
+
+
+PENDING_STATES = frozenset({EntryState.PENDING, EntryState.PROCESSING, EntryState.UNKNOWN})
+TERMINAL_STATES = frozenset({EntryState.CONFIRMED, EntryState.REJECTED, EntryState.CANCELLED})
+INFLOW_KINDS = frozenset(
+    {
+        OperationKind.CASH_OPENING,
+        OperationKind.SALE_COLLECTION,
+        OperationKind.ORDER_ADVANCE,
+        OperationKind.ORDER_SETTLEMENT,
+        OperationKind.OPERATIONAL_CHARGE,
+        OperationKind.CASH_DEPOSIT,
+    }
+)
+OUTFLOW_KINDS = frozenset(
+    {
+        OperationKind.SALE_REFUND,
+        OperationKind.ORDER_REFUND,
+        OperationKind.OPERATIONAL_PAYMENT,
+        OperationKind.CASH_WITHDRAWAL,
+    }
+)
+COLLECTION_KINDS = frozenset(
+    {OperationKind.SALE_COLLECTION, OperationKind.ORDER_ADVANCE, OperationKind.ORDER_SETTLEMENT}
+)
+REFUND_KINDS = frozenset({OperationKind.SALE_REFUND, OperationKind.ORDER_REFUND})
+
+SOURCE_TYPES: dict[OperationKind, frozenset[str]] = {
+    OperationKind.CASH_OPENING: frozenset({"CASH_SESSION", "OPENING_STATE"}),
+    OperationKind.SALE_COLLECTION: frozenset({"SALE"}),
+    OperationKind.ORDER_ADVANCE: frozenset({"ORDER_PAYMENT"}),
+    OperationKind.ORDER_SETTLEMENT: frozenset({"ORDER_PAYMENT"}),
+    OperationKind.SALE_REFUND: frozenset({"SALE_RETURN"}),
+    OperationKind.ORDER_REFUND: frozenset({"ORDER_PAYMENT"}),
+    OperationKind.OPERATIONAL_PAYMENT: frozenset({"OPERATIONAL_PAYMENT"}),
+    OperationKind.OPERATIONAL_CHARGE: frozenset({"OPERATIONAL_DISCOUNT"}),
+    OperationKind.CASH_DEPOSIT: frozenset({"CASH_DEPOSIT"}),
+    OperationKind.CASH_WITHDRAWAL: frozenset({"CASH_WITHDRAWAL"}),
+    OperationKind.TECHNICAL_REVERSAL: frozenset({"FINANCIAL_ENTRY"}),
+    OperationKind.OPENING_OBLIGATION: frozenset({"OPENING_STATE"}),
+}

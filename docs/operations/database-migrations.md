@@ -3,7 +3,7 @@
 ## Authority and safety boundary
 
 The canonical Alembic chain is `0001_foundation_schema` through
-`20261018_0043_operation_context`. PostgreSQL 16 is the supported validation engine. Migration tests
+`20261019_0044_financial_ledger`. PostgreSQL 16 is the supported validation engine. Migration tests
 must run through `scripts/dev/run-migration-validation.ps1`, which reuses the ZM-FIN-005 ephemeral
 PostgreSQL harness and its preconnect and postconnect guards. A migration validation run must never
 use the local Compose database, staging, production, `zeromerma-postgres`,
@@ -90,6 +90,7 @@ can reject existing rows. Lock risk is qualitative; it is not a production timin
 | 41 | `20261018_0041_auth_sessions` | `20260912_0040_authorization` | opaque sessions, rate/reset state and authentication audit/revocation triggers | No | No | Medium | Lossy |
 | 42 | `20261018_0042_idempotency` | `20261018_0041_auth_sessions` | durable command identities, immutable results and deferred terminal-state guard | No | No | Medium | Rejected when identities exist |
 | 43 | `20261018_0043_operation_context` | `20261018_0042_idempotency` | typed audit/outbox context, correlation indexes and contextual authentication trigger | Yes | No | High | Rejected when version-1 context exists |
+| 44 | `20261019_0044_financial_ledger` | `20261018_0043_operation_context` | empty financial operation/entry tables, immutable-evidence guards and serialized allocation checks | No | No | Medium | Rejected when financial evidence exists |
 
 Revision 0043 preserves existing audit/outbox IDs, payloads, states and occurrence
 times. Existing rows receive context version 0 and explicit `UNKNOWN` source/actor
@@ -107,6 +108,35 @@ do not restore only audit/outbox or erase new records to make downgrade pass.
 Lock risk is a conservative classification for constraint/index installation, not
 measured production downtime. Final 0043 execution evidence belongs to
 [operation-context-validation.md](../implementation/operation-context-validation.md).
+
+Revision 0044 creates the financial-ledger foundation without activating any
+operational producer or replacing a current report/cash-close source. It does not
+backfill historical sales, order payments, returns, cash movements, audit or outbox
+data. Existing financial rows retain their IDs and values; the two new tables
+remain empty after upgrade and the current bootstrap seed.
+
+The schema distinguishes immutable economic admission from actual CASH/CARD
+entries. Database guards protect causal identity, branch/currency context, terminal
+evidence and allocation within the admitted amount. A parent-operation lock
+serializes concurrent allocation checks. Explicit zero CASH opening needs no entry;
+an opening receivable, payable or customer advance does not create a drawer entry.
+These rules do not migrate current producers or prove their later integration.
+
+The 0044 downgrade refuses to remove either table when any financial evidence
+exists. Use a reviewed forward migration or a verified restore of the complete
+database, including the corresponding operational and trace data. Do not delete
+financial rows or restore only these two tables to bypass that guard. Its lock-risk
+classification describes new structures, foreign keys and trigger installation;
+it is not a measured deployment-time guarantee. The dictionary and adoption map
+are in [financial-ledger.md](../architecture/financial-ledger.md), and executed
+0044 checks belong to
+[financial-ledger-validation.md](../implementation/financial-ledger-validation.md).
+Local acceptance passed all 17 migration cases across the 44 supported revisions,
+including 225 exact check fingerprints, preservation of every prior table through
+0043-to-0044 upgrade, empty-only downgrade and complete-database restore.
+The strengthened restore case compares complete rows for an admitted financial
+operation and a CONFIRMED entry and checks that restored immutability guards
+still reject their modification; it is a rerun of an existing migration case.
 
 ## Data-preservation evidence
 

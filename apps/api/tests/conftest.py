@@ -46,6 +46,8 @@ TEST_ENGINE, SessionLocal, seed_local_data, create_app = TEST_RUNTIME
 
 TRUNCATE_SQL = """
 TRUNCATE TABLE
+  financial_entries,
+  financial_operations,
   auth_login_limits,
   identity_recovery_credentials,
   identity_privileged_changes,

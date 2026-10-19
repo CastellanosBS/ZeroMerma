@@ -389,6 +389,39 @@ en bases aisladas: 11/11 pruebas de contexto/desconexión y 23/23 de autorizaci�
 El registro de validación conserva ese CI fallido y la reproducción del defecto;
 no los presenta como aceptación del commit corregido.
 
+### 0.13 Registro de ejecución — ZM-FIN-041
+
+El bloque define la fundación canónica de dinero mediante `financial_operations`
+y `financial_entries`: admisión/obligación económica inmutable y componentes por
+medio real. Las entradas confirmadas constituyen el ledger; no se añade otra
+tabla de postings que duplique sus efectos. Los importes pendientes, en proceso
+o `UNKNOWN` no se suman como liquidados, y una compensación técnica conserva el
+original. `MIXED` es clasificación derivada y el cambio se aplica sólo a CASH.
+
+La implementación está terminada y la validación local pasó. El
+[ADR y diccionario financiero](architecture/financial-ledger.md) documenta reglas,
+ecuaciones, casos numéricos derivados de decisiones aprobadas y el mapa de
+adopción. El [registro de validación](implementation/financial-ledger-validation.md)
+registra 58 pruebas de dominio, 61 casos PostgreSQL únicos (58 más 3 en dos
+corridas), 17 de migración y 101 de Contracts, sin fallos. Ruff global y mypy de
+366 archivos pasaron. Los casos numéricos son derivados de las decisiones, no
+nuevas aprobaciones individuales mediante este registro.
+La restauración se volvió a probar con una operación y una entrada CONFIRMED
+pobladas, comparación completa y guardas de inmutabilidad activas; es repetición
+de un caso de migración ya contado, no una prueba distinta adicional.
+
+La revisión 0044 crea estructuras vacías, sin backfill ni productores
+operativos activados. No cambian las fuentes que consumen hoy ventas, pedidos,
+devoluciones, flujo, reportes o cierres: su adopción corresponde a 042–047. El
+opening económico es explícito; apertura CASH cero no crea un movimiento cero,
+y obligaciones RECEIVABLE/PAYABLE/CUSTOMER_ADVANCE no implican efectivo en caja.
+No se convierte historia demo/test en historia productiva ni se fabrican causas.
+
+La aceptación integrada se establece mediante las ocho etapas Foundation y
+**Foundation required** del commit inmutable entregado; SHA y enlace acompañan
+la entrega. Este bloque no declara completada la integración financiera ni los
+gates Data Integrity Ready o Production Ready.
+
 ## 1. Resumen ejecutivo
 
 ZeroMerma posee una base adecuada para evolucionar sin reescritura: monolito modular, FastAPI/SQLAlchemy/PostgreSQL, POS y Backoffice separados, OpenAPI generado, precisión decimal, auditoría y outbox transaccionales. La auditoría activa demostró que una parte importante de ventas, pagos, pedidos, documentos y administración es real. También demostró defectos sistémicos: el POS no alimenta el inventario canónico; el pago de pedido no entra en caja/corte; el worker no procesa eventos; la trazabilidad de identidad/origen es incorrecta; y varias superficies administrativas son simuladas o incompletas.

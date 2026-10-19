@@ -67,6 +67,8 @@ DIRECT_SCOPE_COLUMNS: dict[str, tuple[str, ...]] = {
     "cash_sessions": ("branch_id",),
     "cash_session_closes": ("branch_id",),
     "financial_reconciliations": ("branch_id",),
+    "financial_operations": ("branch_id",),
+    "financial_entries": ("branch_id",),
     "branch_counter_snapshots": ("branch_id",),
     "correction_documents": ("source_branch_id", "corrected_destination_branch_id"),
     "operational_discounts": ("branch_id",),

@@ -52,7 +52,7 @@ from zeromerma_api.testing.database_safety import (
 REPO_ROOT = Path(__file__).resolve().parents[3]
 VERSIONS_DIR = REPO_ROOT / "apps" / "api" / "alembic" / "versions"
 ALEMBIC_INI = REPO_ROOT / "apps" / "api" / "alembic.ini"
-CANONICAL_HEAD = "20261018_0043_operation_context"
+CANONICAL_HEAD = "20261019_0044_financial_ledger"
 EXPECTED_POSTGRES_MAJOR = 16
 TEST_CONTAINER_VARIABLE = "ZEROMERMA_TEST_CONTAINER_NAME"
 
@@ -61,7 +61,7 @@ KNOWN_NAMING_ONLY = "KNOWN_NAMING_ONLY"
 KNOWN_MODEL_OBJECT = "KNOWN_MODEL_OBJECT"
 REAL_SCHEMA_DRIFT = "REAL_SCHEMA_DRIFT"
 UNKNOWN_SCHEMA_DRIFT = "UNKNOWN_SCHEMA_DRIFT"
-DRIFT_BASELINE_VERSION = "2026-10-18.zm-fin-040.1"
+DRIFT_BASELINE_VERSION = "2026-10-19.zm-fin-041.1"
 
 
 @dataclass(frozen=True, order=True, slots=True)
@@ -112,6 +112,24 @@ class ModelIndexFingerprint:
 # Both complete fingerprints are pinned; changed predicates never inherit this equivalence.
 KNOWN_MODEL_INDEXES: frozenset[ModelIndexFingerprint] = frozenset(
     {
+        ModelIndexFingerprint(
+            IndexFingerprint(
+                "public",
+                "financial_operations",
+                "uq_financial_cash_opening",
+                True,
+                ("column:cash_session_id",),
+                "kind = 'CASH_OPENING'",
+            ),
+            IndexFingerprint(
+                "public",
+                "financial_operations",
+                "uq_financial_cash_opening",
+                True,
+                ("column:cash_session_id",),
+                "((kind)::text = 'CASH_OPENING'::text)",
+            ),
+        ),
         ModelIndexFingerprint(
             IndexFingerprint(
                 "public",
@@ -885,6 +903,430 @@ KNOWN_DB_ONLY_CHECKS: frozenset[CheckConstraintFingerprint] = frozenset(
 )
 KNOWN_MODEL_CHECKS: frozenset[ModelCheckFingerprint] = frozenset(
     {
+        ModelCheckFingerprint(
+            "public",
+            "financial_entries",
+            "ck_financial_entries_amount_valid",
+            "ck_financial_entries_amount_valid",
+            "ck_financial_entries_amount_valid",
+            ("amount > 0 AND amount <> 'NaN'::numeric"),
+            ("amount > 0::numeric AND amount <> 'NaN'::numeric"),
+        ),
+        ModelCheckFingerprint(
+            "public",
+            "financial_entries",
+            "ck_financial_entries_branches_array",
+            "ck_financial_entries_branches_array",
+            "ck_financial_entries_branches_array",
+            ("jsonb_typeof(related_branch_ids) = 'array'"),
+            ("jsonb_typeof(related_branch_ids) = 'array'::text"),
+        ),
+        ModelCheckFingerprint(
+            "public",
+            "financial_entries",
+            "ck_financial_entries_context_valid",
+            "ck_financial_entries_context_valid",
+            "ck_financial_entries_context_valid",
+            (
+                "context_version = 1 AND operation_id IS NOT NULL AND correlation_id IS NOT "
+                "NULL AND source_app IN ('POS','BACKOFFICE','API','SYSTEM','WORKER') AND "
+                "((actor_id IS NOT NULL AND actor_type = 'USER') OR (actor_id IS NULL AND "
+                "actor_type = 'SYSTEM' AND source_app IN ('SYSTEM','WORKER')))"
+            ),
+            (
+                "context_version = 1 AND operation_id IS NOT NULL AND correlation_id IS NOT "
+                "NULL AND (source_app::text = ANY (ARRAY['POS'::character varying, "
+                "'BACKOFFICE'::character varying, 'API'::character varying, "
+                "'SYSTEM'::character varying, 'WORKER'::character varying]::text[])) AND "
+                "(actor_id IS NOT NULL AND actor_type::text = 'USER'::text OR actor_id IS NULL"
+                " AND actor_type::text = 'SYSTEM'::text AND (source_app::text = ANY "
+                "(ARRAY['SYSTEM'::character varying, 'WORKER'::character varying]::text[])))"
+            ),
+        ),
+        ModelCheckFingerprint(
+            "public",
+            "financial_entries",
+            "ck_financial_entries_currency_valid",
+            "ck_financial_entries_currency_valid",
+            "ck_financial_entries_currency_valid",
+            ("currency_code = 'MXN'"),
+            ("currency_code::text = 'MXN'::text"),
+        ),
+        ModelCheckFingerprint(
+            "public",
+            "financial_entries",
+            "ck_financial_entries_direction_valid",
+            "ck_financial_entries_direction_valid",
+            "ck_financial_entries_direction_valid",
+            ("direction IN ('IN','OUT')"),
+            (
+                "direction::text = ANY (ARRAY['IN'::character varying, 'OUT'::character "
+                "varying]::text[])"
+            ),
+        ),
+        ModelCheckFingerprint(
+            "public",
+            "financial_entries",
+            "ck_financial_entries_evidence_valid",
+            "ck_financial_entries_evidence_valid",
+            "ck_financial_entries_evidence_valid",
+            (
+                "((resolution_kind IS NULL AND resolution_reference IS NULL AND state IN "
+                "('PENDING','PROCESSING','UNKNOWN','REJECTED','CANCELLED')) OR "
+                "(resolution_kind = 'LOCAL_CASH' AND payment_method_code = 'CASH' AND state = "
+                "'CONFIRMED' AND resolution_reference IS NULL) OR (resolution_reference IS NOT"
+                " NULL AND ((resolution_kind = 'EXTERNAL_RECORDING' AND execution_mode = "
+                "'ACCOUNTING_ONLY' AND state = 'CONFIRMED') OR (resolution_kind = "
+                "'PROVIDER_CAPTURE' AND execution_mode = 'PROVIDER_INTEGRATED' AND direction ="
+                " 'IN' AND state = 'CONFIRMED') OR (resolution_kind = 'PROVIDER_REFUND' AND "
+                "execution_mode = 'PROVIDER_INTEGRATED' AND direction = 'OUT' AND state = "
+                "'CONFIRMED') OR (resolution_kind = 'PROVIDER_REJECTION' AND execution_mode = "
+                "'PROVIDER_INTEGRATED' AND state = 'REJECTED') OR (resolution_kind = "
+                "'PROVIDER_VOID' AND execution_mode = 'PROVIDER_INTEGRATED' AND state = "
+                "'CANCELLED') OR (resolution_kind = 'MANUAL_RECONCILIATION' AND state IN "
+                "('CONFIRMED','REJECTED','CANCELLED'))))) IS TRUE"
+            ),
+            (
+                "(resolution_kind IS NULL AND resolution_reference IS NULL AND (state::text = "
+                "ANY (ARRAY['PENDING'::character varying, 'PROCESSING'::character varying, "
+                "'UNKNOWN'::character varying, 'REJECTED'::character varying, "
+                "'CANCELLED'::character varying]::text[])) OR resolution_kind::text = "
+                "'LOCAL_CASH'::text AND payment_method_code::text = 'CASH'::text AND "
+                "state::text = 'CONFIRMED'::text AND resolution_reference IS NULL OR "
+                "resolution_reference IS NOT NULL AND (resolution_kind::text = "
+                "'EXTERNAL_RECORDING'::text AND execution_mode::text = 'ACCOUNTING_ONLY'::text"
+                " AND state::text = 'CONFIRMED'::text OR resolution_kind::text = "
+                "'PROVIDER_CAPTURE'::text AND execution_mode::text = "
+                "'PROVIDER_INTEGRATED'::text AND direction::text = 'IN'::text AND state::text "
+                "= 'CONFIRMED'::text OR resolution_kind::text = 'PROVIDER_REFUND'::text AND "
+                "execution_mode::text = 'PROVIDER_INTEGRATED'::text AND direction::text = "
+                "'OUT'::text AND state::text = 'CONFIRMED'::text OR resolution_kind::text = "
+                "'PROVIDER_REJECTION'::text AND execution_mode::text = "
+                "'PROVIDER_INTEGRATED'::text AND state::text = 'REJECTED'::text OR "
+                "resolution_kind::text = 'PROVIDER_VOID'::text AND execution_mode::text = "
+                "'PROVIDER_INTEGRATED'::text AND state::text = 'CANCELLED'::text OR "
+                "resolution_kind::text = 'MANUAL_RECONCILIATION'::text AND (state::text = ANY "
+                "(ARRAY['CONFIRMED'::character varying, 'REJECTED'::character varying, "
+                "'CANCELLED'::character varying]::text[])))) IS TRUE"
+            ),
+        ),
+        ModelCheckFingerprint(
+            "public",
+            "financial_entries",
+            "ck_financial_entries_execution_valid",
+            "ck_financial_entries_execution_valid",
+            "ck_financial_entries_execution_valid",
+            (
+                "(payment_method_code = 'CASH' AND execution_mode = 'LOCAL' AND "
+                "cash_session_id IS NOT NULL) OR (payment_method_code = 'CARD' AND "
+                "execution_mode IN "
+                "('ACCOUNTING_ONLY','PROVIDER_INTEGRATED','MANUAL_FALLBACK'))"
+            ),
+            (
+                "payment_method_code::text = 'CASH'::text AND execution_mode::text = "
+                "'LOCAL'::text AND cash_session_id IS NOT NULL OR payment_method_code::text = "
+                "'CARD'::text AND (execution_mode::text = ANY "
+                "(ARRAY['ACCOUNTING_ONLY'::character varying, 'PROVIDER_INTEGRATED'::character"
+                " varying, 'MANUAL_FALLBACK'::character varying]::text[]))"
+            ),
+        ),
+        ModelCheckFingerprint(
+            "public",
+            "financial_entries",
+            "ck_financial_entries_leg_key_valid",
+            "ck_financial_entries_leg_key_valid",
+            "ck_financial_entries_leg_key_valid",
+            ("length(btrim(leg_key)) > 0"),
+            ("length(btrim(leg_key::text)) > 0"),
+        ),
+        ModelCheckFingerprint(
+            "public",
+            "financial_entries",
+            "ck_financial_entries_method_valid",
+            "ck_financial_entries_method_valid",
+            "ck_financial_entries_method_valid",
+            ("payment_method_code IN ('CASH','CARD')"),
+            (
+                "payment_method_code::text = ANY (ARRAY['CASH'::character varying, "
+                "'CARD'::character varying]::text[])"
+            ),
+        ),
+        ModelCheckFingerprint(
+            "public",
+            "financial_entries",
+            "ck_financial_entries_not_self",
+            "ck_financial_entries_not_self",
+            "ck_financial_entries_not_self",
+            ("reverses_entry_id IS NULL OR reverses_entry_id <> id"),
+            ("reverses_entry_id IS NULL OR reverses_entry_id <> id"),
+        ),
+        ModelCheckFingerprint(
+            "public",
+            "financial_entries",
+            "ck_financial_entries_state_valid",
+            "ck_financial_entries_state_valid",
+            "ck_financial_entries_state_valid",
+            (
+                "state IN "
+                "('PENDING','PROCESSING','UNKNOWN','CONFIRMED','REJECTED','CANCELLED') AND "
+                "((state = 'CONFIRMED' AND confirmed_at IS NOT NULL) OR (state <> 'CONFIRMED' "
+                "AND confirmed_at IS NULL))"
+            ),
+            (
+                "state::text = ANY (ARRAY['PENDING'::character varying, "
+                "'PROCESSING'::character varying, 'UNKNOWN'::character varying, "
+                "'CONFIRMED'::character varying, 'REJECTED'::character varying, "
+                "'CANCELLED'::character varying]::text[])) AND (state::text = "
+                "'CONFIRMED'::text AND confirmed_at IS NOT NULL OR state::text <> "
+                "'CONFIRMED'::text AND confirmed_at IS NULL"
+            ),
+        ),
+        ModelCheckFingerprint(
+            "public",
+            "financial_entries",
+            "ck_financial_entries_tender_valid",
+            "ck_financial_entries_tender_valid",
+            "ck_financial_entries_tender_valid",
+            (
+                "change_amount >= 0 AND change_amount <> 'NaN'::numeric AND (tendered_amount "
+                "IS NULL OR (tendered_amount > 0 AND tendered_amount <> 'NaN'::numeric)) AND "
+                "((payment_method_code = 'CASH' AND direction = 'IN' AND tendered_amount IS "
+                "NOT NULL AND tendered_amount = amount + change_amount) OR "
+                "((payment_method_code = 'CARD' OR direction = 'OUT') AND change_amount = 0 "
+                "AND (tendered_amount IS NULL OR tendered_amount = amount)))"
+            ),
+            (
+                "change_amount >= 0::numeric AND change_amount <> 'NaN'::numeric AND "
+                "(tendered_amount IS NULL OR tendered_amount > 0::numeric AND tendered_amount "
+                "<> 'NaN'::numeric) AND (payment_method_code::text = 'CASH'::text AND "
+                "direction::text = 'IN'::text AND tendered_amount IS NOT NULL AND "
+                "tendered_amount = (amount + change_amount) OR (payment_method_code::text = "
+                "'CARD'::text OR direction::text = 'OUT'::text) AND change_amount = 0::numeric"
+                " AND (tendered_amount IS NULL OR tendered_amount = amount))"
+            ),
+        ),
+        ModelCheckFingerprint(
+            "public",
+            "financial_operations",
+            "ck_financial_operations_amount_valid",
+            "ck_financial_operations_amount_valid",
+            "ck_financial_operations_amount_valid",
+            ("amount_due >= 0 AND amount_due <> 'NaN'::numeric"),
+            ("amount_due >= 0::numeric AND amount_due <> 'NaN'::numeric"),
+        ),
+        ModelCheckFingerprint(
+            "public",
+            "financial_operations",
+            "ck_financial_operations_branches_array",
+            "ck_financial_operations_branches_array",
+            "ck_financial_operations_branches_array",
+            ("jsonb_typeof(related_branch_ids) = 'array'"),
+            ("jsonb_typeof(related_branch_ids) = 'array'::text"),
+        ),
+        ModelCheckFingerprint(
+            "public",
+            "financial_operations",
+            "ck_financial_operations_context_valid",
+            "ck_financial_operations_context_valid",
+            "ck_financial_operations_context_valid",
+            (
+                "context_version = 1 AND operation_id IS NOT NULL AND correlation_id IS NOT "
+                "NULL AND source_app IN ('POS','BACKOFFICE','API','SYSTEM','WORKER') AND "
+                "((actor_id IS NOT NULL AND actor_type = 'USER') OR (actor_id IS NULL AND "
+                "actor_type = 'SYSTEM' AND source_app IN ('SYSTEM','WORKER')))"
+            ),
+            (
+                "context_version = 1 AND operation_id IS NOT NULL AND correlation_id IS NOT "
+                "NULL AND (source_app::text = ANY (ARRAY['POS'::character varying, "
+                "'BACKOFFICE'::character varying, 'API'::character varying, "
+                "'SYSTEM'::character varying, 'WORKER'::character varying]::text[])) AND "
+                "(actor_id IS NOT NULL AND actor_type::text = 'USER'::text OR actor_id IS NULL"
+                " AND actor_type::text = 'SYSTEM'::text AND (source_app::text = ANY "
+                "(ARRAY['SYSTEM'::character varying, 'WORKER'::character varying]::text[])))"
+            ),
+        ),
+        ModelCheckFingerprint(
+            "public",
+            "financial_operations",
+            "ck_financial_operations_currency_valid",
+            "ck_financial_operations_currency_valid",
+            "ck_financial_operations_currency_valid",
+            ("currency_code = 'MXN'"),
+            ("currency_code::text = 'MXN'::text"),
+        ),
+        ModelCheckFingerprint(
+            "public",
+            "financial_operations",
+            "ck_financial_operations_not_self",
+            "ck_financial_operations_not_self",
+            "ck_financial_operations_not_self",
+            ("related_operation_id IS NULL OR related_operation_id <> id"),
+            ("related_operation_id IS NULL OR related_operation_id <> id"),
+        ),
+        ModelCheckFingerprint(
+            "public",
+            "financial_operations",
+            "ck_financial_operations_opening_valid",
+            "ck_financial_operations_opening_valid",
+            "ck_financial_operations_opening_valid",
+            (
+                "(((source_type = 'OPENING_STATE' AND opening_reason_code IS NOT NULL AND "
+                "length(btrim(opening_reason_code)) > 0 AND source_evidence_reference IS NOT "
+                "NULL AND cutover_at IS NOT NULL) OR (source_type <> 'OPENING_STATE' AND "
+                "opening_reason_code IS NULL AND source_evidence_reference IS NULL AND "
+                "cutover_at IS NULL)) AND ((kind = 'OPENING_OBLIGATION' AND "
+                "opening_obligation_kind IN ('RECEIVABLE','PAYABLE','CUSTOMER_ADVANCE') AND "
+                "cash_session_id IS NULL AND workstation_id IS NULL) OR (kind <> "
+                "'OPENING_OBLIGATION' AND opening_obligation_kind IS NULL)) AND (kind <> "
+                "'CASH_OPENING' OR cash_session_id IS NOT NULL) AND (source_type <> "
+                "'CASH_SESSION' OR source_id = cash_session_id)) IS TRUE"
+            ),
+            (
+                "((source_type::text = 'OPENING_STATE'::text AND opening_reason_code IS NOT "
+                "NULL AND length(btrim(opening_reason_code::text)) > 0 AND "
+                "source_evidence_reference IS NOT NULL AND cutover_at IS NOT NULL OR "
+                "source_type::text <> 'OPENING_STATE'::text AND opening_reason_code IS NULL "
+                "AND source_evidence_reference IS NULL AND cutover_at IS NULL) AND (kind::text"
+                " = 'OPENING_OBLIGATION'::text AND (opening_obligation_kind::text = ANY "
+                "(ARRAY['RECEIVABLE'::character varying, 'PAYABLE'::character varying, "
+                "'CUSTOMER_ADVANCE'::character varying]::text[])) AND cash_session_id IS NULL "
+                "AND workstation_id IS NULL OR kind::text <> 'OPENING_OBLIGATION'::text AND "
+                "opening_obligation_kind IS NULL) AND (kind::text <> 'CASH_OPENING'::text OR "
+                "cash_session_id IS NOT NULL) AND (source_type::text <> 'CASH_SESSION'::text "
+                "OR source_id = cash_session_id)) IS TRUE"
+            ),
+        ),
+        ModelCheckFingerprint(
+            "public",
+            "financial_operations",
+            "ck_financial_operations_relation_valid",
+            "ck_financial_operations_relation_valid",
+            "ck_financial_operations_relation_valid",
+            (
+                "((kind IN ('SALE_REFUND','ORDER_REFUND') AND ((relation_kind = 'REFUND_OF' "
+                "AND related_operation_id IS NOT NULL) OR (relation_kind IS NULL AND "
+                "related_operation_id IS NULL))) OR (kind = 'TECHNICAL_REVERSAL' AND "
+                "relation_kind = 'REVERSAL_OF' AND related_operation_id IS NOT NULL) OR (kind "
+                "= 'ORDER_SETTLEMENT' AND ((relation_kind = 'SETTLEMENT_OF' AND "
+                "related_operation_id IS NOT NULL) OR (relation_kind IS NULL AND "
+                "related_operation_id IS NULL))) OR (kind NOT IN "
+                "('SALE_REFUND','ORDER_REFUND','TECHNICAL_REVERSAL','ORDER_SETTLEMENT') AND "
+                "relation_kind IS NULL AND related_operation_id IS NULL)) IS TRUE"
+            ),
+            (
+                "((kind::text = ANY (ARRAY['SALE_REFUND'::character varying, "
+                "'ORDER_REFUND'::character varying]::text[])) AND (relation_kind::text = "
+                "'REFUND_OF'::text AND related_operation_id IS NOT NULL OR relation_kind IS "
+                "NULL AND related_operation_id IS NULL) OR kind::text = "
+                "'TECHNICAL_REVERSAL'::text AND relation_kind::text = 'REVERSAL_OF'::text AND "
+                "related_operation_id IS NOT NULL OR kind::text = 'ORDER_SETTLEMENT'::text AND"
+                " (relation_kind::text = 'SETTLEMENT_OF'::text AND related_operation_id IS NOT"
+                " NULL OR relation_kind IS NULL AND related_operation_id IS NULL) OR "
+                "(kind::text <> ALL (ARRAY['SALE_REFUND'::character varying, "
+                "'ORDER_REFUND'::character varying, 'TECHNICAL_REVERSAL'::character varying, "
+                "'ORDER_SETTLEMENT'::character varying]::text[])) AND relation_kind IS NULL "
+                "AND related_operation_id IS NULL) IS TRUE"
+            ),
+        ),
+        ModelCheckFingerprint(
+            "public",
+            "financial_operations",
+            "ck_financial_operations_source_subject_valid",
+            "ck_financial_operations_source_subject_valid",
+            "ck_financial_operations_source_subject_valid",
+            (
+                "kind NOT IN ('SALE_COLLECTION','OPERATIONAL_PAYMENT','OPERATIONAL_CHARGE') OR"
+                " source_id = subject_id"
+            ),
+            (
+                "(kind::text <> ALL (ARRAY['SALE_COLLECTION'::character varying, "
+                "'OPERATIONAL_PAYMENT'::character varying, 'OPERATIONAL_CHARGE'::character "
+                "varying]::text[])) OR source_id = subject_id"
+            ),
+        ),
+        ModelCheckFingerprint(
+            "public",
+            "financial_operations",
+            "ck_financial_operations_source_valid",
+            "ck_financial_operations_source_valid",
+            "ck_financial_operations_source_valid",
+            (
+                "effect_code = kind AND ((kind = 'CASH_OPENING' AND source_type IN "
+                "('CASH_SESSION','OPENING_STATE')) OR (kind = 'SALE_COLLECTION' AND "
+                "source_type = 'SALE') OR (kind IN "
+                "('ORDER_ADVANCE','ORDER_SETTLEMENT','ORDER_REFUND') AND source_type = "
+                "'ORDER_PAYMENT') OR (kind = 'SALE_REFUND' AND source_type = 'SALE_RETURN') OR"
+                " (kind = 'OPERATIONAL_PAYMENT' AND source_type = 'OPERATIONAL_PAYMENT') OR "
+                "(kind = 'OPERATIONAL_CHARGE' AND source_type = 'OPERATIONAL_DISCOUNT') OR "
+                "(kind = 'CASH_DEPOSIT' AND source_type = 'CASH_DEPOSIT') OR (kind = "
+                "'CASH_WITHDRAWAL' AND source_type = 'CASH_WITHDRAWAL') OR (kind = "
+                "'TECHNICAL_REVERSAL' AND source_type = 'FINANCIAL_ENTRY') OR (kind = "
+                "'OPENING_OBLIGATION' AND source_type = 'OPENING_STATE'))"
+            ),
+            (
+                "effect_code::text = kind::text AND (kind::text = 'CASH_OPENING'::text AND "
+                "(source_type::text = ANY (ARRAY['CASH_SESSION'::character varying, "
+                "'OPENING_STATE'::character varying]::text[])) OR kind::text = "
+                "'SALE_COLLECTION'::text AND source_type::text = 'SALE'::text OR (kind::text ="
+                " ANY (ARRAY['ORDER_ADVANCE'::character varying, 'ORDER_SETTLEMENT'::character"
+                " varying, 'ORDER_REFUND'::character varying]::text[])) AND source_type::text "
+                "= 'ORDER_PAYMENT'::text OR kind::text = 'SALE_REFUND'::text AND "
+                "source_type::text = 'SALE_RETURN'::text OR kind::text = "
+                "'OPERATIONAL_PAYMENT'::text AND source_type::text = "
+                "'OPERATIONAL_PAYMENT'::text OR kind::text = 'OPERATIONAL_CHARGE'::text AND "
+                "source_type::text = 'OPERATIONAL_DISCOUNT'::text OR kind::text = "
+                "'CASH_DEPOSIT'::text AND source_type::text = 'CASH_DEPOSIT'::text OR "
+                "kind::text = 'CASH_WITHDRAWAL'::text AND source_type::text = "
+                "'CASH_WITHDRAWAL'::text OR kind::text = 'TECHNICAL_REVERSAL'::text AND "
+                "source_type::text = 'FINANCIAL_ENTRY'::text OR kind::text = "
+                "'OPENING_OBLIGATION'::text AND source_type::text = 'OPENING_STATE'::text)"
+            ),
+        ),
+        ModelCheckFingerprint(
+            "public",
+            "financial_operations",
+            "ck_financial_operations_subject_valid",
+            "ck_financial_operations_subject_valid",
+            "ck_financial_operations_subject_valid",
+            (
+                "((kind IN ('SALE_COLLECTION','SALE_REFUND') AND subject_type = 'SALE') OR "
+                "(kind IN ('ORDER_ADVANCE','ORDER_SETTLEMENT','ORDER_REFUND') AND subject_type"
+                " = 'ORDER') OR (kind = 'OPERATIONAL_PAYMENT' AND subject_type = "
+                "'OPERATIONAL_PAYMENT') OR (kind = 'OPERATIONAL_CHARGE' AND subject_type = "
+                "'OPERATIONAL_DISCOUNT') OR (kind IN "
+                "('CASH_OPENING','CASH_DEPOSIT','CASH_WITHDRAWAL') AND subject_type = "
+                "'CASH_SESSION' AND subject_id = cash_session_id) OR (kind = "
+                "'OPENING_OBLIGATION' AND ((opening_obligation_kind = 'CUSTOMER_ADVANCE' AND "
+                "subject_type = 'ORDER') OR (opening_obligation_kind IN "
+                "('RECEIVABLE','PAYABLE') AND subject_type IN ('ORDER','OPENING_BALANCE')))) "
+                "OR (kind = 'TECHNICAL_REVERSAL' AND subject_type IN "
+                "('SALE','ORDER','OPERATIONAL_PAYMENT','OPERATIONAL_DISCOUNT','CASH_SESSION','OPENING_BALANCE')))"
+                " IS TRUE"
+            ),
+            (
+                "((kind::text = ANY (ARRAY['SALE_COLLECTION'::character varying, "
+                "'SALE_REFUND'::character varying]::text[])) AND subject_type::text = "
+                "'SALE'::text OR (kind::text = ANY (ARRAY['ORDER_ADVANCE'::character varying, "
+                "'ORDER_SETTLEMENT'::character varying, 'ORDER_REFUND'::character "
+                "varying]::text[])) AND subject_type::text = 'ORDER'::text OR kind::text = "
+                "'OPERATIONAL_PAYMENT'::text AND subject_type::text = "
+                "'OPERATIONAL_PAYMENT'::text OR kind::text = 'OPERATIONAL_CHARGE'::text AND "
+                "subject_type::text = 'OPERATIONAL_DISCOUNT'::text OR (kind::text = ANY "
+                "(ARRAY['CASH_OPENING'::character varying, 'CASH_DEPOSIT'::character varying, "
+                "'CASH_WITHDRAWAL'::character varying]::text[])) AND subject_type::text = "
+                "'CASH_SESSION'::text AND subject_id = cash_session_id OR kind::text = "
+                "'OPENING_OBLIGATION'::text AND (opening_obligation_kind::text = "
+                "'CUSTOMER_ADVANCE'::text AND subject_type::text = 'ORDER'::text OR "
+                "(opening_obligation_kind::text = ANY (ARRAY['RECEIVABLE'::character varying, "
+                "'PAYABLE'::character varying]::text[])) AND (subject_type::text = ANY "
+                "(ARRAY['ORDER'::character varying, 'OPENING_BALANCE'::character "
+                "varying]::text[]))) OR kind::text = 'TECHNICAL_REVERSAL'::text AND "
+                "(subject_type::text = ANY (ARRAY['SALE'::character varying, "
+                "'ORDER'::character varying, 'OPERATIONAL_PAYMENT'::character varying, "
+                "'OPERATIONAL_DISCOUNT'::character varying, 'CASH_SESSION'::character varying,"
+                " 'OPENING_BALANCE'::character varying]::text[]))) IS TRUE"
+            ),
+        ),
         *(
             ModelCheckFingerprint(
                 "public",
@@ -3389,6 +3831,7 @@ MODEL_MODULES = (
     "zeromerma_api.modules.configuration.infrastructure.models",
     "zeromerma_api.modules.corrections.infrastructure.models",
     "zeromerma_api.modules.discounts.infrastructure.models",
+    "zeromerma_api.modules.financial_ledger.infrastructure.models",
     "zeromerma_api.modules.idempotency.infrastructure.models",
     "zeromerma_api.modules.identity.infrastructure.models",
     "zeromerma_api.modules.identity.infrastructure.privileged_models",
@@ -5044,8 +5487,8 @@ def test_drift_classifier_accepts_only_exact_known_fingerprints() -> None:
     assert len(KNOWN_DB_ONLY_INDEXES) == 75
     assert len(KNOWN_DB_ONLY_DEFAULTS) == 51
     assert len(KNOWN_DB_ONLY_CHECKS) == 6
-    assert len(KNOWN_MODEL_CHECKS) == 203
-    assert len(KNOWN_MODEL_INDEXES) == 2
+    assert len(KNOWN_MODEL_CHECKS) == 225
+    assert len(KNOWN_MODEL_INDEXES) == 3
     assert (
         sum(item.expected_database_name != item.database_name for item in KNOWN_MODEL_CHECKS) == 87
     )
@@ -5879,8 +6322,8 @@ def test_static_graph() -> None:
     for row in inventory:
         _emit("REVISION", row)
     _emit("GRAPH", graph)
-    assert graph["revision_count"] == 43
-    assert graph["unique_revision_count"] == 43
+    assert graph["revision_count"] == 44
+    assert graph["unique_revision_count"] == 44
     assert graph["duplicate_revisions"] == []
     assert graph["roots"] == ["0001_foundation_schema"]
     assert graph["heads"] == [CANONICAL_HEAD]
@@ -5889,7 +6332,98 @@ def test_static_graph() -> None:
     assert graph["unreachable"] == []
     assert graph["branches"] == {}
     assert graph["merge_revisions"] == []
-    assert len(_topological_revisions(inventory)) == 43
+    assert len(_topological_revisions(inventory)) == 44
+
+
+def test_financial_ledger_transition_is_empty_preserves_history_and_protects_evidence() -> None:
+    with _root_runtime() as (root_config, root_engine):
+        with _temporary_database(root_engine, root_config, "financial-ledger") as (config, engine):
+            _upgrade(engine, config, "20261018_0043_operation_context")
+            with Session(engine) as session:
+                assert_authorized_destructive_connection(session.connection(), config)
+                seed_local_data(session)
+                session.commit()
+            with engine.connect() as connection:
+                old_tables = sorted(
+                    set(inspect(connection).get_table_names()) - {"alembic_version"}
+                )
+                before = {
+                    table: connection.scalar(
+                        text(
+                            f"SELECT md5(coalesce(string_agg(row_to_json(t)::text, '|' "
+                            f"ORDER BY row_to_json(t)::text), '')) FROM {table} t"
+                        )
+                    )
+                    for table in old_tables
+                }
+            _upgrade(engine, config, "head")
+            with engine.connect() as connection:
+                assert_authorized_destructive_connection(connection, config)
+                for table in old_tables:
+                    assert (
+                        connection.scalar(
+                            text(
+                                f"SELECT md5(coalesce(string_agg(row_to_json(t)::text, '|' "
+                                f"ORDER BY row_to_json(t)::text), '')) FROM {table} t"
+                            )
+                        )
+                        == before[table]
+                    ), table
+                for table in ("financial_operations", "financial_entries"):
+                    assert connection.scalar(text(f"SELECT count(*) FROM {table}")) == 0
+                connection.commit()
+                command.downgrade(
+                    _alembic_config(connection, config), "20261018_0043_operation_context"
+                )
+            _upgrade(engine, config, "head")
+            source_id = uuid.uuid4()
+            with engine.begin() as connection:
+                assert_authorized_destructive_connection(connection, config)
+                branch = connection.scalar(text("SELECT id FROM branches ORDER BY code LIMIT 1"))
+                _insert_row(
+                    connection,
+                    "financial_operations",
+                    {
+                        "id": uuid.uuid4(),
+                        "kind": "SALE_COLLECTION",
+                        "source_type": "SALE",
+                        "source_id": source_id,
+                        "effect_code": "SALE_COLLECTION",
+                        "subject_type": "SALE",
+                        "subject_id": source_id,
+                        "amount_due": Decimal("0.00"),
+                        "branch_id": branch,
+                        "currency_code": "MXN",
+                        "context_version": 1,
+                        "source_app": "SYSTEM",
+                        "actor_type": "SYSTEM",
+                        "operation_id": uuid.uuid4(),
+                        "correlation_id": uuid.uuid4(),
+                        "occurred_at": datetime.now(UTC),
+                    },
+                )
+            with pytest.raises(DBAPIError, match="Financial evidence exists"):
+                with engine.connect() as connection:
+                    assert_authorized_destructive_connection(connection, config)
+                    connection.commit()
+                    command.downgrade(
+                        _alembic_config(connection, config), "20261018_0043_operation_context"
+                    )
+            assert _current_revision(engine, config) == CANONICAL_HEAD
+            with engine.connect() as connection:
+                assert connection.scalar(text("SELECT count(*) FROM financial_operations")) == 1
+                assert connection.scalar(text("SELECT count(*) FROM financial_entries")) == 0
+            _emit(
+                "FINANCIAL_LEDGER_TRANSITION",
+                {
+                    "source_revision": "20261018_0043_operation_context",
+                    "target_revision": CANONICAL_HEAD,
+                    "old_tables_preserved": len(old_tables),
+                    "new_tables_initially_empty": True,
+                    "empty_downgrade": "PASS",
+                    "evidence_downgrade": "REJECTED",
+                },
+            )
 
 
 def test_fresh_schema_drift_and_seed() -> None:
@@ -6076,6 +6610,70 @@ def test_dump_restore_sanity() -> None:
                     text("SELECT row_to_json(t) FROM idempotency_records t WHERE id=:id"),
                     {"id": idempotency_values["id"]},
                 )
+                financial_operation_id, financial_entry_id = uuid.uuid4(), uuid.uuid4()
+                financial_subject_id = uuid.uuid4()
+                financial_context = {
+                    "branch_id": identity["branch"],
+                    "workstation_id": identity["workstation"],
+                    "cash_session_id": identity["cash_session"],
+                    "actor_id": identity["user"],
+                    "currency_code": "MXN",
+                    "context_version": 1,
+                    "source_app": "POS",
+                    "actor_type": "USER",
+                    "operation_id": idempotency_values["id"],
+                    "correlation_id": uuid.uuid4(),
+                    "causation_id": uuid.uuid4(),
+                    "request_id": str(uuid.uuid4()),
+                    "idempotency_key": idempotency_values["idempotency_key"],
+                    "operation_code": "restore.financial_probe",
+                    "related_branch_ids": json.dumps([str(identity["branch"])]),
+                    "occurred_at": now,
+                }
+                _insert_row(
+                    connection,
+                    "financial_operations",
+                    {
+                        **financial_context,
+                        "id": financial_operation_id,
+                        "kind": "SALE_COLLECTION",
+                        "source_type": "SALE",
+                        "source_id": financial_subject_id,
+                        "effect_code": "SALE_COLLECTION",
+                        "subject_type": "SALE",
+                        "subject_id": financial_subject_id,
+                        "amount_due": Decimal("12.30"),
+                    },
+                )
+                _insert_row(
+                    connection,
+                    "financial_entries",
+                    {
+                        **financial_context,
+                        "id": financial_entry_id,
+                        "financial_operation_id": financial_operation_id,
+                        "leg_key": "cash-1",
+                        "payment_method_code": "CASH",
+                        "direction": "IN",
+                        "amount": Decimal("12.30"),
+                        "tendered_amount": Decimal("20.00"),
+                        "change_amount": Decimal("7.70"),
+                        "execution_mode": "LOCAL",
+                        "state": "CONFIRMED",
+                        "confirmed_at": now,
+                        "resolution_kind": "LOCAL_CASH",
+                    },
+                )
+                financial_ids = {
+                    "financial_operations": financial_operation_id,
+                    "financial_entries": financial_entry_id,
+                }
+                original_financial_rows = {
+                    table: connection.scalar(
+                        text(f"SELECT row_to_json(t) FROM {table} t WHERE id=:id"), {"id": row_id}
+                    )
+                    for table, row_id in financial_ids.items()
+                }
                 connection.execute(
                     text(
                         "INSERT INTO audit_log "
@@ -6191,6 +6789,22 @@ def test_dump_restore_sanity() -> None:
                                 {"id": row_id},
                             )
                             assert restored_trace == original_traces[table]
+                        for table, row_id in financial_ids.items():
+                            assert (
+                                connection.scalar(
+                                    text(f"SELECT row_to_json(t) FROM {table} t WHERE id=:id"),
+                                    {"id": row_id},
+                                )
+                                == original_financial_rows[table]
+                            )
+                    for table, row_id in financial_ids.items():
+                        with pytest.raises(IntegrityError, match="immutable"):
+                            with target_engine.begin() as connection:
+                                assert_authorized_destructive_connection(connection, target_config)
+                                connection.execute(
+                                    text(f"UPDATE {table} SET currency_code='MXN' WHERE id=:id"),
+                                    {"id": row_id},
+                                )
                     assert restored_revision == CANONICAL_HEAD
                     assert restored_audit == 1
                     assert restored_event == 1
@@ -6209,6 +6823,8 @@ def test_dump_restore_sanity() -> None:
                     "outbox_rows": restored_event,
                     "idempotency_identity_preserved": restored_idempotency == original_idempotency,
                     "operation_context_preserved": True,
+                    "financial_rows_preserved": len(original_financial_rows),
+                    "financial_immutability_restored": True,
                     "format": "pg_dump custom",
                     "result": "PASS",
                 },
