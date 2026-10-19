@@ -25,6 +25,60 @@ function isolatedEnvironment() {
 }
 
 describe("real browser integration safety", () => {
+  it.each(["sale", "return", "order", "cash", "operational"] as const)(
+    "does not release the %s reload boundary until response abortion has finished",
+    async (command) => {
+      isolatedEnvironment();
+      let finishAbort!: () => void;
+      const aborted = new Promise<void>((resolve) => {
+        finishAbort = resolve;
+      });
+      const route = {
+        request: () => ({ method: () => "POST" }),
+        fetch: vi.fn(async () => ({ status: () => 201, json: async () => ({ id: "committed" }) })),
+        abort: vi.fn(() => aborted),
+      };
+      let handler: ((value: typeof route) => Promise<void>) | undefined;
+      const page = {
+        on: vi.fn(),
+        route: vi.fn(async (_url: string, callback: typeof handler) => {
+          handler = callback;
+        }),
+      };
+      const apiUrl = "https://127.0.0.1:41201";
+      const evidence = observeRealApi({ on: vi.fn() }, page, apiUrl);
+      const fault = await (command === "sale"
+        ? dropNextSaleConfirmationResponse(page, apiUrl, evidence)
+        : command === "return"
+          ? dropNextReturnConfirmationResponse(page, apiUrl, evidence)
+          : command === "order"
+            ? dropNextOrderCommandResponse(page, apiUrl, evidence, "/v1/orders")
+            : command === "cash"
+              ? dropNextCashCommandResponse(page, apiUrl, evidence, "/v1/payments")
+              : dropNextOperationalCommandResponse(
+                  page,
+                  apiUrl,
+                  evidence,
+                  "/v1/admin/inventory/adjustments",
+                ));
+      let readyToReload = false;
+      const result = fault.committed.then((value) => {
+        readyToReload = true;
+        return value;
+      });
+      const handling = handler!(route);
+      try {
+        await vi.waitFor(() => expect(route.abort).toHaveBeenCalledWith("failed"));
+        expect(readyToReload).toBe(false);
+      } finally {
+        finishAbort();
+        await handling;
+      }
+      await expect(result).resolves.toEqual({ id: "committed" });
+      expect(route.abort).toHaveBeenCalledTimes(1);
+      expect(evidence).toHaveLength(1);
+    },
+  );
   it("reports only a sanitized error message when a real operational command is rejected", async () => {
     isolatedEnvironment();
     const route = {

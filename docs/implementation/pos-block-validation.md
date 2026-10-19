@@ -78,6 +78,15 @@ not final acceptance: the corrected commit must pass the complete Foundation wor
 The corrected full local Web stage passed in run `c65704e8d8cb4bc0912db7e70aede658`,
 including lint, TypeScript, all unit tests, both builds and 16 mocked browser scenarios.
 
+Hosted run `39332464705` passed Web and the full migration suite, but exposed a race
+in the browser fault-injection harness: its committed-result promise settled before
+the simulated connection abort completed. Five deferred-abort cases reproduced the
+race and passed after the helper fix (23/23 total). Administrative recovery also
+waits for UNKNOWN and an enabled recovery action before reload. These changes affect
+the validation harness only and retain all economic-effect and duplicate checks.
+The corrected full Browser stage passed 19/19 in isolated run
+`27ee28facc924ff2b353088b3c4f4f06`, Foundation run `fd98120ac20d451c98662571fc818535`.
+
 ## Operational information still needed
 
 1. Choose the branch production commitment lead time. The Backoffice form accepts

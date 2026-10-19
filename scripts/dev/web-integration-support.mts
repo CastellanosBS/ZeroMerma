@@ -87,6 +87,27 @@ type SaleRouteRegistration = (
   options: { times: number },
 ) => Promise<void>;
 const saleFaultRegistrations = new WeakMap<object, SaleRouteRegistration>();
+
+async function completeResponseLoss(
+  route: SaleFaultRoute,
+  readCommitted: () => Promise<unknown>,
+  resolveCommitted: (value: unknown) => void,
+  rejectCommitted: (reason: unknown) => void,
+) {
+  try {
+    let result: unknown;
+    try {
+      result = await readCommitted();
+    } finally {
+      // A test may reload as soon as this promise settles. Finish intercepting first.
+      await route.abort("failed");
+    }
+    resolveCommitted(result);
+  } catch (error) {
+    rejectCommitted(error);
+  }
+}
+
 type ContextObservation = {
   on(event: "page", listener: (page: PageObservation) => void): unknown;
 };
@@ -154,19 +175,20 @@ export async function dropNextSaleConfirmationResponse(
   await register(
     `${apiUrl}/v1/sales/confirm`,
     async (route) => {
-      try {
-        if (route.request().method() !== "POST")
-          throw new Error("Only POST sale confirmation can lose a response.");
-        const response = await route.fetch({ maxRedirects: 0 });
-        if (response.status() !== 201)
-          throw new Error(`Expected a real committed sale, received ${response.status()}.`);
-        evidence.push({ method: "POST", path: "/v1/sales/confirm", status: 201 });
-        resolveCommitted(await response.json());
-      } catch (error) {
-        rejectCommitted(error);
-      } finally {
-        await route.abort("failed");
-      }
+      await completeResponseLoss(
+        route,
+        async () => {
+          if (route.request().method() !== "POST")
+            throw new Error("Only POST sale confirmation can lose a response.");
+          const response = await route.fetch({ maxRedirects: 0 });
+          if (response.status() !== 201)
+            throw new Error(`Expected a real committed sale, received ${response.status()}.`);
+          evidence.push({ method: "POST", path: "/v1/sales/confirm", status: 201 });
+          return await response.json();
+        },
+        resolveCommitted,
+        rejectCommitted,
+      );
     },
     { times: 1 },
   );
@@ -195,19 +217,20 @@ export async function dropNextReturnConfirmationResponse(
   await register(
     `${apiUrl}/v1/returns/commit`,
     async (route) => {
-      try {
-        if (route.request().method() !== "POST")
-          throw new Error("Only POST return confirmation can lose a response.");
-        const response = await route.fetch({ maxRedirects: 0 });
-        if (response.status() !== 201)
-          throw new Error(`Expected a real committed return, received ${response.status()}.`);
-        evidence.push({ method: "POST", path: "/v1/returns/commit", status: 201 });
-        resolveCommitted(await response.json());
-      } catch (error) {
-        rejectCommitted(error);
-      } finally {
-        await route.abort("failed");
-      }
+      await completeResponseLoss(
+        route,
+        async () => {
+          if (route.request().method() !== "POST")
+            throw new Error("Only POST return confirmation can lose a response.");
+          const response = await route.fetch({ maxRedirects: 0 });
+          if (response.status() !== 201)
+            throw new Error(`Expected a real committed return, received ${response.status()}.`);
+          evidence.push({ method: "POST", path: "/v1/returns/commit", status: 201 });
+          return await response.json();
+        },
+        resolveCommitted,
+        rejectCommitted,
+      );
     },
     { times: 1 },
   );
@@ -244,26 +267,27 @@ export async function dropNextOrderCommandResponse(
   await register(
     `${apiUrl}${path}`,
     async (route) => {
-      try {
-        if (route.request().method() !== "POST")
-          throw new Error("Only POST order commands can lose a response.");
-        const response = await route.fetch({ maxRedirects: 0 });
-        const expected = path === "/v1/orders" ? 201 : 200;
-        if (response.status() !== expected)
-          throw new Error(
-            `Expected a real committed order command, received ${response.status()}.`,
-          );
-        evidence.push({
-          method: "POST",
-          path: path.replace(/[0-9a-f]{8}-[0-9a-f-]{27,}/gi, "{id}"),
-          status: expected,
-        });
-        resolveCommitted(await response.json());
-      } catch (error) {
-        rejectCommitted(error);
-      } finally {
-        await route.abort("failed");
-      }
+      await completeResponseLoss(
+        route,
+        async () => {
+          if (route.request().method() !== "POST")
+            throw new Error("Only POST order commands can lose a response.");
+          const response = await route.fetch({ maxRedirects: 0 });
+          const expected = path === "/v1/orders" ? 201 : 200;
+          if (response.status() !== expected)
+            throw new Error(
+              `Expected a real committed order command, received ${response.status()}.`,
+            );
+          evidence.push({
+            method: "POST",
+            path: path.replace(/[0-9a-f]{8}-[0-9a-f-]{27,}/gi, "{id}"),
+            status: expected,
+          });
+          return await response.json();
+        },
+        resolveCommitted,
+        rejectCommitted,
+      );
     },
     { times: 1 },
   );
@@ -299,24 +323,27 @@ export async function dropNextCashCommandResponse(
   await register(
     `${apiUrl}${path}`,
     async (route) => {
-      try {
-        if (route.request().method() !== "POST")
-          throw new Error("Only POST cash commands can lose a response.");
-        const response = await route.fetch({ maxRedirects: 0 });
-        const expected = path === "/v1/cash-close/commit" ? 200 : 201;
-        if (response.status() !== expected)
-          throw new Error(`Expected a real committed cash command, received ${response.status()}.`);
-        evidence.push({
-          method: "POST",
-          path: path.replace(/[0-9a-f]{8}-[0-9a-f-]{27,}/gi, "{id}"),
-          status: expected,
-        });
-        resolveCommitted(await response.json());
-      } catch (error) {
-        rejectCommitted(error);
-      } finally {
-        await route.abort("failed");
-      }
+      await completeResponseLoss(
+        route,
+        async () => {
+          if (route.request().method() !== "POST")
+            throw new Error("Only POST cash commands can lose a response.");
+          const response = await route.fetch({ maxRedirects: 0 });
+          const expected = path === "/v1/cash-close/commit" ? 200 : 201;
+          if (response.status() !== expected)
+            throw new Error(
+              `Expected a real committed cash command, received ${response.status()}.`,
+            );
+          evidence.push({
+            method: "POST",
+            path: path.replace(/[0-9a-f]{8}-[0-9a-f-]{27,}/gi, "{id}"),
+            status: expected,
+          });
+          return await response.json();
+        },
+        resolveCommitted,
+        rejectCommitted,
+      );
     },
     { times: 1 },
   );
@@ -372,34 +399,35 @@ export async function dropNextOperationalCommandResponse(
   await register(
     `${apiUrl}${path}`,
     async (route) => {
-      try {
-        if (route.request().method() !== method)
-          throw new Error("The operational method does not match its allowlisted command.");
-        const response = await route.fetch({ maxRedirects: 0 });
-        if (![200, 201].includes(response.status())) {
-          const failure: unknown = await response.json().catch(() => null);
-          const message =
-            failure !== null &&
-            typeof failure === "object" &&
-            "message" in failure &&
-            typeof failure.message === "string"
-              ? ` ${sanitize(failure.message)}`
-              : "";
-          throw new Error(
-            `Expected a real committed operational command, received ${response.status()}.${message}`,
-          );
-        }
-        evidence.push({
-          method,
-          path: path.replace(/[0-9a-f]{8}-[0-9a-f-]{27,}/gi, "{id}"),
-          status: response.status(),
-        });
-        resolveCommitted(await response.json());
-      } catch (error) {
-        rejectCommitted(error);
-      } finally {
-        await route.abort("failed");
-      }
+      await completeResponseLoss(
+        route,
+        async () => {
+          if (route.request().method() !== method)
+            throw new Error("The operational method does not match its allowlisted command.");
+          const response = await route.fetch({ maxRedirects: 0 });
+          if (![200, 201].includes(response.status())) {
+            const failure: unknown = await response.json().catch(() => null);
+            const message =
+              failure !== null &&
+              typeof failure === "object" &&
+              "message" in failure &&
+              typeof failure.message === "string"
+                ? ` ${sanitize(failure.message)}`
+                : "";
+            throw new Error(
+              `Expected a real committed operational command, received ${response.status()}.${message}`,
+            );
+          }
+          evidence.push({
+            method,
+            path: path.replace(/[0-9a-f]{8}-[0-9a-f-]{27,}/gi, "{id}"),
+            status: response.status(),
+          });
+          return await response.json();
+        },
+        resolveCommitted,
+        rejectCommitted,
+      );
     },
     { times: 1 },
   );

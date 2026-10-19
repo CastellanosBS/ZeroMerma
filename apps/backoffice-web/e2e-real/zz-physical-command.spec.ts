@@ -58,6 +58,21 @@ test("real inventory adjustment form and waste command recover lost acknowledgem
   expect(adjusted.branch_id).toBe(branchId);
   expect(adjusted.product_id).toBe(productId);
   expect(adjusted.inventory_movement_id).toBeTruthy();
+  await expect
+    .poll(() =>
+      page.evaluate(
+        () =>
+          JSON.parse(localStorage.getItem("zeromerma-admin-physical-intention:physical-commands")!)
+            ?.status,
+      ),
+    )
+    .toBe("UNKNOWN");
+  await expect(
+    page.getByRole("heading", { name: "Movimiento de inventario pendiente de confirmar" }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "Consultar resultado del movimiento", exact: true }),
+  ).toBeEnabled();
   await page.reload();
   const recovered = page.waitForResponse(
     (response) =>
@@ -117,6 +132,21 @@ test("real inventory adjustment form and waste command recover lost acknowledgem
   await sent;
   expect(wasted.inventory_movement_ids).toHaveLength(2);
   expect(new Set(wasted.inventory_movement_ids).size).toBe(2);
+  await expect
+    .poll(() =>
+      page.evaluate(
+        () =>
+          JSON.parse(localStorage.getItem("zeromerma-admin-physical-intention:physical-commands")!)
+            ?.status,
+      ),
+    )
+    .toBe("UNKNOWN");
+  await expect(
+    page.getByRole("heading", { name: "Movimiento de inventario pendiente de confirmar" }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "Consultar resultado del movimiento", exact: true }),
+  ).toBeEnabled();
   await page.reload();
   const recoveredWaste = page.waitForResponse(
     (response) =>
