@@ -398,8 +398,10 @@ def test_invalid_sale_cannot_leave_a_business_or_financial_effect(
             assert product is not None
             if invalid == "zero_sale":
                 product.unit_price = Decimal("0.00")
+                body["lines"][0]["expected_unit_price"] = "0.00"
             else:
                 product.currency_code = "USD"
+                body["lines"][0]["expected_currency_code"] = "USD"
             session.commit()
     before = _state()
     response = _post(client, headers, "sale", body, new_idempotency_key())

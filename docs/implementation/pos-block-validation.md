@@ -87,6 +87,14 @@ the validation harness only and retain all economic-effect and duplicate checks.
 The corrected full Browser stage passed 19/19 in isolated run
 `27ee28facc924ff2b353088b3c4f4f06`, Foundation run `fd98120ac20d451c98662571fc818535`.
 
+Hosted run `39333739135` passed all stages except the still-running Backend at the
+time of a further fixture audit. That audit found two invalid-sale financial cases
+which changed catalog price/currency without updating the expected values in their
+request. The new price-conflict guard correctly runs first. Updating those synthetic
+expectations preserves the original financial rejection and no-effect assertions;
+all three invalid-sale cases passed in isolated run
+`3b91f8b047324a59ba3fa059f077a4d7` (3/3), including card overpayment.
+
 ## Operational information still needed
 
 1. Choose the branch production commitment lead time. The Backoffice form accepts
