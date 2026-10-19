@@ -9,6 +9,8 @@ import {
   fetchAdminPurchaseDetail,
   fetchAdminPurchases,
   receiveAdminPurchase,
+  updateAdminPurchase,
+  recoverAdminPurchaseCommand,
 } from "./api";
 import type { AdminPurchaseListFilters } from "./types";
 
@@ -41,7 +43,9 @@ const apiPurchaseItem = {
   supplier_name: "Harinas del Centro",
   total_amount: "120.0000",
   warning_state: "critical",
-  warnings: [{ code: "receipt_discrepancy", message: "Diferencia de recepcion.", severity: "critical" }],
+  warnings: [
+    { code: "receipt_discrepancy", message: "Diferencia de recepcion.", severity: "critical" },
+  ],
 } as const;
 
 const apiPurchaseDetail = {
@@ -138,7 +142,14 @@ const apiPurchaseDetail = {
     branch_name: "Centro",
     timezone: "America/Hermosillo",
   },
-  related_documents: [{ document_id: "receipt-1", document_type: "PURCHASE_RECEIPT", folio: "REC-1", status: "COMMITTED" }],
+  related_documents: [
+    {
+      document_id: "receipt-1",
+      document_type: "PURCHASE_RECEIPT",
+      folio: "REC-1",
+      status: "COMMITTED",
+    },
+  ],
   supplier_context: {
     commercial_name: "Harinas Centro",
     lead_time_days: 2,
@@ -148,7 +159,9 @@ const apiPurchaseDetail = {
     supplier_id: "supplier-1",
     supplier_name: "Harinas del Centro",
   },
-  warnings: [{ code: "receipt_discrepancy", message: "Diferencia de recepcion.", severity: "critical" }],
+  warnings: [
+    { code: "receipt_discrepancy", message: "Diferencia de recepcion.", severity: "critical" },
+  ],
 } as const;
 
 function mockJsonResponse(payload: unknown, status = 200) {
@@ -235,7 +248,9 @@ describe("admin purchases API boundary", () => {
   });
 
   it("loads purchase detail and inventory impact", async () => {
-    const fetchSpy = vi.spyOn(globalThis, "fetch").mockImplementation(() => mockJsonResponse(apiPurchaseDetail));
+    const fetchSpy = vi
+      .spyOn(globalThis, "fetch")
+      .mockImplementation(() => mockJsonResponse(apiPurchaseDetail));
 
     const detail = await fetchAdminPurchaseDetail("purchase-1");
 
@@ -248,50 +263,98 @@ describe("admin purchases API boundary", () => {
     expect(detail.inventoryImpact.movements[0]?.movementType).toBe("PURCHASE_RECEIPT");
   });
 
-  it("uses create, direct entry, receive, confirm and cancel endpoints", async () => {
-    const fetchSpy = vi.spyOn(globalThis, "fetch").mockImplementation(() => mockJsonResponse(apiPurchaseDetail, 201));
+  it("uses explicit keys and minimal acknowledgements for all purchase commands", async () => {
+    const key = "019a0000-0000-7000-8000-000000000001";
+    const fetchSpy = vi
+      .spyOn(globalThis, "fetch")
+      .mockImplementation(() => mockJsonResponse(apiPurchaseDetail, 201));
 
-    await createAdminPurchase({
-      branchId: "branch-1",
-      confirmNow: true,
-      externalDocumentNumber: "REM-100",
-      externalDocumentType: "REMISSION",
-      lines: [{ orderedQuantity: "10.000", productId: "product-1", unitCost: "12.0000" }],
-      supplierId: "supplier-1",
-    });
+    const acknowledgement = {
+      id: "purchase-1",
+      branch_id: "branch-1",
+      folio: "CMP-1",
+      status: "DRAFT",
+      document_type: "PURCHASE",
+      receipt_ids: [],
+      inventory_movement_ids: [],
+      lines: [],
+    };
+    fetchSpy.mockImplementation(() => mockJsonResponse(acknowledgement, 201));
+    await createAdminPurchase(
+      {
+        branchId: "branch-1",
+        confirmNow: true,
+        externalDocumentNumber: "REM-100",
+        externalDocumentType: "REMISSION",
+        lines: [{ orderedQuantity: "10.000", productId: "product-1", unitCost: "12.0000" }],
+        supplierId: "supplier-1",
+      },
+      key,
+    );
     expect(fetchSpy).toHaveBeenCalledWith(
       expect.stringContaining("/v1/admin/purchases"),
-      expect.objectContaining({ body: expect.stringContaining("\"confirm_now\":true"), method: "POST" }),
+      expect.objectContaining({
+        body: expect.stringContaining('"confirm_now":true'),
+        method: "POST",
+      }),
     );
 
-    await createAdminDirectEntry({
-      branchId: "branch-1",
-      lines: [{ productId: "product-1", receivedQuantity: "2.000", unitCost: "12.0000" }],
-      supplierId: "supplier-1",
-    });
+    await createAdminDirectEntry(
+      {
+        branchId: "branch-1",
+        lines: [{ productId: "product-1", receivedQuantity: "2.000", unitCost: "12.0000" }],
+        supplierId: "supplier-1",
+      },
+      key,
+    );
     expect(fetchSpy).toHaveBeenLastCalledWith(
       expect.stringContaining("/v1/admin/purchases/direct-entry"),
       expect.objectContaining({ method: "POST" }),
     );
 
-    await receiveAdminPurchase("purchase-1", {
-      lines: [{ discrepancyReason: "Entrega parcial", purchaseLineId: "line-1", receivedQuantity: "2.000" }],
-    });
+    await receiveAdminPurchase(
+      "purchase-1",
+      {
+        lines: [
+          {
+            discrepancyReason: "Entrega parcial",
+            purchaseLineId: "line-1",
+            receivedQuantity: "2.000",
+          },
+        ],
+      },
+      key,
+    );
     expect(fetchSpy).toHaveBeenLastCalledWith(
       expect.stringContaining("/v1/admin/purchases/purchase-1/receive"),
-      expect.objectContaining({ body: expect.stringContaining("\"discrepancy_reason\":\"Entrega parcial\"") }),
+      expect.objectContaining({
+        body: expect.stringContaining('"discrepancy_reason":"Entrega parcial"'),
+      }),
     );
 
-    await confirmAdminPurchase("purchase-1");
+    await confirmAdminPurchase("purchase-1", key);
     expect(fetchSpy).toHaveBeenLastCalledWith(
       expect.stringContaining("/v1/admin/purchases/purchase-1/confirm"),
       expect.objectContaining({ method: "POST" }),
     );
 
-    await cancelAdminPurchase("purchase-1", { reason: "Duplicada" });
+    await cancelAdminPurchase("purchase-1", { reason: "Duplicada" }, key);
     expect(fetchSpy).toHaveBeenLastCalledWith(
       expect.stringContaining("/v1/admin/purchases/purchase-1/cancel"),
       expect.objectContaining({ body: JSON.stringify({ reason: "Duplicada" }), method: "POST" }),
+    );
+    await updateAdminPurchase("purchase-1", { notes: null }, key);
+    expect(fetchSpy).toHaveBeenLastCalledWith(
+      expect.stringContaining("/v1/admin/purchases/purchase-1"),
+      expect.objectContaining({ method: "PATCH", body: JSON.stringify({ notes: null }) }),
+    );
+    for (const [, options] of fetchSpy.mock.calls) {
+      expect(new Headers(options?.headers).get("Idempotency-Key")).toBe(key);
+    }
+    expect(await recoverAdminPurchaseCommand("create", key, "branch-1")).toEqual(acknowledgement);
+    expect(fetchSpy).toHaveBeenLastCalledWith(
+      expect.stringContaining(`/commands/create/${key}?branch_id=branch-1`),
+      expect.objectContaining({ method: "GET" }),
     );
   });
 });

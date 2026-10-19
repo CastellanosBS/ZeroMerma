@@ -1,18 +1,20 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { isCommandIntentionPending } from "@zeromerma/api-client";
 
 import { toBackofficeErrorMessage } from "../../../../lib/api";
 import { useBackofficeAuthStore } from "../../../auth/backoffice-auth-store";
 import { AdminPageHeader } from "../../components/AdminPageHeader";
 import {
   adminProductionBackendContract,
-  cancelAdminProduction,
-  completeAdminProduction,
-  createAdminProduction,
   fetchAdminProduction,
   fetchAdminProductionDetail,
-  startAdminProduction,
-  updateAdminProduction,
+  toCreateApiPayload,
+  toUpdateApiPayload,
+  toCompleteApiPayload,
+  type ProductionCommandResultView,
+  type ProductionCommandPayload,
+  type ProductionCommandCode,
 } from "../api";
 import { AdminProductionDetailPanel } from "../components/AdminProductionDetailPanel";
 import { AdminProductionFilters } from "../components/AdminProductionFilters";
@@ -28,6 +30,13 @@ import type {
   AdminProductionListResponse,
   AdminProductionUpdatePayload,
 } from "../types";
+
+import {
+  productionIntentions,
+  beginProductionCommand,
+  type ProductionIntentionContext,
+} from "../production-command-intent";
+import { useProductionIntention } from "../use-production-intention";
 
 type WorkflowMode = "cancel" | "complete" | "create" | "edit" | "start";
 
@@ -149,6 +158,10 @@ function AdminProductionMetricStrip({
 export function AdminProductionPage() {
   const isAuthenticated = useBackofficeAuthStore((state) => state.isAuthenticated);
   const queryClient = useQueryClient();
+  const user = useBackofficeAuthStore((state) => state.user);
+  const intention = useProductionIntention();
+  const observedKey = useRef(intention.metadata?.key ?? null);
+  const confirmedKey = useRef<string | null>(null);
   const [filters, setFilters] = useState<AdminProductionListFilters>(getInitialFilters);
   const [selectedProductionId, setSelectedProductionId] = useState<string | null>(null);
   const [workflowMode, setWorkflowMode] = useState<WorkflowMode | null>(null);
@@ -184,123 +197,84 @@ export function AdminProductionPage() {
     retry: false,
   });
 
-  const createMutation = useMutation({
+  function confirmed(result: ProductionCommandResultView) {
+    setSelectedProductionId(result.id);
+    setWorkflowMode(null);
+    setWorkflowProductionId(null);
+    setFeedback({
+      tone: "success",
+      message: `${result.folio}: operación confirmada (${result.status}).`,
+    });
+    void queryClient.invalidateQueries({ queryKey: ["admin", "production"] });
+  }
+  const actionMutation = useMutation({
     mutationFn: async ({
+      context,
       payload,
       startNow,
     }: {
-      payload: AdminProductionCreatePayload;
-      startNow: boolean;
+      context: ProductionIntentionContext;
+      payload: ProductionCommandPayload;
+      startNow?: boolean;
     }) => {
-      const created = await createAdminProduction(payload);
-      if (!startNow) {
-        return created;
-      }
-      return startAdminProduction(created.overview.id, payload.notes ?? null);
-    },
-    onError: (error) => {
-      setFeedback({
-        tone: "error",
-        message: toBackofficeErrorMessage(error, "No se pudo guardar la produccion."),
+      const generation = useBackofficeAuthStore.getState().generation;
+      return beginProductionCommand(context, payload, observedKey.current, {
+        startNow: startNow ?? false,
+        onCreated: confirmed,
+        canContinue: () => {
+          const auth = useBackofficeAuthStore.getState();
+          return (
+            auth.isAuthenticated &&
+            auth.user?.id === context.userId &&
+            auth.generation === generation
+          );
+        },
       });
     },
-    onSuccess: (detail) => {
-      setFeedback({ tone: "success", message: "Produccion guardada correctamente." });
-      setSelectedProductionId(detail.overview.id);
+    onSuccess: confirmed,
+    onError: (error) =>
+      setFeedback({
+        tone: "error",
+        message: toBackofficeErrorMessage(
+          error,
+          "No se pudo confirmar la operación de producción.",
+        ),
+      }),
+  });
+  const recoveryMutation = useMutation({
+    mutationFn: (retry: boolean) => {
+      const metadata = intention.metadata;
+      if (!metadata || metadata.userId !== user?.id)
+        throw new Error("Se requiere el operador original.");
+      return retry ? productionIntentions.retry(metadata) : productionIntentions.recover(metadata);
+    },
+    onSuccess: confirmed,
+    onError: (error) =>
+      setFeedback({
+        tone: "error",
+        message: toBackofficeErrorMessage(
+          error,
+          "No se pudo recuperar el resultado. No repitas la producción.",
+        ),
+      }),
+  });
+  useEffect(() => {
+    observedKey.current = intention.metadata?.key ?? null;
+    if (
+      intention.metadata?.status === "CONFIRMED" &&
+      confirmedKey.current !== intention.metadata.key
+    ) {
+      confirmedKey.current = intention.metadata.key;
       setWorkflowMode(null);
       setWorkflowProductionId(null);
       void queryClient.invalidateQueries({ queryKey: ["admin", "production"] });
-    },
-  });
-
-  const updateMutation = useMutation({
-    mutationFn: ({
-      payload,
-      productionId,
-    }: {
-      payload: AdminProductionUpdatePayload;
-      productionId: string;
-    }) => updateAdminProduction(productionId, payload),
-    onError: (error) => {
-      setFeedback({
-        tone: "error",
-        message: toBackofficeErrorMessage(error, "No se pudo actualizar el borrador."),
-      });
-    },
-    onSuccess: (detail) => {
-      setFeedback({ tone: "success", message: "Borrador actualizado correctamente." });
-      setSelectedProductionId(detail.overview.id);
-      setWorkflowMode(null);
-      setWorkflowProductionId(null);
-      void queryClient.invalidateQueries({ queryKey: ["admin", "production"] });
-    },
-  });
-
-  const startMutation = useMutation({
-    mutationFn: ({ notes, productionId }: { notes?: string | null; productionId: string }) =>
-      startAdminProduction(productionId, notes),
-    onError: (error) => {
-      setFeedback({
-        tone: "error",
-        message: toBackofficeErrorMessage(error, "No se pudo iniciar la produccion."),
-      });
-    },
-    onSuccess: (detail) => {
-      setFeedback({ tone: "success", message: "Produccion iniciada correctamente." });
-      setSelectedProductionId(detail.overview.id);
-      setWorkflowMode(null);
-      setWorkflowProductionId(null);
-      void queryClient.invalidateQueries({ queryKey: ["admin", "production"] });
-    },
-  });
-
-  const completeMutation = useMutation({
-    mutationFn: ({
-      payload,
-      productionId,
-    }: {
-      payload: AdminProductionCompletePayload;
-      productionId: string;
-    }) => completeAdminProduction(productionId, payload),
-    onError: (error) => {
-      setFeedback({
-        tone: "error",
-        message: toBackofficeErrorMessage(error, "No se pudo completar la produccion."),
-      });
-    },
-    onSuccess: (detail) => {
-      setFeedback({ tone: "success", message: "Produccion completada correctamente." });
-      setSelectedProductionId(detail.overview.id);
-      setWorkflowMode(null);
-      setWorkflowProductionId(null);
-      void queryClient.invalidateQueries({ queryKey: ["admin", "production"] });
-    },
-  });
-
-  const cancelMutation = useMutation({
-    mutationFn: ({ productionId, reason }: { productionId: string; reason?: string | null }) =>
-      cancelAdminProduction(productionId, reason),
-    onError: (error) => {
-      setFeedback({
-        tone: "error",
-        message: toBackofficeErrorMessage(error, "No se pudo cancelar la produccion."),
-      });
-    },
-    onSuccess: (detail) => {
-      setFeedback({ tone: "success", message: "Produccion cancelada correctamente." });
-      setSelectedProductionId(detail.overview.id);
-      setWorkflowMode(null);
-      setWorkflowProductionId(null);
-      void queryClient.invalidateQueries({ queryKey: ["admin", "production"] });
-    },
-  });
-
+    }
+  }, [intention.metadata?.key, intention.metadata?.status, queryClient]);
   const isSubmitting =
-    createMutation.isPending ||
-    updateMutation.isPending ||
-    startMutation.isPending ||
-    completeMutation.isPending ||
-    cancelMutation.isPending;
+    actionMutation.isPending ||
+    recoveryMutation.isPending ||
+    Boolean(intention.error) ||
+    isCommandIntentionPending(intention.metadata);
 
   const detailProduction = productionDetailQuery.data ?? null;
   const workflowProduction =
@@ -319,15 +293,7 @@ export function AdminProductionPage() {
       )
     : null;
   const workflowErrorMessage =
-    createMutation.isError ||
-    updateMutation.isError ||
-    startMutation.isError ||
-    completeMutation.isError ||
-    cancelMutation.isError
-      ? feedback?.tone === "error"
-        ? feedback.message
-        : "No se pudo completar la operacion."
-      : null;
+    actionMutation.isError && feedback?.tone === "error" ? feedback.message : null;
   const pageStatusLabel = productionQuery.isLoading
     ? "Validando API"
     : productionList.isBackendConnected
@@ -352,6 +318,7 @@ export function AdminProductionPage() {
   }
 
   function openWorkflow(mode: WorkflowMode, productionId?: string | null) {
+    if (isSubmitting) return;
     setFeedback(null);
     setWorkflowMode(mode);
     setWorkflowProductionId(productionId ?? null);
@@ -373,44 +340,59 @@ export function AdminProductionPage() {
     setWorkflowProductionId(null);
   }
 
+  function submit(
+    commandCode: ProductionCommandCode,
+    payload: ProductionCommandPayload,
+    branchId: string,
+    productionId: string | null,
+    startNow = false,
+  ) {
+    if (!user || !isAuthenticated || isSubmitting) return;
+    setFeedback(null);
+    actionMutation.mutate({
+      context: { userId: user.id, branchId, productionId, commandCode },
+      payload,
+      startNow,
+    });
+  }
   function handleCreate(payload: AdminProductionCreatePayload, startNow: boolean) {
-    if (!isAuthenticated || isSubmitting) {
-      return;
-    }
-    setFeedback(null);
-    createMutation.mutate({ payload, startNow });
+    submit("create", toCreateApiPayload(payload), payload.branchId, null, startNow);
   }
-
   function handleUpdate(payload: AdminProductionUpdatePayload) {
-    if (!isAuthenticated || isSubmitting || !workflowProductionId) {
-      return;
-    }
-    setFeedback(null);
-    updateMutation.mutate({ payload, productionId: workflowProductionId });
+    if (workflowProduction && workflowProductionId)
+      submit(
+        "update",
+        toUpdateApiPayload(payload),
+        workflowProduction.overview.branchId,
+        workflowProductionId,
+      );
   }
-
   function handleStart(notes?: string | null) {
-    if (!isAuthenticated || isSubmitting || !workflowProductionId) {
-      return;
-    }
-    setFeedback(null);
-    startMutation.mutate({ notes, productionId: workflowProductionId });
+    if (workflowProduction && workflowProductionId)
+      submit(
+        "start",
+        { notes: notes ?? null },
+        workflowProduction.overview.branchId,
+        workflowProductionId,
+      );
   }
-
   function handleComplete(payload: AdminProductionCompletePayload) {
-    if (!isAuthenticated || isSubmitting || !workflowProductionId) {
-      return;
-    }
-    setFeedback(null);
-    completeMutation.mutate({ payload, productionId: workflowProductionId });
+    if (workflowProduction && workflowProductionId)
+      submit(
+        "complete",
+        toCompleteApiPayload(payload),
+        workflowProduction.overview.branchId,
+        workflowProductionId,
+      );
   }
-
   function handleCancelProduction(reason?: string | null) {
-    if (!isAuthenticated || isSubmitting || !workflowProductionId) {
-      return;
-    }
-    setFeedback(null);
-    cancelMutation.mutate({ productionId: workflowProductionId, reason });
+    if (workflowProduction && workflowProductionId)
+      submit(
+        "cancel",
+        { reason: reason ?? null },
+        workflowProduction.overview.branchId,
+        workflowProductionId,
+      );
   }
 
   function handleOpenBranch(branchId: string) {
@@ -434,6 +416,7 @@ export function AdminProductionPage() {
       <AdminPageHeader
         actionCapability="production.manage"
         actionLabel="Nueva produccion"
+        actionDisabled={isSubmitting}
         description="Planea, ejecuta y cierra lotes de produccion; valida insumos, registra salida terminada y variaciones."
         meta={[pageStatusLabel, "Inventario auditable"]}
         onAction={() => openWorkflow("create")}
@@ -441,6 +424,44 @@ export function AdminProductionPage() {
       />
 
       <div className="flex min-h-0 min-w-0 flex-1 flex-col gap-2.5 overflow-hidden p-3">
+        {intention.error || isCommandIntentionPending(intention.metadata) ? (
+          <section role="alert" className="rounded-xl border border-amber-400 bg-amber-50 p-3">
+            <h2>Producción pendiente de confirmar</h2>
+            <p>
+              {intention.error ??
+                "Consulta el resultado antes de repetir o iniciar otra operación de producción."}
+            </p>
+            {intention.metadata ? (
+              <>
+                <p>
+                  Referencia: {intention.metadata.key} · {intention.metadata.commandCode}
+                </p>
+                <button
+                  type="button"
+                  disabled={recoveryMutation.isPending || intention.metadata.userId !== user?.id}
+                  onClick={() => recoveryMutation.mutate(false)}
+                >
+                  Consultar resultado de producción
+                </button>
+                {productionIntentions.hasBody(intention.metadata.key) &&
+                intention.metadata.status !== "CONFLICT" ? (
+                  <button
+                    type="button"
+                    disabled={recoveryMutation.isPending || intention.metadata.userId !== user?.id}
+                    onClick={() => recoveryMutation.mutate(true)}
+                  >
+                    Reintentar el mismo comando
+                  </button>
+                ) : (
+                  <p>
+                    Tras recargar sólo se consulta. Si el resultado sigue desconocido, conserva la
+                    referencia y solicita revisión.
+                  </p>
+                )}
+              </>
+            ) : null}
+          </section>
+        ) : null}
         <AdminProductionFilters
           filters={filters}
           isBackendConnected={productionList.isBackendConnected}

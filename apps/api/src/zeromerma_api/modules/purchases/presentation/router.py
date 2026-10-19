@@ -1,14 +1,23 @@
 from __future__ import annotations
 
+from dataclasses import replace
 from datetime import UTC, datetime
 from decimal import Decimal
 from typing import Annotated
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, Header, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Path, Query, Request, Response, status
 from sqlalchemy.orm import Session
 
 from zeromerma_api.db.session import get_session
+from zeromerma_api.modules.idempotency.application.canonicalization import (
+    IDEMPOTENCY_KEY_PATTERN,
+    parse_idempotency_key,
+)
+from zeromerma_api.modules.idempotency.presentation.http import (
+    idempotency_response,
+    require_idempotency_key,
+)
 from zeromerma_api.modules.identity.application.schemas import AuthenticatedUser
 from zeromerma_api.modules.identity.application.services import user_can_access_surface
 from zeromerma_api.modules.identity.domain.constants import IDENTITY_SURFACE_BACKOFFICE
@@ -21,12 +30,16 @@ from zeromerma_api.modules.purchases.application.admin_schemas import (
     AdminPurchaseListResponse,
     AdminPurchaseReceiveRequest,
     AdminPurchaseUpdateRequest,
+    PurchaseCommandCode,
+    PurchaseCommandResultView,
 )
 from zeromerma_api.modules.purchases.application.admin_services import AdminPurchaseService
+from zeromerma_api.modules.purchases.application.idempotency import PurchaseCommandService
 from zeromerma_api.modules.purchases.domain.exceptions import (
     PurchaseNotFoundError,
     PurchaseValidationError,
 )
+from zeromerma_api.presentation.errors import error_responses
 
 admin_router = APIRouter(prefix="/v1/admin/purchases", tags=["admin-purchases"])
 
@@ -123,118 +136,201 @@ def get_admin_purchase_detail(
         raise _to_http_exception(error) from error
 
 
-@admin_router.post("", response_model=AdminPurchaseDetailView, status_code=status.HTTP_201_CREATED)
-def create_admin_purchase(
-    command: AdminPurchaseCreateRequest,
+_REPLAY_RESPONSE = {
+    "headers": {"Idempotency-Replayed": {"$ref": "#/components/headers/IdempotencyReplayed"}}
+}
+_REJECTION_RESPONSE = {**error_responses()[409], **_REPLAY_RESPONSE}
+
+
+@admin_router.get(
+    "/commands/{command_code}/{idempotency_key}",
+    response_model=PurchaseCommandResultView,
+    responses={200: _REPLAY_RESPONSE, 409: _REJECTION_RESPONSE},
+)
+def recover_admin_purchase_command(
+    command_code: PurchaseCommandCode,
+    idempotency_key: Annotated[str, Path(pattern=IDEMPOTENCY_KEY_PATTERN)],
+    branch_id: UUID,
+    request: Request,
     current_user: Annotated[AuthenticatedUser, Depends(_require_backoffice_user)],
     session: Annotated[Session, Depends(get_session)],
-    request_id: Annotated[str | None, Header(alias="X-Request-ID")] = None,
-) -> AdminPurchaseDetailView:
+) -> Response:
+    result = PurchaseCommandService().recover(
+        session,
+        current_user=current_user,
+        command_code=command_code,
+        key=parse_idempotency_key(idempotency_key),
+        branch_id=branch_id,
+    )
+    return idempotency_response(
+        replace(result, status_code=200) if result.status_code < 300 else result, request
+    )
+
+
+@admin_router.post(
+    "",
+    response_model=PurchaseCommandResultView,
+    status_code=201,
+    responses={201: _REPLAY_RESPONSE, 409: _REJECTION_RESPONSE},
+)
+def create_admin_purchase(
+    command: AdminPurchaseCreateRequest,
+    request: Request,
+    current_user: Annotated[AuthenticatedUser, Depends(_require_backoffice_user)],
+    session: Annotated[Session, Depends(get_session)],
+    key: Annotated[UUID, Depends(require_idempotency_key)],
+) -> Response:
     try:
-        return AdminPurchaseService().create_purchase(
+        result = PurchaseCommandService().execute(
             session,
-            command=command,
             current_user=current_user,
-            request_id=request_id,
+            command_code="create",
+            command=command,
+            key=key,
+            request_id=request.headers.get("X-Request-ID"),
         )
+        return idempotency_response(result, request)
     except (PurchaseNotFoundError, PurchaseValidationError) as error:
         raise _to_http_exception(error) from error
 
 
-@admin_router.patch("/{purchase_id}", response_model=AdminPurchaseDetailView)
+@admin_router.patch(
+    "/{purchase_id}",
+    response_model=PurchaseCommandResultView,
+    status_code=200,
+    responses={200: _REPLAY_RESPONSE, 409: _REJECTION_RESPONSE},
+)
 def update_admin_purchase(
     purchase_id: UUID,
     command: AdminPurchaseUpdateRequest,
+    request: Request,
     current_user: Annotated[AuthenticatedUser, Depends(_require_backoffice_user)],
     session: Annotated[Session, Depends(get_session)],
-    request_id: Annotated[str | None, Header(alias="X-Request-ID")] = None,
-) -> AdminPurchaseDetailView:
+    key: Annotated[UUID, Depends(require_idempotency_key)],
+) -> Response:
     try:
-        return AdminPurchaseService().update_purchase(
+        result = PurchaseCommandService().execute(
             session,
-            command=command,
             current_user=current_user,
+            command_code="update",
+            command=command,
+            key=key,
             purchase_id=purchase_id,
-            request_id=request_id,
+            request_id=request.headers.get("X-Request-ID"),
         )
+        return idempotency_response(result, request)
     except (PurchaseNotFoundError, PurchaseValidationError) as error:
         raise _to_http_exception(error) from error
 
 
 @admin_router.post(
-    "/direct-entry", response_model=AdminPurchaseDetailView, status_code=status.HTTP_201_CREATED
+    "/direct-entry",
+    response_model=PurchaseCommandResultView,
+    status_code=201,
+    responses={201: _REPLAY_RESPONSE, 409: _REJECTION_RESPONSE},
 )
 def create_admin_direct_entry(
     command: AdminPurchaseDirectEntryRequest,
+    request: Request,
     current_user: Annotated[AuthenticatedUser, Depends(_require_backoffice_user)],
     session: Annotated[Session, Depends(get_session)],
-    request_id: Annotated[str | None, Header(alias="X-Request-ID")] = None,
-) -> AdminPurchaseDetailView:
+    key: Annotated[UUID, Depends(require_idempotency_key)],
+) -> Response:
     try:
-        return AdminPurchaseService().create_direct_entry(
+        result = PurchaseCommandService().execute(
             session,
-            command=command,
             current_user=current_user,
-            request_id=request_id,
+            command_code="direct-entry",
+            command=command,
+            key=key,
+            request_id=request.headers.get("X-Request-ID"),
         )
+        return idempotency_response(result, request)
     except (PurchaseNotFoundError, PurchaseValidationError) as error:
         raise _to_http_exception(error) from error
 
 
-@admin_router.post("/{purchase_id}/confirm", response_model=AdminPurchaseDetailView)
+@admin_router.post(
+    "/{purchase_id}/confirm",
+    response_model=PurchaseCommandResultView,
+    status_code=200,
+    responses={200: _REPLAY_RESPONSE, 409: _REJECTION_RESPONSE},
+)
 def confirm_admin_purchase(
     purchase_id: UUID,
+    request: Request,
     current_user: Annotated[AuthenticatedUser, Depends(_require_backoffice_user)],
     session: Annotated[Session, Depends(get_session)],
-    request_id: Annotated[str | None, Header(alias="X-Request-ID")] = None,
-) -> AdminPurchaseDetailView:
+    key: Annotated[UUID, Depends(require_idempotency_key)],
+) -> Response:
     try:
-        return AdminPurchaseService().confirm_purchase(
+        result = PurchaseCommandService().execute(
             session,
             current_user=current_user,
+            command_code="confirm",
+            command=None,
+            key=key,
             purchase_id=purchase_id,
-            request_id=request_id,
+            request_id=request.headers.get("X-Request-ID"),
         )
+        return idempotency_response(result, request)
     except (PurchaseNotFoundError, PurchaseValidationError) as error:
         raise _to_http_exception(error) from error
 
 
-@admin_router.post("/{purchase_id}/receive", response_model=AdminPurchaseDetailView)
+@admin_router.post(
+    "/{purchase_id}/receive",
+    response_model=PurchaseCommandResultView,
+    status_code=200,
+    responses={200: _REPLAY_RESPONSE, 409: _REJECTION_RESPONSE},
+)
 def receive_admin_purchase(
     purchase_id: UUID,
     command: AdminPurchaseReceiveRequest,
+    request: Request,
     current_user: Annotated[AuthenticatedUser, Depends(_require_backoffice_user)],
     session: Annotated[Session, Depends(get_session)],
-    request_id: Annotated[str | None, Header(alias="X-Request-ID")] = None,
-) -> AdminPurchaseDetailView:
+    key: Annotated[UUID, Depends(require_idempotency_key)],
+) -> Response:
     try:
-        return AdminPurchaseService().receive_purchase(
+        result = PurchaseCommandService().execute(
             session,
-            command=command,
             current_user=current_user,
+            command_code="receive",
+            command=command,
+            key=key,
             purchase_id=purchase_id,
-            request_id=request_id,
+            request_id=request.headers.get("X-Request-ID"),
         )
+        return idempotency_response(result, request)
     except (PurchaseNotFoundError, PurchaseValidationError) as error:
         raise _to_http_exception(error) from error
 
 
-@admin_router.post("/{purchase_id}/cancel", response_model=AdminPurchaseDetailView)
+@admin_router.post(
+    "/{purchase_id}/cancel",
+    response_model=PurchaseCommandResultView,
+    status_code=200,
+    responses={200: _REPLAY_RESPONSE, 409: _REJECTION_RESPONSE},
+)
 def cancel_admin_purchase(
     purchase_id: UUID,
     command: AdminPurchaseCancelRequest,
+    request: Request,
     current_user: Annotated[AuthenticatedUser, Depends(_require_backoffice_user)],
     session: Annotated[Session, Depends(get_session)],
-    request_id: Annotated[str | None, Header(alias="X-Request-ID")] = None,
-) -> AdminPurchaseDetailView:
+    key: Annotated[UUID, Depends(require_idempotency_key)],
+) -> Response:
     try:
-        return AdminPurchaseService().cancel_purchase(
+        result = PurchaseCommandService().execute(
             session,
-            command=command,
             current_user=current_user,
+            command_code="cancel",
+            command=command,
+            key=key,
             purchase_id=purchase_id,
-            request_id=request_id,
+            request_id=request.headers.get("X-Request-ID"),
         )
+        return idempotency_response(result, request)
     except (PurchaseNotFoundError, PurchaseValidationError) as error:
         raise _to_http_exception(error) from error
-

@@ -1,6 +1,7 @@
 import type {
   CorrectionBootstrapResponse,
   CorrectionCommitRequest,
+  CorrectionCommitResultView,
   CorrectionDocumentView,
   CorrectionsHistoryResponse,
   CorrectionSearchResponse,
@@ -37,7 +38,6 @@ export function searchCorrectionTargets({
   query,
   workstationCode,
 }: {
-
   documentType?: string;
   query?: string;
   workstationCode: string;
@@ -55,7 +55,6 @@ export function getCorrectionTargetDetail({
   targetDocumentId,
   workstationCode,
 }: {
-
   targetDocumentId: string;
   workstationCode: string;
 }): Promise<CorrectionTargetDetailResponse> {
@@ -72,7 +71,6 @@ export function getCorrectionsHistory({
   targetDocumentType,
   workstationCode,
 }: {
-
   createdByUserId?: string;
   query?: string;
   reasonCode?: string;
@@ -96,7 +94,6 @@ export function getCorrectionDocumentDetail({
   correctionId,
   workstationCode,
 }: {
-
   correctionId: string;
   workstationCode: string;
 }): Promise<CorrectionDocumentView> {
@@ -109,7 +106,6 @@ export function searchCorrectionProducts({
   query,
   workstationCode,
 }: {
-
   query?: string;
   workstationCode: string;
 }): Promise<CorrectionsProductsResponse> {
@@ -124,17 +120,19 @@ export function searchCorrectionProducts({
 export function commitCorrection({
   payload,
   requestId,
+  idempotencyKey,
 }: {
-
   payload: CorrectionCommitRequest;
   requestId: string;
-}): Promise<CorrectionDocumentView> {
-  return requestJson<CorrectionDocumentView>({
+  idempotencyKey: string;
+}): Promise<CorrectionCommitResultView> {
+  return requestJson<CorrectionCommitResultView>({
     body: payload,
     method: "POST",
     path: "/v1/corrections/commit",
     headers: {
       "X-Request-ID": requestId,
+      "Idempotency-Key": idempotencyKey,
     },
   });
 }

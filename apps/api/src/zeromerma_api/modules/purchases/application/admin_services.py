@@ -19,6 +19,8 @@ from zeromerma_api.modules.catalog.domain.constants import (
     CATALOG_PRODUCT_KIND_RAW_MATERIAL,
 )
 from zeromerma_api.modules.catalog.infrastructure.models import Product
+from zeromerma_api.modules.idempotency.application.context import execution
+from zeromerma_api.modules.idempotency.domain.exceptions import IdempotencyBoundaryError
 from zeromerma_api.modules.identity.application.actions import restrict_actions
 from zeromerma_api.modules.identity.application.schemas import AuthenticatedUser
 from zeromerma_api.modules.identity.application.visibility import operational_user_predicate
@@ -269,27 +271,23 @@ class AdminPurchaseService:
             status=PURCHASE_STATUS_ORDERED if command.confirm_now else PURCHASE_STATUS_DRAFT,
             supplier_id=supplier.id,
         )
-        try:
-            session.add(document)
-            session.flush()
-            self._replace_lines(session, document=document, lines=command.lines, products=products)
-            self._record_change(
-                session,
-                action=AUDIT_ACTION_ADMIN_PURCHASE_CONFIRMED
-                if command.confirm_now
-                else AUDIT_ACTION_ADMIN_PURCHASE_CREATED,
-                branch_id=branch.id,
-                current_user=current_user,
-                document=document,
-                event_name=OUTBOX_EVENT_ADMIN_PURCHASE_CONFIRMED_V1
-                if command.confirm_now
-                else OUTBOX_EVENT_ADMIN_PURCHASE_CREATED_V1,
-                request_id=request_id,
-            )
-            session.commit()
-        except IntegrityError as error:
-            session.rollback()
-            raise PurchaseValidationError("Purchase could not be created.") from error
+        session.add(document)
+        session.flush()
+        self._replace_lines(session, document=document, lines=command.lines, products=products)
+        self._record_change(
+            session,
+            action=AUDIT_ACTION_ADMIN_PURCHASE_CONFIRMED
+            if command.confirm_now
+            else AUDIT_ACTION_ADMIN_PURCHASE_CREATED,
+            branch_id=branch.id,
+            current_user=current_user,
+            document=document,
+            event_name=OUTBOX_EVENT_ADMIN_PURCHASE_CONFIRMED_V1
+            if command.confirm_now
+            else OUTBOX_EVENT_ADMIN_PURCHASE_CREATED_V1,
+            request_id=request_id,
+        )
+        session.flush()
 
         return self.get_purchase_detail(session, purchase_id=document.id)
 
@@ -326,25 +324,19 @@ class AdminPurchaseService:
         if "notes" in command.model_fields_set:
             document.notes = command.notes
 
-        try:
-            if command.lines is not None:
-                products = self._resolve_line_products(session, command.lines)
-                self._replace_lines(
-                    session, document=document, lines=command.lines, products=products
-                )
-            self._record_change(
-                session,
-                action=AUDIT_ACTION_ADMIN_PURCHASE_UPDATED,
-                branch_id=branch.id,
-                current_user=current_user,
-                document=document,
-                event_name=OUTBOX_EVENT_ADMIN_PURCHASE_CREATED_V1,
-                request_id=request_id,
-            )
-            session.commit()
-        except IntegrityError as error:
-            session.rollback()
-            raise PurchaseValidationError("Purchase could not be updated.") from error
+        if command.lines is not None:
+            products = self._resolve_line_products(session, command.lines)
+            self._replace_lines(session, document=document, lines=command.lines, products=products)
+        self._record_change(
+            session,
+            action=AUDIT_ACTION_ADMIN_PURCHASE_UPDATED,
+            branch_id=branch.id,
+            current_user=current_user,
+            document=document,
+            event_name=OUTBOX_EVENT_ADMIN_PURCHASE_CREATED_V1,
+            request_id=request_id,
+        )
+        session.flush()
 
         return self.get_purchase_detail(session, purchase_id=document.id)
 
@@ -377,7 +369,7 @@ class AdminPurchaseService:
             event_name=OUTBOX_EVENT_ADMIN_PURCHASE_CONFIRMED_V1,
             request_id=request_id,
         )
-        session.commit()
+        session.flush()
         return self.get_purchase_detail(session, purchase_id=document.id)
 
     def create_direct_entry(
@@ -421,40 +413,36 @@ class AdminPurchaseService:
             for line in command.lines
         ]
         receipt_lines: list[AdminPurchaseReceiptLineInput] = []
-        try:
-            session.add(document)
-            session.flush()
-            self._replace_lines(session, document=document, lines=purchase_lines, products=products)
-            stored_lines = self._get_lines(session, document.id)
-            for stored_line, command_line in zip(stored_lines, command.lines, strict=True):
-                receipt_lines.append(
-                    AdminPurchaseReceiptLineInput(
-                        notes=command_line.notes,
-                        purchase_line_id=stored_line.id,
-                        received_quantity=command_line.received_quantity,
-                        unit_cost=command_line.unit_cost,
-                    )
+        session.add(document)
+        session.flush()
+        self._replace_lines(session, document=document, lines=purchase_lines, products=products)
+        stored_lines = self._get_lines(session, document.id)
+        for stored_line, command_line in zip(stored_lines, command.lines, strict=True):
+            receipt_lines.append(
+                AdminPurchaseReceiptLineInput(
+                    notes=command_line.notes,
+                    purchase_line_id=stored_line.id,
+                    received_quantity=command_line.received_quantity,
+                    unit_cost=command_line.unit_cost,
                 )
-            self._receive_document(
-                session,
-                command=AdminPurchaseReceiveRequest(lines=receipt_lines, notes=command.notes),
-                current_user=current_user,
-                document=document,
-                request_id=request_id,
             )
-            self._record_change(
-                session,
-                action=AUDIT_ACTION_ADMIN_PURCHASE_CREATED,
-                branch_id=branch.id,
-                current_user=current_user,
-                document=document,
-                event_name=OUTBOX_EVENT_ADMIN_PURCHASE_CREATED_V1,
-                request_id=request_id,
-            )
-            session.commit()
-        except IntegrityError as error:
-            session.rollback()
-            raise PurchaseValidationError("Direct entry could not be created.") from error
+        self._receive_document(
+            session,
+            command=AdminPurchaseReceiveRequest(lines=receipt_lines, notes=command.notes),
+            current_user=current_user,
+            document=document,
+            request_id=request_id,
+        )
+        self._record_change(
+            session,
+            action=AUDIT_ACTION_ADMIN_PURCHASE_CREATED,
+            branch_id=branch.id,
+            current_user=current_user,
+            document=document,
+            event_name=OUTBOX_EVENT_ADMIN_PURCHASE_CREATED_V1,
+            request_id=request_id,
+        )
+        session.flush()
 
         return self.get_purchase_detail(session, purchase_id=document.id)
 
@@ -475,7 +463,7 @@ class AdminPurchaseService:
             document=document,
             request_id=request_id,
         )
-        session.commit()
+        session.flush()
         return self.get_purchase_detail(session, purchase_id=document.id)
 
     def cancel_purchase(
@@ -514,7 +502,7 @@ class AdminPurchaseService:
             event_name=OUTBOX_EVENT_ADMIN_PURCHASE_CANCELLED_V1,
             request_id=request_id,
         )
-        session.commit()
+        session.flush()
         return self.get_purchase_detail(session, purchase_id=document.id)
 
     def _receive_document(
@@ -545,6 +533,8 @@ class AdminPurchaseService:
             raise PurchaseValidationError("Purchase must contain at least one line.")
         lines_by_id = {line.id: line for line in lines}
         receipt_line_ids = {line.purchase_line_id for line in command.lines}
+        if len(receipt_line_ids) != len(command.lines):
+            raise PurchaseValidationError("Receipt line identifiers must be unique.")
         if not receipt_line_ids.issubset(lines_by_id):
             raise PurchaseValidationError("Receipt lines must belong to the selected purchase.")
 
@@ -563,7 +553,9 @@ class AdminPurchaseService:
 
         products = self._products_by_id(session, {line.product_id for line in lines})
         has_discrepancy = False
-        for command_line in command.lines:
+        for command_line in sorted(
+            command.lines, key=lambda item: str(lines_by_id[item.purchase_line_id].product_id)
+        ):
             purchase_line = lines_by_id[command_line.purchase_line_id]
             pending_quantity = Decimal(purchase_line.ordered_quantity) - Decimal(
                 purchase_line.received_quantity
@@ -688,26 +680,37 @@ class AdminPurchaseService:
     def _get_or_create_balance(
         self, session: Session, *, branch_id: uuid.UUID, product_id: uuid.UUID
     ) -> InventoryBalance:
-        balance = session.execute(
+        query = (
             select(InventoryBalance)
             .where(
                 InventoryBalance.branch_id == branch_id,
-                InventoryBalance.location_code == INVENTORY_LOCATION_BACKROOM,
                 InventoryBalance.product_id == product_id,
+                InventoryBalance.location_code == INVENTORY_LOCATION_BACKROOM,
             )
-            .with_for_update(),
-        ).scalar_one_or_none()
+            .with_for_update()
+            .execution_options(populate_existing=True)
+        )
+        balance = session.scalar(query)
         if balance is not None:
             return balance
-        balance = InventoryBalance(
-            branch_id=branch_id,
-            location_code=INVENTORY_LOCATION_BACKROOM,
-            product_id=product_id,
-            quantity_on_hand=ZERO,
-        )
-        session.add(balance)
-        session.flush()
-        return balance
+        try:
+            # Keep ORM branch checks active; a competing first receipt may win this key.
+            with session.begin_nested():
+                balance = InventoryBalance(
+                    branch_id=branch_id,
+                    product_id=product_id,
+                    location_code=INVENTORY_LOCATION_BACKROOM,
+                    quantity_on_hand=ZERO,
+                )
+                session.add(balance)
+                session.flush()
+            return balance
+        except IntegrityError as error:
+            if getattr(getattr(error.orig, "diag", None), "constraint_name", None) != (
+                "uq_inventory_balances_product_branch_location"
+            ):
+                raise
+            return session.scalars(query).one()
 
     def _fetch_rows(
         self,
@@ -1332,7 +1335,13 @@ class AdminPurchaseService:
         request_id: str | None,
         receipt: PurchaseReceipt | None = None,
     ) -> None:
+        owner = execution(session)
+        if owner is None or owner.record is None:
+            raise IdempotencyBoundaryError("A purchase mutation requires its command reservation.")
         metadata = {
+            "operation_id": str(owner.record.id),
+            "idempotency_key": str(owner.record.idempotency_key),
+            "operation_code": owner.record.operation_code,
             "document_type": document.document_type,
             "folio": document.folio,
             "purchase_id": str(document.id),

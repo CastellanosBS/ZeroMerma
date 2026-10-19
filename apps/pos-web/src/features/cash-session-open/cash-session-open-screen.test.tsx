@@ -49,8 +49,11 @@ vi.mock("@tanstack/react-router", () => ({
 }));
 
 vi.mock("../auth/auth-store", () => ({
-  usePosAuthStore: (selector: (state: { isAuthenticated: boolean }) => unknown) =>
-    selector({ isAuthenticated: authStoreMock.isAuthenticated }),
+  usePosAuthStore: Object.assign(
+    (selector: (state: { isAuthenticated: boolean }) => unknown) =>
+      selector({ isAuthenticated: authStoreMock.isAuthenticated }),
+    { subscribe: vi.fn(() => () => undefined) },
+  ),
 }));
 
 vi.mock("../pos-bootstrap/queries", () => ({

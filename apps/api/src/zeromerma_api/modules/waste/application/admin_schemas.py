@@ -5,7 +5,7 @@ from decimal import Decimal
 from typing import Literal
 from uuid import UUID
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 AdminWasteStatus = Literal["COMMITTED", "CANCELLED"]
 AdminWasteImpactLevel = Literal["normal", "high"]
@@ -216,11 +216,13 @@ class AdminWasteDetailView(BaseModel):
 
 
 class AdminWasteCreateRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     branch_id: UUID
     location_code: AdminWasteLocationCode = "BACKROOM"
     notes: str | None = Field(default=None, max_length=1000)
     product_id: UUID
-    quantity: Decimal = Field(gt=0)
+    quantity: Decimal = Field(gt=0, max_digits=12, decimal_places=3)
     reason_code: str = Field(min_length=1, max_length=40)
 
     @field_validator("notes")

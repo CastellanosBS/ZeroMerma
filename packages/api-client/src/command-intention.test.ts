@@ -34,6 +34,148 @@ beforeEach(() => {
   recover.mockReset().mockResolvedValue({ id: "order" });
 });
 afterEach(() => vi.unstubAllGlobals());
+
+function deferred<T>() {
+  let resolve!: (value: T) => void;
+  const promise = new Promise<T>((complete) => {
+    resolve = complete;
+  });
+  return { promise, resolve };
+}
+
+function pauseDigest() {
+  const entered = deferred<void>();
+  const release = deferred<void>();
+  vi.stubGlobal("crypto", {
+    getRandomValues: webcrypto.getRandomValues.bind(webcrypto),
+    subtle: {
+      digest: async (algorithm: string, input: ArrayBuffer) => {
+        entered.resolve();
+        await release.promise;
+        return webcrypto.subtle.digest(algorithm, input);
+      },
+    },
+  });
+  return { entered: entered.promise, release: () => release.resolve() };
+}
+
+it("does not dispatch or persist a new intention after auth changes during its digest", async () => {
+  const engine = coordinator();
+  const hashing = pauseDigest();
+  const result = engine.begin(context, { amount: "20", customer: "private" }, null);
+  const rejected = expect(result).rejects.toThrow("sesión cambió");
+  await hashing.entered;
+  engine.forgetBodies();
+  hashing.release();
+  await rejected;
+  expect(send).not.toHaveBeenCalled();
+  expect(engine.read("station")).toBeNull();
+  await engine.begin(context, { amount: "21", customer: "new" }, null);
+  expect(send).toHaveBeenCalledTimes(1);
+});
+
+it("does not dispatch after auth changes while waiting to acquire the browser lock", async () => {
+  const engine = coordinator();
+  const acquired = deferred<void>();
+  vi.stubGlobal("navigator", {
+    locks: {
+      request: async (_name: string, _options: unknown, callback: (lock: object) => unknown) => {
+        await acquired.promise;
+        return callback({ name: "lock" });
+      },
+    },
+  });
+  const result = engine.begin(context, { amount: "20", customer: "private" }, null);
+  const rejected = expect(result).rejects.toThrow("sesión cambió");
+  engine.forgetBodies();
+  acquired.resolve();
+  await rejected;
+  expect(send).not.toHaveBeenCalled();
+  expect(engine.read("station")).toBeNull();
+});
+
+it("keeps recovery metadata and stops retry after auth changes during its digest", async () => {
+  const engine = coordinator();
+  send.mockRejectedValueOnce(new TypeError("lost"));
+  await expect(
+    engine.begin(context, { amount: "20", customer: "private" }, null),
+  ).rejects.toThrow();
+  const metadata = engine.read("station")!;
+  const hashing = pauseDigest();
+  const result = engine.retry(context);
+  const rejected = expect(result).rejects.toThrow("sesión cambió");
+  await hashing.entered;
+  engine.forgetBodies();
+  hashing.release();
+  await rejected;
+  expect(send).toHaveBeenCalledTimes(1);
+  expect(engine.read("station")).toEqual(metadata);
+  expect(engine.hasBody(metadata.key)).toBe(false);
+  await engine.recover(context);
+  expect(engine.read("station")).toMatchObject({ key: metadata.key, status: "CONFIRMED" });
+  expect(store.get("test-intent:station")).not.toMatch(/amount|customer|private/);
+});
+
+it("does not expose a late mutation result to a changed session", async () => {
+  const engine = coordinator();
+  const response = deferred<{ id: string }>();
+  send.mockReturnValueOnce(response.promise);
+  const result = engine.begin(context, { amount: "20", customer: "private" }, null);
+  const rejected = expect(result).rejects.toThrow("sesión cambió");
+  await vi.waitFor(() => expect(send).toHaveBeenCalledTimes(1));
+  const key = engine.read("station")!.key;
+  engine.forgetBodies();
+  response.resolve({ id: "old-result" });
+  await rejected;
+  expect(engine.read("station")).toMatchObject({ key, status: "UNKNOWN" });
+  expect(engine.hasBody(key)).toBe(false);
+  await engine.recover(context);
+  expect(engine.read("station")).toMatchObject({ key, status: "CONFIRMED" });
+});
+
+it("retains unknown metadata when auth changes during read-only recovery", async () => {
+  const engine = coordinator();
+  send.mockRejectedValueOnce(new TypeError("lost"));
+  await expect(
+    engine.begin(context, { amount: "20", customer: "private" }, null),
+  ).rejects.toThrow();
+  const metadata = engine.read("station")!;
+  const response = deferred<{ id: string }>();
+  recover.mockReturnValueOnce(response.promise);
+  const result = engine.recover(context);
+  const rejected = expect(result).rejects.toThrow("sesión cambió");
+  await vi.waitFor(() => expect(recover).toHaveBeenCalledTimes(1));
+  engine.forgetBodies();
+  response.resolve({ id: "old-result" });
+  await rejected;
+  expect(engine.read("station")).toEqual(metadata);
+  expect(send).toHaveBeenCalledTimes(1);
+  await engine.recover(context);
+  expect(engine.read("station")).toMatchObject({ key: metadata.key, status: "CONFIRMED" });
+});
+
+it("does not unlock an intention from a late rejection after auth invalidation", async () => {
+  const durable = new Error("durable rejection");
+  const engine = coordinator((_metadata, error) => error === durable);
+  send.mockRejectedValueOnce(new TypeError("lost"));
+  await expect(
+    engine.begin(context, { amount: "20", customer: "private" }, null),
+  ).rejects.toThrow();
+  const key = engine.read("station")!.key;
+  const response = deferred<void>();
+  recover.mockImplementationOnce(async () => {
+    await response.promise;
+    throw durable;
+  });
+  const result = engine.recover(context);
+  const rejected = expect(result).rejects.toThrow("sesión cambió");
+  await vi.waitFor(() => expect(recover).toHaveBeenCalledTimes(1));
+  engine.forgetBodies();
+  response.resolve();
+  await rejected;
+  expect(engine.read("station")).toMatchObject({ key, status: "UNKNOWN" });
+  expect(engine.hasBody(key)).toBe(false);
+});
 it("keeps economic and customer bodies only in memory and retries the original identity", async () => {
   const engine = coordinator();
   const payload = { amount: "20", customer: "private customer" };

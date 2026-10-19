@@ -1,6 +1,6 @@
 {
   "application_baseline_commit": "c020649885869cbf7e2987c39e9d14a16d5c3e89",
-  "operation_count": 248,
+  "operation_count": 257,
   "operations": [
     {
       "consumer_contract_state": "CLIENT_GENERATED_USED",
@@ -5892,9 +5892,8 @@
       "expected_growth": "NOT_APPLICABLE",
       "filter_class": [],
       "frontend_consumers": [
-        "apps/backoffice-web/src/features/admin/inventory/api.test.ts",
         "apps/backoffice-web/src/features/admin/inventory/api.ts",
-        "apps/backoffice-web/src/features/admin/inventory/types.ts"
+        "apps/backoffice-web/src/features/admin/physical-commands/physical-command-intent.ts"
       ],
       "generated_client_symbol": "create_admin_inventory_adjustment_v1_admin_inventory_adjustments_post",
       "id_fields": [],
@@ -5909,15 +5908,99 @@
         "body_schema": {
           "$ref": "#/components/schemas/AdminInventoryAdjustmentRequest"
         },
-        "parameters": []
+        "parameters": [
+          {
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": true,
+            "schema": {
+              "description": "A globally unique UUIDv7 identifying this business intention.",
+              "maxLength": 36,
+              "minLength": 36,
+              "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-7[0-9a-fA-F]{3}-[89aAbB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$",
+              "title": "Idempotency-Key",
+              "type": "string"
+            }
+          }
+        ]
       },
       "stable_order": "NOT_APPLICABLE",
       "success_response_schema": [
         {
           "schema": {
-            "$ref": "#/components/schemas/AdminInventoryAdjustmentView"
+            "$ref": "#/components/schemas/AdminInventoryAdjustmentResultView"
           },
           "status": "201"
+        }
+      ]
+    },
+    {
+      "consumer_contract_state": "CLIENT_GENERATED_USED",
+      "contract_gap": [],
+      "datetime_fields": [],
+      "decimal_fields": [],
+      "declared_error_responses": [
+        "400",
+        "401",
+        "403",
+        "404",
+        "409",
+        "422",
+        "423",
+        "429",
+        "500"
+      ],
+      "enum_fields": [],
+      "expected_growth": "NOT_APPLICABLE",
+      "filter_class": [],
+      "frontend_consumers": [
+        "apps/backoffice-web/src/features/admin/inventory/api.ts",
+        "apps/backoffice-web/src/features/admin/physical-commands/physical-command-intent.ts"
+      ],
+      "generated_client_symbol": "recover_create_admin_inventory_adjustment_v1_admin_inventory_adjustments_confirmations__idempotency_key__get",
+      "id_fields": [
+        "$.request.parameters[1].schema"
+      ],
+      "method": "GET",
+      "nullable_fields": [],
+      "operation_id": "recover_create_admin_inventory_adjustment_v1_admin_inventory_adjustments_confirmations__idempotency_key__get",
+      "operation_id_source": "FASTAPI_STABLE_GENERATED",
+      "operation_key": "API:GET:/v1/admin/inventory/adjustments/confirmations/{idempotency_key}",
+      "pagination_class": "NOT_APPLICABLE",
+      "path": "/v1/admin/inventory/adjustments/confirmations/{idempotency_key}",
+      "request_schema": {
+        "body_schema": null,
+        "parameters": [
+          {
+            "in": "path",
+            "name": "idempotency_key",
+            "required": true,
+            "schema": {
+              "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-7[0-9a-fA-F]{3}-[89aAbB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$",
+              "title": "Idempotency Key",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "branch_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Branch Id",
+              "type": "string",
+              "x-zeromerma-id-representation": "JSON_STRING"
+            }
+          }
+        ]
+      },
+      "stable_order": "NOT_APPLICABLE",
+      "success_response_schema": [
+        {
+          "schema": {
+            "$ref": "#/components/schemas/AdminInventoryAdjustmentResultView"
+          },
+          "status": "200"
         }
       ]
     },
@@ -7699,15 +7782,13 @@
       "expected_growth": "NOT_APPLICABLE",
       "filter_class": [],
       "frontend_consumers": [
-        "apps/backoffice-web/src/features/admin/production/api.test.ts",
-        "apps/backoffice-web/src/features/admin/production/api.ts"
+        "apps/backoffice-web/src/features/admin/production/api.ts",
+        "apps/backoffice-web/src/features/admin/production/production-command-intent.ts"
       ],
       "generated_client_symbol": "create_admin_production_v1_admin_production_post",
       "id_fields": [],
       "method": "POST",
-      "nullable_fields": [
-        "$.request.parameters[0].schema"
-      ],
+      "nullable_fields": [],
       "operation_id": "create_admin_production_v1_admin_production_post",
       "operation_id_source": "FASTAPI_STABLE_GENERATED",
       "operation_key": "API:POST:/v1/admin/production",
@@ -7720,18 +7801,15 @@
         "parameters": [
           {
             "in": "header",
-            "name": "X-Request-ID",
-            "required": false,
+            "name": "Idempotency-Key",
+            "required": true,
             "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "X-Request-Id"
+              "description": "A globally unique UUIDv7 identifying this business intention.",
+              "maxLength": 36,
+              "minLength": 36,
+              "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-7[0-9a-fA-F]{3}-[89aAbB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$",
+              "title": "Idempotency-Key",
+              "type": "string"
             }
           }
         ]
@@ -7740,9 +7818,99 @@
       "success_response_schema": [
         {
           "schema": {
-            "$ref": "#/components/schemas/AdminProductionDetailView"
+            "$ref": "#/components/schemas/ProductionCommandResultView"
           },
           "status": "201"
+        }
+      ]
+    },
+    {
+      "consumer_contract_state": "CLIENT_GENERATED_USED",
+      "contract_gap": [],
+      "datetime_fields": [],
+      "decimal_fields": [],
+      "declared_error_responses": [
+        "400",
+        "401",
+        "403",
+        "404",
+        "409",
+        "422",
+        "423",
+        "429",
+        "500"
+      ],
+      "enum_fields": [
+        "$.request.parameters[0].schema"
+      ],
+      "expected_growth": "NOT_APPLICABLE",
+      "filter_class": [],
+      "frontend_consumers": [
+        "apps/backoffice-web/src/features/admin/production/api.ts",
+        "apps/backoffice-web/src/features/admin/production/production-command-intent.ts"
+      ],
+      "generated_client_symbol": "recover_production_command_v1_admin_production_commands__command_code___idempotency_key__get",
+      "id_fields": [
+        "$.request.parameters[2].schema"
+      ],
+      "method": "GET",
+      "nullable_fields": [],
+      "operation_id": "recover_production_command_v1_admin_production_commands__command_code___idempotency_key__get",
+      "operation_id_source": "FASTAPI_STABLE_GENERATED",
+      "operation_key": "API:GET:/v1/admin/production/commands/{command_code}/{idempotency_key}",
+      "pagination_class": "NOT_APPLICABLE",
+      "path": "/v1/admin/production/commands/{command_code}/{idempotency_key}",
+      "request_schema": {
+        "body_schema": null,
+        "parameters": [
+          {
+            "in": "path",
+            "name": "command_code",
+            "required": true,
+            "schema": {
+              "enum": [
+                "create",
+                "update",
+                "start",
+                "complete",
+                "cancel"
+              ],
+              "title": "Command Code",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "idempotency_key",
+            "required": true,
+            "schema": {
+              "maxLength": 36,
+              "minLength": 36,
+              "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-7[0-9a-fA-F]{3}-[89aAbB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$",
+              "title": "Idempotency Key",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "branch_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Branch Id",
+              "type": "string",
+              "x-zeromerma-id-representation": "JSON_STRING"
+            }
+          }
+        ]
+      },
+      "stable_order": "NOT_APPLICABLE",
+      "success_response_schema": [
+        {
+          "schema": {
+            "$ref": "#/components/schemas/ProductionCommandResultView"
+          },
+          "status": "200"
         }
       ]
     },
@@ -7826,17 +7994,15 @@
       "expected_growth": "NOT_APPLICABLE",
       "filter_class": [],
       "frontend_consumers": [
-        "apps/backoffice-web/src/features/admin/production/api.test.ts",
-        "apps/backoffice-web/src/features/admin/production/api.ts"
+        "apps/backoffice-web/src/features/admin/production/api.ts",
+        "apps/backoffice-web/src/features/admin/production/production-command-intent.ts"
       ],
       "generated_client_symbol": "update_admin_production_v1_admin_production__production_id__patch",
       "id_fields": [
         "$.request.parameters[0].schema"
       ],
       "method": "PATCH",
-      "nullable_fields": [
-        "$.request.parameters[1].schema"
-      ],
+      "nullable_fields": [],
       "operation_id": "update_admin_production_v1_admin_production__production_id__patch",
       "operation_id_source": "FASTAPI_STABLE_GENERATED",
       "operation_key": "API:PATCH:/v1/admin/production/{production_id}",
@@ -7860,18 +8026,15 @@
           },
           {
             "in": "header",
-            "name": "X-Request-ID",
-            "required": false,
+            "name": "Idempotency-Key",
+            "required": true,
             "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "X-Request-Id"
+              "description": "A globally unique UUIDv7 identifying this business intention.",
+              "maxLength": 36,
+              "minLength": 36,
+              "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-7[0-9a-fA-F]{3}-[89aAbB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$",
+              "title": "Idempotency-Key",
+              "type": "string"
             }
           }
         ]
@@ -7880,14 +8043,14 @@
       "success_response_schema": [
         {
           "schema": {
-            "$ref": "#/components/schemas/AdminProductionDetailView"
+            "$ref": "#/components/schemas/ProductionCommandResultView"
           },
           "status": "200"
         }
       ]
     },
     {
-      "consumer_contract_state": "NOT_CONSUMED",
+      "consumer_contract_state": "CLIENT_GENERATED_USED",
       "contract_gap": [],
       "datetime_fields": [],
       "decimal_fields": [],
@@ -7905,15 +8068,16 @@
       "enum_fields": [],
       "expected_growth": "NOT_APPLICABLE",
       "filter_class": [],
-      "frontend_consumers": [],
+      "frontend_consumers": [
+        "apps/backoffice-web/src/features/admin/production/api.ts",
+        "apps/backoffice-web/src/features/admin/production/production-command-intent.ts"
+      ],
       "generated_client_symbol": "cancel_admin_production_v1_admin_production__production_id__cancel_post",
       "id_fields": [
         "$.request.parameters[0].schema"
       ],
       "method": "POST",
-      "nullable_fields": [
-        "$.request.parameters[1].schema"
-      ],
+      "nullable_fields": [],
       "operation_id": "cancel_admin_production_v1_admin_production__production_id__cancel_post",
       "operation_id_source": "FASTAPI_STABLE_GENERATED",
       "operation_key": "API:POST:/v1/admin/production/{production_id}/cancel",
@@ -7937,18 +8101,15 @@
           },
           {
             "in": "header",
-            "name": "X-Request-ID",
-            "required": false,
+            "name": "Idempotency-Key",
+            "required": true,
             "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "X-Request-Id"
+              "description": "A globally unique UUIDv7 identifying this business intention.",
+              "maxLength": 36,
+              "minLength": 36,
+              "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-7[0-9a-fA-F]{3}-[89aAbB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$",
+              "title": "Idempotency-Key",
+              "type": "string"
             }
           }
         ]
@@ -7957,14 +8118,14 @@
       "success_response_schema": [
         {
           "schema": {
-            "$ref": "#/components/schemas/AdminProductionDetailView"
+            "$ref": "#/components/schemas/ProductionCommandResultView"
           },
           "status": "200"
         }
       ]
     },
     {
-      "consumer_contract_state": "NOT_CONSUMED",
+      "consumer_contract_state": "CLIENT_GENERATED_USED",
       "contract_gap": [],
       "datetime_fields": [],
       "decimal_fields": [],
@@ -7982,15 +8143,16 @@
       "enum_fields": [],
       "expected_growth": "NOT_APPLICABLE",
       "filter_class": [],
-      "frontend_consumers": [],
+      "frontend_consumers": [
+        "apps/backoffice-web/src/features/admin/production/api.ts",
+        "apps/backoffice-web/src/features/admin/production/production-command-intent.ts"
+      ],
       "generated_client_symbol": "complete_admin_production_v1_admin_production__production_id__complete_post",
       "id_fields": [
         "$.request.parameters[0].schema"
       ],
       "method": "POST",
-      "nullable_fields": [
-        "$.request.parameters[1].schema"
-      ],
+      "nullable_fields": [],
       "operation_id": "complete_admin_production_v1_admin_production__production_id__complete_post",
       "operation_id_source": "FASTAPI_STABLE_GENERATED",
       "operation_key": "API:POST:/v1/admin/production/{production_id}/complete",
@@ -8014,18 +8176,15 @@
           },
           {
             "in": "header",
-            "name": "X-Request-ID",
-            "required": false,
+            "name": "Idempotency-Key",
+            "required": true,
             "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "X-Request-Id"
+              "description": "A globally unique UUIDv7 identifying this business intention.",
+              "maxLength": 36,
+              "minLength": 36,
+              "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-7[0-9a-fA-F]{3}-[89aAbB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$",
+              "title": "Idempotency-Key",
+              "type": "string"
             }
           }
         ]
@@ -8034,14 +8193,14 @@
       "success_response_schema": [
         {
           "schema": {
-            "$ref": "#/components/schemas/AdminProductionDetailView"
+            "$ref": "#/components/schemas/ProductionCommandResultView"
           },
           "status": "200"
         }
       ]
     },
     {
-      "consumer_contract_state": "NOT_CONSUMED",
+      "consumer_contract_state": "CLIENT_GENERATED_USED",
       "contract_gap": [],
       "datetime_fields": [],
       "decimal_fields": [],
@@ -8059,15 +8218,16 @@
       "enum_fields": [],
       "expected_growth": "NOT_APPLICABLE",
       "filter_class": [],
-      "frontend_consumers": [],
+      "frontend_consumers": [
+        "apps/backoffice-web/src/features/admin/production/api.ts",
+        "apps/backoffice-web/src/features/admin/production/production-command-intent.ts"
+      ],
       "generated_client_symbol": "start_admin_production_v1_admin_production__production_id__start_post",
       "id_fields": [
         "$.request.parameters[0].schema"
       ],
       "method": "POST",
-      "nullable_fields": [
-        "$.request.parameters[1].schema"
-      ],
+      "nullable_fields": [],
       "operation_id": "start_admin_production_v1_admin_production__production_id__start_post",
       "operation_id_source": "FASTAPI_STABLE_GENERATED",
       "operation_key": "API:POST:/v1/admin/production/{production_id}/start",
@@ -8091,18 +8251,15 @@
           },
           {
             "in": "header",
-            "name": "X-Request-ID",
-            "required": false,
+            "name": "Idempotency-Key",
+            "required": true,
             "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "X-Request-Id"
+              "description": "A globally unique UUIDv7 identifying this business intention.",
+              "maxLength": 36,
+              "minLength": 36,
+              "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-7[0-9a-fA-F]{3}-[89aAbB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$",
+              "title": "Idempotency-Key",
+              "type": "string"
             }
           }
         ]
@@ -8111,7 +8268,7 @@
       "success_response_schema": [
         {
           "schema": {
-            "$ref": "#/components/schemas/AdminProductionDetailView"
+            "$ref": "#/components/schemas/ProductionCommandResultView"
           },
           "status": "200"
         }
@@ -8927,16 +9084,13 @@
       "expected_growth": "NOT_APPLICABLE",
       "filter_class": [],
       "frontend_consumers": [
-        "apps/backoffice-web/src/features/admin/purchases/api.test.ts",
         "apps/backoffice-web/src/features/admin/purchases/api.ts",
-        "apps/backoffice-web/src/features/admin/purchases/components.test.tsx"
+        "apps/backoffice-web/src/features/admin/purchases/purchase-command-intent.ts"
       ],
       "generated_client_symbol": "create_admin_purchase_v1_admin_purchases_post",
       "id_fields": [],
       "method": "POST",
-      "nullable_fields": [
-        "$.request.parameters[0].schema"
-      ],
+      "nullable_fields": [],
       "operation_id": "create_admin_purchase_v1_admin_purchases_post",
       "operation_id_source": "FASTAPI_STABLE_GENERATED",
       "operation_key": "API:POST:/v1/admin/purchases",
@@ -8949,18 +9103,15 @@
         "parameters": [
           {
             "in": "header",
-            "name": "X-Request-ID",
-            "required": false,
+            "name": "Idempotency-Key",
+            "required": true,
             "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "X-Request-Id"
+              "description": "A globally unique UUIDv7 identifying this business intention.",
+              "maxLength": 36,
+              "minLength": 36,
+              "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-7[0-9a-fA-F]{3}-[89aAbB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$",
+              "title": "Idempotency-Key",
+              "type": "string"
             }
           }
         ]
@@ -8969,9 +9120,98 @@
       "success_response_schema": [
         {
           "schema": {
-            "$ref": "#/components/schemas/AdminPurchaseDetailView"
+            "$ref": "#/components/schemas/PurchaseCommandResultView"
           },
           "status": "201"
+        }
+      ]
+    },
+    {
+      "consumer_contract_state": "CLIENT_GENERATED_USED",
+      "contract_gap": [],
+      "datetime_fields": [],
+      "decimal_fields": [],
+      "declared_error_responses": [
+        "400",
+        "401",
+        "403",
+        "404",
+        "409",
+        "422",
+        "423",
+        "429",
+        "500"
+      ],
+      "enum_fields": [
+        "$.request.parameters[0].schema"
+      ],
+      "expected_growth": "NOT_APPLICABLE",
+      "filter_class": [],
+      "frontend_consumers": [
+        "apps/backoffice-web/src/features/admin/purchases/api.ts",
+        "apps/backoffice-web/src/features/admin/purchases/purchase-command-intent.ts"
+      ],
+      "generated_client_symbol": "recover_admin_purchase_command_v1_admin_purchases_commands__command_code___idempotency_key__get",
+      "id_fields": [
+        "$.request.parameters[2].schema"
+      ],
+      "method": "GET",
+      "nullable_fields": [],
+      "operation_id": "recover_admin_purchase_command_v1_admin_purchases_commands__command_code___idempotency_key__get",
+      "operation_id_source": "FASTAPI_STABLE_GENERATED",
+      "operation_key": "API:GET:/v1/admin/purchases/commands/{command_code}/{idempotency_key}",
+      "pagination_class": "NOT_APPLICABLE",
+      "path": "/v1/admin/purchases/commands/{command_code}/{idempotency_key}",
+      "request_schema": {
+        "body_schema": null,
+        "parameters": [
+          {
+            "in": "path",
+            "name": "command_code",
+            "required": true,
+            "schema": {
+              "enum": [
+                "create",
+                "update",
+                "direct-entry",
+                "confirm",
+                "receive",
+                "cancel"
+              ],
+              "title": "Command Code",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "idempotency_key",
+            "required": true,
+            "schema": {
+              "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-7[0-9a-fA-F]{3}-[89aAbB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$",
+              "title": "Idempotency Key",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "branch_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Branch Id",
+              "type": "string",
+              "x-zeromerma-id-representation": "JSON_STRING"
+            }
+          }
+        ]
+      },
+      "stable_order": "NOT_APPLICABLE",
+      "success_response_schema": [
+        {
+          "schema": {
+            "$ref": "#/components/schemas/PurchaseCommandResultView"
+          },
+          "status": "200"
         }
       ]
     },
@@ -8995,16 +9235,13 @@
       "expected_growth": "NOT_APPLICABLE",
       "filter_class": [],
       "frontend_consumers": [
-        "apps/backoffice-web/src/features/admin/purchases/api.test.ts",
         "apps/backoffice-web/src/features/admin/purchases/api.ts",
-        "apps/backoffice-web/src/features/admin/purchases/components.test.tsx"
+        "apps/backoffice-web/src/features/admin/purchases/purchase-command-intent.ts"
       ],
       "generated_client_symbol": "create_admin_direct_entry_v1_admin_purchases_direct_entry_post",
       "id_fields": [],
       "method": "POST",
-      "nullable_fields": [
-        "$.request.parameters[0].schema"
-      ],
+      "nullable_fields": [],
       "operation_id": "create_admin_direct_entry_v1_admin_purchases_direct_entry_post",
       "operation_id_source": "FASTAPI_STABLE_GENERATED",
       "operation_key": "API:POST:/v1/admin/purchases/direct-entry",
@@ -9017,18 +9254,15 @@
         "parameters": [
           {
             "in": "header",
-            "name": "X-Request-ID",
-            "required": false,
+            "name": "Idempotency-Key",
+            "required": true,
             "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "X-Request-Id"
+              "description": "A globally unique UUIDv7 identifying this business intention.",
+              "maxLength": 36,
+              "minLength": 36,
+              "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-7[0-9a-fA-F]{3}-[89aAbB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$",
+              "title": "Idempotency-Key",
+              "type": "string"
             }
           }
         ]
@@ -9037,7 +9271,7 @@
       "success_response_schema": [
         {
           "schema": {
-            "$ref": "#/components/schemas/AdminPurchaseDetailView"
+            "$ref": "#/components/schemas/PurchaseCommandResultView"
           },
           "status": "201"
         }
@@ -9105,7 +9339,7 @@
       ]
     },
     {
-      "consumer_contract_state": "CLIENT_GENERATED_USED",
+      "consumer_contract_state": "NOT_CONSUMED",
       "contract_gap": [],
       "datetime_fields": [],
       "decimal_fields": [],
@@ -9123,19 +9357,13 @@
       "enum_fields": [],
       "expected_growth": "NOT_APPLICABLE",
       "filter_class": [],
-      "frontend_consumers": [
-        "apps/backoffice-web/src/features/admin/purchases/api.test.ts",
-        "apps/backoffice-web/src/features/admin/purchases/api.ts",
-        "apps/backoffice-web/src/features/admin/purchases/components.test.tsx"
-      ],
+      "frontend_consumers": [],
       "generated_client_symbol": "update_admin_purchase_v1_admin_purchases__purchase_id__patch",
       "id_fields": [
         "$.request.parameters[0].schema"
       ],
       "method": "PATCH",
-      "nullable_fields": [
-        "$.request.parameters[1].schema"
-      ],
+      "nullable_fields": [],
       "operation_id": "update_admin_purchase_v1_admin_purchases__purchase_id__patch",
       "operation_id_source": "FASTAPI_STABLE_GENERATED",
       "operation_key": "API:PATCH:/v1/admin/purchases/{purchase_id}",
@@ -9159,18 +9387,15 @@
           },
           {
             "in": "header",
-            "name": "X-Request-ID",
-            "required": false,
+            "name": "Idempotency-Key",
+            "required": true,
             "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "X-Request-Id"
+              "description": "A globally unique UUIDv7 identifying this business intention.",
+              "maxLength": 36,
+              "minLength": 36,
+              "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-7[0-9a-fA-F]{3}-[89aAbB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$",
+              "title": "Idempotency-Key",
+              "type": "string"
             }
           }
         ]
@@ -9179,14 +9404,14 @@
       "success_response_schema": [
         {
           "schema": {
-            "$ref": "#/components/schemas/AdminPurchaseDetailView"
+            "$ref": "#/components/schemas/PurchaseCommandResultView"
           },
           "status": "200"
         }
       ]
     },
     {
-      "consumer_contract_state": "NOT_CONSUMED",
+      "consumer_contract_state": "CLIENT_GENERATED_USED",
       "contract_gap": [],
       "datetime_fields": [],
       "decimal_fields": [],
@@ -9204,15 +9429,16 @@
       "enum_fields": [],
       "expected_growth": "NOT_APPLICABLE",
       "filter_class": [],
-      "frontend_consumers": [],
+      "frontend_consumers": [
+        "apps/backoffice-web/src/features/admin/purchases/api.ts",
+        "apps/backoffice-web/src/features/admin/purchases/purchase-command-intent.ts"
+      ],
       "generated_client_symbol": "cancel_admin_purchase_v1_admin_purchases__purchase_id__cancel_post",
       "id_fields": [
         "$.request.parameters[0].schema"
       ],
       "method": "POST",
-      "nullable_fields": [
-        "$.request.parameters[1].schema"
-      ],
+      "nullable_fields": [],
       "operation_id": "cancel_admin_purchase_v1_admin_purchases__purchase_id__cancel_post",
       "operation_id_source": "FASTAPI_STABLE_GENERATED",
       "operation_key": "API:POST:/v1/admin/purchases/{purchase_id}/cancel",
@@ -9236,18 +9462,15 @@
           },
           {
             "in": "header",
-            "name": "X-Request-ID",
-            "required": false,
+            "name": "Idempotency-Key",
+            "required": true,
             "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "X-Request-Id"
+              "description": "A globally unique UUIDv7 identifying this business intention.",
+              "maxLength": 36,
+              "minLength": 36,
+              "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-7[0-9a-fA-F]{3}-[89aAbB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$",
+              "title": "Idempotency-Key",
+              "type": "string"
             }
           }
         ]
@@ -9256,14 +9479,14 @@
       "success_response_schema": [
         {
           "schema": {
-            "$ref": "#/components/schemas/AdminPurchaseDetailView"
+            "$ref": "#/components/schemas/PurchaseCommandResultView"
           },
           "status": "200"
         }
       ]
     },
     {
-      "consumer_contract_state": "NOT_CONSUMED",
+      "consumer_contract_state": "CLIENT_GENERATED_USED",
       "contract_gap": [],
       "datetime_fields": [],
       "decimal_fields": [],
@@ -9281,15 +9504,16 @@
       "enum_fields": [],
       "expected_growth": "NOT_APPLICABLE",
       "filter_class": [],
-      "frontend_consumers": [],
+      "frontend_consumers": [
+        "apps/backoffice-web/src/features/admin/purchases/api.ts",
+        "apps/backoffice-web/src/features/admin/purchases/purchase-command-intent.ts"
+      ],
       "generated_client_symbol": "confirm_admin_purchase_v1_admin_purchases__purchase_id__confirm_post",
       "id_fields": [
         "$.request.parameters[0].schema"
       ],
       "method": "POST",
-      "nullable_fields": [
-        "$.request.parameters[1].schema"
-      ],
+      "nullable_fields": [],
       "operation_id": "confirm_admin_purchase_v1_admin_purchases__purchase_id__confirm_post",
       "operation_id_source": "FASTAPI_STABLE_GENERATED",
       "operation_key": "API:POST:/v1/admin/purchases/{purchase_id}/confirm",
@@ -9311,18 +9535,15 @@
           },
           {
             "in": "header",
-            "name": "X-Request-ID",
-            "required": false,
+            "name": "Idempotency-Key",
+            "required": true,
             "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "X-Request-Id"
+              "description": "A globally unique UUIDv7 identifying this business intention.",
+              "maxLength": 36,
+              "minLength": 36,
+              "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-7[0-9a-fA-F]{3}-[89aAbB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$",
+              "title": "Idempotency-Key",
+              "type": "string"
             }
           }
         ]
@@ -9331,14 +9552,14 @@
       "success_response_schema": [
         {
           "schema": {
-            "$ref": "#/components/schemas/AdminPurchaseDetailView"
+            "$ref": "#/components/schemas/PurchaseCommandResultView"
           },
           "status": "200"
         }
       ]
     },
     {
-      "consumer_contract_state": "NOT_CONSUMED",
+      "consumer_contract_state": "CLIENT_GENERATED_USED",
       "contract_gap": [],
       "datetime_fields": [],
       "decimal_fields": [],
@@ -9356,15 +9577,16 @@
       "enum_fields": [],
       "expected_growth": "NOT_APPLICABLE",
       "filter_class": [],
-      "frontend_consumers": [],
+      "frontend_consumers": [
+        "apps/backoffice-web/src/features/admin/purchases/api.ts",
+        "apps/backoffice-web/src/features/admin/purchases/purchase-command-intent.ts"
+      ],
       "generated_client_symbol": "receive_admin_purchase_v1_admin_purchases__purchase_id__receive_post",
       "id_fields": [
         "$.request.parameters[0].schema"
       ],
       "method": "POST",
-      "nullable_fields": [
-        "$.request.parameters[1].schema"
-      ],
+      "nullable_fields": [],
       "operation_id": "receive_admin_purchase_v1_admin_purchases__purchase_id__receive_post",
       "operation_id_source": "FASTAPI_STABLE_GENERATED",
       "operation_key": "API:POST:/v1/admin/purchases/{purchase_id}/receive",
@@ -9388,18 +9610,15 @@
           },
           {
             "in": "header",
-            "name": "X-Request-ID",
-            "required": false,
+            "name": "Idempotency-Key",
+            "required": true,
             "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "X-Request-Id"
+              "description": "A globally unique UUIDv7 identifying this business intention.",
+              "maxLength": 36,
+              "minLength": 36,
+              "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-7[0-9a-fA-F]{3}-[89aAbB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$",
+              "title": "Idempotency-Key",
+              "type": "string"
             }
           }
         ]
@@ -9408,7 +9627,7 @@
       "success_response_schema": [
         {
           "schema": {
-            "$ref": "#/components/schemas/AdminPurchaseDetailView"
+            "$ref": "#/components/schemas/PurchaseCommandResultView"
           },
           "status": "200"
         }
@@ -15190,8 +15409,8 @@
       "expected_growth": "NOT_APPLICABLE",
       "filter_class": [],
       "frontend_consumers": [
-        "apps/backoffice-web/src/features/admin/transfers/api.test.ts",
-        "apps/backoffice-web/src/features/admin/transfers/api.ts"
+        "apps/backoffice-web/src/features/admin/transfers/api.ts",
+        "apps/backoffice-web/src/features/admin/transfers/transfer-command-intent.ts"
       ],
       "generated_client_symbol": "create_admin_transfer_v1_admin_transfers_post",
       "id_fields": [],
@@ -15206,15 +15425,117 @@
         "body_schema": {
           "$ref": "#/components/schemas/AdminTransferCreateRequest"
         },
-        "parameters": []
+        "parameters": [
+          {
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": true,
+            "schema": {
+              "description": "A globally unique UUIDv7 identifying this business intention.",
+              "maxLength": 36,
+              "minLength": 36,
+              "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-7[0-9a-fA-F]{3}-[89aAbB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$",
+              "title": "Idempotency-Key",
+              "type": "string"
+            }
+          }
+        ]
       },
       "stable_order": "NOT_APPLICABLE",
       "success_response_schema": [
         {
           "schema": {
-            "$ref": "#/components/schemas/AdminTransferDetailView"
+            "$ref": "#/components/schemas/TransferCommandResultView"
           },
           "status": "201"
+        }
+      ]
+    },
+    {
+      "consumer_contract_state": "CLIENT_GENERATED_USED",
+      "contract_gap": [],
+      "datetime_fields": [],
+      "decimal_fields": [],
+      "declared_error_responses": [
+        "400",
+        "401",
+        "403",
+        "404",
+        "409",
+        "422",
+        "423",
+        "429",
+        "500"
+      ],
+      "enum_fields": [
+        "$.request.parameters[0].schema"
+      ],
+      "expected_growth": "NOT_APPLICABLE",
+      "filter_class": [],
+      "frontend_consumers": [
+        "apps/backoffice-web/src/features/admin/transfers/api.ts",
+        "apps/backoffice-web/src/features/admin/transfers/transfer-command-intent.ts"
+      ],
+      "generated_client_symbol": "recover_admin_transfer_v1_admin_transfers_commands__command_code__confirmations__idempotency_key__get",
+      "id_fields": [
+        "$.request.parameters[2].schema"
+      ],
+      "method": "GET",
+      "nullable_fields": [],
+      "operation_id": "recover_admin_transfer_v1_admin_transfers_commands__command_code__confirmations__idempotency_key__get",
+      "operation_id_source": "FASTAPI_STABLE_GENERATED",
+      "operation_key": "API:GET:/v1/admin/transfers/commands/{command_code}/confirmations/{idempotency_key}",
+      "pagination_class": "NOT_APPLICABLE",
+      "path": "/v1/admin/transfers/commands/{command_code}/confirmations/{idempotency_key}",
+      "request_schema": {
+        "body_schema": null,
+        "parameters": [
+          {
+            "in": "path",
+            "name": "command_code",
+            "required": true,
+            "schema": {
+              "enum": [
+                "create",
+                "update",
+                "dispatch",
+                "receive",
+                "cancel"
+              ],
+              "title": "Command Code",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "idempotency_key",
+            "required": true,
+            "schema": {
+              "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-7[0-9a-fA-F]{3}-[89aAbB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$",
+              "title": "Idempotency Key",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "branch_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Branch Id",
+              "type": "string",
+              "x-zeromerma-id-representation": "JSON_STRING"
+            }
+          }
+        ]
+      },
+      "stable_order": "NOT_APPLICABLE",
+      "success_response_schema": [
+        {
+          "schema": {
+            "$ref": "#/components/schemas/TransferCommandResultView"
+          },
+          "status": "200"
         }
       ]
     },
@@ -15298,8 +15619,8 @@
       "expected_growth": "NOT_APPLICABLE",
       "filter_class": [],
       "frontend_consumers": [
-        "apps/backoffice-web/src/features/admin/transfers/api.test.ts",
-        "apps/backoffice-web/src/features/admin/transfers/api.ts"
+        "apps/backoffice-web/src/features/admin/transfers/api.ts",
+        "apps/backoffice-web/src/features/admin/transfers/transfer-command-intent.ts"
       ],
       "generated_client_symbol": "update_admin_transfer_v1_admin_transfers__transfer_id__patch",
       "id_fields": [
@@ -15327,6 +15648,19 @@
               "type": "string",
               "x-zeromerma-id-representation": "JSON_STRING"
             }
+          },
+          {
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": true,
+            "schema": {
+              "description": "A globally unique UUIDv7 identifying this business intention.",
+              "maxLength": 36,
+              "minLength": 36,
+              "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-7[0-9a-fA-F]{3}-[89aAbB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$",
+              "title": "Idempotency-Key",
+              "type": "string"
+            }
           }
         ]
       },
@@ -15334,14 +15668,14 @@
       "success_response_schema": [
         {
           "schema": {
-            "$ref": "#/components/schemas/AdminTransferDetailView"
+            "$ref": "#/components/schemas/TransferCommandResultView"
           },
           "status": "200"
         }
       ]
     },
     {
-      "consumer_contract_state": "NOT_CONSUMED",
+      "consumer_contract_state": "CLIENT_GENERATED_USED",
       "contract_gap": [],
       "datetime_fields": [],
       "decimal_fields": [],
@@ -15359,7 +15693,10 @@
       "enum_fields": [],
       "expected_growth": "NOT_APPLICABLE",
       "filter_class": [],
-      "frontend_consumers": [],
+      "frontend_consumers": [
+        "apps/backoffice-web/src/features/admin/transfers/api.ts",
+        "apps/backoffice-web/src/features/admin/transfers/transfer-command-intent.ts"
+      ],
       "generated_client_symbol": "cancel_admin_transfer_v1_admin_transfers__transfer_id__cancel_post",
       "id_fields": [
         "$.request.parameters[0].schema"
@@ -15386,6 +15723,19 @@
               "type": "string",
               "x-zeromerma-id-representation": "JSON_STRING"
             }
+          },
+          {
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": true,
+            "schema": {
+              "description": "A globally unique UUIDv7 identifying this business intention.",
+              "maxLength": 36,
+              "minLength": 36,
+              "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-7[0-9a-fA-F]{3}-[89aAbB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$",
+              "title": "Idempotency-Key",
+              "type": "string"
+            }
           }
         ]
       },
@@ -15393,14 +15743,14 @@
       "success_response_schema": [
         {
           "schema": {
-            "$ref": "#/components/schemas/AdminTransferDetailView"
+            "$ref": "#/components/schemas/TransferCommandResultView"
           },
           "status": "200"
         }
       ]
     },
     {
-      "consumer_contract_state": "NOT_CONSUMED",
+      "consumer_contract_state": "CLIENT_GENERATED_USED",
       "contract_gap": [],
       "datetime_fields": [],
       "decimal_fields": [],
@@ -15418,7 +15768,10 @@
       "enum_fields": [],
       "expected_growth": "NOT_APPLICABLE",
       "filter_class": [],
-      "frontend_consumers": [],
+      "frontend_consumers": [
+        "apps/backoffice-web/src/features/admin/transfers/api.ts",
+        "apps/backoffice-web/src/features/admin/transfers/transfer-command-intent.ts"
+      ],
       "generated_client_symbol": "dispatch_admin_transfer_v1_admin_transfers__transfer_id__dispatch_post",
       "id_fields": [
         "$.request.parameters[0].schema"
@@ -15445,6 +15798,19 @@
               "type": "string",
               "x-zeromerma-id-representation": "JSON_STRING"
             }
+          },
+          {
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": true,
+            "schema": {
+              "description": "A globally unique UUIDv7 identifying this business intention.",
+              "maxLength": 36,
+              "minLength": 36,
+              "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-7[0-9a-fA-F]{3}-[89aAbB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$",
+              "title": "Idempotency-Key",
+              "type": "string"
+            }
           }
         ]
       },
@@ -15452,14 +15818,14 @@
       "success_response_schema": [
         {
           "schema": {
-            "$ref": "#/components/schemas/AdminTransferDetailView"
+            "$ref": "#/components/schemas/TransferCommandResultView"
           },
           "status": "200"
         }
       ]
     },
     {
-      "consumer_contract_state": "NOT_CONSUMED",
+      "consumer_contract_state": "CLIENT_GENERATED_USED",
       "contract_gap": [],
       "datetime_fields": [],
       "decimal_fields": [],
@@ -15477,7 +15843,10 @@
       "enum_fields": [],
       "expected_growth": "NOT_APPLICABLE",
       "filter_class": [],
-      "frontend_consumers": [],
+      "frontend_consumers": [
+        "apps/backoffice-web/src/features/admin/transfers/api.ts",
+        "apps/backoffice-web/src/features/admin/transfers/transfer-command-intent.ts"
+      ],
       "generated_client_symbol": "receive_admin_transfer_v1_admin_transfers__transfer_id__receive_post",
       "id_fields": [
         "$.request.parameters[0].schema"
@@ -15504,6 +15873,19 @@
               "type": "string",
               "x-zeromerma-id-representation": "JSON_STRING"
             }
+          },
+          {
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": true,
+            "schema": {
+              "description": "A globally unique UUIDv7 identifying this business intention.",
+              "maxLength": 36,
+              "minLength": 36,
+              "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-7[0-9a-fA-F]{3}-[89aAbB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$",
+              "title": "Idempotency-Key",
+              "type": "string"
+            }
           }
         ]
       },
@@ -15511,7 +15893,7 @@
       "success_response_schema": [
         {
           "schema": {
-            "$ref": "#/components/schemas/AdminTransferDetailView"
+            "$ref": "#/components/schemas/TransferCommandResultView"
           },
           "status": "200"
         }
@@ -16990,9 +17372,8 @@
       "expected_growth": "NOT_APPLICABLE",
       "filter_class": [],
       "frontend_consumers": [
-        "apps/backoffice-web/src/features/admin/waste/api.test.ts",
-        "apps/backoffice-web/src/features/admin/waste/api.ts",
-        "apps/backoffice-web/src/features/admin/waste/components.test.tsx"
+        "apps/backoffice-web/src/features/admin/physical-commands/physical-command-intent.ts",
+        "apps/backoffice-web/src/features/admin/waste/api.ts"
       ],
       "generated_client_symbol": "create_admin_waste_v1_admin_waste_post",
       "id_fields": [],
@@ -17025,6 +17406,19 @@
               ],
               "title": "X-Request-Id"
             }
+          },
+          {
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": true,
+            "schema": {
+              "description": "A globally unique UUIDv7 identifying this business intention.",
+              "maxLength": 36,
+              "minLength": 36,
+              "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-7[0-9a-fA-F]{3}-[89aAbB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$",
+              "title": "Idempotency-Key",
+              "type": "string"
+            }
           }
         ]
       },
@@ -17032,9 +17426,79 @@
       "success_response_schema": [
         {
           "schema": {
-            "$ref": "#/components/schemas/AdminWasteDetailView"
+            "$ref": "#/components/schemas/OperationCommitResultView"
           },
           "status": "201"
+        }
+      ]
+    },
+    {
+      "consumer_contract_state": "CLIENT_GENERATED_USED",
+      "contract_gap": [],
+      "datetime_fields": [],
+      "decimal_fields": [],
+      "declared_error_responses": [
+        "400",
+        "401",
+        "403",
+        "404",
+        "409",
+        "422",
+        "423",
+        "429",
+        "500"
+      ],
+      "enum_fields": [],
+      "expected_growth": "NOT_APPLICABLE",
+      "filter_class": [],
+      "frontend_consumers": [
+        "apps/backoffice-web/src/features/admin/physical-commands/physical-command-intent.ts",
+        "apps/backoffice-web/src/features/admin/waste/api.ts"
+      ],
+      "generated_client_symbol": "recover_create_admin_waste_v1_admin_waste_confirmations__idempotency_key__get",
+      "id_fields": [
+        "$.request.parameters[1].schema"
+      ],
+      "method": "GET",
+      "nullable_fields": [],
+      "operation_id": "recover_create_admin_waste_v1_admin_waste_confirmations__idempotency_key__get",
+      "operation_id_source": "FASTAPI_STABLE_GENERATED",
+      "operation_key": "API:GET:/v1/admin/waste/confirmations/{idempotency_key}",
+      "pagination_class": "NOT_APPLICABLE",
+      "path": "/v1/admin/waste/confirmations/{idempotency_key}",
+      "request_schema": {
+        "body_schema": null,
+        "parameters": [
+          {
+            "in": "path",
+            "name": "idempotency_key",
+            "required": true,
+            "schema": {
+              "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-7[0-9a-fA-F]{3}-[89aAbB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$",
+              "title": "Idempotency Key",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "branch_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Branch Id",
+              "type": "string",
+              "x-zeromerma-id-representation": "JSON_STRING"
+            }
+          }
+        ]
+      },
+      "stable_order": "NOT_APPLICABLE",
+      "success_response_schema": [
+        {
+          "schema": {
+            "$ref": "#/components/schemas/OperationCommitResultView"
+          },
+          "status": "200"
         }
       ]
     },
@@ -18808,7 +19272,8 @@
       "expected_growth": "NOT_APPLICABLE",
       "filter_class": [],
       "frontend_consumers": [
-        "apps/pos-web/src/features/corrections/corrections-api.ts"
+        "apps/pos-web/src/features/corrections/corrections-api.ts",
+        "apps/pos-web/src/features/operation-commands/operation-command-intent.ts"
       ],
       "generated_client_symbol": "commit_correction_v1_corrections_commit_post",
       "id_fields": [],
@@ -18823,15 +19288,109 @@
         "body_schema": {
           "$ref": "#/components/schemas/CorrectionCommitRequest"
         },
-        "parameters": []
+        "parameters": [
+          {
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": true,
+            "schema": {
+              "description": "A globally unique UUIDv7 identifying this business intention.",
+              "maxLength": 36,
+              "minLength": 36,
+              "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-7[0-9a-fA-F]{3}-[89aAbB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$",
+              "title": "Idempotency-Key",
+              "type": "string"
+            }
+          }
+        ]
       },
       "stable_order": "NOT_APPLICABLE",
       "success_response_schema": [
         {
           "schema": {
-            "$ref": "#/components/schemas/CorrectionDocumentView"
+            "$ref": "#/components/schemas/CorrectionCommitResultView"
           },
           "status": "201"
+        }
+      ]
+    },
+    {
+      "consumer_contract_state": "CLIENT_GENERATED_USED",
+      "contract_gap": [],
+      "datetime_fields": [],
+      "decimal_fields": [],
+      "declared_error_responses": [
+        "400",
+        "401",
+        "403",
+        "404",
+        "409",
+        "422",
+        "423",
+        "429",
+        "500"
+      ],
+      "enum_fields": [],
+      "expected_growth": "NOT_APPLICABLE",
+      "filter_class": [],
+      "frontend_consumers": [
+        "apps/pos-web/src/features/corrections/corrections-api.ts",
+        "apps/pos-web/src/features/operation-commands/operation-command-intent.ts"
+      ],
+      "generated_client_symbol": "recover_commit_correction_v1_corrections_confirmations__idempotency_key__get",
+      "id_fields": [
+        "$.request.parameters[2].schema"
+      ],
+      "method": "GET",
+      "nullable_fields": [],
+      "operation_id": "recover_commit_correction_v1_corrections_confirmations__idempotency_key__get",
+      "operation_id_source": "FASTAPI_STABLE_GENERATED",
+      "operation_key": "API:GET:/v1/corrections/confirmations/{idempotency_key}",
+      "pagination_class": "NOT_APPLICABLE",
+      "path": "/v1/corrections/confirmations/{idempotency_key}",
+      "request_schema": {
+        "body_schema": null,
+        "parameters": [
+          {
+            "in": "path",
+            "name": "idempotency_key",
+            "required": true,
+            "schema": {
+              "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-7[0-9a-fA-F]{3}-[89aAbB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$",
+              "title": "Idempotency Key",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "workstation_code",
+            "required": true,
+            "schema": {
+              "minLength": 1,
+              "title": "Workstation Code",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "cash_session_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Cash Session Id",
+              "type": "string",
+              "x-zeromerma-id-representation": "JSON_STRING"
+            }
+          }
+        ]
+      },
+      "stable_order": "NOT_APPLICABLE",
+      "success_response_schema": [
+        {
+          "schema": {
+            "$ref": "#/components/schemas/CorrectionCommitResultView"
+          },
+          "status": "200"
         }
       ]
     },
@@ -19992,6 +20551,7 @@
       "expected_growth": "NOT_APPLICABLE",
       "filter_class": [],
       "frontend_consumers": [
+        "apps/pos-web/src/features/operation-commands/operation-command-intent.ts",
         "apps/pos-web/src/features/operations/operations-api.ts"
       ],
       "generated_client_symbol": "commit_counter_transfer_v1_operations_counter_transfer_commit_post",
@@ -20007,15 +20567,109 @@
         "body_schema": {
           "$ref": "#/components/schemas/CounterTransferCommitRequest"
         },
-        "parameters": []
+        "parameters": [
+          {
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": true,
+            "schema": {
+              "description": "A globally unique UUIDv7 identifying this business intention.",
+              "maxLength": 36,
+              "minLength": 36,
+              "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-7[0-9a-fA-F]{3}-[89aAbB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$",
+              "title": "Idempotency-Key",
+              "type": "string"
+            }
+          }
+        ]
       },
       "stable_order": "NOT_APPLICABLE",
       "success_response_schema": [
         {
           "schema": {
-            "$ref": "#/components/schemas/OperationDocumentView"
+            "$ref": "#/components/schemas/OperationCommitResultView"
           },
           "status": "201"
+        }
+      ]
+    },
+    {
+      "consumer_contract_state": "CLIENT_GENERATED_USED",
+      "contract_gap": [],
+      "datetime_fields": [],
+      "decimal_fields": [],
+      "declared_error_responses": [
+        "400",
+        "401",
+        "403",
+        "404",
+        "409",
+        "422",
+        "423",
+        "429",
+        "500"
+      ],
+      "enum_fields": [],
+      "expected_growth": "NOT_APPLICABLE",
+      "filter_class": [],
+      "frontend_consumers": [
+        "apps/pos-web/src/features/operation-commands/operation-command-intent.ts",
+        "apps/pos-web/src/features/operations/operations-api.ts"
+      ],
+      "generated_client_symbol": "recover_counter_transfer_v1_operations_counter_transfer_confirmations__idempotency_key__get",
+      "id_fields": [
+        "$.request.parameters[2].schema"
+      ],
+      "method": "GET",
+      "nullable_fields": [],
+      "operation_id": "recover_counter_transfer_v1_operations_counter_transfer_confirmations__idempotency_key__get",
+      "operation_id_source": "FASTAPI_STABLE_GENERATED",
+      "operation_key": "API:GET:/v1/operations/counter-transfer/confirmations/{idempotency_key}",
+      "pagination_class": "NOT_APPLICABLE",
+      "path": "/v1/operations/counter-transfer/confirmations/{idempotency_key}",
+      "request_schema": {
+        "body_schema": null,
+        "parameters": [
+          {
+            "in": "path",
+            "name": "idempotency_key",
+            "required": true,
+            "schema": {
+              "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-7[0-9a-fA-F]{3}-[89aAbB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$",
+              "title": "Idempotency Key",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "workstation_code",
+            "required": true,
+            "schema": {
+              "minLength": 1,
+              "title": "Workstation Code",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "cash_session_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Cash Session Id",
+              "type": "string",
+              "x-zeromerma-id-representation": "JSON_STRING"
+            }
+          }
+        ]
+      },
+      "stable_order": "NOT_APPLICABLE",
+      "success_response_schema": [
+        {
+          "schema": {
+            "$ref": "#/components/schemas/OperationCommitResultView"
+          },
+          "status": "200"
         }
       ]
     },
@@ -20228,6 +20882,7 @@
       "expected_growth": "NOT_APPLICABLE",
       "filter_class": [],
       "frontend_consumers": [
+        "apps/pos-web/src/features/operation-commands/operation-command-intent.ts",
         "apps/pos-web/src/features/operations/operations-api.ts"
       ],
       "generated_client_symbol": "commit_waste_record_v1_operations_waste_commit_post",
@@ -20243,15 +20898,109 @@
         "body_schema": {
           "$ref": "#/components/schemas/WasteCommitRequest"
         },
-        "parameters": []
+        "parameters": [
+          {
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": true,
+            "schema": {
+              "description": "A globally unique UUIDv7 identifying this business intention.",
+              "maxLength": 36,
+              "minLength": 36,
+              "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-7[0-9a-fA-F]{3}-[89aAbB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$",
+              "title": "Idempotency-Key",
+              "type": "string"
+            }
+          }
+        ]
       },
       "stable_order": "NOT_APPLICABLE",
       "success_response_schema": [
         {
           "schema": {
-            "$ref": "#/components/schemas/OperationDocumentView"
+            "$ref": "#/components/schemas/OperationCommitResultView"
           },
           "status": "201"
+        }
+      ]
+    },
+    {
+      "consumer_contract_state": "CLIENT_GENERATED_USED",
+      "contract_gap": [],
+      "datetime_fields": [],
+      "decimal_fields": [],
+      "declared_error_responses": [
+        "400",
+        "401",
+        "403",
+        "404",
+        "409",
+        "422",
+        "423",
+        "429",
+        "500"
+      ],
+      "enum_fields": [],
+      "expected_growth": "NOT_APPLICABLE",
+      "filter_class": [],
+      "frontend_consumers": [
+        "apps/pos-web/src/features/operation-commands/operation-command-intent.ts",
+        "apps/pos-web/src/features/operations/operations-api.ts"
+      ],
+      "generated_client_symbol": "recover_waste_v1_operations_waste_confirmations__idempotency_key__get",
+      "id_fields": [
+        "$.request.parameters[2].schema"
+      ],
+      "method": "GET",
+      "nullable_fields": [],
+      "operation_id": "recover_waste_v1_operations_waste_confirmations__idempotency_key__get",
+      "operation_id_source": "FASTAPI_STABLE_GENERATED",
+      "operation_key": "API:GET:/v1/operations/waste/confirmations/{idempotency_key}",
+      "pagination_class": "NOT_APPLICABLE",
+      "path": "/v1/operations/waste/confirmations/{idempotency_key}",
+      "request_schema": {
+        "body_schema": null,
+        "parameters": [
+          {
+            "in": "path",
+            "name": "idempotency_key",
+            "required": true,
+            "schema": {
+              "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-7[0-9a-fA-F]{3}-[89aAbB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$",
+              "title": "Idempotency Key",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "workstation_code",
+            "required": true,
+            "schema": {
+              "minLength": 1,
+              "title": "Workstation Code",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "cash_session_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Cash Session Id",
+              "type": "string",
+              "x-zeromerma-id-representation": "JSON_STRING"
+            }
+          }
+        ]
+      },
+      "stable_order": "NOT_APPLICABLE",
+      "success_response_schema": [
+        {
+          "schema": {
+            "$ref": "#/components/schemas/OperationCommitResultView"
+          },
+          "status": "200"
         }
       ]
     },
@@ -23033,10 +23782,106 @@
         "429",
         "500"
       ],
+      "enum_fields": [
+        "$.request.parameters[0].schema"
+      ],
+      "expected_growth": "NOT_APPLICABLE",
+      "filter_class": [],
+      "frontend_consumers": [
+        "apps/pos-web/src/features/transfers/transfer-command-intent.ts",
+        "apps/pos-web/src/features/transfers/transfers-api.ts"
+      ],
+      "generated_client_symbol": "recover_pos_transfer_v1_transfers_commands__command_code__confirmations__idempotency_key__get",
+      "id_fields": [
+        "$.request.parameters[3].schema"
+      ],
+      "method": "GET",
+      "nullable_fields": [],
+      "operation_id": "recover_pos_transfer_v1_transfers_commands__command_code__confirmations__idempotency_key__get",
+      "operation_id_source": "FASTAPI_STABLE_GENERATED",
+      "operation_key": "API:GET:/v1/transfers/commands/{command_code}/confirmations/{idempotency_key}",
+      "pagination_class": "NOT_APPLICABLE",
+      "path": "/v1/transfers/commands/{command_code}/confirmations/{idempotency_key}",
+      "request_schema": {
+        "body_schema": null,
+        "parameters": [
+          {
+            "in": "path",
+            "name": "command_code",
+            "required": true,
+            "schema": {
+              "enum": [
+                "dispatch",
+                "receive"
+              ],
+              "title": "Command Code",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "idempotency_key",
+            "required": true,
+            "schema": {
+              "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-7[0-9a-fA-F]{3}-[89aAbB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$",
+              "title": "Idempotency Key",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "workstation_code",
+            "required": true,
+            "schema": {
+              "minLength": 1,
+              "title": "Workstation Code",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "cash_session_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Cash Session Id",
+              "type": "string",
+              "x-zeromerma-id-representation": "JSON_STRING"
+            }
+          }
+        ]
+      },
+      "stable_order": "NOT_APPLICABLE",
+      "success_response_schema": [
+        {
+          "schema": {
+            "$ref": "#/components/schemas/TransferCommandResultView"
+          },
+          "status": "200"
+        }
+      ]
+    },
+    {
+      "consumer_contract_state": "CLIENT_GENERATED_USED",
+      "contract_gap": [],
+      "datetime_fields": [],
+      "decimal_fields": [],
+      "declared_error_responses": [
+        "400",
+        "401",
+        "403",
+        "404",
+        "409",
+        "422",
+        "423",
+        "429",
+        "500"
+      ],
       "enum_fields": [],
       "expected_growth": "NOT_APPLICABLE",
       "filter_class": [],
       "frontend_consumers": [
+        "apps/pos-web/src/features/transfers/transfer-command-intent.ts",
         "apps/pos-web/src/features/transfers/transfers-api.ts"
       ],
       "generated_client_symbol": "commit_transfer_dispatch_v1_transfers_dispatch_commit_post",
@@ -23052,13 +23897,27 @@
         "body_schema": {
           "$ref": "#/components/schemas/TransferDispatchCommitRequest"
         },
-        "parameters": []
+        "parameters": [
+          {
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": true,
+            "schema": {
+              "description": "A globally unique UUIDv7 identifying this business intention.",
+              "maxLength": 36,
+              "minLength": 36,
+              "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-7[0-9a-fA-F]{3}-[89aAbB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$",
+              "title": "Idempotency-Key",
+              "type": "string"
+            }
+          }
+        ]
       },
       "stable_order": "NOT_APPLICABLE",
       "success_response_schema": [
         {
           "schema": {
-            "$ref": "#/components/schemas/TransferDetailResponse"
+            "$ref": "#/components/schemas/TransferCommandResultView"
           },
           "status": "201"
         }
@@ -23450,7 +24309,7 @@
       ]
     },
     {
-      "consumer_contract_state": "NOT_CONSUMED",
+      "consumer_contract_state": "CLIENT_GENERATED_USED",
       "contract_gap": [],
       "datetime_fields": [],
       "decimal_fields": [],
@@ -23468,7 +24327,10 @@
       "enum_fields": [],
       "expected_growth": "NOT_APPLICABLE",
       "filter_class": [],
-      "frontend_consumers": [],
+      "frontend_consumers": [
+        "apps/pos-web/src/features/transfers/transfer-command-intent.ts",
+        "apps/pos-web/src/features/transfers/transfers-api.ts"
+      ],
       "generated_client_symbol": "receive_transfer_v1_transfers__transfer_id__receive_post",
       "id_fields": [
         "$.request.parameters[0].schema"
@@ -23495,6 +24357,19 @@
               "type": "string",
               "x-zeromerma-id-representation": "JSON_STRING"
             }
+          },
+          {
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": true,
+            "schema": {
+              "description": "A globally unique UUIDv7 identifying this business intention.",
+              "maxLength": 36,
+              "minLength": 36,
+              "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-7[0-9a-fA-F]{3}-[89aAbB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$",
+              "title": "Idempotency-Key",
+              "type": "string"
+            }
           }
         ]
       },
@@ -23502,7 +24377,7 @@
       "success_response_schema": [
         {
           "schema": {
-            "$ref": "#/components/schemas/TransferDetailResponse"
+            "$ref": "#/components/schemas/TransferCommandResultView"
           },
           "status": "200"
         }

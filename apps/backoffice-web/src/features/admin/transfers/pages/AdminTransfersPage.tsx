@@ -1,18 +1,16 @@
+import { isCommandIntentionPending } from "@zeromerma/api-client";
+import { transferIntentions, type TransferIntentionPayload } from "../transfer-command-intent";
+import { useTransferIntention, useTransferDraftIdentity } from "../use-transfer-intention";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 
 import { toBackofficeErrorMessage } from "../../../../lib/api";
 import { useBackofficeAuthStore } from "../../../auth/backoffice-auth-store";
 import { AdminPageHeader } from "../../components/AdminPageHeader";
 import {
   adminTransferBackendContract,
-  cancelAdminTransfer,
-  createAdminTransfer,
-  dispatchAdminTransfer,
   fetchAdminTransferDetail,
   fetchAdminTransfers,
-  receiveAdminTransfer,
-  updateAdminTransfer,
 } from "../api";
 import { AdminTransferDetailPanel } from "../components/AdminTransferDetailPanel";
 import { AdminTransferWorkflowPanel } from "../components/AdminTransferWorkflowPanel";
@@ -136,6 +134,8 @@ function AdminTransferMetricStrip({
 }
 
 export function AdminTransfersPage() {
+  const user = useBackofficeAuthStore((state) => state.user);
+  const intention = useTransferIntention();
   const isAuthenticated = useBackofficeAuthStore((state) => state.isAuthenticated);
   const queryClient = useQueryClient();
   const [filters, setFilters] = useState<AdminTransferListFilters>(getInitialFilters);
@@ -173,20 +173,36 @@ export function AdminTransfersPage() {
     retry: false,
   });
 
-  const createMutation = useMutation({
-    mutationFn: async ({
-      dispatchNow,
+  const clearConfirmedDraft = useCallback(() => {
+    setWorkflowMode(null);
+    setWorkflowTransferId(null);
+  }, []);
+  const draftKey = useTransferDraftIdentity(intention.metadata, true, clearConfirmedDraft);
+  function originalBranch(transferId: string): string {
+    const detail = workflowTransferQuery.data ?? transferDetailQuery.data;
+    const branchId =
+      detail?.overview.id === transferId
+        ? detail.origin.branchId
+        : transferList.items.find((item) => item.id === transferId)?.originBranchId;
+    if (!branchId) throw new Error("Carga el contexto original del envío.");
+    return branchId;
+  }
+  function begin(
+    payload: TransferIntentionPayload,
+    branchId: string,
+    transferId: string | null = null,
+    observedKey = draftKey.current ?? null,
+  ) {
+    if (!user || intention.error) throw new Error(intention.error ?? "Se requiere autenticación.");
+    return transferIntentions.begin(
+      { userId: user.id, branchId, transferId, commandCode: payload.commandCode },
       payload,
-    }: {
-      dispatchNow: boolean;
-      payload: AdminTransferCreatePayload;
-    }) => {
-      const created = await createAdminTransfer(payload);
-      if (!dispatchNow) {
-        return created;
-      }
-      return dispatchAdminTransfer(created.overview.id, payload.notes ?? null);
-    },
+      observedKey,
+    );
+  }
+  const createMutation = useMutation({
+    mutationFn: (payload: AdminTransferCreatePayload) =>
+      begin({ commandCode: "create", body: payload }, payload.originBranchId),
     onError: (error) => {
       setFeedback({
         tone: "error",
@@ -195,7 +211,7 @@ export function AdminTransfersPage() {
     },
     onSuccess: (detail) => {
       setFeedback({ tone: "success", message: "Transferencia guardada correctamente." });
-      setSelectedTransferId(detail.overview.id);
+      setSelectedTransferId(detail.id);
       setWorkflowMode(null);
       setWorkflowTransferId(null);
       void queryClient.invalidateQueries({ queryKey: ["admin", "transfers"] });
@@ -209,7 +225,7 @@ export function AdminTransfersPage() {
     }: {
       payload: AdminTransferUpdatePayload;
       transferId: string;
-    }) => updateAdminTransfer(transferId, payload),
+    }) => begin({ commandCode: "update", body: payload }, originalBranch(transferId), transferId),
     onError: (error) => {
       setFeedback({
         tone: "error",
@@ -218,7 +234,7 @@ export function AdminTransfersPage() {
     },
     onSuccess: (detail) => {
       setFeedback({ tone: "success", message: "Borrador actualizado correctamente." });
-      setSelectedTransferId(detail.overview.id);
+      setSelectedTransferId(detail.id);
       setWorkflowMode(null);
       setWorkflowTransferId(null);
       void queryClient.invalidateQueries({ queryKey: ["admin", "transfers"] });
@@ -227,7 +243,7 @@ export function AdminTransfersPage() {
 
   const dispatchMutation = useMutation({
     mutationFn: ({ notes, transferId }: { notes?: string | null; transferId: string }) =>
-      dispatchAdminTransfer(transferId, notes),
+      begin({ commandCode: "dispatch", notes }, originalBranch(transferId), transferId),
     onError: (error) => {
       setFeedback({
         tone: "error",
@@ -236,7 +252,7 @@ export function AdminTransfersPage() {
     },
     onSuccess: (detail) => {
       setFeedback({ tone: "success", message: "Transferencia enviada correctamente." });
-      setSelectedTransferId(detail.overview.id);
+      setSelectedTransferId(detail.id);
       setWorkflowMode(null);
       setWorkflowTransferId(null);
       void queryClient.invalidateQueries({ queryKey: ["admin", "transfers"] });
@@ -250,7 +266,7 @@ export function AdminTransfersPage() {
     }: {
       payload: AdminTransferReceivePayload;
       transferId: string;
-    }) => receiveAdminTransfer(transferId, payload),
+    }) => begin({ commandCode: "receive", body: payload }, originalBranch(transferId), transferId),
     onError: (error) => {
       setFeedback({
         tone: "error",
@@ -259,7 +275,7 @@ export function AdminTransfersPage() {
     },
     onSuccess: (detail) => {
       setFeedback({ tone: "success", message: "Recepcion registrada correctamente." });
-      setSelectedTransferId(detail.overview.id);
+      setSelectedTransferId(detail.id);
       setWorkflowMode(null);
       setWorkflowTransferId(null);
       void queryClient.invalidateQueries({ queryKey: ["admin", "transfers"] });
@@ -268,7 +284,7 @@ export function AdminTransfersPage() {
 
   const cancelMutation = useMutation({
     mutationFn: ({ reason, transferId }: { reason?: string | null; transferId: string }) =>
-      cancelAdminTransfer(transferId, reason),
+      begin({ commandCode: "cancel", reason }, originalBranch(transferId), transferId),
     onError: (error) => {
       setFeedback({
         tone: "error",
@@ -277,7 +293,7 @@ export function AdminTransfersPage() {
     },
     onSuccess: (detail) => {
       setFeedback({ tone: "success", message: "Transferencia cancelada correctamente." });
-      setSelectedTransferId(detail.overview.id);
+      setSelectedTransferId(detail.id);
       setWorkflowMode(null);
       setWorkflowTransferId(null);
       void queryClient.invalidateQueries({ queryKey: ["admin", "transfers"] });
@@ -285,6 +301,8 @@ export function AdminTransfersPage() {
   });
 
   const isSubmitting =
+    Boolean(intention.error) ||
+    isCommandIntentionPending(intention.metadata) ||
     createMutation.isPending ||
     updateMutation.isPending ||
     dispatchMutation.isPending ||
@@ -362,12 +380,12 @@ export function AdminTransfersPage() {
     setWorkflowTransferId(null);
   }
 
-  function handleCreate(payload: AdminTransferCreatePayload, dispatchNow: boolean) {
+  function handleCreate(payload: AdminTransferCreatePayload) {
     if (!isAuthenticated || isSubmitting) {
       return;
     }
     setFeedback(null);
-    createMutation.mutate({ dispatchNow, payload });
+    createMutation.mutate(payload);
   }
 
   function handleUpdate(payload: AdminTransferUpdatePayload) {

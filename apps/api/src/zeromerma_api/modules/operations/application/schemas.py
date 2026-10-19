@@ -4,7 +4,7 @@ from datetime import datetime
 from decimal import Decimal
 from uuid import UUID
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 from zeromerma_api.modules.audit.application.schemas import AuditSummaryView
 from zeromerma_api.modules.branches.application.schemas import BranchSummary, WorkstationSummary
@@ -86,18 +86,26 @@ class OperationsClassProductsResponse(BaseModel):
 
 
 class OperationCommitLineRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     product_id: UUID
     quantity: Decimal = Field(gt=Decimal("0"), max_digits=12, decimal_places=3)
     notes: str | None = Field(default=None, max_length=500)
 
 
 class CounterTransferCommitRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    cash_session_id: UUID
     workstation_code: str = Field(min_length=1, max_length=64)
     lines: list[OperationCommitLineRequest] = Field(min_length=1)
     notes: str | None = Field(default=None, max_length=1000)
 
 
 class WasteCommitRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    cash_session_id: UUID
     workstation_code: str = Field(min_length=1, max_length=64)
     source_bucket_code: str = Field(default=OPERATION_BUCKET_COUNTER, min_length=1, max_length=32)
     reason_code: str = Field(min_length=1, max_length=40)
@@ -201,3 +209,32 @@ class OperationHistoryResponse(BaseModel):
     available_source_buckets: list[OperationHistoryFilterOptionView]
     available_destination_buckets: list[OperationHistoryFilterOptionView]
     records: list[OperationHistoryListItemView]
+
+
+class OperationCommitLineResultView(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    id: UUID
+    line_number: int
+    product_id: UUID
+    quantity: Decimal
+    unit_of_measure_code: str
+
+
+class OperationCommitResultView(BaseModel):
+    """Immutable acknowledgement; mutable details and names are read separately."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    id: UUID
+    folio: str
+    document_type: str
+    status: str
+    branch_id: UUID
+    workstation_id: UUID
+    cash_session_id: UUID | None
+    source_bucket_code: str | None
+    destination_bucket_code: str | None
+    committed_at_utc: datetime
+    inventory_movement_ids: list[UUID]
+    lines: list[OperationCommitLineResultView]

@@ -5,11 +5,29 @@ from decimal import Decimal
 from typing import Literal
 from uuid import UUID
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import AwareDatetime, BaseModel, ConfigDict, Field, field_validator
 
 AdminProductionStatus = Literal["DRAFT", "IN_PROGRESS", "COMPLETED", "CANCELLED"]
 AdminProductionWarningSeverity = Literal["info", "warning", "critical"]
 AdminProductionInputStatus = Literal["available", "insufficient", "unavailable"]
+ProductionCommandCode = Literal["create", "update", "start", "complete", "cancel"]
+
+
+class ProductionCommandResultView(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    id: UUID
+    folio: str
+    branch_id: UUID
+    product_id: UUID
+    recipe_id: UUID
+    status: AdminProductionStatus
+    planned_output_qty: Decimal
+    actual_output_qty: Decimal | None
+    variance_qty: Decimal | None
+    variance_percent: Decimal | None
+    created_at: datetime
+    updated_at: datetime
 
 
 class AdminProductionBackendContractView(BaseModel):
@@ -216,9 +234,11 @@ class AdminProductionDetailView(BaseModel):
 
 
 class AdminProductionCreateRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     branch_id: UUID
     notes: str | None = None
-    planned_at: datetime | None = None
+    planned_at: AwareDatetime | None = None
     planned_output_qty: Decimal = Field(gt=0)
     product_id: UUID
     recipe_id: UUID | None = None
@@ -233,8 +253,10 @@ class AdminProductionCreateRequest(BaseModel):
 
 
 class AdminProductionUpdateRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     notes: str | None = None
-    planned_at: datetime | None = None
+    planned_at: AwareDatetime | None = None
     planned_output_qty: Decimal | None = Field(default=None, gt=0)
     product_id: UUID | None = None
     recipe_id: UUID | None = None
@@ -249,10 +271,14 @@ class AdminProductionUpdateRequest(BaseModel):
 
 
 class AdminProductionStartRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     notes: str | None = None
 
 
 class AdminProductionCompleteRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     actual_output_qty: Decimal = Field(ge=0)
     notes: str | None = None
     variance_reason: str | None = None
@@ -267,4 +293,6 @@ class AdminProductionCompleteRequest(BaseModel):
 
 
 class AdminProductionCancelRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     reason: str | None = None

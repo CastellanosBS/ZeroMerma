@@ -127,11 +127,16 @@ def _commit_return(client: TestClient, sale_id: str) -> dict[str, object]:
 
 
 def _commit_counter_transfer(client: TestClient) -> dict[str, object]:
+    headers = _cashier_headers(client)
+    cash_id = current_cash_session_id(
+        client, headers=headers, workstation_code=SEED_WORKSTATION_CODE
+    )
     response = client.post(
         "/v1/operations/counter-transfer/commit",
-        headers=_cashier_headers(client),
+        headers={**headers, "Idempotency-Key": new_idempotency_key()},
         json={
             "workstation_code": SEED_WORKSTATION_CODE,
+            "cash_session_id": cash_id,
             "lines": [
                 {"product_id": _get_product_id(SEED_PRODUCT_CONCHA_VAN_CODE), "quantity": "4"}
             ],
@@ -139,16 +144,27 @@ def _commit_counter_transfer(client: TestClient) -> dict[str, object]:
         },
     )
     assert response.status_code == 201
-    return response.json()
+    detail = client.get(
+        f"/v1/operations/{response.json()['id']}",
+        headers=headers,
+        params={"workstation_code": SEED_WORKSTATION_CODE},
+    )
+    assert detail.status_code == 200
+    return detail.json()
 
 
 def _commit_correction(client: TestClient, target: dict[str, object]) -> dict[str, object]:
+    headers = _cashier_headers(client)
+    cash_id = current_cash_session_id(
+        client, headers=headers, workstation_code=SEED_WORKSTATION_CODE
+    )
     line = target["lines"][0]
     response = client.post(
         "/v1/corrections/commit",
-        headers=_cashier_headers(client),
+        headers={**headers, "Idempotency-Key": new_idempotency_key()},
         json={
             "workstation_code": SEED_WORKSTATION_CODE,
+            "cash_session_id": cash_id,
             "target_document_id": target["id"],
             "reason_code": "WRONG_QUANTITY",
             "notes": "Ajuste consultado por Backoffice",

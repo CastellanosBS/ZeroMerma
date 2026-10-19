@@ -1,3 +1,4 @@
+import { usePosAuthStore } from "../auth/auth-store";
 import {
   ApiError,
   createCommandIntentionCoordinator,
@@ -51,4 +52,14 @@ export const returnIntentions = createCommandIntentionCoordinator<
     }
     return result;
   },
+});
+
+usePosAuthStore.subscribe((state, previous) => {
+  if (
+    state.generation !== previous.generation ||
+    state.user?.id !== previous.user?.id ||
+    state.session?.id !== previous.session?.id ||
+    state.user?.authorization_version !== previous.user?.authorization_version
+  )
+    returnIntentions.forgetBodies();
 });

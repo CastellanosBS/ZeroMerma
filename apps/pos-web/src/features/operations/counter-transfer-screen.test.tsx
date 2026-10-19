@@ -1,3 +1,4 @@
+import { webcrypto } from "node:crypto";
 // @vitest-environment jsdom
 
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
@@ -10,8 +11,9 @@ import { commitCorrection } from "../corrections/corrections-api";
 import { CounterTransferScreen } from "./counter-transfer-screen";
 import { commitCounterTransfer } from "./operations-api";
 
-(globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT =
-  true;
+(
+  globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }
+).IS_REACT_ACT_ENVIRONMENT = true;
 
 const refetchMock = vi.fn();
 const showErrorMock = vi.fn();
@@ -322,13 +324,16 @@ vi.mock("../../components/app-shell-right-panel", async () => {
 });
 
 vi.mock("../auth/auth-store", () => ({
-  usePosAuthStore: (selector: (state: { isAuthenticated: boolean }) => unknown) =>
-    selector({ isAuthenticated: true }),
+  usePosAuthStore: Object.assign(
+    (selector: (state: { isAuthenticated: boolean; user: { id: string } }) => unknown) =>
+      selector({ isAuthenticated: true, user: { id: "user-1" } }),
+    { subscribe: vi.fn(() => () => undefined) },
+  ),
 }));
 
 vi.mock("../cash-session-open/queries", () => ({
   useCurrentCashSessionQuery: () => ({
-    data: { user_id: "user-1" },
+    data: { id: "cash-session-1", user_id: "user-1" },
     error: null,
     isPending: false,
     refetch: refetchMock,
@@ -588,10 +593,31 @@ async function addLineWithShortcuts(container: HTMLElement, quantity: string) {
 let mountedRoots: Array<() => void> = [];
 
 beforeEach(() => {
+  localStorage.clear();
+  vi.stubGlobal("crypto", webcrypto);
+  Object.defineProperty(navigator, "locks", {
+    configurable: true,
+    value: { request: vi.fn(async (_name, _options, callback) => callback({ name: "lock" })) },
+  });
   rightPanelContent = null;
   historyFilterRequests.length = 0;
-  vi.mocked(commitCounterTransfer).mockResolvedValue(counterTransferDocument);
-  vi.mocked(commitCorrection).mockResolvedValue(correctionDocument);
+  vi.mocked(commitCounterTransfer).mockResolvedValue({
+    ...counterTransferDocument,
+    branch_id: "branch-1",
+    cash_session_id: "cash-session-1",
+    inventory_movement_ids: [],
+    committed_at_utc: counterTransferDocument.committed_at_utc!,
+    lines: counterTransferDocument.lines.map((line) => ({
+      ...line,
+      unit_of_measure_code: line.unit_of_measure_code,
+    })),
+  });
+  vi.mocked(commitCorrection).mockResolvedValue({
+    ...correctionDocument,
+    branch_id: "branch-1",
+    cash_session_id: "cash-session-1",
+    committed_at_utc: correctionDocument.committed_at_utc!,
+  });
 });
 
 afterEach(() => {
@@ -602,6 +628,7 @@ afterEach(() => {
   rightPanelContent = null;
   document.body.innerHTML = "";
   vi.clearAllMocks();
+  vi.unstubAllGlobals();
 });
 
 describe("CounterTransferScreen", () => {
@@ -655,7 +682,9 @@ describe("CounterTransferScreen", () => {
     click(showCounterButton);
     await flush();
 
-    expect(rightPanel?.querySelector('table[aria-label="Estado actual del mostrador"]')).not.toBeNull();
+    expect(
+      rightPanel?.querySelector('table[aria-label="Estado actual del mostrador"]'),
+    ).not.toBeNull();
     expect(rightPanel?.textContent).toContain("Pan dulce");
     expect(rightPanel?.textContent).toContain("Diferido");
     expect(rightPanel?.textContent).not.toContain("Concha vainilla");
@@ -700,7 +729,9 @@ describe("CounterTransferScreen", () => {
     mountedRoots.push(view.unmount);
 
     await selectProductWithShortcuts(view.container);
-    const quantityInput = view.container.querySelector<HTMLInputElement>('input[aria-label="Cantidad"]');
+    const quantityInput = view.container.querySelector<HTMLInputElement>(
+      'input[aria-label="Cantidad"]',
+    );
     changeInput(quantityInput, "0");
     await flush();
     keydown(quantityInput, "Enter");
@@ -769,7 +800,9 @@ describe("CounterTransferScreen", () => {
 
     click(findButtonByText(rightPanel ?? view.container, "Ocultar observación"));
     await flush();
-    expect(rightPanel?.querySelector('textarea[aria-label="Observación del movimiento"]')).toBeNull();
+    expect(
+      rightPanel?.querySelector('textarea[aria-label="Observación del movimiento"]'),
+    ).toBeNull();
     expect(rightPanel?.textContent).toContain("Con texto");
 
     click(findButtonByText(rightPanel ?? view.container, "Agregar observación"));
@@ -784,10 +817,18 @@ describe("CounterTransferScreen", () => {
     click(transferButton);
     await flush();
 
-    expect(commitCounterTransfer).toHaveBeenCalledWith({
-      lines: [{ product_id: "product-1", quantity: "2" }],
-      notes: "Salida de charola 3",
-      workstation_code: "POS-01",
+    await act(async () => {
+      await vi.waitFor(() =>
+        expect(commitCounterTransfer).toHaveBeenCalledWith(
+          {
+            cash_session_id: "cash-session-1",
+            lines: [{ product_id: "product-1", quantity: "2" }],
+            notes: "Salida de charola 3",
+            workstation_code: "POS-01",
+          },
+          expect.stringMatching(/^[0-9a-f-]{36}$/),
+        ),
+      );
     });
     expect(showSuccessMock).toHaveBeenCalledWith(
       "Movimiento a mostrador registrado. Folio CTR-000001.",
@@ -826,7 +867,9 @@ describe("CounterTransferScreen", () => {
     expect(view.container.textContent).toContain("Main Branch Cashier");
     expect(rightPanel?.textContent).not.toContain("Detalle de historial");
     expect(rightPanel?.textContent).toContain("Mostrador actual");
-    expect(rightPanel?.querySelector('table[aria-label="Estado actual del mostrador"]')).not.toBeNull();
+    expect(
+      rightPanel?.querySelector('table[aria-label="Estado actual del mostrador"]'),
+    ).not.toBeNull();
     expect(rightPanel?.textContent).toContain("Pan dulce");
     expect(rightPanel?.textContent).toContain("Diferido");
     expect(rightPanel?.textContent).toContain("aprox.");
@@ -956,21 +999,27 @@ describe("CounterTransferScreen", () => {
     click(findButtonByText(rightPanel ?? view.container, "Guardar ajuste"));
     await flush();
 
-    expect(commitCorrection).toHaveBeenCalledWith({
-      payload: {
-        high_impact_acknowledged: false,
-        lines: [
-          {
-            delta_quantity: "3",
-            product_id: "product-1",
-            target_line_id: "operation-line-1",
+    await act(async () => {
+      await vi.waitFor(() =>
+        expect(commitCorrection).toHaveBeenCalledWith({
+          payload: {
+            cash_session_id: "cash-session-1",
+            high_impact_acknowledged: false,
+            lines: [
+              {
+                delta_quantity: "3",
+                product_id: "product-1",
+                target_line_id: "operation-line-1",
+              },
+            ],
+            reason_code: "WRONG_QUANTITY",
+            target_document_id: "operation-1",
+            workstation_code: "POS-01",
           },
-        ],
-        reason_code: "WRONG_QUANTITY",
-        target_document_id: "operation-1",
-        workstation_code: "POS-01",
-      },
-      requestId: expect.stringMatching(/^counter-transfer-adjustment-/),
+          idempotencyKey: expect.stringMatching(/^[0-9a-f-]{36}$/),
+          requestId: expect.stringMatching(/^correction-/),
+        }),
+      );
     });
     expect(showSuccessMock).toHaveBeenCalledWith("Ajuste COR-000001 registrado correctamente.");
     expect(rightPanel?.textContent).toContain("Detalle de movimiento");

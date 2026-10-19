@@ -253,6 +253,30 @@ inventar fondos; prevención y remedio siguen en el trabajo financiero posterior
 No se declara la solución completa ni lista para producción. La siguiente
 adopción es **ZM-FIN-033**.
 
+### 0.9 Registro de ejecución — ZM-FIN-033–035
+
+El bloque parte de `65c1cb92c8553ffe4e1ed1b799e32939d9fe5bfd` en la rama
+`codex/zm-fin-033-035-idempotency`. Adopta los 23 comandos asignados a este bloque:
+transferencias POS y administrativas, compras, correcciones, traspaso a mostrador,
+merma, ajustes de inventario y producción. Exige clave UUIDv7, conserva el resultado
+original y añade nueve GET de recuperación sin ejecutar otra operación. Los comandos
+POS identifican la caja original y revalidan los permisos vigentes.
+
+La recepción parcial conserva el remanente en tránsito y admite recibos posteriores;
+el ledger administrativo descuenta únicamente lo recibido. Los flujos web conservan
+sólo metadatos de la intención al recargar, y un cambio de autenticación invalida el
+cuerpo en memoria, incluso durante las esperas asíncronas. La compra creada con
+confirmación inmediata exige además el permiso de confirmar.
+
+El [registro de validación](implementation/operations-idempotency-validation.md)
+detalla pruebas, resultados y límites. La aceptación integrada requiere las ocho
+etapas Foundation y **Foundation required** sobre el SHA entregado; las pruebas
+usan PostgreSQL efímero y evidencias sanitizadas. No se introduce migración ni se
+modifica la base habitual. La unificación física POS/administración y la producción
+ampliada conservan sus tareas posteriores; la matriz mantiene las brechas de
+idempotencia administrativa asignadas a 077/080/085. Este bloque no declara el producto listo
+para abrir. El siguiente paso planificado es **ZM-FIN-036**, concurrencia.
+
 ## 1. Resumen ejecutivo
 
 ZeroMerma posee una base adecuada para evolucionar sin reescritura: monolito modular, FastAPI/SQLAlchemy/PostgreSQL, POS y Backoffice separados, OpenAPI generado, precisión decimal, auditoría y outbox transaccionales. La auditoría activa demostró que una parte importante de ventas, pagos, pedidos, documentos y administración es real. También demostró defectos sistémicos: el POS no alimenta el inventario canónico; el pago de pedido no entra en caja/corte; el worker no procesa eventos; la trazabilidad de identidad/origen es incorrecta; y varias superficies administrativas son simuladas o incompletas.

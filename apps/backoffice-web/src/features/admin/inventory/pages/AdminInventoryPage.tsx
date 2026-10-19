@@ -1,3 +1,12 @@
+import { isCommandIntentionPending } from "@zeromerma/api-client";
+import {
+  PHYSICAL_INTENTION_SCOPE,
+  physicalIntentions,
+} from "../../physical-commands/physical-command-intent";
+import {
+  usePhysicalIntention,
+  usePhysicalDraftIdentity,
+} from "../../physical-commands/use-physical-intention";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useMemo, useState } from "react";
 
@@ -7,7 +16,6 @@ import { AdminEntityDrawer } from "../../components/AdminEntityDrawer";
 import { AdminPageHeader } from "../../components/AdminPageHeader";
 import {
   adminInventoryBackendContract,
-  createAdminInventoryAdjustment,
   fetchAdminInventory,
   fetchAdminInventoryDetail,
 } from "../api";
@@ -164,9 +172,24 @@ export function AdminInventoryPage() {
     retry: false,
   });
 
+  const user = useBackofficeAuthStore((state) => state.user);
+  const intentionState = usePhysicalIntention(PHYSICAL_INTENTION_SCOPE);
+  const intentionBlocked =
+    Boolean(intentionState.error) || isCommandIntentionPending(intentionState.metadata);
+  const observedKey = usePhysicalDraftIdentity(intentionState.metadata, true, () => {
+    setIsAdjustmentOpen(false);
+    setAdjustmentSource(null);
+  });
   const adjustmentMutation = useMutation({
-    mutationFn: (payload: AdminInventoryAdjustmentPayload) =>
-      createAdminInventoryAdjustment(payload),
+    mutationFn: async (payload: AdminInventoryAdjustmentPayload) => {
+      if (!user) throw new Error("Se requiere una sesión activa.");
+      if (intentionState.error) throw new Error(intentionState.error);
+      return physicalIntentions.begin(
+        { userId: user.id, branchId: payload.branchId, commandCode: "adjustment" },
+        { commandCode: "adjustment", body: payload },
+        observedKey.current ?? null,
+      );
+    },
     onError: (error) => {
       setFeedback({
         tone: "error",
@@ -177,7 +200,7 @@ export function AdminInventoryPage() {
       setFeedback({ tone: "success", message: "Ajuste de inventario guardado correctamente." });
       setIsAdjustmentOpen(false);
       setAdjustmentSource(null);
-      setSelectedBalanceId(adjustment.balanceId);
+      setSelectedBalanceId("balance_id" in adjustment ? adjustment.balance_id : null);
       void queryClient.invalidateQueries({ queryKey: ["admin", "inventory"] });
     },
   });
@@ -231,7 +254,7 @@ export function AdminInventoryPage() {
   }
 
   function handleSubmitAdjustment(payload: AdminInventoryAdjustmentPayload) {
-    if (!isAuthenticated || adjustmentMutation.isPending) {
+    if (!isAuthenticated || adjustmentMutation.isPending || intentionBlocked) {
       return;
     }
 
@@ -296,7 +319,7 @@ export function AdminInventoryPage() {
             branchOptions={inventoryList.filterOptions.branches}
             errorMessage={adjustmentErrorMessage}
             initialInventory={adjustmentSource}
-            isSubmitting={adjustmentMutation.isPending}
+            isSubmitting={adjustmentMutation.isPending || intentionBlocked}
             locationOptions={inventoryList.filterOptions.locations}
             productOptions={inventoryList.filterOptions.products}
             onClose={() => {
@@ -313,7 +336,7 @@ export function AdminInventoryPage() {
             errorMessage={listErrorMessage}
             inventory={inventoryList.items}
             isLoading={inventoryQuery.isLoading}
-            isSubmitting={adjustmentMutation.isPending}
+            isSubmitting={adjustmentMutation.isPending || intentionBlocked}
             page={inventoryList.page}
             pageSize={inventoryList.pageSize}
             selectedBalanceId={selectedBalanceId}

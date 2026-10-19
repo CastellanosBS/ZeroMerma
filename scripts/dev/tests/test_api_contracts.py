@@ -358,6 +358,100 @@ def test_cash_preview_remains_read_only_and_separate_from_commit_contract() -> N
     }
 
 
+REMAINING_IDEMPOTENT_COMMANDS = [
+    ("post", "/v1/transfers/dispatch/commit", "TransferCommandResultView"),
+    ("post", "/v1/transfers/{transfer_id}/receive", "TransferCommandResultView"),
+    ("post", "/v1/admin/transfers", "TransferCommandResultView"),
+    ("patch", "/v1/admin/transfers/{transfer_id}", "TransferCommandResultView"),
+    *[
+        ("post", f"/v1/admin/transfers/{{transfer_id}}/{action}", "TransferCommandResultView")
+        for action in ("dispatch", "receive", "cancel")
+    ],
+    ("post", "/v1/admin/purchases", "PurchaseCommandResultView"),
+    ("patch", "/v1/admin/purchases/{purchase_id}", "PurchaseCommandResultView"),
+    ("post", "/v1/admin/purchases/direct-entry", "PurchaseCommandResultView"),
+    *[
+        ("post", f"/v1/admin/purchases/{{purchase_id}}/{action}", "PurchaseCommandResultView")
+        for action in ("confirm", "receive", "cancel")
+    ],
+    ("post", "/v1/operations/counter-transfer/commit", "OperationCommitResultView"),
+    ("post", "/v1/operations/waste/commit", "OperationCommitResultView"),
+    ("post", "/v1/corrections/commit", "CorrectionCommitResultView"),
+    ("post", "/v1/admin/waste", "OperationCommitResultView"),
+    ("post", "/v1/admin/inventory/adjustments", "AdminInventoryAdjustmentResultView"),
+    ("post", "/v1/admin/production", "ProductionCommandResultView"),
+    ("patch", "/v1/admin/production/{production_id}", "ProductionCommandResultView"),
+    *[
+        ("post", f"/v1/admin/production/{{production_id}}/{action}", "ProductionCommandResultView")
+        for action in ("start", "complete", "cancel")
+    ],
+]
+
+
+@pytest.mark.parametrize(("method", "path", "result_name"), REMAINING_IDEMPOTENT_COMMANDS)
+def test_operational_commands_publish_required_key_and_minimized_acknowledgement(
+    method: str,
+    path: str,
+    result_name: str,
+) -> None:
+    operation = SCHEMA["paths"][path][method]
+    keys = [item for item in operation["parameters"] if item["name"] == "Idempotency-Key"]
+    assert len(keys) == 1 and keys[0]["required"] and keys[0]["in"] == "header"
+    assert "7[0-9a-fA-F]{3}" in keys[0]["schema"]["pattern"]
+    response = next(
+        value for code, value in operation["responses"].items() if code in {"200", "201"}
+    )
+    assert response["content"]["application/json"]["schema"] == {
+        "$ref": f"#/components/schemas/{result_name}"
+    }
+    assert "Idempotency-Replayed" in response["headers"]
+    assert operation["responses"]["409"]["content"]["application/json"]["schema"] == {
+        "$ref": "#/components/schemas/ApiErrorResponse"
+    }
+    schema = SCHEMA["components"]["schemas"][result_name]
+    assert schema["additionalProperties"] is False
+    assert not {
+        "notes",
+        "reason",
+        "operator_name",
+        "supplier_name",
+        "customer_name",
+        "available_actions",
+    }.intersection(schema["properties"])
+    if not path.startswith("/v1/admin/"):
+        request = operation["requestBody"]["content"]["application/json"]["schema"]["$ref"].split(
+            "/"
+        )[-1]
+        assert "cash_session_id" in SCHEMA["components"]["schemas"][request]["required"]
+
+
+@pytest.mark.parametrize(
+    "path",
+    [
+        "/v1/transfers/commands/{command_code}/confirmations/{idempotency_key}",
+        "/v1/admin/transfers/commands/{command_code}/confirmations/{idempotency_key}",
+        "/v1/admin/purchases/commands/{command_code}/{idempotency_key}",
+        "/v1/admin/production/commands/{command_code}/{idempotency_key}",
+        "/v1/corrections/confirmations/{idempotency_key}",
+        "/v1/operations/counter-transfer/confirmations/{idempotency_key}",
+        "/v1/operations/waste/confirmations/{idempotency_key}",
+        "/v1/admin/waste/confirmations/{idempotency_key}",
+        "/v1/admin/inventory/adjustments/confirmations/{idempotency_key}",
+    ],
+)
+def test_operational_recovery_is_a_contextual_read_without_new_intention(path: str) -> None:
+    operation = SCHEMA["paths"][path]["get"]
+    assert "requestBody" not in operation
+    names = {
+        parameter["name"] for parameter in operation["parameters"] if parameter.get("required")
+    }
+    assert "idempotency_key" in names and "Idempotency-Key" not in names
+    assert (
+        {"branch_id"} if path.startswith("/v1/admin/") else {"workstation_code", "cash_session_id"}
+    ).issubset(names)
+    assert "Idempotency-Replayed" in operation["responses"]["200"]["headers"]
+
+
 def test_error_response_change_is_rejected() -> None:
     changed = copy.deepcopy(SCHEMA)
     _, _, operation = _first_operation(changed)

@@ -86,6 +86,9 @@ Invoke-ZeroMermaIsolatedDatabase -RunId $RunId -Action {
     ZM_E2E_POS_EMAIL = "pos-$runIdentity@example.test"
     ZM_E2E_BACKOFFICE_EMAIL = "reader-$runIdentity@example.test"
     ZM_E2E_ORDER_OPERATOR_EMAIL = "orders-$runIdentity@example.test"
+    ZM_E2E_ORDER_CASHIER_EMAIL = "order-cashier-$runIdentity@example.test"
+    ZM_E2E_ORDER_WORKSTATION_CODE = "POS-INTEGRATION-ORDERS"
+    ZM_E2E_OPERATIONS_OPERATOR_EMAIL = "operations-$runIdentity@example.test"
     ZM_E2E_PASSWORD = [Guid]::NewGuid().ToString("N")
     ZM_E2E_ARTIFACT_DIR = $artifactDirectory
     ZM_E2E_WORKSTATION_CODE = "POS-01"
@@ -170,7 +173,8 @@ Invoke-ZeroMermaIsolatedDatabase -RunId $RunId -Action {
       Protect-IntegrationArtifacts -Directory $artifactDirectory -Secrets @(
         $env:ZM_E2E_PASSWORD,
         $env:ZEROMERMA_TEST_DATABASE_URL, $dbPasswordMatch.Groups['password'].Value,
-        $env:ZM_E2E_POS_EMAIL, $env:ZM_E2E_BACKOFFICE_EMAIL, $env:ZM_E2E_ORDER_OPERATOR_EMAIL
+        $env:ZM_E2E_POS_EMAIL, $env:ZM_E2E_BACKOFFICE_EMAIL, $env:ZM_E2E_ORDER_OPERATOR_EMAIL,
+        $env:ZM_E2E_OPERATIONS_OPERATOR_EMAIL, $env:ZM_E2E_ORDER_CASHIER_EMAIL
       )
     }
     finally {

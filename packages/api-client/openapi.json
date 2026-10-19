@@ -13081,6 +13081,7 @@
         "type": "object"
       },
       "AdminInventoryAdjustmentRequest": {
+        "additionalProperties": false,
         "properties": {
           "adjustment_type": {
             "enum": [
@@ -13133,7 +13134,7 @@
                 "type": "number"
               },
               {
-                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*(?:\\d{0,9}|(?=[\\d.]{1,13}0*$)\\d{0,9}\\.\\d{0,3}0*$)",
                 "type": "string",
                 "x-zeromerma-decimal-representation": "JSON_STRING"
               }
@@ -13158,7 +13159,8 @@
         "title": "AdminInventoryAdjustmentRequest",
         "type": "object"
       },
-      "AdminInventoryAdjustmentView": {
+      "AdminInventoryAdjustmentResultView": {
+        "additionalProperties": false,
         "properties": {
           "adjustment_type": {
             "enum": [
@@ -13187,15 +13189,15 @@
             "type": "string",
             "x-zeromerma-instant-format": "ISO8601_DATETIME"
           },
-          "created_by_user_id": {
-            "format": "uuid",
-            "title": "Created By User Id",
-            "type": "string",
-            "x-zeromerma-id-representation": "JSON_STRING"
-          },
           "id": {
             "format": "uuid",
             "title": "Id",
+            "type": "string",
+            "x-zeromerma-id-representation": "JSON_STRING"
+          },
+          "inventory_movement_id": {
+            "format": "uuid",
+            "title": "Inventory Movement Id",
             "type": "string",
             "x-zeromerma-id-representation": "JSON_STRING"
           },
@@ -13215,17 +13217,6 @@
             "type": "string",
             "x-zeromerma-decimal-representation": "JSON_STRING"
           },
-          "notes": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Notes"
-          },
           "previous_quantity": {
             "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
             "title": "Previous Quantity",
@@ -13243,10 +13234,6 @@
             "title": "Quantity",
             "type": "string",
             "x-zeromerma-decimal-representation": "JSON_STRING"
-          },
-          "reason": {
-            "title": "Reason",
-            "type": "string"
           }
         },
         "required": [
@@ -13255,15 +13242,14 @@
           "balance_id",
           "branch_id",
           "created_at",
-          "created_by_user_id",
+          "inventory_movement_id",
           "location_code",
           "new_quantity",
           "previous_quantity",
           "product_id",
-          "quantity",
-          "reason"
+          "quantity"
         ],
-        "title": "AdminInventoryAdjustmentView",
+        "title": "AdminInventoryAdjustmentResultView",
         "type": "object"
       },
       "AdminInventoryBackendContractView": {
@@ -17689,6 +17675,7 @@
         "type": "object"
       },
       "AdminProductionCancelRequest": {
+        "additionalProperties": false,
         "properties": {
           "reason": {
             "anyOf": [
@@ -17706,6 +17693,7 @@
         "type": "object"
       },
       "AdminProductionCompleteRequest": {
+        "additionalProperties": false,
         "properties": {
           "actual_output_qty": {
             "anyOf": [
@@ -17752,6 +17740,7 @@
         "type": "object"
       },
       "AdminProductionCreateRequest": {
+        "additionalProperties": false,
         "properties": {
           "branch_id": {
             "format": "uuid",
@@ -18861,6 +18850,7 @@
         "type": "object"
       },
       "AdminProductionStartRequest": {
+        "additionalProperties": false,
         "properties": {
           "notes": {
             "anyOf": [
@@ -18878,6 +18868,7 @@
         "type": "object"
       },
       "AdminProductionUpdateRequest": {
+        "additionalProperties": false,
         "properties": {
           "notes": {
             "anyOf": [
@@ -30107,6 +30098,7 @@
         "type": "object"
       },
       "AdminTransferCancelRequest": {
+        "additionalProperties": false,
         "properties": {
           "reason": {
             "anyOf": [
@@ -30125,6 +30117,7 @@
         "type": "object"
       },
       "AdminTransferCreateRequest": {
+        "additionalProperties": false,
         "properties": {
           "destination_branch_id": {
             "format": "uuid",
@@ -30224,6 +30217,7 @@
         "type": "object"
       },
       "AdminTransferDispatchRequest": {
+        "additionalProperties": false,
         "properties": {
           "notes": {
             "anyOf": [
@@ -30434,6 +30428,7 @@
         "type": "object"
       },
       "AdminTransferLineInput": {
+        "additionalProperties": false,
         "properties": {
           "notes": {
             "anyOf": [
@@ -30506,6 +30501,12 @@
             ],
             "title": "Notes"
           },
+          "pending_quantity": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Pending Quantity",
+            "type": "string",
+            "x-zeromerma-decimal-representation": "JSON_STRING"
+          },
           "product_code": {
             "title": "Product Code",
             "type": "string"
@@ -30572,6 +30573,7 @@
           }
         },
         "required": [
+          "pending_quantity",
           "line_status",
           "product_code",
           "product_id",
@@ -30992,6 +30994,7 @@
         "type": "object"
       },
       "AdminTransferReceiptLineInput": {
+        "additionalProperties": false,
         "properties": {
           "notes": {
             "anyOf": [
@@ -31116,6 +31119,7 @@
         "type": "object"
       },
       "AdminTransferReceiveRequest": {
+        "additionalProperties": false,
         "properties": {
           "lines": {
             "items": {
@@ -31175,6 +31179,7 @@
         "type": "object"
       },
       "AdminTransferUpdateRequest": {
+        "additionalProperties": false,
         "properties": {
           "destination_branch_id": {
             "anyOf": [
@@ -32695,6 +32700,7 @@
         "type": "object"
       },
       "AdminWasteCreateRequest": {
+        "additionalProperties": false,
         "properties": {
           "branch_id": {
             "format": "uuid",
@@ -32737,7 +32743,7 @@
                 "type": "number"
               },
               {
-                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*(?:\\d{0,9}|(?=[\\d.]{1,13}0*$)\\d{0,9}\\.\\d{0,3}0*$)",
                 "type": "string",
                 "x-zeromerma-decimal-representation": "JSON_STRING"
               }
@@ -37396,6 +37402,7 @@
         "type": "object"
       },
       "CorrectionCommitLineRequest": {
+        "additionalProperties": false,
         "properties": {
           "delta_quantity": {
             "anyOf": [
@@ -37450,8 +37457,64 @@
         "title": "CorrectionCommitLineRequest",
         "type": "object"
       },
-      "CorrectionCommitRequest": {
+      "CorrectionCommitLineResultView": {
+        "additionalProperties": false,
         "properties": {
+          "delta_quantity": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Delta Quantity",
+            "type": "string",
+            "x-zeromerma-decimal-representation": "JSON_STRING"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string",
+            "x-zeromerma-id-representation": "JSON_STRING"
+          },
+          "line_number": {
+            "title": "Line Number",
+            "type": "integer"
+          },
+          "product_id": {
+            "format": "uuid",
+            "title": "Product Id",
+            "type": "string",
+            "x-zeromerma-id-representation": "JSON_STRING"
+          },
+          "target_line_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string",
+                "x-zeromerma-id-representation": "JSON_STRING"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Target Line Id"
+          }
+        },
+        "required": [
+          "id",
+          "line_number",
+          "target_line_id",
+          "product_id",
+          "delta_quantity"
+        ],
+        "title": "CorrectionCommitLineResultView",
+        "type": "object"
+      },
+      "CorrectionCommitRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "cash_session_id": {
+            "format": "uuid",
+            "title": "Cash Session Id",
+            "type": "string",
+            "x-zeromerma-id-representation": "JSON_STRING"
+          },
           "corrected_destination_branch_id": {
             "anyOf": [
               {
@@ -37509,11 +37572,105 @@
           }
         },
         "required": [
+          "cash_session_id",
           "workstation_code",
           "target_document_id",
           "reason_code"
         ],
         "title": "CorrectionCommitRequest",
+        "type": "object"
+      },
+      "CorrectionCommitResultView": {
+        "additionalProperties": false,
+        "properties": {
+          "branch_id": {
+            "format": "uuid",
+            "title": "Branch Id",
+            "type": "string",
+            "x-zeromerma-id-representation": "JSON_STRING"
+          },
+          "cash_session_id": {
+            "format": "uuid",
+            "title": "Cash Session Id",
+            "type": "string",
+            "x-zeromerma-id-representation": "JSON_STRING"
+          },
+          "committed_at_utc": {
+            "format": "date-time",
+            "title": "Committed At Utc",
+            "type": "string",
+            "x-zeromerma-instant-format": "ISO8601_DATETIME"
+          },
+          "corrected_destination_branch_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string",
+                "x-zeromerma-id-representation": "JSON_STRING"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Corrected Destination Branch Id"
+          },
+          "correction_type": {
+            "title": "Correction Type",
+            "type": "string"
+          },
+          "folio": {
+            "title": "Folio",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string",
+            "x-zeromerma-id-representation": "JSON_STRING"
+          },
+          "lines": {
+            "items": {
+              "$ref": "#/components/schemas/CorrectionCommitLineResultView"
+            },
+            "title": "Lines",
+            "type": "array"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          },
+          "target_document_id": {
+            "format": "uuid",
+            "title": "Target Document Id",
+            "type": "string",
+            "x-zeromerma-id-representation": "JSON_STRING"
+          },
+          "target_document_type": {
+            "title": "Target Document Type",
+            "type": "string"
+          },
+          "workstation_id": {
+            "format": "uuid",
+            "title": "Workstation Id",
+            "type": "string",
+            "x-zeromerma-id-representation": "JSON_STRING"
+          }
+        },
+        "required": [
+          "id",
+          "folio",
+          "target_document_id",
+          "target_document_type",
+          "correction_type",
+          "branch_id",
+          "workstation_id",
+          "cash_session_id",
+          "corrected_destination_branch_id",
+          "status",
+          "committed_at_utc",
+          "lines"
+        ],
+        "title": "CorrectionCommitResultView",
         "type": "object"
       },
       "CorrectionControlsView": {
@@ -38402,7 +38559,14 @@
         "type": "object"
       },
       "CounterTransferCommitRequest": {
+        "additionalProperties": false,
         "properties": {
+          "cash_session_id": {
+            "format": "uuid",
+            "title": "Cash Session Id",
+            "type": "string",
+            "x-zeromerma-id-representation": "JSON_STRING"
+          },
           "lines": {
             "items": {
               "$ref": "#/components/schemas/OperationCommitLineRequest"
@@ -38431,6 +38595,7 @@
           }
         },
         "required": [
+          "cash_session_id",
           "workstation_code",
           "lines"
         ],
@@ -39841,6 +40006,7 @@
         "type": "object"
       },
       "OperationCommitLineRequest": {
+        "additionalProperties": false,
         "properties": {
           "notes": {
             "anyOf": [
@@ -39881,6 +40047,155 @@
           "quantity"
         ],
         "title": "OperationCommitLineRequest",
+        "type": "object"
+      },
+      "OperationCommitLineResultView": {
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string",
+            "x-zeromerma-id-representation": "JSON_STRING"
+          },
+          "line_number": {
+            "title": "Line Number",
+            "type": "integer"
+          },
+          "product_id": {
+            "format": "uuid",
+            "title": "Product Id",
+            "type": "string",
+            "x-zeromerma-id-representation": "JSON_STRING"
+          },
+          "quantity": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Quantity",
+            "type": "string",
+            "x-zeromerma-decimal-representation": "JSON_STRING"
+          },
+          "unit_of_measure_code": {
+            "title": "Unit Of Measure Code",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "line_number",
+          "product_id",
+          "quantity",
+          "unit_of_measure_code"
+        ],
+        "title": "OperationCommitLineResultView",
+        "type": "object"
+      },
+      "OperationCommitResultView": {
+        "additionalProperties": false,
+        "description": "Immutable acknowledgement; mutable details and names are read separately.",
+        "properties": {
+          "branch_id": {
+            "format": "uuid",
+            "title": "Branch Id",
+            "type": "string",
+            "x-zeromerma-id-representation": "JSON_STRING"
+          },
+          "cash_session_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string",
+                "x-zeromerma-id-representation": "JSON_STRING"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cash Session Id"
+          },
+          "committed_at_utc": {
+            "format": "date-time",
+            "title": "Committed At Utc",
+            "type": "string",
+            "x-zeromerma-instant-format": "ISO8601_DATETIME"
+          },
+          "destination_bucket_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Destination Bucket Code"
+          },
+          "document_type": {
+            "title": "Document Type",
+            "type": "string"
+          },
+          "folio": {
+            "title": "Folio",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string",
+            "x-zeromerma-id-representation": "JSON_STRING"
+          },
+          "inventory_movement_ids": {
+            "items": {
+              "format": "uuid",
+              "type": "string",
+              "x-zeromerma-id-representation": "JSON_STRING"
+            },
+            "title": "Inventory Movement Ids",
+            "type": "array"
+          },
+          "lines": {
+            "items": {
+              "$ref": "#/components/schemas/OperationCommitLineResultView"
+            },
+            "title": "Lines",
+            "type": "array"
+          },
+          "source_bucket_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Bucket Code"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          },
+          "workstation_id": {
+            "format": "uuid",
+            "title": "Workstation Id",
+            "type": "string",
+            "x-zeromerma-id-representation": "JSON_STRING"
+          }
+        },
+        "required": [
+          "id",
+          "folio",
+          "document_type",
+          "status",
+          "branch_id",
+          "workstation_id",
+          "cash_session_id",
+          "source_bucket_code",
+          "destination_bucket_code",
+          "committed_at_utc",
+          "inventory_movement_ids",
+          "lines"
+        ],
+        "title": "OperationCommitResultView",
         "type": "object"
       },
       "OperationDocumentLineView": {
@@ -43127,6 +43442,243 @@
         "title": "PrivilegedChangeView",
         "type": "object"
       },
+      "ProductionCommandResultView": {
+        "additionalProperties": false,
+        "properties": {
+          "actual_output_qty": {
+            "anyOf": [
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string",
+                "x-zeromerma-decimal-representation": "JSON_STRING"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Actual Output Qty"
+          },
+          "branch_id": {
+            "format": "uuid",
+            "title": "Branch Id",
+            "type": "string",
+            "x-zeromerma-id-representation": "JSON_STRING"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string",
+            "x-zeromerma-instant-format": "ISO8601_DATETIME"
+          },
+          "folio": {
+            "title": "Folio",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string",
+            "x-zeromerma-id-representation": "JSON_STRING"
+          },
+          "planned_output_qty": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Planned Output Qty",
+            "type": "string",
+            "x-zeromerma-decimal-representation": "JSON_STRING"
+          },
+          "product_id": {
+            "format": "uuid",
+            "title": "Product Id",
+            "type": "string",
+            "x-zeromerma-id-representation": "JSON_STRING"
+          },
+          "recipe_id": {
+            "format": "uuid",
+            "title": "Recipe Id",
+            "type": "string",
+            "x-zeromerma-id-representation": "JSON_STRING"
+          },
+          "status": {
+            "enum": [
+              "DRAFT",
+              "IN_PROGRESS",
+              "COMPLETED",
+              "CANCELLED"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "updated_at": {
+            "format": "date-time",
+            "title": "Updated At",
+            "type": "string",
+            "x-zeromerma-instant-format": "ISO8601_DATETIME"
+          },
+          "variance_percent": {
+            "anyOf": [
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string",
+                "x-zeromerma-decimal-representation": "JSON_STRING"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Variance Percent"
+          },
+          "variance_qty": {
+            "anyOf": [
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string",
+                "x-zeromerma-decimal-representation": "JSON_STRING"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Variance Qty"
+          }
+        },
+        "required": [
+          "id",
+          "folio",
+          "branch_id",
+          "product_id",
+          "recipe_id",
+          "status",
+          "planned_output_qty",
+          "actual_output_qty",
+          "variance_qty",
+          "variance_percent",
+          "created_at",
+          "updated_at"
+        ],
+        "title": "ProductionCommandResultView",
+        "type": "object"
+      },
+      "PurchaseCommandLineResultView": {
+        "additionalProperties": false,
+        "properties": {
+          "ordered_quantity": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Ordered Quantity",
+            "type": "string",
+            "x-zeromerma-decimal-representation": "JSON_STRING"
+          },
+          "pending_quantity": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Pending Quantity",
+            "type": "string",
+            "x-zeromerma-decimal-representation": "JSON_STRING"
+          },
+          "product_id": {
+            "format": "uuid",
+            "title": "Product Id",
+            "type": "string",
+            "x-zeromerma-id-representation": "JSON_STRING"
+          },
+          "purchase_line_id": {
+            "format": "uuid",
+            "title": "Purchase Line Id",
+            "type": "string",
+            "x-zeromerma-id-representation": "JSON_STRING"
+          },
+          "received_quantity": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Received Quantity",
+            "type": "string",
+            "x-zeromerma-decimal-representation": "JSON_STRING"
+          }
+        },
+        "required": [
+          "purchase_line_id",
+          "product_id",
+          "ordered_quantity",
+          "received_quantity",
+          "pending_quantity"
+        ],
+        "title": "PurchaseCommandLineResultView",
+        "type": "object"
+      },
+      "PurchaseCommandResultView": {
+        "additionalProperties": false,
+        "properties": {
+          "branch_id": {
+            "format": "uuid",
+            "title": "Branch Id",
+            "type": "string",
+            "x-zeromerma-id-representation": "JSON_STRING"
+          },
+          "document_type": {
+            "enum": [
+              "PURCHASE",
+              "DIRECT_ENTRY"
+            ],
+            "title": "Document Type",
+            "type": "string"
+          },
+          "folio": {
+            "title": "Folio",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string",
+            "x-zeromerma-id-representation": "JSON_STRING"
+          },
+          "inventory_movement_ids": {
+            "items": {
+              "format": "uuid",
+              "type": "string",
+              "x-zeromerma-id-representation": "JSON_STRING"
+            },
+            "title": "Inventory Movement Ids",
+            "type": "array"
+          },
+          "lines": {
+            "items": {
+              "$ref": "#/components/schemas/PurchaseCommandLineResultView"
+            },
+            "title": "Lines",
+            "type": "array"
+          },
+          "receipt_ids": {
+            "items": {
+              "format": "uuid",
+              "type": "string",
+              "x-zeromerma-id-representation": "JSON_STRING"
+            },
+            "title": "Receipt Ids",
+            "type": "array"
+          },
+          "status": {
+            "enum": [
+              "DRAFT",
+              "ORDERED",
+              "PARTIALLY_RECEIVED",
+              "RECEIVED",
+              "CANCELLED"
+            ],
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "branch_id",
+          "folio",
+          "status",
+          "document_type",
+          "receipt_ids",
+          "inventory_movement_ids",
+          "lines"
+        ],
+        "title": "PurchaseCommandResultView",
+        "type": "object"
+      },
       "ReauthenticationRequest": {
         "additionalProperties": false,
         "properties": {
@@ -45556,6 +46108,140 @@
         "title": "TrainingModeView",
         "type": "object"
       },
+      "TransferCommandLineView": {
+        "additionalProperties": false,
+        "properties": {
+          "pending_quantity": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Pending Quantity",
+            "type": "string",
+            "x-zeromerma-decimal-representation": "JSON_STRING"
+          },
+          "product_id": {
+            "format": "uuid",
+            "title": "Product Id",
+            "type": "string",
+            "x-zeromerma-id-representation": "JSON_STRING"
+          },
+          "received_quantity": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Received Quantity",
+            "type": "string",
+            "x-zeromerma-decimal-representation": "JSON_STRING"
+          },
+          "sent_quantity": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Sent Quantity",
+            "type": "string",
+            "x-zeromerma-decimal-representation": "JSON_STRING"
+          },
+          "shipment_line_id": {
+            "format": "uuid",
+            "title": "Shipment Line Id",
+            "type": "string",
+            "x-zeromerma-id-representation": "JSON_STRING"
+          }
+        },
+        "required": [
+          "shipment_line_id",
+          "product_id",
+          "sent_quantity",
+          "received_quantity",
+          "pending_quantity"
+        ],
+        "title": "TransferCommandLineView",
+        "type": "object"
+      },
+      "TransferCommandResultView": {
+        "additionalProperties": false,
+        "properties": {
+          "cash_session_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string",
+                "x-zeromerma-id-representation": "JSON_STRING"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cash Session Id"
+          },
+          "committed_at_utc": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string",
+                "x-zeromerma-instant-format": "ISO8601_DATETIME"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Committed At Utc"
+          },
+          "destination_branch_id": {
+            "format": "uuid",
+            "title": "Destination Branch Id",
+            "type": "string",
+            "x-zeromerma-id-representation": "JSON_STRING"
+          },
+          "folio": {
+            "title": "Folio",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string",
+            "x-zeromerma-id-representation": "JSON_STRING"
+          },
+          "lines": {
+            "items": {
+              "$ref": "#/components/schemas/TransferCommandLineView"
+            },
+            "title": "Lines",
+            "type": "array"
+          },
+          "origin_branch_id": {
+            "format": "uuid",
+            "title": "Origin Branch Id",
+            "type": "string",
+            "x-zeromerma-id-representation": "JSON_STRING"
+          },
+          "receipt_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string",
+                "x-zeromerma-id-representation": "JSON_STRING"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Receipt Id"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "folio",
+          "status",
+          "origin_branch_id",
+          "destination_branch_id",
+          "receipt_id",
+          "cash_session_id",
+          "committed_at_utc",
+          "lines"
+        ],
+        "title": "TransferCommandResultView",
+        "type": "object"
+      },
       "TransferDestinationBranchView": {
         "properties": {
           "brand_key": {
@@ -45599,25 +46285,26 @@
       },
       "TransferDetailResponse": {
         "properties": {
-          "receipt": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/OperationDocumentView"
-              },
-              {
-                "type": "null"
-              }
-            ]
+          "receipt_progress": {
+            "items": {
+              "$ref": "#/components/schemas/TransferCommandLineView"
+            },
+            "title": "Receipt Progress",
+            "type": "array"
           },
-          "receipt_summary": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/TransferDocumentSummaryView"
-              },
-              {
-                "type": "null"
-              }
-            ]
+          "receipt_summaries": {
+            "items": {
+              "$ref": "#/components/schemas/TransferDocumentSummaryView"
+            },
+            "title": "Receipt Summaries",
+            "type": "array"
+          },
+          "receipts": {
+            "items": {
+              "$ref": "#/components/schemas/OperationDocumentView"
+            },
+            "title": "Receipts",
+            "type": "array"
           },
           "shipment": {
             "$ref": "#/components/schemas/OperationDocumentView"
@@ -45629,13 +46316,15 @@
         "required": [
           "shipment",
           "shipment_summary",
-          "receipt",
-          "receipt_summary"
+          "receipts",
+          "receipt_summaries",
+          "receipt_progress"
         ],
         "title": "TransferDetailResponse",
         "type": "object"
       },
       "TransferDispatchCommitLineRequest": {
+        "additionalProperties": false,
         "properties": {
           "notes": {
             "anyOf": [
@@ -45679,7 +46368,14 @@
         "type": "object"
       },
       "TransferDispatchCommitRequest": {
+        "additionalProperties": false,
         "properties": {
+          "cash_session_id": {
+            "format": "uuid",
+            "title": "Cash Session Id",
+            "type": "string",
+            "x-zeromerma-id-representation": "JSON_STRING"
+          },
           "destination_branch_id": {
             "format": "uuid",
             "title": "Destination Branch Id",
@@ -45715,6 +46411,7 @@
         },
         "required": [
           "workstation_code",
+          "cash_session_id",
           "destination_branch_id",
           "lines"
         ],
@@ -45894,6 +46591,178 @@
         "title": "TransferQuantitySummaryView",
         "type": "object"
       },
+      "TransferReceiptHistoryItemView": {
+        "properties": {
+          "committed_at_utc": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string",
+                "x-zeromerma-instant-format": "ISO8601_DATETIME"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Committed At Utc"
+          },
+          "created_at_utc": {
+            "format": "date-time",
+            "title": "Created At Utc",
+            "type": "string",
+            "x-zeromerma-instant-format": "ISO8601_DATETIME"
+          },
+          "created_by_user_full_name": {
+            "title": "Created By User Full Name",
+            "type": "string"
+          },
+          "created_by_user_id": {
+            "format": "uuid",
+            "title": "Created By User Id",
+            "type": "string",
+            "x-zeromerma-id-representation": "JSON_STRING"
+          },
+          "destination_branch_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Destination Branch Code"
+          },
+          "destination_branch_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Destination Branch Name"
+          },
+          "destination_bucket_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Destination Bucket Code"
+          },
+          "document_type": {
+            "title": "Document Type",
+            "type": "string"
+          },
+          "folio": {
+            "title": "Folio",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string",
+            "x-zeromerma-id-representation": "JSON_STRING"
+          },
+          "line_count": {
+            "title": "Line Count",
+            "type": "integer"
+          },
+          "reason_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason Code"
+          },
+          "reason_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason Name"
+          },
+          "shipment_id": {
+            "format": "uuid",
+            "title": "Shipment Id",
+            "type": "string",
+            "x-zeromerma-id-representation": "JSON_STRING"
+          },
+          "source_branch_code": {
+            "title": "Source Branch Code",
+            "type": "string"
+          },
+          "source_branch_name": {
+            "title": "Source Branch Name",
+            "type": "string"
+          },
+          "source_bucket_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Bucket Code"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          },
+          "total_quantity": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Total Quantity",
+            "type": "string",
+            "x-zeromerma-decimal-representation": "JSON_STRING"
+          },
+          "workstation_code": {
+            "title": "Workstation Code",
+            "type": "string"
+          },
+          "workstation_name": {
+            "title": "Workstation Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "folio",
+          "document_type",
+          "status",
+          "source_branch_code",
+          "source_branch_name",
+          "destination_branch_code",
+          "destination_branch_name",
+          "source_bucket_code",
+          "destination_bucket_code",
+          "workstation_code",
+          "workstation_name",
+          "created_by_user_id",
+          "created_by_user_full_name",
+          "line_count",
+          "total_quantity",
+          "created_at_utc",
+          "committed_at_utc",
+          "shipment_id"
+        ],
+        "title": "TransferReceiptHistoryItemView",
+        "type": "object"
+      },
       "TransferReceiptHistoryResponse": {
         "properties": {
           "available_scopes": {
@@ -45937,7 +46806,7 @@
           },
           "records": {
             "items": {
-              "$ref": "#/components/schemas/OperationHistoryListItemView"
+              "$ref": "#/components/schemas/TransferReceiptHistoryItemView"
             },
             "title": "Records",
             "type": "array"
@@ -45986,6 +46855,7 @@
         "type": "object"
       },
       "TransferReceiptLineRequest": {
+        "additionalProperties": false,
         "properties": {
           "expected_quantity": {
             "anyOf": [
@@ -46057,7 +46927,14 @@
         "type": "object"
       },
       "TransferReceiveRequest": {
+        "additionalProperties": false,
         "properties": {
+          "cash_session_id": {
+            "format": "uuid",
+            "title": "Cash Session Id",
+            "type": "string",
+            "x-zeromerma-id-representation": "JSON_STRING"
+          },
           "lines": {
             "items": {
               "$ref": "#/components/schemas/TransferReceiptLineRequest"
@@ -46087,13 +46964,21 @@
         },
         "required": [
           "workstation_code",
+          "cash_session_id",
           "lines"
         ],
         "title": "TransferReceiveRequest",
         "type": "object"
       },
       "WasteCommitRequest": {
+        "additionalProperties": false,
         "properties": {
+          "cash_session_id": {
+            "format": "uuid",
+            "title": "Cash Session Id",
+            "type": "string",
+            "x-zeromerma-id-representation": "JSON_STRING"
+          },
           "high_impact_acknowledged": {
             "default": false,
             "title": "High Impact Acknowledged",
@@ -46140,6 +47025,7 @@
           }
         },
         "required": [
+          "cash_session_id",
           "workstation_code",
           "reason_code",
           "lines"
@@ -55668,6 +56554,22 @@
     "/v1/admin/inventory/adjustments": {
       "post": {
         "operationId": "create_admin_inventory_adjustment_v1_admin_inventory_adjustments_post",
+        "parameters": [
+          {
+            "description": "A globally unique UUIDv7 identifying this business intention.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": true,
+            "schema": {
+              "description": "A globally unique UUIDv7 identifying this business intention.",
+              "maxLength": 36,
+              "minLength": 36,
+              "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-7[0-9a-fA-F]{3}-[89aAbB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$",
+              "title": "Idempotency-Key",
+              "type": "string"
+            }
+          }
+        ],
         "requestBody": {
           "content": {
             "application/json": {
@@ -55683,11 +56585,16 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/AdminInventoryAdjustmentView"
+                  "$ref": "#/components/schemas/AdminInventoryAdjustmentResultView"
                 }
               }
             },
-            "description": "Successful Response"
+            "description": "Successful Response",
+            "headers": {
+              "Idempotency-Replayed": {
+                "$ref": "#/components/headers/IdempotencyReplayed"
+              }
+            }
           },
           "400": {
             "content": {
@@ -55737,7 +56644,12 @@
                 }
               }
             },
-            "description": "Conflict"
+            "description": "Conflict",
+            "headers": {
+              "Idempotency-Replayed": {
+                "$ref": "#/components/headers/IdempotencyReplayed"
+              }
+            }
           },
           "422": {
             "content": {
@@ -55789,6 +56701,163 @@
           }
         ],
         "summary": "Create Admin Inventory Adjustment",
+        "tags": [
+          "admin-inventory"
+        ],
+        "x-authorization-policy": "explicit-deny-by-default",
+        "x-required-capabilities": [
+          "inventory.adjust"
+        ],
+        "x-zeromerma-operation-id-policy": "FASTAPI_STABLE_GENERATED"
+      }
+    },
+    "/v1/admin/inventory/adjustments/confirmations/{idempotency_key}": {
+      "get": {
+        "operationId": "recover_create_admin_inventory_adjustment_v1_admin_inventory_adjustments_confirmations__idempotency_key__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "idempotency_key",
+            "required": true,
+            "schema": {
+              "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-7[0-9a-fA-F]{3}-[89aAbB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$",
+              "title": "Idempotency Key",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "branch_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Branch Id",
+              "type": "string",
+              "x-zeromerma-id-representation": "JSON_STRING"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminInventoryAdjustmentResultView"
+                }
+              }
+            },
+            "description": "Successful Response",
+            "headers": {
+              "Idempotency-Replayed": {
+                "$ref": "#/components/headers/IdempotencyReplayed"
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Authentication Required"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict",
+            "headers": {
+              "Idempotency-Replayed": {
+                "$ref": "#/components/headers/IdempotencyReplayed"
+              }
+            }
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "423": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Session Locked"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Login Rate Limited"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Internal Server Error"
+          }
+        },
+        "security": [
+          {
+            "PosSessionCookie": []
+          },
+          {
+            "BackofficeSessionCookie": []
+          }
+        ],
+        "summary": "Recover Create Admin Inventory Adjustment",
         "tags": [
           "admin-inventory"
         ],
@@ -58763,19 +59832,17 @@
         "operationId": "create_admin_production_v1_admin_production_post",
         "parameters": [
           {
+            "description": "A globally unique UUIDv7 identifying this business intention.",
             "in": "header",
-            "name": "X-Request-ID",
-            "required": false,
+            "name": "Idempotency-Key",
+            "required": true,
             "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "X-Request-Id"
+              "description": "A globally unique UUIDv7 identifying this business intention.",
+              "maxLength": 36,
+              "minLength": 36,
+              "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-7[0-9a-fA-F]{3}-[89aAbB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$",
+              "title": "Idempotency-Key",
+              "type": "string"
             }
           }
         ],
@@ -58794,11 +59861,16 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/AdminProductionDetailView"
+                  "$ref": "#/components/schemas/ProductionCommandResultView"
                 }
               }
             },
-            "description": "Successful Response"
+            "description": "Successful Response",
+            "headers": {
+              "Idempotency-Replayed": {
+                "$ref": "#/components/headers/IdempotencyReplayed"
+              }
+            }
           },
           "400": {
             "content": {
@@ -58907,6 +59979,174 @@
         "x-required-capabilities": [
           "production.manage"
         ],
+        "x-zeromerma-operation-id-policy": "FASTAPI_STABLE_GENERATED"
+      }
+    },
+    "/v1/admin/production/commands/{command_code}/{idempotency_key}": {
+      "get": {
+        "operationId": "recover_production_command_v1_admin_production_commands__command_code___idempotency_key__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "command_code",
+            "required": true,
+            "schema": {
+              "enum": [
+                "create",
+                "update",
+                "start",
+                "complete",
+                "cancel"
+              ],
+              "title": "Command Code",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "idempotency_key",
+            "required": true,
+            "schema": {
+              "maxLength": 36,
+              "minLength": 36,
+              "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-7[0-9a-fA-F]{3}-[89aAbB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$",
+              "title": "Idempotency Key",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "branch_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Branch Id",
+              "type": "string",
+              "x-zeromerma-id-representation": "JSON_STRING"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProductionCommandResultView"
+                }
+              }
+            },
+            "description": "Successful Response",
+            "headers": {
+              "Idempotency-Replayed": {
+                "$ref": "#/components/headers/IdempotencyReplayed"
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Authentication Required"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "423": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Session Locked"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Login Rate Limited"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Internal Server Error"
+          }
+        },
+        "security": [
+          {
+            "PosSessionCookie": []
+          },
+          {
+            "BackofficeSessionCookie": []
+          }
+        ],
+        "summary": "Recover Production Command",
+        "tags": [
+          "admin-production"
+        ],
+        "x-authorization-policy": "explicit-deny-by-default",
+        "x-required-capabilities": [],
         "x-zeromerma-operation-id-policy": "FASTAPI_STABLE_GENERATED"
       }
     },
@@ -59061,19 +60301,17 @@
             }
           },
           {
+            "description": "A globally unique UUIDv7 identifying this business intention.",
             "in": "header",
-            "name": "X-Request-ID",
-            "required": false,
+            "name": "Idempotency-Key",
+            "required": true,
             "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "X-Request-Id"
+              "description": "A globally unique UUIDv7 identifying this business intention.",
+              "maxLength": 36,
+              "minLength": 36,
+              "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-7[0-9a-fA-F]{3}-[89aAbB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$",
+              "title": "Idempotency-Key",
+              "type": "string"
             }
           }
         ],
@@ -59092,11 +60330,16 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/AdminProductionDetailView"
+                  "$ref": "#/components/schemas/ProductionCommandResultView"
                 }
               }
             },
-            "description": "Successful Response"
+            "description": "Successful Response",
+            "headers": {
+              "Idempotency-Replayed": {
+                "$ref": "#/components/headers/IdempotencyReplayed"
+              }
+            }
           },
           "400": {
             "content": {
@@ -59224,19 +60467,17 @@
             }
           },
           {
+            "description": "A globally unique UUIDv7 identifying this business intention.",
             "in": "header",
-            "name": "X-Request-ID",
-            "required": false,
+            "name": "Idempotency-Key",
+            "required": true,
             "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "X-Request-Id"
+              "description": "A globally unique UUIDv7 identifying this business intention.",
+              "maxLength": 36,
+              "minLength": 36,
+              "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-7[0-9a-fA-F]{3}-[89aAbB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$",
+              "title": "Idempotency-Key",
+              "type": "string"
             }
           }
         ],
@@ -59255,11 +60496,16 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/AdminProductionDetailView"
+                  "$ref": "#/components/schemas/ProductionCommandResultView"
                 }
               }
             },
-            "description": "Successful Response"
+            "description": "Successful Response",
+            "headers": {
+              "Idempotency-Replayed": {
+                "$ref": "#/components/headers/IdempotencyReplayed"
+              }
+            }
           },
           "400": {
             "content": {
@@ -59387,19 +60633,17 @@
             }
           },
           {
+            "description": "A globally unique UUIDv7 identifying this business intention.",
             "in": "header",
-            "name": "X-Request-ID",
-            "required": false,
+            "name": "Idempotency-Key",
+            "required": true,
             "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "X-Request-Id"
+              "description": "A globally unique UUIDv7 identifying this business intention.",
+              "maxLength": 36,
+              "minLength": 36,
+              "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-7[0-9a-fA-F]{3}-[89aAbB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$",
+              "title": "Idempotency-Key",
+              "type": "string"
             }
           }
         ],
@@ -59418,11 +60662,16 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/AdminProductionDetailView"
+                  "$ref": "#/components/schemas/ProductionCommandResultView"
                 }
               }
             },
-            "description": "Successful Response"
+            "description": "Successful Response",
+            "headers": {
+              "Idempotency-Replayed": {
+                "$ref": "#/components/headers/IdempotencyReplayed"
+              }
+            }
           },
           "400": {
             "content": {
@@ -59550,19 +60799,17 @@
             }
           },
           {
+            "description": "A globally unique UUIDv7 identifying this business intention.",
             "in": "header",
-            "name": "X-Request-ID",
-            "required": false,
+            "name": "Idempotency-Key",
+            "required": true,
             "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "X-Request-Id"
+              "description": "A globally unique UUIDv7 identifying this business intention.",
+              "maxLength": 36,
+              "minLength": 36,
+              "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-7[0-9a-fA-F]{3}-[89aAbB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$",
+              "title": "Idempotency-Key",
+              "type": "string"
             }
           }
         ],
@@ -59581,11 +60828,16 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/AdminProductionDetailView"
+                  "$ref": "#/components/schemas/ProductionCommandResultView"
                 }
               }
             },
-            "description": "Successful Response"
+            "description": "Successful Response",
+            "headers": {
+              "Idempotency-Replayed": {
+                "$ref": "#/components/headers/IdempotencyReplayed"
+              }
+            }
           },
           "400": {
             "content": {
@@ -60915,19 +62167,17 @@
         "operationId": "create_admin_purchase_v1_admin_purchases_post",
         "parameters": [
           {
+            "description": "A globally unique UUIDv7 identifying this business intention.",
             "in": "header",
-            "name": "X-Request-ID",
-            "required": false,
+            "name": "Idempotency-Key",
+            "required": true,
             "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "X-Request-Id"
+              "description": "A globally unique UUIDv7 identifying this business intention.",
+              "maxLength": 36,
+              "minLength": 36,
+              "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-7[0-9a-fA-F]{3}-[89aAbB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$",
+              "title": "Idempotency-Key",
+              "type": "string"
             }
           }
         ],
@@ -60946,11 +62196,16 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/AdminPurchaseDetailView"
+                  "$ref": "#/components/schemas/PurchaseCommandResultView"
                 }
               }
             },
-            "description": "Successful Response"
+            "description": "Successful Response",
+            "headers": {
+              "Idempotency-Replayed": {
+                "$ref": "#/components/headers/IdempotencyReplayed"
+              }
+            }
           },
           "400": {
             "content": {
@@ -61000,7 +62255,12 @@
                 }
               }
             },
-            "description": "Conflict"
+            "description": "Conflict",
+            "headers": {
+              "Idempotency-Replayed": {
+                "$ref": "#/components/headers/IdempotencyReplayed"
+              }
+            }
           },
           "422": {
             "content": {
@@ -61062,47 +62322,64 @@
         "x-zeromerma-operation-id-policy": "FASTAPI_STABLE_GENERATED"
       }
     },
-    "/v1/admin/purchases/direct-entry": {
-      "post": {
-        "operationId": "create_admin_direct_entry_v1_admin_purchases_direct_entry_post",
+    "/v1/admin/purchases/commands/{command_code}/{idempotency_key}": {
+      "get": {
+        "operationId": "recover_admin_purchase_command_v1_admin_purchases_commands__command_code___idempotency_key__get",
         "parameters": [
           {
-            "in": "header",
-            "name": "X-Request-ID",
-            "required": false,
+            "in": "path",
+            "name": "command_code",
+            "required": true,
             "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
+              "enum": [
+                "create",
+                "update",
+                "direct-entry",
+                "confirm",
+                "receive",
+                "cancel"
               ],
-              "title": "X-Request-Id"
+              "title": "Command Code",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "idempotency_key",
+            "required": true,
+            "schema": {
+              "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-7[0-9a-fA-F]{3}-[89aAbB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$",
+              "title": "Idempotency Key",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "branch_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Branch Id",
+              "type": "string",
+              "x-zeromerma-id-representation": "JSON_STRING"
             }
           }
         ],
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/AdminPurchaseDirectEntryRequest"
-              }
-            }
-          },
-          "required": true
-        },
         "responses": {
-          "201": {
+          "200": {
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/AdminPurchaseDetailView"
+                  "$ref": "#/components/schemas/PurchaseCommandResultView"
                 }
               }
             },
-            "description": "Successful Response"
+            "description": "Successful Response",
+            "headers": {
+              "Idempotency-Replayed": {
+                "$ref": "#/components/headers/IdempotencyReplayed"
+              }
+            }
           },
           "400": {
             "content": {
@@ -61152,7 +62429,170 @@
                 }
               }
             },
-            "description": "Conflict"
+            "description": "Conflict",
+            "headers": {
+              "Idempotency-Replayed": {
+                "$ref": "#/components/headers/IdempotencyReplayed"
+              }
+            }
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "423": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Session Locked"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Login Rate Limited"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Internal Server Error"
+          }
+        },
+        "security": [
+          {
+            "PosSessionCookie": []
+          },
+          {
+            "BackofficeSessionCookie": []
+          }
+        ],
+        "summary": "Recover Admin Purchase Command",
+        "tags": [
+          "admin-purchases"
+        ],
+        "x-authorization-policy": "explicit-deny-by-default",
+        "x-required-capabilities": [],
+        "x-zeromerma-operation-id-policy": "FASTAPI_STABLE_GENERATED"
+      }
+    },
+    "/v1/admin/purchases/direct-entry": {
+      "post": {
+        "operationId": "create_admin_direct_entry_v1_admin_purchases_direct_entry_post",
+        "parameters": [
+          {
+            "description": "A globally unique UUIDv7 identifying this business intention.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": true,
+            "schema": {
+              "description": "A globally unique UUIDv7 identifying this business intention.",
+              "maxLength": 36,
+              "minLength": 36,
+              "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-7[0-9a-fA-F]{3}-[89aAbB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$",
+              "title": "Idempotency-Key",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AdminPurchaseDirectEntryRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PurchaseCommandResultView"
+                }
+              }
+            },
+            "description": "Successful Response",
+            "headers": {
+              "Idempotency-Replayed": {
+                "$ref": "#/components/headers/IdempotencyReplayed"
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Authentication Required"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict",
+            "headers": {
+              "Idempotency-Replayed": {
+                "$ref": "#/components/headers/IdempotencyReplayed"
+              }
+            }
           },
           "422": {
             "content": {
@@ -61365,19 +62805,17 @@
             }
           },
           {
+            "description": "A globally unique UUIDv7 identifying this business intention.",
             "in": "header",
-            "name": "X-Request-ID",
-            "required": false,
+            "name": "Idempotency-Key",
+            "required": true,
             "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "X-Request-Id"
+              "description": "A globally unique UUIDv7 identifying this business intention.",
+              "maxLength": 36,
+              "minLength": 36,
+              "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-7[0-9a-fA-F]{3}-[89aAbB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$",
+              "title": "Idempotency-Key",
+              "type": "string"
             }
           }
         ],
@@ -61396,11 +62834,16 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/AdminPurchaseDetailView"
+                  "$ref": "#/components/schemas/PurchaseCommandResultView"
                 }
               }
             },
-            "description": "Successful Response"
+            "description": "Successful Response",
+            "headers": {
+              "Idempotency-Replayed": {
+                "$ref": "#/components/headers/IdempotencyReplayed"
+              }
+            }
           },
           "400": {
             "content": {
@@ -61450,7 +62893,12 @@
                 }
               }
             },
-            "description": "Conflict"
+            "description": "Conflict",
+            "headers": {
+              "Idempotency-Replayed": {
+                "$ref": "#/components/headers/IdempotencyReplayed"
+              }
+            }
           },
           "422": {
             "content": {
@@ -61528,19 +62976,17 @@
             }
           },
           {
+            "description": "A globally unique UUIDv7 identifying this business intention.",
             "in": "header",
-            "name": "X-Request-ID",
-            "required": false,
+            "name": "Idempotency-Key",
+            "required": true,
             "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "X-Request-Id"
+              "description": "A globally unique UUIDv7 identifying this business intention.",
+              "maxLength": 36,
+              "minLength": 36,
+              "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-7[0-9a-fA-F]{3}-[89aAbB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$",
+              "title": "Idempotency-Key",
+              "type": "string"
             }
           }
         ],
@@ -61559,11 +63005,16 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/AdminPurchaseDetailView"
+                  "$ref": "#/components/schemas/PurchaseCommandResultView"
                 }
               }
             },
-            "description": "Successful Response"
+            "description": "Successful Response",
+            "headers": {
+              "Idempotency-Replayed": {
+                "$ref": "#/components/headers/IdempotencyReplayed"
+              }
+            }
           },
           "400": {
             "content": {
@@ -61613,7 +63064,12 @@
                 }
               }
             },
-            "description": "Conflict"
+            "description": "Conflict",
+            "headers": {
+              "Idempotency-Replayed": {
+                "$ref": "#/components/headers/IdempotencyReplayed"
+              }
+            }
           },
           "422": {
             "content": {
@@ -61691,19 +63147,17 @@
             }
           },
           {
+            "description": "A globally unique UUIDv7 identifying this business intention.",
             "in": "header",
-            "name": "X-Request-ID",
-            "required": false,
+            "name": "Idempotency-Key",
+            "required": true,
             "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "X-Request-Id"
+              "description": "A globally unique UUIDv7 identifying this business intention.",
+              "maxLength": 36,
+              "minLength": 36,
+              "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-7[0-9a-fA-F]{3}-[89aAbB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$",
+              "title": "Idempotency-Key",
+              "type": "string"
             }
           }
         ],
@@ -61712,11 +63166,16 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/AdminPurchaseDetailView"
+                  "$ref": "#/components/schemas/PurchaseCommandResultView"
                 }
               }
             },
-            "description": "Successful Response"
+            "description": "Successful Response",
+            "headers": {
+              "Idempotency-Replayed": {
+                "$ref": "#/components/headers/IdempotencyReplayed"
+              }
+            }
           },
           "400": {
             "content": {
@@ -61766,7 +63225,12 @@
                 }
               }
             },
-            "description": "Conflict"
+            "description": "Conflict",
+            "headers": {
+              "Idempotency-Replayed": {
+                "$ref": "#/components/headers/IdempotencyReplayed"
+              }
+            }
           },
           "422": {
             "content": {
@@ -61844,19 +63308,17 @@
             }
           },
           {
+            "description": "A globally unique UUIDv7 identifying this business intention.",
             "in": "header",
-            "name": "X-Request-ID",
-            "required": false,
+            "name": "Idempotency-Key",
+            "required": true,
             "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "X-Request-Id"
+              "description": "A globally unique UUIDv7 identifying this business intention.",
+              "maxLength": 36,
+              "minLength": 36,
+              "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-7[0-9a-fA-F]{3}-[89aAbB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$",
+              "title": "Idempotency-Key",
+              "type": "string"
             }
           }
         ],
@@ -61875,11 +63337,16 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/AdminPurchaseDetailView"
+                  "$ref": "#/components/schemas/PurchaseCommandResultView"
                 }
               }
             },
-            "description": "Successful Response"
+            "description": "Successful Response",
+            "headers": {
+              "Idempotency-Replayed": {
+                "$ref": "#/components/headers/IdempotencyReplayed"
+              }
+            }
           },
           "400": {
             "content": {
@@ -61929,7 +63396,12 @@
                 }
               }
             },
-            "description": "Conflict"
+            "description": "Conflict",
+            "headers": {
+              "Idempotency-Replayed": {
+                "$ref": "#/components/headers/IdempotencyReplayed"
+              }
+            }
           },
           "422": {
             "content": {
@@ -71933,6 +73405,22 @@
       },
       "post": {
         "operationId": "create_admin_transfer_v1_admin_transfers_post",
+        "parameters": [
+          {
+            "description": "A globally unique UUIDv7 identifying this business intention.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": true,
+            "schema": {
+              "description": "A globally unique UUIDv7 identifying this business intention.",
+              "maxLength": 36,
+              "minLength": 36,
+              "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-7[0-9a-fA-F]{3}-[89aAbB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$",
+              "title": "Idempotency-Key",
+              "type": "string"
+            }
+          }
+        ],
         "requestBody": {
           "content": {
             "application/json": {
@@ -71948,11 +73436,16 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/AdminTransferDetailView"
+                  "$ref": "#/components/schemas/TransferCommandResultView"
                 }
               }
             },
-            "description": "Successful Response"
+            "description": "Successful Response",
+            "headers": {
+              "Idempotency-Replayed": {
+                "$ref": "#/components/headers/IdempotencyReplayed"
+              }
+            }
           },
           "400": {
             "content": {
@@ -72002,7 +73495,12 @@
                 }
               }
             },
-            "description": "Conflict"
+            "description": "Conflict",
+            "headers": {
+              "Idempotency-Replayed": {
+                "$ref": "#/components/headers/IdempotencyReplayed"
+              }
+            }
           },
           "422": {
             "content": {
@@ -72061,6 +73559,177 @@
         "x-required-capabilities": [
           "transfers.manage"
         ],
+        "x-zeromerma-operation-id-policy": "FASTAPI_STABLE_GENERATED"
+      }
+    },
+    "/v1/admin/transfers/commands/{command_code}/confirmations/{idempotency_key}": {
+      "get": {
+        "operationId": "recover_admin_transfer_v1_admin_transfers_commands__command_code__confirmations__idempotency_key__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "command_code",
+            "required": true,
+            "schema": {
+              "enum": [
+                "create",
+                "update",
+                "dispatch",
+                "receive",
+                "cancel"
+              ],
+              "title": "Command Code",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "idempotency_key",
+            "required": true,
+            "schema": {
+              "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-7[0-9a-fA-F]{3}-[89aAbB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$",
+              "title": "Idempotency Key",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "branch_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Branch Id",
+              "type": "string",
+              "x-zeromerma-id-representation": "JSON_STRING"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TransferCommandResultView"
+                }
+              }
+            },
+            "description": "Successful Response",
+            "headers": {
+              "Idempotency-Replayed": {
+                "$ref": "#/components/headers/IdempotencyReplayed"
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Authentication Required"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict",
+            "headers": {
+              "Idempotency-Replayed": {
+                "$ref": "#/components/headers/IdempotencyReplayed"
+              }
+            }
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "423": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Session Locked"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Login Rate Limited"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Internal Server Error"
+          }
+        },
+        "security": [
+          {
+            "PosSessionCookie": []
+          },
+          {
+            "BackofficeSessionCookie": []
+          }
+        ],
+        "summary": "Recover Admin Transfer",
+        "tags": [
+          "admin-transfers"
+        ],
+        "x-authorization-policy": "explicit-deny-by-default",
+        "x-required-capabilities": [],
         "x-zeromerma-operation-id-policy": "FASTAPI_STABLE_GENERATED"
       }
     },
@@ -72213,6 +73882,20 @@
               "type": "string",
               "x-zeromerma-id-representation": "JSON_STRING"
             }
+          },
+          {
+            "description": "A globally unique UUIDv7 identifying this business intention.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": true,
+            "schema": {
+              "description": "A globally unique UUIDv7 identifying this business intention.",
+              "maxLength": 36,
+              "minLength": 36,
+              "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-7[0-9a-fA-F]{3}-[89aAbB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$",
+              "title": "Idempotency-Key",
+              "type": "string"
+            }
           }
         ],
         "requestBody": {
@@ -72230,11 +73913,16 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/AdminTransferDetailView"
+                  "$ref": "#/components/schemas/TransferCommandResultView"
                 }
               }
             },
-            "description": "Successful Response"
+            "description": "Successful Response",
+            "headers": {
+              "Idempotency-Replayed": {
+                "$ref": "#/components/headers/IdempotencyReplayed"
+              }
+            }
           },
           "400": {
             "content": {
@@ -72284,7 +73972,12 @@
                 }
               }
             },
-            "description": "Conflict"
+            "description": "Conflict",
+            "headers": {
+              "Idempotency-Replayed": {
+                "$ref": "#/components/headers/IdempotencyReplayed"
+              }
+            }
           },
           "422": {
             "content": {
@@ -72360,6 +74053,20 @@
               "type": "string",
               "x-zeromerma-id-representation": "JSON_STRING"
             }
+          },
+          {
+            "description": "A globally unique UUIDv7 identifying this business intention.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": true,
+            "schema": {
+              "description": "A globally unique UUIDv7 identifying this business intention.",
+              "maxLength": 36,
+              "minLength": 36,
+              "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-7[0-9a-fA-F]{3}-[89aAbB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$",
+              "title": "Idempotency-Key",
+              "type": "string"
+            }
           }
         ],
         "requestBody": {
@@ -72377,11 +74084,16 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/AdminTransferDetailView"
+                  "$ref": "#/components/schemas/TransferCommandResultView"
                 }
               }
             },
-            "description": "Successful Response"
+            "description": "Successful Response",
+            "headers": {
+              "Idempotency-Replayed": {
+                "$ref": "#/components/headers/IdempotencyReplayed"
+              }
+            }
           },
           "400": {
             "content": {
@@ -72431,7 +74143,12 @@
                 }
               }
             },
-            "description": "Conflict"
+            "description": "Conflict",
+            "headers": {
+              "Idempotency-Replayed": {
+                "$ref": "#/components/headers/IdempotencyReplayed"
+              }
+            }
           },
           "422": {
             "content": {
@@ -72507,6 +74224,20 @@
               "type": "string",
               "x-zeromerma-id-representation": "JSON_STRING"
             }
+          },
+          {
+            "description": "A globally unique UUIDv7 identifying this business intention.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": true,
+            "schema": {
+              "description": "A globally unique UUIDv7 identifying this business intention.",
+              "maxLength": 36,
+              "minLength": 36,
+              "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-7[0-9a-fA-F]{3}-[89aAbB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$",
+              "title": "Idempotency-Key",
+              "type": "string"
+            }
           }
         ],
         "requestBody": {
@@ -72524,11 +74255,16 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/AdminTransferDetailView"
+                  "$ref": "#/components/schemas/TransferCommandResultView"
                 }
               }
             },
-            "description": "Successful Response"
+            "description": "Successful Response",
+            "headers": {
+              "Idempotency-Replayed": {
+                "$ref": "#/components/headers/IdempotencyReplayed"
+              }
+            }
           },
           "400": {
             "content": {
@@ -72578,7 +74314,12 @@
                 }
               }
             },
-            "description": "Conflict"
+            "description": "Conflict",
+            "headers": {
+              "Idempotency-Replayed": {
+                "$ref": "#/components/headers/IdempotencyReplayed"
+              }
+            }
           },
           "422": {
             "content": {
@@ -72654,6 +74395,20 @@
               "type": "string",
               "x-zeromerma-id-representation": "JSON_STRING"
             }
+          },
+          {
+            "description": "A globally unique UUIDv7 identifying this business intention.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": true,
+            "schema": {
+              "description": "A globally unique UUIDv7 identifying this business intention.",
+              "maxLength": 36,
+              "minLength": 36,
+              "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-7[0-9a-fA-F]{3}-[89aAbB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$",
+              "title": "Idempotency-Key",
+              "type": "string"
+            }
           }
         ],
         "requestBody": {
@@ -72671,11 +74426,16 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/AdminTransferDetailView"
+                  "$ref": "#/components/schemas/TransferCommandResultView"
                 }
               }
             },
-            "description": "Successful Response"
+            "description": "Successful Response",
+            "headers": {
+              "Idempotency-Replayed": {
+                "$ref": "#/components/headers/IdempotencyReplayed"
+              }
+            }
           },
           "400": {
             "content": {
@@ -72725,7 +74485,12 @@
                 }
               }
             },
-            "description": "Conflict"
+            "description": "Conflict",
+            "headers": {
+              "Idempotency-Replayed": {
+                "$ref": "#/components/headers/IdempotencyReplayed"
+              }
+            }
           },
           "422": {
             "content": {
@@ -75489,6 +77254,20 @@
               ],
               "title": "X-Request-Id"
             }
+          },
+          {
+            "description": "A globally unique UUIDv7 identifying this business intention.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": true,
+            "schema": {
+              "description": "A globally unique UUIDv7 identifying this business intention.",
+              "maxLength": 36,
+              "minLength": 36,
+              "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-7[0-9a-fA-F]{3}-[89aAbB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$",
+              "title": "Idempotency-Key",
+              "type": "string"
+            }
           }
         ],
         "requestBody": {
@@ -75506,11 +77285,16 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/AdminWasteDetailView"
+                  "$ref": "#/components/schemas/OperationCommitResultView"
                 }
               }
             },
-            "description": "Successful Response"
+            "description": "Successful Response",
+            "headers": {
+              "Idempotency-Replayed": {
+                "$ref": "#/components/headers/IdempotencyReplayed"
+              }
+            }
           },
           "400": {
             "content": {
@@ -75560,7 +77344,12 @@
                 }
               }
             },
-            "description": "Conflict"
+            "description": "Conflict",
+            "headers": {
+              "Idempotency-Replayed": {
+                "$ref": "#/components/headers/IdempotencyReplayed"
+              }
+            }
           },
           "422": {
             "content": {
@@ -75612,6 +77401,163 @@
           }
         ],
         "summary": "Create Admin Waste",
+        "tags": [
+          "admin-waste"
+        ],
+        "x-authorization-policy": "explicit-deny-by-default",
+        "x-required-capabilities": [
+          "waste.manage"
+        ],
+        "x-zeromerma-operation-id-policy": "FASTAPI_STABLE_GENERATED"
+      }
+    },
+    "/v1/admin/waste/confirmations/{idempotency_key}": {
+      "get": {
+        "operationId": "recover_create_admin_waste_v1_admin_waste_confirmations__idempotency_key__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "idempotency_key",
+            "required": true,
+            "schema": {
+              "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-7[0-9a-fA-F]{3}-[89aAbB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$",
+              "title": "Idempotency Key",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "branch_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Branch Id",
+              "type": "string",
+              "x-zeromerma-id-representation": "JSON_STRING"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OperationCommitResultView"
+                }
+              }
+            },
+            "description": "Successful Response",
+            "headers": {
+              "Idempotency-Replayed": {
+                "$ref": "#/components/headers/IdempotencyReplayed"
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Authentication Required"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict",
+            "headers": {
+              "Idempotency-Replayed": {
+                "$ref": "#/components/headers/IdempotencyReplayed"
+              }
+            }
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "423": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Session Locked"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Login Rate Limited"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Internal Server Error"
+          }
+        },
+        "security": [
+          {
+            "PosSessionCookie": []
+          },
+          {
+            "BackofficeSessionCookie": []
+          }
+        ],
+        "summary": "Recover Create Admin Waste",
         "tags": [
           "admin-waste"
         ],
@@ -79647,6 +81593,22 @@
     "/v1/corrections/commit": {
       "post": {
         "operationId": "commit_correction_v1_corrections_commit_post",
+        "parameters": [
+          {
+            "description": "A globally unique UUIDv7 identifying this business intention.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": true,
+            "schema": {
+              "description": "A globally unique UUIDv7 identifying this business intention.",
+              "maxLength": 36,
+              "minLength": 36,
+              "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-7[0-9a-fA-F]{3}-[89aAbB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$",
+              "title": "Idempotency-Key",
+              "type": "string"
+            }
+          }
+        ],
         "requestBody": {
           "content": {
             "application/json": {
@@ -79662,11 +81624,16 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/CorrectionDocumentView"
+                  "$ref": "#/components/schemas/CorrectionCommitResultView"
                 }
               }
             },
-            "description": "Successful Response"
+            "description": "Successful Response",
+            "headers": {
+              "Idempotency-Replayed": {
+                "$ref": "#/components/headers/IdempotencyReplayed"
+              }
+            }
           },
           "400": {
             "content": {
@@ -79716,7 +81683,12 @@
                 }
               }
             },
-            "description": "Conflict"
+            "description": "Conflict",
+            "headers": {
+              "Idempotency-Replayed": {
+                "$ref": "#/components/headers/IdempotencyReplayed"
+              }
+            }
           },
           "422": {
             "content": {
@@ -79768,6 +81740,173 @@
           }
         ],
         "summary": "Commit Correction",
+        "tags": [
+          "corrections"
+        ],
+        "x-authorization-policy": "explicit-deny-by-default",
+        "x-required-capabilities": [
+          "returns_corrections.manage"
+        ],
+        "x-zeromerma-operation-id-policy": "FASTAPI_STABLE_GENERATED"
+      }
+    },
+    "/v1/corrections/confirmations/{idempotency_key}": {
+      "get": {
+        "operationId": "recover_commit_correction_v1_corrections_confirmations__idempotency_key__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "idempotency_key",
+            "required": true,
+            "schema": {
+              "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-7[0-9a-fA-F]{3}-[89aAbB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$",
+              "title": "Idempotency Key",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "workstation_code",
+            "required": true,
+            "schema": {
+              "minLength": 1,
+              "title": "Workstation Code",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "cash_session_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Cash Session Id",
+              "type": "string",
+              "x-zeromerma-id-representation": "JSON_STRING"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CorrectionCommitResultView"
+                }
+              }
+            },
+            "description": "Successful Response",
+            "headers": {
+              "Idempotency-Replayed": {
+                "$ref": "#/components/headers/IdempotencyReplayed"
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Authentication Required"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict",
+            "headers": {
+              "Idempotency-Replayed": {
+                "$ref": "#/components/headers/IdempotencyReplayed"
+              }
+            }
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "423": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Session Locked"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Login Rate Limited"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Internal Server Error"
+          }
+        },
+        "security": [
+          {
+            "PosSessionCookie": []
+          },
+          {
+            "BackofficeSessionCookie": []
+          }
+        ],
+        "summary": "Recover Commit Correction",
         "tags": [
           "corrections"
         ],
@@ -81923,6 +84062,22 @@
     "/v1/operations/counter-transfer/commit": {
       "post": {
         "operationId": "commit_counter_transfer_v1_operations_counter_transfer_commit_post",
+        "parameters": [
+          {
+            "description": "A globally unique UUIDv7 identifying this business intention.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": true,
+            "schema": {
+              "description": "A globally unique UUIDv7 identifying this business intention.",
+              "maxLength": 36,
+              "minLength": 36,
+              "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-7[0-9a-fA-F]{3}-[89aAbB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$",
+              "title": "Idempotency-Key",
+              "type": "string"
+            }
+          }
+        ],
         "requestBody": {
           "content": {
             "application/json": {
@@ -81938,11 +84093,16 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/OperationDocumentView"
+                  "$ref": "#/components/schemas/OperationCommitResultView"
                 }
               }
             },
-            "description": "Successful Response"
+            "description": "Successful Response",
+            "headers": {
+              "Idempotency-Replayed": {
+                "$ref": "#/components/headers/IdempotencyReplayed"
+              }
+            }
           },
           "400": {
             "content": {
@@ -81992,7 +84152,12 @@
                 }
               }
             },
-            "description": "Conflict"
+            "description": "Conflict",
+            "headers": {
+              "Idempotency-Replayed": {
+                "$ref": "#/components/headers/IdempotencyReplayed"
+              }
+            }
           },
           "422": {
             "content": {
@@ -82044,6 +84209,173 @@
           }
         ],
         "summary": "Commit Counter Transfer",
+        "tags": [
+          "operations"
+        ],
+        "x-authorization-policy": "explicit-deny-by-default",
+        "x-required-capabilities": [
+          "pos.operate"
+        ],
+        "x-zeromerma-operation-id-policy": "FASTAPI_STABLE_GENERATED"
+      }
+    },
+    "/v1/operations/counter-transfer/confirmations/{idempotency_key}": {
+      "get": {
+        "operationId": "recover_counter_transfer_v1_operations_counter_transfer_confirmations__idempotency_key__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "idempotency_key",
+            "required": true,
+            "schema": {
+              "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-7[0-9a-fA-F]{3}-[89aAbB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$",
+              "title": "Idempotency Key",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "workstation_code",
+            "required": true,
+            "schema": {
+              "minLength": 1,
+              "title": "Workstation Code",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "cash_session_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Cash Session Id",
+              "type": "string",
+              "x-zeromerma-id-representation": "JSON_STRING"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OperationCommitResultView"
+                }
+              }
+            },
+            "description": "Successful Response",
+            "headers": {
+              "Idempotency-Replayed": {
+                "$ref": "#/components/headers/IdempotencyReplayed"
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Authentication Required"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict",
+            "headers": {
+              "Idempotency-Replayed": {
+                "$ref": "#/components/headers/IdempotencyReplayed"
+              }
+            }
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "423": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Session Locked"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Login Rate Limited"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Internal Server Error"
+          }
+        },
+        "security": [
+          {
+            "PosSessionCookie": []
+          },
+          {
+            "BackofficeSessionCookie": []
+          }
+        ],
+        "summary": "Recover Counter Transfer",
         "tags": [
           "operations"
         ],
@@ -82307,6 +84639,22 @@
     "/v1/operations/waste/commit": {
       "post": {
         "operationId": "commit_waste_record_v1_operations_waste_commit_post",
+        "parameters": [
+          {
+            "description": "A globally unique UUIDv7 identifying this business intention.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": true,
+            "schema": {
+              "description": "A globally unique UUIDv7 identifying this business intention.",
+              "maxLength": 36,
+              "minLength": 36,
+              "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-7[0-9a-fA-F]{3}-[89aAbB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$",
+              "title": "Idempotency-Key",
+              "type": "string"
+            }
+          }
+        ],
         "requestBody": {
           "content": {
             "application/json": {
@@ -82322,11 +84670,16 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/OperationDocumentView"
+                  "$ref": "#/components/schemas/OperationCommitResultView"
                 }
               }
             },
-            "description": "Successful Response"
+            "description": "Successful Response",
+            "headers": {
+              "Idempotency-Replayed": {
+                "$ref": "#/components/headers/IdempotencyReplayed"
+              }
+            }
           },
           "400": {
             "content": {
@@ -82376,7 +84729,12 @@
                 }
               }
             },
-            "description": "Conflict"
+            "description": "Conflict",
+            "headers": {
+              "Idempotency-Replayed": {
+                "$ref": "#/components/headers/IdempotencyReplayed"
+              }
+            }
           },
           "422": {
             "content": {
@@ -82428,6 +84786,173 @@
           }
         ],
         "summary": "Commit Waste Record",
+        "tags": [
+          "operations"
+        ],
+        "x-authorization-policy": "explicit-deny-by-default",
+        "x-required-capabilities": [
+          "pos.operate"
+        ],
+        "x-zeromerma-operation-id-policy": "FASTAPI_STABLE_GENERATED"
+      }
+    },
+    "/v1/operations/waste/confirmations/{idempotency_key}": {
+      "get": {
+        "operationId": "recover_waste_v1_operations_waste_confirmations__idempotency_key__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "idempotency_key",
+            "required": true,
+            "schema": {
+              "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-7[0-9a-fA-F]{3}-[89aAbB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$",
+              "title": "Idempotency Key",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "workstation_code",
+            "required": true,
+            "schema": {
+              "minLength": 1,
+              "title": "Workstation Code",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "cash_session_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Cash Session Id",
+              "type": "string",
+              "x-zeromerma-id-representation": "JSON_STRING"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OperationCommitResultView"
+                }
+              }
+            },
+            "description": "Successful Response",
+            "headers": {
+              "Idempotency-Replayed": {
+                "$ref": "#/components/headers/IdempotencyReplayed"
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Authentication Required"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict",
+            "headers": {
+              "Idempotency-Replayed": {
+                "$ref": "#/components/headers/IdempotencyReplayed"
+              }
+            }
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "423": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Session Locked"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Login Rate Limited"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Internal Server Error"
+          }
+        },
+        "security": [
+          {
+            "PosSessionCookie": []
+          },
+          {
+            "BackofficeSessionCookie": []
+          }
+        ],
+        "summary": "Recover Waste",
         "tags": [
           "operations"
         ],
@@ -87921,29 +90446,70 @@
         "x-zeromerma-operation-id-policy": "FASTAPI_STABLE_GENERATED"
       }
     },
-    "/v1/transfers/dispatch/commit": {
-      "post": {
-        "operationId": "commit_transfer_dispatch_v1_transfers_dispatch_commit_post",
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/TransferDispatchCommitRequest"
-              }
+    "/v1/transfers/commands/{command_code}/confirmations/{idempotency_key}": {
+      "get": {
+        "operationId": "recover_pos_transfer_v1_transfers_commands__command_code__confirmations__idempotency_key__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "command_code",
+            "required": true,
+            "schema": {
+              "enum": [
+                "dispatch",
+                "receive"
+              ],
+              "title": "Command Code",
+              "type": "string"
             }
           },
-          "required": true
-        },
+          {
+            "in": "path",
+            "name": "idempotency_key",
+            "required": true,
+            "schema": {
+              "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-7[0-9a-fA-F]{3}-[89aAbB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$",
+              "title": "Idempotency Key",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "workstation_code",
+            "required": true,
+            "schema": {
+              "minLength": 1,
+              "title": "Workstation Code",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "cash_session_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Cash Session Id",
+              "type": "string",
+              "x-zeromerma-id-representation": "JSON_STRING"
+            }
+          }
+        ],
         "responses": {
-          "201": {
+          "200": {
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/TransferDetailResponse"
+                  "$ref": "#/components/schemas/TransferCommandResultView"
                 }
               }
             },
-            "description": "Successful Response"
+            "description": "Successful Response",
+            "headers": {
+              "Idempotency-Replayed": {
+                "$ref": "#/components/headers/IdempotencyReplayed"
+              }
+            }
           },
           "400": {
             "content": {
@@ -87993,7 +90559,170 @@
                 }
               }
             },
-            "description": "Conflict"
+            "description": "Conflict",
+            "headers": {
+              "Idempotency-Replayed": {
+                "$ref": "#/components/headers/IdempotencyReplayed"
+              }
+            }
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "423": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Session Locked"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Login Rate Limited"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Internal Server Error"
+          }
+        },
+        "security": [
+          {
+            "PosSessionCookie": []
+          },
+          {
+            "BackofficeSessionCookie": []
+          }
+        ],
+        "summary": "Recover Pos Transfer",
+        "tags": [
+          "transfers"
+        ],
+        "x-authorization-policy": "explicit-deny-by-default",
+        "x-required-capabilities": [],
+        "x-zeromerma-operation-id-policy": "FASTAPI_STABLE_GENERATED"
+      }
+    },
+    "/v1/transfers/dispatch/commit": {
+      "post": {
+        "operationId": "commit_transfer_dispatch_v1_transfers_dispatch_commit_post",
+        "parameters": [
+          {
+            "description": "A globally unique UUIDv7 identifying this business intention.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": true,
+            "schema": {
+              "description": "A globally unique UUIDv7 identifying this business intention.",
+              "maxLength": 36,
+              "minLength": 36,
+              "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-7[0-9a-fA-F]{3}-[89aAbB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$",
+              "title": "Idempotency-Key",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TransferDispatchCommitRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TransferCommandResultView"
+                }
+              }
+            },
+            "description": "Successful Response",
+            "headers": {
+              "Idempotency-Replayed": {
+                "$ref": "#/components/headers/IdempotencyReplayed"
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Authentication Required"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict",
+            "headers": {
+              "Idempotency-Replayed": {
+                "$ref": "#/components/headers/IdempotencyReplayed"
+              }
+            }
           },
           "422": {
             "content": {
@@ -88744,6 +91473,20 @@
               "type": "string",
               "x-zeromerma-id-representation": "JSON_STRING"
             }
+          },
+          {
+            "description": "A globally unique UUIDv7 identifying this business intention.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": true,
+            "schema": {
+              "description": "A globally unique UUIDv7 identifying this business intention.",
+              "maxLength": 36,
+              "minLength": 36,
+              "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-7[0-9a-fA-F]{3}-[89aAbB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$",
+              "title": "Idempotency-Key",
+              "type": "string"
+            }
           }
         ],
         "requestBody": {
@@ -88761,11 +91504,16 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/TransferDetailResponse"
+                  "$ref": "#/components/schemas/TransferCommandResultView"
                 }
               }
             },
-            "description": "Successful Response"
+            "description": "Successful Response",
+            "headers": {
+              "Idempotency-Replayed": {
+                "$ref": "#/components/headers/IdempotencyReplayed"
+              }
+            }
           },
           "400": {
             "content": {
@@ -88815,7 +91563,12 @@
                 }
               }
             },
-            "description": "Conflict"
+            "description": "Conflict",
+            "headers": {
+              "Idempotency-Replayed": {
+                "$ref": "#/components/headers/IdempotencyReplayed"
+              }
+            }
           },
           "422": {
             "content": {

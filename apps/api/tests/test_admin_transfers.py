@@ -22,6 +22,7 @@ from zeromerma_api.modules.inventory.infrastructure.models import (
 )
 from zeromerma_api.modules.outbox.infrastructure.models import OutboxEvent
 from zeromerma_api.testing.authorization import owner_headers
+from zeromerma_api.testing.idempotency import new_idempotency_key
 from zeromerma_api.testing.sessions import login_headers
 
 
@@ -45,10 +46,18 @@ def _get_product_id(code: str) -> str:
         return str(product.id)
 
 
+def _detail(client: TestClient, response: object) -> dict:
+    result = client.get(
+        f"/v1/admin/transfers/{response.json()['id']}", headers=_admin_headers(client)
+    )
+    assert result.status_code == 200, result.text
+    return result.json()
+
+
 def _seed_origin_stock(client: TestClient, *, product_code: str, quantity: str = "20.000") -> None:
     response = client.post(
         "/v1/admin/inventory/adjustments",
-        headers=_admin_headers(client),
+        headers={**_admin_headers(client), "Idempotency-Key": new_idempotency_key()},
         json={
             "adjustment_type": "INCREASE",
             "branch_id": _get_branch_id(SEED_BRANCH_CODE),
@@ -64,7 +73,7 @@ def _seed_origin_stock(client: TestClient, *, product_code: str, quantity: str =
 def _create_transfer(client: TestClient, *, quantity: str = "5.000") -> dict[str, object]:
     response = client.post(
         "/v1/admin/transfers",
-        headers=_admin_headers(client),
+        headers={**_admin_headers(client), "Idempotency-Key": new_idempotency_key()},
         json={
             "destination_branch_id": _get_branch_id(SEED_DESTINATION_BRANCH_CODE),
             "lines": [
@@ -79,7 +88,7 @@ def _create_transfer(client: TestClient, *, quantity: str = "5.000") -> dict[str
     )
 
     assert response.status_code == 201
-    return dict(response.json())
+    return dict(_detail(client, response))
 
 
 def _dispatch_transfer(client: TestClient) -> dict[str, object]:
@@ -88,11 +97,14 @@ def _dispatch_transfer(client: TestClient) -> dict[str, object]:
     transfer_id = str(transfer["overview"]["id"])
     response = client.post(
         f"/v1/admin/transfers/{transfer_id}/dispatch",
-        headers={**_admin_headers(client), "X-Request-ID": "admin-transfer-dispatch"},
+        headers={
+            **{**_admin_headers(client), "X-Request-ID": "admin-transfer-dispatch"},
+            "Idempotency-Key": new_idempotency_key(),
+        },
         json={"notes": "Dispatch from backoffice"},
     )
     assert response.status_code == 200
-    return dict(response.json())
+    return dict(_detail(client, response))
 
 
 def test_admin_transfers_list_empty_and_rejects_pos_surface_user(client: TestClient) -> None:
@@ -121,7 +133,7 @@ def test_admin_transfer_create_update_filters_and_detail(client: TestClient) -> 
 
     update_response = client.patch(
         f"/v1/admin/transfers/{transfer_id}",
-        headers=_admin_headers(client),
+        headers={**_admin_headers(client), "Idempotency-Key": new_idempotency_key()},
         json={
             "lines": [
                 {
@@ -133,7 +145,9 @@ def test_admin_transfer_create_update_filters_and_detail(client: TestClient) -> 
         },
     )
     assert update_response.status_code == 200
-    assert Decimal(str(update_response.json()["overview"]["sent_unit_count"])) == Decimal("6.000")
+    assert Decimal(str(_detail(client, update_response)["overview"]["sent_unit_count"])) == Decimal(
+        "6.000"
+    )
 
     status_response = client.get("/v1/admin/transfers?status=DRAFT", headers=_admin_headers(client))
     assert status_response.status_code == 200
@@ -172,7 +186,7 @@ def test_admin_transfer_validates_same_branch_empty_lines_and_stock(client: Test
 
     same_branch_response = client.post(
         "/v1/admin/transfers",
-        headers=headers,
+        headers={**headers, "Idempotency-Key": new_idempotency_key()},
         json={
             "destination_branch_id": branch_id,
             "lines": [{"product_id": product_id, "quantity": "1.000"}],
@@ -183,7 +197,7 @@ def test_admin_transfer_validates_same_branch_empty_lines_and_stock(client: Test
 
     empty_lines_response = client.post(
         "/v1/admin/transfers",
-        headers=headers,
+        headers={**headers, "Idempotency-Key": new_idempotency_key()},
         json={
             "destination_branch_id": _get_branch_id(SEED_DESTINATION_BRANCH_CODE),
             "lines": [],
@@ -195,7 +209,7 @@ def test_admin_transfer_validates_same_branch_empty_lines_and_stock(client: Test
     transfer = _create_transfer(client)
     dispatch_without_stock = client.post(
         f"/v1/admin/transfers/{transfer['overview']['id']}/dispatch",
-        headers=headers,
+        headers={**headers, "Idempotency-Key": new_idempotency_key()},
         json={},
     )
     assert dispatch_without_stock.status_code == 400
@@ -256,11 +270,14 @@ def test_admin_transfer_receive_full_transfer_and_prevents_double_receipt(
 
     receive_response = client.post(
         f"/v1/admin/transfers/{transfer_id}/receive",
-        headers={**_admin_headers(client), "X-Request-ID": "admin-transfer-receive"},
+        headers={
+            **{**_admin_headers(client), "X-Request-ID": "admin-transfer-receive"},
+            "Idempotency-Key": new_idempotency_key(),
+        },
         json={"lines": receipt_lines, "notes": "Received complete"},
     )
     assert receive_response.status_code == 200
-    received = receive_response.json()
+    received = _detail(client, receive_response)
     assert received["overview"]["status"] == "RECEIVED"
     assert received["receipt"]["has_discrepancy"] is False
     assert received["available_actions"]["can_receive"] is False
@@ -268,7 +285,7 @@ def test_admin_transfer_receive_full_transfer_and_prevents_double_receipt(
 
     duplicate_response = client.post(
         f"/v1/admin/transfers/{transfer_id}/receive",
-        headers=_admin_headers(client),
+        headers={**_admin_headers(client), "Idempotency-Key": new_idempotency_key()},
         json={"lines": receipt_lines},
     )
     assert duplicate_response.status_code == 409
@@ -283,7 +300,7 @@ def test_admin_transfer_receive_requires_discrepancy_reason_and_records_variance
 
     missing_reason_response = client.post(
         f"/v1/admin/transfers/{transfer_id}/receive",
-        headers=_admin_headers(client),
+        headers={**_admin_headers(client), "Idempotency-Key": new_idempotency_key()},
         json={"lines": [{"received_quantity": "3.000", "shipment_line_id": shipment_line_id}]},
     )
     assert missing_reason_response.status_code == 400
@@ -291,7 +308,7 @@ def test_admin_transfer_receive_requires_discrepancy_reason_and_records_variance
 
     receive_response = client.post(
         f"/v1/admin/transfers/{transfer_id}/receive",
-        headers=_admin_headers(client),
+        headers={**_admin_headers(client), "Idempotency-Key": new_idempotency_key()},
         json={
             "lines": [
                 {
@@ -303,10 +320,13 @@ def test_admin_transfer_receive_requires_discrepancy_reason_and_records_variance
         },
     )
     assert receive_response.status_code == 200
-    payload = receive_response.json()
-    assert payload["overview"]["status"] == "RECEIVED_WITH_VARIANCE"
+    payload = _detail(client, receive_response)
+    assert payload["overview"]["status"] == "IN_TRANSIT"
     assert payload["receipt"]["has_discrepancy"] is True
-    assert payload["warnings"][0]["code"] == "quantity_discrepancy"
+    assert [warning["code"] for warning in payload["warnings"]] == [
+        "pending_receipt",
+        "quantity_discrepancy",
+    ]
 
 
 def test_admin_transfer_cancel_draft(client: TestClient) -> None:
@@ -315,18 +335,18 @@ def test_admin_transfer_cancel_draft(client: TestClient) -> None:
 
     cancel_response = client.post(
         f"/v1/admin/transfers/{transfer_id}/cancel",
-        headers=_admin_headers(client),
+        headers={**_admin_headers(client), "Idempotency-Key": new_idempotency_key()},
         json={"reason": "No longer needed"},
     )
 
     assert cancel_response.status_code == 200
-    payload = cancel_response.json()
+    payload = _detail(client, cancel_response)
     assert payload["overview"]["status"] == "CANCELLED"
     assert payload["available_actions"]["can_dispatch"] is False
 
     dispatch_response = client.post(
         f"/v1/admin/transfers/{transfer_id}/dispatch",
-        headers=_admin_headers(client),
+        headers={**_admin_headers(client), "Idempotency-Key": new_idempotency_key()},
         json={},
     )
     assert dispatch_response.status_code == 400

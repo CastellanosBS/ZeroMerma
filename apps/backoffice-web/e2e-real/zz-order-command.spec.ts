@@ -6,12 +6,12 @@ test("real administrative transition recovers a lost response after reload witho
   page,
   network,
 }) => {
-  const station = process.env.ZM_E2E_WORKSTATION_CODE ?? "POS-01";
+  const station = process.env.ZM_E2E_ORDER_WORKSTATION_CODE!;
   const posOrigin = new URL(process.env.ZM_E2E_POS_URL!).origin;
   const login = await page.request.post(`${environment.apiUrl}/v1/auth/login`, {
     headers: { Origin: posOrigin, "X-ZeroMerma-Surface": "POS" },
     data: {
-      email: process.env.ZM_E2E_POS_EMAIL,
+      email: process.env.ZM_E2E_ORDER_CASHIER_EMAIL,
       password: environment.password,
       audience: "POS",
       workstation_code: station,

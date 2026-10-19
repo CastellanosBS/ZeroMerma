@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from decimal import Decimal
+from uuid import uuid4
 
 from fastapi.testclient import TestClient
 from sqlalchemy import func, select
@@ -18,7 +19,8 @@ from zeromerma_api.bootstrap.seed_local import (
 )
 from zeromerma_api.db.session import SessionLocal
 from zeromerma_api.modules.audit.infrastructure.models import AuditLog
-from zeromerma_api.modules.branches.infrastructure.models import Branch
+from zeromerma_api.modules.branches.infrastructure.models import Branch, Workstation
+from zeromerma_api.modules.cash.infrastructure.models import CashSession
 from zeromerma_api.modules.catalog.infrastructure.models import Product
 from zeromerma_api.modules.corrections.infrastructure.models import (
     CorrectionDocument,
@@ -32,12 +34,13 @@ from zeromerma_api.modules.operations.infrastructure.models import (
 from zeromerma_api.modules.outbox.infrastructure.models import OutboxEvent
 from zeromerma_api.testing.idempotency import new_idempotency_key
 from zeromerma_api.testing.sessions import login_headers
+from zeromerma_api.testing.transfer_operators import transfer_cashier_email
 
 
 def _login(client: TestClient, workstation_code: str = SEED_WORKSTATION_CODE) -> dict[str, str]:
     return login_headers(
         client,
-        email=SEED_USER_EMAIL,
+        email=transfer_cashier_email(workstation_code),
         password=SEED_USER_PASSWORD,
         audience="POS",
         workstation_code=workstation_code,
@@ -62,6 +65,26 @@ def _open_cash_session(client: TestClient) -> None:
     assert response.status_code == 201
 
 
+def _cash_id(workstation_code: str) -> str:
+    with SessionLocal() as session:
+        value = session.scalar(
+            select(CashSession.id)
+            .join(Workstation, Workstation.id == CashSession.workstation_id)
+            .where(Workstation.code == workstation_code, CashSession.status == "OPEN")
+        )
+        return str(value or uuid4())
+
+
+def _correction_detail(client: TestClient, correction_id: str) -> dict[str, object]:
+    response = client.get(
+        f"/v1/corrections/history/{correction_id}",
+        params={"workstation_code": SEED_WORKSTATION_CODE},
+        headers=_authorization_header(client),
+    )
+    assert response.status_code == 200
+    return dict(response.json())
+
+
 def _get_product_id(code: str) -> str:
     with SessionLocal() as session:
         product = session.execute(select(Product).where(Product.code == code)).scalar_one()
@@ -81,8 +104,9 @@ def _commit_counter_transfer(
 ) -> dict[str, object]:
     response = client.post(
         "/v1/operations/counter-transfer/commit",
-        headers=_authorization_header(client),
+        headers={**_authorization_header(client), "Idempotency-Key": new_idempotency_key()},
         json={
+            "cash_session_id": _cash_id(SEED_WORKSTATION_CODE),
             "workstation_code": SEED_WORKSTATION_CODE,
             "lines": [
                 {
@@ -100,8 +124,9 @@ def _commit_counter_transfer(
 def _dispatch_transfer(client: TestClient) -> dict[str, object]:
     response = client.post(
         "/v1/transfers/dispatch/commit",
-        headers=_authorization_header(client),
+        headers={**_authorization_header(client), "Idempotency-Key": new_idempotency_key()},
         json={
+            "cash_session_id": _cash_id(SEED_WORKSTATION_CODE),
             "workstation_code": SEED_WORKSTATION_CODE,
             "destination_branch_id": _get_branch_id(SEED_DESTINATION_BRANCH_CODE),
             "lines": [
@@ -118,7 +143,13 @@ def _dispatch_transfer(client: TestClient) -> dict[str, object]:
         },
     )
     assert response.status_code == 201
-    return response.json()["shipment"]
+    detail = client.get(
+        f"/v1/transfers/{response.json()['id']}",
+        params={"workstation_code": SEED_WORKSTATION_CODE},
+        headers=_authorization_header(client),
+    )
+    assert detail.status_code == 200
+    return detail.json()["shipment"]
 
 
 def test_corrections_bootstrap_returns_active_reasons(client: TestClient) -> None:
@@ -214,10 +245,14 @@ def test_correction_commit_keeps_original_document_and_writes_audit_and_outbox(
     response = client.post(
         "/v1/corrections/commit",
         headers={
-            **_authorization_header(client),
-            "X-Request-ID": "phase-4a-correction-commit",
+            **{
+                **_authorization_header(client),
+                "X-Request-ID": "phase-4a-correction-commit",
+            },
+            "Idempotency-Key": new_idempotency_key(),
         },
         json={
+            "cash_session_id": _cash_id(SEED_WORKSTATION_CODE),
             "workstation_code": SEED_WORKSTATION_CODE,
             "target_document_id": counter_transfer["id"],
             "reason_code": "WRONG_QUANTITY",
@@ -234,7 +269,7 @@ def test_correction_commit_keeps_original_document_and_writes_audit_and_outbox(
     )
 
     assert response.status_code == 201
-    payload = response.json()
+    payload = _correction_detail(client, response.json()["id"])
     assert payload["folio"].startswith("COR-")
     assert payload["target_document_id"] == counter_transfer["id"]
     assert payload["target_document_type"] == "COUNTER_TRANSFER"
@@ -305,10 +340,21 @@ def test_shipment_correction_after_receipt_is_rejected(client: TestClient) -> No
     _open_cash_session(client)
     shipment = _dispatch_transfer(client)
 
+    destination_headers = _authorization_header(client, SEED_DESTINATION_WORKSTATION_CODE)
+    opened = client.post(
+        "/v1/cash-sessions/open",
+        headers={**destination_headers, "Idempotency-Key": new_idempotency_key()},
+        json={"workstation_code": SEED_DESTINATION_WORKSTATION_CODE, "opening_amount": "0"},
+    )
+    assert opened.status_code == 201
     first_receive = client.post(
         f"/v1/transfers/{shipment['id']}/receive",
-        headers=_authorization_header(client, SEED_DESTINATION_WORKSTATION_CODE),
+        headers={
+            **_authorization_header(client, SEED_DESTINATION_WORKSTATION_CODE),
+            "Idempotency-Key": new_idempotency_key(),
+        },
         json={
+            "cash_session_id": _cash_id(SEED_DESTINATION_WORKSTATION_CODE),
             "workstation_code": SEED_DESTINATION_WORKSTATION_CODE,
             "lines": [
                 {
@@ -339,8 +385,9 @@ def test_shipment_correction_after_receipt_is_rejected(client: TestClient) -> No
 
     commit_response = client.post(
         "/v1/corrections/commit",
-        headers=_authorization_header(client),
+        headers={**_authorization_header(client), "Idempotency-Key": new_idempotency_key()},
         json={
+            "cash_session_id": _cash_id(SEED_WORKSTATION_CODE),
             "workstation_code": SEED_WORKSTATION_CODE,
             "target_document_id": shipment["id"],
             "reason_code": "COUNT_MISMATCH",
@@ -363,8 +410,9 @@ def test_correction_commit_supports_wrong_product_delta_composition(client: Test
 
     response = client.post(
         "/v1/corrections/commit",
-        headers=_authorization_header(client),
+        headers={**_authorization_header(client), "Idempotency-Key": new_idempotency_key()},
         json={
+            "cash_session_id": _cash_id(SEED_WORKSTATION_CODE),
             "workstation_code": SEED_WORKSTATION_CODE,
             "target_document_id": counter_transfer["id"],
             "reason_code": "WRONG_PRODUCT",
@@ -400,8 +448,9 @@ def test_correction_commit_supports_wrong_destination_for_shipments(
 
     response = client.post(
         "/v1/corrections/commit",
-        headers=_authorization_header(client),
+        headers={**_authorization_header(client), "Idempotency-Key": new_idempotency_key()},
         json={
+            "cash_session_id": _cash_id(SEED_WORKSTATION_CODE),
             "workstation_code": SEED_WORKSTATION_CODE,
             "target_document_id": shipment["id"],
             "reason_code": "WRONG_DESTINATION",
@@ -412,7 +461,7 @@ def test_correction_commit_supports_wrong_destination_for_shipments(
     )
 
     assert response.status_code == 201
-    payload = response.json()
+    payload = _correction_detail(client, response.json()["id"])
     assert payload["target_document_id"] == shipment["id"]
     assert payload["correction_type"] == "DESTINATION_ADJUSTMENT"
     assert payload["reason_code"] == "WRONG_DESTINATION"
@@ -451,10 +500,14 @@ def test_correction_history_and_detail_expose_safe_audit_summary(
     create_response = client.post(
         "/v1/corrections/commit",
         headers={
-            **_authorization_header(client),
-            "X-Request-ID": "phase-4a-correction-history",
+            **{
+                **_authorization_header(client),
+                "X-Request-ID": "phase-4a-correction-history",
+            },
+            "Idempotency-Key": new_idempotency_key(),
         },
         json={
+            "cash_session_id": _cash_id(SEED_WORKSTATION_CODE),
             "workstation_code": SEED_WORKSTATION_CODE,
             "target_document_id": counter_transfer["id"],
             "reason_code": "WRONG_QUANTITY",
@@ -530,8 +583,9 @@ def test_high_impact_correction_requires_acknowledgement_and_emits_alert_outbox(
 
     blocked_response = client.post(
         "/v1/corrections/commit",
-        headers=_authorization_header(client),
+        headers={**_authorization_header(client), "Idempotency-Key": new_idempotency_key()},
         json={
+            "cash_session_id": _cash_id(SEED_WORKSTATION_CODE),
             "workstation_code": SEED_WORKSTATION_CODE,
             "target_document_id": counter_transfer["id"],
             "reason_code": "WRONG_QUANTITY",
@@ -553,10 +607,14 @@ def test_high_impact_correction_requires_acknowledgement_and_emits_alert_outbox(
     response = client.post(
         "/v1/corrections/commit",
         headers={
-            **_authorization_header(client),
-            "X-Request-ID": "phase-4a-correction-high-impact",
+            **{
+                **_authorization_header(client),
+                "X-Request-ID": "phase-4a-correction-high-impact",
+            },
+            "Idempotency-Key": new_idempotency_key(),
         },
         json={
+            "cash_session_id": _cash_id(SEED_WORKSTATION_CODE),
             "workstation_code": SEED_WORKSTATION_CODE,
             "target_document_id": counter_transfer["id"],
             "reason_code": "WRONG_QUANTITY",
@@ -573,7 +631,7 @@ def test_high_impact_correction_requires_acknowledgement_and_emits_alert_outbox(
     )
 
     assert response.status_code == 201
-    payload = response.json()
+    payload = _correction_detail(client, response.json()["id"])
 
     with SessionLocal() as session:
         audit_records = (

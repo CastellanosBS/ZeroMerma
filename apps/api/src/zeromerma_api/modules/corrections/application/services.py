@@ -7,7 +7,6 @@ from decimal import Decimal
 from zoneinfo import ZoneInfo
 
 from sqlalchemy import Select, String, exists, false, func, or_, select
-from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, aliased
 
 from zeromerma_api.core.config import ApiSettings, get_settings
@@ -23,6 +22,7 @@ from zeromerma_api.modules.branches.application.access import (
 )
 from zeromerma_api.modules.branches.application.schemas import BranchSummary, WorkstationSummary
 from zeromerma_api.modules.branches.infrastructure.models import Branch, Workstation
+from zeromerma_api.modules.cash.application.command_context import lock_cash_session
 from zeromerma_api.modules.cash.application.schemas import CashSessionView
 from zeromerma_api.modules.cash.application.services import CashSessionQueryService
 from zeromerma_api.modules.catalog.infrastructure.models import Product, ProductClass
@@ -31,7 +31,9 @@ from zeromerma_api.modules.corrections.application.schemas import (
     AppliedCorrectionSummaryView,
     CorrectionBootstrapResponse,
     CorrectionCommitLineRequest,
+    CorrectionCommitLineResultView,
     CorrectionCommitRequest,
+    CorrectionCommitResultView,
     CorrectionControlsView,
     CorrectionDocumentLineView,
     CorrectionDocumentView,
@@ -398,12 +400,8 @@ class CorrectionQueryService:
                     CorrectionDocument.committed_at_utc,
                     User.email.label("created_by_user_email"),
                     User.full_name.label("created_by_user_full_name"),
-                    corrected_destination_branch.code.label(
-                        "corrected_destination_branch_code"
-                    ),
-                    corrected_destination_branch.name.label(
-                        "corrected_destination_branch_name"
-                    ),
+                    corrected_destination_branch.code.label("corrected_destination_branch_code"),
+                    corrected_destination_branch.name.label("corrected_destination_branch_name"),
                     func.count(CorrectionDocumentLine.id).label("line_count"),
                 )
                 .select_from(CorrectionDocument)
@@ -488,12 +486,8 @@ class CorrectionQueryService:
                     status=record["status"],
                     committed_at_utc=record["committed_at_utc"],
                     line_count=int(record["line_count"]),
-                    corrected_destination_branch_code=record[
-                        "corrected_destination_branch_code"
-                    ],
-                    corrected_destination_branch_name=record[
-                        "corrected_destination_branch_name"
-                    ],
+                    corrected_destination_branch_code=record["corrected_destination_branch_code"],
+                    corrected_destination_branch_name=record["corrected_destination_branch_name"],
                     audit_summary=self._audit_visibility.build_summary(
                         session,
                         created_actor=build_audit_actor_snapshot(
@@ -611,27 +605,39 @@ class CorrectionQueryService:
             current_shift_opened_at=current_open_cash_session.opened_at,
         )
 
-        available_user_rows = session.execute(
-            base_statement.with_only_columns(
-                CorrectionDocument.created_by_user_id,
-                User.full_name.label("created_by_user_full_name"),
+        available_user_rows = (
+            session.execute(
+                base_statement.with_only_columns(
+                    CorrectionDocument.created_by_user_id,
+                    User.full_name.label("created_by_user_full_name"),
+                )
+                .distinct()
+                .order_by(User.full_name.asc())
             )
-            .distinct()
-            .order_by(User.full_name.asc())
-        ).mappings().all()
-        available_target_type_rows = session.execute(
-            base_statement.with_only_columns(target_document.document_type)
-            .distinct()
-            .order_by(target_document.document_type.asc())
-        ).scalars().all()
-        available_reason_rows = session.execute(
-            base_statement.with_only_columns(
-                CorrectionDocument.reason_code,
-                CorrectionReason.name.label("reason_name"),
+            .mappings()
+            .all()
+        )
+        available_target_type_rows = (
+            session.execute(
+                base_statement.with_only_columns(target_document.document_type)
+                .distinct()
+                .order_by(target_document.document_type.asc())
             )
-            .distinct()
-            .order_by(CorrectionReason.name.asc(), CorrectionDocument.reason_code.asc())
-        ).mappings().all()
+            .scalars()
+            .all()
+        )
+        available_reason_rows = (
+            session.execute(
+                base_statement.with_only_columns(
+                    CorrectionDocument.reason_code,
+                    CorrectionReason.name.label("reason_name"),
+                )
+                .distinct()
+                .order_by(CorrectionReason.name.asc(), CorrectionDocument.reason_code.asc())
+            )
+            .mappings()
+            .all()
+        )
 
         filtered_statement = base_statement
         if created_by_user_id is not None:
@@ -660,14 +666,16 @@ class CorrectionQueryService:
                 )
             )
 
-        rows = session.execute(
-            filtered_statement
-            .order_by(
-                CorrectionDocument.committed_at_utc.desc().nullslast(),
-                CorrectionDocument.created_at_utc.desc(),
+        rows = (
+            session.execute(
+                filtered_statement.order_by(
+                    CorrectionDocument.committed_at_utc.desc().nullslast(),
+                    CorrectionDocument.created_at_utc.desc(),
+                ).limit(MAX_CORRECTION_HISTORY_RESULTS)
             )
-            .limit(MAX_CORRECTION_HISTORY_RESULTS)
-        ).mappings().all()
+            .mappings()
+            .all()
+        )
 
         return CorrectionsHistoryResponse(
             workstation_code=workstation_code,
@@ -871,22 +879,31 @@ class CorrectionCommandService:
         current_user: AuthenticatedUser,
         command: CorrectionCommitRequest,
         request_id: str | None,
-    ) -> CorrectionDocumentView:
+        idempotency_key: uuid.UUID,
+        operation_id: uuid.UUID,
+    ) -> CorrectionCommitResultView:
         context = self._workstation_access.resolve_context(
             session,
             user_id=current_user.id,
             workstation_code=command.workstation_code,
         )
-        _require_open_cash_session(
+        lock_cash_session(
             session,
-            cash_session_query=self._cash_session_query,
             current_user=current_user,
-            workstation_code=command.workstation_code,
-            context=context,
+            workstation_id=context.workstation_id,
+            branch_id=context.branch_id,
+            cash_session_id=command.cash_session_id,
         )
+        trace = {
+            "idempotency_key": str(idempotency_key),
+            "operation_id": str(operation_id),
+            "operation_code": "correction.commit",
+            "cash_session_id": str(command.cash_session_id),
+        }
         target_document = _get_target_document(
             session,
             target_document_id=command.target_document_id,
+            for_update=True,
         )
         _ensure_branch_ownership(target_document=target_document, branch_id=context.branch_id)
         is_correctable, blocking_reason = _assess_correction_eligibility(
@@ -905,9 +922,7 @@ class CorrectionCommandService:
             )
         ).scalar_one_or_none()
         if reason is None:
-            raise CorrectionReasonNotFoundError(
-                "Selecciona un motivo de correccion valido."
-            )
+            raise CorrectionReasonNotFoundError("Selecciona un motivo de correccion valido.")
 
         corrected_destination_branch: Branch | None = None
         if reason.code == CORRECTION_REASON_WRONG_DESTINATION:
@@ -916,9 +931,7 @@ class CorrectionCommandService:
                     "Solo puedes corregir el destino en envios a sucursal."
                 )
             if command.corrected_destination_branch_id is None:
-                raise CorrectionValidationError(
-                    "Selecciona una sucursal destino para continuar."
-                )
+                raise CorrectionValidationError("Selecciona una sucursal destino para continuar.")
             if len(command.lines) > 0:
                 raise CorrectionValidationError(
                     "El motivo destino incorrecto no admite ajustes de lineas."
@@ -938,16 +951,12 @@ class CorrectionCommandService:
                 )
             ).scalar_one_or_none()
             if corrected_destination_branch is None:
-                raise CorrectionValidationError(
-                    "Selecciona una sucursal destino valida."
-                )
+                raise CorrectionValidationError("Selecciona una sucursal destino valida.")
             correction_type = CORRECTION_TYPE_DESTINATION_ADJUSTMENT
             resolved_lines: dict[uuid.UUID, dict[str, object]] = {}
         else:
             if command.corrected_destination_branch_id is not None:
-                raise CorrectionValidationError(
-                    "Este motivo no permite corregir el destino."
-                )
+                raise CorrectionValidationError("Este motivo no permite corregir el destino.")
             if len(command.lines) == 0:
                 raise CorrectionValidationError(
                     "Agrega al menos una linea al borrador antes de confirmar."
@@ -965,8 +974,7 @@ class CorrectionCommandService:
             correction_type = CORRECTION_TYPE_DELTA_ADJUSTMENT
         total_adjusted_quantity = _get_total_adjusted_quantity(command.lines)
         is_high_impact = (
-            total_adjusted_quantity
-            >= self._settings.correction_high_impact_quantity_threshold
+            total_adjusted_quantity >= self._settings.correction_high_impact_quantity_threshold
         )
         if is_high_impact and not command.high_impact_acknowledged:
             raise CorrectionValidationError(
@@ -985,6 +993,22 @@ class CorrectionCommandService:
         )
         target_line_matches = _index_target_lines_by_product(target_lines)
         target_lines_by_id = {line.id: line for line in target_lines}
+        resolved_target_line_ids = [
+            _resolve_target_line_id(
+                command_product_id=line.product_id,
+                requested_target_line_id=line.target_line_id,
+                target_line_matches=target_line_matches,
+                target_lines_by_id=target_lines_by_id,
+            )
+            for line in command.lines
+        ]
+        _validate_correction_remainders(
+            session,
+            target_document=target_document,
+            target_lines=target_lines,
+            requested_lines=command.lines,
+            target_line_ids=resolved_target_line_ids,
+        )
 
         correction_document = CorrectionDocument(
             target_document_id=target_document.id,
@@ -1004,186 +1028,208 @@ class CorrectionCommandService:
             committed_at_utc=committed_at,
         )
 
-        try:
-            session.add(correction_document)
-            session.flush()
-            correction_folio = _build_correction_document_folio(correction_document.id)
-            outbox_lines: list[dict[str, str | None]] = []
-            for line_number, line in enumerate(command.lines, start=1):
-                resolved_line = resolved_lines[line.product_id]
-                target_line_id = _resolve_target_line_id(
-                    command_product_id=line.product_id,
-                    requested_target_line_id=line.target_line_id,
-                    target_line_matches=target_line_matches,
-                    target_lines_by_id=target_lines_by_id,
+        session.add(correction_document)
+        session.flush()
+        correction_folio = _build_correction_document_folio(correction_document.id)
+        outbox_lines: list[dict[str, str | None]] = []
+        for line_number, line in enumerate(command.lines, start=1):
+            resolved_line = resolved_lines[line.product_id]
+            target_line_id = resolved_target_line_ids[line_number - 1]
+            session.add(
+                CorrectionDocumentLine(
+                    correction_document_id=correction_document.id,
+                    line_number=line_number,
+                    target_line_id=target_line_id,
+                    product_id=line.product_id,
+                    product_code_snapshot=str(resolved_line["product_code"]),
+                    product_name_snapshot=str(resolved_line["product_name"]),
+                    product_class_id=resolved_line["product_class_id"],
+                    product_class_code_snapshot=str(resolved_line["product_class_code"]),
+                    product_class_name_snapshot=str(resolved_line["product_class_name"]),
+                    delta_quantity=line.delta_quantity,
+                    unit_of_measure_code=str(resolved_line["unit_of_measure_code"]),
+                    notes=line.notes,
                 )
-                session.add(
-                    CorrectionDocumentLine(
-                        correction_document_id=correction_document.id,
-                        line_number=line_number,
-                        target_line_id=target_line_id,
-                        product_id=line.product_id,
-                        product_code_snapshot=str(resolved_line["product_code"]),
-                        product_name_snapshot=str(resolved_line["product_name"]),
-                        product_class_id=resolved_line["product_class_id"],
-                        product_class_code_snapshot=str(resolved_line["product_class_code"]),
-                        product_class_name_snapshot=str(resolved_line["product_class_name"]),
-                        delta_quantity=line.delta_quantity,
-                        notes=line.notes,
-                    )
-                )
-                outbox_lines.append(
-                    {
-                        "line_number": str(line_number),
-                        "target_line_id": str(target_line_id)
-                        if target_line_id is not None
-                        else None,
-                        "product_id": str(line.product_id),
-                        "product_code_snapshot": str(resolved_line["product_code"]),
-                        "product_name_snapshot": str(resolved_line["product_name"]),
-                        "product_class_id": str(resolved_line["product_class_id"]),
-                        "product_class_code_snapshot": str(resolved_line["product_class_code"]),
-                        "product_class_name_snapshot": str(resolved_line["product_class_name"]),
-                        "delta_quantity": str(line.delta_quantity),
-                        "notes": line.notes,
-                    }
-                )
+            )
+            outbox_lines.append(
+                {
+                    "line_number": str(line_number),
+                    "target_line_id": str(target_line_id) if target_line_id is not None else None,
+                    "product_id": str(line.product_id),
+                    "product_code_snapshot": str(resolved_line["product_code"]),
+                    "product_name_snapshot": str(resolved_line["product_name"]),
+                    "product_class_id": str(resolved_line["product_class_id"]),
+                    "product_class_code_snapshot": str(resolved_line["product_class_code"]),
+                    "product_class_name_snapshot": str(resolved_line["product_class_name"]),
+                    "delta_quantity": str(line.delta_quantity),
+                    "notes": line.notes,
+                }
+            )
 
+        self._audit_recorder.record(
+            session,
+            actor_id=current_user.id,
+            action="correction.committed",
+            resource_type="correction_document",
+            resource_id=str(correction_document.id),
+            branch_id=context.branch_id,
+            request_id=resolved_request_id,
+            metadata={
+                **trace,
+                "correction_document_id": str(correction_document.id),
+                "target_document_id": str(target_document.id),
+                "target_document_type": target_document.document_type,
+                "reason_code": reason.code,
+                "corrected_destination_branch_id": (
+                    str(corrected_destination_branch.id)
+                    if corrected_destination_branch is not None
+                    else None
+                ),
+                "corrected_destination_branch_code": (
+                    corrected_destination_branch.code
+                    if corrected_destination_branch is not None
+                    else None
+                ),
+                "folio": correction_folio,
+                "high_impact": is_high_impact,
+                "high_impact_acknowledged": command.high_impact_acknowledged,
+                "high_impact_threshold_quantity": str(
+                    self._settings.correction_high_impact_quantity_threshold
+                ),
+                "status": correction_document.status,
+                "total_adjusted_quantity": str(total_adjusted_quantity),
+                "workstation_code": context.workstation_code,
+                "line_count": len(command.lines),
+            },
+        )
+        self._outbox_writer.append(
+            session,
+            aggregate_type="correction",
+            aggregate_id=str(correction_document.id),
+            event_name=OUTBOX_EVENT_CORRECTION_COMMITTED_V1,
+            payload={
+                **trace,
+                "correction_document_id": str(correction_document.id),
+                "target_document_id": str(target_document.id),
+                "target_document_type": target_document.document_type,
+                "correction_type": correction_document.correction_type,
+                "status": correction_document.status,
+                "source_branch_id": str(context.branch_id),
+                "source_branch_code": context.branch_code,
+                "workstation_id": str(context.workstation_id),
+                "workstation_code": context.workstation_code,
+                "created_by_user_id": str(current_user.id),
+                "created_by_user_email": current_user.email,
+                "reason_code": reason.code,
+                "corrected_destination_branch_id": (
+                    str(corrected_destination_branch.id)
+                    if corrected_destination_branch is not None
+                    else None
+                ),
+                "corrected_destination_branch_code": (
+                    corrected_destination_branch.code
+                    if corrected_destination_branch is not None
+                    else None
+                ),
+                "corrected_destination_branch_name": (
+                    corrected_destination_branch.name
+                    if corrected_destination_branch is not None
+                    else None
+                ),
+                "folio": correction_folio,
+                "high_impact": is_high_impact,
+                "high_impact_acknowledged": command.high_impact_acknowledged,
+                "high_impact_threshold_quantity": str(
+                    self._settings.correction_high_impact_quantity_threshold
+                ),
+                "notes": command.notes,
+                "committed_at_utc": committed_at.isoformat(),
+                "lines": outbox_lines,
+                "total_adjusted_quantity": str(total_adjusted_quantity),
+            },
+            headers={"request_id": resolved_request_id},
+        )
+        if is_high_impact:
             self._audit_recorder.record(
                 session,
                 actor_id=current_user.id,
-                action="correction.committed",
+                action="correction.high_impact_alert_requested",
                 resource_type="correction_document",
                 resource_id=str(correction_document.id),
                 branch_id=context.branch_id,
                 request_id=resolved_request_id,
                 metadata={
+                    **trace,
                     "correction_document_id": str(correction_document.id),
+                    "folio": correction_folio,
+                    "notification_target": "backoffice",
                     "target_document_id": str(target_document.id),
                     "target_document_type": target_document.document_type,
-                    "reason_code": reason.code,
-                    "corrected_destination_branch_id": (
-                        str(corrected_destination_branch.id)
-                        if corrected_destination_branch is not None
-                        else None
-                    ),
-                    "corrected_destination_branch_code": (
-                        corrected_destination_branch.code
-                        if corrected_destination_branch is not None
-                        else None
-                    ),
-                    "folio": correction_folio,
-                    "high_impact": is_high_impact,
-                    "high_impact_acknowledged": command.high_impact_acknowledged,
-                    "high_impact_threshold_quantity": str(
-                        self._settings.correction_high_impact_quantity_threshold
-                    ),
-                    "status": correction_document.status,
                     "total_adjusted_quantity": str(total_adjusted_quantity),
-                    "workstation_code": context.workstation_code,
-                    "line_count": len(command.lines),
                 },
             )
             self._outbox_writer.append(
                 session,
                 aggregate_type="correction",
                 aggregate_id=str(correction_document.id),
-                event_name=OUTBOX_EVENT_CORRECTION_COMMITTED_V1,
+                event_name=OUTBOX_EVENT_CORRECTION_HIGH_IMPACT_ALERT_V1,
                 payload={
+                    **trace,
                     "correction_document_id": str(correction_document.id),
+                    "folio": correction_folio,
+                    "notification_target": "backoffice",
+                    "reason_code": reason.code,
+                    "source_branch_code": context.branch_code,
                     "target_document_id": str(target_document.id),
                     "target_document_type": target_document.document_type,
-                    "correction_type": correction_document.correction_type,
-                    "status": correction_document.status,
-                    "source_branch_id": str(context.branch_id),
-                    "source_branch_code": context.branch_code,
-                    "workstation_id": str(context.workstation_id),
-                    "workstation_code": context.workstation_code,
-                    "created_by_user_id": str(current_user.id),
-                    "created_by_user_email": current_user.email,
-                    "reason_code": reason.code,
-                    "corrected_destination_branch_id": (
-                        str(corrected_destination_branch.id)
-                        if corrected_destination_branch is not None
-                        else None
-                    ),
-                    "corrected_destination_branch_code": (
-                        corrected_destination_branch.code
-                        if corrected_destination_branch is not None
-                        else None
-                    ),
-                    "corrected_destination_branch_name": (
-                        corrected_destination_branch.name
-                        if corrected_destination_branch is not None
-                        else None
-                    ),
-                    "folio": correction_folio,
-                    "high_impact": is_high_impact,
-                    "high_impact_acknowledged": command.high_impact_acknowledged,
-                    "high_impact_threshold_quantity": str(
-                        self._settings.correction_high_impact_quantity_threshold
-                    ),
-                    "notes": command.notes,
-                    "committed_at_utc": committed_at.isoformat(),
-                    "lines": outbox_lines,
                     "total_adjusted_quantity": str(total_adjusted_quantity),
+                    "workstation_code": context.workstation_code,
                 },
                 headers={"request_id": resolved_request_id},
             )
-            if is_high_impact:
-                self._audit_recorder.record(
-                    session,
-                    actor_id=current_user.id,
-                    action="correction.high_impact_alert_requested",
-                    resource_type="correction_document",
-                    resource_id=str(correction_document.id),
-                    branch_id=context.branch_id,
-                    request_id=resolved_request_id,
-                    metadata={
-                        "correction_document_id": str(correction_document.id),
-                        "folio": correction_folio,
-                        "notification_target": "backoffice",
-                        "target_document_id": str(target_document.id),
-                        "target_document_type": target_document.document_type,
-                        "total_adjusted_quantity": str(total_adjusted_quantity),
-                    },
-                )
-                self._outbox_writer.append(
-                    session,
-                    aggregate_type="correction",
-                    aggregate_id=str(correction_document.id),
-                    event_name=OUTBOX_EVENT_CORRECTION_HIGH_IMPACT_ALERT_V1,
-                    payload={
-                        "correction_document_id": str(correction_document.id),
-                        "folio": correction_folio,
-                        "notification_target": "backoffice",
-                        "reason_code": reason.code,
-                        "source_branch_code": context.branch_code,
-                        "target_document_id": str(target_document.id),
-                        "target_document_type": target_document.document_type,
-                        "total_adjusted_quantity": str(total_adjusted_quantity),
-                        "workstation_code": context.workstation_code,
-                    },
-                    headers={"request_id": resolved_request_id},
-                )
-            session.commit()
-        except IntegrityError as error:
-            session.rollback()
-            raise CorrectionValidationError(
-                "No se pudo guardar la correccion por un conflicto de integridad. Intenta de nuevo."
-            ) from error
+        session.flush()
 
-        return _build_correction_document_view(session, correction_document=correction_document)
+        return CorrectionCommitResultView(
+            id=correction_document.id,
+            folio=correction_folio,
+            target_document_id=target_document.id,
+            target_document_type=target_document.document_type,
+            correction_type=correction_document.correction_type,
+            branch_id=context.branch_id,
+            workstation_id=context.workstation_id,
+            cash_session_id=command.cash_session_id,
+            corrected_destination_branch_id=correction_document.corrected_destination_branch_id,
+            status=correction_document.status,
+            committed_at_utc=committed_at,
+            lines=[
+                CorrectionCommitLineResultView(
+                    id=line.id,
+                    line_number=line.line_number,
+                    target_line_id=line.target_line_id,
+                    product_id=line.product_id,
+                    delta_quantity=line.delta_quantity,
+                )
+                for line in session.scalars(
+                    select(CorrectionDocumentLine)
+                    .where(CorrectionDocumentLine.correction_document_id == correction_document.id)
+                    .order_by(CorrectionDocumentLine.line_number)
+                )
+            ],
+        )
 
 
 def _get_target_document(
     session: Session,
     *,
     target_document_id: uuid.UUID,
+    for_update: bool = False,
 ) -> OperationDocument:
-    target_document = session.execute(
-        select(OperationDocument).where(OperationDocument.id == target_document_id)
-    ).scalar_one_or_none()
+    statement = select(OperationDocument).where(OperationDocument.id == target_document_id)
+    if for_update:
+        statement = statement.with_for_update(key_share=True).execution_options(
+            populate_existing=True
+        )
+    target_document = session.execute(statement).scalar_one_or_none()
     if target_document is None:
         raise CorrectionNotFoundError("El documento original no existe.")
     if target_document.document_type not in VALID_CORRECTION_TARGET_DOCUMENT_TYPES:
@@ -1225,10 +1271,12 @@ def _assess_correction_eligibility(
 
     if target_document.document_type == OPERATION_DOCUMENT_TYPE_BRANCH_TRANSFER_SHIPMENT:
         receipt_exists = session.execute(
-            select(OperationDocument.id).where(
+            select(OperationDocument.id)
+            .where(
                 OperationDocument.reference_document_id == target_document.id,
                 OperationDocument.document_type == OPERATION_DOCUMENT_TYPE_BRANCH_TRANSFER_RECEIPT,
             )
+            .limit(1)
         ).scalar_one_or_none()
         if (
             target_document.status != OPERATION_DOCUMENT_STATUS_IN_TRANSIT
@@ -1236,9 +1284,7 @@ def _assess_correction_eligibility(
         ):
             return (
                 False,
-                (
-                    "Este envio ya fue recibido en la sucursal destino y ya no se puede corregir."
-                ),
+                ("Este envio ya fue recibido en la sucursal destino y ya no se puede corregir."),
             )
         return True, None
 
@@ -1294,12 +1340,8 @@ def _build_correction_document_view(
                 CorrectionDocument.reason_code,
                 CorrectionReason.name.label("reason_name"),
                 CorrectionDocument.corrected_destination_branch_id,
-                corrected_destination_branch.code.label(
-                    "corrected_destination_branch_code"
-                ),
-                corrected_destination_branch.name.label(
-                    "corrected_destination_branch_name"
-                ),
+                corrected_destination_branch.code.label("corrected_destination_branch_code"),
+                corrected_destination_branch.name.label("corrected_destination_branch_name"),
                 CorrectionDocument.notes,
                 CorrectionDocument.status,
                 CorrectionDocument.created_at_utc,
@@ -1598,9 +1640,7 @@ def _require_open_cash_session(
             "Necesitas una caja abierta en esta estacion para trabajar con correcciones."
         )
     if current_open_cash_session.user_id != current_user.id:
-        raise CorrectionConflictError(
-            "La caja abierta de esta estacion pertenece a otro cajero."
-        )
+        raise CorrectionConflictError("La caja abierta de esta estacion pertenece a otro cajero.")
     if (
         current_open_cash_session.branch_id != context.branch_id
         or current_open_cash_session.workstation_id != context.workstation_id
@@ -1609,3 +1649,68 @@ def _require_open_cash_session(
             "La caja abierta no coincide con el contexto actual de la estacion."
         )
     return current_open_cash_session
+
+
+def _validate_correction_remainders(
+    session: Session,
+    *,
+    target_document: OperationDocument,
+    target_lines: Sequence[OperationDocumentLine],
+    requested_lines: list[CorrectionCommitLineRequest],
+    target_line_ids: list[uuid.UUID | None],
+) -> None:
+    """The caller holds the source document lock across validation and compensation."""
+    by_product: dict[uuid.UUID, Decimal] = {}
+    by_line: dict[uuid.UUID, Decimal] = {}
+    units: dict[uuid.UUID, set[str]] = {}
+    for line in target_lines:
+        by_product[line.product_id] = by_product.get(line.product_id, Decimal(0)) + line.quantity
+        by_line[line.id] = line.quantity
+        units.setdefault(line.product_id, set()).add(line.unit_of_measure_code)
+    previous = session.execute(
+        select(
+            CorrectionDocumentLine.product_id,
+            CorrectionDocumentLine.target_line_id,
+            CorrectionDocumentLine.delta_quantity,
+            CorrectionDocumentLine.unit_of_measure_code,
+        )
+        .join(
+            CorrectionDocument,
+            CorrectionDocument.id == CorrectionDocumentLine.correction_document_id,
+        )
+        .where(
+            CorrectionDocument.target_document_id == target_document.id,
+            CorrectionDocument.status == CORRECTION_STATUS_COMMITTED,
+        )
+    ).all()
+    for product_id, target_line_id, delta, unit in previous:
+        by_product[product_id] = by_product.get(product_id, Decimal(0)) + delta
+        units.setdefault(product_id, set()).add(unit)
+        if target_line_id is not None:
+            by_line[target_line_id] = by_line.get(target_line_id, Decimal(0)) + delta
+    current_units = {
+        product_id: unit
+        for product_id, unit in session.execute(
+            select(Product.id, Product.unit_of_measure).where(
+                Product.id.in_({item.product_id for item in requested_lines})
+            )
+        )
+    }
+    for requested_line, target_line_id in zip(requested_lines, target_line_ids, strict=True):
+        if units.get(requested_line.product_id, {current_units[requested_line.product_id]}) != {
+            current_units[requested_line.product_id]
+        }:
+            raise CorrectionValidationError(
+                "La unidad del producto no coincide con el documento original."
+            )
+        by_product[requested_line.product_id] = (
+            by_product.get(requested_line.product_id, Decimal(0)) + requested_line.delta_quantity
+        )
+        if target_line_id is not None:
+            by_line[target_line_id] += requested_line.delta_quantity
+    if any(value < 0 for value in by_product.values()) or any(
+        value < 0 for value in by_line.values()
+    ):
+        raise CorrectionValidationError(
+            "El ajuste excede la cantidad restante del documento original."
+        )

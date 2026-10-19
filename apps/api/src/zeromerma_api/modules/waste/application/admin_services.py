@@ -8,7 +8,6 @@ from decimal import ROUND_HALF_UP, Decimal
 
 from pydantic import TypeAdapter
 from sqlalchemy import select
-from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from zeromerma_api.core.config import ApiSettings, get_settings
@@ -29,6 +28,8 @@ from zeromerma_api.modules.inventory.infrastructure.models import (
     InventoryBalance,
     InventoryMovement,
 )
+from zeromerma_api.modules.operations.application.results import build_operation_result
+from zeromerma_api.modules.operations.application.schemas import OperationCommitResultView
 from zeromerma_api.modules.operations.domain.constants import (
     OPERATION_BUCKET_WASTE,
     OPERATION_DOCUMENT_STATUS_CANCELLED,
@@ -248,7 +249,9 @@ class AdminWasteService:
         command: AdminWasteCreateRequest,
         current_user: AuthenticatedUser,
         request_id: str | None,
-    ) -> AdminWasteDetailView:
+        idempotency_key: uuid.UUID,
+        operation_id: uuid.UUID,
+    ) -> OperationCommitResultView:
         branch = self._get_branch(session, command.branch_id)
         if not branch.is_active:
             raise WasteValidationError("Waste branch is inactive.")
@@ -293,58 +296,59 @@ class AdminWasteService:
             workstation_id=workstation.id,
         )
 
-        try:
-            session.add(document)
-            session.flush()
-            session.add(
-                OperationDocumentLine(
-                    operation_document_id=document.id,
-                    line_number=1,
-                    product_id=resolved_product.product.id,
-                    product_code_snapshot=resolved_product.product.code,
-                    product_name_snapshot=resolved_product.product.name,
-                    product_class_id=resolved_product.product_class.id,
-                    product_class_code_snapshot=resolved_product.product_class.code,
-                    product_class_name_snapshot=resolved_product.product_class.name,
-                    quantity=quantity,
-                    unit_of_measure_code=resolved_product.product.unit_of_measure,
-                ),
-            )
-            balance.quantity_on_hand = new_quantity
-            movement = InventoryMovement(
-                balance_after=new_quantity,
-                branch_id=branch.id,
-                direction=INVENTORY_MOVEMENT_DIRECTION_OUT,
-                location_code=location_code,
-                movement_type=INVENTORY_MOVEMENT_TYPE_WASTE_RECORD,
-                notes=command.notes,
-                operator_user_id=current_user.id,
+        session.add(document)
+        session.flush()
+        session.add(
+            OperationDocumentLine(
+                operation_document_id=document.id,
+                line_number=1,
                 product_id=resolved_product.product.id,
+                product_code_snapshot=resolved_product.product.code,
+                product_name_snapshot=resolved_product.product.name,
+                product_class_id=resolved_product.product_class.id,
+                product_class_code_snapshot=resolved_product.product_class.code,
+                product_class_name_snapshot=resolved_product.product_class.name,
                 quantity=quantity,
-                reason=reason.code,
-                source_document_id=document.id,
-                source_document_type=ADMIN_WASTE_SOURCE_DOCUMENT_TYPE,
-                unit_of_measure=resolved_product.product.unit_of_measure,
-            )
-            session.add(movement)
-            self._record_confirmed(
-                session,
-                branch=branch,
-                current_user=current_user,
-                document=document,
-                high_impact=is_high_impact,
-                location_code=location_code,
-                movement=movement,
-                quantity=quantity,
-                reason=reason,
-                request_id=request_id,
-            )
-            session.commit()
-        except IntegrityError as error:
-            session.rollback()
-            raise WasteValidationError("Waste record could not be confirmed.") from error
+                unit_of_measure_code=resolved_product.product.unit_of_measure,
+            ),
+        )
+        balance.quantity_on_hand = new_quantity
+        movement = InventoryMovement(
+            id=uuid.uuid4(),
+            balance_after=new_quantity,
+            branch_id=branch.id,
+            direction=INVENTORY_MOVEMENT_DIRECTION_OUT,
+            location_code=location_code,
+            movement_type=INVENTORY_MOVEMENT_TYPE_WASTE_RECORD,
+            notes=command.notes,
+            operator_user_id=current_user.id,
+            product_id=resolved_product.product.id,
+            quantity=quantity,
+            reason=reason.code,
+            source_document_id=document.id,
+            source_document_type=ADMIN_WASTE_SOURCE_DOCUMENT_TYPE,
+            unit_of_measure=resolved_product.product.unit_of_measure,
+        )
+        session.add(movement)
+        self._record_confirmed(
+            session,
+            branch=branch,
+            current_user=current_user,
+            document=document,
+            high_impact=is_high_impact,
+            location_code=location_code,
+            movement=movement,
+            quantity=quantity,
+            reason=reason,
+            request_id=request_id,
+            idempotency_key=idempotency_key,
+            operation_id=operation_id,
+        )
+        session.flush()
 
-        return self.get_waste_detail(session, waste_id=document.id)
+        return build_operation_result(
+            session, document, cash_session_id=None, inventory_movement_ids=[movement.id]
+        )
 
     def _fetch_rows(
         self,
@@ -715,8 +719,13 @@ class AdminWasteService:
         quantity: Decimal,
         reason: WasteReason,
         request_id: str | None,
+        idempotency_key: uuid.UUID,
+        operation_id: uuid.UUID,
     ) -> None:
         metadata = {
+            "idempotency_key": str(idempotency_key),
+            "operation_id": str(operation_id),
+            "operation_code": "waste.commit",
             "branch_id": str(branch.id),
             "folio": _build_folio(document.id),
             "high_impact": high_impact,

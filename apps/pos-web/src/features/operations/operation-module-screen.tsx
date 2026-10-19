@@ -1,3 +1,9 @@
+import { isCommandIntentionPending } from "@zeromerma/api-client";
+import { operationIntentions } from "../operation-commands/operation-command-intent";
+import {
+  useOperationIntention,
+  useOperationDraftIdentity,
+} from "../operation-commands/use-operation-intention";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Navigate } from "@tanstack/react-router";
 import {
@@ -12,7 +18,10 @@ import {
 } from "react";
 
 import { useAppShellRightPanel } from "../../components/app-shell-right-panel";
-import { CapturedProductLineList, CapturedProductLineRow } from "../../components/captured-product-lines";
+import {
+  CapturedProductLineList,
+  CapturedProductLineRow,
+} from "../../components/captured-product-lines";
 import { CatalogSelectionCard } from "../../components/catalog-selection-card";
 import { CatalogVisual } from "../../components/catalog-visual";
 import {
@@ -28,11 +37,7 @@ import {
 import { OperationalStatus } from "../../components/operational-status";
 import { PosModuleLayout, PosSummaryPanel } from "../../components/pos-module-layout";
 import { PosBlockerPanel } from "../../components/pos-feedback";
-import {
-  PosButton,
-  PosCard,
-  PosStatusBadge,
-} from "../../components/pos-foundations";
+import { PosButton, PosCard, PosStatusBadge } from "../../components/pos-foundations";
 import {
   CentralWorkspaceSheet,
   FlowGuide,
@@ -42,7 +47,12 @@ import {
   SearchField,
 } from "../../components/pos-module-primitives";
 import { PosScannerInput } from "../../components/pos-scanner-input";
-import { PosFilterBar, PosHistoryView, PosRecordTable, type PosRecordColumn } from "../../components/pos-records";
+import {
+  PosFilterBar,
+  PosHistoryView,
+  PosRecordTable,
+  type PosRecordColumn,
+} from "../../components/pos-records";
 import {
   ArrowLeftIcon,
   ClipboardIcon,
@@ -111,7 +121,7 @@ import {
   sortOperationalProducts,
   updateOperationLineQuantity,
 } from "./model";
-import { commitCounterTransfer, commitWasteRecord } from "./operations-api";
+
 import {
   operationDocumentQueryKey,
   operationHistoryQueryKey,
@@ -306,9 +316,7 @@ function buildWasteHistoryRecords(
   }));
 }
 
-function getOperationStateLabel(
-  state: ReturnType<typeof getOperationDocumentState>,
-): string {
+function getOperationStateLabel(state: ReturnType<typeof getOperationDocumentState>): string {
   switch (state) {
     case "NO_LINES_YET":
       return "Sin lineas";
@@ -355,9 +363,7 @@ function getOperationStateBadgeTone(
   }
 }
 
-function getCounterTransferPanelTitle(
-  state: ReturnType<typeof getOperationDocumentState>,
-): string {
+function getCounterTransferPanelTitle(state: ReturnType<typeof getOperationDocumentState>): string {
   switch (state) {
     case "NO_LINES_YET":
       return "Nuevo traspaso";
@@ -391,15 +397,10 @@ function getWasteReasonLabel(reason: WasteReasonView): string {
 }
 
 function getWasteSourceBucketLabel(code: string): string {
-  return (
-    WASTE_SOURCE_BUCKET_OPTIONS.find((option) => option.value === code)?.label ??
-    "Pendiente"
-  );
+  return WASTE_SOURCE_BUCKET_OPTIONS.find((option) => option.value === code)?.label ?? "Pendiente";
 }
 
-function getWasteUiStateLabel(
-  state: ReturnType<typeof getWasteDocumentUiState>,
-): string {
+function getWasteUiStateLabel(state: ReturnType<typeof getWasteDocumentUiState>): string {
   switch (state) {
     case "TRACEABILITY_INCOMPLETE":
     case "BLOCKED_MISSING_ORIGIN":
@@ -443,10 +444,7 @@ function getWasteUiStateTone(
   }
 }
 
-function getWasteReasonName(
-  wasteReasons: WasteReasonView[],
-  reasonCode: string,
-): string {
+function getWasteReasonName(wasteReasons: WasteReasonView[], reasonCode: string): string {
   const reason = wasteReasons.find((item) => item.code === reasonCode);
   return reason ? getWasteReasonLabel(reason) : "Pendiente";
 }
@@ -473,9 +471,7 @@ function formatOperationQuantity(quantity: number | string): string {
   }).format(Number(quantity));
 }
 
-function getCounterAvailableQuantity(
-  product: CashCloseReconciliationProductView,
-): number {
+function getCounterAvailableQuantity(product: CashCloseReconciliationProductView): number {
   const resolvedQuantity =
     product.final_expected_quantity ?? product.expected_quantity_before_deferred_attr;
   return Number(resolvedQuantity);
@@ -645,10 +641,16 @@ function GroupedCounterAvailabilitySection({
           className="overflow-hidden rounded-[var(--pos-radius-panel)] border border-[var(--pos-shell-border)] bg-white"
         >
           {groups.map((group) => (
-            <div className="border-t border-[var(--pos-shell-border)] first:border-t-0" key={group.classId}>
+            <div
+              className="border-t border-[var(--pos-shell-border)] first:border-t-0"
+              key={group.classId}
+            >
               <div className="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-3 bg-slate-50 px-3 py-2">
                 <div className="min-w-0">
-                  <p className="truncate text-sm font-semibold text-slate-950" title={group.className}>
+                  <p
+                    className="truncate text-sm font-semibold text-slate-950"
+                    title={group.className}
+                  >
                     {group.className}
                   </p>
                   {group.pendingClassCaptureQuantity > 0 ? (
@@ -730,9 +732,7 @@ function CounterAvailabilitySection({
     <div className="grid gap-3" ref={containerRef} tabIndex={-1}>
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0">
-          <h2 className="text-sm font-semibold text-slate-950">
-            Clases en mostrador
-          </h2>
+          <h2 className="text-sm font-semibold text-slate-950">Clases en mostrador</h2>
           <p className="mt-1 text-sm text-slate-600">
             Vista operativa del saldo real esperado en mostrador para {branchName}. Agrupa el
             disponible por clase y muestra la composicion interna de referencia antes de la
@@ -831,9 +831,7 @@ function WasteTraceabilitySection({
           <PosStatusBadge status={sourceBucketCode ? "ready" : "draft"}>
             {originLabel}
           </PosStatusBadge>
-          <PosStatusBadge status={reasonCode ? "ready" : "draft"}>
-            {reasonLabel}
-          </PosStatusBadge>
+          <PosStatusBadge status={reasonCode ? "ready" : "draft"}>{reasonLabel}</PosStatusBadge>
         </div>
       </div>
 
@@ -941,7 +939,6 @@ function WasteTraceabilitySection({
 export function OperationModuleScreen({ variant }: { variant: OperationModuleVariant }) {
   const config = operationModuleConfig[variant];
   const queryClient = useQueryClient();
-  const isAuthenticated = usePosAuthStore((state) => state.isAuthenticated);
   const showError = useStatusMessageStore((state) => state.showError);
   const showSuccess = useStatusMessageStore((state) => state.showSuccess);
   const showWarning = useStatusMessageStore((state) => state.showWarning);
@@ -960,8 +957,7 @@ export function OperationModuleScreen({ variant }: { variant: OperationModuleVar
   const [reasonCode, setReasonCode] = useState("");
   const [notes, setNotes] = useState("");
   const [isWasteHighImpactAcknowledged, setIsWasteHighImpactAcknowledged] = useState(false);
-  const [lastWasteHighImpactAlertRequested, setLastWasteHighImpactAlertRequested] =
-    useState(false);
+  const [lastWasteHighImpactAlertRequested, setLastWasteHighImpactAlertRequested] = useState(false);
   const [scannerText, setScannerText] = useState("");
   const [pendingScannerCode, setPendingScannerCode] = useState<string | null>(null);
   const [wasteCenterView, setWasteCenterView] = useState<"capture" | "history">("capture");
@@ -991,6 +987,21 @@ export function OperationModuleScreen({ variant }: { variant: OperationModuleVar
   const counterTransferDraftQuantityInputRef = useRef<HTMLInputElement | null>(null);
   const operationsBootstrapQuery = useOperationsBootstrapQuery();
   const currentCashSessionQuery = useCurrentCashSessionQuery();
+  const user = usePosAuthStore((state) => state.user);
+  const intentionState = useOperationIntention(operationsBootstrapQuery.data?.workstation.id ?? "");
+  const intentionBlocked =
+    Boolean(intentionState.error) || isCommandIntentionPending(intentionState.metadata);
+  const observedKey = useOperationDraftIdentity(
+    intentionState.metadata,
+    Boolean(operationsBootstrapQuery.data),
+    () => {
+      setDraftState(createInitialOperationDraftState());
+      setNotes("");
+      setReasonCode("");
+      setIsWasteHighImpactAcknowledged(false);
+      setIsCounterTransferConfirmDialogOpen(false);
+    },
+  );
   const wasteStockValidatedSourceBuckets = useMemo(
     () => operationsBootstrapQuery.data?.waste_controls.stock_validated_source_bucket_codes ?? [],
     [operationsBootstrapQuery.data?.waste_controls.stock_validated_source_bucket_codes],
@@ -1001,9 +1012,7 @@ export function OperationModuleScreen({ variant }: { variant: OperationModuleVar
     (variant === "waste" &&
       wasteCenterView === "capture" &&
       wasteStockValidatedSourceBuckets.includes(sourceBucketCode));
-  const counterAvailabilityQuery = useCashCloseReconciliationQuery(
-    shouldLoadCounterAvailability,
-  );
+  const counterAvailabilityQuery = useCashCloseReconciliationQuery(shouldLoadCounterAvailability);
   const debouncedSearchText = useDebouncedValue(draftState.searchText, 180);
   const catalogQuery = useOperationsCatalogQuery(
     config.moduleKey,
@@ -1078,7 +1087,7 @@ export function OperationModuleScreen({ variant }: { variant: OperationModuleVar
     setSelectedCounterTransferDraftLineKey((current) =>
       current !== null && draftState.lines.some((line) => line.key === current)
         ? current
-        : draftState.lines[0]?.key ?? null,
+        : (draftState.lines[0]?.key ?? null),
     );
   }, [draftState.lines, variant]);
 
@@ -1103,7 +1112,11 @@ export function OperationModuleScreen({ variant }: { variant: OperationModuleVar
     }
 
     counterTransferAvailabilityRef.current?.focus();
-  }, [counterAvailabilityQuery.data?.relevant_products?.length, counterTransferCenterView, variant]);
+  }, [
+    counterAvailabilityQuery.data?.relevant_products?.length,
+    counterTransferCenterView,
+    variant,
+  ]);
 
   useEffect(() => {
     const quantityCaptureTarget =
@@ -1117,8 +1130,7 @@ export function OperationModuleScreen({ variant }: { variant: OperationModuleVar
     }
 
     const canFocusWasteQuantity =
-      variant !== "waste" ||
-      (sourceBucketCode.trim().length > 0 && reasonCode.trim().length > 0);
+      variant !== "waste" || (sourceBucketCode.trim().length > 0 && reasonCode.trim().length > 0);
 
     if (!canFocusWasteQuantity) {
       quantityFocusTargetRef.current = null;
@@ -1132,13 +1144,7 @@ export function OperationModuleScreen({ variant }: { variant: OperationModuleVar
     quantityFocusTargetRef.current = quantityCaptureTarget;
     quantityInputRef.current?.focus();
     quantityInputRef.current?.select();
-  }, [
-    draftState.controlState,
-    draftState.pendingSelection,
-    reasonCode,
-    sourceBucketCode,
-    variant,
-  ]);
+  }, [draftState.controlState, draftState.pendingSelection, reasonCode, sourceBucketCode, variant]);
 
   const sortedClasses = useMemo(
     () => sortOperationalClasses(catalogQuery.data?.classes ?? []),
@@ -1220,7 +1226,10 @@ export function OperationModuleScreen({ variant }: { variant: OperationModuleVar
       const productClass = sortedClasses[index];
       if (
         productClass &&
-        !(variant === "waste" && !(sourceBucketCode.trim().length > 0 && reasonCode.trim().length > 0))
+        !(
+          variant === "waste" &&
+          !(sourceBucketCode.trim().length > 0 && reasonCode.trim().length > 0)
+        )
       ) {
         setLastCommittedDocument(null);
         setDraftState((state) => selectClassForOperation(state, productClass));
@@ -1233,7 +1242,10 @@ export function OperationModuleScreen({ variant }: { variant: OperationModuleVar
       const product = sortedProducts[index];
       if (
         product &&
-        !(variant === "waste" && !(sourceBucketCode.trim().length > 0 && reasonCode.trim().length > 0))
+        !(
+          variant === "waste" &&
+          !(sourceBucketCode.trim().length > 0 && reasonCode.trim().length > 0)
+        )
       ) {
         setLastCommittedDocument(null);
         setDraftState((state) => selectProductForOperation(state, product));
@@ -1314,9 +1326,7 @@ export function OperationModuleScreen({ variant }: { variant: OperationModuleVar
     (wasteControls?.high_impact_requires_acknowledgement ?? false) && isWasteHighImpact;
   const counterAvailabilityByProductId = useMemo(
     () =>
-      buildCounterAvailabilityByProductId(
-        counterAvailabilityQuery.data?.relevant_products ?? [],
-      ),
+      buildCounterAvailabilityByProductId(counterAvailabilityQuery.data?.relevant_products ?? []),
     [counterAvailabilityQuery.data?.relevant_products],
   );
   const wasteStockBlockingMessages = useMemo(() => {
@@ -1477,13 +1487,7 @@ export function OperationModuleScreen({ variant }: { variant: OperationModuleVar
 
       searchInputRef.current?.focus();
     });
-  }, [
-    focusWasteOriginIndex,
-    focusWasteReasonIndex,
-    hasWasteOrigin,
-    hasWasteReason,
-    variant,
-  ]);
+  }, [focusWasteOriginIndex, focusWasteReasonIndex, hasWasteOrigin, hasWasteReason, variant]);
   const isCounterTransferAvailabilityView =
     variant === "counterTransfer" && counterTransferCenterView === "counterAvailability";
   const activeGridKey = useMemo(() => {
@@ -1503,11 +1507,7 @@ export function OperationModuleScreen({ variant }: { variant: OperationModuleVar
     }
 
     return null;
-  }, [
-    draftState.controlState,
-    draftState.pendingSelection,
-    isCounterTransferAvailabilityView,
-  ]);
+  }, [draftState.controlState, draftState.pendingSelection, isCounterTransferAvailabilityView]);
   const availableCounterClasses = useMemo(
     () => counterAvailabilityQuery.data?.counter_class_availability ?? [],
     [counterAvailabilityQuery.data?.counter_class_availability],
@@ -1537,7 +1537,7 @@ export function OperationModuleScreen({ variant }: { variant: OperationModuleVar
       )
     : null;
   const counterTransferHistoryAllDayRows = useMemo(
-    () => (variant === "counterTransfer" ? counterTransferHistoryQuery.data?.records ?? [] : []),
+    () => (variant === "counterTransfer" ? (counterTransferHistoryQuery.data?.records ?? []) : []),
     [counterTransferHistoryQuery.data?.records, variant],
   );
   const counterTransferHistoryShiftCounts = useMemo(() => {
@@ -1624,10 +1624,7 @@ export function OperationModuleScreen({ variant }: { variant: OperationModuleVar
       return;
     }
 
-    if (
-      draftState.controlState === CONTROL_STATE_PRODUCT_SELECTION &&
-      sortedProducts.length > 0
-    ) {
+    if (draftState.controlState === CONTROL_STATE_PRODUCT_SELECTION && sortedProducts.length > 0) {
       lastGridFocusKeyRef.current = activeGridKey;
       focusProductIndex(0);
     }
@@ -1658,12 +1655,7 @@ export function OperationModuleScreen({ variant }: { variant: OperationModuleVar
     if (!selectedRecordIsVisible) {
       setSelectedHistoryDocumentId(counterTransferHistoryRows[0]?.id ?? null);
     }
-  }, [
-    counterTransferCenterView,
-    counterTransferHistoryRows,
-    selectedHistoryDocumentId,
-    variant,
-  ]);
+  }, [counterTransferCenterView, counterTransferHistoryRows, selectedHistoryDocumentId, variant]);
 
   useEffect(() => {
     if (variant !== "waste" || wasteCenterView !== "history") {
@@ -1678,30 +1670,40 @@ export function OperationModuleScreen({ variant }: { variant: OperationModuleVar
     if (firstRecord) {
       setSelectedHistoryDocumentId(firstRecord.id);
     }
-  }, [
-    selectedHistoryDocumentId,
-    variant,
-    wasteCenterView,
-    wasteHistoryQuery.data?.records,
-  ]);
+  }, [selectedHistoryDocumentId, variant, wasteCenterView, wasteHistoryQuery.data?.records]);
 
   const commitMutation = useMutation({
     mutationFn: async () => {
-      if (!isAuthenticated || operationsBootstrapQuery.data === undefined) {
+      if (!user || operationsBootstrapQuery.data === undefined || !currentCashSessionQuery.data) {
         throw new Error("Se requiere autenticacion y contexto de estacion.");
       }
 
+      if (intentionState.error) throw new Error(intentionState.error);
+      const context = {
+        userId: user.id,
+        branchId: operationsBootstrapQuery.data.branch.id,
+        workstationId: operationsBootstrapQuery.data.workstation.id,
+        workstationCode: operationsBootstrapQuery.data.workstation.code,
+        cashSessionId: currentCashSessionQuery.data.id,
+        targetDocumentId: null,
+      };
       const lines = buildOperationCommitLines(draftState.lines);
       if (variant === "counterTransfer") {
         const payload: CounterTransferCommitRequest = {
+          cash_session_id: currentCashSessionQuery.data.id,
           workstation_code: operationsBootstrapQuery.data.workstation.code,
           lines,
           notes: null,
         };
-        return commitCounterTransfer(payload);
+        return operationIntentions.begin(
+          { ...context, commandCode: "counter-transfer" },
+          { commandCode: "counter-transfer", body: payload },
+          observedKey.current ?? null,
+        );
       }
 
       const payload: WasteCommitRequest = {
+        cash_session_id: currentCashSessionQuery.data.id,
         high_impact_acknowledged: wasteRequiresHighImpactAcknowledgement
           ? isWasteHighImpactAcknowledged
           : false,
@@ -1711,7 +1713,11 @@ export function OperationModuleScreen({ variant }: { variant: OperationModuleVar
         lines,
         notes: notes.trim().length > 0 ? notes.trim() : null,
       };
-      return commitWasteRecord(payload);
+      return operationIntentions.begin(
+        { ...context, commandCode: "waste" },
+        { commandCode: "waste", body: payload },
+        observedKey.current ?? null,
+      );
     },
     onSuccess: (document) => {
       const wasteAlertRequested = variant === "waste" && isWasteHighImpact;
@@ -1811,11 +1817,11 @@ export function OperationModuleScreen({ variant }: { variant: OperationModuleVar
   );
   const selectedCounterTransferHistoryDocument =
     variant === "counterTransfer" && counterTransferCenterView === "history"
-      ? selectedHistoryDocumentQuery.data ?? null
+      ? (selectedHistoryDocumentQuery.data ?? null)
       : null;
   const selectedWasteHistoryDocument =
     variant === "waste" && wasteCenterView === "history"
-      ? selectedHistoryDocumentQuery.data ?? null
+      ? (selectedHistoryDocumentQuery.data ?? null)
       : null;
   const counterTransferHistoryColumns = useMemo<
     PosRecordColumn<OperationHistoryResponse["records"][number]>[]
@@ -1870,8 +1876,12 @@ export function OperationModuleScreen({ variant }: { variant: OperationModuleVar
         key: "operator",
         renderCell: (record) => (
           <div className="min-w-0">
-            <p className="truncate font-medium text-slate-900">{record.created_by_user_full_name}</p>
-            <p className="mt-1 truncate text-xs font-medium text-slate-500">{record.workstation_name}</p>
+            <p className="truncate font-medium text-slate-900">
+              {record.created_by_user_full_name}
+            </p>
+            <p className="mt-1 truncate text-xs font-medium text-slate-500">
+              {record.workstation_name}
+            </p>
           </div>
         ),
         width: "14rem",
@@ -2337,16 +2347,12 @@ export function OperationModuleScreen({ variant }: { variant: OperationModuleVar
             >
               <div className="grid h-full min-h-0 auto-rows-max content-start gap-1.5">
                 <CounterMovementSummaryCard
-                  destinationLabel={
-                    getCounterTransferBucketLabel(
-                      selectedCounterTransferHistoryDocument.destination_bucket_code,
-                    )
-                  }
-                  sourceLabel={
-                    getCounterTransferBucketLabel(
-                      selectedCounterTransferHistoryDocument.source_bucket_code,
-                    )
-                  }
+                  destinationLabel={getCounterTransferBucketLabel(
+                    selectedCounterTransferHistoryDocument.destination_bucket_code,
+                  )}
+                  sourceLabel={getCounterTransferBucketLabel(
+                    selectedCounterTransferHistoryDocument.source_bucket_code,
+                  )}
                 />
                 <GroupedCounterAvailabilitySection
                   badgeLabel="Aprox. hasta cierre"
@@ -2411,7 +2417,7 @@ export function OperationModuleScreen({ variant }: { variant: OperationModuleVar
               </Button>
               <Button
                 className={cn("h-11", posPrimaryButtonClass)}
-                disabled={commitMutation.isPending}
+                disabled={commitMutation.isPending || intentionBlocked}
                 onClick={handleCommit}
                 type="button"
               >
@@ -2542,18 +2548,18 @@ export function OperationModuleScreen({ variant }: { variant: OperationModuleVar
           },
           variant: "neutral",
         },
-          {
-            key: "new-waste",
-            label: "Nueva merma",
-            leadingIcon: <ClipboardIcon className="h-4 w-4" />,
-            onSelect: () => {
-              setLastCommittedDocument(null);
-              setLastWasteHighImpactAlertRequested(false);
-              setSelectedHistoryDocumentId(null);
-              setWasteCenterView("capture");
-            },
-            variant: "primary",
+        {
+          key: "new-waste",
+          label: "Nueva merma",
+          leadingIcon: <ClipboardIcon className="h-4 w-4" />,
+          onSelect: () => {
+            setLastCommittedDocument(null);
+            setLastWasteHighImpactAlertRequested(false);
+            setSelectedHistoryDocumentId(null);
+            setWasteCenterView("capture");
           },
+          variant: "primary",
+        },
       ];
 
       return (
@@ -2665,8 +2671,8 @@ export function OperationModuleScreen({ variant }: { variant: OperationModuleVar
                 leadingIcon: <PrinterIcon className="h-4 w-4" />,
                 onSelect: () => undefined,
                 variant: "neutral",
-                },
-              ]}
+              },
+            ]}
             auditSummary={selectedWasteHistoryDocument.audit_summary}
             context={{
               branchName: selectedWasteHistoryDocument.source_branch_name,
@@ -2680,7 +2686,9 @@ export function OperationModuleScreen({ variant }: { variant: OperationModuleVar
               {
                 key: "origin",
                 label: "Origen",
-                value: getWasteSourceBucketLabel(selectedWasteHistoryDocument.source_bucket_code ?? ""),
+                value: getWasteSourceBucketLabel(
+                  selectedWasteHistoryDocument.source_bucket_code ?? "",
+                ),
               },
               {
                 key: "reason",
@@ -2770,7 +2778,7 @@ export function OperationModuleScreen({ variant }: { variant: OperationModuleVar
             </Button>
             <Button
               className={cn("h-11 w-full", posPrimaryButtonClass)}
-              disabled={wasteBlockedReason !== null || commitMutation.isPending}
+              disabled={wasteBlockedReason !== null || commitMutation.isPending || intentionBlocked}
               onClick={handleCommit}
               type="button"
             >
@@ -2792,7 +2800,9 @@ export function OperationModuleScreen({ variant }: { variant: OperationModuleVar
       >
         <div className="grid h-full min-h-0 content-start gap-3">
           <div className="grid gap-2">
-            {commitErrorMessage ? <InlineNotice tone="error">{commitErrorMessage}</InlineNotice> : null}
+            {commitErrorMessage ? (
+              <InlineNotice tone="error">{commitErrorMessage}</InlineNotice>
+            ) : null}
             <div className="grid gap-2 rounded-xl border border-[var(--pos-shell-border)] bg-[var(--pos-shell-muted)] px-3 py-2.5 text-sm">
               <div className="grid grid-cols-[4.25rem_minmax(0,1fr)] items-center gap-2">
                 <span className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">
@@ -2808,7 +2818,10 @@ export function OperationModuleScreen({ variant }: { variant: OperationModuleVar
                 </span>
                 <span className="truncate text-right font-semibold text-slate-950">
                   {hasWasteReason
-                    ? getWasteReasonName(operationsBootstrapQuery.data?.waste_reasons ?? [], reasonCode)
+                    ? getWasteReasonName(
+                        operationsBootstrapQuery.data?.waste_reasons ?? [],
+                        reasonCode,
+                      )
                     : "Pendiente"}
                 </span>
               </div>
@@ -2842,7 +2855,7 @@ export function OperationModuleScreen({ variant }: { variant: OperationModuleVar
               <CapturedProductLineList>
                 {draftState.lines.map((line) => (
                   <CapturedProductLineRow
-                    disabled={commitMutation.isPending}
+                    disabled={commitMutation.isPending || intentionBlocked}
                     key={line.key}
                     name={line.productName}
                     onDecrement={() => {
@@ -2897,7 +2910,7 @@ export function OperationModuleScreen({ variant }: { variant: OperationModuleVar
             <div className="mt-2 grid gap-2">
               <textarea
                 className={cn("min-h-20 rounded-lg px-3 py-2 text-sm shadow-sm", posInputClass)}
-                disabled={commitMutation.isPending}
+                disabled={commitMutation.isPending || intentionBlocked}
                 onChange={(event) => {
                   setLastCommittedDocument(null);
                   setNotes(event.target.value);
@@ -2925,7 +2938,7 @@ export function OperationModuleScreen({ variant }: { variant: OperationModuleVar
                 <input
                   checked={isWasteHighImpactAcknowledged}
                   className="h-4 w-4 rounded border-[var(--pos-shell-border)] text-[var(--pos-accent-strong)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--pos-ring)] focus-visible:ring-offset-2"
-                  disabled={commitMutation.isPending}
+                  disabled={commitMutation.isPending || intentionBlocked}
                   onChange={(event) => setIsWasteHighImpactAcknowledged(event.target.checked)}
                   type="checkbox"
                 />
@@ -2955,6 +2968,7 @@ export function OperationModuleScreen({ variant }: { variant: OperationModuleVar
   }, [
     commitErrorMessage,
     commitMutation.isPending,
+    intentionBlocked,
     config.commitButtonLabel,
     counterTransferCenterView,
     groupedCounterAvailability,
@@ -3037,22 +3051,21 @@ export function OperationModuleScreen({ variant }: { variant: OperationModuleVar
     return <Navigate to="/cash-session/open" />;
   }
 
-  const flowActiveStepKey =
-    isCounterTransferAvailabilityView
+  const flowActiveStepKey = isCounterTransferAvailabilityView
+    ? "summary"
+    : variant === "counterTransfer" && counterTransferCenterView === "history"
       ? "summary"
-      : variant === "counterTransfer" && counterTransferCenterView === "history"
-        ? "summary"
       : variant === "waste" && wasteCenterView === "history"
         ? "summary"
-      : variant === "waste" && !isWasteTraceabilityReady
-      ? "traceability"
-      : draftState.controlState === CONTROL_STATE_PRODUCT_SELECTION
-        ? "product"
-        : draftState.controlState === CONTROL_STATE_QUANTITY_CAPTURE
-          ? "quantity"
-          : draftState.lines.length > 0
-            ? "summary"
-            : "class";
+        : variant === "waste" && !isWasteTraceabilityReady
+          ? "traceability"
+          : draftState.controlState === CONTROL_STATE_PRODUCT_SELECTION
+            ? "product"
+            : draftState.controlState === CONTROL_STATE_QUANTITY_CAPTURE
+              ? "quantity"
+              : draftState.lines.length > 0
+                ? "summary"
+                : "class";
   const showSearch =
     !isCounterTransferAvailabilityView &&
     !(variant === "counterTransfer" && counterTransferCenterView === "history") &&
@@ -3082,7 +3095,7 @@ export function OperationModuleScreen({ variant }: { variant: OperationModuleVar
       ? `${draftState.lines.length} ${draftState.lines.length === 1 ? "linea" : "lineas"} en documento`
       : null;
   const selectedCounterTransferClass =
-    variant === "counterTransfer" ? draftState.pendingSelection?.productClass ?? null : null;
+    variant === "counterTransfer" ? (draftState.pendingSelection?.productClass ?? null) : null;
   const pageHeader =
     variant === "counterTransfer" ? (
       counterTransferCenterView === "capture" && !isCounterTransferAvailabilityView ? (
@@ -3143,9 +3156,9 @@ export function OperationModuleScreen({ variant }: { variant: OperationModuleVar
             >
               {counterTransferCenterView === "history"
                 ? "Historial de traspasos"
-                  : isCounterTransferAvailabilityView
-                    ? "Mostrador actual"
-                    : "Empaque -&gt; Mostrador"}
+                : isCounterTransferAvailabilityView
+                  ? "Mostrador actual"
+                  : "Empaque -&gt; Mostrador"}
             </ModuleStateChip>
           }
           stateChip={
@@ -3157,15 +3170,17 @@ export function OperationModuleScreen({ variant }: { variant: OperationModuleVar
               </ModuleStateChip>
             )
           }
-          title={counterTransferCenterView === "history" ? "Historial del mostrador" : "Pasar a mostrador"}
+          title={
+            counterTransferCenterView === "history"
+              ? "Historial del mostrador"
+              : "Pasar a mostrador"
+          }
         />
       )
     ) : (
       <CompactPageHeader
         secondaryChips={
-          <ModuleStateChip
-            tone={wasteCenterView === "history" ? "info" : "primary"}
-          >
+          <ModuleStateChip tone={wasteCenterView === "history" ? "info" : "primary"}>
             {wasteCenterView === "history" ? "Historial de merma" : "Captura de merma"}
           </ModuleStateChip>
         }
@@ -3188,39 +3203,36 @@ export function OperationModuleScreen({ variant }: { variant: OperationModuleVar
               {
                 key: "class",
                 label: "Clase",
-                state:
-                  !isWasteTraceabilityReady
-                    ? "blocked"
-                    : flowActiveStepKey === "class"
-                      ? "current"
-                      : draftState.pendingSelection !== null || draftState.lines.length > 0
-                        ? "completed"
-                        : "upcoming",
+                state: !isWasteTraceabilityReady
+                  ? "blocked"
+                  : flowActiveStepKey === "class"
+                    ? "current"
+                    : draftState.pendingSelection !== null || draftState.lines.length > 0
+                      ? "completed"
+                      : "upcoming",
               },
               {
                 key: "product",
                 label: "Producto",
-                state:
-                  !isWasteTraceabilityReady
-                    ? "blocked"
-                    : flowActiveStepKey === "product"
-                      ? "current"
-                      : draftState.controlState === CONTROL_STATE_QUANTITY_CAPTURE ||
-                          draftState.lines.length > 0
-                        ? "completed"
-                        : "upcoming",
+                state: !isWasteTraceabilityReady
+                  ? "blocked"
+                  : flowActiveStepKey === "product"
+                    ? "current"
+                    : draftState.controlState === CONTROL_STATE_QUANTITY_CAPTURE ||
+                        draftState.lines.length > 0
+                      ? "completed"
+                      : "upcoming",
               },
               {
                 key: "quantity",
                 label: "Cantidad",
-                state:
-                  !isWasteTraceabilityReady
-                    ? "blocked"
-                    : flowActiveStepKey === "quantity"
-                      ? "current"
-                      : draftState.lines.length > 0
-                        ? "completed"
-                        : "upcoming",
+                state: !isWasteTraceabilityReady
+                  ? "blocked"
+                  : flowActiveStepKey === "quantity"
+                    ? "current"
+                    : draftState.lines.length > 0
+                      ? "completed"
+                      : "upcoming",
               },
               {
                 key: "summary",
@@ -3708,7 +3720,8 @@ export function OperationModuleScreen({ variant }: { variant: OperationModuleVar
                 />
               ) : null}
 
-              {selectionErrorMessage && draftState.controlState !== CONTROL_STATE_QUANTITY_CAPTURE ? (
+              {selectionErrorMessage &&
+              draftState.controlState !== CONTROL_STATE_QUANTITY_CAPTURE ? (
                 <div className="mb-2 flex items-start justify-between gap-3 rounded-lg border border-[var(--ui-color-danger-soft)] bg-[var(--ui-color-danger-soft)] px-3 py-2 text-sm text-[var(--ui-color-danger)]">
                   <p className="leading-6">{selectionErrorMessage}</p>
                   <button
@@ -3722,7 +3735,8 @@ export function OperationModuleScreen({ variant }: { variant: OperationModuleVar
                 </div>
               ) : null}
 
-              {isWasteCaptureBlocked && draftState.controlState !== CONTROL_STATE_QUANTITY_CAPTURE ? (
+              {isWasteCaptureBlocked &&
+              draftState.controlState !== CONTROL_STATE_QUANTITY_CAPTURE ? (
                 <InlineNotice tone="warning">
                   Selecciona origen y motivo para capturar productos.
                 </InlineNotice>
@@ -3771,13 +3785,13 @@ export function OperationModuleScreen({ variant }: { variant: OperationModuleVar
                   {draftState.controlState === CONTROL_STATE_PRODUCT_SELECTION ? (
                     sortedProducts.length > 0 ? (
                       <div className="grid gap-2.5">
-                          <div className="flex flex-wrap items-center justify-between gap-2">
-                            <div className="flex flex-wrap items-center gap-2 text-xs text-slate-500">
-                              <span className="font-medium text-slate-700">
-                                {selectedCounterTransferClass?.name}
-                              </span>
-                            </div>
+                        <div className="flex flex-wrap items-center justify-between gap-2">
+                          <div className="flex flex-wrap items-center gap-2 text-xs text-slate-500">
+                            <span className="font-medium text-slate-700">
+                              {selectedCounterTransferClass?.name}
+                            </span>
                           </div>
+                        </div>
                         <div className="grid gap-2.5 sm:grid-cols-2 xl:grid-cols-3">
                           {sortedProducts.map((product, index) => {
                             const itemProps = getProductItemProps(index);
@@ -3904,7 +3918,9 @@ export function OperationModuleScreen({ variant }: { variant: OperationModuleVar
                                     className={cn("h-10 min-w-12 px-3", posOutlineButtonClass)}
                                     key={preset}
                                     onClick={() =>
-                                      setDraftState((state) => setPendingQuantityText(state, preset))
+                                      setDraftState((state) =>
+                                        setPendingQuantityText(state, preset),
+                                      )
                                     }
                                     type="button"
                                   >
@@ -3991,7 +4007,8 @@ export function OperationModuleScreen({ variant }: { variant: OperationModuleVar
                 />
               ) : null}
 
-              {isWasteCaptureBlocked && draftState.controlState !== CONTROL_STATE_QUANTITY_CAPTURE ? (
+              {isWasteCaptureBlocked &&
+              draftState.controlState !== CONTROL_STATE_QUANTITY_CAPTURE ? (
                 <InlineNotice tone="warning">
                   Selecciona origen y motivo para capturar productos.
                 </InlineNotice>
@@ -4061,9 +4078,7 @@ export function OperationModuleScreen({ variant }: { variant: OperationModuleVar
                               onCardKeyDown={itemProps.onKeyDown}
                               onSelect={() => {
                                 setLastCommittedDocument(null);
-                                setDraftState((state) =>
-                                  selectProductForOperation(state, product),
-                                );
+                                setDraftState((state) => selectProductForOperation(state, product));
                               }}
                               shortcutLabel={getSelectionShortcutLabel(index)}
                               tabIndex={itemProps.tabIndex}
@@ -4082,131 +4097,137 @@ export function OperationModuleScreen({ variant }: { variant: OperationModuleVar
               ) : null}
 
               {quantitySelection !== null && quantityProduct !== null ? (
-            <div className="w-full max-w-5xl justify-self-center rounded-xl border border-[var(--pos-shell-border)] bg-white p-3 shadow-sm">
-              <div className="grid gap-3 lg:grid-cols-[12rem_minmax(0,1fr)]">
-                <CatalogVisual
-                  className="min-h-[11.5rem]"
-                  code={quantityProduct.code}
-                  name={quantityProduct.name}
-                />
+                <div className="w-full max-w-5xl justify-self-center rounded-xl border border-[var(--pos-shell-border)] bg-white p-3 shadow-sm">
+                  <div className="grid gap-3 lg:grid-cols-[12rem_minmax(0,1fr)]">
+                    <CatalogVisual
+                      className="min-h-[11.5rem]"
+                      code={quantityProduct.code}
+                      name={quantityProduct.name}
+                    />
 
-                <div className="grid gap-2.5">
-                  <div className="flex flex-wrap items-start justify-between gap-3">
-                    <div>
-                      <div className="flex flex-wrap items-center gap-2">
-                        <p className="text-base font-semibold text-slate-950">{quantityProduct.name}</p>
-                        {!isQuantityReady ? (
-                          <span className="pos-chip" data-tone="warning">
-                            Pendiente
-                          </span>
+                    <div className="grid gap-2.5">
+                      <div className="flex flex-wrap items-start justify-between gap-3">
+                        <div>
+                          <div className="flex flex-wrap items-center gap-2">
+                            <p className="text-base font-semibold text-slate-950">
+                              {quantityProduct.name}
+                            </p>
+                            {!isQuantityReady ? (
+                              <span className="pos-chip" data-tone="warning">
+                                Pendiente
+                              </span>
+                            ) : null}
+                          </div>
+                          <p className="mt-1 text-sm text-slate-600">
+                            {quantitySelection.productClass.name}
+                          </p>
+                        </div>
+
+                        <Button
+                          aria-label="Regresar"
+                          className={cn("h-10 px-3", posOutlineButtonClass)}
+                          onClick={() =>
+                            setDraftState((state) => goBackFromOperationalState(state))
+                          }
+                          title="Regresar"
+                          type="button"
+                        >
+                          <ArrowLeftIcon className="h-4 w-4" />
+                        </Button>
+                      </div>
+
+                      <div className="grid gap-2">
+                        <input
+                          aria-label="Cantidad"
+                          className={cn(
+                            "h-16 rounded-xl px-4 text-[2.25rem] font-semibold tracking-tight shadow-sm",
+                            posInputClass,
+                          )}
+                          disabled={isWasteQuantityBlocked}
+                          inputMode="decimal"
+                          onChange={(event) =>
+                            setDraftState((state) =>
+                              setPendingQuantityText(state, event.target.value),
+                            )
+                          }
+                          onKeyDown={(event) => {
+                            if (event.key === "Enter") {
+                              event.preventDefault();
+                              handleAddLine();
+                            }
+
+                            if (event.key === "Escape") {
+                              event.preventDefault();
+                              setDraftState((state) => goBackFromOperationalState(state));
+                            }
+                          }}
+                          placeholder="0"
+                          ref={quantityInputRef}
+                          value={quantitySelection.quantityText}
+                        />
+                        {isWasteQuantityBlocked ? (
+                          <InlineNotice tone="warning">
+                            {WASTE_TRACEABILITY_BLOCK_MESSAGE}
+                          </InlineNotice>
+                        ) : null}
+                        <div className="flex flex-wrap items-center gap-2">
+                          <div className="flex items-center gap-2">
+                            <Button
+                              className={cn("h-10 px-3", posOutlineButtonClass)}
+                              disabled={isWasteQuantityBlocked}
+                              onClick={() =>
+                                setDraftState((state) => decrementPendingOperationQuantity(state))
+                              }
+                              type="button"
+                            >
+                              -1
+                            </Button>
+                            <Button
+                              className={cn("h-10 px-3", posOutlineButtonClass)}
+                              disabled={isWasteQuantityBlocked}
+                              onClick={() =>
+                                setDraftState((state) => incrementPendingOperationQuantity(state))
+                              }
+                              type="button"
+                            >
+                              +1
+                            </Button>
+                          </div>
+                          <div className="flex flex-wrap items-center gap-2">
+                            {quantityShortcuts.map((shortcut) => (
+                              <span className="pos-chip" data-tone="muted" key={shortcut.label}>
+                                {shortcut.label} {shortcut.value}
+                              </span>
+                            ))}
+                          </div>
+                        </div>
+                        <div className="flex flex-wrap items-center justify-end gap-3">
+                          <Button
+                            className={cn("h-10 px-5", posPrimaryButtonClass)}
+                            disabled={!isQuantityReady || isWasteQuantityBlocked}
+                            onClick={handleAddLine}
+                            type="button"
+                          >
+                            Agregar
+                          </Button>
+                        </div>
+                        {selectionErrorMessage ? (
+                          <div className="flex items-start justify-between gap-3 rounded-lg border border-[var(--ui-color-danger-soft)] bg-[var(--ui-color-danger-soft)] px-3 py-2 text-sm text-[var(--ui-color-danger)]">
+                            <p className="leading-6">{selectionErrorMessage}</p>
+                            <button
+                              aria-label="Cerrar error"
+                              className="flex h-8 w-8 items-center justify-center rounded-full text-[var(--ui-color-danger)] transition hover:bg-[var(--ui-color-danger-soft)] hover:text-[var(--ui-color-danger)]"
+                              onClick={() => setSelectionErrorMessage(null)}
+                              type="button"
+                            >
+                              <XIcon className="h-4 w-4" />
+                            </button>
+                          </div>
                         ) : null}
                       </div>
-                      <p className="mt-1 text-sm text-slate-600">
-                        {quantitySelection.productClass.name}
-                      </p>
                     </div>
-
-                    <Button
-                      aria-label="Regresar"
-                      className={cn("h-10 px-3", posOutlineButtonClass)}
-                      onClick={() => setDraftState((state) => goBackFromOperationalState(state))}
-                      title="Regresar"
-                      type="button"
-                    >
-                      <ArrowLeftIcon className="h-4 w-4" />
-                    </Button>
-                  </div>
-
-                  <div className="grid gap-2">
-                    <input
-                      aria-label="Cantidad"
-                      className={cn(
-                        "h-16 rounded-xl px-4 text-[2.25rem] font-semibold tracking-tight shadow-sm",
-                        posInputClass,
-                      )}
-                      disabled={isWasteQuantityBlocked}
-                      inputMode="decimal"
-                      onChange={(event) =>
-                        setDraftState((state) => setPendingQuantityText(state, event.target.value))
-                      }
-                      onKeyDown={(event) => {
-                        if (event.key === "Enter") {
-                          event.preventDefault();
-                          handleAddLine();
-                        }
-
-                        if (event.key === "Escape") {
-                          event.preventDefault();
-                          setDraftState((state) => goBackFromOperationalState(state));
-                        }
-                      }}
-                      placeholder="0"
-                      ref={quantityInputRef}
-                      value={quantitySelection.quantityText}
-                    />
-                    {isWasteQuantityBlocked ? (
-                      <InlineNotice tone="warning">
-                        {WASTE_TRACEABILITY_BLOCK_MESSAGE}
-                      </InlineNotice>
-                    ) : null}
-                    <div className="flex flex-wrap items-center gap-2">
-                      <div className="flex items-center gap-2">
-                        <Button
-                          className={cn("h-10 px-3", posOutlineButtonClass)}
-                          disabled={isWasteQuantityBlocked}
-                          onClick={() =>
-                            setDraftState((state) => decrementPendingOperationQuantity(state))
-                          }
-                          type="button"
-                        >
-                          -1
-                        </Button>
-                        <Button
-                          className={cn("h-10 px-3", posOutlineButtonClass)}
-                          disabled={isWasteQuantityBlocked}
-                          onClick={() =>
-                            setDraftState((state) => incrementPendingOperationQuantity(state))
-                          }
-                          type="button"
-                        >
-                          +1
-                        </Button>
-                      </div>
-                      <div className="flex flex-wrap items-center gap-2">
-                        {quantityShortcuts.map((shortcut) => (
-                          <span className="pos-chip" data-tone="muted" key={shortcut.label}>
-                            {shortcut.label} {shortcut.value}
-                          </span>
-                        ))}
-                      </div>
-                    </div>
-                    <div className="flex flex-wrap items-center justify-end gap-3">
-                      <Button
-                        className={cn("h-10 px-5", posPrimaryButtonClass)}
-                        disabled={!isQuantityReady || isWasteQuantityBlocked}
-                        onClick={handleAddLine}
-                        type="button"
-                      >
-                        Agregar
-                      </Button>
-                    </div>
-                    {selectionErrorMessage ? (
-                      <div className="flex items-start justify-between gap-3 rounded-lg border border-[var(--ui-color-danger-soft)] bg-[var(--ui-color-danger-soft)] px-3 py-2 text-sm text-[var(--ui-color-danger)]">
-                        <p className="leading-6">{selectionErrorMessage}</p>
-                        <button
-                          aria-label="Cerrar error"
-                          className="flex h-8 w-8 items-center justify-center rounded-full text-[var(--ui-color-danger)] transition hover:bg-[var(--ui-color-danger-soft)] hover:text-[var(--ui-color-danger)]"
-                          onClick={() => setSelectionErrorMessage(null)}
-                          type="button"
-                        >
-                          <XIcon className="h-4 w-4" />
-                        </button>
-                      </div>
-                    ) : null}
                   </div>
                 </div>
-              </div>
-            </div>
               ) : null}
             </>
           )}

@@ -28,6 +28,9 @@ export const adminPurchaseBackendContract: AdminPurchaseBackendContract = {
 
 type ApiBackendContract = components["schemas"]["AdminPurchaseBackendContractView"];
 type ApiDirectEntryPayload = components["schemas"]["AdminPurchaseDirectEntryRequest"];
+export type PurchaseCommandResultView = components["schemas"]["PurchaseCommandResultView"];
+export type PurchaseUpdatePayload = components["schemas"]["AdminPurchaseUpdateRequest"];
+
 type ApiPurchaseCancelPayload = components["schemas"]["AdminPurchaseCancelRequest"];
 type ApiPurchaseCreatePayload = components["schemas"]["AdminPurchaseCreateRequest"];
 type ApiPurchaseDetail = components["schemas"]["AdminPurchaseDetailView"];
@@ -37,7 +40,11 @@ type ApiPurchaseListResponse = components["schemas"]["AdminPurchaseListResponse"
 type ApiPurchaseReceiptPayload = components["schemas"]["AdminPurchaseReceiveRequest"];
 type ApiPurchaseWarning = components["schemas"]["AdminPurchaseWarningView"];
 
-function appendOptionalParam(params: URLSearchParams, key: string, value: string | null | undefined) {
+function appendOptionalParam(
+  params: URLSearchParams,
+  key: string,
+  value: string | null | undefined,
+) {
   if (!value || value === "all") {
     return;
   }
@@ -320,9 +327,7 @@ export function fetchAdminPurchases(
   }).then(mapPurchaseListFromApi);
 }
 
-export function fetchAdminPurchaseDetail(
-  purchaseId: string,
-): Promise<AdminPurchaseDetail> {
+export function fetchAdminPurchaseDetail(purchaseId: string): Promise<AdminPurchaseDetail> {
   return requestJson<ApiPurchaseDetail>({
     path: `/v1/admin/purchases/${purchaseId}`,
   }).then(mapAdminPurchaseDetailFromApi);
@@ -330,52 +335,85 @@ export function fetchAdminPurchaseDetail(
 
 export function createAdminPurchase(
   payload: AdminPurchasePayload,
-): Promise<AdminPurchaseDetail> {
-  return requestJson<ApiPurchaseDetail>({
+  key: string,
+): Promise<PurchaseCommandResultView> {
+  return requestJson<PurchaseCommandResultView>({
+    headers: { "Idempotency-Key": key },
     body: toPurchaseApiPayload(payload),
     method: "POST",
     path: "/v1/admin/purchases",
-  }).then(mapAdminPurchaseDetailFromApi);
+  });
 }
 
 export function createAdminDirectEntry(
   payload: AdminDirectEntryPayload,
-): Promise<AdminPurchaseDetail> {
-  return requestJson<ApiPurchaseDetail>({
+  key: string,
+): Promise<PurchaseCommandResultView> {
+  return requestJson<PurchaseCommandResultView>({
+    headers: { "Idempotency-Key": key },
     body: toDirectEntryApiPayload(payload),
     method: "POST",
     path: "/v1/admin/purchases/direct-entry",
-  }).then(mapAdminPurchaseDetailFromApi);
+  });
 }
 
 export function confirmAdminPurchase(
   purchaseId: string,
-): Promise<AdminPurchaseDetail> {
-  return requestJson<ApiPurchaseDetail>({
+  key: string,
+): Promise<PurchaseCommandResultView> {
+  return requestJson<PurchaseCommandResultView>({
+    headers: { "Idempotency-Key": key },
     method: "POST",
     path: `/v1/admin/purchases/${purchaseId}/confirm`,
-  }).then(mapAdminPurchaseDetailFromApi);
+  });
 }
 
 export function receiveAdminPurchase(
   purchaseId: string,
   payload: AdminPurchaseReceiptPayload,
-): Promise<AdminPurchaseDetail> {
-  return requestJson<ApiPurchaseDetail>({
+  key: string,
+): Promise<PurchaseCommandResultView> {
+  return requestJson<PurchaseCommandResultView>({
+    headers: { "Idempotency-Key": key },
     body: toReceiptApiPayload(payload),
     method: "POST",
     path: `/v1/admin/purchases/${purchaseId}/receive`,
-  }).then(mapAdminPurchaseDetailFromApi);
+  });
 }
 
 export function cancelAdminPurchase(
   purchaseId: string,
   payload: AdminPurchaseCancelPayload,
-): Promise<AdminPurchaseDetail> {
+  key: string,
+): Promise<PurchaseCommandResultView> {
   const body: ApiPurchaseCancelPayload = { reason: payload.reason ?? null };
-  return requestJson<ApiPurchaseDetail>({
+  return requestJson<PurchaseCommandResultView>({
+    headers: { "Idempotency-Key": key },
     body,
     method: "POST",
     path: `/v1/admin/purchases/${purchaseId}/cancel`,
-  }).then(mapAdminPurchaseDetailFromApi);
+  });
+}
+
+export function updateAdminPurchase(
+  purchaseId: string,
+  payload: PurchaseUpdatePayload,
+  key: string,
+): Promise<PurchaseCommandResultView> {
+  return requestJson<PurchaseCommandResultView>({
+    path: `/v1/admin/purchases/${purchaseId}`,
+    method: "PATCH",
+    body: payload,
+    headers: { "Idempotency-Key": key },
+  });
+}
+
+export function recoverAdminPurchaseCommand(
+  commandCode: import("@zeromerma/api-client").paths["/v1/admin/purchases/commands/{command_code}/{idempotency_key}"]["get"]["parameters"]["path"]["command_code"],
+  key: string,
+  branchId: string,
+): Promise<PurchaseCommandResultView> {
+  return requestJson<PurchaseCommandResultView>({
+    path: `/v1/admin/purchases/commands/${commandCode}/${encodeURIComponent(key)}?${new URLSearchParams({ branch_id: branchId })}`,
+  });
 }

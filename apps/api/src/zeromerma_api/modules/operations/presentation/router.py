@@ -1,9 +1,10 @@
 from __future__ import annotations
 
+from dataclasses import replace
 from typing import Annotated
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
+from fastapi import APIRouter, Depends, HTTPException, Path, Query, Request, Response, status
 from sqlalchemy.orm import Session
 
 from zeromerma_api.db.session import get_session
@@ -19,10 +20,20 @@ from zeromerma_api.modules.catalog.domain.exceptions import (
     ProductClassNotFoundError,
     ProductNotFoundError,
 )
+from zeromerma_api.modules.idempotency.application.canonicalization import (
+    IDEMPOTENCY_KEY_PATTERN,
+    parse_idempotency_key,
+)
+from zeromerma_api.modules.idempotency.presentation.http import (
+    idempotency_response,
+    require_idempotency_key,
+)
 from zeromerma_api.modules.identity.application.schemas import AuthenticatedUser
 from zeromerma_api.modules.identity.presentation.dependencies import get_current_user
+from zeromerma_api.modules.operations.application.idempotency import OperationCommitService
 from zeromerma_api.modules.operations.application.schemas import (
     CounterTransferCommitRequest,
+    OperationCommitResultView,
     OperationDocumentView,
     OperationHistoryResponse,
     OperationsBootstrapResponse,
@@ -31,7 +42,6 @@ from zeromerma_api.modules.operations.application.schemas import (
     WasteCommitRequest,
 )
 from zeromerma_api.modules.operations.application.services import (
-    OperationsCommandService,
     OperationsQueryService,
 )
 from zeromerma_api.modules.operations.domain.exceptions import (
@@ -40,6 +50,11 @@ from zeromerma_api.modules.operations.domain.exceptions import (
     OperationValidationError,
     WasteReasonNotFoundError,
 )
+from zeromerma_api.presentation.errors import error_responses
+
+_REPLAY_RESPONSE = {
+    "headers": {"Idempotency-Replayed": {"$ref": "#/components/headers/IdempotencyReplayed"}}
+}
 
 router = APIRouter(prefix="/v1/operations", tags=["operations"])
 
@@ -180,43 +195,103 @@ def get_operation_document(
 
 @router.post(
     "/counter-transfer/commit",
-    response_model=OperationDocumentView,
+    response_model=OperationCommitResultView,
     status_code=status.HTTP_201_CREATED,
+    responses={201: _REPLAY_RESPONSE, 409: {**error_responses()[409], **_REPLAY_RESPONSE}},
 )
 def commit_counter_transfer(
     payload: CounterTransferCommitRequest,
     request: Request,
+    idempotency_key: Annotated[UUID, Depends(require_idempotency_key)],
     current_user: Annotated[AuthenticatedUser, Depends(get_current_user)],
     session: Annotated[Session, Depends(get_session)],
-) -> OperationDocumentView:
+) -> Response:
     try:
-        return OperationsCommandService().commit_counter_transfer(
+        result = OperationCommitService().commit(
             session,
             current_user=current_user,
             command=payload,
             request_id=request.headers.get("X-Request-ID"),
+            key=idempotency_key,
         )
+        return idempotency_response(result, request)
     except (BranchAccessError, CatalogError, OperationError) as error:
         raise _to_http_exception(error) from error
 
 
 @router.post(
     "/waste/commit",
-    response_model=OperationDocumentView,
+    response_model=OperationCommitResultView,
     status_code=status.HTTP_201_CREATED,
+    responses={201: _REPLAY_RESPONSE, 409: {**error_responses()[409], **_REPLAY_RESPONSE}},
 )
 def commit_waste_record(
     payload: WasteCommitRequest,
     request: Request,
+    idempotency_key: Annotated[UUID, Depends(require_idempotency_key)],
     current_user: Annotated[AuthenticatedUser, Depends(get_current_user)],
     session: Annotated[Session, Depends(get_session)],
-) -> OperationDocumentView:
+) -> Response:
     try:
-        return OperationsCommandService().commit_waste_record(
+        result = OperationCommitService().commit(
             session,
             current_user=current_user,
             command=payload,
             request_id=request.headers.get("X-Request-ID"),
+            key=idempotency_key,
         )
+        return idempotency_response(result, request)
     except (BranchAccessError, CatalogError, OperationError) as error:
         raise _to_http_exception(error) from error
+
+
+@router.get(
+    "/counter-transfer/confirmations/{idempotency_key}",
+    response_model=OperationCommitResultView,
+    responses={200: _REPLAY_RESPONSE, 409: {**error_responses()[409], **_REPLAY_RESPONSE}},
+)
+def recover_counter_transfer(
+    idempotency_key: Annotated[str, Path(pattern=IDEMPOTENCY_KEY_PATTERN)],
+    workstation_code: Annotated[str, Query(min_length=1)],
+    cash_session_id: UUID,
+    request: Request,
+    current_user: Annotated[AuthenticatedUser, Depends(get_current_user)],
+    session: Annotated[Session, Depends(get_session)],
+) -> Response:
+    result = OperationCommitService().recover(
+        session,
+        current_user=current_user,
+        key=parse_idempotency_key(idempotency_key),
+        command_code="counter-transfer",
+        workstation_code=workstation_code,
+        cash_session_id=cash_session_id,
+    )
+    if result.status_code < 300:
+        result = replace(result, status_code=200)
+    return idempotency_response(result, request)
+
+
+@router.get(
+    "/waste/confirmations/{idempotency_key}",
+    response_model=OperationCommitResultView,
+    responses={200: _REPLAY_RESPONSE, 409: {**error_responses()[409], **_REPLAY_RESPONSE}},
+)
+def recover_waste(
+    idempotency_key: Annotated[str, Path(pattern=IDEMPOTENCY_KEY_PATTERN)],
+    workstation_code: Annotated[str, Query(min_length=1)],
+    cash_session_id: UUID,
+    request: Request,
+    current_user: Annotated[AuthenticatedUser, Depends(get_current_user)],
+    session: Annotated[Session, Depends(get_session)],
+) -> Response:
+    result = OperationCommitService().recover(
+        session,
+        current_user=current_user,
+        key=parse_idempotency_key(idempotency_key),
+        command_code="waste",
+        workstation_code=workstation_code,
+        cash_session_id=cash_session_id,
+    )
+    if result.status_code < 300:
+        result = replace(result, status_code=200)
+    return idempotency_response(result, request)

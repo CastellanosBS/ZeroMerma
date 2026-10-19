@@ -66,7 +66,7 @@ def main(argv: Sequence[str] = ()) -> None:
             SEED_USER_EMAIL,
             seed_local_data,
         )
-        from zeromerma_api.modules.branches.infrastructure.models import Branch
+        from zeromerma_api.modules.branches.infrastructure.models import Branch, Workstation
         from zeromerma_api.modules.identity.application.security import PasswordHasher
         from zeromerma_api.modules.identity.infrastructure.models import (
             Permission,
@@ -96,6 +96,47 @@ def main(argv: Sequence[str] = ()) -> None:
             )
             if branch is None or other_branch is None:
                 raise RuntimeError("Canonical seed did not create both fixture branches")
+            # Administrative order setup has its own cashier and station so the
+            # expanded POS suite does not exhaust another fixture's login budget.
+            order_cashier = User(
+                email=os.environ["ZM_E2E_ORDER_CASHIER_EMAIL"],
+                full_name="Integration order cashier",
+                password_hash=PasswordHasher().hash_password(password),
+                allowed_surfaces=["POS"],
+                default_surface="POS",
+            )
+            session.add(order_cashier)
+            session.flush()
+            session.add_all(
+                [
+                    UserBranchAssignment(
+                        user_id=order_cashier.id, branch_id=branch.id, is_default=True
+                    ),
+                    Workstation(
+                        branch_id=branch.id,
+                        code=os.environ["ZM_E2E_ORDER_WORKSTATION_CODE"],
+                        name="Integration order workstation",
+                    ),
+                ]
+            )
+            for cashier_assignment in session.scalars(
+                select(UserRoleAssignment).where(
+                    UserRoleAssignment.user_id == cashier.id,
+                    UserRoleAssignment.is_active.is_(True),
+                )
+            ).all():
+                order_cashier_assignment = UserRoleAssignment(
+                    user_id=order_cashier.id,
+                    role_id=cashier_assignment.role_id,
+                    scope_type="BRANCH_SET",
+                )
+                session.add(order_cashier_assignment)
+                session.flush()
+                session.add(
+                    UserRoleAssignmentBranchScope(
+                        assignment_id=order_cashier_assignment.id, branch_id=branch.id
+                    )
+                )
             session.execute(
                 delete(UserRoleAssignment).where(UserRoleAssignment.user_id == reader.id)
             )
@@ -163,7 +204,10 @@ def main(argv: Sequence[str] = ()) -> None:
             session.add_all([order_operator, order_role])
             session.flush()
             order_capabilities = {
-                "orders.view", "orders.manage", "orders.cancel", "returns_corrections.view"
+                "orders.view",
+                "orders.manage",
+                "orders.cancel",
+                "returns_corrections.view",
             }
             order_permissions = list(
                 session.scalars(select(Permission).where(Permission.code.in_(order_capabilities)))
@@ -189,6 +233,75 @@ def main(argv: Sequence[str] = ()) -> None:
                     assignment_id=order_assignment.id, branch_id=branch.id
                 )
             )
+            operations_user = User(
+                email=os.environ["ZM_E2E_OPERATIONS_OPERATOR_EMAIL"],
+                full_name="Integration operations operator",
+                password_hash=PasswordHasher().hash_password(password),
+                allowed_surfaces=["BACKOFFICE"],
+                default_surface="BACKOFFICE",
+            )
+            operations_role = Role(
+                code="integration_operations",
+                name="Integration operations",
+                surfaces=["BACKOFFICE"],
+                is_active=True,
+            )
+            session.add_all([operations_user, operations_role])
+            session.flush()
+            operations_capabilities = {
+                "branches.view",
+                "catalog.view",
+                "catalog.manage",
+                "recipes.view",
+                "recipes.manage",
+                "suppliers.view",
+                "suppliers.manage",
+                "inventory.view",
+                "inventory.adjust",
+                "purchases.view",
+                "purchases.manage",
+                "purchases.confirm",
+                "purchases.receive",
+                "purchases.cancel",
+                "transfers.view",
+                "transfers.manage",
+                "transfers.execute",
+                "transfers.cancel",
+                "production.view",
+                "production.manage",
+                "production.execute",
+                "production.cancel",
+                "waste.view",
+                "waste.manage",
+            }
+            operations_permissions = list(
+                session.scalars(
+                    select(Permission).where(Permission.code.in_(operations_capabilities))
+                )
+            )
+            if {
+                permission.code for permission in operations_permissions
+            } != operations_capabilities:
+                raise RuntimeError("Canonical operational capabilities were not seeded")
+            session.add_all(
+                RolePermission(role_id=operations_role.id, permission_id=item.id)
+                for item in operations_permissions
+            )
+            session.add(
+                UserRoleAssignment(
+                    user_id=operations_user.id,
+                    role_id=operations_role.id,
+                    scope_type="GLOBAL",
+                )
+            )
+            for assigned_branch in (branch, other_branch):
+                session.add(
+                    UserBranchAssignment(
+                        user_id=operations_user.id,
+                        branch_id=assigned_branch.id,
+                        is_default=assigned_branch.id == branch.id,
+                    )
+                )
             session.add(
                 User(
                     email=f"denied-{config.run_id}@example.invalid",

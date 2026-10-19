@@ -1,15 +1,19 @@
+import { isCommandIntentionPending } from "@zeromerma/api-client";
+import {
+  PHYSICAL_INTENTION_SCOPE,
+  physicalIntentions,
+} from "../../physical-commands/physical-command-intent";
+import {
+  usePhysicalIntention,
+  usePhysicalDraftIdentity,
+} from "../../physical-commands/use-physical-intention";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useMemo, useState } from "react";
 
 import { toBackofficeErrorMessage } from "../../../../lib/api";
 import { useBackofficeAuthStore } from "../../../auth/backoffice-auth-store";
 import { AdminPageHeader } from "../../components/AdminPageHeader";
-import {
-  adminWasteBackendContract,
-  createAdminWaste,
-  fetchAdminWaste,
-  fetchAdminWasteDetail,
-} from "../api";
+import { adminWasteBackendContract, fetchAdminWaste, fetchAdminWasteDetail } from "../api";
 import { AdminWasteDetailPanel } from "../components/AdminWasteDetailPanel";
 import { AdminWasteFilters } from "../components/AdminWasteFilters";
 import { AdminWasteTable } from "../components/AdminWasteTable";
@@ -158,8 +162,23 @@ export function AdminWastePage() {
     retry: false,
   });
 
+  const user = useBackofficeAuthStore((state) => state.user);
+  const intentionState = usePhysicalIntention(PHYSICAL_INTENTION_SCOPE);
+  const intentionBlocked =
+    Boolean(intentionState.error) || isCommandIntentionPending(intentionState.metadata);
+  const observedKey = usePhysicalDraftIdentity(intentionState.metadata, true, () => {
+    setIsCreateOpen(false);
+  });
   const createMutation = useMutation({
-    mutationFn: (payload: AdminWasteCreatePayload) => createAdminWaste(payload),
+    mutationFn: async (payload: AdminWasteCreatePayload) => {
+      if (!user) throw new Error("Se requiere una sesión activa.");
+      if (intentionState.error) throw new Error(intentionState.error);
+      return physicalIntentions.begin(
+        { userId: user.id, branchId: payload.branchId, commandCode: "waste" },
+        { commandCode: "waste", body: payload },
+        observedKey.current ?? null,
+      );
+    },
     onError: (error) => {
       setFeedback({
         tone: "error",
@@ -168,7 +187,7 @@ export function AdminWastePage() {
     },
     onSuccess: (detail) => {
       setFeedback({ tone: "success", message: "Merma confirmada correctamente." });
-      setSelectedWasteId(detail.overview.id);
+      setSelectedWasteId(detail.id);
       setIsCreateOpen(false);
       void queryClient.invalidateQueries({ queryKey: ["admin", "waste"] });
       void queryClient.invalidateQueries({ queryKey: ["admin", "inventory"] });
@@ -223,7 +242,7 @@ export function AdminWastePage() {
   }
 
   function handleCreate(payload: AdminWasteCreatePayload) {
-    if (!isAuthenticated || createMutation.isPending) {
+    if (!isAuthenticated || createMutation.isPending || intentionBlocked) {
       return;
     }
     setFeedback(null);
@@ -270,7 +289,7 @@ export function AdminWastePage() {
           <AdminWasteWorkflowPanel
             branchOptions={wasteList.filterOptions.branches}
             errorMessage={workflowErrorMessage}
-            isSubmitting={createMutation.isPending}
+            isSubmitting={createMutation.isPending || intentionBlocked}
             locationOptions={wasteList.filterOptions.locations}
             productOptions={wasteList.filterOptions.products}
             reasonOptions={wasteList.filterOptions.reasons}
@@ -284,7 +303,7 @@ export function AdminWastePage() {
             backendContract={wasteList.backendContract}
             errorMessage={listErrorMessage}
             isLoading={wasteQuery.isLoading}
-            isSubmitting={createMutation.isPending}
+            isSubmitting={createMutation.isPending || intentionBlocked}
             page={wasteList.page}
             pageSize={wasteList.pageSize}
             selectedWasteId={selectedWasteId}

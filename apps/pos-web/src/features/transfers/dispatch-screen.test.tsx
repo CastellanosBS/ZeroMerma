@@ -1,3 +1,5 @@
+import { webcrypto } from "node:crypto";
+import { transferIntentions } from "./transfer-command-intent";
 // @vitest-environment jsdom
 
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
@@ -14,8 +16,9 @@ import type {
   TransferDispatchHistoryResponse,
 } from "../../lib/api-contracts";
 
-(globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT =
-  true;
+(
+  globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }
+).IS_REACT_ACT_ENVIRONMENT = true;
 
 const refetchMock = vi.fn();
 const showErrorMock = vi.fn();
@@ -79,8 +82,17 @@ const historyDestinations: OperationHistoryFilterOptionView[] = [
 ];
 
 const committedTransfer: TransferDetailResponse = {
-  receipt: null,
-  receipt_summary: null,
+  receipts: [],
+  receipt_summaries: [],
+  receipt_progress: [
+    {
+      shipment_line_id: "transfer-line-1",
+      product_id: "product-1",
+      sent_quantity: "3.000",
+      received_quantity: "0.000",
+      pending_quantity: "3.000",
+    },
+  ],
   shipment: {
     committed_at_utc: "2026-04-22T18:12:00Z",
     created_at_utc: "2026-04-22T18:10:00Z",
@@ -214,13 +226,16 @@ function AppShellRightPanelProbe() {
 }
 
 vi.mock("../auth/auth-store", () => ({
-  usePosAuthStore: (selector: (state: { isAuthenticated: boolean }) => unknown) =>
-    selector({ isAuthenticated: true }),
+  usePosAuthStore: Object.assign(
+    (selector: (state: { isAuthenticated: boolean; user: { id: string } }) => unknown) =>
+      selector({ isAuthenticated: true, user: { id: "user-1" } }),
+    { subscribe: vi.fn(() => () => undefined) },
+  ),
 }));
 
 vi.mock("../cash-session-open/queries", () => ({
   useCurrentCashSessionQuery: () => ({
-    data: { user_id: "user-1" },
+    data: { id: "cash-1", user_id: "user-1" },
     error: null,
     isPending: false,
     refetch: refetchMock,
@@ -342,10 +357,7 @@ function changeInput(element: HTMLInputElement | null, value: string) {
   }
 
   act(() => {
-    const valueSetter = Object.getOwnPropertyDescriptor(
-      HTMLInputElement.prototype,
-      "value",
-    )?.set;
+    const valueSetter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")?.set;
     valueSetter?.call(element, value);
     element.dispatchEvent(new Event("input", { bubbles: true }));
     element.dispatchEvent(new Event("change", { bubbles: true }));
@@ -358,10 +370,7 @@ function changeSelect(element: HTMLSelectElement | null, value: string) {
   }
 
   act(() => {
-    const valueSetter = Object.getOwnPropertyDescriptor(
-      HTMLSelectElement.prototype,
-      "value",
-    )?.set;
+    const valueSetter = Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, "value")?.set;
     valueSetter?.call(element, value);
     element.dispatchEvent(new Event("input", { bubbles: true }));
     element.dispatchEvent(new Event("change", { bubbles: true }));
@@ -441,12 +450,29 @@ async function addShipmentLineUsingKeyboard(container: HTMLElement) {
 let mountedRoots: Array<() => void> = [];
 
 beforeEach(() => {
+  localStorage.clear();
+  transferIntentions.forgetBodies();
+  vi.stubGlobal("crypto", webcrypto);
+  Object.defineProperty(navigator, "locks", {
+    configurable: true,
+    value: { request: vi.fn(async (_name, _options, callback) => callback({ name: "lock" })) },
+  });
   rightPanelContent = null;
   showErrorMock.mockReset();
   showSuccessMock.mockReset();
   refetchMock.mockReset();
   vi.mocked(commitTransferDispatch).mockReset();
-  vi.mocked(commitTransferDispatch).mockResolvedValue(committedTransfer);
+  vi.mocked(commitTransferDispatch).mockResolvedValue({
+    id: "transfer-1",
+    folio: "ENV-000001",
+    status: "IN_TRANSIT",
+    origin_branch_id: "branch-1",
+    destination_branch_id: "branch-2",
+    cash_session_id: "cash-1",
+    receipt_id: null,
+    committed_at_utc: "2026-04-22T18:12:00Z",
+    lines: [],
+  });
 });
 
 afterEach(() => {
@@ -535,12 +561,16 @@ describe("TransferDispatchScreen", () => {
     click(confirmButton ?? null);
     await flush();
 
-    expect(commitTransferDispatch).toHaveBeenCalledWith({
-      destination_branch_id: "branch-2",
-      lines: [{ product_id: "product-1", quantity: "4" }],
-      notes: null,
-      workstation_code: "POS-01",
-    });
+    expect(commitTransferDispatch).toHaveBeenCalledWith(
+      {
+        cash_session_id: "cash-1",
+        destination_branch_id: "branch-2",
+        lines: [{ product_id: "product-1", quantity: "4" }],
+        notes: null,
+        workstation_code: "POS-01",
+      },
+      expect.any(String),
+    );
     expect(showSuccessMock).toHaveBeenCalledWith("Envio registrado. Folio ENV-000001.");
     expect(view.container.textContent).toContain("Historial de envios");
     expect(view.container.textContent).toContain("ENV-000001");

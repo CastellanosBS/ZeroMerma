@@ -44,6 +44,7 @@ from zeromerma_api.modules.outbox.infrastructure.models import OutboxEvent
 from zeromerma_api.modules.suppliers.infrastructure.models import Supplier
 from zeromerma_api.presentation.access_policy import ENDPOINT_POLICIES, install_access_policies
 from zeromerma_api.presentation.errors import install_error_handlers
+from zeromerma_api.testing.idempotency import new_idempotency_key
 from zeromerma_api.testing.sessions import fixture_session_headers
 
 
@@ -327,7 +328,7 @@ def test_http_inventory_scope_filters_omitted_and_foreign_filters_and_denies_mut
     assert foreign_filter.status_code == 403, foreign_filter.text
     response = client.post(
         "/v1/admin/inventory/adjustments",
-        headers=headers,
+        headers={**headers, "Idempotency-Key": new_idempotency_key()},
         json={
             "adjustment_type": "INCREASE",
             "branch_id": str(branches[1]),
@@ -340,7 +341,7 @@ def test_http_inventory_scope_filters_omitted_and_foreign_filters_and_denies_mut
     assert response.status_code in {403, 404}, response.text
     response = client.post(
         "/v1/admin/inventory/adjustments",
-        headers=headers,
+        headers={**headers, "Idempotency-Key": new_idempotency_key()},
         json={
             "adjustment_type": "INCREASE",
             "branch_id": str(branches[0]),

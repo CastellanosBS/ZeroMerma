@@ -7,7 +7,6 @@ from typing import cast
 from zoneinfo import ZoneInfo
 
 from sqlalchemy import Select, func, or_, select
-from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, aliased
 
 from zeromerma_api.core.config import ApiSettings, get_settings
@@ -23,6 +22,7 @@ from zeromerma_api.modules.branches.application.access import (
 )
 from zeromerma_api.modules.branches.application.schemas import WorkstationSummary
 from zeromerma_api.modules.branches.infrastructure.models import Branch, Workstation
+from zeromerma_api.modules.cash.application.command_context import lock_cash_session
 from zeromerma_api.modules.cash.application.services import CashSessionQueryService
 from zeromerma_api.modules.catalog.domain.exceptions import (
     ProductClassNotFoundError,
@@ -31,10 +31,12 @@ from zeromerma_api.modules.catalog.domain.exceptions import (
 from zeromerma_api.modules.catalog.infrastructure.models import Product, ProductClass
 from zeromerma_api.modules.identity.application.schemas import AuthenticatedUser
 from zeromerma_api.modules.identity.infrastructure.models import User
+from zeromerma_api.modules.operations.application.results import build_operation_result
 from zeromerma_api.modules.operations.application.schemas import (
     CounterTransferCommitRequest,
     OperationBranchSummary,
     OperationCommitLineRequest,
+    OperationCommitResultView,
     OperationDocumentLineView,
     OperationDocumentView,
     OperationHistoryFilterOptionView,
@@ -114,16 +116,24 @@ class OperationsQueryService:
         )
         local_timestamp = datetime.now(tz=UTC).astimezone(ZoneInfo(context.branch_timezone))
 
-        waste_reason_records = session.execute(
-            select(WasteReason.code, WasteReason.name, WasteReason.display_order)
-            .where(WasteReason.is_active.is_(True))
-            .order_by(WasteReason.display_order.asc(), WasteReason.name.asc())
-        ).mappings().all()
-        destination_branch_records = session.execute(
-            select(Branch.id, Branch.code, Branch.name, Branch.timezone)
-            .where(Branch.is_active.is_(True), Branch.id != context.branch_id)
-            .order_by(Branch.name.asc())
-        ).mappings().all()
+        waste_reason_records = (
+            session.execute(
+                select(WasteReason.code, WasteReason.name, WasteReason.display_order)
+                .where(WasteReason.is_active.is_(True))
+                .order_by(WasteReason.display_order.asc(), WasteReason.name.asc())
+            )
+            .mappings()
+            .all()
+        )
+        destination_branch_records = (
+            session.execute(
+                select(Branch.id, Branch.code, Branch.name, Branch.timezone)
+                .where(Branch.is_active.is_(True), Branch.id != context.branch_id)
+                .order_by(Branch.name.asc())
+            )
+            .mappings()
+            .all()
+        )
         branch_brand_key = _get_branch_brand_key(context.branch_code)
 
         return OperationsBootstrapResponse(
@@ -420,66 +430,86 @@ class OperationsQueryService:
             ),
         )
 
-        available_user_rows = session.execute(
-            base_statement.with_only_columns(
-                OperationDocument.created_by_user_id,
-                User.full_name.label("created_by_user_full_name"),
+        available_user_rows = (
+            session.execute(
+                base_statement.with_only_columns(
+                    OperationDocument.created_by_user_id,
+                    User.full_name.label("created_by_user_full_name"),
+                )
+                .distinct()
+                .order_by(User.full_name.asc())
             )
-            .distinct()
-            .order_by(User.full_name.asc())
-        ).mappings().all()
-        available_source_bucket_rows = session.execute(
-            base_statement.with_only_columns(OperationDocument.source_bucket_code)
-            .distinct()
-            .order_by(OperationDocument.source_bucket_code.asc())
-        ).scalars().all()
-        available_destination_bucket_rows = session.execute(
-            base_statement.with_only_columns(OperationDocument.destination_bucket_code)
-            .distinct()
-            .order_by(OperationDocument.destination_bucket_code.asc())
-        ).scalars().all()
-        available_reason_rows = session.execute(
-            base_statement.with_only_columns(
-                OperationDocument.reason_code,
-                WasteReason.name.label("reason_name"),
+            .mappings()
+            .all()
+        )
+        available_source_bucket_rows = (
+            session.execute(
+                base_statement.with_only_columns(OperationDocument.source_bucket_code)
+                .distinct()
+                .order_by(OperationDocument.source_bucket_code.asc())
             )
-            .where(OperationDocument.reason_code.is_not(None))
-            .distinct()
-            .order_by(WasteReason.name.asc(), OperationDocument.reason_code.asc())
-        ).mappings().all()
-        available_product_rows = session.execute(
-            apply_operation_history_scope_filters(
-                cast(
-                    Select[tuple[object, ...]],
-                    select(
-                        OperationDocumentLine.product_id,
-                        Product.code.label("product_code"),
-                        Product.name.label("product_name"),
-                    )
-                    .select_from(OperationDocumentLine)
-                    .join(
-                        OperationDocument,
-                        OperationDocument.id == OperationDocumentLine.operation_document_id,
-                    )
-                    .join(Product, Product.id == OperationDocumentLine.product_id)
-                    .where(
-                        OperationDocument.document_type == normalized_document_type,
-                        OperationDocument.source_branch_id == context.branch_id,
-                        OperationDocument.workstation_id == context.workstation_id,
+            .scalars()
+            .all()
+        )
+        available_destination_bucket_rows = (
+            session.execute(
+                base_statement.with_only_columns(OperationDocument.destination_bucket_code)
+                .distinct()
+                .order_by(OperationDocument.destination_bucket_code.asc())
+            )
+            .scalars()
+            .all()
+        )
+        available_reason_rows = (
+            session.execute(
+                base_statement.with_only_columns(
+                    OperationDocument.reason_code,
+                    WasteReason.name.label("reason_name"),
+                )
+                .where(OperationDocument.reason_code.is_not(None))
+                .distinct()
+                .order_by(WasteReason.name.asc(), OperationDocument.reason_code.asc())
+            )
+            .mappings()
+            .all()
+        )
+        available_product_rows = (
+            session.execute(
+                apply_operation_history_scope_filters(
+                    cast(
+                        Select[tuple[object, ...]],
+                        select(
+                            OperationDocumentLine.product_id,
+                            Product.code.label("product_code"),
+                            Product.name.label("product_name"),
+                        )
+                        .select_from(OperationDocumentLine)
+                        .join(
+                            OperationDocument,
+                            OperationDocument.id == OperationDocumentLine.operation_document_id,
+                        )
+                        .join(Product, Product.id == OperationDocumentLine.product_id)
+                        .where(
+                            OperationDocument.document_type == normalized_document_type,
+                            OperationDocument.source_branch_id == context.branch_id,
+                            OperationDocument.workstation_id == context.workstation_id,
+                        ),
                     ),
-                ),
-                normalized_scope=normalized_scope,
-                context=context,
-                current_shift_opened_at=get_current_shift_opened_at_for_history_scope(
-                    session,
-                    cash_session_query=self._cash_session_query,
                     normalized_scope=normalized_scope,
-                    workstation_code=workstation_code,
-                ),
+                    context=context,
+                    current_shift_opened_at=get_current_shift_opened_at_for_history_scope(
+                        session,
+                        cash_session_query=self._cash_session_query,
+                        normalized_scope=normalized_scope,
+                        workstation_code=workstation_code,
+                    ),
+                )
+                .distinct()
+                .order_by(Product.name.asc(), Product.code.asc())
             )
-            .distinct()
-            .order_by(Product.name.asc(), Product.code.asc())
-        ).mappings().all()
+            .mappings()
+            .all()
+        )
 
         filtered_statement = base_statement
         if created_by_user_id is not None:
@@ -508,21 +538,25 @@ class OperationsQueryService:
             )
 
         destination_branch = aliased(Branch)
-        record_rows = session.execute(
-            filtered_statement.outerjoin(
-                destination_branch,
-                destination_branch.id == OperationDocument.destination_branch_id,
+        record_rows = (
+            session.execute(
+                filtered_statement.outerjoin(
+                    destination_branch,
+                    destination_branch.id == OperationDocument.destination_branch_id,
+                )
+                .add_columns(
+                    destination_branch.code.label("destination_branch_code"),
+                    destination_branch.name.label("destination_branch_name"),
+                )
+                .order_by(
+                    OperationDocument.committed_at_utc.desc().nullslast(),
+                    OperationDocument.created_at_utc.desc(),
+                )
+                .limit(MAX_OPERATION_HISTORY_ITEMS)
             )
-            .add_columns(
-                destination_branch.code.label("destination_branch_code"),
-                destination_branch.name.label("destination_branch_name"),
-            )
-            .order_by(
-                OperationDocument.committed_at_utc.desc().nullslast(),
-                OperationDocument.created_at_utc.desc(),
-            )
-            .limit(MAX_OPERATION_HISTORY_ITEMS)
-        ).mappings().all()
+            .mappings()
+            .all()
+        )
 
         return OperationHistoryResponse(
             workstation_code=workstation_code,
@@ -640,66 +674,74 @@ class OperationsQueryService:
     ) -> OperationDocumentView:
         source_branch = aliased(Branch)
         destination_branch = aliased(Branch)
-        record = session.execute(
-            select(
-                OperationDocument.id,
-                OperationDocument.document_type,
-                OperationDocument.status,
-                OperationDocument.source_branch_id,
-                source_branch.code.label("source_branch_code"),
-                source_branch.name.label("source_branch_name"),
-                OperationDocument.destination_branch_id,
-                destination_branch.code.label("destination_branch_code"),
-                destination_branch.name.label("destination_branch_name"),
-                OperationDocument.source_bucket_code,
-                OperationDocument.destination_bucket_code,
-                OperationDocument.workstation_id,
-                Workstation.code.label("workstation_code"),
-                Workstation.name.label("workstation_name"),
-                OperationDocument.created_by_user_id,
-                User.email.label("created_by_user_email"),
-                User.full_name.label("created_by_user_full_name"),
-                OperationDocument.reason_code,
-                WasteReason.name.label("reason_name"),
-                OperationDocument.notes,
-                OperationDocument.reference_document_id,
-                OperationDocument.created_at_utc,
-                OperationDocument.committed_at_utc,
+        record = (
+            session.execute(
+                select(
+                    OperationDocument.id,
+                    OperationDocument.document_type,
+                    OperationDocument.status,
+                    OperationDocument.source_branch_id,
+                    source_branch.code.label("source_branch_code"),
+                    source_branch.name.label("source_branch_name"),
+                    OperationDocument.destination_branch_id,
+                    destination_branch.code.label("destination_branch_code"),
+                    destination_branch.name.label("destination_branch_name"),
+                    OperationDocument.source_bucket_code,
+                    OperationDocument.destination_bucket_code,
+                    OperationDocument.workstation_id,
+                    Workstation.code.label("workstation_code"),
+                    Workstation.name.label("workstation_name"),
+                    OperationDocument.created_by_user_id,
+                    User.email.label("created_by_user_email"),
+                    User.full_name.label("created_by_user_full_name"),
+                    OperationDocument.reason_code,
+                    WasteReason.name.label("reason_name"),
+                    OperationDocument.notes,
+                    OperationDocument.reference_document_id,
+                    OperationDocument.created_at_utc,
+                    OperationDocument.committed_at_utc,
+                )
+                .select_from(OperationDocument)
+                .join(source_branch, source_branch.id == OperationDocument.source_branch_id)
+                .outerjoin(
+                    destination_branch,
+                    destination_branch.id == OperationDocument.destination_branch_id,
+                )
+                .join(Workstation, Workstation.id == OperationDocument.workstation_id)
+                .join(User, User.id == OperationDocument.created_by_user_id)
+                .outerjoin(WasteReason, WasteReason.code == OperationDocument.reason_code)
+                .where(OperationDocument.id == document_id)
             )
-            .select_from(OperationDocument)
-            .join(source_branch, source_branch.id == OperationDocument.source_branch_id)
-            .outerjoin(
-                destination_branch,
-                destination_branch.id == OperationDocument.destination_branch_id,
-            )
-            .join(Workstation, Workstation.id == OperationDocument.workstation_id)
-            .join(User, User.id == OperationDocument.created_by_user_id)
-            .outerjoin(WasteReason, WasteReason.code == OperationDocument.reason_code)
-            .where(OperationDocument.id == document_id)
-        ).mappings().one_or_none()
+            .mappings()
+            .one_or_none()
+        )
         if record is None:
             raise OperationDocumentNotFoundError("Operation document was not found.")
 
-        line_records = session.execute(
-            select(
-                OperationDocumentLine.id,
-                OperationDocumentLine.line_number,
-                OperationDocumentLine.product_id,
-                OperationDocumentLine.product_code_snapshot,
-                OperationDocumentLine.product_name_snapshot,
-                OperationDocumentLine.product_class_id,
-                OperationDocumentLine.product_class_code_snapshot,
-                OperationDocumentLine.product_class_name_snapshot,
-                OperationDocumentLine.quantity,
-                OperationDocumentLine.expected_quantity,
-                OperationDocumentLine.received_quantity,
-                OperationDocumentLine.unit_of_measure_code,
-                OperationDocumentLine.variance_reason,
-                OperationDocumentLine.notes,
+        line_records = (
+            session.execute(
+                select(
+                    OperationDocumentLine.id,
+                    OperationDocumentLine.line_number,
+                    OperationDocumentLine.product_id,
+                    OperationDocumentLine.product_code_snapshot,
+                    OperationDocumentLine.product_name_snapshot,
+                    OperationDocumentLine.product_class_id,
+                    OperationDocumentLine.product_class_code_snapshot,
+                    OperationDocumentLine.product_class_name_snapshot,
+                    OperationDocumentLine.quantity,
+                    OperationDocumentLine.expected_quantity,
+                    OperationDocumentLine.received_quantity,
+                    OperationDocumentLine.unit_of_measure_code,
+                    OperationDocumentLine.variance_reason,
+                    OperationDocumentLine.notes,
+                )
+                .where(OperationDocumentLine.operation_document_id == document_id)
+                .order_by(OperationDocumentLine.line_number.asc())
             )
-            .where(OperationDocumentLine.operation_document_id == document_id)
-            .order_by(OperationDocumentLine.line_number.asc())
-        ).mappings().all()
+            .mappings()
+            .all()
+        )
 
         return OperationDocumentView(
             id=record["id"],
@@ -797,12 +839,27 @@ class OperationsCommandService:
         current_user: AuthenticatedUser,
         command: CounterTransferCommitRequest,
         request_id: str | None,
-    ) -> OperationDocumentView:
+        idempotency_key: uuid.UUID,
+        operation_id: uuid.UUID,
+    ) -> OperationCommitResultView:
         context = self._workstation_access.resolve_context(
             session,
             user_id=current_user.id,
             workstation_code=command.workstation_code,
         )
+        lock_cash_session(
+            session,
+            current_user=current_user,
+            workstation_id=context.workstation_id,
+            branch_id=context.branch_id,
+            cash_session_id=command.cash_session_id,
+        )
+        trace = {
+            "idempotency_key": str(idempotency_key),
+            "operation_id": str(operation_id),
+            "operation_code": "counter_transfer.commit",
+            "cash_session_id": str(command.cash_session_id),
+        }
         resolved_lines = _resolve_commit_products(session, command.lines)
         committed_at = datetime.now(tz=UTC)
         resolved_request_id = request_id or str(uuid.uuid4())
@@ -819,62 +876,58 @@ class OperationsCommandService:
             committed_at_utc=committed_at,
         )
 
-        try:
-            session.add(document)
-            session.flush()
-            _append_operation_lines(
-                session,
-                document_id=document.id,
-                lines=command.lines,
-                resolved_lines=resolved_lines,
-            )
-            self._audit_recorder.record(
-                session,
-                actor_id=current_user.id,
-                action="counter_transfer.committed",
-                resource_type="operation_document",
-                resource_id=str(document.id),
-                branch_id=context.branch_id,
-                request_id=resolved_request_id,
-                metadata={
-                    "document_type": document.document_type,
-                    "status": document.status,
-                    "source_branch_code": context.branch_code,
-                    "source_bucket_code": OPERATION_BUCKET_BACKROOM,
-                    "destination_bucket_code": OPERATION_BUCKET_COUNTER,
-                    "workstation_code": context.workstation_code,
-                    "line_count": len(command.lines),
-                },
-            )
-            self._outbox_writer.append(
-                session,
-                aggregate_type="operation_document",
-                aggregate_id=str(document.id),
-                event_name=OUTBOX_EVENT_COUNTER_TRANSFER_COMMITTED_V1,
-                payload={
-                    "document_id": str(document.id),
-                    "document_type": document.document_type,
-                    "status": document.status,
-                    "source_branch_id": str(context.branch_id),
-                    "source_branch_code": context.branch_code,
-                    "workstation_id": str(context.workstation_id),
-                    "workstation_code": context.workstation_code,
-                    "created_by_user_id": str(current_user.id),
-                    "created_by_user_email": current_user.email,
-                    "notes": command.notes,
-                    "committed_at_utc": committed_at.isoformat(),
-                    "lines": _build_outbox_lines(command.lines, resolved_lines),
-                },
-                headers={"request_id": resolved_request_id},
-            )
-            session.commit()
-        except IntegrityError as error:
-            session.rollback()
-            raise OperationValidationError(
-                "Counter transfer invariants were violated by a concurrent request."
-            ) from error
+        session.add(document)
+        session.flush()
+        _append_operation_lines(
+            session,
+            document_id=document.id,
+            lines=command.lines,
+            resolved_lines=resolved_lines,
+        )
+        self._audit_recorder.record(
+            session,
+            actor_id=current_user.id,
+            action="counter_transfer.committed",
+            resource_type="operation_document",
+            resource_id=str(document.id),
+            branch_id=context.branch_id,
+            request_id=resolved_request_id,
+            metadata={
+                **trace,
+                "document_type": document.document_type,
+                "status": document.status,
+                "source_branch_code": context.branch_code,
+                "source_bucket_code": OPERATION_BUCKET_BACKROOM,
+                "destination_bucket_code": OPERATION_BUCKET_COUNTER,
+                "workstation_code": context.workstation_code,
+                "line_count": len(command.lines),
+            },
+        )
+        self._outbox_writer.append(
+            session,
+            aggregate_type="operation_document",
+            aggregate_id=str(document.id),
+            event_name=OUTBOX_EVENT_COUNTER_TRANSFER_COMMITTED_V1,
+            payload={
+                **trace,
+                "document_id": str(document.id),
+                "document_type": document.document_type,
+                "status": document.status,
+                "source_branch_id": str(context.branch_id),
+                "source_branch_code": context.branch_code,
+                "workstation_id": str(context.workstation_id),
+                "workstation_code": context.workstation_code,
+                "created_by_user_id": str(current_user.id),
+                "created_by_user_email": current_user.email,
+                "notes": command.notes,
+                "committed_at_utc": committed_at.isoformat(),
+                "lines": _build_outbox_lines(command.lines, resolved_lines),
+            },
+            headers={"request_id": resolved_request_id},
+        )
+        session.flush()
 
-        return self._query_service.get_operation_document(session, document_id=document.id)
+        return build_operation_result(session, document, cash_session_id=command.cash_session_id)
 
     def commit_waste_record(
         self,
@@ -883,12 +936,27 @@ class OperationsCommandService:
         current_user: AuthenticatedUser,
         command: WasteCommitRequest,
         request_id: str | None,
-    ) -> OperationDocumentView:
+        idempotency_key: uuid.UUID,
+        operation_id: uuid.UUID,
+    ) -> OperationCommitResultView:
         context = self._workstation_access.resolve_context(
             session,
             user_id=current_user.id,
             workstation_code=command.workstation_code,
         )
+        lock_cash_session(
+            session,
+            current_user=current_user,
+            workstation_id=context.workstation_id,
+            branch_id=context.branch_id,
+            cash_session_id=command.cash_session_id,
+        )
+        trace = {
+            "idempotency_key": str(idempotency_key),
+            "operation_id": str(operation_id),
+            "operation_code": "waste.commit",
+            "cash_session_id": str(command.cash_session_id),
+        }
         if command.source_bucket_code not in {OPERATION_BUCKET_BACKROOM, OPERATION_BUCKET_COUNTER}:
             raise OperationValidationError("Waste source bucket must be BACKROOM or COUNTER.")
 
@@ -899,24 +967,16 @@ class OperationsCommandService:
             )
         ).scalar_one_or_none()
         if waste_reason is None:
-            raise WasteReasonNotFoundError(
-                f"Waste reason {command.reason_code} is not available."
-            )
+            raise WasteReasonNotFoundError(f"Waste reason {command.reason_code} is not available.")
 
         resolved_lines = _resolve_commit_products(session, command.lines)
         total_quantity = _sum_operation_commit_quantities(command.lines)
         is_high_impact = total_quantity > self._settings.waste_high_impact_quantity_threshold
-        notes_required = (
-            waste_reason.code in WASTE_REASON_CODES_REQUIRING_NOTE or is_high_impact
-        )
+        notes_required = waste_reason.code in WASTE_REASON_CODES_REQUIRING_NOTE or is_high_impact
         if notes_required and not _has_meaningful_text(command.notes):
-            raise OperationValidationError(
-                "Operational notes are required for this waste record."
-            )
+            raise OperationValidationError("Operational notes are required for this waste record.")
         if is_high_impact and not command.high_impact_acknowledged:
-            raise OperationValidationError(
-                "High-impact waste must be acknowledged before commit."
-            )
+            raise OperationValidationError("High-impact waste must be acknowledged before commit.")
         committed_at = datetime.now(tz=UTC)
         resolved_request_id = request_id or str(uuid.uuid4())
         document = OperationDocument(
@@ -933,39 +993,88 @@ class OperationsCommandService:
             committed_at_utc=committed_at,
         )
 
-        try:
-            session.add(document)
-            session.flush()
-            _append_operation_lines(
-                session,
-                document_id=document.id,
-                lines=command.lines,
-                resolved_lines=resolved_lines,
-            )
-            document_folio = _build_operation_document_folio(document.document_type, document.id)
+        session.add(document)
+        session.flush()
+        _append_operation_lines(
+            session,
+            document_id=document.id,
+            lines=command.lines,
+            resolved_lines=resolved_lines,
+        )
+        document_folio = _build_operation_document_folio(document.document_type, document.id)
+        self._audit_recorder.record(
+            session,
+            actor_id=current_user.id,
+            action="waste_record.committed",
+            resource_type="operation_document",
+            resource_id=str(document.id),
+            branch_id=context.branch_id,
+            request_id=resolved_request_id,
+            metadata={
+                **trace,
+                "document_type": document.document_type,
+                "status": document.status,
+                "source_branch_code": context.branch_code,
+                "source_bucket_code": command.source_bucket_code,
+                "destination_bucket_code": OPERATION_BUCKET_WASTE,
+                "workstation_code": context.workstation_code,
+                "reason_code": waste_reason.code,
+                "line_count": len(command.lines),
+                "notes_required": notes_required,
+                "high_impact": is_high_impact,
+                "high_impact_threshold_quantity": str(
+                    self._settings.waste_high_impact_quantity_threshold
+                ),
+                "high_impact_acknowledged": command.high_impact_acknowledged,
+                "total_quantity": str(total_quantity),
+            },
+        )
+        self._outbox_writer.append(
+            session,
+            aggregate_type="operation_document",
+            aggregate_id=str(document.id),
+            event_name=OUTBOX_EVENT_WASTE_RECORD_COMMITTED_V1,
+            payload={
+                **trace,
+                "document_id": str(document.id),
+                "document_type": document.document_type,
+                "status": document.status,
+                "source_branch_id": str(context.branch_id),
+                "source_branch_code": context.branch_code,
+                "workstation_id": str(context.workstation_id),
+                "workstation_code": context.workstation_code,
+                "created_by_user_id": str(current_user.id),
+                "created_by_user_email": current_user.email,
+                "reason_code": waste_reason.code,
+                "high_impact": is_high_impact,
+                "high_impact_threshold_quantity": str(
+                    self._settings.waste_high_impact_quantity_threshold
+                ),
+                "high_impact_acknowledged": command.high_impact_acknowledged,
+                "notes": command.notes,
+                "committed_at_utc": committed_at.isoformat(),
+                "total_quantity": str(total_quantity),
+                "lines": _build_outbox_lines(command.lines, resolved_lines),
+            },
+            headers={"request_id": resolved_request_id},
+        )
+        if is_high_impact:
             self._audit_recorder.record(
                 session,
                 actor_id=current_user.id,
-                action="waste_record.committed",
+                action="waste_record.high_impact_alert_requested",
                 resource_type="operation_document",
                 resource_id=str(document.id),
                 branch_id=context.branch_id,
                 request_id=resolved_request_id,
                 metadata={
+                    **trace,
                     "document_type": document.document_type,
-                    "status": document.status,
-                    "source_branch_code": context.branch_code,
-                    "source_bucket_code": command.source_bucket_code,
-                    "destination_bucket_code": OPERATION_BUCKET_WASTE,
-                    "workstation_code": context.workstation_code,
+                    "folio": document_folio,
                     "reason_code": waste_reason.code,
-                    "line_count": len(command.lines),
-                    "notes_required": notes_required,
-                    "high_impact": is_high_impact,
-                    "high_impact_threshold_quantity": str(
-                        self._settings.waste_high_impact_quantity_threshold
-                    ),
-                    "high_impact_acknowledged": command.high_impact_acknowledged,
+                    "source_bucket_code": command.source_bucket_code,
+                    "notification_target": "backoffice",
+                    "threshold_quantity": str(self._settings.waste_high_impact_quantity_threshold),
                     "total_quantity": str(total_quantity),
                 },
             )
@@ -973,9 +1082,11 @@ class OperationsCommandService:
                 session,
                 aggregate_type="operation_document",
                 aggregate_id=str(document.id),
-                event_name=OUTBOX_EVENT_WASTE_RECORD_COMMITTED_V1,
+                event_name=OUTBOX_EVENT_WASTE_RECORD_HIGH_IMPACT_ALERT_V1,
                 payload={
+                    **trace,
                     "document_id": str(document.id),
+                    "folio": document_folio,
                     "document_type": document.document_type,
                     "status": document.status,
                     "source_branch_id": str(context.branch_id),
@@ -985,76 +1096,19 @@ class OperationsCommandService:
                     "created_by_user_id": str(current_user.id),
                     "created_by_user_email": current_user.email,
                     "reason_code": waste_reason.code,
-                    "high_impact": is_high_impact,
-                    "high_impact_threshold_quantity": str(
-                        self._settings.waste_high_impact_quantity_threshold
-                    ),
-                    "high_impact_acknowledged": command.high_impact_acknowledged,
+                    "source_bucket_code": command.source_bucket_code,
+                    "notification_target": "backoffice",
                     "notes": command.notes,
-                    "committed_at_utc": committed_at.isoformat(),
+                    "threshold_quantity": str(self._settings.waste_high_impact_quantity_threshold),
                     "total_quantity": str(total_quantity),
+                    "committed_at_utc": committed_at.isoformat(),
                     "lines": _build_outbox_lines(command.lines, resolved_lines),
                 },
                 headers={"request_id": resolved_request_id},
             )
-            if is_high_impact:
-                self._audit_recorder.record(
-                    session,
-                    actor_id=current_user.id,
-                    action="waste_record.high_impact_alert_requested",
-                    resource_type="operation_document",
-                    resource_id=str(document.id),
-                    branch_id=context.branch_id,
-                    request_id=resolved_request_id,
-                    metadata={
-                        "document_type": document.document_type,
-                        "folio": document_folio,
-                        "reason_code": waste_reason.code,
-                        "source_bucket_code": command.source_bucket_code,
-                        "notification_target": "backoffice",
-                        "threshold_quantity": str(
-                            self._settings.waste_high_impact_quantity_threshold
-                        ),
-                        "total_quantity": str(total_quantity),
-                    },
-                )
-                self._outbox_writer.append(
-                    session,
-                    aggregate_type="operation_document",
-                    aggregate_id=str(document.id),
-                    event_name=OUTBOX_EVENT_WASTE_RECORD_HIGH_IMPACT_ALERT_V1,
-                    payload={
-                        "document_id": str(document.id),
-                        "folio": document_folio,
-                        "document_type": document.document_type,
-                        "status": document.status,
-                        "source_branch_id": str(context.branch_id),
-                        "source_branch_code": context.branch_code,
-                        "workstation_id": str(context.workstation_id),
-                        "workstation_code": context.workstation_code,
-                        "created_by_user_id": str(current_user.id),
-                        "created_by_user_email": current_user.email,
-                        "reason_code": waste_reason.code,
-                        "source_bucket_code": command.source_bucket_code,
-                        "notification_target": "backoffice",
-                        "notes": command.notes,
-                        "threshold_quantity": str(
-                            self._settings.waste_high_impact_quantity_threshold
-                        ),
-                        "total_quantity": str(total_quantity),
-                        "committed_at_utc": committed_at.isoformat(),
-                        "lines": _build_outbox_lines(command.lines, resolved_lines),
-                    },
-                    headers={"request_id": resolved_request_id},
-                )
-            session.commit()
-        except IntegrityError as error:
-            session.rollback()
-            raise OperationValidationError(
-                "Waste record invariants were violated by a concurrent request."
-            ) from error
+        session.flush()
 
-        return self._query_service.get_operation_document(session, document_id=document.id)
+        return build_operation_result(session, document, cash_session_id=command.cash_session_id)
 
 
 def _append_operation_lines(
@@ -1077,6 +1131,7 @@ def _append_operation_lines(
                 product_class_code_snapshot=str(resolved_line["product_class_code"]),
                 product_class_name_snapshot=str(resolved_line["product_class_name"]),
                 quantity=line.quantity,
+                unit_of_measure_code=str(resolved_line["unit_of_measure_code"]),
                 expected_quantity=None,
                 received_quantity=None,
                 notes=line.notes,
@@ -1123,25 +1178,30 @@ def _resolve_commit_products(
         raise OperationValidationError("Operation document must contain at least one line.")
 
     product_ids = {line.product_id for line in lines}
-    records = session.execute(
-        select(
-            Product.id,
-            Product.code.label("product_code"),
-            Product.name.label("product_name"),
-            Product.product_class_id,
-            ProductClass.code.label("product_class_code"),
-            ProductClass.name.label("product_class_name"),
+    records = (
+        session.execute(
+            select(
+                Product.id,
+                Product.code.label("product_code"),
+                Product.name.label("product_name"),
+                Product.unit_of_measure.label("unit_of_measure_code"),
+                Product.product_class_id,
+                ProductClass.code.label("product_class_code"),
+                ProductClass.name.label("product_class_name"),
+            )
+            .select_from(Product)
+            .join(ProductClass, ProductClass.id == Product.product_class_id)
+            .where(
+                Product.id.in_(product_ids),
+                Product.is_active.is_(True),
+                Product.is_sellable.is_(True),
+                ProductClass.is_active.is_(True),
+                ProductClass.is_sellable.is_(True),
+            )
         )
-        .select_from(Product)
-        .join(ProductClass, ProductClass.id == Product.product_class_id)
-        .where(
-            Product.id.in_(product_ids),
-            Product.is_active.is_(True),
-            Product.is_sellable.is_(True),
-            ProductClass.is_active.is_(True),
-            ProductClass.is_sellable.is_(True),
-        )
-    ).mappings().all()
+        .mappings()
+        .all()
+    )
     resolved = {record["id"]: dict(record) for record in records}
     for product_id in product_ids:
         if product_id not in resolved:

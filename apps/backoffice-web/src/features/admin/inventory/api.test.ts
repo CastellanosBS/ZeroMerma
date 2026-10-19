@@ -221,7 +221,7 @@ describe("admin inventory API boundary", () => {
           balance_id: "balance-1",
           branch_id: "branch-1",
           created_at: "2026-05-20T10:00:00Z",
-          created_by_user_id: "user-1",
+          inventory_movement_id: "movement-1",
           id: "adjustment-1",
           location_code: "BACKROOM",
           new_quantity: "12.000",
@@ -229,21 +229,23 @@ describe("admin inventory API boundary", () => {
           previous_quantity: "0.000",
           product_id: "product-1",
           quantity: "12.000",
-          reason: "Initial count",
         },
         201,
       ),
     );
 
-    const adjustment = await createAdminInventoryAdjustment({
-      adjustmentType: "INCREASE",
-      branchId: "branch-1",
-      locationCode: "BACKROOM",
-      notes: null,
-      productId: "product-1",
-      quantity: "12.000",
-      reason: "Initial count",
-    });
+    const adjustment = await createAdminInventoryAdjustment(
+      {
+        adjustmentType: "INCREASE",
+        branchId: "branch-1",
+        locationCode: "BACKROOM",
+        notes: null,
+        productId: "product-1",
+        quantity: "12.000",
+        reason: "Initial count",
+      },
+      "0199f12c-0000-7000-8000-000000000001",
+    );
 
     expect(fetchSpy).toHaveBeenCalledWith(
       expect.stringContaining("/v1/admin/inventory/adjustments"),
@@ -260,7 +262,7 @@ describe("admin inventory API boundary", () => {
         method: "POST",
       }),
     );
-    expect(adjustment.balanceId).toBe("balance-1");
-    expect(adjustment.newQuantity).toBe("12.000");
+    expect(adjustment.balance_id).toBe("balance-1");
+    expect(adjustment.new_quantity).toBe("12.000");
   });
 });

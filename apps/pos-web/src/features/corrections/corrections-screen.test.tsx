@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
 
+import { webcrypto } from "node:crypto";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { act, useSyncExternalStore, type ReactNode } from "react";
 import { createRoot } from "react-dom/client";
@@ -9,8 +10,9 @@ import { CorrectionsScreen } from "./corrections-screen";
 import { commitCorrection, getCorrectionTargetDetail } from "./corrections-api";
 import { KeyboardShortcutRegistry } from "../pos-shell/keyboard";
 
-(globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT =
-  true;
+(
+  globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }
+).IS_REACT_ACT_ENVIRONMENT = true;
 
 const refetchMock = vi.fn();
 const showErrorMock = vi.fn();
@@ -280,13 +282,16 @@ function AppShellRightPanelProbe() {
 }
 
 vi.mock("../auth/auth-store", () => ({
-  usePosAuthStore: (selector: (state: { isAuthenticated: boolean }) => unknown) =>
-    selector({ isAuthenticated: true }),
+  usePosAuthStore: Object.assign(
+    (selector: (state: { isAuthenticated: boolean; user: { id: string } }) => unknown) =>
+      selector({ isAuthenticated: true, user: { id: "user-1" } }),
+    { subscribe: vi.fn(() => () => undefined) },
+  ),
 }));
 
 vi.mock("../cash-session-open/queries", () => ({
   useCurrentCashSessionQuery: () => ({
-    data: { user_id: "user-1" },
+    data: { id: "cash-session-1", user_id: "user-1" },
     error: null,
     isPending: false,
     refetch: refetchMock,
@@ -337,10 +342,7 @@ vi.mock("./queries", () => ({
     refetch: refetchMock,
   }),
   useCorrectionDocumentDetailQuery: (correctionId: string | null) => ({
-    data:
-      correctionId === committedCorrectionResponse.id
-        ? committedCorrectionResponse
-        : null,
+    data: correctionId === committedCorrectionResponse.id ? committedCorrectionResponse : null,
     error: null,
     isPending: false,
     refetch: refetchMock,
@@ -371,16 +373,13 @@ vi.mock("./queries", () => ({
         createdByUserId.length === 0 || record.created_by_user_id === createdByUserId;
       const matchesType =
         targetDocumentType.length === 0 || record.target_document_type === targetDocumentType;
-      const matchesReason =
-        reasonCode.length === 0 || record.reason_code === reasonCode;
+      const matchesReason = reasonCode.length === 0 || record.reason_code === reasonCode;
       return matchesScope && matchesQuery && matchesUser && matchesType && matchesReason;
     });
 
     return {
       data: {
-        available_document_types: [
-          { label: "Paso a mostrador", value: "COUNTER_TRANSFER" },
-        ],
+        available_document_types: [{ label: "Paso a mostrador", value: "COUNTER_TRANSFER" }],
         available_reasons: [{ label: "Wrong quantity", value: "WRONG_QUANTITY" }],
         available_scopes: [
           { code: "CURRENT_SHIFT", label: "Turno actual" },
@@ -446,10 +445,7 @@ function changeInput(element: HTMLInputElement | null, value: string) {
   }
 
   act(() => {
-    const valueSetter = Object.getOwnPropertyDescriptor(
-      HTMLInputElement.prototype,
-      "value",
-    )?.set;
+    const valueSetter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")?.set;
     valueSetter?.call(element, value);
     element.dispatchEvent(new Event("input", { bubbles: true }));
     element.dispatchEvent(new Event("change", { bubbles: true }));
@@ -462,10 +458,7 @@ function changeSelect(element: HTMLSelectElement | null, value: string) {
   }
 
   act(() => {
-    const valueSetter = Object.getOwnPropertyDescriptor(
-      HTMLSelectElement.prototype,
-      "value",
-    )?.set;
+    const valueSetter = Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, "value")?.set;
     valueSetter?.call(element, value);
     element.dispatchEvent(new Event("input", { bubbles: true }));
     element.dispatchEvent(new Event("change", { bubbles: true }));
@@ -553,6 +546,12 @@ function renderUi() {
 let mountedRoots: Array<() => void> = [];
 
 beforeEach(() => {
+  localStorage.clear();
+  vi.stubGlobal("crypto", webcrypto);
+  Object.defineProperty(navigator, "locks", {
+    configurable: true,
+    value: { request: vi.fn(async (_name, _options, callback) => callback({ name: "lock" })) },
+  });
   rightPanelContent = null;
   showErrorMock.mockReset();
   showSuccessMock.mockReset();
@@ -566,6 +565,7 @@ beforeEach(() => {
 afterEach(() => {
   mountedRoots.forEach((unmount) => unmount());
   mountedRoots = [];
+  vi.unstubAllGlobals();
 });
 
 describe("CorrectionsScreen", () => {
@@ -621,13 +621,12 @@ describe("CorrectionsScreen", () => {
       button.textContent?.includes("Guardar ajuste"),
     );
     click(registerButton);
-    await flush();
-    await flush();
+    await act(async () => {
+      await vi.waitFor(() => expect(showSuccessMock).toHaveBeenCalled());
+    });
 
     expect(commitCorrection).toHaveBeenCalledTimes(1);
-    expect(showSuccessMock).toHaveBeenCalledWith(
-      "Ajuste COR-000123 registrado correctamente.",
-    );
+    expect(showSuccessMock).toHaveBeenCalledWith("Ajuste COR-000123 registrado correctamente.");
     expect(view.container.textContent).toContain("Movimientos");
     expect(getRightPanel(view.container)?.textContent).toContain("Da click en una cantidad nueva");
   });
@@ -651,8 +650,9 @@ describe("CorrectionsScreen", () => {
       button.textContent?.includes("Guardar ajuste"),
     );
     click(registerButton);
-    await flush();
-    await flush();
+    await act(async () => {
+      await vi.waitFor(() => expect(showSuccessMock).toHaveBeenCalled());
+    });
 
     const historyButton = Array.from(view.container.querySelectorAll("button")).find((button) =>
       button.textContent?.includes("Historial de ajustes"),

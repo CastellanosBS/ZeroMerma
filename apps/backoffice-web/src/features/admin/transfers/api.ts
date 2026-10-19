@@ -1,4 +1,4 @@
-import type { components } from "@zeromerma/api-client";
+import type { components, paths } from "@zeromerma/api-client";
 
 import { requestJson } from "../../../lib/api";
 import type {
@@ -35,7 +35,11 @@ type ApiTransferCreatePayload = components["schemas"]["AdminTransferCreateReques
 type ApiTransferUpdatePayload = components["schemas"]["AdminTransferUpdateRequest"];
 type ApiTransferReceivePayload = components["schemas"]["AdminTransferReceiveRequest"];
 
-function appendOptionalParam(params: URLSearchParams, key: string, value: string | null | undefined) {
+function appendOptionalParam(
+  params: URLSearchParams,
+  key: string,
+  value: string | null | undefined,
+) {
   if (!value || value === "all") {
     return;
   }
@@ -155,6 +159,7 @@ export function mapAdminTransferDetailFromApi(item: ApiTransferDetail): AdminTra
       receivedQuantity: line.received_quantity ?? null,
       requestedQuantity: line.requested_quantity,
       sentQuantity: line.sent_quantity,
+      pendingQuantity: line.pending_quantity,
       shipmentLineId: line.shipment_line_id,
       unitOfMeasure: line.unit_of_measure,
       varianceReason: line.variance_reason ?? null,
@@ -238,14 +243,23 @@ function toCreateApiPayload(payload: AdminTransferCreatePayload): ApiTransferCre
 
 function toUpdateApiPayload(payload: AdminTransferUpdatePayload): ApiTransferUpdatePayload {
   return {
-    destination_branch_id: payload.destinationBranchId ?? null,
-    lines: payload.lines?.map((line) => ({
-      notes: line.notes ?? null,
-      product_id: line.productId,
-      quantity: line.quantity,
-    })) ?? null,
-    notes: payload.notes ?? null,
-    origin_branch_id: payload.originBranchId ?? null,
+    ...(payload.destinationBranchId !== undefined
+      ? { destination_branch_id: payload.destinationBranchId }
+      : {}),
+    ...(payload.originBranchId !== undefined ? { origin_branch_id: payload.originBranchId } : {}),
+    ...(payload.notes !== undefined ? { notes: payload.notes } : {}),
+    ...(payload.lines !== undefined
+      ? {
+          lines:
+            payload.lines === null
+              ? null
+              : payload.lines.map((line) => ({
+                  notes: line.notes ?? null,
+                  product_id: line.productId,
+                  quantity: line.quantity,
+                })),
+        }
+      : {}),
   };
 }
 
@@ -295,54 +309,77 @@ export function fetchAdminTransferDetail(transferId: string): Promise<AdminTrans
 
 export function createAdminTransfer(
   payload: AdminTransferCreatePayload,
-): Promise<AdminTransferDetail> {
-  return requestJson<ApiTransferDetail>({
+  idempotencyKey: string,
+): Promise<TransferCommandResultView> {
+  return requestJson<TransferCommandResultView>({
+    headers: { "Idempotency-Key": idempotencyKey },
     body: toCreateApiPayload(payload),
     method: "POST",
     path: "/v1/admin/transfers",
-  }).then(mapAdminTransferDetailFromApi);
+  });
 }
 
 export function updateAdminTransfer(
   transferId: string,
   payload: AdminTransferUpdatePayload,
-): Promise<AdminTransferDetail> {
-  return requestJson<ApiTransferDetail>({
+  idempotencyKey: string,
+): Promise<TransferCommandResultView> {
+  return requestJson<TransferCommandResultView>({
+    headers: { "Idempotency-Key": idempotencyKey },
     body: toUpdateApiPayload(payload),
     method: "PATCH",
     path: `/v1/admin/transfers/${transferId}`,
-  }).then(mapAdminTransferDetailFromApi);
+  });
 }
 
 export function dispatchAdminTransfer(
   transferId: string,
-  notes?: string | null,
-): Promise<AdminTransferDetail> {
-  return requestJson<ApiTransferDetail>({
+  notes: string | null | undefined,
+  idempotencyKey: string,
+): Promise<TransferCommandResultView> {
+  return requestJson<TransferCommandResultView>({
+    headers: { "Idempotency-Key": idempotencyKey },
     body: { notes: notes ?? null },
     method: "POST",
     path: `/v1/admin/transfers/${transferId}/dispatch`,
-  }).then(mapAdminTransferDetailFromApi);
+  });
 }
 
 export function receiveAdminTransfer(
   transferId: string,
   payload: AdminTransferReceivePayload,
-): Promise<AdminTransferDetail> {
-  return requestJson<ApiTransferDetail>({
+  idempotencyKey: string,
+): Promise<TransferCommandResultView> {
+  return requestJson<TransferCommandResultView>({
+    headers: { "Idempotency-Key": idempotencyKey },
     body: toReceiveApiPayload(payload),
     method: "POST",
     path: `/v1/admin/transfers/${transferId}/receive`,
-  }).then(mapAdminTransferDetailFromApi);
+  });
 }
 
 export function cancelAdminTransfer(
   transferId: string,
-  reason?: string | null,
-): Promise<AdminTransferDetail> {
-  return requestJson<ApiTransferDetail>({
+  reason: string | null | undefined,
+  idempotencyKey: string,
+): Promise<TransferCommandResultView> {
+  return requestJson<TransferCommandResultView>({
+    headers: { "Idempotency-Key": idempotencyKey },
     body: { reason: reason ?? null },
     method: "POST",
     path: `/v1/admin/transfers/${transferId}/cancel`,
-  }).then(mapAdminTransferDetailFromApi);
+  });
+}
+
+export type TransferCommandResultView = components["schemas"]["TransferCommandResultView"];
+export type TransferCommandCode =
+  paths["/v1/admin/transfers/commands/{command_code}/confirmations/{idempotency_key}"]["get"]["parameters"]["path"]["command_code"];
+export function recoverAdminTransferCommand(
+  commandCode: TransferCommandCode,
+  key: string,
+  branchId: string,
+): Promise<TransferCommandResultView> {
+  return requestJson({
+    path: `/v1/admin/transfers/commands/${commandCode}/confirmations/${encodeURIComponent(key)}?branch_id=${encodeURIComponent(branchId)}`,
+  });
 }

@@ -7,12 +7,16 @@ from decimal import ROUND_HALF_UP, Decimal
 
 from pydantic import TypeAdapter
 from sqlalchemy import String, cast, delete, or_, select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from zeromerma_api.modules.audit.application.service import AuditRecorder
 from zeromerma_api.modules.branches.infrastructure.models import Branch
 from zeromerma_api.modules.catalog.domain.constants import CATALOG_PRODUCT_KIND_FINISHED_GOOD
 from zeromerma_api.modules.catalog.infrastructure.models import Product, Recipe, RecipeInput
+from zeromerma_api.modules.idempotency.application.context import execution
+from zeromerma_api.modules.idempotency.domain.exceptions import IdempotencyBoundaryError
+from zeromerma_api.modules.idempotency.infrastructure.models import IdempotencyRecord
 from zeromerma_api.modules.identity.application.actions import restrict_actions
 from zeromerma_api.modules.identity.application.schemas import AuthenticatedUser
 from zeromerma_api.modules.identity.infrastructure.models import User
@@ -54,6 +58,7 @@ from zeromerma_api.modules.production.application.admin_schemas import (
     AdminProductionWarningSeverity,
     AdminProductionWarningView,
     AdminProductionWasteScrapView,
+    ProductionCommandResultView,
 )
 from zeromerma_api.modules.production.domain.constants import (
     AUDIT_ACTION_ADMIN_PRODUCTION_CANCELLED,
@@ -202,7 +207,8 @@ class AdminProductionService:
         command: AdminProductionCreateRequest,
         current_user: AuthenticatedUser,
         request_id: str | None,
-    ) -> AdminProductionDetailView:
+    ) -> ProductionCommandResultView:
+        _require_command(session)
         branch = self._get_branch(session, command.branch_id)
         product = self._get_finished_product(session, command.product_id)
         recipe = self._resolve_recipe(session, product_id=product.id, recipe_id=command.recipe_id)
@@ -229,8 +235,7 @@ class AdminProductionService:
             metadata={"product_id": str(product.id), "recipe_id": str(recipe.id)},
             request_id=request_id,
         )
-        session.commit()
-        return self.get_production_detail(session, production_id=batch.id)
+        return self._command_result(session, batch)
 
     def update_production(
         self,
@@ -240,8 +245,9 @@ class AdminProductionService:
         current_user: AuthenticatedUser,
         production_id: uuid.UUID,
         request_id: str | None,
-    ) -> AdminProductionDetailView:
-        row = self._get_row(session, production_id)
+    ) -> ProductionCommandResultView:
+        _require_command(session)
+        row = self._get_row(session, production_id, lock=True)
         if row.batch.status != PRODUCTION_STATUS_DRAFT:
             raise ProductionValidationError("Only draft production can be edited.")
 
@@ -274,8 +280,7 @@ class AdminProductionService:
             metadata={"product_id": str(product.id), "recipe_id": str(recipe.id)},
             request_id=request_id,
         )
-        session.commit()
-        return self.get_production_detail(session, production_id=row.batch.id)
+        return self._command_result(session, row.batch)
 
     def start_production(
         self,
@@ -285,8 +290,9 @@ class AdminProductionService:
         current_user: AuthenticatedUser,
         production_id: uuid.UUID,
         request_id: str | None,
-    ) -> AdminProductionDetailView:
-        row = self._get_row(session, production_id)
+    ) -> ProductionCommandResultView:
+        _require_command(session)
+        row = self._get_row(session, production_id, lock=True)
         if row.batch.status != PRODUCTION_STATUS_DRAFT:
             raise ProductionValidationError("Only draft production can be started.")
         if not row.branch.is_active:
@@ -317,8 +323,7 @@ class AdminProductionService:
             metadata={},
             request_id=request_id,
         )
-        session.commit()
-        return self.get_production_detail(session, production_id=row.batch.id)
+        return self._command_result(session, row.batch)
 
     def complete_production(
         self,
@@ -328,8 +333,9 @@ class AdminProductionService:
         current_user: AuthenticatedUser,
         production_id: uuid.UUID,
         request_id: str | None,
-    ) -> AdminProductionDetailView:
-        row = self._get_row(session, production_id)
+    ) -> ProductionCommandResultView:
+        _require_command(session)
+        row = self._get_row(session, production_id, lock=True)
         if row.batch.status != PRODUCTION_STATUS_IN_PROGRESS:
             raise ProductionValidationError("Only in-progress production can be completed.")
 
@@ -344,16 +350,23 @@ class AdminProductionService:
         if not inputs:
             raise ProductionValidationError("Production requires recipe inputs.")
 
+        # Every balance, including an absent output row, follows one deterministic lock order.
+        product_ids = {line.input_product_id for line in inputs}
+        if actual_output > ZERO:
+            product_ids.add(row.product.id)
+        balances = {
+            product_id: self._get_or_create_balance(
+                session,
+                branch_id=row.branch.id,
+                product_id=product_id,
+                location_code=INVENTORY_LOCATION_BACKROOM,
+            )
+            for product_id in sorted(product_ids, key=str)
+        }
         now = _utc_now()
         for input_line in inputs:
             input_product = self._get_product(session, input_line.input_product_id)
-            balance = self._get_balance(
-                session,
-                product_id=input_line.input_product_id,
-                branch_id=row.branch.id,
-                location_code=INVENTORY_LOCATION_BACKROOM,
-                for_update=True,
-            )
+            balance = balances[input_line.input_product_id]
             available = Decimal(balance.quantity_on_hand) if balance is not None else ZERO
             required = Decimal(input_line.required_qty)
             if available < required:
@@ -385,12 +398,7 @@ class AdminProductionService:
             )
 
         if actual_output > ZERO:
-            output_balance = self._get_or_create_balance(
-                session,
-                product_id=row.product.id,
-                branch_id=row.branch.id,
-                location_code=INVENTORY_LOCATION_BACKROOM,
-            )
+            output_balance = balances[row.product.id]
             previous_output = Decimal(output_balance.quantity_on_hand)
             output_balance.quantity_on_hand = _q3(previous_output + actual_output)
             session.add(
@@ -432,8 +440,7 @@ class AdminProductionService:
             },
             request_id=request_id,
         )
-        session.commit()
-        return self.get_production_detail(session, production_id=row.batch.id)
+        return self._command_result(session, row.batch)
 
     def cancel_production(
         self,
@@ -443,8 +450,9 @@ class AdminProductionService:
         current_user: AuthenticatedUser,
         production_id: uuid.UUID,
         request_id: str | None,
-    ) -> AdminProductionDetailView:
-        row = self._get_row(session, production_id)
+    ) -> ProductionCommandResultView:
+        _require_command(session)
+        row = self._get_row(session, production_id, lock=True)
         if row.batch.status == PRODUCTION_STATUS_COMPLETED:
             raise ProductionValidationError(
                 "Completed production cannot be cancelled. "
@@ -466,8 +474,7 @@ class AdminProductionService:
             metadata={"reason": command.reason},
             request_id=request_id,
         )
-        session.commit()
-        return self.get_production_detail(session, production_id=row.batch.id)
+        return self._command_result(session, row.batch)
 
     def _fetch_rows(
         self,
@@ -525,7 +532,16 @@ class AdminProductionService:
             for batch, branch, product, recipe, user in session.execute(query).all()
         ]
 
-    def _get_row(self, session: Session, production_id: uuid.UUID) -> _ProductionRow:
+    def _get_row(
+        self, session: Session, production_id: uuid.UUID, *, lock: bool = False
+    ) -> _ProductionRow:
+        if lock:
+            session.execute(
+                select(ProductionBatch)
+                .where(ProductionBatch.id == production_id)
+                .with_for_update(key_share=True)
+                .execution_options(populate_existing=True)
+            ).scalar_one_or_none()
         row = session.execute(
             select(ProductionBatch, Branch, Product, Recipe, User)
             .join(Branch, Branch.id == ProductionBatch.branch_id)
@@ -1079,7 +1095,7 @@ class AdminProductionService:
             InventoryBalance.product_id == product_id,
         )
         if for_update:
-            query = query.with_for_update()
+            query = query.with_for_update().execution_options(populate_existing=True)
         return session.execute(query).scalar_one_or_none()
 
     def _get_or_create_balance(
@@ -1105,9 +1121,44 @@ class AdminProductionService:
             product_id=product_id,
             quantity_on_hand=ZERO,
         )
-        session.add(balance)
-        session.flush()
+        try:
+            with session.begin_nested():
+                session.add(balance)
+                session.flush()
+        except IntegrityError as error:
+            if getattr(getattr(error.orig, "diag", None), "constraint_name", None) != (
+                "uq_inventory_balances_product_branch_location"
+            ):
+                raise
+            existing = self._get_balance(
+                session,
+                branch_id=branch_id,
+                product_id=product_id,
+                location_code=location_code,
+                for_update=True,
+            )
+            if existing is None:
+                raise
+            return existing
         return balance
+
+    @staticmethod
+    def _command_result(session: Session, batch: ProductionBatch) -> ProductionCommandResultView:
+        session.flush()
+        return ProductionCommandResultView(
+            id=batch.id,
+            folio=_build_folio(batch.id),
+            branch_id=batch.branch_id,
+            product_id=batch.product_id,
+            recipe_id=batch.recipe_id,
+            status=_ADMIN_PRODUCTION_STATUS_ADAPTER.validate_python(batch.status),
+            planned_output_qty=batch.planned_output_qty,
+            actual_output_qty=batch.actual_output_qty,
+            variance_qty=batch.variance_qty,
+            variance_percent=batch.variance_percent,
+            created_at=batch.created_at,
+            updated_at=batch.updated_at,
+        )
 
     def _record_change(
         self,
@@ -1120,7 +1171,11 @@ class AdminProductionService:
         metadata: dict[str, object],
         request_id: str | None,
     ) -> None:
+        owner = _require_command(session)
         payload = {
+            "idempotency_key": str(owner.idempotency_key),
+            "operation_id": str(owner.id),
+            "operation_code": owner.operation_code,
             "branch_id": str(batch.branch_id),
             "production_id": str(batch.id),
             "status": batch.status,
@@ -1179,3 +1234,10 @@ def _build_folio(batch_id: uuid.UUID) -> str:
 
 def _recipe_name(recipe: Recipe) -> str:
     return recipe.version_name or f"Receta {str(recipe.id)[:8]}"
+
+
+def _require_command(session: Session) -> IdempotencyRecord:
+    owner = execution(session)
+    if owner is None or owner.record is None or not owner.action_running:
+        raise IdempotencyBoundaryError("Production mutations require a command reservation.")
+    return owner.record

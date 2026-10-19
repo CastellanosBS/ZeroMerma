@@ -30,7 +30,11 @@ type ApiWasteListResponse = components["schemas"]["AdminWasteListResponse"];
 type ApiWasteReason = components["schemas"]["AdminWasteReasonView"];
 type ApiWasteWarning = components["schemas"]["AdminWasteWarningView"];
 
-function appendOptionalParam(params: URLSearchParams, key: string, value: string | null | undefined) {
+function appendOptionalParam(
+  params: URLSearchParams,
+  key: string,
+  value: string | null | undefined,
+) {
   if (!value || value === "all") {
     return;
   }
@@ -280,10 +284,14 @@ export function fetchAdminWasteDetail(wasteId: string): Promise<AdminWasteDetail
   }).then(mapAdminWasteDetailFromApi);
 }
 
-export function createAdminWaste(payload: AdminWasteCreatePayload): Promise<AdminWasteDetail> {
-  return requestJson<ApiWasteDetail>({
+export function createAdminWaste(
+  payload: AdminWasteCreatePayload,
+  idempotencyKey: string,
+): Promise<components["schemas"]["OperationCommitResultView"]> {
+  return requestJson<components["schemas"]["OperationCommitResultView"]>({
+    headers: { "Idempotency-Key": idempotencyKey },
     body: toCreateApiPayload(payload),
     method: "POST",
     path: "/v1/admin/waste",
-  }).then(mapAdminWasteDetailFromApi);
+  });
 }

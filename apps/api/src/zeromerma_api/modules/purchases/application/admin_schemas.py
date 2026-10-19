@@ -5,11 +5,42 @@ from decimal import Decimal
 from typing import Literal
 from uuid import UUID
 
-from pydantic import BaseModel, Field, field_validator, model_validator
+from pydantic import AwareDatetime, BaseModel, ConfigDict, Field, field_validator, model_validator
 
 AdminPurchaseStatus = Literal["DRAFT", "ORDERED", "PARTIALLY_RECEIVED", "RECEIVED", "CANCELLED"]
 AdminPurchaseType = Literal["PURCHASE", "DIRECT_ENTRY"]
+PurchaseCommandCode = Literal["create", "update", "direct-entry", "confirm", "receive", "cancel"]
 AdminPurchaseWarningSeverity = Literal["info", "warning", "critical"]
+
+
+class PurchaseCommandLineResultView(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    purchase_line_id: UUID
+    product_id: UUID
+    ordered_quantity: Decimal
+    received_quantity: Decimal
+    pending_quantity: Decimal
+
+
+class PurchaseCommandResultView(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    id: UUID
+    branch_id: UUID
+    folio: str
+    status: AdminPurchaseStatus
+    document_type: AdminPurchaseType
+    receipt_ids: list[UUID]
+    inventory_movement_ids: list[UUID]
+    lines: list[PurchaseCommandLineResultView]
+
+
+class PurchaseCommandRejectionView(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    code: Literal["PURCHASE_COMMAND_REJECTED"] = "PURCHASE_COMMAND_REJECTED"
+    message: str
 
 
 class AdminPurchaseBackendContractView(BaseModel):
@@ -231,8 +262,8 @@ class AdminPurchaseLineInput(BaseModel):
 class AdminPurchaseCreateRequest(BaseModel):
     branch_id: UUID
     confirm_now: bool = False
-    document_date: datetime | None = None
-    external_document_date: datetime | None = None
+    document_date: AwareDatetime | None = None
+    external_document_date: AwareDatetime | None = None
     external_document_number: str | None = Field(default=None, max_length=120)
     external_document_type: str | None = Field(default=None, max_length=32)
     lines: list[AdminPurchaseLineInput] = Field(min_length=1)
@@ -247,8 +278,8 @@ class AdminPurchaseCreateRequest(BaseModel):
 
 class AdminPurchaseUpdateRequest(BaseModel):
     branch_id: UUID | None = None
-    document_date: datetime | None = None
-    external_document_date: datetime | None = None
+    document_date: AwareDatetime | None = None
+    external_document_date: AwareDatetime | None = None
     external_document_number: str | None = Field(default=None, max_length=120)
     external_document_type: str | None = Field(default=None, max_length=32)
     lines: list[AdminPurchaseLineInput] | None = None
@@ -284,8 +315,8 @@ class AdminPurchaseDirectEntryLineInput(BaseModel):
 
 class AdminPurchaseDirectEntryRequest(BaseModel):
     branch_id: UUID
-    document_date: datetime | None = None
-    external_document_date: datetime | None = None
+    document_date: AwareDatetime | None = None
+    external_document_date: AwareDatetime | None = None
     external_document_number: str | None = Field(default=None, max_length=120)
     external_document_type: str | None = Field(default=None, max_length=32)
     lines: list[AdminPurchaseDirectEntryLineInput] = Field(min_length=1)

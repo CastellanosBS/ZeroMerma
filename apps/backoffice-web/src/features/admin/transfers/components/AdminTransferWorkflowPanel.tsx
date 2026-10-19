@@ -1,7 +1,7 @@
 import { AdminActionButton } from "../../components/AdminActionButton";
 import { hasEffectiveCapability, type PermissionCode } from "../../../auth/authorization";
 import { useBackofficeAuthorization } from "../../../auth/authorization-context";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type { FormEvent } from "react";
 
 import type {
@@ -39,7 +39,7 @@ interface AdminTransferWorkflowPanelProps {
   mode: WorkflowMode;
   onCancelTransfer: (reason: string | null) => void;
   onClose: () => void;
-  onCreate: (payload: AdminTransferCreatePayload, dispatchNow: boolean) => void;
+  onCreate: (payload: AdminTransferCreatePayload) => void;
   onDispatch: (notes: string | null) => void;
   onReceive: (payload: AdminTransferReceivePayload) => void;
   onUpdate: (payload: AdminTransferUpdatePayload) => void;
@@ -85,12 +85,14 @@ function getDescription(mode: WorkflowMode, transfer?: AdminTransferDetail | nul
 
 function buildInitialDraftLines(transfer?: AdminTransferDetail | null): DraftLineState[] {
   if (transfer?.lines.length) {
-    return transfer.lines.map((line) => ({
-      id: line.shipmentLineId,
-      notes: line.notes ?? "",
-      productId: line.productId,
-      quantity: line.requestedQuantity,
-    }));
+    return transfer.lines
+      .filter((line) => Number(line.pendingQuantity) > 0)
+      .map((line) => ({
+        id: line.shipmentLineId,
+        notes: line.notes ?? "",
+        productId: line.productId,
+        quantity: line.requestedQuantity,
+      }));
   }
 
   return [{ id: crypto.randomUUID(), notes: "", productId: "", quantity: "" }];
@@ -144,14 +146,24 @@ export function AdminTransferWorkflowPanel({
     transfer?.origin.branchId || branchOptions[0]?.id || "",
   );
   const [receiveLines, setReceiveLines] = useState<ReceiveLineState[]>(() =>
-    (transfer?.lines ?? []).map((line) => ({
-      notes: "",
-      receivedQuantity: line.sentQuantity,
-      shipmentLineId: line.shipmentLineId,
-      varianceReason: line.varianceReason ?? "",
-    })),
+    (transfer?.lines ?? [])
+      .filter((line) => Number(line.pendingQuantity) > 0)
+      .map((line) => ({
+        notes: "",
+        receivedQuantity: line.pendingQuantity,
+        shipmentLineId: line.shipmentLineId,
+        varianceReason: line.varianceReason ?? "",
+      })),
   );
   const [reason, setReason] = useState("");
+
+  useEffect(() => {
+    if (mode !== "create") return;
+    setOriginBranchId((current) => current || branchOptions[0]?.id || "");
+    setDestinationBranchId(
+      (current) => current || branchOptions[1]?.id || branchOptions[0]?.id || "",
+    );
+  }, [branchOptions, mode]);
 
   const selectedOriginLabel = useMemo(
     () =>
@@ -234,7 +246,7 @@ export function AdminTransferWorkflowPanel({
         return false;
       }
       if (
-        Number(receiveLine.receivedQuantity) !== Number(sourceLine.sentQuantity) &&
+        Number(receiveLine.receivedQuantity) !== Number(sourceLine.pendingQuantity) &&
         !receiveLine.varianceReason.trim()
       ) {
         setLocalError("Captura una razon para cada discrepancia entre enviado y recibido.");
@@ -264,15 +276,12 @@ export function AdminTransferWorkflowPanel({
         });
         return;
       }
-      onCreate(
-        {
-          destinationBranchId,
-          lines,
-          notes: notes.trim() || null,
-          originBranchId,
-        },
-        false,
-      );
+      onCreate({
+        destinationBranchId,
+        lines,
+        notes: notes.trim() || null,
+        originBranchId,
+      });
       return;
     }
 
@@ -298,27 +307,6 @@ export function AdminTransferWorkflowPanel({
     }
 
     onCancelTransfer(reason.trim() || null);
-  }
-
-  function handleCreateAndDispatch() {
-    if (
-      !hasEffectiveCapability(actor, "transfers.manage", [originBranchId, destinationBranchId]) ||
-      !hasEffectiveCapability(actor, "transfers.execute", [originBranchId, destinationBranchId])
-    )
-      return;
-    setLocalError(null);
-    if (!validateDraft()) {
-      return;
-    }
-    onCreate(
-      {
-        destinationBranchId,
-        lines: toDraftPayload(draftLines),
-        notes: notes.trim() || null,
-        originBranchId,
-      },
-      true,
-    );
   }
 
   return (
@@ -470,72 +458,79 @@ export function AdminTransferWorkflowPanel({
           <span className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">
             Recepcion
           </span>
-          {transfer.lines.map((line) => {
-            const receiveLine = receiveLines.find(
-              (item) => item.shipmentLineId === line.shipmentLineId,
-            );
-            const hasDifference =
-              Number(receiveLine?.receivedQuantity ?? "0") !== Number(line.sentQuantity);
+          {transfer.lines
+            .filter((line) => Number(line.pendingQuantity) > 0)
+            .map((line) => {
+              const receiveLine = receiveLines.find(
+                (item) => item.shipmentLineId === line.shipmentLineId,
+              );
+              const hasDifference =
+                Number(receiveLine?.receivedQuantity ?? "0") !== Number(line.pendingQuantity);
 
-            return (
-              <div
-                className="grid min-w-0 gap-2 rounded-[16px] border border-[var(--ui-color-border)] bg-white p-2 lg:grid-cols-[minmax(12rem,1fr)_7rem_minmax(11rem,0.9fr)_minmax(10rem,0.8fr)]"
-                key={line.shipmentLineId}
-              >
-                <div className="min-w-0">
-                  <p
-                    className="truncate text-sm font-semibold text-slate-950"
-                    title={line.productName}
-                  >
-                    {line.productName}
-                  </p>
-                  <p className="truncate font-mono text-xs text-slate-500" title={line.productCode}>
-                    {line.productCode} - enviado {line.sentQuantity} {line.unitOfMeasure}
-                  </p>
+              return (
+                <div
+                  className="grid min-w-0 gap-2 rounded-[16px] border border-[var(--ui-color-border)] bg-white p-2 lg:grid-cols-[minmax(12rem,1fr)_7rem_minmax(11rem,0.9fr)_minmax(10rem,0.8fr)]"
+                  key={line.shipmentLineId}
+                >
+                  <div className="min-w-0">
+                    <p
+                      className="truncate text-sm font-semibold text-slate-950"
+                      title={line.productName}
+                    >
+                      {line.productName}
+                    </p>
+                    <p
+                      className="truncate font-mono text-xs text-slate-500"
+                      title={line.productCode}
+                    >
+                      {line.productCode} - pendiente {line.pendingQuantity} {line.unitOfMeasure}
+                    </p>
+                  </div>
+                  <label className="grid min-w-0 gap-1 text-xs font-semibold uppercase tracking-[0.1em] text-slate-500">
+                    Recibido
+                    <input
+                      className={inputClassName}
+                      min="0"
+                      step="0.001"
+                      type="number"
+                      value={receiveLine?.receivedQuantity ?? ""}
+                      onChange={(event) =>
+                        updateReceiveLine(line.shipmentLineId, {
+                          receivedQuantity: event.target.value,
+                        })
+                      }
+                    />
+                  </label>
+                  <label className="grid min-w-0 gap-1 text-xs font-semibold uppercase tracking-[0.1em] text-slate-500">
+                    Razon si difiere
+                    <input
+                      className={inputClassName}
+                      disabled={!hasDifference}
+                      maxLength={180}
+                      placeholder={hasDifference ? "Obligatoria" : "Sin diferencia"}
+                      value={receiveLine?.varianceReason ?? ""}
+                      onChange={(event) =>
+                        updateReceiveLine(line.shipmentLineId, {
+                          varianceReason: event.target.value,
+                        })
+                      }
+                    />
+                  </label>
+                  <label className="grid min-w-0 gap-1 text-xs font-semibold uppercase tracking-[0.1em] text-slate-500">
+                    Notas
+                    <input
+                      className={inputClassName}
+                      maxLength={180}
+                      placeholder="Opcional"
+                      value={receiveLine?.notes ?? ""}
+                      onChange={(event) =>
+                        updateReceiveLine(line.shipmentLineId, { notes: event.target.value })
+                      }
+                    />
+                  </label>
                 </div>
-                <label className="grid min-w-0 gap-1 text-xs font-semibold uppercase tracking-[0.1em] text-slate-500">
-                  Recibido
-                  <input
-                    className={inputClassName}
-                    min="0"
-                    step="0.001"
-                    type="number"
-                    value={receiveLine?.receivedQuantity ?? ""}
-                    onChange={(event) =>
-                      updateReceiveLine(line.shipmentLineId, {
-                        receivedQuantity: event.target.value,
-                      })
-                    }
-                  />
-                </label>
-                <label className="grid min-w-0 gap-1 text-xs font-semibold uppercase tracking-[0.1em] text-slate-500">
-                  Razon si difiere
-                  <input
-                    className={inputClassName}
-                    disabled={!hasDifference}
-                    maxLength={180}
-                    placeholder={hasDifference ? "Obligatoria" : "Sin diferencia"}
-                    value={receiveLine?.varianceReason ?? ""}
-                    onChange={(event) =>
-                      updateReceiveLine(line.shipmentLineId, { varianceReason: event.target.value })
-                    }
-                  />
-                </label>
-                <label className="grid min-w-0 gap-1 text-xs font-semibold uppercase tracking-[0.1em] text-slate-500">
-                  Notas
-                  <input
-                    className={inputClassName}
-                    maxLength={180}
-                    placeholder="Opcional"
-                    value={receiveLine?.notes ?? ""}
-                    onChange={(event) =>
-                      updateReceiveLine(line.shipmentLineId, { notes: event.target.value })
-                    }
-                  />
-                </label>
-              </div>
-            );
-          })}
+              );
+            })}
         </div>
       ) : null}
 
@@ -578,19 +573,6 @@ export function AdminTransferWorkflowPanel({
         >
           Cerrar
         </button>
-        {mode === "create" ? (
-          <AdminActionButton
-            capability="transfers.manage"
-            additionalCapabilities={["transfers.execute"]}
-            branchIds={[originBranchId, destinationBranchId]}
-            className="rounded-2xl border border-[var(--ui-color-border)] bg-white px-4 py-2 text-sm font-semibold text-[var(--ui-color-info)] transition hover:bg-[var(--ui-color-surface-tint)] focus:outline-none focus:ring-4 focus:ring-[var(--ui-color-ring)] disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-400"
-            disabled={isSubmitting}
-            type="button"
-            onClick={handleCreateAndDispatch}
-          >
-            Guardar y enviar
-          </AdminActionButton>
-        ) : null}
         <AdminActionButton
           capability={actionCapability}
           branchIds={[originBranchId, destinationBranchId]}

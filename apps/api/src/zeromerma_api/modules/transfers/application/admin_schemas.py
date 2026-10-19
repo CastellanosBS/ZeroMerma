@@ -5,7 +5,7 @@ from decimal import Decimal
 from typing import Literal
 from uuid import UUID
 
-from pydantic import BaseModel, Field, field_validator, model_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 AdminTransferStatus = Literal[
     "DRAFT",
@@ -120,6 +120,7 @@ class AdminTransferBranchView(BaseModel):
 
 
 class AdminTransferLineView(BaseModel):
+    pending_quantity: Decimal
     difference: Decimal | None = None
     line_status: str
     notes: str | None = None
@@ -193,6 +194,7 @@ class AdminTransferDetailView(BaseModel):
 
 
 class AdminTransferLineInput(BaseModel):
+    model_config = ConfigDict(extra="forbid")
     product_id: UUID
     quantity: Decimal = Field(gt=Decimal("0"), max_digits=12, decimal_places=3)
     notes: str | None = Field(default=None, max_length=500)
@@ -207,6 +209,7 @@ class AdminTransferLineInput(BaseModel):
 
 
 class AdminTransferCreateRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
     destination_branch_id: UUID
     lines: list[AdminTransferLineInput] = Field(min_length=1)
     notes: str | None = Field(default=None, max_length=1000)
@@ -214,6 +217,8 @@ class AdminTransferCreateRequest(BaseModel):
 
     @model_validator(mode="after")
     def validate_distinct_branches(self) -> AdminTransferCreateRequest:
+        if len({line.product_id for line in self.lines}) != len(self.lines):
+            raise ValueError("Transfer products must be unique.")
         if self.origin_branch_id == self.destination_branch_id:
             raise ValueError("Origin and destination branches must differ.")
         return self
@@ -228,6 +233,7 @@ class AdminTransferCreateRequest(BaseModel):
 
 
 class AdminTransferUpdateRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
     destination_branch_id: UUID | None = None
     lines: list[AdminTransferLineInput] | None = None
     notes: str | None = Field(default=None, max_length=1000)
@@ -250,6 +256,8 @@ class AdminTransferUpdateRequest(BaseModel):
     ) -> list[AdminTransferLineInput] | None:
         if value is not None and len(value) == 0:
             raise ValueError("Transfer must contain at least one line.")
+        if value is not None and len({line.product_id for line in value}) != len(value):
+            raise ValueError("Transfer products must be unique.")
         return value
 
     @field_validator("notes")
@@ -262,6 +270,7 @@ class AdminTransferUpdateRequest(BaseModel):
 
 
 class AdminTransferDispatchRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
     notes: str | None = Field(default=None, max_length=1000)
 
     @field_validator("notes")
@@ -274,6 +283,7 @@ class AdminTransferDispatchRequest(BaseModel):
 
 
 class AdminTransferReceiptLineInput(BaseModel):
+    model_config = ConfigDict(extra="forbid")
     notes: str | None = Field(default=None, max_length=500)
     received_quantity: Decimal = Field(ge=Decimal("0"), max_digits=12, decimal_places=3)
     shipment_line_id: UUID
@@ -289,8 +299,15 @@ class AdminTransferReceiptLineInput(BaseModel):
 
 
 class AdminTransferReceiveRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
     lines: list[AdminTransferReceiptLineInput] = Field(min_length=1)
     notes: str | None = Field(default=None, max_length=1000)
+
+    @model_validator(mode="after")
+    def unique_lines(self) -> AdminTransferReceiveRequest:
+        if len({line.shipment_line_id for line in self.lines}) != len(self.lines):
+            raise ValueError("Receipt lines must be unique.")
+        return self
 
     @field_validator("notes")
     @classmethod
@@ -302,6 +319,7 @@ class AdminTransferReceiveRequest(BaseModel):
 
 
 class AdminTransferCancelRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
     reason: str | None = Field(default=None, max_length=160)
 
     @field_validator("reason")

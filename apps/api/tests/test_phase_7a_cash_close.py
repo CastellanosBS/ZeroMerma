@@ -260,11 +260,31 @@ def test_cash_close_summary_exposes_inbound_and_outbound_transfer_warnings(
     client: TestClient,
 ) -> None:
     _open_cash_session(client)
+    from zeromerma_api.testing.transfer_operators import transfer_cashier_email
+
+    destination_headers = login_headers(
+        client,
+        email=transfer_cashier_email(SEED_DESTINATION_WORKSTATION_CODE),
+        password=SEED_USER_PASSWORD,
+        audience="POS",
+        workstation_code=SEED_DESTINATION_WORKSTATION_CODE,
+    )
+    opened = client.post(
+        "/v1/cash-sessions/open",
+        headers={**destination_headers, "Idempotency-Key": new_idempotency_key()},
+        json={"workstation_code": SEED_DESTINATION_WORKSTATION_CODE, "opening_amount": "150"},
+    )
+    assert opened.status_code == 201, opened.text
+    origin_headers = _authorization_header(client)
+    origin_cash_id = current_cash_session_id(
+        client, headers=origin_headers, workstation_code=SEED_WORKSTATION_CODE
+    )
 
     outbound_dispatch = client.post(
         "/v1/transfers/dispatch/commit",
-        headers=_authorization_header(client),
+        headers={**origin_headers, "Idempotency-Key": new_idempotency_key()},
         json={
+            "cash_session_id": origin_cash_id,
             "workstation_code": SEED_WORKSTATION_CODE,
             "destination_branch_id": _get_branch_id(SEED_DESTINATION_BRANCH_CODE),
             "lines": [
@@ -279,8 +299,9 @@ def test_cash_close_summary_exposes_inbound_and_outbound_transfer_warnings(
 
     inbound_dispatch = client.post(
         "/v1/transfers/dispatch/commit",
-        headers=_authorization_header(client, SEED_DESTINATION_WORKSTATION_CODE),
+        headers={**destination_headers, "Idempotency-Key": new_idempotency_key()},
         json={
+            "cash_session_id": opened.json()["id"],
             "workstation_code": SEED_DESTINATION_WORKSTATION_CODE,
             "destination_branch_id": _get_branch_id("MAIN"),
             "lines": [

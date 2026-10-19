@@ -15,4 +15,3 @@ class TransferNotFoundError(TransferError):
 
 class TransferAlreadyReceivedError(TransferError):
     """Raised when a transfer is no longer receivable."""
-

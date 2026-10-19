@@ -1,7 +1,7 @@
 import { AdminActionButton } from "../../components/AdminActionButton";
 import { hasEffectiveCapability, type PermissionCode } from "../../../auth/authorization";
 import { useBackofficeAuthorization } from "../../../auth/authorization-context";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type { FormEvent } from "react";
 
 import type {
@@ -115,6 +115,18 @@ export function AdminProductionWorkflowPanel({
   const [reason, setReason] = useState("");
   const [recipeId, setRecipeId] = useState(production?.productRecipe.recipeId || "");
   const [varianceReason, setVarianceReason] = useState(production?.overview.varianceReason ?? "");
+
+  useEffect(() => {
+    if (mode === "create" && branchOptions[0]) {
+      setBranchId((current) => current || branchOptions[0]!.id);
+    }
+  }, [branchOptions, mode]);
+
+  useEffect(() => {
+    if (mode === "create" && productOptions[0]) {
+      setProductId((current) => current || productOptions[0]!.id);
+    }
+  }, [mode, productOptions]);
 
   const selectedBranchLabel = useMemo(
     () =>

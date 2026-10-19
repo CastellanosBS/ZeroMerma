@@ -1,3 +1,5 @@
+import { webcrypto } from "node:crypto";
+import { transferIntentions } from "./transfer-command-intent";
 // @vitest-environment jsdom
 
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
@@ -16,8 +18,9 @@ import { KeyboardShortcutRegistry } from "../pos-shell/keyboard";
 import { TransferReceiptScreen } from "./receipt-screen";
 import { receiveTransfer } from "./transfers-api";
 
-(globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT =
-  true;
+(
+  globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }
+).IS_REACT_ACT_ENVIRONMENT = true;
 
 const refetchMock = vi.fn();
 const showErrorMock = vi.fn();
@@ -95,8 +98,17 @@ const pendingInboundTransfersResponse: PendingInboundTransfersResponse = {
 };
 
 const pendingTransferDetail: TransferDetailResponse = {
-  receipt: null,
-  receipt_summary: null,
+  receipts: [],
+  receipt_summaries: [],
+  receipt_progress: [
+    {
+      shipment_line_id: "transfer-line-1",
+      product_id: "product-1",
+      sent_quantity: "3.000",
+      received_quantity: "0.000",
+      pending_quantity: "3.000",
+    },
+  ],
   shipment: {
     committed_at_utc: "2026-04-22T18:12:00Z",
     created_at_utc: "2026-04-22T18:10:00Z",
@@ -158,64 +170,77 @@ const pendingTransferDetail: TransferDetailResponse = {
 };
 
 const receivedTransferDetail: TransferDetailResponse = {
-  receipt: {
-    committed_at_utc: "2026-04-22T18:20:00Z",
-    created_at_utc: "2026-04-22T18:20:00Z",
-    created_by_user_email: "cashier@zeromerma.local",
-    created_by_user_full_name: "North Branch Cashier",
-    created_by_user_id: "user-1",
-    destination_branch_code: "NORTH",
-    destination_branch_id: "branch-2",
-    destination_branch_name: "North Branch",
-    destination_bucket_code: "BACKROOM",
-    document_type: "BRANCH_TRANSFER_RECEIPT",
-    folio: "REC-000001",
-    id: "receipt-1",
-    lines: [
-      {
-        expected_quantity: "3.000",
-        id: "receipt-line-1",
-        line_number: 1,
-        notes: null,
-        product_class_code_snapshot: "PAN-DULCE",
-        product_class_id: "class-1",
-        product_class_name_snapshot: "Pan dulce",
-        product_code_snapshot: "CONCHA-VAN",
-        product_id: "product-1",
-        product_name_snapshot: "Concha vainilla",
-        quantity: "3.000",
-        received_quantity: "3.000",
-        unit_of_measure_code: "EACH",
-        variance_reason: null,
-      },
-    ],
-    notes: null,
-    reason_code: null,
-    reason_name: null,
-    reference_document_id: "transfer-1",
-    source_branch_code: "MAIN",
-    source_branch_id: "branch-1",
-    source_branch_name: "Main Branch",
-    source_bucket_code: "IN_TRANSIT",
-    status: "RECEIVED",
-    workstation_code: "POS-01",
-    workstation_id: "workstation-1",
-    workstation_name: "Front Register 01",
-  },
-  receipt_summary: {
-    committed_at_utc: "2026-04-22T18:20:00Z",
-    document_id: "receipt-1",
-    folio: "REC-000001",
-    linked_shipment_id: "transfer-1",
-    quantity_summary: {
-      expected_total_quantity: "3.000",
-      has_variance: false,
-      line_count: 1,
-      received_total_quantity: "3.000",
-      variance_line_count: 0,
+  receipts: [
+    {
+      committed_at_utc: "2026-04-22T18:20:00Z",
+      created_at_utc: "2026-04-22T18:20:00Z",
+      created_by_user_email: "cashier@zeromerma.local",
+      created_by_user_full_name: "North Branch Cashier",
+      created_by_user_id: "user-1",
+      destination_branch_code: "NORTH",
+      destination_branch_id: "branch-2",
+      destination_branch_name: "North Branch",
+      destination_bucket_code: "BACKROOM",
+      document_type: "BRANCH_TRANSFER_RECEIPT",
+      folio: "REC-000001",
+      id: "receipt-1",
+      lines: [
+        {
+          expected_quantity: "3.000",
+          id: "receipt-line-1",
+          line_number: 1,
+          notes: null,
+          product_class_code_snapshot: "PAN-DULCE",
+          product_class_id: "class-1",
+          product_class_name_snapshot: "Pan dulce",
+          product_code_snapshot: "CONCHA-VAN",
+          product_id: "product-1",
+          product_name_snapshot: "Concha vainilla",
+          quantity: "3.000",
+          received_quantity: "3.000",
+          unit_of_measure_code: "EACH",
+          variance_reason: null,
+        },
+      ],
+      notes: null,
+      reason_code: null,
+      reason_name: null,
+      reference_document_id: "transfer-1",
+      source_branch_code: "MAIN",
+      source_branch_id: "branch-1",
+      source_branch_name: "Main Branch",
+      source_bucket_code: "IN_TRANSIT",
+      status: "RECEIVED",
+      workstation_code: "POS-01",
+      workstation_id: "workstation-1",
+      workstation_name: "Front Register 01",
     },
-    status: "RECEIVED",
-  },
+  ],
+  receipt_summaries: [
+    {
+      committed_at_utc: "2026-04-22T18:20:00Z",
+      document_id: "receipt-1",
+      folio: "REC-000001",
+      linked_shipment_id: "transfer-1",
+      quantity_summary: {
+        expected_total_quantity: "3.000",
+        has_variance: false,
+        line_count: 1,
+        received_total_quantity: "3.000",
+        variance_line_count: 0,
+      },
+      status: "RECEIVED",
+    },
+  ],
+  receipt_progress: [
+    {
+      shipment_line_id: "transfer-line-1",
+      product_id: "product-1",
+      sent_quantity: "3.000",
+      received_quantity: "3.000",
+      pending_quantity: "0.000",
+    },
+  ],
   shipment: {
     ...pendingTransferDetail.shipment,
     status: "RECEIVED",
@@ -243,7 +268,8 @@ const receiptHistoryResponse: TransferReceiptHistoryResponse = {
       destination_bucket_code: "BACKROOM",
       document_type: "BRANCH_TRANSFER_RECEIPT",
       folio: "REC-000001",
-      id: "transfer-1",
+      id: "receipt-1",
+      shipment_id: "transfer-1",
       line_count: 1,
       source_branch_code: "MAIN",
       source_branch_name: "Main Branch",
@@ -305,13 +331,16 @@ function AppShellRightPanelProbe() {
 }
 
 vi.mock("../auth/auth-store", () => ({
-  usePosAuthStore: (selector: (state: { isAuthenticated: boolean }) => unknown) =>
-    selector({ isAuthenticated: true }),
+  usePosAuthStore: Object.assign(
+    (selector: (state: { isAuthenticated: boolean; user: { id: string } }) => unknown) =>
+      selector({ isAuthenticated: true, user: { id: "user-1" } }),
+    { subscribe: vi.fn(() => () => undefined) },
+  ),
 }));
 
 vi.mock("../cash-session-open/queries", () => ({
   useCurrentCashSessionQuery: () => ({
-    data: { user_id: "user-1" },
+    data: { id: "cash-1", user_id: "user-1" },
     error: null,
     isPending: false,
     refetch: refetchMock,
@@ -415,10 +444,7 @@ function changeInput(element: HTMLInputElement | null, value: string) {
   }
 
   act(() => {
-    const valueSetter = Object.getOwnPropertyDescriptor(
-      HTMLInputElement.prototype,
-      "value",
-    )?.set;
+    const valueSetter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")?.set;
     valueSetter?.call(element, value);
     element.dispatchEvent(new Event("input", { bubbles: true }));
     element.dispatchEvent(new Event("change", { bubbles: true }));
@@ -473,10 +499,7 @@ function findButtonByText(container: ParentNode, text: string): HTMLButtonElemen
   ) as HTMLButtonElement | undefined;
 }
 
-function findButtonByExactText(
-  container: ParentNode,
-  text: string,
-): HTMLButtonElement | undefined {
+function findButtonByExactText(container: ParentNode, text: string): HTMLButtonElement | undefined {
   return Array.from(container.querySelectorAll("button")).find(
     (button) => button.textContent?.trim() === text,
   ) as HTMLButtonElement | undefined;
@@ -498,6 +521,13 @@ async function selectPendingShipmentWithKeyboard(container: HTMLElement) {
 let mountedRoots: Array<() => void> = [];
 
 beforeEach(() => {
+  localStorage.clear();
+  transferIntentions.forgetBodies();
+  vi.stubGlobal("crypto", webcrypto);
+  Object.defineProperty(navigator, "locks", {
+    configurable: true,
+    value: { request: vi.fn(async (_name, _options, callback) => callback({ name: "lock" })) },
+  });
   rightPanelContent = null;
   showErrorMock.mockReset();
   showSuccessMock.mockReset();
@@ -512,7 +542,17 @@ beforeEach(() => {
       transfers: [],
     };
     activeTransferDetailState = receivedTransferDetail;
-    return receivedTransferDetail;
+    return {
+      id: "transfer-1",
+      folio: "ENV-000001",
+      status: "RECEIVED",
+      origin_branch_id: "branch-1",
+      destination_branch_id: "branch-2",
+      cash_session_id: "cash-1",
+      receipt_id: "receipt-1",
+      committed_at_utc: "2026-04-22T18:12:00Z",
+      lines: [],
+    };
   });
 });
 
@@ -549,10 +589,7 @@ describe("TransferReceiptScreen", () => {
 
     await selectPendingShipmentWithKeyboard(view.container);
 
-    const receivedInput = findInputByLabel(
-      view.container,
-      "Cantidad recibida de Concha vainilla",
-    );
+    const receivedInput = findInputByLabel(view.container, "Cantidad recibida de Concha vainilla");
     expect(document.activeElement).toBe(receivedInput);
 
     changeInput(receivedInput, "2");
@@ -572,10 +609,7 @@ describe("TransferReceiptScreen", () => {
     keydown(scannerInput, "Enter");
     await flush();
 
-    const receivedInput = findInputByLabel(
-      view.container,
-      "Cantidad recibida de Concha vainilla",
-    );
+    const receivedInput = findInputByLabel(view.container, "Cantidad recibida de Concha vainilla");
 
     expect(receivedInput).not.toBeNull();
     expect(document.activeElement).toBe(receivedInput);
@@ -588,10 +622,7 @@ describe("TransferReceiptScreen", () => {
 
     await selectPendingShipmentWithKeyboard(view.container);
 
-    const receivedInput = findInputByLabel(
-      view.container,
-      "Cantidad recibida de Concha vainilla",
-    );
+    const receivedInput = findInputByLabel(view.container, "Cantidad recibida de Concha vainilla");
     changeInput(receivedInput, "2");
     await flush();
 
@@ -645,20 +676,25 @@ describe("TransferReceiptScreen", () => {
     click(dialogConfirmButton ?? null);
     await flush();
 
-    expect(receiveTransfer).toHaveBeenCalledWith("transfer-1", {
-      lines: [
-        {
-          expected_quantity: "3",
-          notes: null,
-          received_quantity: "3",
-          shipment_line_id: "transfer-line-1",
-          variance_reason: null,
-        },
-      ],
-      notes: null,
-      workstation_code: "POS-01",
-    });
-    expect(showSuccessMock).toHaveBeenCalledWith("Recepcion registrada. Folio REC-000001.");
+    expect(receiveTransfer).toHaveBeenCalledWith(
+      "transfer-1",
+      {
+        cash_session_id: "cash-1",
+        lines: [
+          {
+            expected_quantity: "3",
+            notes: null,
+            received_quantity: "3",
+            shipment_line_id: "transfer-line-1",
+            variance_reason: null,
+          },
+        ],
+        notes: null,
+        workstation_code: "POS-01",
+      },
+      expect.any(String),
+    );
+    expect(showSuccessMock).toHaveBeenCalledWith("Recepcion registrada. Folio ENV-000001.");
     expect(view.container.textContent).toContain("Historial de recepciones");
     expect(view.container.textContent).toContain("REC-000001");
     expect(rightPanel?.textContent).toContain("Recepcion seleccionada");

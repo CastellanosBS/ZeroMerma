@@ -126,11 +126,14 @@ const apiProductionDetail = {
     recipe_yield_qty: "10.000",
     recipe_yield_uom: "piece",
   },
-  related_documents: [{ document_id: "recipe-1", document_type: "RECIPE", folio: "Base", status: "active" }],
+  related_documents: [
+    { document_id: "recipe-1", document_type: "RECIPE", folio: "Base", status: "active" },
+  ],
   warnings: [{ code: "raw_material_shortage", message: "Faltan insumos.", severity: "critical" }],
   waste_scrap: {
     integration_available: false,
-    notes: "Waste/scrap is represented as production yield variance; dedicated merma documents are pending contract.",
+    notes:
+      "Waste/scrap is represented as production yield variance; dedicated merma documents are pending contract.",
     records: [],
   },
 } as const;
@@ -220,7 +223,9 @@ describe("admin production API boundary", () => {
   });
 
   it("loads production detail", async () => {
-    const fetchSpy = vi.spyOn(globalThis, "fetch").mockImplementation(() => mockJsonResponse(apiProductionDetail));
+    const fetchSpy = vi
+      .spyOn(globalThis, "fetch")
+      .mockImplementation(() => mockJsonResponse(apiProductionDetail));
 
     const detail = await fetchAdminProductionDetail("production-1");
 
@@ -234,23 +239,33 @@ describe("admin production API boundary", () => {
   });
 
   it("creates, starts, completes, and cancels through canonical endpoints", async () => {
-    const fetchSpy = vi.spyOn(globalThis, "fetch").mockImplementation(() => mockJsonResponse(apiProductionDetail, 201));
+    const fetchSpy = vi
+      .spyOn(globalThis, "fetch")
+      .mockImplementation(() => mockJsonResponse(apiProductionDetail, 201));
 
-    await createAdminProduction({
-      branchId: "branch-1",
-      notes: "Bake today",
-      plannedAt: "2026-05-20T10:00:00Z",
-      plannedOutputQty: "20.000",
-      productId: "product-1",
-      recipeId: "recipe-1",
-    });
-    await startAdminProduction("production-1", "Start");
-    await completeAdminProduction("production-1", {
-      actualOutputQty: "18.000",
-      notes: "Completed",
-      varianceReason: "Shrinkage",
-    });
-    await cancelAdminProduction("production-1", "Not needed");
+    const key = "01960000-0000-7000-8000-000000000001";
+    await createAdminProduction(
+      {
+        branchId: "branch-1",
+        notes: "Bake today",
+        plannedAt: "2026-05-20T10:00:00Z",
+        plannedOutputQty: "20.000",
+        productId: "product-1",
+        recipeId: "recipe-1",
+      },
+      key,
+    );
+    await startAdminProduction("production-1", "Start", key);
+    await completeAdminProduction(
+      "production-1",
+      {
+        actualOutputQty: "18.000",
+        notes: "Completed",
+        varianceReason: "Shrinkage",
+      },
+      key,
+    );
+    await cancelAdminProduction("production-1", "Not needed", key);
 
     expect(fetchSpy).toHaveBeenNthCalledWith(
       1,

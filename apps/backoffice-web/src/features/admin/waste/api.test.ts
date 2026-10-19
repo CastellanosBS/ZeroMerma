@@ -43,7 +43,9 @@ const apiWasteItem = {
   status: "COMMITTED",
   uom: "piece",
   warning_state: "warning",
-  warnings: [{ code: "high_impact", message: "Merma marcada como alto impacto.", severity: "warning" }],
+  warnings: [
+    { code: "high_impact", message: "Merma marcada como alto impacto.", severity: "warning" },
+  ],
 } as const;
 
 const apiWasteDetail = {
@@ -133,8 +135,17 @@ const apiWasteDetail = {
     requires_evidence: false,
     requires_note: false,
   },
-  related_documents: [{ document_id: "movement-1", document_type: "INVENTORY_MOVEMENT", folio: "WASTE_RECORD", status: "OUT" }],
-  warnings: [{ code: "high_impact", message: "Merma marcada como alto impacto.", severity: "warning" }],
+  related_documents: [
+    {
+      document_id: "movement-1",
+      document_type: "INVENTORY_MOVEMENT",
+      folio: "WASTE_RECORD",
+      status: "OUT",
+    },
+  ],
+  warnings: [
+    { code: "high_impact", message: "Merma marcada como alto impacto.", severity: "warning" },
+  ],
 } as const;
 
 function mockJsonResponse(payload: unknown, status = 200) {
@@ -242,7 +253,9 @@ describe("admin waste API boundary", () => {
   });
 
   it("loads waste detail", async () => {
-    const fetchSpy = vi.spyOn(globalThis, "fetch").mockImplementation(() => mockJsonResponse(apiWasteDetail));
+    const fetchSpy = vi
+      .spyOn(globalThis, "fetch")
+      .mockImplementation(() => mockJsonResponse(apiWasteDetail));
 
     const detail = await fetchAdminWasteDetail("waste-1");
 
@@ -256,16 +269,21 @@ describe("admin waste API boundary", () => {
   });
 
   it("creates waste through canonical backend endpoint", async () => {
-    const fetchSpy = vi.spyOn(globalThis, "fetch").mockImplementation(() => mockJsonResponse(apiWasteDetail, 201));
+    const fetchSpy = vi
+      .spyOn(globalThis, "fetch")
+      .mockImplementation(() => mockJsonResponse(apiWasteDetail, 201));
 
-    await createAdminWaste({
-      branchId: "branch-1",
-      locationCode: "BACKROOM",
-      notes: "Expired batch",
-      productId: "product-1",
-      quantity: "12.000",
-      reasonCode: "EXPIRED",
-    });
+    await createAdminWaste(
+      {
+        branchId: "branch-1",
+        locationCode: "BACKROOM",
+        notes: "Expired batch",
+        productId: "product-1",
+        quantity: "12.000",
+        reasonCode: "EXPIRED",
+      },
+      "0199f12c-0000-7000-8000-000000000001",
+    );
 
     expect(fetchSpy).toHaveBeenCalledWith(
       expect.stringContaining("/v1/admin/waste"),

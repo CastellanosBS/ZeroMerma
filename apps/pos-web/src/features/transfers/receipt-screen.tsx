@@ -1,13 +1,9 @@
+import { isCommandIntentionPending } from "@zeromerma/api-client";
+import { transferIntentions } from "./transfer-command-intent";
+import { useTransferDraftIdentity, useTransferIntention } from "./use-transfer-intention";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Navigate } from "@tanstack/react-router";
-import {
-  useCallback,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-  type FocusEvent,
-} from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type FocusEvent } from "react";
 
 import { useAppShellRightPanel } from "../../components/app-shell-right-panel";
 import {
@@ -35,10 +31,7 @@ import {
   SearchField,
   ScrollPane,
 } from "../../components/pos-module-primitives";
-import {
-  ArrowLeftIcon,
-  ChevronRightIcon,
-} from "../../components/pos-icons";
+import { ArrowLeftIcon, ChevronRightIcon } from "../../components/pos-icons";
 import { Button } from "../../components/ui/button";
 import type {
   OperationDocumentView,
@@ -50,17 +43,17 @@ import type {
 } from "../../lib/api-contracts";
 import { formatCompactLocalDateTime, formatLocalDateTime } from "../../lib/formatters";
 import { toOperationalErrorMessage } from "../../lib/http";
-import { matchesScannerValue, normalizeScannerText, parseShipmentScannerValue } from "../../lib/scanner";
+import {
+  matchesScannerValue,
+  normalizeScannerText,
+  parseShipmentScannerValue,
+} from "../../lib/scanner";
 import { cn } from "../../lib/utils";
 import { usePosAuthStore } from "../auth/auth-store";
 import { useCurrentCashSessionQuery } from "../cash-session-open/queries";
 import { useOperationsBootstrapQuery } from "../operations/queries";
 import { formatQuantityFromMilliUnits } from "../pos-terminal/model";
-import {
-  posInputClass,
-  posOutlineButtonClass,
-  posPrimaryButtonClass,
-} from "../pos-theme/theme";
+import { posInputClass, posOutlineButtonClass, posPrimaryButtonClass } from "../pos-theme/theme";
 import { useStatusMessageStore } from "../status-messages/store";
 import {
   buildTransferReceiveLines,
@@ -88,7 +81,6 @@ import {
   useTransferDetailQuery,
   useTransferReceiptHistoryQuery,
 } from "./queries";
-import { receiveTransfer } from "./transfers-api";
 
 const VARIANCE_REASON_SUGGESTIONS = ["Faltante", "Dañado", "Sobrante", "Error de surtido"] as const;
 const EMPTY_VALUE_TEXT = String.fromCharCode(8212);
@@ -193,10 +185,7 @@ function getReceiptStateChipTone(
   return getReceiptUiStateTone(uiState);
 }
 
-function toTransferReceiptErrorMessage(
-  error: unknown,
-  fallbackMessage: string,
-): string {
+function toTransferReceiptErrorMessage(error: unknown, fallbackMessage: string): string {
   const message = toOperationalErrorMessage(error, fallbackMessage);
 
   if (message === "Transfer shipment was not found.") {
@@ -211,21 +200,16 @@ function toTransferReceiptErrorMessage(
     return "Este envio no corresponde a la sucursal actual.";
   }
 
-  if (
-    message === "Transfer receipt lines must match the pending shipment lines exactly."
-  ) {
+  if (message === "Transfer receipt lines must match the pending shipment lines exactly.") {
     return "Las lineas ya no coinciden con el envio pendiente. Vuelve a abrir el detalle.";
   }
 
-  if (
-    message === "Transfer receipt expected quantities must match the pending shipment."
-  ) {
+  if (message === "Transfer receipt expected quantities must match the pending shipment.") {
     return "Las cantidades esperadas ya no coinciden con el envio pendiente.";
   }
 
   if (
-    message ===
-    "Variance reason is required when the received quantity differs from the shipment."
+    message === "Variance reason is required when the received quantity differs from the shipment."
   ) {
     return "Cada linea con diferencia necesita un motivo antes de confirmar la recepcion.";
   }
@@ -238,11 +222,7 @@ function toTransferReceiptErrorMessage(
 }
 
 function isTransferReceivable(detail: TransferDetailResponse | null): boolean {
-  return (
-    detail !== null &&
-    detail.receipt === null &&
-    detail.shipment.status === "IN_TRANSIT"
-  );
+  return detail !== null && detail.shipment.status === "IN_TRANSIT";
 }
 
 function formatDifferenceLabel(varianceMilli: number): string {
@@ -308,7 +288,7 @@ function buildTransferDocumentLineSummaryItems(
       statusTone: hasVariance ? "warning" : "confirmed",
       title: line.product_name_snapshot,
       trailingNote: hasVariance
-        ? line.variance_reason ?? `Esperado ${expectedText}`
+        ? (line.variance_reason ?? `Esperado ${expectedText}`)
         : `Esperado ${expectedText}`,
     };
   });
@@ -383,10 +363,7 @@ function buildReceiptHistoryRecords(
         ? formatCompactLocalDateTime(record.committed_at_utc, timeZone)
         : undefined,
       secondaryTimestampLabel: "Creado",
-      secondaryTimestampValue: formatCompactLocalDateTime(
-        record.created_at_utc,
-        timeZone,
-      ),
+      secondaryTimestampValue: formatCompactLocalDateTime(record.created_at_utc, timeZone),
       statusLabel: getTransferStatusLabel(record.status),
       statusTone: getTransferStatusBadgeTone(record.status),
       subtitle: record.source_branch_name,
@@ -479,9 +456,7 @@ function ReceiptLineRow({
           posInputClass,
         )}
         inputMode="decimal"
-        onChange={(event) =>
-          onReceivedQuantityChange(line.shipmentLineId, event.target.value)
-        }
+        onChange={(event) => onReceivedQuantityChange(line.shipmentLineId, event.target.value)}
         onFocus={handleInputFocus}
         ref={inputRef}
         value={line.receivedQuantityText}
@@ -499,9 +474,7 @@ function ReceiptLineRow({
           aria-label={`Motivo de diferencia de ${line.productName}`}
           className={cn("h-9 rounded-lg px-2 text-sm shadow-sm", posInputClass)}
           list={`variance-reasons-${line.shipmentLineId}`}
-          onChange={(event) =>
-            onVarianceReasonChange(line.shipmentLineId, event.target.value)
-          }
+          onChange={(event) => onVarianceReasonChange(line.shipmentLineId, event.target.value)}
           placeholder="Motivo"
           value={line.varianceReason}
         />
@@ -644,7 +617,9 @@ function ReceiptSummaryPanel({
     >
       <div className="grid h-full min-h-0 grid-rows-[auto_auto_minmax(0,1fr)_auto] gap-3">
         <div className="grid gap-2">
-          {commitErrorMessage ? <InlineNotice tone="error">{commitErrorMessage}</InlineNotice> : null}
+          {commitErrorMessage ? (
+            <InlineNotice tone="error">{commitErrorMessage}</InlineNotice>
+          ) : null}
           {detail ? (
             <div className="grid gap-2 rounded-lg border border-[var(--pos-shell-border)] bg-[var(--pos-shell-muted)]/70 px-3 py-2 text-sm">
               <ReceiptSummaryRow label="Origen" value={detail.shipment.source_branch_name} />
@@ -682,10 +657,7 @@ function ReceiptSummaryPanel({
               {notes.trim().length > 0 ? "Observacion agregada" : "Agregar observacion"}
             </span>
             <ChevronRightIcon
-              className={cn(
-                "h-4 w-4 text-slate-400 transition",
-                isNotesExpanded && "rotate-90",
-              )}
+              className={cn("h-4 w-4 text-slate-400 transition", isNotesExpanded && "rotate-90")}
             />
           </button>
           {isNotesExpanded ? (
@@ -883,17 +855,17 @@ function ReceiptDetailSurface({
         </div>
         <ScrollPane className="h-full">
           <div className="min-w-[42rem]">
-          <LineComparisonHeader />
-          {lines.map((line, index) => (
-            <ReceiptLineRow
-              focusToken={focusToken}
-              isPrimaryControl={index === 0}
-              key={line.shipmentLineId}
-              line={line}
-              onReceivedQuantityChange={onReceivedQuantityChange}
-              onVarianceReasonChange={onVarianceReasonChange}
-            />
-          ))}
+            <LineComparisonHeader />
+            {lines.map((line, index) => (
+              <ReceiptLineRow
+                focusToken={focusToken}
+                isPrimaryControl={index === 0}
+                key={line.shipmentLineId}
+                line={line}
+                onReceivedQuantityChange={onReceivedQuantityChange}
+                onVarianceReasonChange={onVarianceReasonChange}
+              />
+            ))}
           </div>
         </ScrollPane>
       </div>
@@ -902,6 +874,7 @@ function ReceiptDetailSurface({
 }
 
 export function TransferReceiptScreen() {
+  const user = usePosAuthStore((state) => state.user);
   const isAuthenticated = usePosAuthStore((state) => state.isAuthenticated);
   const queryClient = useQueryClient();
   const showError = useStatusMessageStore((state) => state.showError);
@@ -911,14 +884,15 @@ export function TransferReceiptScreen() {
   const [selectedTransferId, setSelectedTransferId] = useState<string | null>(null);
   const [receiptLines, setReceiptLines] = useState<TransferReceiptLineDraft[]>([]);
   const [notes, setNotes] = useState("");
-  const [lastReceivedTransfer, setLastReceivedTransfer] =
-    useState<TransferDetailResponse | null>(null);
+  const [lastReceivedTransfer, setLastReceivedTransfer] = useState<TransferDetailResponse | null>(
+    null,
+  );
   const [isConfirmDialogOpen, setIsConfirmDialogOpen] = useState(false);
   const [isNotesExpanded, setIsNotesExpanded] = useState(false);
   const [commitErrorMessage, setCommitErrorMessage] = useState<string | null>(null);
   const [centerView, setCenterView] = useState<TransferReceiptCenterView>("pending");
-  const [selectedHistoryTransferId, setSelectedHistoryTransferId] =
-    useState<string | null>(null);
+  const [selectedHistoryReceiptId, setSelectedHistoryReceiptId] = useState<string | null>(null);
+  const [selectedHistoryTransferId, setSelectedHistoryTransferId] = useState<string | null>(null);
   const [pendingSearchText, setPendingSearchText] = useState("");
   const [pendingScannerText, setPendingScannerText] = useState("");
   const [pendingScannerFolio, setPendingScannerFolio] = useState<string | null>(null);
@@ -930,6 +904,19 @@ export function TransferReceiptScreen() {
 
   const operationsBootstrapQuery = useOperationsBootstrapQuery();
   const currentCashSessionQuery = useCurrentCashSessionQuery();
+  const intention = useTransferIntention(operationsBootstrapQuery.data?.workstation.id ?? "");
+  const clearConfirmedDraft = useCallback(() => {
+    setSelectedTransferId(null);
+    setReceiptLines([]);
+    setNotes("");
+    setIsConfirmDialogOpen(false);
+  }, []);
+  const draftKey = useTransferDraftIdentity(
+    intention.metadata,
+    Boolean(operationsBootstrapQuery.data),
+    clearConfirmedDraft,
+  );
+
   const pendingInboundTransfersQuery = usePendingInboundTransfersQuery();
   const transferDetailQuery = useTransferDetailQuery(
     centerView === "pending" ? selectedTransferId : null,
@@ -937,8 +924,7 @@ export function TransferReceiptScreen() {
   const receiptHistoryQuery = useTransferReceiptHistoryQuery(
     {
       scope: historyScope,
-      sourceBranchId:
-        historySourceBranchId !== "ALL" ? historySourceBranchId : undefined,
+      sourceBranchId: historySourceBranchId !== "ALL" ? historySourceBranchId : undefined,
       status: historyStatus !== "ALL" ? historyStatus : undefined,
     },
     centerView === "history",
@@ -969,7 +955,10 @@ export function TransferReceiptScreen() {
       return;
     }
 
-    const draftState = createTransferReceiptDraftState(transferDetail.shipment);
+    const draftState = createTransferReceiptDraftState(
+      transferDetail.shipment,
+      transferDetail.receipt_progress,
+    );
     setReceiptLines(draftState.lines);
     setNotes("");
     setIsNotesExpanded(false);
@@ -1008,28 +997,43 @@ export function TransferReceiptScreen() {
     mutationFn: async () => {
       if (
         !isAuthenticated ||
+        !user ||
+        !currentCashSessionQuery.data ||
         operationsBootstrapQuery.data === undefined ||
         selectedTransferId === null
       ) {
-        throw new Error(
-          "Se requiere autenticacion, contexto de estacion y un envio seleccionado.",
-        );
+        throw new Error("Se requiere autenticacion, contexto de estacion y un envio seleccionado.");
       }
 
-      return receiveTransfer(selectedTransferId, {
-        workstation_code: operationsBootstrapQuery.data.workstation.code,
-        lines: buildTransferReceiveLines(receiptLines),
-        notes: notes.trim().length > 0 ? notes.trim() : null,
-      });
+      if (intention.error) throw new Error(intention.error);
+      return transferIntentions.begin(
+        {
+          userId: user.id,
+          branchId: operationsBootstrapQuery.data.branch.id,
+          workstationId: operationsBootstrapQuery.data.workstation.id,
+          workstationCode: operationsBootstrapQuery.data.workstation.code,
+          cashSessionId: currentCashSessionQuery.data.id,
+          commandCode: "receive",
+          transferId: selectedTransferId,
+        },
+        {
+          cash_session_id: currentCashSessionQuery.data.id,
+          workstation_code: operationsBootstrapQuery.data.workstation.code,
+          lines: buildTransferReceiveLines(receiptLines),
+          notes: notes.trim().length > 0 ? notes.trim() : null,
+        },
+        draftKey.current ?? null,
+      );
     },
     onSuccess: async (detail) => {
       setLastReceivedTransfer(null);
-      setSelectedHistoryTransferId(detail.shipment.id);
+      setSelectedHistoryTransferId(detail.id);
+      setSelectedHistoryReceiptId(detail.receipt_id);
       setCommitErrorMessage(null);
       setIsConfirmDialogOpen(false);
       clearSelection();
       setCenterView("history");
-      showSuccess(`Recepcion registrada. Folio ${detail.receipt_summary?.folio ?? "REC"}.`);
+      showSuccess(`Recepcion registrada. Folio ${detail.folio}.`);
 
       await Promise.all([
         queryClient.invalidateQueries({
@@ -1040,7 +1044,7 @@ export function TransferReceiptScreen() {
         queryClient.invalidateQueries({
           queryKey: transferDetailQueryKey(
             operationsBootstrapQuery.data!.workstation.code,
-            detail.shipment.id,
+            detail.id,
           ),
         }),
         queryClient.invalidateQueries({
@@ -1048,10 +1052,7 @@ export function TransferReceiptScreen() {
             operationsBootstrapQuery.data!.workstation.code,
             {
               scope: historyScope,
-              sourceBranchId:
-                historySourceBranchId !== "ALL"
-                  ? historySourceBranchId
-                  : undefined,
+              sourceBranchId: historySourceBranchId !== "ALL" ? historySourceBranchId : undefined,
               status: historyStatus !== "ALL" ? historyStatus : undefined,
             },
           ),
@@ -1060,11 +1061,22 @@ export function TransferReceiptScreen() {
     },
   });
 
+  const isCommandPending =
+    commitMutation.isPending ||
+    Boolean(intention.error) ||
+    isCommandIntentionPending(intention.metadata);
+
   const pendingTransfers = useMemo(
     () => pendingInboundTransfersQuery.data?.transfers ?? [],
     [pendingInboundTransfersQuery.data],
   );
   const selectedDetail = transferDetailQuery.data ?? null;
+  const selectedHistoryReceipt = selectedHistoryTransferQuery.data?.receipts.find(
+    (receipt) => receipt.id === selectedHistoryReceiptId,
+  );
+  const selectedHistoryReceiptSummary = selectedHistoryTransferQuery.data?.receipt_summaries.find(
+    (receipt) => receipt.document_id === selectedHistoryReceiptId,
+  );
   const selectedDetailReceivable = isTransferReceivable(selectedDetail);
   const expectedTotalMilli = getTransferReceiptExpectedTotalMilli(receiptLines);
   const receivedTotalMilli = getTransferReceiptReceivedTotalMilli(receiptLines);
@@ -1076,7 +1088,9 @@ export function TransferReceiptScreen() {
   const hasMissingQuantities = hasTransferReceiptMissingQuantities(receiptLines);
   const hasMissingVarianceReason = hasTransferReceiptMissingVarianceReason(receiptLines);
   const hasLineMismatch =
-    selectedDetail !== null && selectedDetail.shipment.lines.length !== receiptLines.length;
+    selectedDetail !== null &&
+    selectedDetail.receipt_progress.filter((line) => Number(line.pending_quantity) > 0).length !==
+      receiptLines.length;
   const transferQueryMessage =
     transferDetailQuery.error !== null
       ? toTransferReceiptErrorMessage(
@@ -1098,12 +1112,11 @@ export function TransferReceiptScreen() {
     hasLoadedLines: receiptLines.length > 0,
     hasSelectedTransfer: selectedTransferId !== null,
     hasVariance: varianceLineCount > 0,
-    isConfirmPending: commitMutation.isPending,
+    isConfirmPending: isCommandPending,
     pendingShipmentCount: pendingTransfers.length,
     requiresQuantityCapture: hasMissingQuantities,
   });
   const activeTimezone = operationsBootstrapQuery.data?.branch.timezone ?? "UTC";
-  const selectedHistoryDetail = selectedHistoryTransferQuery.data ?? null;
   const debouncedPendingSearch = useDebouncedValue(pendingSearchText, 160);
   const pendingOriginOptions = useMemo(() => {
     const seen = new Map<string, string>();
@@ -1113,18 +1126,15 @@ export function TransferReceiptScreen() {
       }
     }
 
-    return Array.from(seen, ([value, label]) => ({ label, value })).sort(
-      (left, right) => left.label.localeCompare(right.label),
+    return Array.from(seen, ([value, label]) => ({ label, value })).sort((left, right) =>
+      left.label.localeCompare(right.label),
     );
   }, [pendingTransfers]);
   const filteredPendingTransfers = useMemo(() => {
     const normalizedSearch = debouncedPendingSearch.trim().toLowerCase();
 
     return pendingTransfers.filter((transfer) => {
-      if (
-        pendingOriginBranchId !== "ALL" &&
-        transfer.source_branch_id !== pendingOriginBranchId
-      ) {
+      if (pendingOriginBranchId !== "ALL" && transfer.source_branch_id !== pendingOriginBranchId) {
         return false;
       }
 
@@ -1132,11 +1142,7 @@ export function TransferReceiptScreen() {
         return true;
       }
 
-      const haystack = [
-        transfer.folio,
-        transfer.source_branch_code,
-        transfer.source_branch_name,
-      ]
+      const haystack = [transfer.folio, transfer.source_branch_code, transfer.source_branch_name]
         .join(" ")
         .toLowerCase();
 
@@ -1229,12 +1235,7 @@ export function TransferReceiptScreen() {
   }, [filteredPendingTransfers, pendingScannerFolio]);
 
   const historyRecords = useMemo(
-    () =>
-      buildReceiptHistoryRecords(
-        receiptHistoryQuery.data,
-        activeTimezone,
-        historySearchText,
-      ),
+    () => buildReceiptHistoryRecords(receiptHistoryQuery.data, activeTimezone, historySearchText),
     [activeTimezone, historySearchText, receiptHistoryQuery.data],
   );
   const lineSummaryItems = useMemo(
@@ -1290,7 +1291,7 @@ export function TransferReceiptScreen() {
             title="Detalle no disponible"
           />
         </PosSummaryPanel>
-      ) : selectedHistoryDetail?.receipt && selectedHistoryDetail.receipt_summary ? (
+      ) : selectedHistoryReceipt && selectedHistoryReceiptSummary ? (
         <OperationDocumentSummaryPanel
           actions={[
             {
@@ -1301,61 +1302,50 @@ export function TransferReceiptScreen() {
               variant: "neutral",
             },
           ]}
-          auditSummary={selectedHistoryDetail.receipt.audit_summary}
+          auditSummary={selectedHistoryReceipt.audit_summary}
           context={{
             branchName:
-              selectedHistoryDetail.receipt.destination_branch_name ??
+              selectedHistoryReceipt.destination_branch_name ??
               operationsBootstrapQuery.data.branch.name,
-            userName: selectedHistoryDetail.receipt.created_by_user_full_name,
-            workstationName: selectedHistoryDetail.receipt.workstation_name,
+            userName: selectedHistoryReceipt.created_by_user_full_name,
+            workstationName: selectedHistoryReceipt.workstation_name,
           }}
-          description={`Origen ${selectedHistoryDetail.receipt.source_branch_name}`}
+          description={`Origen ${selectedHistoryReceipt.source_branch_name}`}
           kind="branchReceipt"
-          lines={buildTransferDocumentLineSummaryItems(selectedHistoryDetail.receipt)}
+          lines={buildTransferDocumentLineSummaryItems(selectedHistoryReceipt)}
           metrics={buildReceiptMetrics({
-            differenceLineCount:
-              selectedHistoryDetail.receipt_summary.quantity_summary.variance_line_count,
+            differenceLineCount: selectedHistoryReceiptSummary.quantity_summary.variance_line_count,
             differenceTotalText: formatDifferenceLabel(
               Math.round(
                 (Number(
-                  selectedHistoryDetail.receipt_summary.quantity_summary.received_total_quantity ??
-                    "0",
+                  selectedHistoryReceiptSummary.quantity_summary.received_total_quantity ?? "0",
                 ) -
-                  Number(
-                    selectedHistoryDetail.receipt_summary.quantity_summary.expected_total_quantity,
-                  )) *
+                  Number(selectedHistoryReceiptSummary.quantity_summary.expected_total_quantity)) *
                   1000,
               ),
             ),
             expectedUnitsText: formatQuantityFromMilliUnits(
-              Number(
-                selectedHistoryDetail.receipt_summary.quantity_summary.expected_total_quantity,
-              ) * 1000,
+              Number(selectedHistoryReceiptSummary.quantity_summary.expected_total_quantity) * 1000,
             ),
-            lineCount:
-              selectedHistoryDetail.receipt_summary.quantity_summary.line_count,
+            lineCount: selectedHistoryReceiptSummary.quantity_summary.line_count,
             receivedUnitsText: formatQuantityFromMilliUnits(
               Number(
-                selectedHistoryDetail.receipt_summary.quantity_summary.received_total_quantity ??
-                  "0",
+                selectedHistoryReceiptSummary.quantity_summary.received_total_quantity ?? "0",
               ) * 1000,
             ),
           })}
-          referenceValue={selectedHistoryDetail.receipt_summary.folio}
-          stateLabel={getTransferStatusLabel(selectedHistoryDetail.receipt.status)}
-          stateTone={getTransferStatusBadgeTone(selectedHistoryDetail.receipt.status)}
+          referenceValue={selectedHistoryReceiptSummary.folio}
+          stateLabel={getTransferStatusLabel(selectedHistoryReceipt.status)}
+          stateTone={getTransferStatusBadgeTone(selectedHistoryReceipt.status)}
           timeZone={activeTimezone}
           timestamps={{
             committedAtLabel: "Confirmado",
-            committedAtValue: selectedHistoryDetail.receipt.committed_at_utc
-              ? formatLocalDateTime(
-                  selectedHistoryDetail.receipt.committed_at_utc,
-                  activeTimezone,
-                )
+            committedAtValue: selectedHistoryReceipt.committed_at_utc
+              ? formatLocalDateTime(selectedHistoryReceipt.committed_at_utc, activeTimezone)
               : null,
             createdAtLabel: "Creado",
             createdAtValue: formatLocalDateTime(
-              selectedHistoryDetail.receipt.created_at_utc,
+              selectedHistoryReceipt.created_at_utc,
               activeTimezone,
             ),
           }}
@@ -1370,9 +1360,7 @@ export function TransferReceiptScreen() {
         >
           <div className="grid h-full place-items-center rounded-xl border border-dashed border-[var(--pos-shell-border)] bg-[var(--pos-shell-muted)] px-4 py-6 text-center">
             <div className="grid max-w-sm gap-1.5">
-              <p className="text-base font-semibold text-slate-950">
-                Selecciona una recepcion.
-              </p>
+              <p className="text-base font-semibold text-slate-950">Selecciona una recepcion.</p>
               <p className="text-sm leading-6 text-slate-600">
                 El panel derecho mostrara folio, cantidades y contexto operativo.
               </p>
@@ -1388,12 +1376,12 @@ export function TransferReceiptScreen() {
         detail={selectedDetail}
         differenceTotalText={differenceTotalText}
         expectedUnitsText={expectedUnitsText}
-        isCommitPending={commitMutation.isPending}
+        isCommitPending={isCommandPending}
         isNotesExpanded={isNotesExpanded}
         notes={notes}
         onClearSelection={clearSelection}
         onCommit={() => {
-          if (commitBlockedReason === null && !commitMutation.isPending) {
+          if (commitBlockedReason === null && !isCommandPending) {
             setCommitErrorMessage(null);
             setIsConfirmDialogOpen(true);
           }
@@ -1484,7 +1472,9 @@ export function TransferReceiptScreen() {
             <CompactPageHeader
               secondaryChips={
                 <ModuleStateChip
-                  tone={centerView === "history" ? "info" : selectedTransferId ? "primary" : "muted"}
+                  tone={
+                    centerView === "history" ? "info" : selectedTransferId ? "primary" : "muted"
+                  }
                 >
                   {centerView === "history"
                     ? `${historyRecords.length} recepciones`
@@ -1633,9 +1623,17 @@ export function TransferReceiptScreen() {
                 <OperationHistoryList
                   emptyDescription="Aun no hay recepciones confirmadas para los filtros seleccionados."
                   loading={receiptHistoryQuery.isPending}
-                  onSelect={(record) => setSelectedHistoryTransferId(record.id)}
+                  onSelect={(record) => {
+                    const receipt = receiptHistoryQuery.data?.records.find(
+                      (item) => item.id === record.id,
+                    );
+                    if (receipt) {
+                      setSelectedHistoryReceiptId(receipt.id);
+                      setSelectedHistoryTransferId(receipt.shipment_id);
+                    }
+                  }}
                   records={historyRecords}
-                  selectedRecordId={selectedHistoryTransferId}
+                  selectedRecordId={selectedHistoryReceiptId}
                 />
               )}
             </PosHistoryView>
@@ -1666,11 +1664,7 @@ export function TransferReceiptScreen() {
                   setLastReceivedTransfer(null);
                 }
                 setReceiptLines((state) =>
-                  updateTransferReceiptLineVarianceReason(
-                    state,
-                    shipmentLineId,
-                    varianceReason,
-                  ),
+                  updateTransferReceiptLineVarianceReason(state, shipmentLineId, varianceReason),
                 );
               }}
               queryError={transferDetailQuery.error}
@@ -1766,7 +1760,7 @@ export function TransferReceiptScreen() {
                   ? `${historyRecords.length} recepciones visibles.`
                   : selectedTransferId === null
                     ? `${filteredPendingTransfers.length} envios pendientes.`
-                  : `${receivedUnitsText} unidades capturadas.`}
+                    : `${receivedUnitsText} unidades capturadas.`}
               </p>
             </div>
             <span className="pos-chip" data-tone="primary">
@@ -1785,7 +1779,7 @@ export function TransferReceiptScreen() {
         differenceTotalText={differenceTotalText}
         expectedUnitsText={expectedUnitsText}
         isOpen={isConfirmDialogOpen}
-        isPending={commitMutation.isPending}
+        isPending={isCommandPending}
         lineCount={receiptLines.length}
         lines={lineSummaryItems}
         onCancel={() => setIsConfirmDialogOpen(false)}

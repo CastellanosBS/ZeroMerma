@@ -5,7 +5,7 @@ from decimal import Decimal
 from typing import Literal
 from uuid import UUID
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 AdminInventoryLocationCode = Literal["BACKROOM", "COUNTER", "IN_TRANSIT", "WASTE"]
 AdminInventoryProductKind = Literal["FINISHED_GOOD", "RAW_MATERIAL", "CONSUMABLE", "DISPOSABLE"]
@@ -173,12 +173,14 @@ class AdminInventoryMovementsResponse(BaseModel):
 
 
 class AdminInventoryAdjustmentRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     adjustment_type: AdminInventoryAdjustmentType
     branch_id: UUID
     location_code: AdminInventoryLocationCode = "BACKROOM"
     notes: str | None = Field(default=None, max_length=500)
     product_id: UUID
-    quantity: Decimal = Field(gt=0)
+    quantity: Decimal = Field(gt=0, max_digits=12, decimal_places=3)
     reason: str = Field(min_length=1, max_length=160)
 
     @field_validator("reason")
@@ -198,17 +200,17 @@ class AdminInventoryAdjustmentRequest(BaseModel):
         return normalized or None
 
 
-class AdminInventoryAdjustmentView(BaseModel):
+class AdminInventoryAdjustmentResultView(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     id: UUID
     adjustment_type: AdminInventoryAdjustmentType
     balance_id: UUID
     branch_id: UUID
     created_at: datetime
-    created_by_user_id: UUID
+    inventory_movement_id: UUID
     location_code: AdminInventoryLocationCode
     new_quantity: Decimal
-    notes: str | None = None
     previous_quantity: Decimal
     product_id: UUID
     quantity: Decimal
-    reason: str

@@ -2,9 +2,10 @@ from __future__ import annotations
 
 from datetime import datetime
 from decimal import Decimal
+from typing import Literal
 from uuid import UUID
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from zeromerma_api.modules.operations.application.schemas import (
     OperationDocumentView,
@@ -15,19 +16,29 @@ from zeromerma_api.modules.operations.application.schemas import (
 
 
 class TransferDispatchCommitLineRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
     product_id: UUID
     quantity: Decimal = Field(gt=Decimal("0"), max_digits=12, decimal_places=3)
     notes: str | None = Field(default=None, max_length=500)
 
 
 class TransferDispatchCommitRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
     workstation_code: str = Field(min_length=1, max_length=64)
+    cash_session_id: UUID
     destination_branch_id: UUID
     lines: list[TransferDispatchCommitLineRequest] = Field(min_length=1)
     notes: str | None = Field(default=None, max_length=1000)
 
+    @model_validator(mode="after")
+    def unique_products(self) -> TransferDispatchCommitRequest:
+        if len({line.product_id for line in self.lines}) != len(self.lines):
+            raise ValueError("Transfer products must be unique.")
+        return self
+
 
 class TransferReceiptLineRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
     shipment_line_id: UUID
     expected_quantity: Decimal = Field(gt=Decimal("0"), max_digits=12, decimal_places=3)
     received_quantity: Decimal = Field(ge=Decimal("0"), max_digits=12, decimal_places=3)
@@ -36,9 +47,45 @@ class TransferReceiptLineRequest(BaseModel):
 
 
 class TransferReceiveRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
     workstation_code: str = Field(min_length=1, max_length=64)
+    cash_session_id: UUID
     lines: list[TransferReceiptLineRequest] = Field(min_length=1)
     notes: str | None = Field(default=None, max_length=1000)
+
+    @model_validator(mode="after")
+    def unique_lines(self) -> TransferReceiveRequest:
+        if len({line.shipment_line_id for line in self.lines}) != len(self.lines):
+            raise ValueError("Receipt lines must be unique.")
+        return self
+
+
+TransferCommandCode = Literal["create", "update", "dispatch", "receive", "cancel"]
+PosTransferCommandCode = Literal["dispatch", "receive"]
+
+
+class TransferCommandLineView(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    shipment_line_id: UUID
+    product_id: UUID
+    sent_quantity: Decimal
+    received_quantity: Decimal
+    pending_quantity: Decimal
+
+
+class TransferCommandResultView(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    id: UUID
+    folio: str
+    status: str
+    origin_branch_id: UUID
+    destination_branch_id: UUID
+    receipt_id: UUID | None
+    cash_session_id: UUID | None
+    committed_at_utc: datetime | None
+    lines: list[TransferCommandLineView]
 
 
 class PendingInboundTransferView(BaseModel):
@@ -93,6 +140,10 @@ class TransferDispatchHistoryResponse(BaseModel):
     records: list[OperationHistoryListItemView]
 
 
+class TransferReceiptHistoryItemView(OperationHistoryListItemView):
+    shipment_id: UUID
+
+
 class TransferReceiptHistoryResponse(BaseModel):
     workstation_code: str
     scope: str
@@ -103,11 +154,12 @@ class TransferReceiptHistoryResponse(BaseModel):
     available_users: list[OperationHistoryFilterOptionView]
     available_source_branches: list[OperationHistoryFilterOptionView]
     available_statuses: list[OperationHistoryFilterOptionView]
-    records: list[OperationHistoryListItemView]
+    records: list[TransferReceiptHistoryItemView]
 
 
 class TransferDetailResponse(BaseModel):
     shipment: OperationDocumentView
     shipment_summary: TransferDocumentSummaryView
-    receipt: OperationDocumentView | None
-    receipt_summary: TransferDocumentSummaryView | None
+    receipts: list[OperationDocumentView]
+    receipt_summaries: list[TransferDocumentSummaryView]
+    receipt_progress: list[TransferCommandLineView]

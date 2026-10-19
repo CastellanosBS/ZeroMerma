@@ -1,10 +1,11 @@
 from __future__ import annotations
 
+from dataclasses import replace
 from datetime import UTC, date, datetime, time
 from typing import Annotated
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
+from fastapi import APIRouter, Depends, HTTPException, Path, Query, Request, Response, status
 from sqlalchemy.orm import Session
 
 from zeromerma_api.db.session import get_session
@@ -21,9 +22,11 @@ from zeromerma_api.modules.corrections.application.admin_schemas import (
     AdminCorrectionsListResponse,
 )
 from zeromerma_api.modules.corrections.application.admin_services import AdminCorrectionsService
+from zeromerma_api.modules.corrections.application.idempotency import CorrectionCommitService
 from zeromerma_api.modules.corrections.application.schemas import (
     CorrectionBootstrapResponse,
     CorrectionCommitRequest,
+    CorrectionCommitResultView,
     CorrectionDocumentView,
     CorrectionSearchResponse,
     CorrectionsHistoryResponse,
@@ -31,7 +34,6 @@ from zeromerma_api.modules.corrections.application.schemas import (
     CorrectionTargetDetailResponse,
 )
 from zeromerma_api.modules.corrections.application.services import (
-    CorrectionCommandService,
     CorrectionQueryService,
 )
 from zeromerma_api.modules.corrections.domain.exceptions import (
@@ -42,11 +44,24 @@ from zeromerma_api.modules.corrections.domain.exceptions import (
     CorrectionReasonNotFoundError,
     CorrectionValidationError,
 )
+from zeromerma_api.modules.idempotency.application.canonicalization import (
+    IDEMPOTENCY_KEY_PATTERN,
+    parse_idempotency_key,
+)
+from zeromerma_api.modules.idempotency.presentation.http import (
+    idempotency_response,
+    require_idempotency_key,
+)
 from zeromerma_api.modules.identity.application.schemas import AuthenticatedUser
 from zeromerma_api.modules.identity.application.services import user_can_access_surface
 from zeromerma_api.modules.identity.domain.constants import IDENTITY_SURFACE_BACKOFFICE
 from zeromerma_api.modules.identity.presentation.dependencies import get_current_user
 from zeromerma_api.modules.operations.domain.exceptions import OperationError
+from zeromerma_api.presentation.errors import error_responses
+
+_REPLAY_RESPONSE = {
+    "headers": {"Idempotency-Replayed": {"$ref": "#/components/headers/IdempotencyReplayed"}}
+}
 
 router = APIRouter(prefix="/v1/corrections", tags=["corrections"])
 admin_router = APIRouter(
@@ -277,20 +292,52 @@ def get_correction_target_detail(
         raise _to_http_exception(error) from error
 
 
-@router.post("/commit", response_model=CorrectionDocumentView, status_code=status.HTTP_201_CREATED)
+@router.post(
+    "/commit",
+    response_model=CorrectionCommitResultView,
+    status_code=status.HTTP_201_CREATED,
+    responses={201: _REPLAY_RESPONSE, 409: {**error_responses()[409], **_REPLAY_RESPONSE}},
+)
 def commit_correction(
     payload: CorrectionCommitRequest,
     request: Request,
+    idempotency_key: Annotated[UUID, Depends(require_idempotency_key)],
     current_user: Annotated[AuthenticatedUser, Depends(get_current_user)],
     session: Annotated[Session, Depends(get_session)],
-) -> CorrectionDocumentView:
+) -> Response:
     try:
-        return CorrectionCommandService().commit_correction(
+        result = CorrectionCommitService().commit(
             session,
             current_user=current_user,
             command=payload,
             request_id=request.headers.get("X-Request-ID"),
+            key=idempotency_key,
         )
+        return idempotency_response(result, request)
     except (BranchAccessError, CatalogError, OperationError, CorrectionError) as error:
         raise _to_http_exception(error) from error
 
+
+@router.get(
+    "/confirmations/{idempotency_key}",
+    response_model=CorrectionCommitResultView,
+    responses={200: _REPLAY_RESPONSE, 409: {**error_responses()[409], **_REPLAY_RESPONSE}},
+)
+def recover_commit_correction(
+    idempotency_key: Annotated[str, Path(pattern=IDEMPOTENCY_KEY_PATTERN)],
+    workstation_code: Annotated[str, Query(min_length=1)],
+    cash_session_id: UUID,
+    request: Request,
+    current_user: Annotated[AuthenticatedUser, Depends(get_current_user)],
+    session: Annotated[Session, Depends(get_session)],
+) -> Response:
+    result = CorrectionCommitService().recover(
+        session,
+        current_user=current_user,
+        key=parse_idempotency_key(idempotency_key),
+        workstation_code=workstation_code,
+        cash_session_id=cash_session_id,
+    )
+    if result.status_code < 300:
+        result = replace(result, status_code=200)
+    return idempotency_response(result, request)

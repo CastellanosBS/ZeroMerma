@@ -21,6 +21,7 @@ from zeromerma_api.modules.inventory.infrastructure.models import (
 )
 from zeromerma_api.modules.outbox.infrastructure.models import OutboxEvent
 from zeromerma_api.testing.authorization import owner_headers
+from zeromerma_api.testing.idempotency import new_idempotency_key
 from zeromerma_api.testing.sessions import login_headers
 
 
@@ -53,7 +54,10 @@ def _create_adjustment(
 ) -> dict[str, object]:
     response = client.post(
         "/v1/admin/inventory/adjustments",
-        headers={**_admin_headers(client), "X-Request-ID": "admin-inventory-adjustment-test"},
+        headers={
+            **{**_admin_headers(client), "X-Request-ID": "admin-inventory-adjustment-test"},
+            "Idempotency-Key": new_idempotency_key(),
+        },
         json={
             "adjustment_type": adjustment_type,
             "branch_id": _get_branch_id(SEED_BRANCH_CODE),
@@ -209,28 +213,28 @@ def test_admin_inventory_adjustment_validates_reason_quantity_product_and_branch
 
     reason_response = client.post(
         "/v1/admin/inventory/adjustments",
-        headers=headers,
+        headers={**headers, "Idempotency-Key": new_idempotency_key()},
         json={**base_payload, "reason": " "},
     )
     assert reason_response.status_code == 422
 
     quantity_response = client.post(
         "/v1/admin/inventory/adjustments",
-        headers=headers,
+        headers={**headers, "Idempotency-Key": new_idempotency_key()},
         json={**base_payload, "quantity": "0"},
     )
     assert quantity_response.status_code == 422
 
     product_response = client.post(
         "/v1/admin/inventory/adjustments",
-        headers=headers,
+        headers={**headers, "Idempotency-Key": new_idempotency_key()},
         json={**base_payload, "product_id": "00000000-0000-0000-0000-000000000000"},
     )
     assert product_response.status_code == 404
 
     branch_response = client.post(
         "/v1/admin/inventory/adjustments",
-        headers=headers,
+        headers={**headers, "Idempotency-Key": new_idempotency_key()},
         json={**base_payload, "branch_id": "00000000-0000-0000-0000-000000000000"},
     )
     assert branch_response.status_code == 404

@@ -355,8 +355,13 @@ boundaries are recorded in
 
 ZM-FIN-029 adopts the foundation in sales; 030 covers the seven existing order
 commands and their embedded payment effects; 031 covers the existing return and
-its CASH refund; 032 covers the four existing cash commands. Tasks 033–035 cover
-transfers, corrections/waste and production.
+its CASH refund; 032 covers the four existing cash commands. Tasks 033–035 adopt
+23 existing commands across transfers/receipts, purchases, corrections, counter
+transfers, waste, inventory adjustments and production. Their minimized snapshots,
+nine recovery GETs, partial receipts and browser recovery behavior are described in
+[the operational validation record](../implementation/operations-idempotency-validation.md).
+The common browser coordinator invalidates volatile bodies across login changes,
+including asynchronous lock/digest windows; unknown results keep their original key.
 The wider review of commit ownership belongs to 039 and unified causal context to
 040. Historical order request correlation is not converted into fabricated
 idempotency records during adoption.

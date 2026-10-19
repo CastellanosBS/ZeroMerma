@@ -23,6 +23,7 @@ from zeromerma_api.modules.inventory.infrastructure.models import (
 from zeromerma_api.modules.operations.infrastructure.models import OperationDocument
 from zeromerma_api.modules.outbox.infrastructure.models import OutboxEvent
 from zeromerma_api.testing.authorization import owner_headers
+from zeromerma_api.testing.idempotency import new_idempotency_key
 from zeromerma_api.testing.sessions import login_headers
 
 
@@ -51,7 +52,7 @@ def _create_stock(
 ) -> dict[str, object]:
     response = client.post(
         "/v1/admin/inventory/adjustments",
-        headers=_admin_headers(client),
+        headers={**_admin_headers(client), "Idempotency-Key": new_idempotency_key()},
         json={
             "adjustment_type": "INCREASE",
             "branch_id": _get_branch_id(),
@@ -75,7 +76,10 @@ def _create_waste(
 ) -> dict[str, object]:
     response = client.post(
         "/v1/admin/waste",
-        headers={**_admin_headers(client), "X-Request-ID": "admin-waste-test"},
+        headers={
+            **{**_admin_headers(client), "X-Request-ID": "admin-waste-test"},
+            "Idempotency-Key": new_idempotency_key(),
+        },
         json={
             "branch_id": _get_branch_id(),
             "location_code": "BACKROOM",
@@ -86,7 +90,9 @@ def _create_waste(
         },
     )
     assert response.status_code == 201
-    return dict(response.json())
+    detail = client.get(f"/v1/admin/waste/{response.json()['id']}", headers=_admin_headers(client))
+    assert detail.status_code == 200
+    return dict(detail.json())
 
 
 def test_admin_waste_list_empty_and_rejects_pos_surface_user(client: TestClient) -> None:
@@ -222,12 +228,16 @@ def test_admin_waste_validates_note_reason_stock_and_quantity(client: TestClient
     }
 
     quantity_response = client.post(
-        "/v1/admin/waste", headers=headers, json={**base_payload, "quantity": "0"}
+        "/v1/admin/waste",
+        headers={**headers, "Idempotency-Key": new_idempotency_key()},
+        json={**base_payload, "quantity": "0"},
     )
     assert quantity_response.status_code == 422
 
     missing_note_response = client.post(
-        "/v1/admin/waste", headers=headers, json={**base_payload, "notes": None}
+        "/v1/admin/waste",
+        headers={**headers, "Idempotency-Key": new_idempotency_key()},
+        json={**base_payload, "notes": None},
     )
     assert missing_note_response.status_code == 409
     assert (
@@ -237,18 +247,22 @@ def test_admin_waste_validates_note_reason_stock_and_quantity(client: TestClient
 
     other_note_response = client.post(
         "/v1/admin/waste",
-        headers=headers,
+        headers={**headers, "Idempotency-Key": new_idempotency_key()},
         json={**base_payload, "reason_code": "OTHER", "notes": None},
     )
     assert other_note_response.status_code == 409
 
     missing_reason_response = client.post(
-        "/v1/admin/waste", headers=headers, json={**base_payload, "reason_code": "NOPE"}
+        "/v1/admin/waste",
+        headers={**headers, "Idempotency-Key": new_idempotency_key()},
+        json={**base_payload, "reason_code": "NOPE"},
     )
     assert missing_reason_response.status_code == 404
 
     excess_response = client.post(
-        "/v1/admin/waste", headers=headers, json={**base_payload, "quantity": "5.000"}
+        "/v1/admin/waste",
+        headers={**headers, "Idempotency-Key": new_idempotency_key()},
+        json={**base_payload, "quantity": "5.000"},
     )
     assert excess_response.status_code == 409
     assert (

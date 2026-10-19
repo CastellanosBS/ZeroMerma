@@ -323,6 +323,77 @@ export async function dropNextCashCommandResponse(
   return { committed };
 }
 
+/** Drop a real successful response only for the remaining idempotency adoption commands. */
+export async function dropNextOperationalCommandResponse(
+  page: PageObservation,
+  apiUrl: string,
+  evidence: NetworkEvidence,
+  path: string,
+  method: "POST" | "PATCH" = "POST",
+) {
+  const id = "[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}";
+  const allowed =
+    method === "PATCH"
+      ? new RegExp(`^/v1/admin/(transfers|purchases|production)/${id}$`).test(path)
+      : [
+          "/v1/transfers/dispatch/commit",
+          "/v1/operations/counter-transfer/commit",
+          "/v1/operations/waste/commit",
+          "/v1/corrections/commit",
+          "/v1/admin/transfers",
+          "/v1/admin/purchases",
+          "/v1/admin/purchases/direct-entry",
+          "/v1/admin/production",
+          "/v1/admin/waste",
+          "/v1/admin/inventory/adjustments",
+        ].includes(path) ||
+        [
+          `^/v1/transfers/${id}/receive$`,
+          `^/v1/admin/transfers/${id}/(dispatch|receive|cancel)$`,
+          `^/v1/admin/purchases/${id}/(confirm|receive|cancel)$`,
+          `^/v1/admin/production/${id}/(start|complete|cancel)$`,
+        ].some((pattern) => new RegExp(pattern).test(path));
+  if (
+    realEnvironment(path.startsWith("/v1/admin/") ? "backoffice" : "pos").apiUrl !== apiUrl ||
+    !allowed
+  )
+    throw new Error("Operational faults require an allowlisted isolated command path.");
+  const register = saleFaultRegistrations.get(page);
+  if (!register) throw new Error("Real API observation must precede operational response loss.");
+  let resolveCommitted!: (value: unknown) => void;
+  let rejectCommitted!: (reason: unknown) => void;
+  const committed = new Promise<unknown>((resolve, reject) => {
+    resolveCommitted = resolve;
+    rejectCommitted = reject;
+  });
+  await register(
+    `${apiUrl}${path}`,
+    async (route) => {
+      try {
+        if (route.request().method() !== method)
+          throw new Error("The operational method does not match its allowlisted command.");
+        const response = await route.fetch({ maxRedirects: 0 });
+        if (![200, 201].includes(response.status()))
+          throw new Error(
+            `Expected a real committed operational command, received ${response.status()}.`,
+          );
+        evidence.push({
+          method,
+          path: path.replace(/[0-9a-f]{8}-[0-9a-f-]{27,}/gi, "{id}"),
+          status: response.status(),
+        });
+        resolveCommitted(await response.json());
+      } catch (error) {
+        rejectCommitted(error);
+      } finally {
+        await route.abort("failed");
+      }
+    },
+    { times: 1 },
+  );
+  return { committed };
+}
+
 function sanitize(value: string): string {
   let result = value;
   for (const name of [
@@ -330,6 +401,8 @@ function sanitize(value: string): string {
     "ZM_E2E_POS_EMAIL",
     "ZM_E2E_BACKOFFICE_EMAIL",
     "ZM_E2E_ORDER_OPERATOR_EMAIL",
+    "ZM_E2E_ORDER_CASHIER_EMAIL",
+    "ZM_E2E_OPERATIONS_OPERATOR_EMAIL",
   ]) {
     const secret = process.env[name];
     if (secret) result = result.split(secret).join("[REDACTED]");

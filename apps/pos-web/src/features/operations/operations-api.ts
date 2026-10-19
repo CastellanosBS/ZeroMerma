@@ -1,6 +1,7 @@
 import type {
   CounterTransferCommitRequest,
   OperationDocumentView,
+  OperationCommitResultView,
   OperationHistoryResponse,
   OperationsBootstrapResponse,
   OperationsCatalogResponse,
@@ -67,8 +68,10 @@ export function getOperationsClassProducts(
 
 export function commitCounterTransfer(
   payload: CounterTransferCommitRequest,
-): Promise<OperationDocumentView> {
-  return requestJson<OperationDocumentView>({
+  idempotencyKey: string,
+): Promise<OperationCommitResultView> {
+  return requestJson<OperationCommitResultView>({
+    headers: { "Idempotency-Key": idempotencyKey },
     body: payload,
     method: "POST",
     path: "/v1/operations/counter-transfer/commit",
@@ -77,8 +80,10 @@ export function commitCounterTransfer(
 
 export function commitWasteRecord(
   payload: WasteCommitRequest,
-): Promise<OperationDocumentView> {
-  return requestJson<OperationDocumentView>({
+  idempotencyKey: string,
+): Promise<OperationCommitResultView> {
+  return requestJson<OperationCommitResultView>({
+    headers: { "Idempotency-Key": idempotencyKey },
     body: payload,
     method: "POST",
     path: "/v1/operations/waste/commit",

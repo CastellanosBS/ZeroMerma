@@ -24,6 +24,7 @@ from zeromerma_api.modules.inventory.infrastructure.models import (
 from zeromerma_api.modules.outbox.infrastructure.models import OutboxEvent
 from zeromerma_api.modules.suppliers.infrastructure.models import Supplier, SupplierProduct
 from zeromerma_api.testing.authorization import owner_headers
+from zeromerma_api.testing.idempotency import new_idempotency_key
 from zeromerma_api.testing.sessions import login_headers
 
 
@@ -137,13 +138,22 @@ def _create_purchase(client: TestClient, *, confirm_now: bool = False) -> dict[s
     supplier = _create_supplier(client, code=f"SUP-{suffix}", tax_id=f"CMP{suffix}")
     response = client.post(
         "/v1/admin/purchases",
-        headers={**_admin_headers(client), "X-Request-ID": "admin-purchase-create"},
+        headers={
+            **{**_admin_headers(client), "X-Request-ID": "admin-purchase-create"},
+            "Idempotency-Key": new_idempotency_key(),
+        },
         json=_purchase_payload(
             confirm_now=confirm_now, supplier_id=str(supplier["overview"]["id"])
         ),
     )
     assert response.status_code == 201
-    return dict(response.json())
+    return _purchase_detail(client, response.json()["id"])
+
+
+def _purchase_detail(client: TestClient, purchase_id: str) -> dict:
+    response = client.get(f"/v1/admin/purchases/{purchase_id}", headers=_admin_headers(client))
+    assert response.status_code == 200
+    return response.json()
 
 
 def test_admin_purchases_list_empty_and_rejects_pos_surface_user(client: TestClient) -> None:
@@ -231,7 +241,7 @@ def test_admin_purchases_validates_required_fields_and_invalid_values(client: Te
 
     missing_supplier_response = client.post(
         "/v1/admin/purchases",
-        headers=headers,
+        headers={**headers, "Idempotency-Key": new_idempotency_key()},
         json={
             **_purchase_payload(supplier_id=str(supplier["overview"]["id"])),
             "supplier_id": str(uuid.uuid4()),
@@ -241,14 +251,14 @@ def test_admin_purchases_validates_required_fields_and_invalid_values(client: Te
 
     empty_lines_response = client.post(
         "/v1/admin/purchases",
-        headers=headers,
+        headers={**headers, "Idempotency-Key": new_idempotency_key()},
         json={**_purchase_payload(supplier_id=str(supplier["overview"]["id"])), "lines": []},
     )
     assert empty_lines_response.status_code == 422
 
     invalid_quantity_response = client.post(
         "/v1/admin/purchases",
-        headers=headers,
+        headers={**headers, "Idempotency-Key": new_idempotency_key()},
         json={
             **_purchase_payload(supplier_id=str(supplier["overview"]["id"])),
             "lines": [
@@ -264,7 +274,7 @@ def test_admin_purchases_validates_required_fields_and_invalid_values(client: Te
 
     invalid_cost_response = client.post(
         "/v1/admin/purchases",
-        headers=headers,
+        headers={**headers, "Idempotency-Key": new_idempotency_key()},
         json={
             **_purchase_payload(supplier_id=str(supplier["overview"]["id"])),
             "lines": [
@@ -287,14 +297,18 @@ def test_admin_purchases_confirm_and_receive_full_purchase_creates_inventory_mov
     line_id = payload["lines"][0]["purchase_line_id"]
 
     confirm_response = client.post(
-        f"/v1/admin/purchases/{purchase_id}/confirm", headers=_admin_headers(client)
+        f"/v1/admin/purchases/{purchase_id}/confirm",
+        headers={**_admin_headers(client), "Idempotency-Key": new_idempotency_key()},
     )
     assert confirm_response.status_code == 200
-    assert confirm_response.json()["overview"]["status"] == "ORDERED"
+    assert confirm_response.json()["status"] == "ORDERED"
 
     receive_response = client.post(
         f"/v1/admin/purchases/{purchase_id}/receive",
-        headers={**_admin_headers(client), "X-Request-ID": "admin-purchase-receive"},
+        headers={
+            **{**_admin_headers(client), "X-Request-ID": "admin-purchase-receive"},
+            "Idempotency-Key": new_idempotency_key(),
+        },
         json={
             "lines": [
                 {
@@ -308,7 +322,7 @@ def test_admin_purchases_confirm_and_receive_full_purchase_creates_inventory_mov
     )
 
     assert receive_response.status_code == 200
-    received = receive_response.json()
+    received = _purchase_detail(client, receive_response.json()["id"])
     assert received["overview"]["status"] == "RECEIVED"
     assert Decimal(str(received["receipt"]["received_quantity"])) == Decimal("5.000")
     assert received["inventory_impact"]["integration_available"] is True
@@ -344,7 +358,7 @@ def test_admin_purchases_partial_receipt_requires_reason_and_prevents_over_recei
 
     missing_reason_response = client.post(
         f"/v1/admin/purchases/{purchase_id}/receive",
-        headers=headers,
+        headers={**headers, "Idempotency-Key": new_idempotency_key()},
         json={"lines": [{"purchase_line_id": line_id, "received_quantity": "2.000"}]},
     )
     assert missing_reason_response.status_code == 409
@@ -355,7 +369,7 @@ def test_admin_purchases_partial_receipt_requires_reason_and_prevents_over_recei
 
     partial_response = client.post(
         f"/v1/admin/purchases/{purchase_id}/receive",
-        headers=headers,
+        headers={**headers, "Idempotency-Key": new_idempotency_key()},
         json={
             "lines": [
                 {
@@ -367,12 +381,12 @@ def test_admin_purchases_partial_receipt_requires_reason_and_prevents_over_recei
         },
     )
     assert partial_response.status_code == 200
-    assert partial_response.json()["overview"]["status"] == "PARTIALLY_RECEIVED"
-    assert partial_response.json()["overview"]["has_discrepancy"] is True
+    assert partial_response.json()["status"] == "PARTIALLY_RECEIVED"
+    assert _purchase_detail(client, purchase_id)["overview"]["has_discrepancy"] is True
 
     over_response = client.post(
         f"/v1/admin/purchases/{purchase_id}/receive",
-        headers=headers,
+        headers={**headers, "Idempotency-Key": new_idempotency_key()},
         json={
             "lines": [
                 {
@@ -393,7 +407,10 @@ def test_admin_purchases_direct_entry_creates_received_document_and_inventory(
     supplier = _create_supplier(client)
     response = client.post(
         "/v1/admin/purchases/direct-entry",
-        headers={**_admin_headers(client), "X-Request-ID": "admin-direct-entry"},
+        headers={
+            **{**_admin_headers(client), "X-Request-ID": "admin-direct-entry"},
+            "Idempotency-Key": new_idempotency_key(),
+        },
         json={
             "branch_id": _get_branch_id(),
             "external_document_number": "FAC-200",
@@ -411,7 +428,7 @@ def test_admin_purchases_direct_entry_creates_received_document_and_inventory(
     )
 
     assert response.status_code == 201
-    payload = response.json()
+    payload = _purchase_detail(client, response.json()["id"])
     assert payload["overview"]["document_type"] == "DIRECT_ENTRY"
     assert payload["overview"]["status"] == "RECEIVED"
     assert payload["receipt"]["receipt_count"] == 1
@@ -428,25 +445,25 @@ def test_admin_purchases_cancel_draft_and_block_cancel_after_receipt(client: Tes
     draft_id = draft["overview"]["id"]
     cancel_response = client.post(
         f"/v1/admin/purchases/{draft_id}/cancel",
-        headers=_admin_headers(client),
+        headers={**_admin_headers(client), "Idempotency-Key": new_idempotency_key()},
         json={"reason": "Orden duplicada"},
     )
     assert cancel_response.status_code == 200
-    assert cancel_response.json()["overview"]["status"] == "CANCELLED"
+    assert cancel_response.json()["status"] == "CANCELLED"
 
     received = _create_purchase(client, confirm_now=True)
     received_id = received["overview"]["id"]
     line_id = received["lines"][0]["purchase_line_id"]
     receive_response = client.post(
         f"/v1/admin/purchases/{received_id}/receive",
-        headers=_admin_headers(client),
+        headers={**_admin_headers(client), "Idempotency-Key": new_idempotency_key()},
         json={"lines": [{"purchase_line_id": line_id, "received_quantity": "5.000"}]},
     )
     assert receive_response.status_code == 200
 
     cancel_received_response = client.post(
         f"/v1/admin/purchases/{received_id}/cancel",
-        headers=_admin_headers(client),
+        headers={**_admin_headers(client), "Idempotency-Key": new_idempotency_key()},
         json={"reason": "No se puede cancelar"},
     )
     assert cancel_received_response.status_code == 409

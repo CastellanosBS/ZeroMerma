@@ -1,3 +1,9 @@
+import { isCommandIntentionPending } from "@zeromerma/api-client";
+import { operationIntentions } from "../operation-commands/operation-command-intent";
+import {
+  useOperationIntention,
+  useOperationDraftIdentity,
+} from "../operation-commands/use-operation-intention";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Navigate } from "@tanstack/react-router";
 import {
@@ -12,7 +18,10 @@ import {
 } from "react";
 
 import { useAppShellRightPanel } from "../../components/app-shell-right-panel";
-import { CapturedProductLineList, CapturedProductLineRow } from "../../components/captured-product-lines";
+import {
+  CapturedProductLineList,
+  CapturedProductLineRow,
+} from "../../components/captured-product-lines";
 import { CatalogSelectionCard } from "../../components/catalog-selection-card";
 import { CatalogVisual } from "../../components/catalog-visual";
 import {
@@ -43,10 +52,11 @@ import type {
   CashCloseCounterClassAvailabilityView,
   CashCloseReconciliationProductView,
   CashCloseReconciliationResponse,
-  CorrectionDocumentView,
+  CorrectionCommitResultView,
   CorrectionReasonView,
   CounterTransferCommitRequest,
   OperationDocumentView,
+  OperationCommitResultView,
   OperationHistoryResponse,
 } from "../../lib/api-contracts";
 import { formatCompactLocalDateTime } from "../../lib/formatters";
@@ -63,7 +73,7 @@ import {
   useCashCloseReconciliationQuery,
 } from "../cash-close/queries";
 import { useCurrentCashSessionQuery } from "../cash-session-open/queries";
-import { commitCorrection } from "../corrections/corrections-api";
+
 import {
   correctionTargetDetailQueryKey,
   correctionsBootstrapQueryKey,
@@ -100,7 +110,7 @@ import {
   sortOperationalProducts,
   updateOperationLineQuantity,
 } from "./model";
-import { commitCounterTransfer } from "./operations-api";
+
 import {
   operationDocumentQueryKey,
   operationHistoryQueryKey,
@@ -152,14 +162,6 @@ function useDebouncedValue(value: string, delayMs: number): string {
 
 function isNumpadSubmitKey(event: ReactKeyboardEvent<HTMLInputElement>) {
   return event.key === "Enter" || event.key === "NumpadEnter";
-}
-
-function createRequestId(scope: string): string {
-  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
-    return `${scope}-${crypto.randomUUID()}`;
-  }
-
-  return `${scope}-${Date.now()}-${Math.random().toString(16).slice(2)}`;
 }
 
 function getTransferStateLabel(lineCount: number, isCommitPending: boolean): string {
@@ -229,9 +231,7 @@ function getHistoryDaypartLabel(daypart: HistoryDaypartFilter): string {
   }
 }
 
-function getHistoryRecordTimestamp(
-  record: OperationHistoryResponse["records"][number],
-): string {
+function getHistoryRecordTimestamp(record: OperationHistoryResponse["records"][number]): string {
   return record.committed_at_utc ?? record.created_at_utc;
 }
 
@@ -369,9 +369,7 @@ function getAdjustmentDraftActiveLines(draft: CounterTransferAdjustmentDraft) {
 }
 
 function getAdjustmentDraftChangedLines(draft: CounterTransferAdjustmentDraft) {
-  return getAdjustmentDraftActiveLines(draft).filter(
-    (item) => item.deltaQuantityMilliUnits !== 0,
-  );
+  return getAdjustmentDraftActiveLines(draft).filter((item) => item.deltaQuantityMilliUnits !== 0);
 }
 
 function getAdjustmentDraftInvalidLineCount(draft: CounterTransferAdjustmentDraft): number {
@@ -409,7 +407,7 @@ export function CounterTransferScreen() {
   const [selectionErrorMessage, setSelectionErrorMessage] = useState<string | null>(null);
   const [commitErrorMessage, setCommitErrorMessage] = useState<string | null>(null);
   const [lastCommittedDocument, setLastCommittedDocument] =
-    useState<OperationDocumentView | null>(null);
+    useState<OperationCommitResultView | null>(null);
   const [currentView, setCurrentView] = useState<CounterTransferView>("capture");
   const [historyScope, setHistoryScope] = useState("CURRENT_SHIFT");
   const [historyCashierId, setHistoryCashierId] = useState("ALL");
@@ -422,7 +420,7 @@ export function CounterTransferScreen() {
   );
   const [adjustmentErrorMessage, setAdjustmentErrorMessage] = useState<string | null>(null);
   const [lastCommittedCorrection, setLastCommittedCorrection] =
-    useState<CorrectionDocumentView | null>(null);
+    useState<CorrectionCommitResultView | null>(null);
   const quantityInputRef = useRef<HTMLInputElement>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
   const lastAutoFocusedGridKeyRef = useRef<string | null>(null);
@@ -502,19 +500,47 @@ export function CounterTransferScreen() {
     setCommitErrorMessage(null);
   }
 
+  const user = usePosAuthStore((state) => state.user);
+  const intentionState = useOperationIntention(operationsBootstrapQuery.data?.workstation.id ?? "");
+  const intentionBlocked =
+    Boolean(intentionState.error) || isCommandIntentionPending(intentionState.metadata);
+  const observedKey = useOperationDraftIdentity(
+    intentionState.metadata,
+    Boolean(operationsBootstrapQuery.data),
+    () => {
+      setDraftState(createInitialOperationDraftState());
+      setNotes("");
+      setAdjustmentDraft(createAdjustmentDraft(null, correctionReasons));
+      setHistoryDetailMode("detail");
+    },
+  );
   const commitMutation = useMutation({
     mutationFn: async () => {
-      if (!isAuthenticated || operationsBootstrapQuery.data === undefined) {
+      if (!user || operationsBootstrapQuery.data === undefined || !currentCashSessionQuery.data) {
         throw new Error("No hay contexto operativo para registrar el movimiento.");
       }
 
+      if (intentionState.error) throw new Error(intentionState.error);
       const payload: CounterTransferCommitRequest = {
+        cash_session_id: currentCashSessionQuery.data.id,
         lines: buildOperationCommitLines(draftState.lines),
         notes: notes.trim().length > 0 ? notes.trim() : null,
         workstation_code: operationsBootstrapQuery.data.workstation.code,
       };
 
-      return commitCounterTransfer(payload);
+      return operationIntentions.begin(
+        {
+          userId: user.id,
+          branchId: operationsBootstrapQuery.data.branch.id,
+          workstationId: operationsBootstrapQuery.data.workstation.id,
+          workstationCode: operationsBootstrapQuery.data.workstation.code,
+          cashSessionId: currentCashSessionQuery.data.id,
+          targetDocumentId: null,
+          commandCode: "counter-transfer",
+        },
+        { commandCode: "counter-transfer", body: payload },
+        observedKey.current ?? null,
+      );
     },
     onError: (error) => {
       const message = toOperationalErrorMessage(
@@ -529,7 +555,7 @@ export function CounterTransferScreen() {
       setNotes("");
       setSelectionErrorMessage(null);
       setCommitErrorMessage(null);
-      setLastCommittedDocument(document);
+      if ("document_type" in document) setLastCommittedDocument(document);
       showSuccess(`Movimiento a mostrador registrado. Folio ${document.folio}.`);
       void queryClient.invalidateQueries({
         queryKey: operationHistoryQueryKey(appEnv.VITE_POS_WORKSTATION_CODE, "COUNTER_TRANSFER", {
@@ -548,7 +574,12 @@ export function CounterTransferScreen() {
   const adjustmentMutation = useMutation({
     mutationFn: async () => {
       const selectedDocument = selectedHistoryDocumentQuery.data;
-      if (!isAuthenticated || !selectedDocument) {
+      if (
+        !user ||
+        !selectedDocument ||
+        !operationsBootstrapQuery.data ||
+        !currentCashSessionQuery.data
+      ) {
         throw new Error("Selecciona un movimiento antes de aplicar un ajuste.");
       }
 
@@ -568,20 +599,37 @@ export function CounterTransferScreen() {
         throw new Error("Confirma el ajuste de alto impacto antes de registrarlo.");
       }
 
-      return commitCorrection({
-        payload: {
-          high_impact_acknowledged: adjustmentDraft.highImpactAcknowledged,
-          lines: adjustmentActiveLines.map(({ deltaQuantityMilliUnits, line }) => ({
-            delta_quantity: formatSignedQuantityForApi(deltaQuantityMilliUnits),
-            product_id: line.productId,
-            target_line_id: line.lineId,
-          })),
-          reason_code: adjustmentDraft.reasonCode,
-          target_document_id: selectedDocument.id,
-          workstation_code: appEnv.VITE_POS_WORKSTATION_CODE,
+      if (intentionState.error) throw new Error(intentionState.error);
+      const result = await operationIntentions.begin(
+        {
+          userId: user.id,
+          branchId: operationsBootstrapQuery.data.branch.id,
+          workstationId: operationsBootstrapQuery.data.workstation.id,
+          workstationCode: appEnv.VITE_POS_WORKSTATION_CODE,
+          cashSessionId: currentCashSessionQuery.data.id,
+          targetDocumentId: selectedDocument.id,
+          commandCode: "correction",
         },
-        requestId: createRequestId("counter-transfer-adjustment"),
-      });
+        {
+          commandCode: "correction",
+          body: {
+            cash_session_id: currentCashSessionQuery.data.id,
+            high_impact_acknowledged: adjustmentDraft.highImpactAcknowledged,
+            lines: adjustmentActiveLines.map(({ deltaQuantityMilliUnits, line }) => ({
+              delta_quantity: formatSignedQuantityForApi(deltaQuantityMilliUnits),
+              product_id: line.productId,
+              target_line_id: line.lineId,
+            })),
+            reason_code: adjustmentDraft.reasonCode,
+            target_document_id: selectedDocument.id,
+            workstation_code: appEnv.VITE_POS_WORKSTATION_CODE,
+          },
+        },
+        observedKey.current ?? null,
+      );
+      if (!("target_document_id" in result))
+        throw new Error("El resultado no corresponde a un ajuste.");
+      return result;
     },
     onError: (error) => {
       const message = toOperationalErrorMessage(error, "No fue posible registrar el ajuste.");
@@ -591,7 +639,9 @@ export function CounterTransferScreen() {
     onSuccess: async (correction) => {
       setLastCommittedCorrection(correction);
       setHistoryDetailMode("detail");
-      setAdjustmentDraft(createAdjustmentDraft(selectedHistoryDocumentQuery.data ?? null, correctionReasons));
+      setAdjustmentDraft(
+        createAdjustmentDraft(selectedHistoryDocumentQuery.data ?? null, correctionReasons),
+      );
       setAdjustmentErrorMessage(null);
       showSuccess(`Ajuste ${correction.folio} registrado correctamente.`);
       await Promise.all([
@@ -691,7 +741,7 @@ export function CounterTransferScreen() {
     getItemProps: getProductItemProps,
   } = productGridFocus;
 
-  const commitMutationIsPending = commitMutation.isPending;
+  const commitMutationIsPending = commitMutation.isPending || intentionBlocked;
   const canSubmit =
     isAuthenticated &&
     operationsBootstrapQuery.data !== undefined &&
@@ -712,10 +762,7 @@ export function CounterTransferScreen() {
       setSelectionErrorMessage(null);
     } catch (error) {
       setSelectionErrorMessage(
-        toOperationalErrorMessage(
-          error,
-          "Confirma el producto y la cantidad antes de agregar.",
-        ),
+        toOperationalErrorMessage(error, "Confirma el producto y la cantidad antes de agregar."),
       );
     }
   }, [draftState.pendingSelection]);
@@ -734,17 +781,20 @@ export function CounterTransferScreen() {
     commitMutation.mutate();
   }, [canSubmit, commitMutation, lineCount, showWarning]);
 
-  const handleLineQuantityChange = useCallback((lineKey: string, quantityMilliUnits: number) => {
-    if (quantityMilliUnits <= 0) {
-      showWarning("Captura una cantidad mayor que cero.");
-      return;
-    }
+  const handleLineQuantityChange = useCallback(
+    (lineKey: string, quantityMilliUnits: number) => {
+      if (quantityMilliUnits <= 0) {
+        showWarning("Captura una cantidad mayor que cero.");
+        return;
+      }
 
-    updateDraftState((state) => ({
-      ...state,
-      lines: updateLineQuantity(state.lines, lineKey, quantityMilliUnits),
-    }));
-  }, [showWarning]);
+      updateDraftState((state) => ({
+        ...state,
+        lines: updateLineQuantity(state.lines, lineKey, quantityMilliUnits),
+      }));
+    },
+    [showWarning],
+  );
 
   const handleLineRemove = useCallback((lineKey: string) => {
     updateDraftState((state) => ({
@@ -753,19 +803,25 @@ export function CounterTransferScreen() {
     }));
   }, []);
 
-  const handleLineIncrement = useCallback((line: OperationLine) => {
-    handleLineQuantityChange(line.key, line.quantityMilliUnits + 1000);
-  }, [handleLineQuantityChange]);
+  const handleLineIncrement = useCallback(
+    (line: OperationLine) => {
+      handleLineQuantityChange(line.key, line.quantityMilliUnits + 1000);
+    },
+    [handleLineQuantityChange],
+  );
 
-  const handleLineDecrement = useCallback((line: OperationLine) => {
-    const nextQuantity = line.quantityMilliUnits - 1000;
-    if (nextQuantity <= 0) {
-      handleLineRemove(line.key);
-      return;
-    }
+  const handleLineDecrement = useCallback(
+    (line: OperationLine) => {
+      const nextQuantity = line.quantityMilliUnits - 1000;
+      if (nextQuantity <= 0) {
+        handleLineRemove(line.key);
+        return;
+      }
 
-    handleLineQuantityChange(line.key, nextQuantity);
-  }, [handleLineQuantityChange, handleLineRemove]);
+      handleLineQuantityChange(line.key, nextQuantity);
+    },
+    [handleLineQuantityChange, handleLineRemove],
+  );
 
   const openHistory = useCallback(() => {
     setHistoryScope("CURRENT_SHIFT");
@@ -998,7 +1054,7 @@ export function CounterTransferScreen() {
         error={selectedHistoryDocumentQuery.error}
         isAdjustmentHighImpact={isAdjustmentHighImpact}
         isLoading={selectedHistoryDocumentQuery.isPending}
-        isSavingAdjustment={adjustmentMutation.isPending}
+        isSavingAdjustment={adjustmentMutation.isPending || intentionBlocked}
         lastCommittedCorrection={lastCommittedCorrection}
         onAdjustmentDraftChange={setAdjustmentDraft}
         onCancelAdjustment={handleCancelHistoryAdjustment}
@@ -1012,7 +1068,9 @@ export function CounterTransferScreen() {
         onStartAdjustment={handleStartHistoryAdjustment}
         timeZone={operationsBootstrapQuery.data.branch.timezone}
       />
-    ) : operationsBootstrapQuery.data && currentCashSessionQuery.data && currentView === "history" ? (
+    ) : operationsBootstrapQuery.data &&
+      currentCashSessionQuery.data &&
+      currentView === "history" ? (
       <CounterTransferCounterStateRightPanel
         counterAvailabilityQuery={counterAvailabilityQuery}
         onBackToCapture={closeHistory}
@@ -1056,7 +1114,10 @@ export function CounterTransferScreen() {
     return (
       <PosErrorState
         action={
-          <Button className={posPrimaryButtonClass} onClick={() => operationsBootstrapQuery.refetch()}>
+          <Button
+            className={posPrimaryButtonClass}
+            onClick={() => operationsBootstrapQuery.refetch()}
+          >
             Reintentar
           </Button>
         }
@@ -1073,7 +1134,10 @@ export function CounterTransferScreen() {
     return (
       <PosErrorState
         action={
-          <Button className={posPrimaryButtonClass} onClick={() => currentCashSessionQuery.refetch()}>
+          <Button
+            className={posPrimaryButtonClass}
+            onClick={() => currentCashSessionQuery.refetch()}
+          >
             Reintentar
           </Button>
         }
@@ -1108,232 +1172,237 @@ export function CounterTransferScreen() {
         />
       ) : (
         <CentralWorkspaceSheet
-        className="lg:h-full"
-        contentClassName="min-h-0 overflow-y-auto px-3 pb-3 pt-2"
-        header={
-          <CompactPageHeader
-            activeStep={getActiveStep(draftState)}
-            flowSteps={[
-              {
-                icon: <StoreIcon className="h-3.5 w-3.5" />,
-                key: "class",
-                label: "Clase",
-              },
-              {
-                icon: <PackageIcon className="h-3.5 w-3.5" />,
-                key: "product",
-                label: "Producto",
-              },
-              {
-                icon: <HashIcon className="h-3.5 w-3.5" />,
-                key: "quantity",
-                label: "Cantidad",
-              },
-            ]}
-            flowVariant="process"
-            secondaryChips={
-              lineCount > 0 ? (
-                <ModuleStateChip tone="primary">{totalUnitsText} unidades</ModuleStateChip>
-              ) : null
-            }
-            stateChip={
-              <ModuleStateChip tone={getTransferStateTone(lineCount, commitMutationIsPending)}>
-                {getTransferStateLabel(lineCount, commitMutationIsPending)}
-              </ModuleStateChip>
-            }
-            title="Pasar a mostrador"
-          />
-        }
-        toolbar={
-          showStageBackAction || showSearch ? (
-            <div className="flex min-w-0 flex-wrap items-center justify-between gap-3">
-              <div className="flex min-w-0 items-center gap-2">
-                {showStageBackAction ? (
-                  <Button
-                    aria-label="Regresar"
-                    className={cn("h-10 px-3", posOutlineButtonClass)}
-                    onClick={() => {
-                      updateDraftState(goBackFromOperationalState);
-                      setSelectionErrorMessage(null);
-                    }}
-                    title="Regresar"
-                    type="button"
-                  >
-                    <ArrowLeftIcon className="h-4 w-4" />
-                  </Button>
+          className="lg:h-full"
+          contentClassName="min-h-0 overflow-y-auto px-3 pb-3 pt-2"
+          header={
+            <CompactPageHeader
+              activeStep={getActiveStep(draftState)}
+              flowSteps={[
+                {
+                  icon: <StoreIcon className="h-3.5 w-3.5" />,
+                  key: "class",
+                  label: "Clase",
+                },
+                {
+                  icon: <PackageIcon className="h-3.5 w-3.5" />,
+                  key: "product",
+                  label: "Producto",
+                },
+                {
+                  icon: <HashIcon className="h-3.5 w-3.5" />,
+                  key: "quantity",
+                  label: "Cantidad",
+                },
+              ]}
+              flowVariant="process"
+              secondaryChips={
+                lineCount > 0 ? (
+                  <ModuleStateChip tone="primary">{totalUnitsText} unidades</ModuleStateChip>
+                ) : null
+              }
+              stateChip={
+                <ModuleStateChip tone={getTransferStateTone(lineCount, commitMutationIsPending)}>
+                  {getTransferStateLabel(lineCount, commitMutationIsPending)}
+                </ModuleStateChip>
+              }
+              title="Pasar a mostrador"
+            />
+          }
+          toolbar={
+            showStageBackAction || showSearch ? (
+              <div className="flex min-w-0 flex-wrap items-center justify-between gap-3">
+                <div className="flex min-w-0 items-center gap-2">
+                  {showStageBackAction ? (
+                    <Button
+                      aria-label="Regresar"
+                      className={cn("h-10 px-3", posOutlineButtonClass)}
+                      onClick={() => {
+                        updateDraftState(goBackFromOperationalState);
+                        setSelectionErrorMessage(null);
+                      }}
+                      title="Regresar"
+                      type="button"
+                    >
+                      <ArrowLeftIcon className="h-4 w-4" />
+                    </Button>
+                  ) : null}
+                </div>
+
+                {showSearch ? (
+                  <div className="flex min-w-0 flex-1 justify-end">
+                    <SearchField
+                      ariaLabel="Buscar en mostrador"
+                      className="w-full max-w-sm"
+                      inputClassName={cn("h-9 rounded-lg text-sm shadow-sm", posInputClass)}
+                      inputRef={searchInputRef}
+                      onChange={(value) => {
+                        updateDraftState((state) => ({ ...state, searchText: value }));
+                        setSelectionErrorMessage(null);
+                      }}
+                      placeholder={
+                        draftState.controlState === CONTROL_STATE_PRODUCT_SELECTION
+                          ? "Filtrar producto"
+                          : "Filtrar clase"
+                      }
+                      value={draftState.searchText}
+                    />
+                  </div>
                 ) : null}
               </div>
+            ) : undefined
+          }
+          toolbarClassName="py-2"
+        >
+          {isSelectionLoading ? (
+            <PosLoadingState
+              description="Cargando catalogo operativo."
+              title="Cargando seleccion"
+            />
+          ) : null}
 
-              {showSearch ? (
-                <div className="flex min-w-0 flex-1 justify-end">
-                  <SearchField
-                    ariaLabel="Buscar en mostrador"
-                    className="w-full max-w-sm"
-                    inputClassName={cn("h-9 rounded-lg text-sm shadow-sm", posInputClass)}
-                    inputRef={searchInputRef}
-                    onChange={(value) => {
-                      updateDraftState((state) => ({ ...state, searchText: value }));
-                      setSelectionErrorMessage(null);
-                    }}
-                    placeholder={
-                      draftState.controlState === CONTROL_STATE_PRODUCT_SELECTION
-                        ? "Filtrar producto"
-                        : "Filtrar clase"
-                    }
-                    value={draftState.searchText}
-                  />
+          {!isSelectionLoading && selectionLoadError ? (
+            <PosErrorState
+              action={
+                <Button
+                  className={posPrimaryButtonClass}
+                  onClick={() =>
+                    draftState.controlState === CONTROL_STATE_PRODUCT_SELECTION
+                      ? classProductsQuery.refetch()
+                      : catalogQuery.refetch()
+                  }
+                  type="button"
+                >
+                  Reintentar
+                </Button>
+              }
+              description={toOperationalErrorMessage(
+                selectionLoadError,
+                "Confirma la disponibilidad del catalogo.",
+              )}
+              title="La seleccion no esta disponible"
+            />
+          ) : null}
+
+          {selectionErrorMessage && draftState.controlState !== CONTROL_STATE_QUANTITY_CAPTURE ? (
+            <div className="mb-2">
+              <PosInlineValidationMessage tone="error">
+                {selectionErrorMessage}
+              </PosInlineValidationMessage>
+            </div>
+          ) : null}
+
+          {!isSelectionLoading &&
+          !selectionLoadError &&
+          draftState.controlState === CONTROL_STATE_CLASS_SELECTION ? (
+            sortedClasses.length > 0 ? (
+              <div className="grid gap-2.5">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <p className="text-xs font-medium text-slate-500">
+                    Numero: seleccionar clase / Enter: seleccionar / Esc: limpiar busqueda
+                  </p>
                 </div>
-              ) : null}
-            </div>
-          ) : undefined
-        }
-        toolbarClassName="py-2"
-      >
-        {isSelectionLoading ? (
-          <PosLoadingState description="Cargando catalogo operativo." title="Cargando seleccion" />
-        ) : null}
+                <div className="grid gap-2.5 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
+                  {sortedClasses.map((productClass, index) => {
+                    const itemProps = getClassItemProps(index);
 
-        {!isSelectionLoading && selectionLoadError ? (
-          <PosErrorState
-            action={
-              <Button
-                className={posPrimaryButtonClass}
-                onClick={() =>
-                  draftState.controlState === CONTROL_STATE_PRODUCT_SELECTION
-                    ? classProductsQuery.refetch()
-                    : catalogQuery.refetch()
-                }
-                type="button"
-              >
-                Reintentar
-              </Button>
-            }
-            description={toOperationalErrorMessage(
-              selectionLoadError,
-              "Confirma la disponibilidad del catalogo.",
-            )}
-            title="La seleccion no esta disponible"
-          />
-        ) : null}
-
-        {selectionErrorMessage && draftState.controlState !== CONTROL_STATE_QUANTITY_CAPTURE ? (
-          <div className="mb-2">
-            <PosInlineValidationMessage tone="error">{selectionErrorMessage}</PosInlineValidationMessage>
-          </div>
-        ) : null}
-
-        {!isSelectionLoading &&
-        !selectionLoadError &&
-        draftState.controlState === CONTROL_STATE_CLASS_SELECTION ? (
-          sortedClasses.length > 0 ? (
-            <div className="grid gap-2.5">
-              <div className="flex flex-wrap items-center justify-between gap-2">
-                <p className="text-xs font-medium text-slate-500">
-                  Numero: seleccionar clase / Enter: seleccionar / Esc: limpiar busqueda
-                </p>
-              </div>
-              <div className="grid gap-2.5 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
-                {sortedClasses.map((productClass, index) => {
-                  const itemProps = getClassItemProps(index);
-
-                  return (
-                    <CatalogSelectionCard
-                      buttonRef={itemProps.ref as Ref<HTMLButtonElement>}
-                      code={productClass.code}
-                      isActive={classActiveIndex === index}
-                      key={productClass.id}
-                      name={productClass.name}
-                      onCardFocus={itemProps.onFocus}
-                      onCardKeyDown={itemProps.onKeyDown}
-                      onSelect={() => {
-                        updateDraftState((state) => selectClassForOperation(state, productClass));
-                        setSelectionErrorMessage(null);
-                      }}
-                      priceText={null}
-                      shortcutLabel={getSelectionShortcutLabel(index)}
-                      tabIndex={itemProps.tabIndex}
-                      variant="pos"
-                    />
-                  );
-                })}
-              </div>
-            </div>
-          ) : (
-            <SelectionEmptyState text="No hay clases para esta busqueda." />
-          )
-        ) : null}
-
-        {!isSelectionLoading &&
-        !selectionLoadError &&
-        draftState.controlState === CONTROL_STATE_PRODUCT_SELECTION ? (
-          sortedProducts.length > 0 ? (
-            <div className="grid gap-2.5">
-              <div className="flex flex-wrap items-center justify-between gap-2">
-                <div className="flex min-w-0 flex-wrap items-center gap-2 text-xs text-slate-500">
-                  <span className="font-medium text-slate-700">
-                    {draftState.pendingSelection?.productClass.name}
-                  </span>
+                    return (
+                      <CatalogSelectionCard
+                        buttonRef={itemProps.ref as Ref<HTMLButtonElement>}
+                        code={productClass.code}
+                        isActive={classActiveIndex === index}
+                        key={productClass.id}
+                        name={productClass.name}
+                        onCardFocus={itemProps.onFocus}
+                        onCardKeyDown={itemProps.onKeyDown}
+                        onSelect={() => {
+                          updateDraftState((state) => selectClassForOperation(state, productClass));
+                          setSelectionErrorMessage(null);
+                        }}
+                        priceText={null}
+                        shortcutLabel={getSelectionShortcutLabel(index)}
+                        tabIndex={itemProps.tabIndex}
+                        variant="pos"
+                      />
+                    );
+                  })}
                 </div>
-                <p className="text-xs font-medium text-slate-500">
-                  Numero: seleccionar producto / Esc: volver
-                </p>
               </div>
-              <div className="grid gap-2.5 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
-                {sortedProducts.map((product, index) => {
-                  const itemProps = getProductItemProps(index);
+            ) : (
+              <SelectionEmptyState text="No hay clases para esta busqueda." />
+            )
+          ) : null}
 
-                  return (
-                    <CatalogSelectionCard
-                      buttonRef={itemProps.ref as Ref<HTMLButtonElement>}
-                      code={product.code}
-                      isActive={productActiveIndex === index}
-                      key={product.id}
-                      name={product.name}
-                      onCardFocus={itemProps.onFocus}
-                      onCardKeyDown={itemProps.onKeyDown}
-                      onSelect={() => {
-                        updateDraftState((state) => selectProductForOperation(state, product));
-                        setSelectionErrorMessage(null);
-                      }}
-                      priceText={null}
-                      shortcutLabel={getSelectionShortcutLabel(index)}
-                      tabIndex={itemProps.tabIndex}
-                      variant="pos"
-                    />
-                  );
-                })}
+          {!isSelectionLoading &&
+          !selectionLoadError &&
+          draftState.controlState === CONTROL_STATE_PRODUCT_SELECTION ? (
+            sortedProducts.length > 0 ? (
+              <div className="grid gap-2.5">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <div className="flex min-w-0 flex-wrap items-center gap-2 text-xs text-slate-500">
+                    <span className="font-medium text-slate-700">
+                      {draftState.pendingSelection?.productClass.name}
+                    </span>
+                  </div>
+                  <p className="text-xs font-medium text-slate-500">
+                    Numero: seleccionar producto / Esc: volver
+                  </p>
+                </div>
+                <div className="grid gap-2.5 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
+                  {sortedProducts.map((product, index) => {
+                    const itemProps = getProductItemProps(index);
+
+                    return (
+                      <CatalogSelectionCard
+                        buttonRef={itemProps.ref as Ref<HTMLButtonElement>}
+                        code={product.code}
+                        isActive={productActiveIndex === index}
+                        key={product.id}
+                        name={product.name}
+                        onCardFocus={itemProps.onFocus}
+                        onCardKeyDown={itemProps.onKeyDown}
+                        onSelect={() => {
+                          updateDraftState((state) => selectProductForOperation(state, product));
+                          setSelectionErrorMessage(null);
+                        }}
+                        priceText={null}
+                        shortcutLabel={getSelectionShortcutLabel(index)}
+                        tabIndex={itemProps.tabIndex}
+                        variant="pos"
+                      />
+                    );
+                  })}
+                </div>
               </div>
-            </div>
-          ) : (
-            <SelectionEmptyState text="No hay productos para esta busqueda." />
-          )
-        ) : null}
+            ) : (
+              <SelectionEmptyState text="No hay productos para esta busqueda." />
+            )
+          ) : null}
 
-        {draftState.controlState === CONTROL_STATE_QUANTITY_CAPTURE &&
-        draftState.pendingSelection?.product ? (
-          <QuantityCapturePanel
-            inputRef={quantityInputRef}
-            onAdd={handleAddLine}
-            onBack={() => {
-              updateDraftState(goBackFromOperationalState);
-              setSelectionErrorMessage(null);
-            }}
-            onDecrement={() => updateDraftState(decrementPendingOperationQuantity)}
-            onIncrement={() => updateDraftState(incrementPendingOperationQuantity)}
-            onQuantityChange={(value) =>
-              updateDraftState((state) => setPendingQuantityText(state, value))
-            }
-            productClassName={draftState.pendingSelection.productClass.name}
-            productCode={draftState.pendingSelection.product.code}
-            productName={draftState.pendingSelection.product.name}
-            quantityText={draftState.pendingSelection.quantityText}
-            selectionErrorMessage={selectionErrorMessage}
-            setQuantity={(value) =>
-              updateDraftState((state) => setPendingQuantityText(state, value))
-            }
-          />
-        ) : null}
-      </CentralWorkspaceSheet>
+          {draftState.controlState === CONTROL_STATE_QUANTITY_CAPTURE &&
+          draftState.pendingSelection?.product ? (
+            <QuantityCapturePanel
+              inputRef={quantityInputRef}
+              onAdd={handleAddLine}
+              onBack={() => {
+                updateDraftState(goBackFromOperationalState);
+                setSelectionErrorMessage(null);
+              }}
+              onDecrement={() => updateDraftState(decrementPendingOperationQuantity)}
+              onIncrement={() => updateDraftState(incrementPendingOperationQuantity)}
+              onQuantityChange={(value) =>
+                updateDraftState((state) => setPendingQuantityText(state, value))
+              }
+              productClassName={draftState.pendingSelection.productClass.name}
+              productCode={draftState.pendingSelection.product.code}
+              productName={draftState.pendingSelection.product.name}
+              quantityText={draftState.pendingSelection.quantityText}
+              selectionErrorMessage={selectionErrorMessage}
+              setQuantity={(value) =>
+                updateDraftState((state) => setPendingQuantityText(state, value))
+              }
+            />
+          ) : null}
+        </CentralWorkspaceSheet>
       )}
     </div>
   );
@@ -1421,10 +1490,18 @@ function QuantityCapturePanel({
             />
 
             <div className="flex flex-wrap items-center gap-2">
-              <Button className={cn("h-10 px-3", posOutlineButtonClass)} onClick={onDecrement} type="button">
+              <Button
+                className={cn("h-10 px-3", posOutlineButtonClass)}
+                onClick={onDecrement}
+                type="button"
+              >
                 -1
               </Button>
-              <Button className={cn("h-10 px-3", posOutlineButtonClass)} onClick={onIncrement} type="button">
+              <Button
+                className={cn("h-10 px-3", posOutlineButtonClass)}
+                onClick={onIncrement}
+                type="button"
+              >
                 +1
               </Button>
               {quantityPresets.map((preset) => (
@@ -1451,7 +1528,9 @@ function QuantityCapturePanel({
             </div>
 
             {selectionErrorMessage ? (
-              <PosInlineValidationMessage tone="error">{selectionErrorMessage}</PosInlineValidationMessage>
+              <PosInlineValidationMessage tone="error">
+                {selectionErrorMessage}
+              </PosInlineValidationMessage>
             ) : null}
           </div>
         </div>
@@ -1489,7 +1568,7 @@ function CounterTransferRightPanel({
   };
   isSubmitting: boolean;
   isCounterStateOpen: boolean;
-  lastCommittedDocument: OperationDocumentView | null;
+  lastCommittedDocument: OperationCommitResultView | null;
   lines: OperationLine[];
   notes: string;
   onCommit: () => void;
@@ -1588,13 +1667,17 @@ function CounterTransferRightPanel({
           </RightPanelBlock>
 
           {commitErrorMessage ? (
-            <PosInlineValidationMessage tone="error">{commitErrorMessage}</PosInlineValidationMessage>
+            <PosInlineValidationMessage tone="error">
+              {commitErrorMessage}
+            </PosInlineValidationMessage>
           ) : null}
 
           {lastCommittedDocument ? (
             <div className="flex items-center gap-2 rounded-lg border border-[rgba(18,122,90,0.16)] bg-[var(--ui-color-success-soft)] px-3 py-2 text-sm font-medium text-[var(--ui-color-success)]">
               <CheckCircleIcon className="h-4 w-4 shrink-0" />
-              <span className="min-w-0 truncate">Ultimo movimiento: {lastCommittedDocument.folio}</span>
+              <span className="min-w-0 truncate">
+                Ultimo movimiento: {lastCommittedDocument.folio}
+              </span>
             </div>
           ) : null}
         </div>
@@ -1656,9 +1739,7 @@ function CounterTransferHistoryWorkspace({
   const records =
     historyDaypart === "ALL"
       ? allRecords
-      : allRecords.filter(
-          (record) => getHistoryRecordDaypart(record, timeZone) === historyDaypart,
-        );
+      : allRecords.filter((record) => getHistoryRecordDaypart(record, timeZone) === historyDaypart);
   const availableCashiers = historyQuery.data?.available_users ?? [];
   const availableScopes =
     historyQuery.data?.available_scopes && historyQuery.data.available_scopes.length > 0
@@ -1676,9 +1757,7 @@ function CounterTransferHistoryWorkspace({
       contentClassName="min-h-0 overflow-hidden px-3 pb-3 pt-2"
       header={
         <CompactPageHeader
-          secondaryChips={
-            <ModuleStateChip tone="muted">{records.length} folios</ModuleStateChip>
-          }
+          secondaryChips={<ModuleStateChip tone="muted">{records.length} folios</ModuleStateChip>}
           stateChip={<ModuleStateChip tone="primary">Historial</ModuleStateChip>}
           title="Historial a mostrador"
         />
@@ -1725,7 +1804,10 @@ function CounterTransferHistoryWorkspace({
           <div className="flex min-w-0 flex-wrap items-center gap-2">
             <select
               aria-label="Filtrar por cajero"
-              className={cn("h-10 min-w-[12rem] rounded-lg px-3 text-sm font-medium", posInputClass)}
+              className={cn(
+                "h-10 min-w-[12rem] rounded-lg px-3 text-sm font-medium",
+                posInputClass,
+              )}
               onChange={(event) => onCashierChange(event.target.value)}
               value={historyCashierId}
             >
@@ -1801,10 +1883,7 @@ function CounterTransferHistoryTable({
     nextRow?.focus();
   }
 
-  function handleRowKeyDown(
-    event: ReactKeyboardEvent<HTMLTableRowElement>,
-    recordId: string,
-  ) {
+  function handleRowKeyDown(event: ReactKeyboardEvent<HTMLTableRowElement>, recordId: string) {
     if (event.key === "Enter" || event.key === " ") {
       event.preventDefault();
       onRecordSelect(recordId);
@@ -1939,7 +2018,7 @@ function CounterTransferHistoryDetailRightPanel({
   isAdjustmentHighImpact: boolean;
   isLoading: boolean;
   isSavingAdjustment: boolean;
-  lastCommittedCorrection: CorrectionDocumentView | null;
+  lastCommittedCorrection: CorrectionCommitResultView | null;
   onAdjustmentDraftChange: (draft: CounterTransferAdjustmentDraft) => void;
   onCancelAdjustment: () => void;
   onRetry: () => void;
@@ -2060,7 +2139,7 @@ function CounterTransferMovementDetail({
   adjustmentMode: boolean;
   document: OperationDocumentView;
   isAdjustmentHighImpact: boolean;
-  lastCommittedCorrection: CorrectionDocumentView | null;
+  lastCommittedCorrection: CorrectionCommitResultView | null;
   onAdjustmentDraftChange: (draft: CounterTransferAdjustmentDraft) => void;
   timeZone: string;
 }) {
@@ -2153,13 +2232,17 @@ function CounterTransferMovementDetail({
       ) : null}
 
       {adjustmentErrorMessage ? (
-        <PosInlineValidationMessage tone="error">{adjustmentErrorMessage}</PosInlineValidationMessage>
+        <PosInlineValidationMessage tone="error">
+          {adjustmentErrorMessage}
+        </PosInlineValidationMessage>
       ) : null}
 
       {lastCommittedCorrection ? (
         <div className="flex items-center gap-2 rounded-lg border border-[rgba(18,122,90,0.16)] bg-[var(--ui-color-success-soft)] px-3 py-2 text-sm font-medium text-[var(--ui-color-success)]">
           <CheckCircleIcon className="h-4 w-4 shrink-0" />
-          <span className="min-w-0 truncate">Ajuste registrado: {lastCommittedCorrection.folio}</span>
+          <span className="min-w-0 truncate">
+            Ajuste registrado: {lastCommittedCorrection.folio}
+          </span>
         </div>
       ) : null}
     </div>
@@ -2327,10 +2410,7 @@ function buildCounterStateGroups(data: CashCloseReconciliationResponse): Counter
   }
 
   const classRowsById = new Map(
-    data.counter_class_availability.map((classRow) => [
-      classRow.product_class_id,
-      classRow,
-    ]),
+    data.counter_class_availability.map((classRow) => [classRow.product_class_id, classRow]),
   );
   const groupedClassRows = data.counter_class_availability
     .filter((classRow) => {
@@ -2413,10 +2493,7 @@ function CounterStateInventoryTable({
     });
   }
 
-  function handleGroupRowKeyDown(
-    event: ReactKeyboardEvent<HTMLTableRowElement>,
-    groupKey: string,
-  ) {
+  function handleGroupRowKeyDown(event: ReactKeyboardEvent<HTMLTableRowElement>, groupKey: string) {
     if (event.key === "Enter" || event.key === " ") {
       event.preventDefault();
       toggleGroup(groupKey);
@@ -2425,7 +2502,10 @@ function CounterStateInventoryTable({
 
   return (
     <div className="overflow-hidden rounded-lg border border-[var(--pos-shell-border)] bg-white shadow-sm">
-      <table aria-label="Estado actual del mostrador" className="w-full table-fixed text-left text-sm">
+      <table
+        aria-label="Estado actual del mostrador"
+        className="w-full table-fixed text-left text-sm"
+      >
         <thead className="border-b border-[var(--pos-shell-border)] bg-[var(--pos-shell-muted)] text-[10px] font-semibold uppercase tracking-[0.08em] text-slate-500">
           <tr>
             <th className="px-2.5 py-2">Clase / producto</th>

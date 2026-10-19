@@ -1,18 +1,17 @@
+import { isCommandIntentionPending } from "@zeromerma/api-client";
+
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useMemo, useState } from "react";
+
+import { useEffect, useMemo, useRef, useState } from "react";
 
 import { toBackofficeErrorMessage } from "../../../../lib/api";
 import { useBackofficeAuthStore } from "../../../auth/backoffice-auth-store";
 import { AdminPageHeader } from "../../components/AdminPageHeader";
 import {
   adminPurchaseBackendContract,
-  cancelAdminPurchase,
-  confirmAdminPurchase,
-  createAdminDirectEntry,
-  createAdminPurchase,
+  type PurchaseCommandResultView,
   fetchAdminPurchaseDetail,
   fetchAdminPurchases,
-  receiveAdminPurchase,
 } from "../api";
 import { AdminPurchaseDetailPanel } from "../components/AdminPurchaseDetailPanel";
 import { AdminPurchasesFilters } from "../components/AdminPurchasesFilters";
@@ -29,6 +28,10 @@ import type {
   AdminPurchasePayload,
   AdminPurchaseReceiptPayload,
 } from "../types";
+
+import { purchaseIntentions, type PurchaseIntentionPayload } from "../purchase-command-intent";
+
+import { usePurchaseIntention } from "../use-purchase-intention";
 
 const defaultFilters: AdminPurchaseListFilters = {
   discrepancyState: "all",
@@ -150,6 +153,13 @@ function getPurchaseId(item: AdminPurchaseDetail | AdminPurchaseListItem): strin
 export function AdminPurchasesPage() {
   const isAuthenticated = useBackofficeAuthStore((state) => state.isAuthenticated);
   const queryClient = useQueryClient();
+
+  const user = useBackofficeAuthStore((state) => state.user);
+
+  const intention = usePurchaseIntention();
+
+  const observedKey = useRef<string | null | undefined>(undefined);
+
   const [filters, setFilters] = useState<AdminPurchaseListFilters>(getInitialFilters);
   const [selectedPurchaseId, setSelectedPurchaseId] = useState<string | null>(null);
   const [workflowMode, setWorkflowMode] = useState<WorkflowMode | null>(null);
@@ -177,97 +187,124 @@ export function AdminPurchasesPage() {
     retry: false,
   });
 
-  const createPurchaseMutation = useMutation({
-    mutationFn: (payload: AdminPurchasePayload) => createAdminPurchase(payload),
-    onError: (error) => {
+  function confirmed(result: PurchaseCommandResultView) {
+    setFeedback({ tone: "success", message: `${result.folio}: operación confirmada.` });
+
+    setSelectedPurchaseId(result.id);
+
+    setWorkflowMode(null);
+
+    void queryClient.invalidateQueries({ queryKey: ["admin", "purchases"] });
+  }
+
+  function begin(
+    payload: PurchaseIntentionPayload,
+    branchId: string,
+    purchaseId: string | null = null,
+  ) {
+    if (!user) throw new Error("Se requiere el operador original.");
+
+    return purchaseIntentions.begin(
+      { userId: user.id, branchId, purchaseId, commandCode: payload.commandCode },
+      payload,
+      observedKey.current ?? null,
+    );
+  }
+
+  function branchFor(purchaseId: string) {
+    const branch =
+      purchaseDetailQuery.data?.overview.id === purchaseId
+        ? purchaseDetailQuery.data.overview.branchId
+        : purchaseList.items.find((item) => item.id === purchaseId)?.branchId;
+
+    if (!branch) throw new Error("Actualiza el detalle de la compra antes de continuar.");
+
+    return branch;
+  }
+
+  const mutationOptions = {
+    onSuccess: confirmed,
+
+    onError: (error: unknown) =>
       setFeedback({
-        tone: "error",
-        message: toBackofficeErrorMessage(error, "No se pudo guardar la compra."),
-      });
-    },
-    onSuccess: (detail) => {
-      setFeedback({ tone: "success", message: "Compra guardada correctamente." });
-      setSelectedPurchaseId(detail.overview.id);
-      setWorkflowMode(null);
-      void queryClient.invalidateQueries({ queryKey: ["admin", "purchases"] });
-    },
+        tone: "error" as const,
+        message: toBackofficeErrorMessage(error, "No se pudo confirmar la operación de compra."),
+      }),
+  };
+
+  const createPurchaseMutation = useMutation({
+    ...mutationOptions,
+
+    mutationFn: (payload: AdminPurchasePayload) =>
+      begin({ commandCode: "create", body: payload }, payload.branchId),
   });
 
   const directEntryMutation = useMutation({
+    ...mutationOptions,
+
     mutationFn: (payload: AdminDirectEntryPayload) =>
-      createAdminDirectEntry(payload),
-    onError: (error) => {
-      setFeedback({
-        tone: "error",
-        message: toBackofficeErrorMessage(error, "No se pudo confirmar la entrada."),
-      });
-    },
-    onSuccess: (detail) => {
-      setFeedback({ tone: "success", message: "Entrada directa confirmada." });
-      setSelectedPurchaseId(detail.overview.id);
-      setWorkflowMode(null);
-      void queryClient.invalidateQueries({ queryKey: ["admin", "purchases"] });
-    },
+      begin({ commandCode: "direct-entry", body: payload }, payload.branchId),
   });
 
   const receiveMutation = useMutation({
+    ...mutationOptions,
+
     mutationFn: ({
       payload,
       purchaseId,
     }: {
       payload: AdminPurchaseReceiptPayload;
       purchaseId: string;
-    }) => receiveAdminPurchase(purchaseId, payload),
-    onError: (error) => {
-      setFeedback({
-        tone: "error",
-        message: toBackofficeErrorMessage(error, "No se pudo confirmar la recepcion."),
-      });
-    },
-    onSuccess: (detail) => {
-      setFeedback({ tone: "success", message: "Recepcion confirmada e inventario actualizado." });
-      setSelectedPurchaseId(detail.overview.id);
-      setWorkflowMode(null);
-      void queryClient.invalidateQueries({ queryKey: ["admin", "purchases"] });
-    },
+    }) => begin({ commandCode: "receive", body: payload }, branchFor(purchaseId), purchaseId),
   });
 
   const confirmMutation = useMutation({
-    mutationFn: (purchaseId: string) => confirmAdminPurchase(purchaseId),
-    onError: (error) => {
-      setFeedback({
-        tone: "error",
-        message: toBackofficeErrorMessage(error, "No se pudo confirmar la compra."),
-      });
-    },
-    onSuccess: (detail) => {
-      setFeedback({ tone: "success", message: "Compra confirmada." });
-      setSelectedPurchaseId(detail.overview.id);
-      void queryClient.invalidateQueries({ queryKey: ["admin", "purchases"] });
-    },
+    ...mutationOptions,
+
+    mutationFn: (purchaseId: string) =>
+      begin({ commandCode: "confirm" }, branchFor(purchaseId), purchaseId),
   });
 
   const cancelMutation = useMutation({
+    ...mutationOptions,
+
     mutationFn: ({
       payload,
       purchaseId,
     }: {
       payload: AdminPurchaseCancelPayload;
       purchaseId: string;
-    }) => cancelAdminPurchase(purchaseId, payload),
-    onError: (error) => {
-      setFeedback({
-        tone: "error",
-        message: toBackofficeErrorMessage(error, "No se pudo cancelar la compra."),
-      });
-    },
-    onSuccess: (detail) => {
-      setFeedback({ tone: "success", message: "Compra cancelada." });
-      setSelectedPurchaseId(detail.overview.id);
-      setWorkflowMode(null);
-      void queryClient.invalidateQueries({ queryKey: ["admin", "purchases"] });
+    }) => begin({ commandCode: "cancel", body: payload }, branchFor(purchaseId), purchaseId),
+  });
+
+  const recoveryMutation = useMutation({
+    ...mutationOptions,
+
+    mutationFn: (retry: boolean) => {
+      const metadata = intention.metadata;
+
+      if (!metadata || metadata.userId !== user?.id)
+        throw new Error("Se requiere el operador original.");
+
+      return retry ? purchaseIntentions.retry(metadata) : purchaseIntentions.recover(metadata);
     },
   });
+
+  useEffect(() => {
+    const key = intention.metadata?.key ?? null;
+    if (observedKey.current === undefined) {
+      observedKey.current =
+        intention.metadata?.status === "CONFIRMED" || intention.metadata?.status === "REJECTED"
+          ? key
+          : null;
+    } else if (intention.metadata?.status === "CONFIRMED") {
+      if (key !== observedKey.current) {
+        setWorkflowMode(null);
+        void queryClient.invalidateQueries({ queryKey: ["admin", "purchases"] });
+      }
+      observedKey.current = key;
+    } else if (intention.metadata?.status === "REJECTED") observedKey.current = key;
+  }, [intention.metadata?.key, intention.metadata?.status, queryClient]);
 
   const purchaseDetail = purchaseDetailQuery.data ?? null;
   const listErrorMessage = purchasesQuery.isError
@@ -278,6 +315,9 @@ export function AdminPurchasesPage() {
     : null;
   const workflowErrorMessage = feedback?.tone === "error" ? feedback.message : null;
   const isSubmitting =
+    Boolean(intention.error) ||
+    isCommandIntentionPending(intention.metadata) ||
+    recoveryMutation.isPending ||
     createPurchaseMutation.isPending ||
     directEntryMutation.isPending ||
     receiveMutation.isPending ||
@@ -304,6 +344,8 @@ export function AdminPurchasesPage() {
     mode: WorkflowMode,
     purchase?: AdminPurchaseDetail | AdminPurchaseListItem | null,
   ) {
+    if (isSubmitting) return;
+
     setFeedback(null);
     if (purchase) {
       setSelectedPurchaseId(getPurchaseId(purchase));
@@ -352,6 +394,7 @@ export function AdminPurchasesPage() {
       <AdminPageHeader
         actionCapability="purchases.manage"
         actionLabel="Nueva compra"
+        actionDisabled={isSubmitting}
         description="Registra compras a proveedores, entradas de mercancia, recepciones parciales e impacto en inventario."
         meta={[pageStatusLabel, "Recepcion auditable"]}
         onAction={() => handleOpenWorkflow("purchase")}
@@ -359,6 +402,46 @@ export function AdminPurchasesPage() {
       />
 
       <div className="flex min-h-0 min-w-0 flex-1 flex-col gap-2.5 overflow-hidden p-3">
+        {intention.error || isCommandIntentionPending(intention.metadata) ? (
+          <section role="alert" className="rounded-xl border border-amber-400 bg-amber-50 p-3">
+            <h2>Compra pendiente de confirmar</h2>
+
+            <p>
+              {intention.error ??
+                "Consulta el resultado antes de iniciar otra operación de compra."}
+            </p>
+
+            {intention.metadata ? (
+              <>
+                <p>
+                  Referencia: {intention.metadata.key} · {intention.metadata.commandCode}
+                </p>
+
+                <button
+                  type="button"
+                  disabled={recoveryMutation.isPending || intention.metadata.userId !== user?.id}
+                  onClick={() => recoveryMutation.mutate(false)}
+                >
+                  Consultar resultado de compra
+                </button>
+
+                {purchaseIntentions.hasBody(intention.metadata.key) &&
+                intention.metadata.status !== "CONFLICT" ? (
+                  <button
+                    type="button"
+                    disabled={recoveryMutation.isPending || intention.metadata.userId !== user?.id}
+                    onClick={() => recoveryMutation.mutate(true)}
+                  >
+                    Reintentar el mismo comando
+                  </button>
+                ) : (
+                  <p>Tras recargar sólo se consulta el resultado.</p>
+                )}
+              </>
+            ) : null}
+          </section>
+        ) : null}
+
         <div className="flex min-w-0 flex-wrap gap-2">
           <button
             className="rounded-full bg-[var(--ui-color-info)] px-3 py-1.5 text-sm font-semibold text-white transition hover:brightness-95 focus:outline-none focus:ring-4 focus:ring-[var(--ui-color-ring)]"

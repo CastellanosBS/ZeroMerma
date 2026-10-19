@@ -1,11 +1,9 @@
+import { isCommandIntentionPending } from "@zeromerma/api-client";
+import { transferIntentions } from "./transfer-command-intent";
+import { useTransferDraftIdentity, useTransferIntention } from "./use-transfer-intention";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Navigate } from "@tanstack/react-router";
-import {
-  DialogBody,
-  DialogFooter,
-  DialogHeader,
-  DialogSurface,
-} from "@zeromerma/ui";
+import { DialogBody, DialogFooter, DialogHeader, DialogSurface } from "@zeromerma/ui";
 import {
   useCallback,
   useEffect,
@@ -17,7 +15,10 @@ import {
 } from "react";
 
 import { useAppShellRightPanel } from "../../components/app-shell-right-panel";
-import { CapturedProductLineList, CapturedProductLineRow } from "../../components/captured-product-lines";
+import {
+  CapturedProductLineList,
+  CapturedProductLineRow,
+} from "../../components/captured-product-lines";
 import { CatalogSelectionCard } from "../../components/catalog-selection-card";
 import {
   OperationHistoryList,
@@ -105,11 +106,7 @@ import {
   hasTransferDispatchDestination,
   type TransferDispatchUiState,
 } from "./model";
-import {
-  useTransferDetailQuery,
-  useTransferDispatchHistoryQuery,
-} from "./queries";
-import { commitTransferDispatch } from "./transfers-api";
+import { useTransferDetailQuery, useTransferDispatchHistoryQuery } from "./queries";
 
 const TRANSFER_DISPATCH_MODULE_KEY = "BRANCH_TRANSFER_SHIPMENT";
 const EMPTY_DESTINATION_TEXT = String.fromCharCode(8212);
@@ -280,10 +277,7 @@ function getTransferDocumentStatusChipTone(status: string) {
   }
 }
 
-function getRouteSuggestionLabel(
-  originLabel: string,
-  destinationLabel?: string | null,
-): string {
+function getRouteSuggestionLabel(originLabel: string, destinationLabel?: string | null): string {
   if (typeof destinationLabel === "string" && destinationLabel.trim().length > 0) {
     return `${originLabel} -> ${destinationLabel}`;
   }
@@ -443,7 +437,8 @@ function DispatchLineRow({
   }
 
   function adjustQuantity(deltaMilliUnits: number) {
-    const currentQuantityMilliUnits = parseQuantityToMilliUnits(quantityText) ?? line.quantityMilliUnits;
+    const currentQuantityMilliUnits =
+      parseQuantityToMilliUnits(quantityText) ?? line.quantityMilliUnits;
     const nextQuantityMilliUnits = currentQuantityMilliUnits + deltaMilliUnits;
     if (nextQuantityMilliUnits <= 0) {
       onQuantityInvalid("La cantidad debe ser mayor que cero.");
@@ -533,11 +528,16 @@ function TransferDispatchSummaryPanel({
     >
       <div className="grid h-full min-h-0 grid-rows-[auto_minmax(0,1fr)_auto] gap-3">
         <div className="grid gap-2">
-          {commitErrorMessage ? <InlineNotice tone="error">{commitErrorMessage}</InlineNotice> : null}
+          {commitErrorMessage ? (
+            <InlineNotice tone="error">{commitErrorMessage}</InlineNotice>
+          ) : null}
           <div className="grid gap-1.5 rounded-lg border border-[var(--pos-shell-border)] bg-[var(--pos-shell-muted)]/70 px-3 py-2 text-sm">
             <div className="flex items-center justify-between gap-3">
               <span className="font-medium text-slate-600">Origen</span>
-              <span className="min-w-0 truncate text-right font-semibold text-slate-950" title={originBranchLabel}>
+              <span
+                className="min-w-0 truncate text-right font-semibold text-slate-950"
+                title={originBranchLabel}
+              >
                 {originBranchLabel}
               </span>
             </div>
@@ -557,7 +557,9 @@ function TransferDispatchSummaryPanel({
             ) : null}
           </div>
 
-          {commitBlockedReason ? <InlineNotice tone="warning">{commitBlockedReason}</InlineNotice> : null}
+          {commitBlockedReason ? (
+            <InlineNotice tone="warning">{commitBlockedReason}</InlineNotice>
+          ) : null}
         </div>
 
         <RightPanelBlock
@@ -734,7 +736,10 @@ function TransferDispatchConfirmationDialog({
                 {lines.map((line) => (
                   <tr key={line.key}>
                     <td className="min-w-0 px-3 py-2">
-                      <span className="block truncate font-medium text-slate-950" title={line.productName}>
+                      <span
+                        className="block truncate font-medium text-slate-950"
+                        title={line.productName}
+                      >
                         {line.productName}
                       </span>
                     </td>
@@ -795,9 +800,7 @@ function TransferDispatchHistoryDetailPanel({
           <h2 className="truncate text-[1.05rem] font-semibold tracking-tight text-slate-950">
             Envio seleccionado
           </h2>
-          <p className="mt-1 truncate text-sm font-medium text-slate-600">
-            {shipment.folio}
-          </p>
+          <p className="mt-1 truncate text-sm font-medium text-slate-600">{shipment.folio}</p>
         </div>
         <ModuleStateChip tone={getTransferDocumentStatusChipTone(shipment.status)}>
           {getTransferDocumentStatusLabel(shipment.status)}
@@ -829,15 +832,15 @@ function TransferDispatchHistoryDetailPanel({
             </div>
           </RightPanelBlock>
 
-          {transferDetail.receipt_summary ? (
+          {transferDetail.receipt_summaries.at(-1) ? (
             <InlineNotice
               tone={
-                transferDetail.receipt_summary.status === "RECEIVED_WITH_VARIANCE"
+                transferDetail.receipt_summaries.at(-1)?.status === "RECEIVED_WITH_VARIANCE"
                   ? "warning"
                   : "success"
               }
             >
-              Recepcion vinculada: {transferDetail.receipt_summary.folio}.
+              Recepcion vinculada: {transferDetail.receipt_summaries.at(-1)?.folio}.
             </InlineNotice>
           ) : null}
 
@@ -898,6 +901,7 @@ function TransferDetailRow({ label, value }: { label: string; value: string }) {
 
 export function TransferDispatchScreen() {
   const queryClient = useQueryClient();
+  const user = usePosAuthStore((state) => state.user);
   const isAuthenticated = usePosAuthStore((state) => state.isAuthenticated);
   const showError = useStatusMessageStore((state) => state.showError);
   const showSuccess = useStatusMessageStore((state) => state.showSuccess);
@@ -921,6 +925,18 @@ export function TransferDispatchScreen() {
 
   const operationsBootstrapQuery = useOperationsBootstrapQuery();
   const currentCashSessionQuery = useCurrentCashSessionQuery();
+  const intention = useTransferIntention(operationsBootstrapQuery.data?.workstation.id ?? "");
+  const clearConfirmedDraft = useCallback(() => {
+    setDraftState(createInitialOperationDraftState());
+    setNotes("");
+    setIsConfirmDialogOpen(false);
+  }, []);
+  const draftKey = useTransferDraftIdentity(
+    intention.metadata,
+    Boolean(operationsBootstrapQuery.data),
+    clearConfirmedDraft,
+  );
+
   const debouncedSearchText = useDebouncedValue(draftState.searchText, 180);
 
   const hasDestination = hasTransferDispatchDestination(destinationBranchId);
@@ -933,14 +949,18 @@ export function TransferDispatchScreen() {
 
   const catalogQuery = useOperationsCatalogQuery(
     TRANSFER_DISPATCH_MODULE_KEY,
-    hasDestination && centerView === "capture" && displayControlState === CONTROL_STATE_CLASS_SELECTION
+    hasDestination &&
+      centerView === "capture" &&
+      displayControlState === CONTROL_STATE_CLASS_SELECTION
       ? debouncedSearchText
       : "",
   );
   const classProductsQuery = useOperationsClassProductsQuery(
     TRANSFER_DISPATCH_MODULE_KEY,
-    hasDestination ? draftState.pendingSelection?.productClass.id ?? null : null,
-    hasDestination && centerView === "capture" && displayControlState === CONTROL_STATE_PRODUCT_SELECTION
+    hasDestination ? (draftState.pendingSelection?.productClass.id ?? null) : null,
+    hasDestination &&
+      centerView === "capture" &&
+      displayControlState === CONTROL_STATE_PRODUCT_SELECTION
       ? debouncedSearchText
       : "",
   );
@@ -948,8 +968,7 @@ export function TransferDispatchScreen() {
   const historyQuery = useTransferDispatchHistoryQuery(
     {
       createdByUserId: historyUserId !== "ALL" ? historyUserId : undefined,
-      destinationBranchId:
-        historyDestinationId !== "ALL" ? historyDestinationId : undefined,
+      destinationBranchId: historyDestinationId !== "ALL" ? historyDestinationId : undefined,
       scope: historyScope,
     },
     centerView === "history",
@@ -969,7 +988,12 @@ export function TransferDispatchScreen() {
 
   const commitMutation = useMutation({
     mutationFn: async () => {
-      if (!isAuthenticated || operationsBootstrapQuery.data === undefined) {
+      if (
+        !isAuthenticated ||
+        !user ||
+        !currentCashSessionQuery.data ||
+        operationsBootstrapQuery.data === undefined
+      ) {
         throw new Error("Se requiere autenticacion y contexto de estacion.");
       }
 
@@ -978,13 +1002,27 @@ export function TransferDispatchScreen() {
       }
 
       const payload: TransferDispatchCommitRequest = {
+        cash_session_id: currentCashSessionQuery.data.id,
         destination_branch_id: destinationBranchId,
         lines: buildOperationCommitLines(draftState.lines),
         notes: notes.trim().length > 0 ? notes.trim() : null,
         workstation_code: operationsBootstrapQuery.data.workstation.code,
       };
 
-      return commitTransferDispatch(payload);
+      if (intention.error) throw new Error(intention.error);
+      return transferIntentions.begin(
+        {
+          userId: user.id,
+          branchId: operationsBootstrapQuery.data.branch.id,
+          workstationId: operationsBootstrapQuery.data.workstation.id,
+          workstationCode: payload.workstation_code,
+          cashSessionId: payload.cash_session_id,
+          commandCode: "dispatch",
+          transferId: null,
+        },
+        payload,
+        draftKey.current ?? null,
+      );
     },
     onSuccess: (detail) => {
       setDraftState(createInitialOperationDraftState());
@@ -993,21 +1031,26 @@ export function TransferDispatchScreen() {
       setNotes("");
       setIsNotesExpanded(false);
       setCenterView("history");
-      setSelectedHistoryTransferId(detail.shipment.id);
+      setSelectedHistoryTransferId(detail.id);
       void queryClient.invalidateQueries({ queryKey: ["transfer-dispatch-history"] });
-      showSuccess(`Envio registrado. Folio ${detail.shipment_summary.folio}.`);
+      showSuccess(`Envio registrado. Folio ${detail.folio}.`);
     },
   });
+
+  const isCommandPending =
+    commitMutation.isPending ||
+    Boolean(intention.error) ||
+    isCommandIntentionPending(intention.metadata);
 
   const classGridFocus = useRovingFocusGrid({
     itemCount: sortedClasses.length,
     onActivate: (index) => {
       const productClass = sortedClasses[index];
-      if (!productClass || centerView === "history" || !hasDestination || commitMutation.isPending) {
+      if (!productClass || centerView === "history" || !hasDestination || isCommandPending) {
         return;
       }
 
-        setCommitErrorMessage(null);
+      setCommitErrorMessage(null);
       setDraftState((state) => selectClassForOperation(state, productClass));
     },
   });
@@ -1015,11 +1058,11 @@ export function TransferDispatchScreen() {
     itemCount: sortedProducts.length,
     onActivate: (index) => {
       const product = sortedProducts[index];
-      if (!product || centerView === "history" || !hasDestination || commitMutation.isPending) {
+      if (!product || centerView === "history" || !hasDestination || isCommandPending) {
         return;
       }
 
-        setCommitErrorMessage(null);
+      setCommitErrorMessage(null);
       setDraftState((state) => selectProductForOperation(state, product));
     },
   });
@@ -1054,9 +1097,7 @@ export function TransferDispatchScreen() {
       ? getOperationPendingCaptureTargetKey(draftState.pendingSelection)
       : null;
   const isValidationReady =
-    hasDestination &&
-    lineCount > 0 &&
-    draftState.controlState === CONTROL_STATE_CLASS_SELECTION;
+    hasDestination && lineCount > 0 && draftState.controlState === CONTROL_STATE_CLASS_SELECTION;
   const commitBlockedReason = getDispatchCommitBlockedReason({
     controlState: draftState.controlState,
     hasDestination,
@@ -1066,13 +1107,12 @@ export function TransferDispatchScreen() {
     hasCommittedTransfer: false,
     hasDestination,
     isCaptureInProgress: draftState.controlState !== CONTROL_STATE_CLASS_SELECTION,
-    isCommitPending: commitMutation.isPending,
+    isCommitPending: isCommandPending,
     isValidationReady,
     lineCount,
   });
   const showSearch =
-    centerView === "capture" &&
-    displayControlState !== CONTROL_STATE_QUANTITY_CAPTURE;
+    centerView === "capture" && displayControlState !== CONTROL_STATE_QUANTITY_CAPTURE;
   const isSelectionLoading =
     centerView === "capture" &&
     ((displayControlState === CONTROL_STATE_CLASS_SELECTION && catalogQuery.isPending) ||
@@ -1189,7 +1229,7 @@ export function TransferDispatchScreen() {
     function handleKeyboard(event: KeyboardEvent) {
       if (!isEditableTarget(event.target)) {
         if ((event.ctrlKey && event.key.toLowerCase() === "f") || event.key === "/") {
-          if (showSearch && !commitMutation.isPending) {
+          if (showSearch && !isCommandPending) {
             event.preventDefault();
             searchInputRef.current?.focus();
             searchInputRef.current?.select();
@@ -1212,7 +1252,7 @@ export function TransferDispatchScreen() {
         }
 
         if (
-          !commitMutation.isPending &&
+          !isCommandPending &&
           (displayControlState === CONTROL_STATE_PRODUCT_SELECTION ||
             displayControlState === CONTROL_STATE_QUANTITY_CAPTURE)
         ) {
@@ -1221,7 +1261,7 @@ export function TransferDispatchScreen() {
           return;
         }
 
-        if (!commitMutation.isPending && draftState.searchText.trim().length > 0) {
+        if (!isCommandPending && draftState.searchText.trim().length > 0) {
           event.preventDefault();
           setDraftState((state) => ({
             ...state,
@@ -1235,7 +1275,7 @@ export function TransferDispatchScreen() {
       if (
         isEditableTarget(event.target) ||
         !hasDestination ||
-        commitMutation.isPending ||
+        isCommandPending ||
         centerView === "history"
       ) {
         return;
@@ -1275,7 +1315,7 @@ export function TransferDispatchScreen() {
     return () => window.removeEventListener("keydown", handleKeyboard);
   }, [
     centerView,
-    commitMutation.isPending,
+    isCommandPending,
     displayControlState,
     draftState.searchText,
     hasDestination,
@@ -1380,8 +1420,14 @@ export function TransferDispatchScreen() {
               Volver a captura
             </Button>
           }
-          stateLabel={historyQuery.isPending || isSelectedHistoryTransferPending ? "Consultando" : "Sin seleccion"}
-          stateTone={historyQuery.isPending || isSelectedHistoryTransferPending ? "pending" : "draft"}
+          stateLabel={
+            historyQuery.isPending || isSelectedHistoryTransferPending
+              ? "Consultando"
+              : "Sin seleccion"
+          }
+          stateTone={
+            historyQuery.isPending || isSelectedHistoryTransferPending ? "pending" : "draft"
+          }
           title="Historial de envios"
         >
           <div className="flex h-full items-center justify-center px-3 text-center">
@@ -1399,13 +1445,13 @@ export function TransferDispatchScreen() {
         commitErrorMessage={commitErrorMessage}
         destinationLabel={destinationLabel}
         hasDestination={hasDestination}
-        isCommitPending={commitMutation.isPending}
+        isCommitPending={isCommandPending}
         isHistoryViewActive={false}
         isNotesExpanded={isNotesExpanded}
         lines={draftState.lines}
         notes={notes}
         onCommit={() => {
-          if (commitBlockedReason === null && !commitMutation.isPending) {
+          if (commitBlockedReason === null && !isCommandPending) {
             setIsConfirmDialogOpen(true);
           }
         }}
@@ -1442,7 +1488,7 @@ export function TransferDispatchScreen() {
     centerView,
     commitBlockedReason,
     commitErrorMessage,
-    commitMutation.isPending,
+    isCommandPending,
     destinationLabel,
     draftState.lines,
     hasDestination,
@@ -1516,13 +1562,7 @@ export function TransferDispatchScreen() {
     <CompactPageHeader
       secondaryChips={
         <ModuleStateChip
-          tone={
-            centerView === "history"
-              ? "info"
-              : hasDestination
-                ? "primary"
-                : "muted"
-          }
+          tone={centerView === "history" ? "info" : hasDestination ? "primary" : "muted"}
         >
           {centerView === "history" ? "Historial de envios" : routeSuggestionLabel}
         </ModuleStateChip>
@@ -1535,7 +1575,9 @@ export function TransferDispatchScreen() {
             uiState,
           })}
         >
-          {centerView === "history" ? "Consulta" : getDispatchStatusLabel({ hasDestination, uiState })}
+          {centerView === "history"
+            ? "Consulta"
+            : getDispatchStatusLabel({ hasDestination, uiState })}
         </ModuleStateChip>
       }
       title={centerView === "history" ? "Historial de envios" : "Enviar a sucursal"}
@@ -1585,7 +1627,7 @@ export function TransferDispatchScreen() {
             <Button
               aria-label="Regresar"
               className={cn("h-10 px-3", posOutlineButtonClass)}
-              disabled={commitMutation.isPending}
+              disabled={isCommandPending}
               onClick={() => setDraftState((state) => goBackFromOperationalState(state))}
               title="Regresar"
               type="button"
@@ -1600,7 +1642,7 @@ export function TransferDispatchScreen() {
           <SearchField
             ariaLabel="Buscar catalogo para envio"
             className="w-full max-w-sm"
-            disabled={!hasDestination || commitMutation.isPending}
+            disabled={!hasDestination || isCommandPending}
             inputClassName={cn("h-9 rounded-lg text-sm shadow-sm", posInputClass)}
             inputRef={searchInputRef}
             onChange={(value) => {
@@ -1625,7 +1667,7 @@ export function TransferDispatchScreen() {
       <TransferDispatchConfirmationDialog
         destinationLabel={destinationLabel}
         isOpen={isConfirmDialogOpen}
-        isPending={commitMutation.isPending}
+        isPending={isCommandPending}
         lineCount={lineCount}
         lines={draftState.lines}
         onCancel={() => setIsConfirmDialogOpen(false)}
@@ -1764,7 +1806,7 @@ export function TransferDispatchScreen() {
                 </label>
                 <select
                   className={cn("h-10 rounded-lg px-3 text-sm shadow-sm", posInputClass)}
-                  disabled={commitMutation.isPending}
+                  disabled={isCommandPending}
                   id="transfer-destination-branch"
                   onChange={(event) => handleDestinationChange(event.target.value)}
                   value={destinationBranchId}
@@ -1784,7 +1826,9 @@ export function TransferDispatchScreen() {
                     )}
                     title={routeSuggestionLabel}
                   >
-                    {hasDestination ? routeSuggestionLabel : "Selecciona destino para capturar productos"}
+                    {hasDestination
+                      ? routeSuggestionLabel
+                      : "Selecciona destino para capturar productos"}
                   </p>
                 </div>
               </div>
@@ -1826,7 +1870,7 @@ export function TransferDispatchScreen() {
                     <div
                       className={cn(
                         "grid gap-3 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4",
-                        (!hasDestination || commitMutation.isPending) &&
+                        (!hasDestination || isCommandPending) &&
                           "pointer-events-none select-none opacity-55",
                       )}
                     >
@@ -1839,7 +1883,7 @@ export function TransferDispatchScreen() {
                               buttonRef={itemProps.ref}
                               code={productClass.code}
                               isActive={classActiveIndex === index}
-                              isDisabled={!hasDestination || commitMutation.isPending}
+                              isDisabled={!hasDestination || isCommandPending}
                               isPrimaryControl={index === 0}
                               key={productClass.id}
                               onCardFocus={itemProps.onFocus}
@@ -1881,7 +1925,7 @@ export function TransferDispatchScreen() {
                     <div
                       className={cn(
                         "grid gap-3 sm:grid-cols-2 xl:grid-cols-3",
-                        (!hasDestination || commitMutation.isPending) &&
+                        (!hasDestination || isCommandPending) &&
                           "pointer-events-none select-none opacity-55",
                       )}
                     >
@@ -1894,15 +1938,13 @@ export function TransferDispatchScreen() {
                               buttonRef={itemProps.ref}
                               code={product.code}
                               isActive={productActiveIndex === index}
-                              isDisabled={!hasDestination || commitMutation.isPending}
+                              isDisabled={!hasDestination || isCommandPending}
                               isPrimaryControl={index === 0}
                               key={product.id}
                               onCardFocus={itemProps.onFocus}
                               onCardKeyDown={itemProps.onKeyDown}
                               onSelect={() => {
-                                setDraftState((state) =>
-                                  selectProductForOperation(state, product),
-                                );
+                                setDraftState((state) => selectProductForOperation(state, product));
                               }}
                               shortcutLabel={getSelectionShortcutLabel(index)}
                               tabIndex={itemProps.tabIndex}
@@ -1931,121 +1973,121 @@ export function TransferDispatchScreen() {
               {quantitySelection !== null && quantityProduct !== null ? (
                 <div className="mt-3 w-full max-w-3xl justify-self-center rounded-xl border border-[var(--pos-shell-border)] bg-white p-3.5 shadow-sm">
                   <div className="grid gap-3">
-                      <div className="flex flex-wrap items-start justify-between gap-3">
-                        <div className="min-w-0">
-                          <div className="flex flex-wrap items-center gap-2">
-                            <p className="truncate text-base font-semibold text-slate-950">
-                              {quantityProduct.name}
-                            </p>
-                            {!isQuantityReady ? (
-                              <span className="pos-chip" data-tone="warning">
-                                Pendiente
-                              </span>
-                            ) : null}
-                          </div>
-                          <p className="mt-1 truncate text-sm text-slate-600">
-                            {quantitySelection.productClass.name}
+                    <div className="flex flex-wrap items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <p className="truncate text-base font-semibold text-slate-950">
+                            {quantityProduct.name}
                           </p>
+                          {!isQuantityReady ? (
+                            <span className="pos-chip" data-tone="warning">
+                              Pendiente
+                            </span>
+                          ) : null}
                         </div>
+                        <p className="mt-1 truncate text-sm text-slate-600">
+                          {quantitySelection.productClass.name}
+                        </p>
+                      </div>
 
+                      <Button
+                        aria-label="Regresar"
+                        className={cn("h-10 px-3", posOutlineButtonClass)}
+                        disabled={isCommandPending}
+                        onClick={() => setDraftState((state) => goBackFromOperationalState(state))}
+                        title="Regresar"
+                        type="button"
+                        variant="outline"
+                      >
+                        <ArrowLeftIcon className="h-4 w-4" />
+                      </Button>
+                    </div>
+
+                    <div className="grid gap-3 justify-items-center">
+                      <input
+                        aria-label="Cantidad"
+                        className={cn(
+                          "h-16 w-full max-w-[12rem] rounded-xl px-4 text-center text-[2.25rem] font-semibold tracking-tight shadow-sm",
+                          posInputClass,
+                        )}
+                        inputMode="decimal"
+                        onChange={(event) =>
+                          setDraftState((state) =>
+                            setPendingQuantityText(state, event.target.value),
+                          )
+                        }
+                        onKeyDown={(event) => {
+                          if (event.key === "Enter" || event.key === "NumpadEnter") {
+                            event.preventDefault();
+                            handleAddLine();
+                          }
+
+                          if (event.key === "Escape") {
+                            event.preventDefault();
+                            setDraftState((state) => goBackFromOperationalState(state));
+                          }
+                        }}
+                        placeholder="0"
+                        ref={quantityInputRef}
+                        value={quantitySelection.quantityText}
+                      />
+
+                      <div className="flex flex-wrap items-center justify-center gap-2">
                         <Button
-                          aria-label="Regresar"
                           className={cn("h-10 px-3", posOutlineButtonClass)}
-                          disabled={commitMutation.isPending}
-                          onClick={() => setDraftState((state) => goBackFromOperationalState(state))}
-                          title="Regresar"
+                          disabled={isCommandPending}
+                          onClick={() =>
+                            setDraftState((state) => decrementPendingOperationQuantity(state))
+                          }
                           type="button"
                           variant="outline"
                         >
-                          <ArrowLeftIcon className="h-4 w-4" />
+                          -1
+                        </Button>
+                        <Button
+                          className={cn("h-10 px-3", posOutlineButtonClass)}
+                          disabled={isCommandPending}
+                          onClick={() =>
+                            setDraftState((state) => incrementPendingOperationQuantity(state))
+                          }
+                          type="button"
+                          variant="outline"
+                        >
+                          +1
+                        </Button>
+                        <span className="pos-kbd-chip">Enter Agrega</span>
+                        <span className="pos-kbd-chip">Esc Regresa</span>
+                      </div>
+
+                      <div className="flex w-full flex-wrap items-center justify-end gap-3">
+                        <Button
+                          className={cn("h-10 px-5", posPrimaryButtonClass)}
+                          disabled={!hasDestination || !isQuantityReady || isCommandPending}
+                          onClick={handleAddLine}
+                          type="button"
+                        >
+                          Agregar linea
                         </Button>
                       </div>
 
-                      <div className="grid gap-3 justify-items-center">
-                        <input
-                          aria-label="Cantidad"
-                          className={cn(
-                            "h-16 w-full max-w-[12rem] rounded-xl px-4 text-center text-[2.25rem] font-semibold tracking-tight shadow-sm",
-                            posInputClass,
-                          )}
-                          inputMode="decimal"
-                          onChange={(event) =>
-                            setDraftState((state) =>
-                              setPendingQuantityText(state, event.target.value),
-                            )
+                      {selectionErrorMessage ? (
+                        <InlineNotice
+                          action={
+                            <button
+                              aria-label="Cerrar error"
+                              className="flex h-8 w-8 items-center justify-center rounded-full text-[var(--ui-color-danger)] transition hover:bg-[var(--ui-color-danger-soft)]"
+                              onClick={() => setSelectionErrorMessage(null)}
+                              type="button"
+                            >
+                              <XIcon className="h-4 w-4" />
+                            </button>
                           }
-                          onKeyDown={(event) => {
-                            if (event.key === "Enter" || event.key === "NumpadEnter") {
-                              event.preventDefault();
-                              handleAddLine();
-                            }
-
-                            if (event.key === "Escape") {
-                              event.preventDefault();
-                              setDraftState((state) => goBackFromOperationalState(state));
-                            }
-                          }}
-                          placeholder="0"
-                          ref={quantityInputRef}
-                          value={quantitySelection.quantityText}
-                        />
-
-                        <div className="flex flex-wrap items-center justify-center gap-2">
-                          <Button
-                            className={cn("h-10 px-3", posOutlineButtonClass)}
-                            disabled={commitMutation.isPending}
-                            onClick={() =>
-                              setDraftState((state) => decrementPendingOperationQuantity(state))
-                            }
-                            type="button"
-                            variant="outline"
-                          >
-                            -1
-                          </Button>
-                          <Button
-                            className={cn("h-10 px-3", posOutlineButtonClass)}
-                            disabled={commitMutation.isPending}
-                            onClick={() =>
-                              setDraftState((state) => incrementPendingOperationQuantity(state))
-                            }
-                            type="button"
-                            variant="outline"
-                          >
-                            +1
-                          </Button>
-                          <span className="pos-kbd-chip">Enter Agrega</span>
-                          <span className="pos-kbd-chip">Esc Regresa</span>
-                        </div>
-
-                        <div className="flex w-full flex-wrap items-center justify-end gap-3">
-                          <Button
-                            className={cn("h-10 px-5", posPrimaryButtonClass)}
-                            disabled={!hasDestination || !isQuantityReady || commitMutation.isPending}
-                            onClick={handleAddLine}
-                            type="button"
-                          >
-                            Agregar linea
-                          </Button>
-                        </div>
-
-                        {selectionErrorMessage ? (
-                          <InlineNotice
-                            action={
-                              <button
-                                aria-label="Cerrar error"
-                                className="flex h-8 w-8 items-center justify-center rounded-full text-[var(--ui-color-danger)] transition hover:bg-[var(--ui-color-danger-soft)]"
-                                onClick={() => setSelectionErrorMessage(null)}
-                                type="button"
-                              >
-                                <XIcon className="h-4 w-4" />
-                              </button>
-                            }
-                            tone="error"
-                          >
-                            {selectionErrorMessage}
-                          </InlineNotice>
-                        ) : null}
-                      </div>
+                          tone="error"
+                        >
+                          {selectionErrorMessage}
+                        </InlineNotice>
+                      ) : null}
+                    </div>
                   </div>
                 </div>
               ) : null}

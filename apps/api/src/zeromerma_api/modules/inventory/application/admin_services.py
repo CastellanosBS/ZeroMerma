@@ -23,8 +23,8 @@ from zeromerma_api.modules.identity.application.schemas import AuthenticatedUser
 from zeromerma_api.modules.identity.infrastructure.models import User
 from zeromerma_api.modules.inventory.application.admin_schemas import (
     AdminInventoryAdjustmentRequest,
+    AdminInventoryAdjustmentResultView,
     AdminInventoryAdjustmentType,
-    AdminInventoryAdjustmentView,
     AdminInventoryBranchLocationView,
     AdminInventoryDetailView,
     AdminInventoryFilterOptionsView,
@@ -207,7 +207,9 @@ class AdminInventoryService:
         current_user: AuthenticatedUser,
         command: AdminInventoryAdjustmentRequest,
         request_id: str | None,
-    ) -> AdminInventoryAdjustmentView:
+        idempotency_key: uuid.UUID,
+        operation_id: uuid.UUID,
+    ) -> AdminInventoryAdjustmentResultView:
         product = session.get(Product, command.product_id)
         if product is None:
             raise InventoryNotFoundError("Product was not found.")
@@ -277,6 +279,10 @@ class AdminInventoryService:
         session.flush()
 
         metadata = {
+            "idempotency_key": str(idempotency_key),
+            "operation_id": str(operation_id),
+            "operation_code": "inventory.adjust",
+            "inventory_movement_id": str(movement.id),
             "adjustment_id": str(adjustment.id),
             "adjustment_type": command.adjustment_type,
             "branch_id": str(branch.id),
@@ -305,26 +311,24 @@ class AdminInventoryService:
             payload=metadata,
             headers={"request_id": request_id} if request_id else {},
         )
-        session.commit()
+        session.flush()
 
-        return AdminInventoryAdjustmentView(
+        return AdminInventoryAdjustmentResultView(
             adjustment_type=_ADMIN_INVENTORY_ADJUSTMENT_TYPE_ADAPTER.validate_python(
                 adjustment.adjustment_type
             ),
             balance_id=balance.id,
             branch_id=adjustment.branch_id,
             created_at=adjustment.created_at,
-            created_by_user_id=adjustment.created_by_user_id,
+            inventory_movement_id=movement.id,
             id=adjustment.id,
             location_code=_ADMIN_INVENTORY_LOCATION_CODE_ADAPTER.validate_python(
                 adjustment.location_code
             ),
             new_quantity=adjustment.new_quantity,
-            notes=adjustment.notes,
             previous_quantity=adjustment.previous_quantity,
             product_id=adjustment.product_id,
             quantity=adjustment.quantity,
-            reason=adjustment.reason,
         )
 
     def _fetch_rows(

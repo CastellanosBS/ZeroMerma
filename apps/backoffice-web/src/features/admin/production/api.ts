@@ -1,4 +1,4 @@
-import type { components } from "@zeromerma/api-client";
+import type { components, paths } from "@zeromerma/api-client";
 
 import { requestJson } from "../../../lib/api";
 import type {
@@ -24,6 +24,16 @@ export const adminProductionBackendContract: AdminProductionBackendContract = {
   updateEndpoint: "PATCH /v1/admin/production/{production_id}",
 };
 
+export type ProductionCommandResultView = components["schemas"]["ProductionCommandResultView"];
+export type ProductionCommandCode =
+  paths["/v1/admin/production/commands/{command_code}/{idempotency_key}"]["get"]["parameters"]["path"]["command_code"];
+export type ProductionCommandPayload =
+  | components["schemas"]["AdminProductionCreateRequest"]
+  | components["schemas"]["AdminProductionUpdateRequest"]
+  | components["schemas"]["AdminProductionStartRequest"]
+  | components["schemas"]["AdminProductionCompleteRequest"]
+  | components["schemas"]["AdminProductionCancelRequest"];
+
 type ApiProductionBackendContract = components["schemas"]["AdminProductionBackendContractView"];
 type ApiProductionCompletePayload = components["schemas"]["AdminProductionCompleteRequest"];
 type ApiProductionCreatePayload = components["schemas"]["AdminProductionCreateRequest"];
@@ -34,7 +44,11 @@ type ApiProductionListResponse = components["schemas"]["AdminProductionListRespo
 type ApiProductionUpdatePayload = components["schemas"]["AdminProductionUpdateRequest"];
 type ApiProductionWarning = components["schemas"]["AdminProductionWarningView"];
 
-function appendOptionalParam(params: URLSearchParams, key: string, value: string | null | undefined) {
+function appendOptionalParam(
+  params: URLSearchParams,
+  key: string,
+  value: string | null | undefined,
+) {
   if (!value || value === "all") {
     return;
   }
@@ -52,7 +66,9 @@ function mapMetric(value: number | string | null | undefined): string {
   return String(value);
 }
 
-function mapBackendContract(contract?: ApiProductionBackendContract): AdminProductionBackendContract {
+function mapBackendContract(
+  contract?: ApiProductionBackendContract,
+): AdminProductionBackendContract {
   if (!contract) {
     return adminProductionBackendContract;
   }
@@ -76,7 +92,9 @@ function mapWarningFromApi(warning: ApiProductionWarning): AdminProductionWarnin
   };
 }
 
-export function mapAdminProductionListItemFromApi(item: ApiProductionListItem): AdminProductionListItem {
+export function mapAdminProductionListItemFromApi(
+  item: ApiProductionListItem,
+): AdminProductionListItem {
   return {
     actualOutputQty: item.actual_output_qty ?? null,
     branchId: item.branch_id,
@@ -208,7 +226,9 @@ export function mapAdminProductionDetailFromApi(item: ApiProductionDetail): Admi
   };
 }
 
-function mapProductionListFromApi(response: ApiProductionListResponse): AdminProductionListResponse {
+function mapProductionListFromApi(
+  response: ApiProductionListResponse,
+): AdminProductionListResponse {
   return {
     backendContract: mapBackendContract(response.backend_contract),
     filterOptions: {
@@ -235,7 +255,9 @@ function mapProductionListFromApi(response: ApiProductionListResponse): AdminPro
   };
 }
 
-function toCreateApiPayload(payload: AdminProductionCreatePayload): ApiProductionCreatePayload {
+export function toCreateApiPayload(
+  payload: AdminProductionCreatePayload,
+): ApiProductionCreatePayload {
   return {
     branch_id: payload.branchId,
     notes: payload.notes ?? null,
@@ -246,17 +268,23 @@ function toCreateApiPayload(payload: AdminProductionCreatePayload): ApiProductio
   };
 }
 
-function toUpdateApiPayload(payload: AdminProductionUpdatePayload): ApiProductionUpdatePayload {
+export function toUpdateApiPayload(
+  payload: AdminProductionUpdatePayload,
+): ApiProductionUpdatePayload {
   return {
-    notes: payload.notes ?? null,
-    planned_at: payload.plannedAt ?? null,
-    planned_output_qty: payload.plannedOutputQty ?? null,
-    product_id: payload.productId ?? null,
-    recipe_id: payload.recipeId ?? null,
+    ...(payload.notes !== undefined ? { notes: payload.notes } : {}),
+    ...(payload.plannedAt !== undefined ? { planned_at: payload.plannedAt } : {}),
+    ...(payload.plannedOutputQty !== undefined
+      ? { planned_output_qty: payload.plannedOutputQty }
+      : {}),
+    ...(payload.productId !== undefined ? { product_id: payload.productId } : {}),
+    ...(payload.recipeId !== undefined ? { recipe_id: payload.recipeId } : {}),
   };
 }
 
-function toCompleteApiPayload(payload: AdminProductionCompletePayload): ApiProductionCompletePayload {
+export function toCompleteApiPayload(
+  payload: AdminProductionCompletePayload,
+): ApiProductionCompletePayload {
   return {
     actual_output_qty: payload.actualOutputQty,
     notes: payload.notes ?? null,
@@ -297,56 +325,56 @@ export function fetchAdminProductionDetail(productionId: string): Promise<AdminP
   }).then(mapAdminProductionDetailFromApi);
 }
 
-export function createAdminProduction(
-  payload: AdminProductionCreatePayload,
-): Promise<AdminProductionDetail> {
-  return requestJson<ApiProductionDetail>({
-    body: toCreateApiPayload(payload),
-    method: "POST",
-    path: "/v1/admin/production",
-  }).then(mapAdminProductionDetailFromApi);
+export function sendProductionCommand(
+  commandCode: ProductionCommandCode,
+  productionId: string | null,
+  payload: ProductionCommandPayload,
+  key: string,
+): Promise<ProductionCommandResultView> {
+  const path =
+    commandCode === "create"
+      ? "/v1/admin/production"
+      : commandCode === "update"
+        ? `/v1/admin/production/${productionId}`
+        : `/v1/admin/production/${productionId}/${commandCode}`;
+  return requestJson<ProductionCommandResultView>({
+    body: payload,
+    method: commandCode === "update" ? "PATCH" : "POST",
+    path,
+    headers: { "Idempotency-Key": key },
+  });
 }
 
+export function recoverProductionCommand(
+  commandCode: ProductionCommandCode,
+  key: string,
+  branchId: string,
+): Promise<ProductionCommandResultView> {
+  return requestJson<ProductionCommandResultView>({
+    path: `/v1/admin/production/commands/${commandCode}/${encodeURIComponent(key)}?${new URLSearchParams({ branch_id: branchId })}`,
+  });
+}
+
+export function createAdminProduction(payload: AdminProductionCreatePayload, key: string) {
+  return sendProductionCommand("create", null, toCreateApiPayload(payload), key);
+}
 export function updateAdminProduction(
   productionId: string,
   payload: AdminProductionUpdatePayload,
-): Promise<AdminProductionDetail> {
-  return requestJson<ApiProductionDetail>({
-    body: toUpdateApiPayload(payload),
-    method: "PATCH",
-    path: `/v1/admin/production/${productionId}`,
-  }).then(mapAdminProductionDetailFromApi);
+  key: string,
+) {
+  return sendProductionCommand("update", productionId, toUpdateApiPayload(payload), key);
 }
-
-export function startAdminProduction(
-  productionId: string,
-  notes?: string | null,
-): Promise<AdminProductionDetail> {
-  return requestJson<ApiProductionDetail>({
-    body: { notes: notes ?? null },
-    method: "POST",
-    path: `/v1/admin/production/${productionId}/start`,
-  }).then(mapAdminProductionDetailFromApi);
+export function startAdminProduction(productionId: string, notes: string | null, key: string) {
+  return sendProductionCommand("start", productionId, { notes }, key);
 }
-
 export function completeAdminProduction(
   productionId: string,
   payload: AdminProductionCompletePayload,
-): Promise<AdminProductionDetail> {
-  return requestJson<ApiProductionDetail>({
-    body: toCompleteApiPayload(payload),
-    method: "POST",
-    path: `/v1/admin/production/${productionId}/complete`,
-  }).then(mapAdminProductionDetailFromApi);
+  key: string,
+) {
+  return sendProductionCommand("complete", productionId, toCompleteApiPayload(payload), key);
 }
-
-export function cancelAdminProduction(
-  productionId: string,
-  reason?: string | null,
-): Promise<AdminProductionDetail> {
-  return requestJson<ApiProductionDetail>({
-    body: { reason: reason ?? null },
-    method: "POST",
-    path: `/v1/admin/production/${productionId}/cancel`,
-  }).then(mapAdminProductionDetailFromApi);
+export function cancelAdminProduction(productionId: string, reason: string | null, key: string) {
+  return sendProductionCommand("cancel", productionId, { reason }, key);
 }

@@ -104,11 +104,17 @@ export function createInitialTransferReceiptDraftState(): TransferReceiptDraftSt
 
 export function createTransferReceiptDraftState(
   shipment: OperationDocumentView,
+  progress: import("../../lib/api-contracts").TransferCommandLineView[],
 ): TransferReceiptDraftState {
   return {
     controlState: TRANSFER_RECEIPT_STATE_DETAIL,
     selectedTransferId: shipment.id,
-    lines: shipment.lines.map(createTransferReceiptLineDraft),
+    lines: shipment.lines.flatMap((line) => {
+      const pending = progress.find((item) => item.shipment_line_id === line.id)?.pending_quantity;
+      return pending !== undefined && Number(pending) > 0
+        ? [createTransferReceiptLineDraft({ ...line, expected_quantity: pending })]
+        : [];
+    }),
     notes: "",
   };
 }
@@ -143,69 +149,48 @@ export function updateTransferReceiptLineVarianceReason(
   );
 }
 
-export function getTransferReceiptExpectedTotalMilli(
-  lines: TransferReceiptLineDraft[],
-): number {
+export function getTransferReceiptExpectedTotalMilli(lines: TransferReceiptLineDraft[]): number {
   return lines.reduce(
     (sum, line) => sum + (parseQuantityToMilliUnits(line.expectedQuantityText) ?? 0),
     0,
   );
 }
 
-export function getTransferReceiptReceivedTotalMilli(
-  lines: TransferReceiptLineDraft[],
-): number {
+export function getTransferReceiptReceivedTotalMilli(lines: TransferReceiptLineDraft[]): number {
   return lines.reduce(
     (sum, line) => sum + (parseQuantityToMilliUnits(line.receivedQuantityText) ?? 0),
     0,
   );
 }
 
-export function getTransferReceiptVarianceLineCount(
-  lines: TransferReceiptLineDraft[],
-): number {
+export function getTransferReceiptVarianceLineCount(lines: TransferReceiptLineDraft[]): number {
   return lines.filter((line) => hasTransferReceiptLineVariance(line)).length;
 }
 
-export function hasTransferReceiptMissingQuantities(
-  lines: TransferReceiptLineDraft[],
-): boolean {
-  return lines.some(
-    (line) => parseQuantityToMilliUnits(line.receivedQuantityText) === null,
-  );
+export function hasTransferReceiptMissingQuantities(lines: TransferReceiptLineDraft[]): boolean {
+  return lines.some((line) => parseQuantityToMilliUnits(line.receivedQuantityText) === null);
 }
 
 export function hasTransferReceiptMissingVarianceReason(
   lines: TransferReceiptLineDraft[],
 ): boolean {
   return lines.some(
-    (line) =>
-      hasTransferReceiptLineVariance(line) &&
-      line.varianceReason.trim().length === 0,
+    (line) => hasTransferReceiptLineVariance(line) && line.varianceReason.trim().length === 0,
   );
 }
 
-export function hasTransferReceiptLineVariance(
-  line: TransferReceiptLineDraft,
-): boolean {
+export function hasTransferReceiptLineVariance(line: TransferReceiptLineDraft): boolean {
   return line.receivedQuantityText.trim() !== line.expectedQuantityText.trim();
 }
 
-export function getTransferReceiptLineVarianceMilli(
-  line: TransferReceiptLineDraft,
-): number {
+export function getTransferReceiptLineVarianceMilli(line: TransferReceiptLineDraft): number {
   const expectedMilli = parseQuantityToMilliUnits(line.expectedQuantityText) ?? 0;
   const receivedMilli = parseQuantityToMilliUnits(line.receivedQuantityText) ?? 0;
   return receivedMilli - expectedMilli;
 }
 
-export function getTransferReceiptDifferenceTotalMilli(
-  lines: TransferReceiptLineDraft[],
-): number {
-  return (
-    getTransferReceiptReceivedTotalMilli(lines) -
-    getTransferReceiptExpectedTotalMilli(lines)
-  );
+export function getTransferReceiptDifferenceTotalMilli(lines: TransferReceiptLineDraft[]): number {
+  return getTransferReceiptReceivedTotalMilli(lines) - getTransferReceiptExpectedTotalMilli(lines);
 }
 
 export function getTransferReceiptUiState({
@@ -323,13 +308,11 @@ export function buildTransferReceiveLines(
       throw new Error("Las cantidades recibidas deben ser cero o mayores.");
     }
 
-    if (
-      receivedMilli !== expectedMilli &&
-      line.varianceReason.trim().length === 0
-    ) {
-      throw new Error(
-        `Indica el motivo de la diferencia en ${line.productName}.`,
-      );
+    if (receivedMilli > expectedMilli)
+      throw new Error("La recepción supera la cantidad pendiente.");
+
+    if (receivedMilli !== expectedMilli && line.varianceReason.trim().length === 0) {
+      throw new Error(`Indica el motivo de la diferencia en ${line.productName}.`);
     }
 
     return {
@@ -345,9 +328,7 @@ export function buildTransferReceiveLines(
   });
 }
 
-function createTransferReceiptLineDraft(
-  line: OperationDocumentLineView,
-): TransferReceiptLineDraft {
+function createTransferReceiptLineDraft(line: OperationDocumentLineView): TransferReceiptLineDraft {
   const expectedQuantityText = formatLineQuantity(
     line.expected_quantity ?? line.quantity,
     "La cantidad esperada del envio es obligatoria.",
@@ -365,10 +346,7 @@ function createTransferReceiptLineDraft(
   };
 }
 
-function formatLineQuantity(
-  value: string | number | null,
-  errorMessage: string,
-): string {
+function formatLineQuantity(value: string | number | null, errorMessage: string): string {
   if (value === null) {
     throw new Error(errorMessage);
   }

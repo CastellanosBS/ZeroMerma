@@ -1,6 +1,8 @@
 import type {
   PendingInboundTransfersResponse,
   TransferDetailResponse,
+  TransferCommandResultView,
+  PosTransferCommandCode,
   TransferDispatchCommitRequest,
   TransferDispatchHistoryResponse,
   TransferReceiptHistoryResponse,
@@ -23,8 +25,10 @@ export interface TransferReceiptHistoryFilters {
 
 export function commitTransferDispatch(
   payload: TransferDispatchCommitRequest,
-): Promise<TransferDetailResponse> {
-  return requestJson<TransferDetailResponse>({
+  idempotencyKey: string,
+): Promise<TransferCommandResultView> {
+  return requestJson<TransferCommandResultView>({
+    headers: { "Idempotency-Key": idempotencyKey },
     body: payload,
     method: "POST",
     path: "/v1/transfers/dispatch/commit",
@@ -100,10 +104,27 @@ export function getTransferReceiptHistory(
 export function receiveTransfer(
   transferId: string,
   payload: TransferReceiveRequest,
-): Promise<TransferDetailResponse> {
-  return requestJson<TransferDetailResponse>({
+  idempotencyKey: string,
+): Promise<TransferCommandResultView> {
+  return requestJson<TransferCommandResultView>({
+    headers: { "Idempotency-Key": idempotencyKey },
     body: payload,
     method: "POST",
     path: `/v1/transfers/${encodeURIComponent(transferId)}/receive`,
+  });
+}
+
+export function recoverTransferCommand(
+  commandCode: PosTransferCommandCode,
+  key: string,
+  workstationCode: string,
+  cashSessionId: string,
+): Promise<TransferCommandResultView> {
+  const query = new URLSearchParams({
+    workstation_code: workstationCode,
+    cash_session_id: cashSessionId,
+  });
+  return requestJson({
+    path: `/v1/transfers/commands/${commandCode}/confirmations/${encodeURIComponent(key)}?${query}`,
   });
 }

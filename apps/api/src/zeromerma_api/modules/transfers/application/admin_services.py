@@ -7,7 +7,6 @@ from decimal import Decimal
 
 from pydantic import TypeAdapter
 from sqlalchemy import delete, exists, select
-from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, aliased
 
 from zeromerma_api.modules.audit.application.service import AuditRecorder
@@ -72,6 +71,16 @@ from zeromerma_api.modules.transfers.application.admin_schemas import (
     AdminTransferWarningSeverity,
     AdminTransferWarningView,
 )
+from zeromerma_api.modules.transfers.application.schemas import TransferCommandResultView
+from zeromerma_api.modules.transfers.application.workflow import (
+    command_snapshot,
+    command_trace,
+    lock_shipment,
+    progress,
+    receipts,
+    received_quantities,
+)
+from zeromerma_api.modules.transfers.application.workflow import receipt_lines as all_receipt_lines
 from zeromerma_api.modules.transfers.domain.exceptions import (
     TransferAlreadyReceivedError,
     TransferNotFoundError,
@@ -187,7 +196,7 @@ class AdminTransferService:
         current_user: AuthenticatedUser,
         command: AdminTransferCreateRequest,
         request_id: str | None,
-    ) -> AdminTransferDetailView:
+    ) -> TransferCommandResultView:
         origin_branch = self._get_branch(session, command.origin_branch_id)
         destination_branch = self._get_branch(session, command.destination_branch_id)
         self._validate_transfer_branches(origin_branch, destination_branch, for_dispatch=False)
@@ -207,32 +216,27 @@ class AdminTransferService:
             committed_at_utc=None,
         )
 
-        try:
-            session.add(shipment)
-            session.flush()
-            self._replace_lines(
-                session, shipment=shipment, lines=command.lines, resolved_products=resolved_products
-            )
-            self._record_change(
-                session,
-                current_user=current_user,
-                shipment=shipment,
-                action="admin.transfer.created",
-                event_name=ADMIN_TRANSFER_CREATED_EVENT,
-                request_id=request_id,
-                metadata={
-                    "destination_branch_id": str(destination_branch.id),
-                    "line_count": len(command.lines),
-                    "origin_branch_id": str(origin_branch.id),
-                    "status": shipment.status,
-                },
-            )
-            session.commit()
-        except IntegrityError as error:
-            session.rollback()
-            raise TransferValidationError("Transfer draft could not be created.") from error
+        session.add(shipment)
+        session.flush()
+        self._replace_lines(
+            session, shipment=shipment, lines=command.lines, resolved_products=resolved_products
+        )
+        self._record_change(
+            session,
+            current_user=current_user,
+            shipment=shipment,
+            action="admin.transfer.created",
+            event_name=ADMIN_TRANSFER_CREATED_EVENT,
+            request_id=request_id,
+            metadata={
+                "destination_branch_id": str(destination_branch.id),
+                "line_count": len(command.lines),
+                "origin_branch_id": str(origin_branch.id),
+                "status": shipment.status,
+            },
+        )
 
-        return self.get_transfer_detail(session, transfer_id=shipment.id)
+        return command_snapshot(session, shipment)
 
     def update_transfer(
         self,
@@ -242,8 +246,8 @@ class AdminTransferService:
         transfer_id: uuid.UUID,
         command: AdminTransferUpdateRequest,
         request_id: str | None,
-    ) -> AdminTransferDetailView:
-        shipment = self._get_shipment(session, transfer_id)
+    ) -> TransferCommandResultView:
+        shipment = lock_shipment(session, transfer_id)
         if shipment.status != OPERATION_DOCUMENT_STATUS_DRAFT:
             raise TransferValidationError("Only draft transfers can be edited.")
 
@@ -264,34 +268,29 @@ class AdminTransferService:
         if "notes" in command.model_fields_set:
             shipment.notes = command.notes
 
-        try:
-            if command.lines is not None:
-                resolved_products = self._resolve_products(session, command.lines)
-                self._replace_lines(
-                    session,
-                    shipment=shipment,
-                    lines=command.lines,
-                    resolved_products=resolved_products,
-                )
-            self._record_change(
+        if command.lines is not None:
+            resolved_products = self._resolve_products(session, command.lines)
+            self._replace_lines(
                 session,
-                current_user=current_user,
                 shipment=shipment,
-                action="admin.transfer.updated",
-                event_name=ADMIN_TRANSFER_CREATED_EVENT,
-                request_id=request_id,
-                metadata={
-                    "destination_branch_id": str(destination_branch.id),
-                    "origin_branch_id": str(origin_branch.id),
-                    "status": shipment.status,
-                },
+                lines=command.lines,
+                resolved_products=resolved_products,
             )
-            session.commit()
-        except IntegrityError as error:
-            session.rollback()
-            raise TransferValidationError("Transfer draft could not be updated.") from error
+        self._record_change(
+            session,
+            current_user=current_user,
+            shipment=shipment,
+            action="admin.transfer.updated",
+            event_name=ADMIN_TRANSFER_CREATED_EVENT,
+            request_id=request_id,
+            metadata={
+                "destination_branch_id": str(destination_branch.id),
+                "origin_branch_id": str(origin_branch.id),
+                "status": shipment.status,
+            },
+        )
 
-        return self.get_transfer_detail(session, transfer_id=shipment.id)
+        return command_snapshot(session, shipment)
 
     def dispatch_transfer(
         self,
@@ -301,8 +300,8 @@ class AdminTransferService:
         transfer_id: uuid.UUID,
         command: AdminTransferDispatchRequest,
         request_id: str | None,
-    ) -> AdminTransferDetailView:
-        shipment = self._get_shipment(session, transfer_id)
+    ) -> TransferCommandResultView:
+        shipment = lock_shipment(session, transfer_id)
         if shipment.status != OPERATION_DOCUMENT_STATUS_DRAFT:
             raise TransferValidationError("Only draft transfers can be dispatched.")
         if shipment.destination_branch_id is None:
@@ -324,34 +323,29 @@ class AdminTransferService:
         if command.notes is not None:
             shipment.notes = command.notes
 
-        try:
-            self._apply_dispatch_inventory(
-                session,
-                current_user=current_user,
-                shipment=shipment,
-                shipment_lines=shipment_lines,
-                destination_branch_id=destination_branch.id,
-            )
-            self._record_change(
-                session,
-                current_user=current_user,
-                shipment=shipment,
-                action="transfer.dispatched",
-                event_name=OUTBOX_EVENT_TRANSFER_DISPATCHED_V1,
-                request_id=request_id,
-                metadata={
-                    "destination_branch_id": str(destination_branch.id),
-                    "line_count": len(shipment_lines),
-                    "origin_branch_id": str(origin_branch.id),
-                    "status": shipment.status,
-                },
-            )
-            session.commit()
-        except IntegrityError as error:
-            session.rollback()
-            raise TransferValidationError("Transfer dispatch could not be persisted.") from error
+        self._apply_dispatch_inventory(
+            session,
+            current_user=current_user,
+            shipment=shipment,
+            shipment_lines=shipment_lines,
+            destination_branch_id=destination_branch.id,
+        )
+        self._record_change(
+            session,
+            current_user=current_user,
+            shipment=shipment,
+            action="transfer.dispatched",
+            event_name=OUTBOX_EVENT_TRANSFER_DISPATCHED_V1,
+            request_id=request_id,
+            metadata={
+                "destination_branch_id": str(destination_branch.id),
+                "line_count": len(shipment_lines),
+                "origin_branch_id": str(origin_branch.id),
+                "status": shipment.status,
+            },
+        )
 
-        return self.get_transfer_detail(session, transfer_id=shipment.id)
+        return command_snapshot(session, shipment)
 
     def receive_transfer(
         self,
@@ -361,38 +355,39 @@ class AdminTransferService:
         transfer_id: uuid.UUID,
         command: AdminTransferReceiveRequest,
         request_id: str | None,
-    ) -> AdminTransferDetailView:
-        shipment = self._get_shipment(session, transfer_id)
+    ) -> TransferCommandResultView:
+        shipment = lock_shipment(session, transfer_id)
         if shipment.status != OPERATION_DOCUMENT_STATUS_IN_TRANSIT:
             raise TransferAlreadyReceivedError("Transfer shipment is no longer pending receipt.")
         if shipment.destination_branch_id is None:
             raise TransferValidationError("Transfer destination branch is missing.")
 
-        existing_receipt = self._get_receipt(session, shipment.id)
-        if existing_receipt is not None:
-            raise TransferAlreadyReceivedError("Transfer shipment is no longer pending receipt.")
-
+        prior = received_quantities(session, shipment.id)
         shipment_lines = self._get_shipment_lines(session, shipment.id)
         if not shipment_lines:
             raise TransferValidationError("Transfer shipment has no lines.")
 
         receipt_by_line_id = {line.shipment_line_id: line for line in command.lines}
-        if {line.id for line in shipment_lines} != set(receipt_by_line_id):
+        if not set(receipt_by_line_id).issubset({line.id for line in shipment_lines}):
             raise TransferValidationError(
                 "Transfer receipt lines must match the pending shipment lines exactly."
             )
 
         for shipment_line in shipment_lines:
+            if shipment_line.id not in receipt_by_line_id:
+                continue
             receipt_line = receipt_by_line_id[shipment_line.id]
-            if (
-                receipt_line.received_quantity != shipment_line.quantity
-                and not receipt_line.variance_reason
-            ):
+            remaining = shipment_line.quantity - prior.get(shipment_line.line_number, Decimal(0))
+            if remaining <= 0 or receipt_line.received_quantity > remaining:
+                raise TransferValidationError("Received quantity cannot exceed pending quantity.")
+            if receipt_line.received_quantity != remaining and not receipt_line.variance_reason:
                 raise TransferValidationError(
                     "Variance reason is required when the received quantity "
                     "differs from the shipment."
                 )
 
+        if not any(line.received_quantity > 0 for line in command.lines):
+            raise TransferValidationError("Receipt must include a positive quantity.")
         destination_branch = self._get_branch(session, shipment.destination_branch_id)
         workstation = self._get_active_workstation_for_branch(session, destination_branch.id)
         committed_at = datetime.now(tz=UTC)
@@ -411,67 +406,82 @@ class AdminTransferService:
             committed_at_utc=committed_at,
         )
 
-        try:
-            session.add(receipt)
-            session.flush()
-            for shipment_line in shipment_lines:
-                receipt_line = receipt_by_line_id[shipment_line.id]
-                if receipt_line.received_quantity != shipment_line.quantity:
-                    has_discrepancy = True
-                session.add(
-                    OperationDocumentLine(
-                        operation_document_id=receipt.id,
-                        line_number=shipment_line.line_number,
-                        product_id=shipment_line.product_id,
-                        product_code_snapshot=shipment_line.product_code_snapshot,
-                        product_name_snapshot=shipment_line.product_name_snapshot,
-                        product_class_id=shipment_line.product_class_id,
-                        product_class_code_snapshot=shipment_line.product_class_code_snapshot,
-                        product_class_name_snapshot=shipment_line.product_class_name_snapshot,
-                        quantity=shipment_line.quantity,
-                        expected_quantity=shipment_line.quantity,
-                        received_quantity=receipt_line.received_quantity,
-                        unit_of_measure_code=shipment_line.unit_of_measure_code,
-                        variance_reason=receipt_line.variance_reason,
-                        notes=receipt_line.notes,
-                    )
+        session.add(receipt)
+        session.flush()
+        for shipment_line in shipment_lines:
+            if shipment_line.id not in receipt_by_line_id:
+                continue
+            receipt_line = receipt_by_line_id[shipment_line.id]
+            remaining = shipment_line.quantity - prior.get(shipment_line.line_number, Decimal(0))
+            if remaining <= 0 or receipt_line.received_quantity > remaining:
+                raise TransferValidationError("Received quantity cannot exceed pending quantity.")
+            if receipt_line.received_quantity != remaining:
+                has_discrepancy = True
+            session.add(
+                OperationDocumentLine(
+                    operation_document_id=receipt.id,
+                    line_number=shipment_line.line_number,
+                    product_id=shipment_line.product_id,
+                    product_code_snapshot=shipment_line.product_code_snapshot,
+                    product_name_snapshot=shipment_line.product_name_snapshot,
+                    product_class_id=shipment_line.product_class_id,
+                    product_class_code_snapshot=shipment_line.product_class_code_snapshot,
+                    product_class_name_snapshot=shipment_line.product_class_name_snapshot,
+                    quantity=shipment_line.quantity,
+                    expected_quantity=remaining,
+                    received_quantity=receipt_line.received_quantity,
+                    unit_of_measure_code=shipment_line.unit_of_measure_code,
+                    variance_reason=receipt_line.variance_reason,
+                    notes=receipt_line.notes,
                 )
+            )
 
-            receipt.status = (
-                OPERATION_DOCUMENT_STATUS_RECEIVED_WITH_VARIANCE
-                if has_discrepancy
-                else OPERATION_DOCUMENT_STATUS_RECEIVED
+        receipt.status = (
+            OPERATION_DOCUMENT_STATUS_RECEIVED_WITH_VARIANCE
+            if has_discrepancy
+            else OPERATION_DOCUMENT_STATUS_RECEIVED
+        )
+        final_status = (
+            OPERATION_DOCUMENT_STATUS_IN_TRANSIT
+            if any(
+                prior.get(line.line_number, Decimal(0))
+                + (
+                    receipt_by_line_id[line.id].received_quantity
+                    if line.id in receipt_by_line_id
+                    else Decimal(0)
+                )
+                < line.quantity
+                for line in shipment_lines
             )
-            shipment.status = receipt.status
-            self._apply_receipt_inventory(
-                session,
-                current_user=current_user,
-                shipment=shipment,
-                receipt=receipt,
-                shipment_lines=shipment_lines,
-                receipt_by_line_id=receipt_by_line_id,
-            )
-            self._record_change(
-                session,
-                current_user=current_user,
-                shipment=shipment,
-                action="transfer.received",
-                event_name=OUTBOX_EVENT_TRANSFER_RECEIVED_V1,
-                request_id=request_id,
-                metadata={
-                    "destination_branch_id": str(destination_branch.id),
-                    "line_count": len(shipment_lines),
-                    "receipt_id": str(receipt.id),
-                    "shipment_id": str(shipment.id),
-                    "status": receipt.status,
-                },
-            )
-            session.commit()
-        except IntegrityError as error:
-            session.rollback()
-            raise TransferValidationError("Transfer receipt could not be persisted.") from error
+            else OPERATION_DOCUMENT_STATUS_RECEIVED
+        )
+        if shipment.status != final_status:
+            shipment.status = final_status
+        self._apply_receipt_inventory(
+            session,
+            current_user=current_user,
+            shipment=shipment,
+            receipt=receipt,
+            shipment_lines=shipment_lines,
+            receipt_by_line_id=receipt_by_line_id,
+        )
+        self._record_change(
+            session,
+            current_user=current_user,
+            shipment=shipment,
+            action="transfer.received",
+            event_name=OUTBOX_EVENT_TRANSFER_RECEIVED_V1,
+            request_id=request_id,
+            metadata={
+                "destination_branch_id": str(destination_branch.id),
+                "line_count": len(shipment_lines),
+                "receipt_id": str(receipt.id),
+                "shipment_id": str(shipment.id),
+                "status": receipt.status,
+            },
+        )
 
-        return self.get_transfer_detail(session, transfer_id=shipment.id)
+        return command_snapshot(session, shipment, receipt_id=receipt.id)
 
     def cancel_transfer(
         self,
@@ -481,8 +491,8 @@ class AdminTransferService:
         transfer_id: uuid.UUID,
         command: AdminTransferCancelRequest,
         request_id: str | None,
-    ) -> AdminTransferDetailView:
-        shipment = self._get_shipment(session, transfer_id)
+    ) -> TransferCommandResultView:
+        shipment = lock_shipment(session, transfer_id)
         if shipment.status != OPERATION_DOCUMENT_STATUS_DRAFT:
             raise TransferValidationError("Only draft transfers can be cancelled.")
 
@@ -504,9 +514,8 @@ class AdminTransferService:
             request_id=request_id,
             metadata={"reason": command.reason, "status": shipment.status},
         )
-        session.commit()
 
-        return self.get_transfer_detail(session, transfer_id=shipment.id)
+        return command_snapshot(session, shipment)
 
     def _fetch_rows(
         self,
@@ -523,6 +532,18 @@ class AdminTransferService:
         origin_branch = aliased(Branch)
         destination_branch = aliased(Branch)
         receipt_document = aliased(OperationDocument)
+        latest_receipt = aliased(OperationDocument)
+        latest_receipt_id = (
+            select(latest_receipt.id)
+            .where(
+                latest_receipt.reference_document_id == OperationDocument.id,
+                latest_receipt.document_type == OPERATION_DOCUMENT_TYPE_BRANCH_TRANSFER_RECEIPT,
+            )
+            .order_by(latest_receipt.created_at_utc.desc(), latest_receipt.id.desc())
+            .limit(1)
+            .correlate(OperationDocument)
+            .scalar_subquery()
+        )
         receipt_user = aliased(User)
 
         query = (
@@ -544,7 +565,7 @@ class AdminTransferService:
             .join(User, User.id == OperationDocument.created_by_user_id)
             .outerjoin(
                 receipt_document,
-                (receipt_document.reference_document_id == OperationDocument.id)
+                (receipt_document.id == latest_receipt_id)
                 & (
                     receipt_document.document_type
                     == OPERATION_DOCUMENT_TYPE_BRANCH_TRANSFER_RECEIPT
@@ -849,12 +870,16 @@ class AdminTransferService:
         if shipment.destination_branch_id is None:
             raise TransferValidationError("Transfer destination branch is missing.")
         for shipment_line in shipment_lines:
+            if shipment_line.id not in receipt_by_line_id:
+                continue
             receipt_line = receipt_by_line_id[shipment_line.id]
+            if receipt_line.received_quantity == 0:
+                continue
             self._apply_stock_delta(
                 session,
                 branch_id=shipment.destination_branch_id,
                 current_user=current_user,
-                delta=-shipment_line.quantity,
+                delta=-receipt_line.received_quantity,
                 location_code=INVENTORY_LOCATION_IN_TRANSIT,
                 movement_type=INVENTORY_MOVEMENT_TYPE_TRANSFER_RECEIPT,
                 notes=receipt_line.notes,
@@ -997,6 +1022,7 @@ class AdminTransferService:
                 "document_type": shipment.document_type,
                 "transfer_id": str(shipment.id),
                 **metadata,
+                **command_trace(session),
             },
         )
         self._outbox_writer.append(
@@ -1008,8 +1034,9 @@ class AdminTransferService:
                 "document_type": shipment.document_type,
                 "transfer_id": str(shipment.id),
                 **metadata,
+                **command_trace(session),
             },
-            headers={"request_id": request_id} if request_id else {},
+            headers={"request_id": request_id, **command_trace(session)},
         )
 
     def _to_list_item(self, session: Session, row: _AdminTransferRow) -> AdminTransferListItemView:
@@ -1063,8 +1090,8 @@ class AdminTransferService:
             shipment_lines=shipment_lines,
         )
         receipt_state = (
-            "pending"
-            if row.receipt is None and row.shipment.status == OPERATION_DOCUMENT_STATUS_IN_TRANSIT
+            ("partial" if row.receipt else "pending")
+            if row.shipment.status == OPERATION_DOCUMENT_STATUS_IN_TRANSIT
             else "not_dispatched"
             if row.shipment.status == OPERATION_DOCUMENT_STATUS_DRAFT
             else "cancelled"
@@ -1133,7 +1160,7 @@ class AdminTransferService:
                 received_total_quantity=received_total,
                 state=receipt_state,
             ),
-            related_documents=self._related_documents(row),
+            related_documents=self._related_documents(session, row),
             warnings=warnings,
         )
 
@@ -1154,7 +1181,18 @@ class AdminTransferService:
         views: list[AdminTransferLineView] = []
         for shipment_line in shipment_lines:
             receipt_line = receipt_by_line_number.get(shipment_line.line_number)
-            received_quantity = receipt_line.received_quantity if receipt_line is not None else None
+            received_quantity = (
+                sum(
+                    (
+                        line.received_quantity or Decimal(0)
+                        for line in receipt_lines
+                        if line.line_number == shipment_line.line_number
+                    ),
+                    Decimal(0),
+                )
+                if receipt_lines
+                else None
+            )
             difference = (
                 received_quantity - shipment_line.quantity
                 if received_quantity is not None
@@ -1177,6 +1215,7 @@ class AdminTransferService:
                     product_kind=product.product_kind if product is not None else "UNKNOWN",
                     product_name=shipment_line.product_name_snapshot,
                     received_quantity=received_quantity,
+                    pending_quantity=shipment_line.quantity - (received_quantity or Decimal(0)),
                     requested_quantity=shipment_line.quantity,
                     sent_quantity=shipment_line.quantity,
                     shipment_line_id=shipment_line.id,
@@ -1203,8 +1242,7 @@ class AdminTransferService:
         row: _AdminTransferRow,
     ) -> AdminTransferInventoryImpactView:
         document_ids = [row.shipment.id]
-        if row.receipt is not None:
-            document_ids.append(row.receipt.id)
+        document_ids.extend(receipt.id for receipt in receipts(session, row.shipment.id))
         movements = (
             session.execute(
                 select(InventoryMovement)
@@ -1237,7 +1275,9 @@ class AdminTransferService:
             else "No hay movimientos de inventario vinculados a esta transferencia.",
         )
 
-    def _related_documents(self, row: _AdminTransferRow) -> list[AdminTransferRelatedDocumentView]:
+    def _related_documents(
+        self, session: Session, row: _AdminTransferRow
+    ) -> list[AdminTransferRelatedDocumentView]:
         documents = [
             AdminTransferRelatedDocumentView(
                 document_id=row.shipment.id,
@@ -1246,13 +1286,13 @@ class AdminTransferService:
                 status=row.shipment.status,
             )
         ]
-        if row.receipt is not None:
+        for receipt in receipts(session, row.shipment.id):
             documents.append(
                 AdminTransferRelatedDocumentView(
-                    document_id=row.receipt.id,
-                    document_type=row.receipt.document_type,
-                    folio=_build_receipt_folio(row.receipt.id),
-                    status=row.receipt.status,
+                    document_id=receipt.id,
+                    document_type=receipt.document_type,
+                    folio=_build_receipt_folio(receipt.id),
+                    status=receipt.status,
                 )
             )
         return documents
@@ -1281,7 +1321,10 @@ class AdminTransferService:
             total_transfers=len(rows),
             units_in_transit=sum(
                 (
-                    _sum_line_quantity(self._get_shipment_lines(session, row.shipment.id))
+                    sum(
+                        (line.pending_quantity for line in progress(session, row.shipment.id)),
+                        Decimal("0"),
+                    )
                     for row in in_transit_rows
                 ),
                 Decimal("0"),
@@ -1426,29 +1469,25 @@ class AdminTransferService:
     ) -> bool:
         if not receipt_lines:
             return False
-        receipt_by_line_number = {line.line_number: line for line in receipt_lines}
         return any(
-            receipt_by_line_number.get(line.line_number) is not None
-            and receipt_by_line_number[line.line_number].received_quantity != line.quantity
+            sum(
+                (
+                    receipt.received_quantity or Decimal(0)
+                    for receipt in receipt_lines
+                    if receipt.line_number == line.line_number
+                ),
+                Decimal(0),
+            )
+            != line.quantity
             for line in shipment_lines
         )
 
     def _get_receipt_lines(
-        self,
-        session: Session,
-        receipt: OperationDocument | None,
+        self, session: Session, receipt: OperationDocument | None
     ) -> list[OperationDocumentLine]:
-        if receipt is None:
+        if receipt is None or receipt.reference_document_id is None:
             return []
-        return list(
-            session.execute(
-                select(OperationDocumentLine)
-                .where(OperationDocumentLine.operation_document_id == receipt.id)
-                .order_by(OperationDocumentLine.line_number.asc())
-            )
-            .scalars()
-            .all()
-        )
+        return all_receipt_lines(session, receipt.reference_document_id)
 
     def _matches_search(self, row: _AdminTransferRow, search: str) -> bool:
         haystack = " ".join(

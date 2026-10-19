@@ -1,5 +1,5 @@
 import { AdminActionButton } from "../../components/AdminActionButton";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type { FormEvent } from "react";
 
 import type {
@@ -99,6 +99,16 @@ export function AdminInventoryAdjustmentPanel({
   const [quantity, setQuantity] = useState("");
   const [reason, setReason] = useState("");
   const [localError, setLocalError] = useState<string | null>(null);
+
+  useEffect(() => {
+    // The drawer can open before its options arrive. Initialize only untouched empty fields.
+    setProductId((current) => current || productOptions[0]?.id || "");
+    setBranchId((current) => current || branchOptions[0]?.id || "");
+    setLocationCode(
+      (current) =>
+        current || (locationOptions[0]?.id as AdminInventoryLocationCode | undefined) || "",
+    );
+  }, [productOptions, branchOptions, locationOptions]);
 
   const selectedProductLabel = useMemo(
     () =>

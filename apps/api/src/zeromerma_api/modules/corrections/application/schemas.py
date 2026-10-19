@@ -4,7 +4,7 @@ from datetime import datetime
 from decimal import Decimal
 from uuid import UUID
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from zeromerma_api.modules.audit.application.schemas import AuditSummaryView
 from zeromerma_api.modules.branches.application.schemas import BranchSummary, WorkstationSummary
@@ -121,6 +121,8 @@ class CorrectionTargetDetailResponse(BaseModel):
 
 
 class CorrectionCommitLineRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     target_line_id: UUID | None = None
     product_id: UUID
     delta_quantity: Decimal = Field(max_digits=12, decimal_places=3)
@@ -135,6 +137,9 @@ class CorrectionCommitLineRequest(BaseModel):
 
 
 class CorrectionCommitRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    cash_session_id: UUID
     workstation_code: str = Field(min_length=1, max_length=64)
     target_document_id: UUID
     reason_code: str = Field(min_length=1, max_length=40)
@@ -223,3 +228,30 @@ class CorrectionsHistoryResponse(BaseModel):
     available_document_types: list[CorrectionHistoryFilterOptionView]
     available_reasons: list[CorrectionHistoryFilterOptionView]
     records: list[CorrectionHistoryListItemView]
+
+
+class CorrectionCommitLineResultView(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    id: UUID
+    line_number: int
+    target_line_id: UUID | None
+    product_id: UUID
+    delta_quantity: Decimal
+
+
+class CorrectionCommitResultView(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    id: UUID
+    folio: str
+    target_document_id: UUID
+    target_document_type: str
+    correction_type: str
+    branch_id: UUID
+    workstation_id: UUID
+    cash_session_id: UUID
+    corrected_destination_branch_id: UUID | None
+    status: str
+    committed_at_utc: datetime
+    lines: list[CorrectionCommitLineResultView]

@@ -1,3 +1,9 @@
+import { isCommandIntentionPending } from "@zeromerma/api-client";
+import { operationIntentions } from "../operation-commands/operation-command-intent";
+import {
+  useOperationIntention,
+  useOperationDraftIdentity,
+} from "../operation-commands/use-operation-intention";
 import { useMutation, useQueries, useQueryClient } from "@tanstack/react-query";
 import { Navigate } from "@tanstack/react-router";
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -27,6 +33,7 @@ import { Button } from "../../components/ui/button";
 import { appEnv } from "../../env";
 import type {
   CorrectionDocumentView,
+  CorrectionCommitResultView,
   CorrectionHistoryListItemView,
   CorrectionSearchDocumentView,
   CorrectionTargetDetailResponse,
@@ -40,13 +47,9 @@ import { cn } from "../../lib/utils";
 import { usePosAuthStore } from "../auth/auth-store";
 import { useCurrentCashSessionQuery } from "../cash-session-open/queries";
 import { formatQuantityFromMilliUnits } from "../pos-terminal/model";
-import {
-  posInputClass,
-  posOutlineButtonClass,
-  posPrimaryButtonClass,
-} from "../pos-theme/theme";
+import { posInputClass, posOutlineButtonClass, posPrimaryButtonClass } from "../pos-theme/theme";
 import { useStatusMessageStore } from "../status-messages/store";
-import { commitCorrection, getCorrectionTargetDetail } from "./corrections-api";
+import { getCorrectionTargetDetail } from "./corrections-api";
 import {
   buildCorrectionCommitLines,
   createInitialCorrectionDraftState,
@@ -94,14 +97,6 @@ type CorrectionUiState =
   | "CONFIRMED"
   | "ERROR";
 
-function createRequestId(scope: string): string {
-  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
-    return `${scope}-${crypto.randomUUID()}`;
-  }
-
-  return `${scope}-${Date.now()}-${Math.random().toString(16).slice(2)}`;
-}
-
 function useDebouncedValue(value: string, delayMs: number): string {
   const [debouncedValue, setDebouncedValue] = useState(value);
 
@@ -147,14 +142,6 @@ function isTodayInTimeZone(dateTime: string | null, timeZone: string): boolean {
   return getLocalDayKey(dateTime, timeZone) === getLocalDayKey(new Date().toISOString(), timeZone);
 }
 
-function formatCorrectionFolio(correctionId: string): string {
-  return `COR-${correctionId.split("-", 1)[0].toUpperCase()}`;
-}
-
-function getCorrectionReference(correction: { folio?: string | null; id: string }): string {
-  return correction.folio ?? formatCorrectionFolio(correction.id);
-}
-
 function getDocumentTypeLabel(documentType: string): string {
   switch (documentType) {
     case "COUNTER_TRANSFER":
@@ -198,7 +185,9 @@ function getSignedEffectLabel(value: number): string {
   return `${prefix}${formatQuantityFromMilliUnits(Math.abs(value))} unidades`;
 }
 
-function getCorrectionTargetTotalQuantityText(target: CorrectionTargetDetailResponse | null): string {
+function getCorrectionTargetTotalQuantityText(
+  target: CorrectionTargetDetailResponse | null,
+): string {
   if (!target) {
     return "-";
   }
@@ -253,10 +242,7 @@ function buildCorrectionsHistoryRecords(
 }
 
 function getCorrectionNetEffectMilliUnits(correction: CorrectionDocumentView): number {
-  return correction.lines.reduce(
-    (sum, line) => sum + Number(line.delta_quantity) * 1000,
-    0,
-  );
+  return correction.lines.reduce((sum, line) => sum + Number(line.delta_quantity) * 1000, 0);
 }
 
 function getCorrectionUiState({
@@ -437,8 +423,7 @@ function CorrectionsSummaryPanel({
   const supportsDestinationCorrection =
     selectedTarget?.target_document.document_type === "BRANCH_TRANSFER_SHIPMENT";
   const availableReasonOptions = correctionReasons.filter(
-    (reason) =>
-      supportsDestinationCorrection || reason.code !== WRONG_DESTINATION_REASON_CODE,
+    (reason) => supportsDestinationCorrection || reason.code !== WRONG_DESTINATION_REASON_CODE,
   );
   const availableDestinationBranches = destinationBranches.filter(
     (branch) => branch.id !== selectedTarget?.target_document.destination_branch_id,
@@ -481,10 +466,9 @@ function CorrectionsSummaryPanel({
     }
 
     const draftLine = getDraftLineForTarget(line.id);
-    const originalQuantityMilliUnits =
-      parseSignedQuantityToMilliUnits(String(line.quantity)) ?? 0;
+    const originalQuantityMilliUnits = parseSignedQuantityToMilliUnits(String(line.quantity)) ?? 0;
     const draftQuantityMilliUnits = draftLine
-      ? parseSignedQuantityToMilliUnits(draftLine.deltaQuantityText) ?? 0
+      ? (parseSignedQuantityToMilliUnits(draftLine.deltaQuantityText) ?? 0)
       : 0;
 
     setEditingLineId(line.id);
@@ -543,7 +527,7 @@ function CorrectionsSummaryPanel({
 
   return (
     <PosSummaryPanel
-      description={selectedTarget ? documentReference ?? undefined : undefined}
+      description={selectedTarget ? (documentReference ?? undefined) : undefined}
       footer={
         selectedTarget && hasDraftWork ? (
           <Button
@@ -580,7 +564,10 @@ function CorrectionsSummaryPanel({
 
           <div className="rounded-xl border border-[var(--pos-shell-border)] bg-white px-3 py-2">
             <div className="flex min-w-0 items-center justify-between gap-2">
-              <span className="min-w-0 truncate text-sm font-semibold text-slate-950" title={documentReference ?? undefined}>
+              <span
+                className="min-w-0 truncate text-sm font-semibold text-slate-950"
+                title={documentReference ?? undefined}
+              >
                 {documentReference ?? "Movimiento"}
               </span>
               <ModuleStateChip tone={selectedTarget.is_correctable ? "success" : "warning"}>
@@ -687,18 +674,17 @@ function CorrectionsSummaryPanel({
                 const originalLineQuantityMilliUnits =
                   parseSignedQuantityToMilliUnits(String(line.quantity)) ?? 0;
                 const draftLineDeltaMilliUnits = draftLine
-                  ? parseSignedQuantityToMilliUnits(draftLine.deltaQuantityText) ?? 0
+                  ? (parseSignedQuantityToMilliUnits(draftLine.deltaQuantityText) ?? 0)
                   : 0;
                 const isEditing = editingLineId === line.id;
-                const shownDeltaMilliUnits =
-                  isEditing
-                    ? (() => {
-                        const editedQuantity = parseSignedQuantityToMilliUnits(editingQuantityText);
-                        return editedQuantity === null
-                          ? null
-                          : editedQuantity - originalLineQuantityMilliUnits;
-                      })()
-                    : draftLineDeltaMilliUnits;
+                const shownDeltaMilliUnits = isEditing
+                  ? (() => {
+                      const editedQuantity = parseSignedQuantityToMilliUnits(editingQuantityText);
+                      return editedQuantity === null
+                        ? null
+                        : editedQuantity - originalLineQuantityMilliUnits;
+                    })()
+                  : draftLineDeltaMilliUnits;
                 const correctedLineQuantityMilliUnits =
                   originalLineQuantityMilliUnits + draftLineDeltaMilliUnits;
 
@@ -708,7 +694,10 @@ function CorrectionsSummaryPanel({
                     data-correction-line-row={line.id}
                     key={line.id}
                   >
-                    <span className="min-w-0 truncate font-semibold text-slate-950" title={line.product_name_snapshot}>
+                    <span
+                      className="min-w-0 truncate font-semibold text-slate-950"
+                      title={line.product_name_snapshot}
+                    >
                       {line.product_name_snapshot}
                     </span>
                     <span className="text-right font-semibold text-slate-600">
@@ -810,9 +799,7 @@ function CorrectionsSummaryPanel({
           ))}
 
           {!hasDraftWork ? (
-            <InlineNotice tone="info">
-              Da click en una cantidad nueva para editarla.
-            </InlineNotice>
+            <InlineNotice tone="info">Da click en una cantidad nueva para editarla.</InlineNotice>
           ) : null}
         </div>
       )}
@@ -897,7 +884,10 @@ function CorrectionsHistorySummaryPanel({
                 className="grid grid-cols-[minmax(0,1fr)_5.5rem] items-center gap-2 px-3 py-2"
                 key={line.id}
               >
-                <span className="truncate text-sm font-semibold text-slate-950" title={line.product_name_snapshot}>
+                <span
+                  className="truncate text-sm font-semibold text-slate-950"
+                  title={line.product_name_snapshot}
+                >
                   {line.product_name_snapshot}
                 </span>
                 <span className="text-right text-sm font-semibold text-slate-950">
@@ -925,6 +915,10 @@ export function CorrectionsScreen() {
   const queryClient = useQueryClient();
   const correctionsBootstrapQuery = useCorrectionsBootstrapQuery();
   const currentCashSessionQuery = useCurrentCashSessionQuery();
+  const user = usePosAuthStore((state) => state.user);
+  const intentionState = useOperationIntention(
+    correctionsBootstrapQuery.data?.workstation.id ?? "",
+  );
   const [selectedDocumentType, setSelectedDocumentType] = useState("");
   const [selectedDayScope, setSelectedDayScope] = useState<"all" | "today">("all");
   const [searchText, setSearchText] = useState("");
@@ -937,10 +931,12 @@ export function CorrectionsScreen() {
   const [centerSection, setCenterSection] = useState<CorrectionsCenterSection>("documents");
   const [draftState, setDraftState] = useState(createInitialCorrectionDraftState);
   const [lastCommittedCorrection, setLastCommittedCorrection] =
-    useState<CorrectionDocumentView | null>(null);
+    useState<CorrectionCommitResultView | null>(null);
   const [isHighImpactAcknowledged, setIsHighImpactAcknowledged] = useState(false);
   const [commitError, setCommitError] = useState<string | null>(null);
-  const [selectedHistoryCorrectionId, setSelectedHistoryCorrectionId] = useState<string | null>(null);
+  const [selectedHistoryCorrectionId, setSelectedHistoryCorrectionId] = useState<string | null>(
+    null,
+  );
   const searchInputRef = useRef<HTMLInputElement | null>(null);
   const debouncedSearchText = useDebouncedValue(searchText, 220);
   const historySearchInputRef = useRef<HTMLInputElement | null>(null);
@@ -956,7 +952,9 @@ export function CorrectionsScreen() {
     selectedHistoryTargetDocumentType,
     selectedHistoryReasonCode,
   );
-  const correctionHistoryDetailQuery = useCorrectionDocumentDetailQuery(selectedHistoryCorrectionId);
+  const correctionHistoryDetailQuery = useCorrectionDocumentDetailQuery(
+    selectedHistoryCorrectionId,
+  );
   const correctionTargetDetailQuery = useCorrectionTargetDetailQuery(selectedTargetId);
   const allDocuments = useMemo(
     () => correctionTargetsQuery.data?.documents ?? [],
@@ -989,7 +987,10 @@ export function CorrectionsScreen() {
   });
 
   useEffect(() => {
-    if (selectedTargetId !== null && !documents.some((document) => document.id === selectedTargetId)) {
+    if (
+      selectedTargetId !== null &&
+      !documents.some((document) => document.id === selectedTargetId)
+    ) {
       setSelectedTargetId(null);
       setCenterSection("documents");
     }
@@ -1013,7 +1014,9 @@ export function CorrectionsScreen() {
             blockingReason: correctionTargetDetailQuery.data.blocking_reason,
             isCorrectable: correctionTargetDetailQuery.data.is_correctable,
             isPending: false,
-            totalQuantityText: getCorrectionTargetTotalQuantityText(correctionTargetDetailQuery.data),
+            totalQuantityText: getCorrectionTargetTotalQuantityText(
+              correctionTargetDetailQuery.data,
+            ),
           });
           return;
         }
@@ -1029,12 +1032,12 @@ export function CorrectionsScreen() {
 
       const query = eligibilityQueries[index];
       if (query?.data) {
-          map.set(document.id, {
-            blockingReason: query.data.blocking_reason,
-            isCorrectable: query.data.is_correctable,
-            isPending: false,
-            totalQuantityText: getCorrectionTargetTotalQuantityText(query.data),
-          });
+        map.set(document.id, {
+          blockingReason: query.data.blocking_reason,
+          isCorrectable: query.data.is_correctable,
+          isPending: false,
+          totalQuantityText: getCorrectionTargetTotalQuantityText(query.data),
+        });
         return;
       }
 
@@ -1072,8 +1075,7 @@ export function CorrectionsScreen() {
   const isHighImpactAdjustment =
     correctionHighImpactThresholdMilliUnits > 0 &&
     totalAdjustedQuantityMilliUnits >= correctionHighImpactThresholdMilliUnits;
-  const isReasonMissing =
-    hasDraftWork && hasCorrectionDraftMissingReason(draftState.reasonCode);
+  const isReasonMissing = hasDraftWork && hasCorrectionDraftMissingReason(draftState.reasonCode);
   const blockedReason = getCorrectionDraftBlockedReason({
     hasHighImpactAcknowledgement: isHighImpactAcknowledged,
     correctedDestinationBranchId: draftState.correctedDestinationBranchId,
@@ -1141,7 +1143,9 @@ export function CorrectionsScreen() {
     }
 
     if (lastCommittedCorrection) {
-      const committedRecord = historyRecords.find((record) => record.id === lastCommittedCorrection.id);
+      const committedRecord = historyRecords.find(
+        (record) => record.id === lastCommittedCorrection.id,
+      );
       if (committedRecord) {
         setSelectedHistoryCorrectionId(committedRecord.id);
         return;
@@ -1164,7 +1168,7 @@ export function CorrectionsScreen() {
 
       const isInteractiveTrigger =
         event.target instanceof HTMLElement &&
-        event.target.closest("button, a, [role=\"button\"], summary") !== null;
+        event.target.closest('button, a, [role="button"], summary') !== null;
 
       if (event.key === "Enter") {
         if (isInteractiveTrigger) {
@@ -1198,34 +1202,64 @@ export function CorrectionsScreen() {
     setDraftState(updater);
   };
 
+  const observedKey = useOperationDraftIdentity(
+    intentionState.metadata,
+    Boolean(correctionsBootstrapQuery.data),
+    () => {
+      setDraftState(createInitialCorrectionDraftState());
+      setIsHighImpactAcknowledged(false);
+    },
+  );
   const commitMutation = useMutation({
     mutationFn: async () => {
-      if (!isAuthenticated || !selectedTargetId) {
+      if (
+        !user ||
+        !selectedTargetId ||
+        !correctionsBootstrapQuery.data ||
+        !currentCashSessionQuery.data
+      ) {
         throw new Error("Selecciona un movimiento antes de guardar el ajuste.");
       }
 
-      return commitCorrection({
-        payload: {
-          high_impact_acknowledged: isHighImpactAcknowledged,
-          workstation_code: appEnv.VITE_POS_WORKSTATION_CODE,
-          target_document_id: selectedTargetId,
-          reason_code: draftState.reasonCode,
-          corrected_destination_branch_id:
-            draftState.reasonCode === WRONG_DESTINATION_REASON_CODE
-              ? draftState.correctedDestinationBranchId ?? undefined
-              : undefined,
-          notes: draftState.notes.trim().length > 0 ? draftState.notes.trim() : undefined,
-          lines:
-            draftState.reasonCode === WRONG_DESTINATION_REASON_CODE
-              ? []
-              : buildCorrectionCommitLines(draftState.lines),
+      if (intentionState.error) throw new Error(intentionState.error);
+      const context = {
+        userId: user.id,
+        branchId: correctionsBootstrapQuery.data.branch.id,
+        workstationId: correctionsBootstrapQuery.data.workstation.id,
+        workstationCode: appEnv.VITE_POS_WORKSTATION_CODE,
+        cashSessionId: currentCashSessionQuery.data.id,
+        commandCode: "correction" as const,
+        targetDocumentId: selectedTargetId,
+      };
+      const result = await operationIntentions.begin(
+        context,
+        {
+          commandCode: "correction",
+          body: {
+            cash_session_id: currentCashSessionQuery.data.id,
+            high_impact_acknowledged: isHighImpactAcknowledged,
+            workstation_code: appEnv.VITE_POS_WORKSTATION_CODE,
+            target_document_id: selectedTargetId,
+            reason_code: draftState.reasonCode,
+            corrected_destination_branch_id:
+              draftState.reasonCode === WRONG_DESTINATION_REASON_CODE
+                ? (draftState.correctedDestinationBranchId ?? undefined)
+                : undefined,
+            notes: draftState.notes.trim().length > 0 ? draftState.notes.trim() : undefined,
+            lines:
+              draftState.reasonCode === WRONG_DESTINATION_REASON_CODE
+                ? []
+                : buildCorrectionCommitLines(draftState.lines),
+          },
         },
-        requestId: createRequestId("correction"),
-      });
+        observedKey.current ?? null,
+      );
+      if (!("target_document_id" in result))
+        throw new Error("El resultado no corresponde a un ajuste.");
+      return result;
     },
     onSuccess: async (result) => {
-      const correctionAlertRequested =
-        isHighImpactAdjustment && result.lines.length > 0;
+      const correctionAlertRequested = isHighImpactAdjustment && result.lines.length > 0;
       setLastCommittedCorrection(result);
       setSelectedHistoryCorrectionId(result.id);
       setDraftState(createInitialCorrectionDraftState());
@@ -1234,8 +1268,8 @@ export function CorrectionsScreen() {
       setCenterSection("documents");
       showSuccess(
         correctionAlertRequested
-          ? `Ajuste ${getCorrectionReference(result)} registrado. Se preparo alerta para backoffice.`
-          : `Ajuste ${getCorrectionReference(result)} registrado correctamente.`,
+          ? `Ajuste ${result.folio} registrado. Se preparo alerta para backoffice.`
+          : `Ajuste ${result.folio} registrado correctamente.`,
       );
       await Promise.all([
         queryClient.invalidateQueries({
@@ -1261,10 +1295,7 @@ export function CorrectionsScreen() {
       ]);
     },
     onError: (error) => {
-      const message = toOperationalErrorMessage(
-        error,
-        "No fue posible registrar el ajuste.",
-      );
+      const message = toOperationalErrorMessage(error, "No fue posible registrar el ajuste.");
       setCommitError(message);
       showError(message);
     },
@@ -1272,9 +1303,9 @@ export function CorrectionsScreen() {
 
   const correctedDestinationLabel =
     draftState.correctedDestinationBranchId !== null
-      ? correctionsBootstrapQuery.data?.destination_branches.find(
+      ? (correctionsBootstrapQuery.data?.destination_branches.find(
           (branch) => branch.id === draftState.correctedDestinationBranchId,
-        )?.name ?? null
+        )?.name ?? null)
       : null;
   const netEffectMilliUnits = getCorrectionDraftNetQuantityMilliUnits(draftState.lines);
   const uiState = getCorrectionUiState({
@@ -1283,7 +1314,10 @@ export function CorrectionsScreen() {
     hasCommitted: lastCommittedCorrection !== null,
     hasInvalidQuantity,
     hasSelectedTarget: selectedTarget !== null,
-    isCommitPending: commitMutation.isPending,
+    isCommitPending:
+      commitMutation.isPending ||
+      Boolean(intentionState.error) ||
+      isCommandIntentionPending(intentionState.metadata),
     isReasonMissing,
   });
   const draftBlockingMessages = getCorrectionDraftBlockingMessages({
@@ -1337,12 +1371,7 @@ export function CorrectionsScreen() {
         onCommitTargetLineAdjustment={(line, direction, magnitudeText) => {
           updateDraftState((current) => ({
             ...current,
-            lines: upsertTargetLineDraftAdjustment(
-              current.lines,
-              line,
-              direction,
-              magnitudeText,
-            ),
+            lines: upsertTargetLineDraftAdjustment(current.lines, line, direction, magnitudeText),
           }));
         }}
         onCorrectedDestinationBranchChange={(destinationBranchId) =>
@@ -1423,13 +1452,7 @@ export function CorrectionsScreen() {
       ) : (
         draftSummaryPanel
       ),
-    [
-      centerSection,
-      draftSummaryPanel,
-      selectedHistoryCorrection,
-      selectedHistoryRecord,
-      timeZone,
-    ],
+    [centerSection, draftSummaryPanel, selectedHistoryCorrection, selectedHistoryRecord, timeZone],
   );
 
   useAppShellRightPanel(summaryPanel);
@@ -1518,8 +1541,7 @@ export function CorrectionsScreen() {
       align: "right",
       header: "Unidades",
       key: "units",
-      renderCell: (document) =>
-        eligibilityByDocumentId.get(document.id)?.totalQuantityText ?? "-",
+      renderCell: (document) => eligibilityByDocumentId.get(document.id)?.totalQuantityText ?? "-",
       width: "14%",
     },
     {
@@ -1612,96 +1634,96 @@ export function CorrectionsScreen() {
     </PosHistoryView>
   );
   const historyPane = (
-      <PosHistoryView
-        title="Historial de ajustes"
-        toolbar={
-          <PosFilterBar
-            chipFilters={historyScopeOptions.map((scope) => ({
-              isActive: historyScope === scope.code,
-              key: scope.code,
-              label: scope.label,
-              onSelect: () => setHistoryScope(scope.code),
-            }))}
-            countLabel={
-              <ModuleStateChip tone="muted">
-                {historyRecords.length} {historyRecords.length === 1 ? "ajuste" : "ajustes"}
-              </ModuleStateChip>
-            }
-            searchInput={{
-              ariaLabel: "Buscar ajuste",
-              className: "min-w-[16rem] max-w-md",
-              hotkeyLabel: "Buscar ajuste en historial",
-              inputRef: historySearchInputRef,
-              onChange: setHistorySearchText,
-              placeholder: "Buscar folio, movimiento o motivo",
-              value: historySearchText,
-            }}
-            selectFilters={[
-              {
-                ariaLabel: "Filtrar historial por usuario",
-                key: "history-user",
-                onChange: setSelectedHistoryCreatedByUserId,
-                options: [
-                  { label: "Todos los cajeros", value: "" },
-                  ...historyUserOptions.map((option) => ({
-                    label: option.label,
-                    value: option.value,
-                  })),
-                ],
-                value: selectedHistoryCreatedByUserId,
-              },
-              {
-                ariaLabel: "Filtrar historial por tipo de movimiento",
-                key: "history-document-type",
-                onChange: setSelectedHistoryTargetDocumentType,
-                options: [
-                  { label: "Todos los tipos", value: "" },
-                  ...historyDocumentTypeOptions.map((option) => ({
-                    label: getDocumentTypeLabel(option.value),
-                    value: option.value,
-                  })),
-                ],
-                value: selectedHistoryTargetDocumentType,
-              },
-              {
-                ariaLabel: "Filtrar historial por motivo",
-                key: "history-reason",
-                onChange: setSelectedHistoryReasonCode,
-                options: [
-                  { label: "Todos los motivos", value: "" },
-                  ...historyReasonOptions.map((option) => ({
-                    label: getCorrectionReasonLabel(option.value, option.label),
-                    value: option.value,
-                  })),
-                ],
-                value: selectedHistoryReasonCode,
-              },
-            ]}
-            title="Consulta"
-          />
-        }
-      >
-        {correctionsHistoryQuery.error ? (
-          <OperationalStatus
-            action={<Button onClick={() => correctionsHistoryQuery.refetch()}>Reintentar</Button>}
-            description={toOperationalErrorMessage(
-              correctionsHistoryQuery.error,
-              "No fue posible consultar el historial de ajustes.",
-            )}
-            title="Historial no disponible"
-          />
-        ) : (
-          <OperationHistoryList
-            emptyDescription="No hay ajustes para este filtro."
-            loading={correctionsHistoryQuery.isPending}
-            loadingTitle="Consultando ajustes"
-            onSelect={(record) => setSelectedHistoryCorrectionId(record.id)}
-            records={historyRecords}
-            selectedRecordId={selectedHistoryCorrectionId}
-          />
-        )}
-      </PosHistoryView>
-    );
+    <PosHistoryView
+      title="Historial de ajustes"
+      toolbar={
+        <PosFilterBar
+          chipFilters={historyScopeOptions.map((scope) => ({
+            isActive: historyScope === scope.code,
+            key: scope.code,
+            label: scope.label,
+            onSelect: () => setHistoryScope(scope.code),
+          }))}
+          countLabel={
+            <ModuleStateChip tone="muted">
+              {historyRecords.length} {historyRecords.length === 1 ? "ajuste" : "ajustes"}
+            </ModuleStateChip>
+          }
+          searchInput={{
+            ariaLabel: "Buscar ajuste",
+            className: "min-w-[16rem] max-w-md",
+            hotkeyLabel: "Buscar ajuste en historial",
+            inputRef: historySearchInputRef,
+            onChange: setHistorySearchText,
+            placeholder: "Buscar folio, movimiento o motivo",
+            value: historySearchText,
+          }}
+          selectFilters={[
+            {
+              ariaLabel: "Filtrar historial por usuario",
+              key: "history-user",
+              onChange: setSelectedHistoryCreatedByUserId,
+              options: [
+                { label: "Todos los cajeros", value: "" },
+                ...historyUserOptions.map((option) => ({
+                  label: option.label,
+                  value: option.value,
+                })),
+              ],
+              value: selectedHistoryCreatedByUserId,
+            },
+            {
+              ariaLabel: "Filtrar historial por tipo de movimiento",
+              key: "history-document-type",
+              onChange: setSelectedHistoryTargetDocumentType,
+              options: [
+                { label: "Todos los tipos", value: "" },
+                ...historyDocumentTypeOptions.map((option) => ({
+                  label: getDocumentTypeLabel(option.value),
+                  value: option.value,
+                })),
+              ],
+              value: selectedHistoryTargetDocumentType,
+            },
+            {
+              ariaLabel: "Filtrar historial por motivo",
+              key: "history-reason",
+              onChange: setSelectedHistoryReasonCode,
+              options: [
+                { label: "Todos los motivos", value: "" },
+                ...historyReasonOptions.map((option) => ({
+                  label: getCorrectionReasonLabel(option.value, option.label),
+                  value: option.value,
+                })),
+              ],
+              value: selectedHistoryReasonCode,
+            },
+          ]}
+          title="Consulta"
+        />
+      }
+    >
+      {correctionsHistoryQuery.error ? (
+        <OperationalStatus
+          action={<Button onClick={() => correctionsHistoryQuery.refetch()}>Reintentar</Button>}
+          description={toOperationalErrorMessage(
+            correctionsHistoryQuery.error,
+            "No fue posible consultar el historial de ajustes.",
+          )}
+          title="Historial no disponible"
+        />
+      ) : (
+        <OperationHistoryList
+          emptyDescription="No hay ajustes para este filtro."
+          loading={correctionsHistoryQuery.isPending}
+          loadingTitle="Consultando ajustes"
+          onSelect={(record) => setSelectedHistoryCorrectionId(record.id)}
+          records={historyRecords}
+          selectedRecordId={selectedHistoryCorrectionId}
+        />
+      )}
+    </PosHistoryView>
+  );
   return (
     <CentralWorkspaceSheet
       className="lg:h-full"
@@ -1710,9 +1732,7 @@ export function CorrectionsScreen() {
         <CompactPageHeader
           secondaryChips={
             selectedTarget ? (
-              <ModuleStateChip tone="primary">
-                {selectedTarget.document_title}
-              </ModuleStateChip>
+              <ModuleStateChip tone="primary">{selectedTarget.document_title}</ModuleStateChip>
             ) : null
           }
           stateChip={

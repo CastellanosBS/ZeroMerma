@@ -29,6 +29,7 @@ export function createCommandIntentionCoordinator<C extends object, P, R>(option
 }) {
   type Metadata = CommandIntentionMetadata<C>;
   const bodies = new Map<string, P>();
+  let epoch = 0;
   const fields = [...options.contextFields, "key", "payloadDigest", "status"];
   const storageKey = (scope: string) => `${options.storagePrefix}${scope}`;
 
@@ -105,6 +106,14 @@ export function createCommandIntentionCoordinator<C extends object, P, R>(option
     return Array.from(new Uint8Array(hash), (byte) => byte.toString(16).padStart(2, "0")).join("");
   }
 
+  function sessionChanged() {
+    return new Error("La sesión cambió. Consulta el resultado con el operador original.");
+  }
+
+  function requireCurrentEpoch(expected: number) {
+    if (epoch !== expected) throw sessionChanged();
+  }
+
   function recordError(
     metadata: Metadata,
     error: unknown,
@@ -126,15 +135,23 @@ export function createCommandIntentionCoordinator<C extends object, P, R>(option
     if (rejected) bodies.delete(metadata.key);
   }
 
-  async function send(metadata: Metadata, payload: P, firstKnownSend: boolean): Promise<R> {
+  async function send(
+    metadata: Metadata,
+    payload: P,
+    firstKnownSend: boolean,
+    expectedEpoch: number,
+  ): Promise<R> {
     try {
+      requireCurrentEpoch(expectedEpoch);
       const result = await options.send(metadata, payload, metadata.key);
+      requireCurrentEpoch(expectedEpoch);
       write({ ...metadata, status: "CONFIRMED" });
       bodies.delete(metadata.key);
       return result;
     } catch (error) {
-      recordError(metadata, error, firstKnownSend);
-      throw error;
+      const failure = epoch === expectedEpoch ? error : sessionChanged();
+      recordError(metadata, failure, firstKnownSend);
+      throw failure;
     }
   }
 
@@ -155,7 +172,10 @@ export function createCommandIntentionCoordinator<C extends object, P, R>(option
   return {
     read,
     hasBody: (key: string) => bodies.has(key),
-    forgetBodies: () => bodies.clear(),
+    forgetBodies: () => {
+      epoch += 1;
+      bodies.clear();
+    },
     subscribe(scope: string, update: () => void) {
       const onStorage = (event: StorageEvent) => {
         if (event.key === null || event.key === storageKey(scope)) update();
@@ -168,7 +188,9 @@ export function createCommandIntentionCoordinator<C extends object, P, R>(option
       };
     },
     begin(context: C, payload: P, observedKey: string | null): Promise<R> {
+      const expectedEpoch = epoch;
       return claim(options.scope(context), async () => {
+        requireCurrentEpoch(expectedEpoch);
         const existing = read(options.scope(context));
         if (isCommandIntentionPending(existing) || (existing?.key ?? null) !== observedKey) {
           throw new Error(
@@ -176,19 +198,23 @@ export function createCommandIntentionCoordinator<C extends object, P, R>(option
           );
         }
         const frozen = JSON.parse(JSON.stringify(payload)) as P;
+        const payloadDigest = await digest(frozen);
+        requireCurrentEpoch(expectedEpoch);
         const metadata = {
           ...context,
           key: createIdempotencyKey(),
-          payloadDigest: await digest(frozen),
+          payloadDigest,
           status: "PENDING" as const,
         };
         bodies.set(metadata.key, frozen);
         write(metadata);
-        return send(metadata, frozen, true);
+        return send(metadata, frozen, true, expectedEpoch);
       });
     },
     retry(context: C): Promise<R> {
+      const expectedEpoch = epoch;
       return claim(options.scope(context), async () => {
+        requireCurrentEpoch(expectedEpoch);
         const metadata = requirePending(context);
         if (metadata.status === "CONFLICT")
           throw new Error(
@@ -200,26 +226,31 @@ export function createCommandIntentionCoordinator<C extends object, P, R>(option
             "El contenido original ya no está disponible. Consulta el resultado; no vuelvas a cobrar.",
           );
         }
+        requireCurrentEpoch(expectedEpoch);
         write({ ...metadata, status: "PENDING" });
-        return send(metadata, payload, false);
+        return send(metadata, payload, false, expectedEpoch);
       });
     },
     recover(context: C): Promise<R> {
+      const expectedEpoch = epoch;
       return claim(options.scope(context), async () => {
+        requireCurrentEpoch(expectedEpoch);
         const metadata = requirePending(context);
         try {
           const result = await options.recover(metadata);
+          requireCurrentEpoch(expectedEpoch);
           write({ ...metadata, status: "CONFIRMED" });
           bodies.delete(metadata.key);
           return result;
         } catch (error) {
+          const failure = epoch === expectedEpoch ? error : sessionChanged();
           recordError(
             metadata,
-            error,
+            failure,
             false,
-            options.isRecoveredRejection?.(metadata, error) === true,
+            epoch === expectedEpoch && options.isRecoveredRejection?.(metadata, error) === true,
           );
-          throw error;
+          throw failure;
         }
       });
     },

@@ -5,6 +5,7 @@ import {
   dropNextReturnConfirmationResponse,
   dropNextOrderCommandResponse,
   dropNextCashCommandResponse,
+  dropNextOperationalCommandResponse,
   observeRealApi,
   realEnvironment,
 } from "../../../../scripts/dev/web-integration-support.mjs";
@@ -16,12 +17,79 @@ function isolatedEnvironment() {
   vi.stubEnv("ZM_E2E_RUN_ID", "guard-unit-test");
   vi.stubEnv("ZM_E2E_API_URL", "https://127.0.0.1:41201");
   vi.stubEnv("ZM_E2E_POS_URL", "https://127.0.0.1:41202");
+  vi.stubEnv("ZM_E2E_BACKOFFICE_URL", "https://127.0.0.1:41203");
+  vi.stubEnv("ZM_E2E_BACKOFFICE_EMAIL", "reader@example.test");
   vi.stubEnv("ZM_E2E_POS_EMAIL", "synthetic@example.test");
   vi.stubEnv("ZM_E2E_PASSWORD", "unit-only-password");
   vi.stubEnv("ZM_E2E_ARTIFACT_DIR", ".tmp/unit-web-guard");
 }
 
 describe("real browser integration safety", () => {
+  it("restricts operational response loss to explicit mutations and rejects query overrides", async () => {
+    isolatedEnvironment();
+    const page = { on: vi.fn(), route: vi.fn() };
+    const evidence = observeRealApi({ on: vi.fn() }, page, "https://127.0.0.1:41201");
+    for (const path of [
+      "/v1/auth/login",
+      "/v1/admin/purchases?override=true",
+      "/v1/admin/inventory",
+      "/v1/admin/production/invalid/complete",
+      "/v1/admin/suppliers",
+    ]) {
+      await expect(
+        dropNextOperationalCommandResponse(page, "https://127.0.0.1:41201", evidence, path),
+      ).rejects.toThrow("allowlisted");
+    }
+    await expect(
+      dropNextOperationalCommandResponse(
+        page,
+        "https://127.0.0.1:41201",
+        evidence,
+        "/v1/admin/purchases",
+        "PATCH",
+      ),
+    ).rejects.toThrow("allowlisted");
+  });
+  it.each([200, 409])(
+    "drops an actual operational PATCH only after a successful commit (%i)",
+    async (status) => {
+      isolatedEnvironment();
+      const route = {
+        request: () => ({ method: () => "PATCH" }),
+        fetch: vi.fn(async () => ({
+          status: () => status,
+          json: async () => ({ id: "document" }),
+        })),
+        abort: vi.fn(async () => {}),
+      };
+      let handler: ((value: typeof route) => Promise<void>) | undefined;
+      const page = {
+        on: vi.fn(),
+        route: vi.fn(async (_url: string, callback: typeof handler) => {
+          handler = callback;
+        }),
+      };
+      const evidence = observeRealApi({ on: vi.fn() }, page, "https://127.0.0.1:41201");
+      const fault = await dropNextOperationalCommandResponse(
+        page,
+        "https://127.0.0.1:41201",
+        evidence,
+        "/v1/admin/production/019a0000-0000-7000-8000-000000000001",
+        "PATCH",
+      );
+      const outcome =
+        status === 200
+          ? expect(fault.committed).resolves.toEqual({ id: "document" })
+          : expect(fault.committed).rejects.toThrow("received 409");
+      await handler!(route);
+      await outcome;
+      expect(route.fetch).toHaveBeenCalledWith({ maxRedirects: 0 });
+      expect(route.abort).toHaveBeenCalledWith("failed");
+      expect(evidence).toEqual(
+        status === 200 ? [{ method: "PATCH", path: "/v1/admin/production/{id}", status: 200 }] : [],
+      );
+    },
+  );
   it("does not expose order response loss for arbitrary or administrative creation paths", async () => {
     isolatedEnvironment();
     const register = vi.fn();

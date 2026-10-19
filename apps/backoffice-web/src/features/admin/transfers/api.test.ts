@@ -199,7 +199,9 @@ describe("admin transfers API boundary", () => {
   });
 
   it("loads transfer detail", async () => {
-    const fetchSpy = vi.spyOn(globalThis, "fetch").mockImplementation(() => mockJsonResponse(apiTransferDetail));
+    const fetchSpy = vi
+      .spyOn(globalThis, "fetch")
+      .mockImplementation(() => mockJsonResponse(apiTransferDetail));
 
     const detail = await fetchAdminTransferDetail("transfer-1");
 
@@ -212,20 +214,36 @@ describe("admin transfers API boundary", () => {
   });
 
   it("creates, dispatches, receives, and cancels through canonical endpoints", async () => {
-    const fetchSpy = vi.spyOn(globalThis, "fetch").mockImplementation(() => mockJsonResponse(apiTransferDetail, 201));
+    const fetchSpy = vi
+      .spyOn(globalThis, "fetch")
+      .mockImplementation(() => mockJsonResponse(apiTransferDetail, 201));
 
-    await createAdminTransfer({
-      destinationBranchId: "branch-2",
-      lines: [{ notes: null, productId: "product-1", quantity: "10.000" }],
-      notes: "Send today",
-      originBranchId: "branch-1",
-    });
-    await dispatchAdminTransfer("transfer-1", "Dispatch");
-    await receiveAdminTransfer("transfer-1", {
-      lines: [{ notes: null, receivedQuantity: "9.000", shipmentLineId: "line-1", varianceReason: "Missing item" }],
-      notes: "Received",
-    });
-    await cancelAdminTransfer("transfer-1", "Not needed");
+    await createAdminTransfer(
+      {
+        destinationBranchId: "branch-2",
+        lines: [{ notes: null, productId: "product-1", quantity: "10.000" }],
+        notes: "Send today",
+        originBranchId: "branch-1",
+      },
+      "01900000-0000-7000-8000-000000000001",
+    );
+    await dispatchAdminTransfer("transfer-1", "Dispatch", "01900000-0000-7000-8000-000000000002");
+    await receiveAdminTransfer(
+      "transfer-1",
+      {
+        lines: [
+          {
+            notes: null,
+            receivedQuantity: "9.000",
+            shipmentLineId: "line-1",
+            varianceReason: "Missing item",
+          },
+        ],
+        notes: "Received",
+      },
+      "01900000-0000-7000-8000-000000000003",
+    );
+    await cancelAdminTransfer("transfer-1", "Not needed", "01900000-0000-7000-8000-000000000004");
 
     expect(fetchSpy).toHaveBeenNthCalledWith(
       1,

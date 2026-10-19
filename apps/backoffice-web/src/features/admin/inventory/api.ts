@@ -2,7 +2,6 @@ import type { components } from "@zeromerma/api-client";
 
 import { requestJson } from "../../../lib/api";
 import type {
-  AdminInventoryAdjustment,
   AdminInventoryAdjustmentPayload,
   AdminInventoryBackendContract,
   AdminInventoryDetail,
@@ -30,9 +29,13 @@ type AdminInventoryApiDetail = components["schemas"]["AdminInventoryDetailView"]
 type AdminInventoryApiMovement = components["schemas"]["AdminInventoryMovementView"];
 type AdminInventoryApiMovementsResponse = components["schemas"]["AdminInventoryMovementsResponse"];
 type AdminInventoryApiAdjustmentPayload = components["schemas"]["AdminInventoryAdjustmentRequest"];
-type AdminInventoryApiAdjustment = components["schemas"]["AdminInventoryAdjustmentView"];
+type AdminInventoryApiAdjustment = components["schemas"]["AdminInventoryAdjustmentResultView"];
 
-function appendOptionalParam(params: URLSearchParams, key: string, value: string | null | undefined) {
+function appendOptionalParam(
+  params: URLSearchParams,
+  key: string,
+  value: string | null | undefined,
+) {
   if (!value || value === "all") {
     return;
   }
@@ -63,7 +66,9 @@ function mapWarningFromApi(warning: AdminInventoryApiWarning): AdminInventoryWar
   };
 }
 
-export function mapAdminInventoryMovementFromApi(item: AdminInventoryApiMovement): AdminInventoryMovement {
+export function mapAdminInventoryMovementFromApi(
+  item: AdminInventoryApiMovement,
+): AdminInventoryMovement {
   return {
     balanceAfter: item.balance_after ?? null,
     branchId: item.branch_id,
@@ -84,7 +89,9 @@ export function mapAdminInventoryMovementFromApi(item: AdminInventoryApiMovement
   };
 }
 
-export function mapAdminInventoryListItemFromApi(item: AdminInventoryApiListItem): AdminInventoryListItem {
+export function mapAdminInventoryListItemFromApi(
+  item: AdminInventoryApiListItem,
+): AdminInventoryListItem {
   return {
     availableQuantity: item.available_quantity ?? null,
     balanceId: item.balance_id,
@@ -111,7 +118,9 @@ export function mapAdminInventoryListItemFromApi(item: AdminInventoryApiListItem
   };
 }
 
-export function mapAdminInventoryDetailFromApi(item: AdminInventoryApiDetail): AdminInventoryDetail {
+export function mapAdminInventoryDetailFromApi(
+  item: AdminInventoryApiDetail,
+): AdminInventoryDetail {
   return {
     balanceId: item.balance_id,
     branchLocation: {
@@ -161,7 +170,9 @@ export function mapAdminInventoryDetailFromApi(item: AdminInventoryApiDetail): A
   };
 }
 
-function mapAdminInventoryListFromApi(response: AdminInventoryApiListResponse): AdminInventoryListResponse {
+function mapAdminInventoryListFromApi(
+  response: AdminInventoryApiListResponse,
+): AdminInventoryListResponse {
   return {
     backendContract: adminInventoryBackendContract,
     filterOptions: {
@@ -186,25 +197,9 @@ function mapAdminInventoryListFromApi(response: AdminInventoryApiListResponse): 
   };
 }
 
-function mapAdminInventoryAdjustmentFromApi(item: AdminInventoryApiAdjustment): AdminInventoryAdjustment {
-  return {
-    adjustmentType: item.adjustment_type,
-    balanceId: item.balance_id,
-    branchId: item.branch_id,
-    createdAt: item.created_at,
-    createdByUserId: item.created_by_user_id,
-    id: item.id,
-    locationCode: item.location_code,
-    newQuantity: item.new_quantity,
-    notes: item.notes ?? null,
-    previousQuantity: item.previous_quantity,
-    productId: item.product_id,
-    quantity: item.quantity,
-    reason: item.reason,
-  };
-}
-
-function toAdjustmentApiPayload(payload: AdminInventoryAdjustmentPayload): AdminInventoryApiAdjustmentPayload {
+function toAdjustmentApiPayload(
+  payload: AdminInventoryAdjustmentPayload,
+): AdminInventoryApiAdjustmentPayload {
   return {
     adjustment_type: payload.adjustmentType,
     branch_id: payload.branchId,
@@ -240,9 +235,7 @@ export function fetchAdminInventory(
   }).then(mapAdminInventoryListFromApi);
 }
 
-export function fetchAdminInventoryDetail(
-  balanceId: string,
-): Promise<AdminInventoryDetail> {
+export function fetchAdminInventoryDetail(balanceId: string): Promise<AdminInventoryDetail> {
   return requestJson<AdminInventoryApiDetail>({
     path: `/v1/admin/inventory/${balanceId}`,
   }).then(mapAdminInventoryDetailFromApi);
@@ -265,10 +258,12 @@ export function fetchAdminInventoryMovements(
 
 export function createAdminInventoryAdjustment(
   payload: AdminInventoryAdjustmentPayload,
-): Promise<AdminInventoryAdjustment> {
+  idempotencyKey: string,
+): Promise<AdminInventoryApiAdjustment> {
   return requestJson<AdminInventoryApiAdjustment>({
+    headers: { "Idempotency-Key": idempotencyKey },
     body: toAdjustmentApiPayload(payload),
     method: "POST",
     path: "/v1/admin/inventory/adjustments",
-  }).then(mapAdminInventoryAdjustmentFromApi);
+  });
 }

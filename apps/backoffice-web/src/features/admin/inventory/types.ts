@@ -1,5 +1,9 @@
 export type AdminInventoryLocationCode = "BACKROOM" | "COUNTER" | "IN_TRANSIT" | "WASTE";
-export type AdminInventoryProductKind = "FINISHED_GOOD" | "RAW_MATERIAL" | "CONSUMABLE" | "DISPOSABLE";
+export type AdminInventoryProductKind =
+  | "FINISHED_GOOD"
+  | "RAW_MATERIAL"
+  | "CONSUMABLE"
+  | "DISPOSABLE";
 export type AdminInventoryProductStatus = "active" | "inactive";
 export type AdminInventoryStockState = "in_stock" | "out_of_stock" | "low_stock" | "negative_stock";
 export type AdminInventoryWarningSeverity = "info" | "warning" | "critical";
@@ -177,22 +181,6 @@ export interface AdminInventoryAdjustmentPayload {
   branchId: string;
   locationCode: AdminInventoryLocationCode;
   notes?: string | null;
-  productId: string;
-  quantity: string;
-  reason: string;
-}
-
-export interface AdminInventoryAdjustment {
-  adjustmentType: AdminInventoryAdjustmentType;
-  balanceId: string;
-  branchId: string;
-  createdAt: string;
-  createdByUserId: string;
-  id: string;
-  locationCode: AdminInventoryLocationCode;
-  newQuantity: string;
-  notes?: string | null;
-  previousQuantity: string;
   productId: string;
   quantity: string;
   reason: string;

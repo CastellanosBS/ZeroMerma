@@ -1,7 +1,17 @@
-export type AdminTransferStatus = "DRAFT" | "IN_TRANSIT" | "RECEIVED" | "RECEIVED_WITH_VARIANCE" | "CANCELLED";
+export type AdminTransferStatus =
+  | "DRAFT"
+  | "IN_TRANSIT"
+  | "RECEIVED"
+  | "RECEIVED_WITH_VARIANCE"
+  | "CANCELLED";
 export type AdminTransferWarningSeverity = "info" | "warning" | "critical";
 export type AdminTransferDiscrepancyState = "with_discrepancy" | "without_discrepancy";
-export type AdminTransferProductKind = "FINISHED_GOOD" | "RAW_MATERIAL" | "CONSUMABLE" | "DISPOSABLE" | string;
+export type AdminTransferProductKind =
+  | "FINISHED_GOOD"
+  | "RAW_MATERIAL"
+  | "CONSUMABLE"
+  | "DISPOSABLE"
+  | string;
 
 export interface AdminTransferFilterOption {
   id: string;
@@ -108,6 +118,7 @@ export interface AdminTransferLine {
   receivedQuantity?: string | null;
   requestedQuantity: string;
   sentQuantity: string;
+  pendingQuantity: string;
   shipmentLineId: string;
   unitOfMeasure: string;
   varianceReason?: string | null;

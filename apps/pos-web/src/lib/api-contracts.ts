@@ -191,3 +191,9 @@ export type OperationalDiscountCommitResultView =
 export type CashCloseCommitResultView = components["schemas"]["CashCloseCommitResultView"];
 
 export type CashCloseCommitRequest = components["schemas"]["CashCloseCommitRequest"];
+export type TransferCommandResultView = components["schemas"]["TransferCommandResultView"];
+export type TransferCommandLineView = components["schemas"]["TransferCommandLineView"];
+export type PosTransferCommandCode =
+  import("@zeromerma/api-client").paths["/v1/transfers/commands/{command_code}/confirmations/{idempotency_key}"]["get"]["parameters"]["path"]["command_code"];
+export type OperationCommitResultView = components["schemas"]["OperationCommitResultView"];
+export type CorrectionCommitResultView = components["schemas"]["CorrectionCommitResultView"];

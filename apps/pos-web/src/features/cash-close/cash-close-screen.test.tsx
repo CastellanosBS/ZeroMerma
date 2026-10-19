@@ -312,16 +312,19 @@ vi.mock("../../components/app-shell-right-panel", () => ({
 }));
 
 vi.mock("../auth/auth-store", () => ({
-  usePosAuthStore: (
-    selector: (state: {
-      isAuthenticated: boolean;
-      clearSession: typeof clearSessionMock;
-    }) => unknown,
-  ) =>
-    selector({
-      isAuthenticated: true,
-      clearSession: clearSessionMock,
-    }),
+  usePosAuthStore: Object.assign(
+    (
+      selector: (state: {
+        isAuthenticated: boolean;
+        clearSession: typeof clearSessionMock;
+      }) => unknown,
+    ) =>
+      selector({
+        isAuthenticated: true,
+        clearSession: clearSessionMock,
+      }),
+    { subscribe: vi.fn(() => () => undefined) },
+  ),
 }));
 
 vi.mock("../pos-terminal/store", () => ({

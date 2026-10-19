@@ -83,7 +83,16 @@ const shipment: OperationDocumentView = {
 
 describe("transfer receipt model", () => {
   it("creates a draft with expected quantities copied to received quantities", () => {
-    const draft = createTransferReceiptDraftState(shipment);
+    const draft = createTransferReceiptDraftState(
+      shipment,
+      shipment.lines.map((line) => ({
+        shipment_line_id: line.id,
+        product_id: line.product_id,
+        sent_quantity: line.quantity,
+        received_quantity: "0.000",
+        pending_quantity: line.quantity,
+      })),
+    );
 
     expect(draft.selectedTransferId).toBe(shipment.id);
     expect(draft.lines).toHaveLength(2);
@@ -96,7 +105,16 @@ describe("transfer receipt model", () => {
   });
 
   it("tracks quantity edits and variance reasons", () => {
-    const initialDraft = createTransferReceiptDraftState(shipment);
+    const initialDraft = createTransferReceiptDraftState(
+      shipment,
+      shipment.lines.map((line) => ({
+        shipment_line_id: line.id,
+        product_id: line.product_id,
+        sent_quantity: line.quantity,
+        received_quantity: "0.000",
+        pending_quantity: line.quantity,
+      })),
+    );
     const linesWithQuantityChange = updateTransferReceiptLineQuantity(
       initialDraft.lines,
       "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb",
@@ -117,7 +135,16 @@ describe("transfer receipt model", () => {
   });
 
   it("builds receipt payload lines with expected and received quantities", () => {
-    const initialDraft = createTransferReceiptDraftState(shipment);
+    const initialDraft = createTransferReceiptDraftState(
+      shipment,
+      shipment.lines.map((line) => ({
+        shipment_line_id: line.id,
+        product_id: line.product_id,
+        sent_quantity: line.quantity,
+        received_quantity: "0.000",
+        pending_quantity: line.quantity,
+      })),
+    );
     const lines = updateTransferReceiptLineVarianceReason(
       updateTransferReceiptLineQuantity(
         initialDraft.lines,
@@ -147,7 +174,16 @@ describe("transfer receipt model", () => {
   });
 
   it("requires a variance reason when the received quantity differs", () => {
-    const initialDraft = createTransferReceiptDraftState(shipment);
+    const initialDraft = createTransferReceiptDraftState(
+      shipment,
+      shipment.lines.map((line) => ({
+        shipment_line_id: line.id,
+        product_id: line.product_id,
+        sent_quantity: line.quantity,
+        received_quantity: "0.000",
+        pending_quantity: line.quantity,
+      })),
+    );
     const lines = updateTransferReceiptLineQuantity(
       initialDraft.lines,
       "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb",
@@ -160,7 +196,16 @@ describe("transfer receipt model", () => {
   });
 
   it("detects missing received quantities and missing variance reasons", () => {
-    const initialDraft = createTransferReceiptDraftState(shipment);
+    const initialDraft = createTransferReceiptDraftState(
+      shipment,
+      shipment.lines.map((line) => ({
+        shipment_line_id: line.id,
+        product_id: line.product_id,
+        sent_quantity: line.quantity,
+        received_quantity: "0.000",
+        pending_quantity: line.quantity,
+      })),
+    );
     const linesWithMissingQuantity = updateTransferReceiptLineQuantity(
       initialDraft.lines,
       "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb",

@@ -64,7 +64,27 @@ def authorize_cash_command(
     ):
         raise auth_error(403, "FORBIDDEN", "The cash command surface is not authorized.")
     refreshed = resolve_authorization(session, current_user, surface="POS")
-    require_branches(refreshed, capability, [context.branch_id])
+    require_branches(refreshed, capability, [context.branch_id, *context.related_branch_ids])
+    validate_cash_command_reference(session, context)
+
+
+def validate_cash_command_reference(session: Session, context: CommandContext) -> None:
+    """Validate a historical cash reference after authorization, before reservation."""
+    if context.cash_session_id is None:
+        return
+    row = session.execute(
+        select(CashSession.user_id, CashSession.workstation_id, CashSession.branch_id).where(
+            CashSession.id == context.cash_session_id
+        )
+    ).one_or_none()
+    if row is None:
+        raise IdempotencyError("CASH_SESSION_NOT_FOUND", 409, "The cash session was not found.")
+    if (
+        row.user_id != context.actor_user_id
+        or row.workstation_id != context.workstation_id
+        or row.branch_id != context.branch_id
+    ):
+        raise auth_error(403, "FORBIDDEN", "The cash session belongs to another context.")
 
 
 def lock_cash_session(

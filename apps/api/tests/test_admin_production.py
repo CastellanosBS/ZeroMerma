@@ -31,6 +31,7 @@ from zeromerma_api.modules.inventory.infrastructure.models import (
 from zeromerma_api.modules.outbox.infrastructure.models import OutboxEvent
 from zeromerma_api.modules.production.infrastructure.models import ProductionBatch
 from zeromerma_api.testing.authorization import owner_headers
+from zeromerma_api.testing.idempotency import new_idempotency_key
 from zeromerma_api.testing.sessions import login_headers
 
 
@@ -40,6 +41,16 @@ def _login_cashier(client: TestClient) -> dict[str, str]:
 
 def _admin_headers(client: TestClient) -> dict[str, str]:
     return owner_headers()
+
+
+def _production_headers(client: TestClient) -> dict[str, str]:
+    return {**_admin_headers(client), "Idempotency-Key": new_idempotency_key()}
+
+
+def _detail(client: TestClient, production_id: str) -> dict[str, object]:
+    response = client.get(f"/v1/admin/production/{production_id}", headers=_admin_headers(client))
+    assert response.status_code == 200
+    return dict(response.json())
 
 
 def _get_branch_id(code: str) -> str:
@@ -125,7 +136,7 @@ def _create_production(
 ) -> dict[str, object]:
     response = client.post(
         "/v1/admin/production",
-        headers={**_admin_headers(client), "X-Request-ID": "admin-production-create"},
+        headers={**_production_headers(client), "X-Request-ID": "admin-production-create"},
         json={
             "branch_id": _get_branch_id(SEED_BRANCH_CODE),
             "notes": "Backoffice production draft",
@@ -136,13 +147,13 @@ def _create_production(
     )
 
     assert response.status_code == 201
-    return dict(response.json())
+    return _detail(client, response.json()["id"])
 
 
 def _seed_raw_stock(client: TestClient, *, product_id: str, quantity: str = "10.000") -> None:
     response = client.post(
         "/v1/admin/inventory/adjustments",
-        headers=_admin_headers(client),
+        headers={**_admin_headers(client), "Idempotency-Key": new_idempotency_key()},
         json={
             "adjustment_type": "INCREASE",
             "branch_id": _get_branch_id(SEED_BRANCH_CODE),
@@ -166,12 +177,12 @@ def _create_started_production(
 
     start_response = client.post(
         f"/v1/admin/production/{production_id}/start",
-        headers={**_admin_headers(client), "X-Request-ID": "admin-production-start"},
+        headers={**_production_headers(client), "X-Request-ID": "admin-production-start"},
         json={"notes": "Start batch"},
     )
 
     assert start_response.status_code == 200
-    return dict(start_response.json())
+    return _detail(client, start_response.json()["id"])
 
 
 def test_admin_production_list_empty_and_rejects_pos_surface_user(client: TestClient) -> None:
@@ -251,7 +262,7 @@ def test_admin_production_validates_target_recipe_and_quantity(client: TestClien
 
     raw_target_response = client.post(
         "/v1/admin/production",
-        headers=headers,
+        headers={**headers, "Idempotency-Key": new_idempotency_key()},
         json={
             "branch_id": _get_branch_id(SEED_BRANCH_CODE),
             "planned_output_qty": "10.000",
@@ -264,7 +275,7 @@ def test_admin_production_validates_target_recipe_and_quantity(client: TestClien
 
     invalid_recipe_response = client.post(
         "/v1/admin/production",
-        headers=headers,
+        headers={**headers, "Idempotency-Key": new_idempotency_key()},
         json={
             "branch_id": _get_branch_id(SEED_BRANCH_CODE),
             "planned_output_qty": "10.000",
@@ -277,7 +288,7 @@ def test_admin_production_validates_target_recipe_and_quantity(client: TestClien
 
     quantity_response = client.post(
         "/v1/admin/production",
-        headers=headers,
+        headers={**headers, "Idempotency-Key": new_idempotency_key()},
         json={
             "branch_id": _get_branch_id(SEED_BRANCH_CODE),
             "planned_output_qty": "0",
@@ -296,7 +307,7 @@ def test_admin_production_start_blocks_shortages_then_succeeds(client: TestClien
 
     blocked_response = client.post(
         f"/v1/admin/production/{production_id}/start",
-        headers=_admin_headers(client),
+        headers=_production_headers(client),
         json={},
     )
     assert blocked_response.status_code == 409
@@ -305,12 +316,12 @@ def test_admin_production_start_blocks_shortages_then_succeeds(client: TestClien
     _seed_raw_stock(client, product_id=raw_material_id)
     start_response = client.post(
         f"/v1/admin/production/{production_id}/start",
-        headers=_admin_headers(client),
+        headers=_production_headers(client),
         json={"notes": "Materials ready"},
     )
 
     assert start_response.status_code == 200
-    payload = start_response.json()
+    payload = _detail(client, start_response.json()["id"])
     assert payload["overview"]["status"] == "IN_PROGRESS"
     assert payload["available_actions"]["can_complete"] is True
     assert payload["planned_inputs"][0]["status"] == "available"
@@ -325,7 +336,7 @@ def test_admin_production_complete_writes_inventory_movements_audit_and_outbox(
 
     complete_response = client.post(
         f"/v1/admin/production/{production_id}/complete",
-        headers={**_admin_headers(client), "X-Request-ID": "admin-production-complete"},
+        headers={**_production_headers(client), "X-Request-ID": "admin-production-complete"},
         json={
             "actual_output_qty": "18.000",
             "notes": "Yield below plan after cooling",
@@ -334,7 +345,7 @@ def test_admin_production_complete_writes_inventory_movements_audit_and_outbox(
     )
 
     assert complete_response.status_code == 200
-    payload = complete_response.json()
+    payload = _detail(client, complete_response.json()["id"])
     assert payload["overview"]["status"] == "COMPLETED"
     assert Decimal(str(payload["output_yield"]["variance_qty"])) == Decimal("-2.000")
     assert Decimal(str(payload["output_yield"]["variance_percent"])) == Decimal("-10.0000")
@@ -389,14 +400,14 @@ def test_admin_production_complete_validates_output_and_variance_reason(client: 
 
     negative_response = client.post(
         f"/v1/admin/production/{production_id}/complete",
-        headers=_admin_headers(client),
+        headers=_production_headers(client),
         json={"actual_output_qty": "-1.000"},
     )
     assert negative_response.status_code == 422
 
     missing_reason_response = client.post(
         f"/v1/admin/production/{production_id}/complete",
-        headers=_admin_headers(client),
+        headers=_production_headers(client),
         json={"actual_output_qty": "18.000"},
     )
     assert missing_reason_response.status_code == 409
@@ -404,7 +415,7 @@ def test_admin_production_complete_validates_output_and_variance_reason(client: 
 
     zero_response = client.post(
         f"/v1/admin/production/{production_id}/complete",
-        headers=_admin_headers(client),
+        headers=_production_headers(client),
         json={"actual_output_qty": "0.000"},
     )
     assert zero_response.status_code == 409
@@ -421,24 +432,24 @@ def test_admin_production_cancel_draft_and_blocks_completed_cancellation(
 
     cancel_response = client.post(
         f"/v1/admin/production/{production_id}/cancel",
-        headers=_admin_headers(client),
+        headers=_production_headers(client),
         json={"reason": "No longer needed"},
     )
     assert cancel_response.status_code == 200
-    assert cancel_response.json()["overview"]["status"] == "CANCELLED"
+    assert cancel_response.json()["status"] == "CANCELLED"
 
     completed = _create_started_production(client, actual_stock="12.000")
     completed_id = str(completed["overview"]["id"])
     complete_response = client.post(
         f"/v1/admin/production/{completed_id}/complete",
-        headers=_admin_headers(client),
+        headers=_production_headers(client),
         json={"actual_output_qty": "20.000"},
     )
     assert complete_response.status_code == 200
 
     blocked_cancel_response = client.post(
         f"/v1/admin/production/{completed_id}/cancel",
-        headers=_admin_headers(client),
+        headers=_production_headers(client),
         json={"reason": "Mistake"},
     )
     assert blocked_cancel_response.status_code == 409

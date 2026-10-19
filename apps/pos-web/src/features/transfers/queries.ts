@@ -20,8 +20,7 @@ export function usePendingInboundTransfersQuery(enabled = true) {
 
   return useQuery({
     queryKey: pendingInboundTransfersQueryKey(appEnv.VITE_POS_WORKSTATION_CODE),
-    queryFn: () =>
-      getPendingInboundTransfers(appEnv.VITE_POS_WORKSTATION_CODE),
+    queryFn: () => getPendingInboundTransfers(appEnv.VITE_POS_WORKSTATION_CODE),
     enabled: isAuthenticated && enabled,
   });
 }
@@ -34,15 +33,8 @@ export function useTransferDetailQuery(transferId: string | null) {
   const isAuthenticated = usePosAuthStore((state) => state.isAuthenticated);
 
   return useQuery({
-    queryKey: transferDetailQueryKey(
-      appEnv.VITE_POS_WORKSTATION_CODE,
-      transferId ?? "none",
-    ),
-    queryFn: () =>
-      getTransferDetail(
-        appEnv.VITE_POS_WORKSTATION_CODE,
-        transferId!,
-      ),
+    queryKey: transferDetailQueryKey(appEnv.VITE_POS_WORKSTATION_CODE, transferId ?? "none"),
+    queryFn: () => getTransferDetail(appEnv.VITE_POS_WORKSTATION_CODE, transferId!),
     enabled: isAuthenticated && transferId !== null,
   });
 }
@@ -68,11 +60,7 @@ export function useTransferDispatchHistoryQuery(
 
   return useQuery({
     queryKey: transferDispatchHistoryQueryKey(appEnv.VITE_POS_WORKSTATION_CODE, filters),
-    queryFn: () =>
-      getTransferDispatchHistory(
-        appEnv.VITE_POS_WORKSTATION_CODE,
-        filters,
-      ),
+    queryFn: () => getTransferDispatchHistory(appEnv.VITE_POS_WORKSTATION_CODE, filters),
     enabled: isAuthenticated && enabled,
   });
 }
@@ -99,11 +87,7 @@ export function useTransferReceiptHistoryQuery(
 
   return useQuery({
     queryKey: transferReceiptHistoryQueryKey(appEnv.VITE_POS_WORKSTATION_CODE, filters),
-    queryFn: () =>
-      getTransferReceiptHistory(
-        appEnv.VITE_POS_WORKSTATION_CODE,
-        filters,
-      ),
+    queryFn: () => getTransferReceiptHistory(appEnv.VITE_POS_WORKSTATION_CODE, filters),
     enabled: isAuthenticated && enabled,
   });
 }

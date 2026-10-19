@@ -1,3 +1,4 @@
+import { usePosAuthStore } from "../auth/auth-store";
 import {
   createCommandIntentionCoordinator,
   isCommandIntentionPending,
@@ -36,3 +37,13 @@ export const forgetSaleIntentionBodies = coordinator.forgetBodies;
 export const beginSaleConfirmation = coordinator.begin;
 export const retrySaleConfirmation = coordinator.retry;
 export const recoverSaleConfirmation = coordinator.recover;
+
+usePosAuthStore.subscribe((state, previous) => {
+  if (
+    state.generation !== previous.generation ||
+    state.user?.id !== previous.user?.id ||
+    state.session?.id !== previous.session?.id ||
+    state.user?.authorization_version !== previous.user?.authorization_version
+  )
+    coordinator.forgetBodies();
+});

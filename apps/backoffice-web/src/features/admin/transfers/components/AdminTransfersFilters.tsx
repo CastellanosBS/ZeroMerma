@@ -36,7 +36,10 @@ const discrepancyOptions: Array<{ label: string; value: AdminTransferDiscrepancy
   { value: "without_discrepancy", label: "Sin discrepancia" },
 ];
 
-function optionLabel(options: Array<{ id: string; label: string }>, value: string | null | undefined) {
+function optionLabel(
+  options: Array<{ id: string; label: string }>,
+  value: string | null | undefined,
+) {
   return options.find((option) => option.id === value)?.label ?? value ?? "";
 }
 
@@ -57,7 +60,12 @@ export function AdminTransfersFilters({
   const branchDisabled = options.branches.length === 0;
   const chips: AdminFilterChip[] = [
     filters.search
-      ? { key: "search", label: "Busqueda", value: filters.search, onRemove: () => onChange({ page: 1, search: "" }) }
+      ? {
+          key: "search",
+          label: "Busqueda",
+          value: filters.search,
+          onRemove: () => onChange({ page: 1, search: "" }),
+        }
       : null,
     filters.originBranchId
       ? {
@@ -84,10 +92,20 @@ export function AdminTransfersFilters({
         }
       : null,
     filters.dateFrom
-      ? { key: "from", label: "Desde", value: filters.dateFrom, onRemove: () => onChange({ dateFrom: null, page: 1 }) }
+      ? {
+          key: "from",
+          label: "Desde",
+          value: filters.dateFrom,
+          onRemove: () => onChange({ dateFrom: null, page: 1 }),
+        }
       : null,
     filters.dateTo
-      ? { key: "to", label: "Hasta", value: filters.dateTo, onRemove: () => onChange({ dateTo: null, page: 1 }) }
+      ? {
+          key: "to",
+          label: "Hasta",
+          value: filters.dateTo,
+          onRemove: () => onChange({ dateTo: null, page: 1 }),
+        }
       : null,
     filters.productId
       ? {
@@ -109,7 +127,9 @@ export function AdminTransfersFilters({
       ? {
           key: "discrepancy",
           label: "Discrepancia",
-          value: discrepancyOptions.find((option) => option.value === filters.discrepancyState)?.label ?? filters.discrepancyState,
+          value:
+            discrepancyOptions.find((option) => option.value === filters.discrepancyState)?.label ??
+            filters.discrepancyState,
           onRemove: () => onChange({ discrepancyState: "all", page: 1 }),
         }
       : null,
@@ -135,57 +155,71 @@ export function AdminTransfersFilters({
         onClose={() => setIsFiltersOpen(false)}
       >
         <div className="grid min-w-0 gap-3">
-        <AdminFilterField id="admin-transfers-origin" label="Origen">
-          <select
-            className={`${inputClassName} truncate`}
-            disabled={branchDisabled}
-            id="admin-transfers-origin"
-            title={branchDisabled ? "Sucursales pendientes de API" : "Sucursal origen"}
-            value={filters.originBranchId ?? ""}
-            onChange={(event) => onChange({ originBranchId: event.target.value || null, page: 1 })}
-          >
-            {branchDisabled ? <option value="">Sucursales pendientes de API</option> : <option value="">Todas</option>}
-            {options.branches.map((option) => (
-              <option key={option.id} title={option.label} value={option.id}>
-                {option.label}
-              </option>
-            ))}
-          </select>
-        </AdminFilterField>
+          <AdminFilterField id="admin-transfers-origin" label="Origen">
+            <select
+              className={`${inputClassName} truncate`}
+              disabled={branchDisabled}
+              id="admin-transfers-origin"
+              title={branchDisabled ? "Sucursales pendientes de API" : "Sucursal origen"}
+              value={filters.originBranchId ?? ""}
+              onChange={(event) =>
+                onChange({ originBranchId: event.target.value || null, page: 1 })
+              }
+            >
+              {branchDisabled ? (
+                <option value="">Sucursales pendientes de API</option>
+              ) : (
+                <option value="">Todas</option>
+              )}
+              {options.branches.map((option) => (
+                <option key={option.id} title={option.label} value={option.id}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+          </AdminFilterField>
 
-        <AdminFilterField id="admin-transfers-destination" label="Destino">
-          <select
-            className={`${inputClassName} truncate`}
-            disabled={branchDisabled}
-            id="admin-transfers-destination"
-            title={branchDisabled ? "Sucursales pendientes de API" : "Sucursal destino"}
-            value={filters.destinationBranchId ?? ""}
-            onChange={(event) => onChange({ destinationBranchId: event.target.value || null, page: 1 })}
-          >
-            {branchDisabled ? <option value="">Sucursales pendientes de API</option> : <option value="">Todas</option>}
-            {options.branches.map((option) => (
-              <option key={option.id} title={option.label} value={option.id}>
-                {option.label}
-              </option>
-            ))}
-          </select>
-        </AdminFilterField>
+          <AdminFilterField id="admin-transfers-destination" label="Destino">
+            <select
+              className={`${inputClassName} truncate`}
+              disabled={branchDisabled}
+              id="admin-transfers-destination"
+              title={branchDisabled ? "Sucursales pendientes de API" : "Sucursal destino"}
+              value={filters.destinationBranchId ?? ""}
+              onChange={(event) =>
+                onChange({ destinationBranchId: event.target.value || null, page: 1 })
+              }
+            >
+              {branchDisabled ? (
+                <option value="">Sucursales pendientes de API</option>
+              ) : (
+                <option value="">Todas</option>
+              )}
+              {options.branches.map((option) => (
+                <option key={option.id} title={option.label} value={option.id}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+          </AdminFilterField>
 
-        <AdminFilterField id="admin-transfers-status" label="Estado">
-          <select
-            className={inputClassName}
-            id="admin-transfers-status"
-            value={filters.status ?? "all"}
-            onChange={(event) => onChange({ page: 1, status: event.target.value as AdminTransferStatus | "all" })}
-          >
-            <option value="all">Todos</option>
-            {options.statuses.map((option) => (
-              <option key={option.id} title={option.label} value={option.id}>
-                {option.label}
-              </option>
-            ))}
-          </select>
-        </AdminFilterField>
+          <AdminFilterField id="admin-transfers-status" label="Estado">
+            <select
+              className={inputClassName}
+              id="admin-transfers-status"
+              value={filters.status ?? "all"}
+              onChange={(event) =>
+                onChange({ page: 1, status: event.target.value as AdminTransferStatus | "all" })
+              }
+            >
+              <option value="all">Todos</option>
+              {options.statuses.map((option) => (
+                <option key={option.id} title={option.label} value={option.id}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+          </AdminFilterField>
 
           <AdminFilterField id="admin-transfers-date-from" label="Desde">
             <input
@@ -228,7 +262,9 @@ export function AdminTransfersFilters({
               className={`${inputClassName} truncate`}
               id="admin-transfers-operator"
               value={filters.operatorUserId ?? ""}
-              onChange={(event) => onChange({ operatorUserId: event.target.value || null, page: 1 })}
+              onChange={(event) =>
+                onChange({ operatorUserId: event.target.value || null, page: 1 })
+              }
             >
               <option value="">Todos</option>
               {options.operators.map((option) => (
@@ -253,42 +289,42 @@ export function AdminTransfersFilters({
             >
               {discrepancyOptions.map((option) => (
                 <option key={option.value} value={option.value}>
-                {option.label}
-              </option>
-            ))}
-          </select>
+                  {option.label}
+                </option>
+              ))}
+            </select>
           </AdminFilterField>
 
-      <div className="flex min-w-0 flex-wrap gap-2 border-t border-[var(--ui-color-border)] pt-3 text-xs">
-        <button
-          className="rounded-full border border-[var(--ui-color-border)] bg-white px-3 py-1 font-semibold text-slate-600 transition hover:bg-slate-50 focus:outline-none focus:ring-4 focus:ring-[var(--ui-color-ring)]"
-          type="button"
-          onClick={() => onChange({ page: 1, status: "IN_TRANSIT" })}
-        >
-          En transito
-        </button>
-        <button
-          className="rounded-full border border-[var(--ui-color-border)] bg-white px-3 py-1 font-semibold text-slate-600 transition hover:bg-slate-50 focus:outline-none focus:ring-4 focus:ring-[var(--ui-color-ring)]"
-          type="button"
-          onClick={() => onChange({ discrepancyState: "with_discrepancy", page: 1 })}
-        >
-          Con discrepancias
-        </button>
-        <button
-          className="rounded-full border border-[var(--ui-color-border)] bg-white px-3 py-1 font-semibold text-slate-600 transition hover:bg-slate-50 focus:outline-none focus:ring-4 focus:ring-[var(--ui-color-ring)]"
-          type="button"
-          onClick={() => onChange({ page: 1, status: "DRAFT" })}
-        >
-          Borradores
-        </button>
-        <button
-          className="rounded-full border border-[var(--ui-color-border)] bg-white px-3 py-1 font-semibold text-slate-600 transition hover:bg-slate-50 focus:outline-none focus:ring-4 focus:ring-[var(--ui-color-ring)]"
-          type="button"
-          onClick={() => onChange({ page: 1, status: "RECEIVED" })}
-        >
-          Recibidas
-        </button>
-      </div>
+          <div className="flex min-w-0 flex-wrap gap-2 border-t border-[var(--ui-color-border)] pt-3 text-xs">
+            <button
+              className="rounded-full border border-[var(--ui-color-border)] bg-white px-3 py-1 font-semibold text-slate-600 transition hover:bg-slate-50 focus:outline-none focus:ring-4 focus:ring-[var(--ui-color-ring)]"
+              type="button"
+              onClick={() => onChange({ page: 1, status: "IN_TRANSIT" })}
+            >
+              En transito
+            </button>
+            <button
+              className="rounded-full border border-[var(--ui-color-border)] bg-white px-3 py-1 font-semibold text-slate-600 transition hover:bg-slate-50 focus:outline-none focus:ring-4 focus:ring-[var(--ui-color-ring)]"
+              type="button"
+              onClick={() => onChange({ discrepancyState: "with_discrepancy", page: 1 })}
+            >
+              Con discrepancias
+            </button>
+            <button
+              className="rounded-full border border-[var(--ui-color-border)] bg-white px-3 py-1 font-semibold text-slate-600 transition hover:bg-slate-50 focus:outline-none focus:ring-4 focus:ring-[var(--ui-color-ring)]"
+              type="button"
+              onClick={() => onChange({ page: 1, status: "DRAFT" })}
+            >
+              Borradores
+            </button>
+            <button
+              className="rounded-full border border-[var(--ui-color-border)] bg-white px-3 py-1 font-semibold text-slate-600 transition hover:bg-slate-50 focus:outline-none focus:ring-4 focus:ring-[var(--ui-color-ring)]"
+              type="button"
+              onClick={() => onChange({ page: 1, status: "RECEIVED" })}
+            >
+              Recibidas
+            </button>
+          </div>
         </div>
       </AdminAdvancedFiltersSheet>
     </>

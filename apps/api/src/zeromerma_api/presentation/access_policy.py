@@ -274,6 +274,61 @@ ENDPOINT_POLICIES: dict[tuple[str, str], EndpointPolicy] = {
     ("GET", "/v1/operations/classes/{class_id}/products"): EndpointPolicy(("pos.operate",), "POS"),
     ("GET", "/v1/operations/history"): EndpointPolicy(("pos.operate",), "POS"),
     ("GET", "/v1/operations/{document_id}"): EndpointPolicy(("pos.operate",), "POS"),
+    ("GET", "/v1/admin/production/commands/{command_code}/{idempotency_key}"): EndpointPolicy(
+        (),
+        "BACKOFFICE",
+        exception_reason=(
+            "ProductionIdempotencyService binds the typed command capability and validates "
+            "original actor, surface and every participating branch during recovery."
+        ),
+    ),
+    ("GET", "/v1/admin/purchases/commands/{command_code}/{idempotency_key}"): EndpointPolicy(
+        (),
+        "BACKOFFICE",
+        exception_reason=(
+            "PurchaseCommandService binds the typed command capability and validates original "
+            "actor, surface and every participating branch during recovery."
+        ),
+    ),
+    (
+        "GET",
+        "/v1/transfers/commands/{command_code}/confirmations/{idempotency_key}",
+    ): EndpointPolicy(
+        (),
+        "POS",
+        exception_reason=(
+            "TransferCommandServiceWrapper binds the command capability and validates "
+            "the original "
+            "actor, surface and every participating branch during recovery."
+        ),
+    ),
+    (
+        "GET",
+        "/v1/admin/transfers/commands/{command_code}/confirmations/{idempotency_key}",
+    ): EndpointPolicy(
+        (),
+        "BACKOFFICE",
+        exception_reason=(
+            "TransferCommandServiceWrapper binds the command capability and validates "
+            "the original "
+            "actor, surface and every participating branch during recovery."
+        ),
+    ),
+    ("GET", "/v1/corrections/confirmations/{idempotency_key}"): EndpointPolicy(
+        ("returns_corrections.manage",), "POS"
+    ),
+    ("GET", "/v1/operations/counter-transfer/confirmations/{idempotency_key}"): EndpointPolicy(
+        ("pos.operate",), "POS"
+    ),
+    ("GET", "/v1/operations/waste/confirmations/{idempotency_key}"): EndpointPolicy(
+        ("pos.operate",), "POS"
+    ),
+    ("GET", "/v1/admin/waste/confirmations/{idempotency_key}"): EndpointPolicy(
+        ("waste.manage",), "BACKOFFICE"
+    ),
+    ("GET", "/v1/admin/inventory/adjustments/confirmations/{idempotency_key}"): EndpointPolicy(
+        ("inventory.adjust",), "BACKOFFICE"
+    ),
     ("GET", "/v1/orders"): EndpointPolicy(("orders.view",), "POS"),
     ("GET", "/v1/orders/bootstrap"): EndpointPolicy(("orders.view",), "POS"),
     ("GET", "/v1/orders/catalog"): EndpointPolicy(("orders.view",), "POS"),

@@ -178,8 +178,11 @@ vi.mock("../../components/app-shell-right-panel", () => ({
 }));
 
 vi.mock("../auth/auth-store", () => ({
-  usePosAuthStore: (selector: (state: { isAuthenticated: boolean }) => unknown) =>
-    selector({ isAuthenticated: true }),
+  usePosAuthStore: Object.assign(
+    (selector: (state: { isAuthenticated: boolean }) => unknown) =>
+      selector({ isAuthenticated: true }),
+    { subscribe: vi.fn(() => () => undefined) },
+  ),
 }));
 
 vi.mock("../cash-session-open/queries", () => ({

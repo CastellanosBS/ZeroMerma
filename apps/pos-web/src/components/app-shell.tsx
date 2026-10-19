@@ -1,4 +1,6 @@
 import { CashRecoveryPanel } from "../features/cash-commands/cash-recovery-panel";
+import { OperationRecoveryPanel } from "../features/operation-commands/operation-recovery-panel";
+import { TransferRecoveryPanel } from "../features/transfers/transfer-recovery-panel";
 import { useNavigate, useRouterState } from "@tanstack/react-router";
 import {
   type CSSProperties,
@@ -824,6 +826,8 @@ function AppShellFrame({ bootstrap, cashSession, children, onSignOut, onLock }: 
 
             <main className="min-w-0 min-h-0 overflow-hidden" data-pos-shell-region="center">
               <CashRecoveryPanel workstationId={bootstrap.workstation.id} />
+              <OperationRecoveryPanel workstationId={bootstrap.workstation.id} />
+              <TransferRecoveryPanel workstationId={bootstrap.workstation.id} />
               <OrderRecoveryPanel workstationId={bootstrap.workstation.id} />
               <ReturnRecoveryPanel workstationId={bootstrap.workstation.id} />
               {children}

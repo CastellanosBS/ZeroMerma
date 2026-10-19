@@ -5,7 +5,6 @@ from datetime import UTC, datetime
 from decimal import Decimal
 
 from sqlalchemy import func, select
-from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, aliased
 
 from zeromerma_api.modules.audit.application.service import AuditRecorder
@@ -55,13 +54,23 @@ from zeromerma_api.modules.outbox.application.service import OutboxWriter
 from zeromerma_api.modules.transfers.application.schemas import (
     PendingInboundTransfersResponse,
     PendingInboundTransferView,
+    TransferCommandResultView,
     TransferDetailResponse,
     TransferDispatchCommitRequest,
     TransferDispatchHistoryResponse,
     TransferDocumentSummaryView,
     TransferQuantitySummaryView,
+    TransferReceiptHistoryItemView,
     TransferReceiptHistoryResponse,
     TransferReceiveRequest,
+)
+from zeromerma_api.modules.transfers.application.workflow import (
+    command_snapshot,
+    command_trace,
+    lock_shipment,
+    progress,
+    receipts,
+    received_quantities,
 )
 from zeromerma_api.modules.transfers.domain.exceptions import (
     TransferAlreadyReceivedError,
@@ -184,7 +193,10 @@ class TransferQueryService:
                     created_at_utc=record["created_at_utc"],
                     committed_at_utc=record["committed_at_utc"],
                     line_count=int(record["line_count"]),
-                    expected_total_quantity=record["total_quantity"],
+                    expected_total_quantity=sum(
+                        (line.pending_quantity for line in progress(session, record["id"])),
+                        Decimal(0),
+                    ),
                 )
                 for record in records
             ],
@@ -214,24 +226,19 @@ class TransferQueryService:
         if context.branch_id not in {shipment.source_branch_id, shipment.destination_branch_id}:
             raise TransferNotFoundError("Transfer shipment was not found.")
 
-        receipt = session.execute(
-            select(OperationDocument).where(
-                OperationDocument.reference_document_id == shipment.id,
-                OperationDocument.document_type == OPERATION_DOCUMENT_TYPE_BRANCH_TRANSFER_RECEIPT,
-            )
-        ).scalar_one_or_none()
         shipment_view = self._operations_query.get_operation_document(
-            session,
-            document_id=shipment.id,
+            session, document_id=shipment.id
         )
-        receipt_view = (
-            self._operations_query.get_operation_document(session, document_id=receipt.id)
-            if receipt is not None
-            else None
-        )
-        return _build_transfer_detail_response(
+        receipt_views = [
+            self._operations_query.get_operation_document(session, document_id=row.id)
+            for row in receipts(session, shipment.id)
+        ]
+        return TransferDetailResponse(
             shipment=shipment_view,
-            receipt=receipt_view,
+            shipment_summary=_build_transfer_document_summary(shipment_view),
+            receipts=receipt_views,
+            receipt_summaries=[_build_transfer_document_summary(row) for row in receipt_views],
+            receipt_progress=progress(session, shipment.id),
         )
 
     def get_outbound_dispatch_history(
@@ -464,6 +471,7 @@ class TransferQueryService:
         base_statement = (
             select(
                 OperationDocument.id,
+                OperationDocument.reference_document_id.label("shipment_id"),
                 OperationDocument.document_type,
                 OperationDocument.status,
                 OperationDocument.source_branch_id,
@@ -613,7 +621,8 @@ class TransferQueryService:
                 if status_code is not None
             ],
             records=[
-                OperationHistoryListItemView(
+                TransferReceiptHistoryItemView(
+                    shipment_id=row["shipment_id"],
                     id=row["id"],
                     folio=_build_transfer_folio(row["document_type"], row["id"]),
                     document_type=row["document_type"],
@@ -658,7 +667,7 @@ class TransferCommandService:
         current_user: AuthenticatedUser,
         command: TransferDispatchCommitRequest,
         request_id: str | None,
-    ) -> TransferDetailResponse:
+    ) -> TransferCommandResultView:
         context = self._workstation_access.resolve_context(
             session,
             user_id=current_user.id,
@@ -702,101 +711,91 @@ class TransferCommandService:
             committed_at_utc=committed_at,
         )
 
-        try:
-            session.add(shipment)
-            session.flush()
-            for line_number, line in enumerate(command.lines, start=1):
-                resolved_line = resolved_lines[line.product_id]
-                session.add(
-                    OperationDocumentLine(
-                        operation_document_id=shipment.id,
-                        line_number=line_number,
-                        product_id=line.product_id,
-                        product_code_snapshot=str(resolved_line["product_code"]),
-                        product_name_snapshot=str(resolved_line["product_name"]),
-                        product_class_id=resolved_line["product_class_id"],
-                        product_class_code_snapshot=str(resolved_line["product_class_code"]),
-                        product_class_name_snapshot=str(resolved_line["product_class_name"]),
-                        quantity=line.quantity,
-                        expected_quantity=line.quantity,
-                        received_quantity=None,
-                        notes=line.notes,
-                    )
+        session.add(shipment)
+        session.flush()
+        for line_number, line in enumerate(command.lines, start=1):
+            resolved_line = resolved_lines[line.product_id]
+            session.add(
+                OperationDocumentLine(
+                    operation_document_id=shipment.id,
+                    line_number=line_number,
+                    product_id=line.product_id,
+                    product_code_snapshot=str(resolved_line["product_code"]),
+                    product_name_snapshot=str(resolved_line["product_name"]),
+                    product_class_id=resolved_line["product_class_id"],
+                    product_class_code_snapshot=str(resolved_line["product_class_code"]),
+                    product_class_name_snapshot=str(resolved_line["product_class_name"]),
+                    quantity=line.quantity,
+                    expected_quantity=line.quantity,
+                    received_quantity=None,
+                    notes=line.notes,
                 )
-
-            self._audit_recorder.record(
-                session,
-                actor_id=current_user.id,
-                action="transfer.dispatched",
-                resource_type="operation_document",
-                resource_id=str(shipment.id),
-                branch_id=context.branch_id,
-                request_id=resolved_request_id,
-                metadata={
-                    "document_type": shipment.document_type,
-                    "status": shipment.status,
-                    "source_branch_code": context.branch_code,
-                    "destination_branch_code": destination_branch.code,
-                    "source_bucket_code": OPERATION_BUCKET_BACKROOM,
-                    "destination_bucket_code": OPERATION_BUCKET_BACKROOM,
-                    "workstation_code": context.workstation_code,
-                    "line_count": len(command.lines),
-                },
             )
-            self._outbox_writer.append(
-                session,
-                aggregate_type="transfer",
-                aggregate_id=str(shipment.id),
-                event_name=OUTBOX_EVENT_TRANSFER_DISPATCHED_V1,
-                payload={
-                    "document_id": str(shipment.id),
-                    "document_type": shipment.document_type,
-                    "status": shipment.status,
-                    "source_branch_id": str(context.branch_id),
-                    "source_branch_code": context.branch_code,
-                    "destination_branch_id": str(destination_branch.id),
-                    "destination_branch_code": destination_branch.code,
-                    "workstation_id": str(context.workstation_id),
-                    "workstation_code": context.workstation_code,
-                    "created_by_user_id": str(current_user.id),
-                    "created_by_user_email": current_user.email,
-                    "notes": command.notes,
-                    "committed_at_utc": committed_at.isoformat(),
-                    "quantity_summary": {
-                        "line_count": len(command.lines),
-                        "expected_total_quantity": str(
-                            sum((line.quantity for line in command.lines), Decimal("0"))
-                        ),
-                        "received_total_quantity": None,
-                        "has_variance": False,
-                        "variance_line_count": 0,
-                    },
-                    "lines": _build_outbox_lines(
-                        [
-                            OperationCommitLineRequest(
-                                product_id=line.product_id,
-                                quantity=line.quantity,
-                                notes=line.notes,
-                            )
-                            for line in command.lines
-                        ],
-                        resolved_lines,
-                    ),
-                },
-                headers={"request_id": resolved_request_id},
-            )
-            session.commit()
-        except IntegrityError as error:
-            session.rollback()
-            raise TransferValidationError(
-                "Transfer dispatch invariants were violated by a concurrent request."
-            ) from error
 
-        shipment_view = self._operations_query.get_operation_document(
+        self._audit_recorder.record(
             session,
-            document_id=shipment.id,
+            actor_id=current_user.id,
+            action="transfer.dispatched",
+            resource_type="operation_document",
+            resource_id=str(shipment.id),
+            branch_id=context.branch_id,
+            request_id=resolved_request_id,
+            metadata={
+                **command_trace(session),
+                "document_type": shipment.document_type,
+                "status": shipment.status,
+                "source_branch_code": context.branch_code,
+                "destination_branch_code": destination_branch.code,
+                "source_bucket_code": OPERATION_BUCKET_BACKROOM,
+                "destination_bucket_code": OPERATION_BUCKET_BACKROOM,
+                "workstation_code": context.workstation_code,
+                "line_count": len(command.lines),
+            },
         )
-        return _build_transfer_detail_response(shipment=shipment_view, receipt=None)
+        self._outbox_writer.append(
+            session,
+            aggregate_type="transfer",
+            aggregate_id=str(shipment.id),
+            event_name=OUTBOX_EVENT_TRANSFER_DISPATCHED_V1,
+            payload={
+                "document_id": str(shipment.id),
+                "document_type": shipment.document_type,
+                "status": shipment.status,
+                "source_branch_id": str(context.branch_id),
+                "source_branch_code": context.branch_code,
+                "destination_branch_id": str(destination_branch.id),
+                "destination_branch_code": destination_branch.code,
+                "workstation_id": str(context.workstation_id),
+                "workstation_code": context.workstation_code,
+                "created_by_user_id": str(current_user.id),
+                "created_by_user_email": current_user.email,
+                "notes": command.notes,
+                "committed_at_utc": committed_at.isoformat(),
+                "quantity_summary": {
+                    "line_count": len(command.lines),
+                    "expected_total_quantity": str(
+                        sum((line.quantity for line in command.lines), Decimal("0"))
+                    ),
+                    "received_total_quantity": None,
+                    "has_variance": False,
+                    "variance_line_count": 0,
+                },
+                "lines": _build_outbox_lines(
+                    [
+                        OperationCommitLineRequest(
+                            product_id=line.product_id,
+                            quantity=line.quantity,
+                            notes=line.notes,
+                        )
+                        for line in command.lines
+                    ],
+                    resolved_lines,
+                ),
+            },
+            headers={"request_id": resolved_request_id, **command_trace(session)},
+        )
+
+        return command_snapshot(session, shipment)
 
     def receive_transfer(
         self,
@@ -807,20 +806,13 @@ class TransferCommandService:
         transfer_id: uuid.UUID,
         command: TransferReceiveRequest,
         request_id: str | None,
-    ) -> TransferDetailResponse:
+    ) -> TransferCommandResultView:
         context = self._workstation_access.resolve_context(
             session,
             user_id=current_user.id,
             workstation_code=workstation_code,
         )
-        shipment = session.execute(
-            select(OperationDocument).where(
-                OperationDocument.id == transfer_id,
-                OperationDocument.document_type == OPERATION_DOCUMENT_TYPE_BRANCH_TRANSFER_SHIPMENT,
-            )
-        ).scalar_one_or_none()
-        if shipment is None:
-            raise TransferNotFoundError("Transfer shipment was not found.")
+        shipment = lock_shipment(session, transfer_id)
         if shipment.destination_branch_id != context.branch_id:
             raise TransferValidationError(
                 "Transfer shipment is not destined to the current branch."
@@ -828,15 +820,7 @@ class TransferCommandService:
         if shipment.status != OPERATION_DOCUMENT_STATUS_IN_TRANSIT:
             raise TransferAlreadyReceivedError("Transfer shipment is no longer pending receipt.")
 
-        existing_receipt = session.execute(
-            select(OperationDocument.id).where(
-                OperationDocument.reference_document_id == shipment.id,
-                OperationDocument.document_type == OPERATION_DOCUMENT_TYPE_BRANCH_TRANSFER_RECEIPT,
-            )
-        ).scalar_one_or_none()
-        if existing_receipt is not None:
-            raise TransferAlreadyReceivedError("Transfer shipment is no longer pending receipt.")
-
+        prior = received_quantities(session, shipment.id)
         shipment_lines = (
             session.execute(
                 select(OperationDocumentLine)
@@ -850,11 +834,11 @@ class TransferCommandService:
             raise OperationDocumentNotFoundError("Transfer shipment has no lines.")
 
         receipt_by_line_id = {line.shipment_line_id: line for line in command.lines}
-        if {line.id for line in shipment_lines} != set(receipt_by_line_id):
-            raise TransferValidationError(
-                "Transfer receipt lines must match the pending shipment lines exactly."
-            )
+        if not set(receipt_by_line_id).issubset({line.id for line in shipment_lines}):
+            raise TransferValidationError("Receipt lines must belong to the selected shipment.")
 
+        if not any(line.received_quantity > 0 for line in command.lines):
+            raise TransferValidationError("Receipt must include a positive quantity.")
         resolved_request_id = request_id or str(uuid.uuid4())
         committed_at = datetime.now(tz=UTC)
         has_variance = False
@@ -872,166 +856,155 @@ class TransferCommandService:
             committed_at_utc=committed_at,
         )
 
-        try:
-            session.add(receipt)
-            session.flush()
-            for shipment_line in shipment_lines:
-                receipt_line = receipt_by_line_id[shipment_line.id]
-                if receipt_line.expected_quantity != shipment_line.quantity:
-                    raise TransferValidationError(
-                        "Transfer receipt expected quantities must match the pending shipment."
-                    )
-                if receipt_line.received_quantity != shipment_line.quantity and (
-                    receipt_line.variance_reason is None
-                    or receipt_line.variance_reason.strip() == ""
-                ):
-                    raise TransferValidationError(
-                        "Variance reason is required when the received quantity "
-                        "differs from the shipment."
-                    )
-                if receipt_line.received_quantity != shipment_line.quantity:
-                    has_variance = True
-                session.add(
-                    OperationDocumentLine(
-                        operation_document_id=receipt.id,
-                        line_number=shipment_line.line_number,
-                        product_id=shipment_line.product_id,
-                        product_code_snapshot=shipment_line.product_code_snapshot,
-                        product_name_snapshot=shipment_line.product_name_snapshot,
-                        product_class_id=shipment_line.product_class_id,
-                        product_class_code_snapshot=shipment_line.product_class_code_snapshot,
-                        product_class_name_snapshot=shipment_line.product_class_name_snapshot,
-                        quantity=shipment_line.quantity,
-                        expected_quantity=shipment_line.quantity,
-                        received_quantity=receipt_line.received_quantity,
-                        variance_reason=receipt_line.variance_reason,
-                        notes=receipt_line.notes,
-                    )
+        session.add(receipt)
+        session.flush()
+        for shipment_line in shipment_lines:
+            if shipment_line.id not in receipt_by_line_id:
+                continue
+            receipt_line = receipt_by_line_id[shipment_line.id]
+            remaining = shipment_line.quantity - prior.get(shipment_line.line_number, Decimal(0))
+            if remaining <= 0 or receipt_line.received_quantity > remaining:
+                raise TransferValidationError("Received quantity cannot exceed pending quantity.")
+            if receipt_line.expected_quantity != remaining:
+                raise TransferValidationError(
+                    "Transfer receipt expected quantities must match the pending shipment."
                 )
-
-            receipt.status = (
-                OPERATION_DOCUMENT_STATUS_RECEIVED_WITH_VARIANCE
-                if has_variance
-                else OPERATION_DOCUMENT_STATUS_RECEIVED
+            if receipt_line.received_quantity != remaining and (
+                receipt_line.variance_reason is None or receipt_line.variance_reason.strip() == ""
+            ):
+                raise TransferValidationError(
+                    "Variance reason is required when the received quantity "
+                    "differs from the shipment."
+                )
+            if receipt_line.received_quantity != remaining:
+                has_variance = True
+            session.add(
+                OperationDocumentLine(
+                    operation_document_id=receipt.id,
+                    line_number=shipment_line.line_number,
+                    product_id=shipment_line.product_id,
+                    product_code_snapshot=shipment_line.product_code_snapshot,
+                    product_name_snapshot=shipment_line.product_name_snapshot,
+                    product_class_id=shipment_line.product_class_id,
+                    product_class_code_snapshot=shipment_line.product_class_code_snapshot,
+                    product_class_name_snapshot=shipment_line.product_class_name_snapshot,
+                    quantity=shipment_line.quantity,
+                    expected_quantity=remaining,
+                    received_quantity=receipt_line.received_quantity,
+                    variance_reason=receipt_line.variance_reason,
+                    notes=receipt_line.notes,
+                )
             )
-            shipment.status = receipt.status
 
-            self._audit_recorder.record(
-                session,
-                actor_id=current_user.id,
-                action="transfer.received",
-                resource_type="operation_document",
-                resource_id=str(receipt.id),
-                branch_id=context.branch_id,
-                request_id=resolved_request_id,
-                metadata={
-                    "shipment_id": str(shipment.id),
-                    "receipt_id": str(receipt.id),
-                    "status": receipt.status,
-                    "source_branch_id": str(shipment.source_branch_id),
-                    "destination_branch_id": str(context.branch_id),
-                    "workstation_code": context.workstation_code,
+        receipt.status = (
+            OPERATION_DOCUMENT_STATUS_RECEIVED_WITH_VARIANCE
+            if has_variance
+            else OPERATION_DOCUMENT_STATUS_RECEIVED
+        )
+        final_status = (
+            OPERATION_DOCUMENT_STATUS_IN_TRANSIT
+            if any(
+                prior.get(line.line_number, Decimal(0))
+                + (
+                    receipt_by_line_id[line.id].received_quantity
+                    if line.id in receipt_by_line_id
+                    else Decimal(0)
+                )
+                < line.quantity
+                for line in shipment_lines
+            )
+            else OPERATION_DOCUMENT_STATUS_RECEIVED
+        )
+        if shipment.status != final_status:
+            shipment.status = final_status
+
+        self._audit_recorder.record(
+            session,
+            actor_id=current_user.id,
+            action="transfer.received",
+            resource_type="operation_document",
+            resource_id=str(receipt.id),
+            branch_id=context.branch_id,
+            request_id=resolved_request_id,
+            metadata={
+                **command_trace(session),
+                "shipment_id": str(shipment.id),
+                "receipt_id": str(receipt.id),
+                "status": receipt.status,
+                "source_branch_id": str(shipment.source_branch_id),
+                "destination_branch_id": str(context.branch_id),
+                "workstation_code": context.workstation_code,
+                "line_count": len(command.lines),
+            },
+        )
+        self._outbox_writer.append(
+            session,
+            aggregate_type="transfer",
+            aggregate_id=str(shipment.id),
+            event_name=OUTBOX_EVENT_TRANSFER_RECEIVED_V1,
+            payload={
+                "shipment_id": str(shipment.id),
+                "receipt_id": str(receipt.id),
+                "status": receipt.status,
+                "source_branch_id": str(shipment.source_branch_id),
+                "destination_branch_id": str(context.branch_id),
+                "workstation_id": str(context.workstation_id),
+                "workstation_code": context.workstation_code,
+                "received_by_user_id": str(current_user.id),
+                "received_by_user_email": current_user.email,
+                "notes": command.notes,
+                "committed_at_utc": committed_at.isoformat(),
+                "linked_shipment_id": str(shipment.id),
+                "quantity_summary": {
                     "line_count": len(command.lines),
+                    "expected_total_quantity": str(
+                        sum((line.expected_quantity for line in command.lines), Decimal("0"))
+                    ),
+                    "received_total_quantity": str(
+                        sum(
+                            (
+                                receipt_by_line_id[line.id].received_quantity
+                                for line in shipment_lines
+                                if line.id in receipt_by_line_id
+                            ),
+                            Decimal("0"),
+                        )
+                    ),
+                    "has_variance": has_variance,
+                    "variance_line_count": sum(
+                        1
+                        for line in shipment_lines
+                        if line.id in receipt_by_line_id
+                        if receipt_by_line_id[line.id].received_quantity
+                        != line.quantity - prior.get(line.line_number, Decimal(0))
+                    ),
                 },
-            )
-            self._outbox_writer.append(
-                session,
-                aggregate_type="transfer",
-                aggregate_id=str(shipment.id),
-                event_name=OUTBOX_EVENT_TRANSFER_RECEIVED_V1,
-                payload={
-                    "shipment_id": str(shipment.id),
-                    "receipt_id": str(receipt.id),
-                    "status": receipt.status,
-                    "source_branch_id": str(shipment.source_branch_id),
-                    "destination_branch_id": str(context.branch_id),
-                    "workstation_id": str(context.workstation_id),
-                    "workstation_code": context.workstation_code,
-                    "received_by_user_id": str(current_user.id),
-                    "received_by_user_email": current_user.email,
-                    "notes": command.notes,
-                    "committed_at_utc": committed_at.isoformat(),
-                    "linked_shipment_id": str(shipment.id),
-                    "quantity_summary": {
-                        "line_count": len(command.lines),
-                        "expected_total_quantity": str(
-                            sum((line.quantity for line in shipment_lines), Decimal("0"))
+                "lines": [
+                    {
+                        "shipment_line_id": str(shipment_line.id),
+                        "product_id": str(shipment_line.product_id),
+                        "product_code_snapshot": shipment_line.product_code_snapshot,
+                        "product_name_snapshot": shipment_line.product_name_snapshot,
+                        "product_class_id": str(shipment_line.product_class_id),
+                        "product_class_code_snapshot": (shipment_line.product_class_code_snapshot),
+                        "product_class_name_snapshot": (shipment_line.product_class_name_snapshot),
+                        "expected_quantity": str(
+                            receipt_by_line_id[shipment_line.id].expected_quantity
                         ),
-                        "received_total_quantity": str(
-                            sum(
-                                (
-                                    receipt_by_line_id[line.id].received_quantity
-                                    for line in shipment_lines
-                                ),
-                                Decimal("0"),
-                            )
+                        "received_quantity": str(
+                            receipt_by_line_id[shipment_line.id].received_quantity
                         ),
-                        "has_variance": has_variance,
-                        "variance_line_count": sum(
-                            1
-                            for line in shipment_lines
-                            if receipt_by_line_id[line.id].received_quantity != line.quantity
-                        ),
-                    },
-                    "lines": [
-                        {
-                            "shipment_line_id": str(shipment_line.id),
-                            "product_id": str(shipment_line.product_id),
-                            "product_code_snapshot": shipment_line.product_code_snapshot,
-                            "product_name_snapshot": shipment_line.product_name_snapshot,
-                            "product_class_id": str(shipment_line.product_class_id),
-                            "product_class_code_snapshot": (
-                                shipment_line.product_class_code_snapshot
-                            ),
-                            "product_class_name_snapshot": (
-                                shipment_line.product_class_name_snapshot
-                            ),
-                            "expected_quantity": str(shipment_line.quantity),
-                            "received_quantity": str(
-                                receipt_by_line_id[shipment_line.id].received_quantity
-                            ),
-                            "variance_reason": receipt_by_line_id[shipment_line.id].variance_reason,
-                            "notes": receipt_by_line_id[shipment_line.id].notes,
-                        }
-                        for shipment_line in shipment_lines
-                    ],
-                },
-                headers={"request_id": resolved_request_id},
-            )
-            session.commit()
-        except IntegrityError as error:
-            session.rollback()
-            raise TransferValidationError(
-                "Transfer receipt invariants were violated by a concurrent request."
-            ) from error
-
-        shipment_view = self._operations_query.get_operation_document(
-            session,
-            document_id=shipment.id,
-        )
-        receipt_view = self._operations_query.get_operation_document(
-            session,
-            document_id=receipt.id,
-        )
-        return _build_transfer_detail_response(
-            shipment=shipment_view,
-            receipt=receipt_view,
+                        "variance_reason": receipt_by_line_id[shipment_line.id].variance_reason,
+                        "notes": receipt_by_line_id[shipment_line.id].notes,
+                    }
+                    for shipment_line in shipment_lines
+                    if shipment_line.id in receipt_by_line_id
+                ],
+            },
+            headers={"request_id": resolved_request_id, **command_trace(session)},
         )
 
-
-def _build_transfer_detail_response(
-    *,
-    shipment: OperationDocumentView,
-    receipt: OperationDocumentView | None,
-) -> TransferDetailResponse:
-    return TransferDetailResponse(
-        shipment=shipment,
-        shipment_summary=_build_transfer_document_summary(shipment),
-        receipt=receipt,
-        receipt_summary=(
-            _build_transfer_document_summary(receipt) if receipt is not None else None
-        ),
-    )
+        return command_snapshot(session, shipment, receipt_id=receipt.id)
 
 
 def _build_transfer_document_summary(

@@ -1,4 +1,6 @@
 import { Link, Outlet, useRouterState } from "@tanstack/react-router";
+import { AdminPhysicalRecoveryPanel } from "../physical-commands/physical-recovery-panel";
+import { AdminTransferRecoveryPanel } from "../transfers/transfer-recovery-panel";
 import { useEffect, useState } from "react";
 
 import { logoutSession } from "../../auth/session-api";
@@ -296,6 +298,8 @@ export function AdminLayout() {
         </aside>
 
         <main className="min-h-0 min-w-0 lg:overflow-hidden">
+          <AdminPhysicalRecoveryPanel />
+          <AdminTransferRecoveryPanel />
           {canOpenRoute ? <Outlet /> : <AdminAccessDenied />}
         </main>
       </div>

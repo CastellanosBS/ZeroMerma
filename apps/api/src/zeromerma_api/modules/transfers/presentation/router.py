@@ -1,10 +1,12 @@
 from __future__ import annotations
 
+from dataclasses import replace
 from datetime import UTC, datetime
 from typing import Annotated
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response, status
+from fastapi import Path as ApiPath
 from sqlalchemy.orm import Session
 
 from zeromerma_api.db.session import get_session
@@ -16,6 +18,14 @@ from zeromerma_api.modules.branches.domain.exceptions import (
     WorkstationNotFoundError,
 )
 from zeromerma_api.modules.catalog.domain.exceptions import CatalogError, ProductNotFoundError
+from zeromerma_api.modules.idempotency.application.canonicalization import (
+    IDEMPOTENCY_KEY_PATTERN,
+    parse_idempotency_key,
+)
+from zeromerma_api.modules.idempotency.presentation.http import (
+    idempotency_response,
+    require_idempotency_key,
+)
 from zeromerma_api.modules.identity.application.schemas import AuthenticatedUser
 from zeromerma_api.modules.identity.application.services import user_can_access_surface
 from zeromerma_api.modules.identity.domain.constants import IDENTITY_SURFACE_BACKOFFICE
@@ -34,8 +44,12 @@ from zeromerma_api.modules.transfers.application.admin_schemas import (
     AdminTransferUpdateRequest,
 )
 from zeromerma_api.modules.transfers.application.admin_services import AdminTransferService
+from zeromerma_api.modules.transfers.application.idempotency import TransferCommandServiceWrapper
 from zeromerma_api.modules.transfers.application.schemas import (
     PendingInboundTransfersResponse,
+    PosTransferCommandCode,
+    TransferCommandCode,
+    TransferCommandResultView,
     TransferDetailResponse,
     TransferDispatchCommitRequest,
     TransferDispatchHistoryResponse,
@@ -43,7 +57,6 @@ from zeromerma_api.modules.transfers.application.schemas import (
     TransferReceiveRequest,
 )
 from zeromerma_api.modules.transfers.application.services import (
-    TransferCommandService,
     TransferQueryService,
 )
 from zeromerma_api.modules.transfers.domain.exceptions import (
@@ -52,6 +65,11 @@ from zeromerma_api.modules.transfers.domain.exceptions import (
     TransferNotFoundError,
     TransferValidationError,
 )
+from zeromerma_api.presentation.errors import error_responses
+
+_REPLAY_RESPONSE = {
+    "headers": {"Idempotency-Replayed": {"$ref": "#/components/headers/IdempotencyReplayed"}}
+}
 
 router = APIRouter(prefix="/v1/transfers", tags=["transfers"])
 admin_router = APIRouter(prefix="/v1/admin/transfers", tags=["admin-transfers"])
@@ -170,112 +188,154 @@ def get_admin_transfer_detail(
         raise _to_http_exception(error) from error
 
 
-@admin_router.post("", response_model=AdminTransferDetailView, status_code=status.HTTP_201_CREATED)
+@admin_router.post(
+    "",
+    response_model=TransferCommandResultView,
+    responses={201: _REPLAY_RESPONSE, 409: {**error_responses()[409], **_REPLAY_RESPONSE}},
+    status_code=status.HTTP_201_CREATED,
+)
 def create_admin_transfer(
     payload: AdminTransferCreateRequest,
     request: Request,
     current_user: Annotated[AuthenticatedUser, Depends(get_current_user)],
     session: Annotated[Session, Depends(get_session)],
-) -> AdminTransferDetailView:
+    key: Annotated[UUID, Depends(require_idempotency_key)],
+) -> Response:
     _require_backoffice_user(current_user)
     try:
-        return AdminTransferService().create_transfer(
+        result = TransferCommandServiceWrapper().execute_admin(
             session,
             current_user=current_user,
+            key=key,
+            command_code="create",
             command=payload,
             request_id=request.headers.get("X-Request-ID"),
         )
+        return idempotency_response(result, request)
     except TransferError as error:
         raise _to_http_exception(error) from error
 
 
-@admin_router.patch("/{transfer_id}", response_model=AdminTransferDetailView)
+@admin_router.patch(
+    "/{transfer_id}",
+    response_model=TransferCommandResultView,
+    responses={200: _REPLAY_RESPONSE, 409: {**error_responses()[409], **_REPLAY_RESPONSE}},
+)
 def update_admin_transfer(
     transfer_id: UUID,
     payload: AdminTransferUpdateRequest,
     request: Request,
     current_user: Annotated[AuthenticatedUser, Depends(get_current_user)],
     session: Annotated[Session, Depends(get_session)],
-) -> AdminTransferDetailView:
+    key: Annotated[UUID, Depends(require_idempotency_key)],
+) -> Response:
     _require_backoffice_user(current_user)
     try:
-        return AdminTransferService().update_transfer(
+        result = TransferCommandServiceWrapper().execute_admin(
             session,
             current_user=current_user,
+            key=key,
+            command_code="update",
             transfer_id=transfer_id,
             command=payload,
             request_id=request.headers.get("X-Request-ID"),
         )
+        return idempotency_response(result, request)
     except TransferError as error:
         raise _to_http_exception(error) from error
 
 
-@admin_router.post("/{transfer_id}/dispatch", response_model=AdminTransferDetailView)
+@admin_router.post(
+    "/{transfer_id}/dispatch",
+    response_model=TransferCommandResultView,
+    responses={200: _REPLAY_RESPONSE, 409: {**error_responses()[409], **_REPLAY_RESPONSE}},
+)
 def dispatch_admin_transfer(
     transfer_id: UUID,
     payload: AdminTransferDispatchRequest,
     request: Request,
     current_user: Annotated[AuthenticatedUser, Depends(get_current_user)],
     session: Annotated[Session, Depends(get_session)],
-) -> AdminTransferDetailView:
+    key: Annotated[UUID, Depends(require_idempotency_key)],
+) -> Response:
     _require_backoffice_user(current_user)
     try:
-        return AdminTransferService().dispatch_transfer(
+        result = TransferCommandServiceWrapper().execute_admin(
             session,
             current_user=current_user,
+            key=key,
+            command_code="dispatch",
             transfer_id=transfer_id,
             command=payload,
             request_id=request.headers.get("X-Request-ID"),
         )
+        return idempotency_response(result, request)
     except TransferError as error:
         raise _to_http_exception(error) from error
 
 
-@admin_router.post("/{transfer_id}/receive", response_model=AdminTransferDetailView)
+@admin_router.post(
+    "/{transfer_id}/receive",
+    response_model=TransferCommandResultView,
+    responses={200: _REPLAY_RESPONSE, 409: {**error_responses()[409], **_REPLAY_RESPONSE}},
+)
 def receive_admin_transfer(
     transfer_id: UUID,
     payload: AdminTransferReceiveRequest,
     request: Request,
     current_user: Annotated[AuthenticatedUser, Depends(get_current_user)],
     session: Annotated[Session, Depends(get_session)],
-) -> AdminTransferDetailView:
+    key: Annotated[UUID, Depends(require_idempotency_key)],
+) -> Response:
     _require_backoffice_user(current_user)
     try:
-        return AdminTransferService().receive_transfer(
+        result = TransferCommandServiceWrapper().execute_admin(
             session,
             current_user=current_user,
+            key=key,
+            command_code="receive",
             transfer_id=transfer_id,
             command=payload,
             request_id=request.headers.get("X-Request-ID"),
         )
+        return idempotency_response(result, request)
     except TransferError as error:
         raise _to_http_exception(error) from error
 
 
-@admin_router.post("/{transfer_id}/cancel", response_model=AdminTransferDetailView)
+@admin_router.post(
+    "/{transfer_id}/cancel",
+    response_model=TransferCommandResultView,
+    responses={200: _REPLAY_RESPONSE, 409: {**error_responses()[409], **_REPLAY_RESPONSE}},
+)
 def cancel_admin_transfer(
     transfer_id: UUID,
     payload: AdminTransferCancelRequest,
     request: Request,
     current_user: Annotated[AuthenticatedUser, Depends(get_current_user)],
     session: Annotated[Session, Depends(get_session)],
-) -> AdminTransferDetailView:
+    key: Annotated[UUID, Depends(require_idempotency_key)],
+) -> Response:
     _require_backoffice_user(current_user)
     try:
-        return AdminTransferService().cancel_transfer(
+        result = TransferCommandServiceWrapper().execute_admin(
             session,
             current_user=current_user,
+            key=key,
+            command_code="cancel",
             transfer_id=transfer_id,
             command=payload,
             request_id=request.headers.get("X-Request-ID"),
         )
+        return idempotency_response(result, request)
     except TransferError as error:
         raise _to_http_exception(error) from error
 
 
 @router.post(
     "/dispatch/commit",
-    response_model=TransferDetailResponse,
+    response_model=TransferCommandResultView,
+    responses={201: _REPLAY_RESPONSE, 409: {**error_responses()[409], **_REPLAY_RESPONSE}},
     status_code=status.HTTP_201_CREATED,
 )
 def commit_transfer_dispatch(
@@ -283,14 +343,18 @@ def commit_transfer_dispatch(
     request: Request,
     current_user: Annotated[AuthenticatedUser, Depends(get_current_user)],
     session: Annotated[Session, Depends(get_session)],
-) -> TransferDetailResponse:
+    key: Annotated[UUID, Depends(require_idempotency_key)],
+) -> Response:
     try:
-        return TransferCommandService().commit_dispatch(
+        result = TransferCommandServiceWrapper().execute_pos(
             session,
             current_user=current_user,
+            key=key,
+            command_code="dispatch",
             command=payload,
             request_id=request.headers.get("X-Request-ID"),
         )
+        return idempotency_response(result, request)
     except (BranchAccessError, CatalogError, OperationError, TransferError) as error:
         raise _to_http_exception(error) from error
 
@@ -375,23 +439,81 @@ def get_transfer_detail(
         raise _to_http_exception(error) from error
 
 
-@router.post("/{transfer_id}/receive", response_model=TransferDetailResponse)
+@router.post(
+    "/{transfer_id}/receive",
+    response_model=TransferCommandResultView,
+    responses={200: _REPLAY_RESPONSE, 409: {**error_responses()[409], **_REPLAY_RESPONSE}},
+)
 def receive_transfer(
     transfer_id: UUID,
     payload: TransferReceiveRequest,
     request: Request,
     current_user: Annotated[AuthenticatedUser, Depends(get_current_user)],
     session: Annotated[Session, Depends(get_session)],
-) -> TransferDetailResponse:
+    key: Annotated[UUID, Depends(require_idempotency_key)],
+) -> Response:
     try:
-        return TransferCommandService().receive_transfer(
+        result = TransferCommandServiceWrapper().execute_pos(
             session,
             current_user=current_user,
-            workstation_code=payload.workstation_code,
+            key=key,
+            command_code="receive",
             transfer_id=transfer_id,
             command=payload,
             request_id=request.headers.get("X-Request-ID"),
         )
+        return idempotency_response(result, request)
     except (BranchAccessError, CatalogError, OperationError, TransferError) as error:
         raise _to_http_exception(error) from error
 
+
+@router.get(
+    "/commands/{command_code}/confirmations/{idempotency_key}",
+    response_model=TransferCommandResultView,
+    responses={200: _REPLAY_RESPONSE, 409: {**error_responses()[409], **_REPLAY_RESPONSE}},
+)
+def recover_pos_transfer(
+    command_code: PosTransferCommandCode,
+    idempotency_key: Annotated[str, ApiPath(pattern=IDEMPOTENCY_KEY_PATTERN)],
+    workstation_code: Annotated[str, Query(min_length=1)],
+    cash_session_id: UUID,
+    request: Request,
+    current_user: Annotated[AuthenticatedUser, Depends(get_current_user)],
+    session: Annotated[Session, Depends(get_session)],
+) -> Response:
+    result = TransferCommandServiceWrapper().recover_pos(
+        session,
+        current_user=current_user,
+        command_code=command_code,
+        key=parse_idempotency_key(idempotency_key),
+        workstation_code=workstation_code,
+        cash_session_id=cash_session_id,
+    )
+    return idempotency_response(
+        replace(result, status_code=200) if result.status_code < 300 else result, request
+    )
+
+
+@admin_router.get(
+    "/commands/{command_code}/confirmations/{idempotency_key}",
+    response_model=TransferCommandResultView,
+    responses={200: _REPLAY_RESPONSE, 409: {**error_responses()[409], **_REPLAY_RESPONSE}},
+)
+def recover_admin_transfer(
+    command_code: TransferCommandCode,
+    idempotency_key: Annotated[str, ApiPath(pattern=IDEMPOTENCY_KEY_PATTERN)],
+    branch_id: UUID,
+    request: Request,
+    current_user: Annotated[AuthenticatedUser, Depends(get_current_user)],
+    session: Annotated[Session, Depends(get_session)],
+) -> Response:
+    result = TransferCommandServiceWrapper().recover_admin(
+        session,
+        current_user=current_user,
+        command_code=command_code,
+        key=parse_idempotency_key(idempotency_key),
+        branch_id=branch_id,
+    )
+    return idempotency_response(
+        replace(result, status_code=200) if result.status_code < 300 else result, request
+    )

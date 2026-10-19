@@ -17,7 +17,6 @@ from zeromerma_api.bootstrap.seed_local import (
     SEED_PRODUCT_CLASS_BOLILLO_CODE,
     SEED_PRODUCT_CLASS_PAN_DULCE_CODE,
     SEED_PRODUCT_CONCHA_VAN_CODE,
-    SEED_USER_EMAIL,
     SEED_USER_PASSWORD,
     SEED_WORKSTATION_CODE,
 )
@@ -25,6 +24,7 @@ from zeromerma_api.db.access_scope import bind_authorization_scope
 from zeromerma_api.db.session import SessionLocal
 from zeromerma_api.modules.audit.infrastructure.models import AuditLog
 from zeromerma_api.modules.branches.infrastructure.models import Branch, Workstation
+from zeromerma_api.modules.cash.infrastructure.models import CashSession
 from zeromerma_api.modules.catalog.infrastructure.models import Product, ProductClass
 from zeromerma_api.modules.identity.application.session_services import SessionService
 from zeromerma_api.modules.operations.infrastructure.models import (
@@ -35,12 +35,13 @@ from zeromerma_api.modules.operations.infrastructure.models import (
 from zeromerma_api.modules.outbox.infrastructure.models import OutboxEvent
 from zeromerma_api.testing.idempotency import new_idempotency_key
 from zeromerma_api.testing.sessions import login_headers
+from zeromerma_api.testing.transfer_operators import transfer_cashier_email
 
 
 def _login(client: TestClient, workstation_code: str = SEED_WORKSTATION_CODE) -> dict[str, str]:
     return login_headers(
         client,
-        email=SEED_USER_EMAIL,
+        email=transfer_cashier_email(workstation_code),
         password=SEED_USER_PASSWORD,
         audience="POS",
         workstation_code=workstation_code,
@@ -66,6 +67,28 @@ def _open_cash_session(client: TestClient, workstation_code: str = SEED_WORKSTAT
         },
     )
     assert response.status_code == 201
+
+
+def _cash_id(workstation_code: str) -> str:
+    with SessionLocal() as session:
+        cash = session.scalars(
+            select(CashSession)
+            .join(Workstation, Workstation.id == CashSession.workstation_id)
+            .where(Workstation.code == workstation_code, CashSession.status == "OPEN")
+        ).one()
+        return str(cash.id)
+
+
+def _command_detail(client: TestClient, response: object, workstation: str, kind: str) -> dict:
+    document_id = response.json()["id"]
+    prefix = "transfers" if kind == "transfer" else "operations"
+    detail = client.get(
+        f"/v1/{prefix}/{document_id}",
+        headers=_authorization_header(client, workstation),
+        params={"workstation_code": workstation},
+    )
+    assert detail.status_code == 200, detail.text
+    return detail.json()
 
 
 def _get_product_id(code: str) -> str:
@@ -152,13 +175,19 @@ def test_operations_catalog_and_class_products_resolve_exact_products(
 
 
 def test_counter_transfer_commit_writes_document_audit_and_outbox(client: TestClient) -> None:
+    _open_cash_session(client, SEED_WORKSTATION_CODE)
+
     response = client.post(
         "/v1/operations/counter-transfer/commit",
         headers={
-            **_authorization_header(client),
-            "X-Request-ID": "phase-3a-counter-transfer",
+            **{
+                **_authorization_header(client),
+                "X-Request-ID": "phase-3a-counter-transfer",
+            },
+            "Idempotency-Key": new_idempotency_key(),
         },
         json={
+            "cash_session_id": _cash_id(SEED_WORKSTATION_CODE),
             "workstation_code": SEED_WORKSTATION_CODE,
             "lines": [
                 {
@@ -171,7 +200,7 @@ def test_counter_transfer_commit_writes_document_audit_and_outbox(client: TestCl
     )
 
     assert response.status_code == 201
-    payload = response.json()
+    payload = _command_detail(client, response, SEED_WORKSTATION_CODE, "operation")
     assert payload["document_type"] == "COUNTER_TRANSFER"
     assert payload["status"] == "COMMITTED"
     assert payload["source_bucket_code"] == "BACKROOM"
@@ -199,8 +228,9 @@ def test_counter_transfer_detail_and_history_return_folio_and_filters(
 
     commit_response = client.post(
         "/v1/operations/counter-transfer/commit",
-        headers=_authorization_header(client),
+        headers={**_authorization_header(client), "Idempotency-Key": new_idempotency_key()},
         json={
+            "cash_session_id": _cash_id(SEED_WORKSTATION_CODE),
             "workstation_code": SEED_WORKSTATION_CODE,
             "lines": [
                 {
@@ -211,7 +241,7 @@ def test_counter_transfer_detail_and_history_return_folio_and_filters(
         },
     )
     assert commit_response.status_code == 201
-    document = commit_response.json()
+    document = _command_detail(client, commit_response, SEED_WORKSTATION_CODE, "operation")
 
     detail_response = client.get(
         f"/v1/operations/{document['id']}",
@@ -279,13 +309,19 @@ def test_counter_transfer_detail_and_history_return_folio_and_filters(
 def test_waste_commit_requires_exact_product_and_reason_and_writes_audit_and_outbox(
     client: TestClient,
 ) -> None:
+    _open_cash_session(client, SEED_WORKSTATION_CODE)
+
     response = client.post(
         "/v1/operations/waste/commit",
         headers={
-            **_authorization_header(client),
-            "X-Request-ID": "phase-3a-waste",
+            **{
+                **_authorization_header(client),
+                "X-Request-ID": "phase-3a-waste",
+            },
+            "Idempotency-Key": new_idempotency_key(),
         },
         json={
+            "cash_session_id": _cash_id(SEED_WORKSTATION_CODE),
             "workstation_code": SEED_WORKSTATION_CODE,
             "source_bucket_code": "COUNTER",
             "reason_code": "DAMAGED",
@@ -301,7 +337,7 @@ def test_waste_commit_requires_exact_product_and_reason_and_writes_audit_and_out
     )
 
     assert response.status_code == 201
-    payload = response.json()
+    payload = _command_detail(client, response, SEED_WORKSTATION_CODE, "operation")
     assert payload["document_type"] == "WASTE_RECORD"
     assert payload["status"] == "COMMITTED"
     assert payload["source_bucket_code"] == "COUNTER"
@@ -327,10 +363,13 @@ def test_waste_commit_requires_exact_product_and_reason_and_writes_audit_and_out
 def test_waste_commit_requires_operational_notes_for_sensitive_reasons(
     client: TestClient,
 ) -> None:
+    _open_cash_session(client, SEED_WORKSTATION_CODE)
+
     response = client.post(
         "/v1/operations/waste/commit",
-        headers=_authorization_header(client),
+        headers={**_authorization_header(client), "Idempotency-Key": new_idempotency_key()},
         json={
+            "cash_session_id": _cash_id(SEED_WORKSTATION_CODE),
             "workstation_code": SEED_WORKSTATION_CODE,
             "source_bucket_code": "COUNTER",
             "reason_code": "DAMAGED",
@@ -351,10 +390,13 @@ def test_waste_commit_requires_operational_notes_for_sensitive_reasons(
 def test_high_impact_waste_requires_acknowledgement_and_emits_alert_outbox(
     client: TestClient,
 ) -> None:
+    _open_cash_session(client, SEED_WORKSTATION_CODE)
+
     missing_ack_response = client.post(
         "/v1/operations/waste/commit",
-        headers=_authorization_header(client),
+        headers={**_authorization_header(client), "Idempotency-Key": new_idempotency_key()},
         json={
+            "cash_session_id": _cash_id(SEED_WORKSTATION_CODE),
             "workstation_code": SEED_WORKSTATION_CODE,
             "source_bucket_code": "COUNTER",
             "reason_code": "OLD_COUNTER",
@@ -378,10 +420,14 @@ def test_high_impact_waste_requires_acknowledgement_and_emits_alert_outbox(
     response = client.post(
         "/v1/operations/waste/commit",
         headers={
-            **_authorization_header(client),
-            "X-Request-ID": "phase-3a-waste-high-impact",
+            **{
+                **_authorization_header(client),
+                "X-Request-ID": "phase-3a-waste-high-impact",
+            },
+            "Idempotency-Key": new_idempotency_key(),
         },
         json={
+            "cash_session_id": _cash_id(SEED_WORKSTATION_CODE),
             "workstation_code": SEED_WORKSTATION_CODE,
             "source_bucket_code": "COUNTER",
             "reason_code": "OLD_COUNTER",
@@ -397,7 +443,7 @@ def test_high_impact_waste_requires_acknowledgement_and_emits_alert_outbox(
     )
 
     assert response.status_code == 201
-    payload = response.json()
+    payload = _command_detail(client, response, SEED_WORKSTATION_CODE, "operation")
 
     with SessionLocal() as session:
         audit_records = (
@@ -436,8 +482,9 @@ def test_waste_history_returns_reason_and_product_filters(client: TestClient) ->
 
     commit_response = client.post(
         "/v1/operations/waste/commit",
-        headers=_authorization_header(client),
+        headers={**_authorization_header(client), "Idempotency-Key": new_idempotency_key()},
         json={
+            "cash_session_id": _cash_id(SEED_WORKSTATION_CODE),
             "workstation_code": SEED_WORKSTATION_CODE,
             "source_bucket_code": "COUNTER",
             "reason_code": "DAMAGED",
@@ -451,7 +498,7 @@ def test_waste_history_returns_reason_and_product_filters(client: TestClient) ->
         },
     )
     assert commit_response.status_code == 201
-    waste_document = commit_response.json()
+    waste_document = _command_detail(client, commit_response, SEED_WORKSTATION_CODE, "operation")
 
     history_response = client.get(
         "/v1/operations/history",
@@ -485,14 +532,18 @@ def test_waste_history_returns_reason_and_product_filters(client: TestClient) ->
 
 
 def test_transfer_dispatch_pending_detail_and_receive_work_end_to_end(client: TestClient) -> None:
+    _open_cash_session(client, SEED_DESTINATION_WORKSTATION_CODE)
+    _open_cash_session(client, SEED_WORKSTATION_CODE)
+
     headers = {
         **_authorization_header(client),
         "X-Request-ID": "phase-3a-transfer-dispatch",
     }
     dispatch_response = client.post(
         "/v1/transfers/dispatch/commit",
-        headers=headers,
+        headers={**headers, "Idempotency-Key": new_idempotency_key()},
         json={
+            "cash_session_id": _cash_id(SEED_WORKSTATION_CODE),
             "workstation_code": SEED_WORKSTATION_CODE,
             "destination_branch_id": _get_branch_id(SEED_DESTINATION_BRANCH_CODE),
             "lines": [
@@ -510,7 +561,9 @@ def test_transfer_dispatch_pending_detail_and_receive_work_end_to_end(client: Te
     )
 
     assert dispatch_response.status_code == 201
-    shipment = dispatch_response.json()["shipment"]
+    shipment = _command_detail(client, dispatch_response, SEED_WORKSTATION_CODE, "transfer")[
+        "shipment"
+    ]
     assert shipment["document_type"] == "BRANCH_TRANSFER_SHIPMENT"
     assert shipment["status"] == "IN_TRANSIT"
     assert shipment["destination_branch_code"] == SEED_DESTINATION_BRANCH_CODE
@@ -544,16 +597,20 @@ def test_transfer_dispatch_pending_detail_and_receive_work_end_to_end(client: Te
         str(detail_payload["shipment_summary"]["quantity_summary"]["expected_total_quantity"])
     ) == Decimal("8.000")
     assert detail_payload["shipment_summary"]["quantity_summary"]["has_variance"] is False
-    assert detail_payload["receipt"] is None
-    assert detail_payload["receipt_summary"] is None
+    assert detail_payload["receipts"] == []
+    assert detail_payload["receipt_summaries"] == []
 
     receive_response = client.post(
         f"/v1/transfers/{shipment['id']}/receive",
         headers={
-            **_authorization_header(client, SEED_DESTINATION_WORKSTATION_CODE),
-            "X-Request-ID": "phase-3a-transfer-receive",
+            **{
+                **_authorization_header(client, SEED_DESTINATION_WORKSTATION_CODE),
+                "X-Request-ID": "phase-3a-transfer-receive",
+            },
+            "Idempotency-Key": new_idempotency_key(),
         },
         json={
+            "cash_session_id": _cash_id(SEED_DESTINATION_WORKSTATION_CODE),
             "workstation_code": SEED_DESTINATION_WORKSTATION_CODE,
             "lines": [
                 {
@@ -571,20 +628,22 @@ def test_transfer_dispatch_pending_detail_and_receive_work_end_to_end(client: Te
         },
     )
     assert receive_response.status_code == 200
-    receive_payload = receive_response.json()
-    assert receive_payload["shipment"]["status"] == "RECEIVED"
-    assert receive_payload["receipt"]["document_type"] == "BRANCH_TRANSFER_RECEIPT"
-    assert receive_payload["receipt"]["status"] == "RECEIVED"
-    assert receive_payload["receipt"]["reference_document_id"] == shipment["id"]
-    assert receive_payload["shipment_summary"]["quantity_summary"]["has_variance"] is False
-    assert receive_payload["receipt_summary"]["folio"].startswith("REC-")
-    assert receive_payload["receipt_summary"]["linked_shipment_id"] == shipment["id"]
-    assert receive_payload["receipt_summary"]["quantity_summary"]["has_variance"] is False
-    assert Decimal(str(receive_payload["receipt"]["lines"][0]["received_quantity"])) == Decimal(
-        "6.000"
+    receive_payload = _command_detail(
+        client, receive_response, SEED_DESTINATION_WORKSTATION_CODE, "transfer"
     )
+    assert receive_payload["shipment"]["status"] == "RECEIVED"
+    assert receive_payload["receipts"][-1]["document_type"] == "BRANCH_TRANSFER_RECEIPT"
+    assert receive_payload["receipts"][-1]["status"] == "RECEIVED"
+    assert receive_payload["receipts"][-1]["reference_document_id"] == shipment["id"]
+    assert receive_payload["shipment_summary"]["quantity_summary"]["has_variance"] is False
+    assert receive_payload["receipt_summaries"][-1]["folio"].startswith("REC-")
+    assert receive_payload["receipt_summaries"][-1]["linked_shipment_id"] == shipment["id"]
+    assert receive_payload["receipt_summaries"][-1]["quantity_summary"]["has_variance"] is False
     assert Decimal(
-        str(receive_payload["receipt_summary"]["quantity_summary"]["received_total_quantity"])
+        str(receive_payload["receipts"][-1]["lines"][0]["received_quantity"])
+    ) == Decimal("6.000")
+    assert Decimal(
+        str(receive_payload["receipt_summaries"][-1]["quantity_summary"]["received_total_quantity"])
     ) == Decimal("8.000")
 
     with SessionLocal() as session:
@@ -640,8 +699,9 @@ def test_transfer_dispatch_history_returns_folio_status_and_filters(client: Test
 
     dispatch_response = client.post(
         "/v1/transfers/dispatch/commit",
-        headers=_authorization_header(client),
+        headers={**_authorization_header(client), "Idempotency-Key": new_idempotency_key()},
         json={
+            "cash_session_id": _cash_id(SEED_WORKSTATION_CODE),
             "workstation_code": SEED_WORKSTATION_CODE,
             "destination_branch_id": _get_branch_id(SEED_DESTINATION_BRANCH_CODE),
             "lines": [
@@ -654,7 +714,9 @@ def test_transfer_dispatch_history_returns_folio_status_and_filters(client: Test
         },
     )
     assert dispatch_response.status_code == 201
-    shipment = dispatch_response.json()["shipment"]
+    shipment = _command_detail(client, dispatch_response, SEED_WORKSTATION_CODE, "transfer")[
+        "shipment"
+    ]
 
     history_response = client.get(
         "/v1/transfers/outbound/history",
@@ -678,12 +740,15 @@ def test_transfer_dispatch_history_returns_folio_status_and_filters(client: Test
 
 
 def test_transfer_inbound_history_returns_folio_status_and_filters(client: TestClient) -> None:
+    _open_cash_session(client, SEED_WORKSTATION_CODE)
+
     _open_cash_session(client, SEED_DESTINATION_WORKSTATION_CODE)
 
     dispatch_response = client.post(
         "/v1/transfers/dispatch/commit",
-        headers=_authorization_header(client),
+        headers={**_authorization_header(client), "Idempotency-Key": new_idempotency_key()},
         json={
+            "cash_session_id": _cash_id(SEED_WORKSTATION_CODE),
             "workstation_code": SEED_WORKSTATION_CODE,
             "destination_branch_id": _get_branch_id(SEED_DESTINATION_BRANCH_CODE),
             "lines": [
@@ -695,12 +760,18 @@ def test_transfer_inbound_history_returns_folio_status_and_filters(client: TestC
         },
     )
     assert dispatch_response.status_code == 201
-    shipment = dispatch_response.json()["shipment"]
+    shipment = _command_detail(client, dispatch_response, SEED_WORKSTATION_CODE, "transfer")[
+        "shipment"
+    ]
 
     receive_response = client.post(
         f"/v1/transfers/{shipment['id']}/receive",
-        headers=_authorization_header(client, SEED_DESTINATION_WORKSTATION_CODE),
+        headers={
+            **_authorization_header(client, SEED_DESTINATION_WORKSTATION_CODE),
+            "Idempotency-Key": new_idempotency_key(),
+        },
         json={
+            "cash_session_id": _cash_id(SEED_DESTINATION_WORKSTATION_CODE),
             "workstation_code": SEED_DESTINATION_WORKSTATION_CODE,
             "lines": [
                 {
@@ -712,7 +783,9 @@ def test_transfer_inbound_history_returns_folio_status_and_filters(client: TestC
         },
     )
     assert receive_response.status_code == 200
-    receipt = receive_response.json()["receipt"]
+    receipt = _command_detail(
+        client, receive_response, SEED_DESTINATION_WORKSTATION_CODE, "transfer"
+    )["receipts"][-1]
     history_response = client.get(
         "/v1/transfers/inbound/history",
         params={
@@ -739,10 +812,13 @@ def test_transfer_inbound_history_returns_folio_status_and_filters(client: TestC
 
 
 def test_transfer_dispatch_rejects_same_branch_destination(client: TestClient) -> None:
+    _open_cash_session(client, SEED_WORKSTATION_CODE)
+
     response = client.post(
         "/v1/transfers/dispatch/commit",
-        headers=_authorization_header(client),
+        headers={**_authorization_header(client), "Idempotency-Key": new_idempotency_key()},
         json={
+            "cash_session_id": _cash_id(SEED_WORKSTATION_CODE),
             "workstation_code": SEED_WORKSTATION_CODE,
             "destination_branch_id": _get_branch_id("MAIN"),
             "lines": [
@@ -759,10 +835,14 @@ def test_transfer_dispatch_rejects_same_branch_destination(client: TestClient) -
 
 
 def test_transfer_receive_rejects_already_received_transfer(client: TestClient) -> None:
+    _open_cash_session(client, SEED_DESTINATION_WORKSTATION_CODE)
+    _open_cash_session(client, SEED_WORKSTATION_CODE)
+
     dispatch_response = client.post(
         "/v1/transfers/dispatch/commit",
-        headers=_authorization_header(client),
+        headers={**_authorization_header(client), "Idempotency-Key": new_idempotency_key()},
         json={
+            "cash_session_id": _cash_id(SEED_WORKSTATION_CODE),
             "workstation_code": SEED_WORKSTATION_CODE,
             "destination_branch_id": _get_branch_id(SEED_DESTINATION_BRANCH_CODE),
             "lines": [
@@ -774,12 +854,18 @@ def test_transfer_receive_rejects_already_received_transfer(client: TestClient) 
         },
     )
     assert dispatch_response.status_code == 201
-    shipment = dispatch_response.json()["shipment"]
+    shipment = _command_detail(client, dispatch_response, SEED_WORKSTATION_CODE, "transfer")[
+        "shipment"
+    ]
 
     first_receive = client.post(
         f"/v1/transfers/{shipment['id']}/receive",
-        headers=_authorization_header(client, SEED_DESTINATION_WORKSTATION_CODE),
+        headers={
+            **_authorization_header(client, SEED_DESTINATION_WORKSTATION_CODE),
+            "Idempotency-Key": new_idempotency_key(),
+        },
         json={
+            "cash_session_id": _cash_id(SEED_DESTINATION_WORKSTATION_CODE),
             "workstation_code": SEED_DESTINATION_WORKSTATION_CODE,
             "lines": [
                 {
@@ -794,8 +880,12 @@ def test_transfer_receive_rejects_already_received_transfer(client: TestClient) 
 
     second_receive = client.post(
         f"/v1/transfers/{shipment['id']}/receive",
-        headers=_authorization_header(client, SEED_DESTINATION_WORKSTATION_CODE),
+        headers={
+            **_authorization_header(client, SEED_DESTINATION_WORKSTATION_CODE),
+            "Idempotency-Key": new_idempotency_key(),
+        },
         json={
+            "cash_session_id": _cash_id(SEED_DESTINATION_WORKSTATION_CODE),
             "workstation_code": SEED_DESTINATION_WORKSTATION_CODE,
             "lines": [
                 {
@@ -811,10 +901,14 @@ def test_transfer_receive_rejects_already_received_transfer(client: TestClient) 
 
 
 def test_transfer_receive_with_variance_marks_receipt_and_shipment(client: TestClient) -> None:
+    _open_cash_session(client, SEED_DESTINATION_WORKSTATION_CODE)
+    _open_cash_session(client, SEED_WORKSTATION_CODE)
+
     dispatch_response = client.post(
         "/v1/transfers/dispatch/commit",
-        headers=_authorization_header(client),
+        headers={**_authorization_header(client), "Idempotency-Key": new_idempotency_key()},
         json={
+            "cash_session_id": _cash_id(SEED_WORKSTATION_CODE),
             "workstation_code": SEED_WORKSTATION_CODE,
             "destination_branch_id": _get_branch_id(SEED_DESTINATION_BRANCH_CODE),
             "lines": [
@@ -831,15 +925,21 @@ def test_transfer_receive_with_variance_marks_receipt_and_shipment(client: TestC
         },
     )
     assert dispatch_response.status_code == 201
-    shipment = dispatch_response.json()["shipment"]
+    shipment = _command_detail(client, dispatch_response, SEED_WORKSTATION_CODE, "transfer")[
+        "shipment"
+    ]
 
     receive_response = client.post(
         f"/v1/transfers/{shipment['id']}/receive",
         headers={
-            **_authorization_header(client, SEED_DESTINATION_WORKSTATION_CODE),
-            "X-Request-ID": "phase-3c-transfer-variance",
+            **{
+                **_authorization_header(client, SEED_DESTINATION_WORKSTATION_CODE),
+                "X-Request-ID": "phase-3c-transfer-variance",
+            },
+            "Idempotency-Key": new_idempotency_key(),
         },
         json={
+            "cash_session_id": _cash_id(SEED_DESTINATION_WORKSTATION_CODE),
             "workstation_code": SEED_DESTINATION_WORKSTATION_CODE,
             "lines": [
                 {
@@ -859,17 +959,19 @@ def test_transfer_receive_with_variance_marks_receipt_and_shipment(client: TestC
     )
 
     assert receive_response.status_code == 200
-    payload = receive_response.json()
-    assert payload["shipment"]["status"] == "RECEIVED_WITH_VARIANCE"
-    assert payload["receipt"]["status"] == "RECEIVED_WITH_VARIANCE"
-    assert payload["receipt_summary"]["linked_shipment_id"] == shipment["id"]
-    assert payload["receipt_summary"]["quantity_summary"]["has_variance"] is True
-    assert payload["receipt_summary"]["quantity_summary"]["variance_line_count"] == 1
+    payload = _command_detail(
+        client, receive_response, SEED_DESTINATION_WORKSTATION_CODE, "transfer"
+    )
+    assert payload["shipment"]["status"] == "IN_TRANSIT"
+    assert payload["receipts"][-1]["status"] == "RECEIVED_WITH_VARIANCE"
+    assert payload["receipt_summaries"][-1]["linked_shipment_id"] == shipment["id"]
+    assert payload["receipt_summaries"][-1]["quantity_summary"]["has_variance"] is True
+    assert payload["receipt_summaries"][-1]["quantity_summary"]["variance_line_count"] == 1
     assert Decimal(
-        str(payload["receipt_summary"]["quantity_summary"]["expected_total_quantity"])
+        str(payload["receipt_summaries"][-1]["quantity_summary"]["expected_total_quantity"])
     ) == Decimal("6.000")
     assert Decimal(
-        str(payload["receipt_summary"]["quantity_summary"]["received_total_quantity"])
+        str(payload["receipt_summaries"][-1]["quantity_summary"]["received_total_quantity"])
     ) == Decimal("5.000")
 
     with SessionLocal() as session:
@@ -898,7 +1000,7 @@ def test_transfer_receive_with_variance_marks_receipt_and_shipment(client: TestC
             )
         ).scalar_one()
 
-    assert shipment_record.status == "RECEIVED_WITH_VARIANCE"
+    assert shipment_record.status == "IN_TRANSIT"
     assert receipt_record.status == "RECEIVED_WITH_VARIANCE"
     assert len(outbox_events) == 1
     assert audit_record.request_id == "phase-3c-transfer-variance"
@@ -907,10 +1009,14 @@ def test_transfer_receive_with_variance_marks_receipt_and_shipment(client: TestC
 def test_transfer_receive_requires_variance_reason_when_quantity_differs(
     client: TestClient,
 ) -> None:
+    _open_cash_session(client, SEED_DESTINATION_WORKSTATION_CODE)
+    _open_cash_session(client, SEED_WORKSTATION_CODE)
+
     dispatch_response = client.post(
         "/v1/transfers/dispatch/commit",
-        headers=_authorization_header(client),
+        headers={**_authorization_header(client), "Idempotency-Key": new_idempotency_key()},
         json={
+            "cash_session_id": _cash_id(SEED_WORKSTATION_CODE),
             "workstation_code": SEED_WORKSTATION_CODE,
             "destination_branch_id": _get_branch_id(SEED_DESTINATION_BRANCH_CODE),
             "lines": [
@@ -922,12 +1028,18 @@ def test_transfer_receive_requires_variance_reason_when_quantity_differs(
         },
     )
     assert dispatch_response.status_code == 201
-    shipment = dispatch_response.json()["shipment"]
+    shipment = _command_detail(client, dispatch_response, SEED_WORKSTATION_CODE, "transfer")[
+        "shipment"
+    ]
 
     receive_response = client.post(
         f"/v1/transfers/{shipment['id']}/receive",
-        headers=_authorization_header(client, SEED_DESTINATION_WORKSTATION_CODE),
+        headers={
+            **_authorization_header(client, SEED_DESTINATION_WORKSTATION_CODE),
+            "Idempotency-Key": new_idempotency_key(),
+        },
         json={
+            "cash_session_id": _cash_id(SEED_DESTINATION_WORKSTATION_CODE),
             "workstation_code": SEED_DESTINATION_WORKSTATION_CODE,
             "lines": [
                 {
@@ -965,10 +1077,13 @@ def test_transfer_receive_requires_variance_reason_when_quantity_differs(
 def test_pos_transfer_receipt_cannot_bypass_workstation_binding(
     client: TestClient, scenario: str
 ) -> None:
+    _open_cash_session(client, SEED_WORKSTATION_CODE)
+
     dispatch = client.post(
         "/v1/transfers/dispatch/commit",
-        headers=_authorization_header(client),
+        headers={**_authorization_header(client), "Idempotency-Key": new_idempotency_key()},
         json={
+            "cash_session_id": _cash_id(SEED_WORKSTATION_CODE),
             "workstation_code": SEED_WORKSTATION_CODE,
             "destination_branch_id": _get_branch_id(SEED_DESTINATION_BRANCH_CODE),
             "lines": [
@@ -977,7 +1092,9 @@ def test_pos_transfer_receipt_cannot_bypass_workstation_binding(
         },
     )
     assert dispatch.status_code == 201
-    shipment_id = UUID(dispatch.json()["shipment"]["id"])
+    shipment_id = UUID(
+        _command_detail(client, dispatch, SEED_WORKSTATION_CODE, "transfer")["shipment"]["id"]
+    )
     destination_headers = _authorization_header(client, SEED_DESTINATION_WORKSTATION_CODE)
     foreign_branch_id = UUID(_get_branch_id(SEED_ALT_DESTINATION_BRANCH_CODE))
 

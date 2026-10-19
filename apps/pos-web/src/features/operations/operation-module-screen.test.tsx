@@ -1,3 +1,4 @@
+import { webcrypto } from "node:crypto";
 // @vitest-environment jsdom
 
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
@@ -8,10 +9,12 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { OperationModuleScreen } from "./operation-module-screen";
 import { commitCounterTransfer, commitWasteRecord } from "./operations-api";
 import type { OperationDocumentView } from "../../lib/api-contracts";
+import { operationIntentions } from "../operation-commands/operation-command-intent";
 import { KeyboardShortcutRegistry } from "../pos-shell/keyboard";
 
-(globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT =
-  true;
+(
+  globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }
+).IS_REACT_ACT_ENVIRONMENT = true;
 
 const refetchMock = vi.fn();
 const pushMessageMock = vi.fn();
@@ -352,13 +355,16 @@ function AppShellRightPanelProbe() {
 }
 
 vi.mock("../auth/auth-store", () => ({
-  usePosAuthStore: (selector: (state: { isAuthenticated: boolean }) => unknown) =>
-    selector({ isAuthenticated: true }),
+  usePosAuthStore: Object.assign(
+    (selector: (state: { isAuthenticated: boolean; user: { id: string } }) => unknown) =>
+      selector({ isAuthenticated: true, user: { id: "user-1" } }),
+    { subscribe: vi.fn(() => () => undefined) },
+  ),
 }));
 
 vi.mock("../cash-session-open/queries", () => ({
   useCurrentCashSessionQuery: () => ({
-    data: { user_id: "user-1" },
+    data: { id: "cash-session-1", user_id: "user-1" },
     error: null,
     isPending: false,
     refetch: refetchMock,
@@ -498,10 +504,7 @@ function changeInput(element: HTMLInputElement | null, value: string) {
   }
 
   act(() => {
-    const valueSetter = Object.getOwnPropertyDescriptor(
-      HTMLInputElement.prototype,
-      "value",
-    )?.set;
+    const valueSetter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")?.set;
     valueSetter?.call(element, value);
     element.dispatchEvent(new Event("input", { bubbles: true }));
     element.dispatchEvent(new Event("change", { bubbles: true }));
@@ -515,6 +518,7 @@ function renderUi(variant: "counterTransfer" | "waste" = "counterTransfer") {
       queries: { retry: false },
     },
   });
+  queryClients.push(queryClient);
   const container = document.createElement("div");
   document.body.appendChild(container);
 
@@ -550,6 +554,12 @@ async function flush() {
   });
 }
 
+async function waitForSuccess(message: string) {
+  await act(async () => {
+    await vi.waitFor(() => expect(showSuccessMock).toHaveBeenCalledWith(message));
+  });
+}
+
 async function addCounterTransferLine(container: HTMLElement) {
   const classButton = Array.from(container.querySelectorAll("button")).find((button) =>
     button.textContent?.includes("Pan dulce"),
@@ -569,8 +579,10 @@ async function addCounterTransferLine(container: HTMLElement) {
 }
 
 function findCounterTransferPrimaryButton(scope: ParentNode) {
-  return Array.from(scope.querySelectorAll("button")).find((button) =>
-    button.textContent?.includes("Transferir") || button.textContent?.includes("Confirmar traspaso"),
+  return Array.from(scope.querySelectorAll("button")).find(
+    (button) =>
+      button.textContent?.includes("Transferir") ||
+      button.textContent?.includes("Confirmar traspaso"),
   ) as HTMLButtonElement | undefined;
 }
 
@@ -640,8 +652,16 @@ async function addWasteLine(
 }
 
 let mountedRoots: Array<() => void> = [];
+let queryClients: QueryClient[] = [];
 
 beforeEach(() => {
+  operationIntentions.forgetBodies();
+  localStorage.clear();
+  vi.stubGlobal("crypto", webcrypto);
+  Object.defineProperty(navigator, "locks", {
+    configurable: true,
+    value: { request: vi.fn(async (_name, _options, callback) => callback({ name: "lock" })) },
+  });
   rightPanelContent = null;
   mockCounterAvailabilityData = {
     counter_class_availability: [
@@ -676,17 +696,50 @@ beforeEach(() => {
   showWarningMock.mockReset();
   vi.mocked(commitCounterTransfer).mockReset();
   vi.mocked(commitWasteRecord).mockReset();
-  vi.mocked(commitCounterTransfer).mockResolvedValue(counterTransferDocument);
-  vi.mocked(commitWasteRecord).mockResolvedValue(wasteDocument);
+  vi.mocked(commitCounterTransfer).mockResolvedValue({
+    ...counterTransferDocument,
+    branch_id: "branch-1",
+    cash_session_id: "cash-session-1",
+    inventory_movement_ids: [],
+    committed_at_utc: counterTransferDocument.committed_at_utc!,
+    lines: counterTransferDocument.lines.map((line) => ({
+      ...line,
+      unit_of_measure_code: line.unit_of_measure_code,
+    })),
+  });
+  vi.mocked(commitWasteRecord).mockResolvedValue({
+    ...wasteDocument,
+    branch_id: "branch-1",
+    cash_session_id: "cash-session-1",
+    inventory_movement_ids: [],
+    committed_at_utc: wasteDocument.committed_at_utc!,
+    lines: wasteDocument.lines.map((line) => ({
+      ...line,
+      unit_of_measure_code: line.unit_of_measure_code,
+    })),
+  });
 });
 
-afterEach(() => {
-  for (const unmount of mountedRoots) {
-    unmount();
+afterEach(async () => {
+  try {
+    await act(async () => {
+      await vi.waitFor(() => {
+        for (const queryClient of queryClients) {
+          expect(queryClient.isMutating()).toBe(0);
+        }
+      });
+    });
+  } finally {
+    for (const unmount of mountedRoots) {
+      unmount();
+    }
+    mountedRoots = [];
+    queryClients = [];
+    operationIntentions.forgetBodies();
+    document.body.innerHTML = "";
+    vi.restoreAllMocks();
+    vi.unstubAllGlobals();
   }
-  mountedRoots = [];
-  document.body.innerHTML = "";
-  vi.restoreAllMocks();
 });
 
 describe("OperationModuleScreen counter transfer", () => {
@@ -746,10 +799,19 @@ describe("OperationModuleScreen counter transfer", () => {
     click(confirmButton ?? null);
     await flush();
 
-    expect(commitCounterTransfer).toHaveBeenCalledWith({
-      lines: [{ product_id: "product-1", quantity: "2" }],
-      notes: null,
-      workstation_code: "POS-01",
+    await waitForSuccess("Traspaso registrado. Folio CTR-000001.");
+    await act(async () => {
+      await vi.waitFor(() =>
+        expect(commitCounterTransfer).toHaveBeenCalledWith(
+          {
+            cash_session_id: "cash-session-1",
+            lines: [{ product_id: "product-1", quantity: "2" }],
+            notes: null,
+            workstation_code: "POS-01",
+          },
+          expect.stringMatching(/^[0-9a-f-]{36}$/),
+        ),
+      );
     });
     expect(showSuccessMock).toHaveBeenCalledWith("Traspaso registrado. Folio CTR-000001.");
     expect(rightPanel?.textContent).toContain("Nuevo traspaso");
@@ -813,10 +875,19 @@ describe("OperationModuleScreen counter transfer", () => {
     click(confirmButton ?? null);
     await flush();
 
-    expect(commitCounterTransfer).toHaveBeenCalledWith({
-      lines: [{ product_id: "product-1", quantity: "5" }],
-      notes: null,
-      workstation_code: "POS-01",
+    await waitForSuccess("Traspaso registrado. Folio CTR-000001.");
+    await act(async () => {
+      await vi.waitFor(() =>
+        expect(commitCounterTransfer).toHaveBeenCalledWith(
+          {
+            cash_session_id: "cash-session-1",
+            lines: [{ product_id: "product-1", quantity: "5" }],
+            notes: null,
+            workstation_code: "POS-01",
+          },
+          expect.stringMatching(/^[0-9a-f-]{36}$/),
+        ),
+      );
     });
   });
 
@@ -848,7 +919,9 @@ describe("OperationModuleScreen counter transfer", () => {
     keydown(productButton, "Enter");
     await flush();
 
-    const quantityInput = view.container.querySelector<HTMLInputElement>('input[aria-label="Cantidad"]');
+    const quantityInput = view.container.querySelector<HTMLInputElement>(
+      'input[aria-label="Cantidad"]',
+    );
     expect(quantityInput).not.toBeNull();
     keydown(quantityInput, "Escape");
     await flush();
@@ -868,7 +941,7 @@ describe("OperationModuleScreen counter transfer", () => {
     await flush();
 
     keydown(window, "Enter", { ctrlKey: true });
-    await flush();
+    await waitForSuccess("Traspaso registrado. Folio CTR-000001.");
 
     expect(commitCounterTransfer).toHaveBeenCalledTimes(1);
     expect(showSuccessMock).toHaveBeenCalledWith("Traspaso registrado. Folio CTR-000001.");
@@ -918,6 +991,9 @@ describe("OperationModuleScreen counter transfer", () => {
     click(confirmButton ?? null);
     await flush();
 
+    await act(async () => {
+      await vi.waitFor(() => expect(showSuccessMock).toHaveBeenCalled());
+    });
     const availabilityTable = view.container.querySelector(
       '[aria-label="Clases y productos actualmente en mostrador"]',
     );
@@ -938,7 +1014,9 @@ describe("OperationModuleScreen waste", () => {
     expect(view.container.textContent).toContain("Origen pendiente");
     expect(view.container.textContent).toContain("Motivo pendiente");
     expect(view.container.textContent).toContain("Buscar producto o clase");
-    expect(view.container.textContent).toContain("Selecciona origen y motivo para capturar productos.");
+    expect(view.container.textContent).toContain(
+      "Selecciona origen y motivo para capturar productos.",
+    );
     expect(rightPanel?.textContent).toContain("Selecciona origen y motivo para continuar.");
     expect(rightPanel?.textContent).toContain("Agrega productos para construir el documento.");
 
@@ -1000,13 +1078,22 @@ describe("OperationModuleScreen waste", () => {
     await flush();
 
     expect(view.container.textContent).not.toContain("Confirmar merma");
-    expect(commitWasteRecord).toHaveBeenCalledWith({
-      high_impact_acknowledged: false,
-      lines: [{ product_id: "product-1", quantity: "2" }],
-      notes: null,
-      reason_code: "OLD_COUNTER",
-      source_bucket_code: "COUNTER",
-      workstation_code: "POS-01",
+    await waitForSuccess("Merma registrada. Folio WST-000001.");
+    await act(async () => {
+      await vi.waitFor(() =>
+        expect(commitWasteRecord).toHaveBeenCalledWith(
+          {
+            cash_session_id: "cash-session-1",
+            high_impact_acknowledged: false,
+            lines: [{ product_id: "product-1", quantity: "2" }],
+            notes: null,
+            reason_code: "OLD_COUNTER",
+            source_bucket_code: "COUNTER",
+            workstation_code: "POS-01",
+          },
+          expect.stringMatching(/^[0-9a-f-]{36}$/),
+        ),
+      );
     });
   });
 
@@ -1022,13 +1109,22 @@ describe("OperationModuleScreen waste", () => {
     click(registerButton ?? null);
     await flush();
 
-    expect(commitWasteRecord).toHaveBeenCalledWith({
-      high_impact_acknowledged: false,
-      lines: [{ product_id: "product-1", quantity: "2" }],
-      notes: null,
-      reason_code: "OLD_COUNTER",
-      source_bucket_code: "COUNTER",
-      workstation_code: "POS-01",
+    await waitForSuccess("Merma registrada. Folio WST-000001.");
+    await act(async () => {
+      await vi.waitFor(() =>
+        expect(commitWasteRecord).toHaveBeenCalledWith(
+          {
+            cash_session_id: "cash-session-1",
+            high_impact_acknowledged: false,
+            lines: [{ product_id: "product-1", quantity: "2" }],
+            notes: null,
+            reason_code: "OLD_COUNTER",
+            source_bucket_code: "COUNTER",
+            workstation_code: "POS-01",
+          },
+          expect.stringMatching(/^[0-9a-f-]{36}$/),
+        ),
+      );
     });
     expect(showSuccessMock).toHaveBeenCalledWith("Merma registrada. Folio WST-000001.");
     expect(rightPanel?.textContent).toContain("Ver historial");
@@ -1112,7 +1208,9 @@ describe("OperationModuleScreen waste", () => {
     keydown(productButton, "Enter");
     await flush();
 
-    const quantityInput = view.container.querySelector<HTMLInputElement>('input[aria-label="Cantidad"]');
+    const quantityInput = view.container.querySelector<HTMLInputElement>(
+      'input[aria-label="Cantidad"]',
+    );
     changeInput(quantityInput, "2");
     await flush();
     keydown(quantityInput, "Enter");
@@ -1166,9 +1264,12 @@ describe("OperationModuleScreen waste", () => {
     });
 
     const rightPanel = view.container.querySelector('[data-testid="right-panel-probe"]');
-    expect(rightPanel?.textContent).toContain("Confirma la merma de alto impacto antes de registrar.");
+    expect(rightPanel?.textContent).toContain(
+      "Confirma la merma de alto impacto antes de registrar.",
+    );
 
-    const acknowledgement = view.container.querySelector<HTMLInputElement>('input[type="checkbox"]');
+    const acknowledgement =
+      view.container.querySelector<HTMLInputElement>('input[type="checkbox"]');
     if (!acknowledgement) {
       throw new Error("Expected high-impact acknowledgement checkbox.");
     }
@@ -1184,13 +1285,22 @@ describe("OperationModuleScreen waste", () => {
     click(registerButton ?? null);
     await flush();
 
-    expect(commitWasteRecord).toHaveBeenCalledWith({
-      high_impact_acknowledged: true,
-      lines: [{ product_id: "product-1", quantity: "12" }],
-      notes: "Large high-impact waste batch.",
-      reason_code: "OLD_COUNTER",
-      source_bucket_code: "COUNTER",
-      workstation_code: "POS-01",
+    await waitForSuccess("Merma registrada. Folio WST-000001. Se preparo alerta para backoffice.");
+    await act(async () => {
+      await vi.waitFor(() =>
+        expect(commitWasteRecord).toHaveBeenCalledWith(
+          {
+            cash_session_id: "cash-session-1",
+            high_impact_acknowledged: true,
+            lines: [{ product_id: "product-1", quantity: "12" }],
+            notes: "Large high-impact waste batch.",
+            reason_code: "OLD_COUNTER",
+            source_bucket_code: "COUNTER",
+            workstation_code: "POS-01",
+          },
+          expect.stringMatching(/^[0-9a-f-]{36}$/),
+        ),
+      );
     });
     expect(showSuccessMock).toHaveBeenCalledWith(
       "Merma registrada. Folio WST-000001. Se preparo alerta para backoffice.",

@@ -1,3 +1,4 @@
+import { useBackofficeAuthStore } from "../../auth/backoffice-auth-store";
 import {
   ApiError,
   createCommandIntentionCoordinator,
@@ -48,4 +49,14 @@ export const adminOrderIntentions = createCommandIntentionCoordinator<
       });
     return result;
   },
+});
+
+useBackofficeAuthStore.subscribe((state, previous) => {
+  if (
+    state.generation !== previous.generation ||
+    state.user?.id !== previous.user?.id ||
+    state.session?.id !== previous.session?.id ||
+    state.user?.authorization_version !== previous.user?.authorization_version
+  )
+    adminOrderIntentions.forgetBodies();
 });
