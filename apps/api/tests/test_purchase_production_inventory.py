@@ -51,15 +51,23 @@ def _detail(client: TestClient, family: str, identity: str) -> dict[str, Any]:
 
 
 def _purchase(
-    client: TestClient, product_id: str, quantity: str, cost: str, **line_fields: Any
+    client: TestClient,
+    product_id: str,
+    quantity: str,
+    cost: str,
+    *,
+    supplier_id: str | None = None,
+    **line_fields: Any,
 ) -> Any:
-    supplier = _create_supplier(client)
+    if supplier_id is None:
+        supplier = _create_supplier(client)
+        supplier_id = str(supplier["overview"]["id"])
     return _post(
         client,
         "/v1/admin/purchases/direct-entry",
         {
             "branch_id": _get_branch_id(),
-            "supplier_id": supplier["overview"]["id"],
+            "supplier_id": supplier_id,
             "lines": [
                 {
                     "product_id": product_id,
@@ -575,12 +583,19 @@ def test_reserved_input_expiring_after_release_can_only_be_reconciled_as_explici
         product.lot_tracking_enabled = product.expiry_required = True
         session.commit()
     expiry = datetime.now(UTC).replace(microsecond=0) + timedelta(days=1)
+    supplier_id = str(_create_supplier(client)["overview"]["id"])
     for code, expires_at in (
         ("RESERVED-EARLY", expiry),
         ("FRESH-LATER", expiry + timedelta(days=7)),
     ):
         purchased = _purchase(
-            client, raw, "4", "2", lot_code=code, expires_at=expires_at.isoformat()
+            client,
+            raw,
+            "4",
+            "2",
+            supplier_id=supplier_id,
+            lot_code=code,
+            expires_at=expires_at.isoformat(),
         )
         assert purchased.status_code == 201, purchased.text
     plan = _released(client, product_id=raw)

@@ -160,6 +160,8 @@ def test_audited_missing_six_pesos_reconciles_to_527_in_pos_and_backoffice(
 ) -> None:
     headers, context = _setup(client)
     _, class_id = _baseline(context["cash_session_id"], SEED_PRODUCT_BOLILLO_STD_CODE, 7)
+    # All nine physical units must exist before the seven-unit class sale.
+    order = _create(client, headers, context)
     sale = _post(
         client,
         headers,
@@ -173,7 +175,6 @@ def test_audited_missing_six_pesos_reconciles_to_527_in_pos_and_backoffice(
         },
     )
     assert sale["total_amount"] == "21.00"
-    order = _create(client, headers, context)
     _post(client, headers, f"/v1/orders/{order['id']}/mark-ready", context)
     payment_body = {
         **context,
