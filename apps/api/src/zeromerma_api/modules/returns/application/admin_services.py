@@ -48,6 +48,7 @@ from zeromerma_api.modules.returns.domain.exceptions import (
     SaleReturnNotFoundError,
     SaleReturnValidationError,
 )
+from zeromerma_api.modules.returns.domain.folios import build_return_folio
 from zeromerma_api.modules.returns.infrastructure.models import (
     ReturnDispositionAllocation,
     SaleReturn,
@@ -239,7 +240,7 @@ class AdminReturnsService:
             ),
             overview=AdminReturnOverviewView(
                 id=type_cast(uuid.UUID, overview_row["id"]),
-                folio=_build_return_folio(type_cast(uuid.UUID, overview_row["id"])),
+                folio=build_return_folio(type_cast(uuid.UUID, overview_row["id"])),
                 status=type_cast(str, overview_row["status"]),
                 created_at=type_cast(datetime, overview_row["created_at_utc"]),
                 branch_id=type_cast(uuid.UUID, overview_row["branch_id"]),
@@ -427,8 +428,8 @@ def _build_return_conditions(
         conditions.append(SaleReturn.status == normalized_status)
     normalized_search = _normalize_search(search)
     if normalized_search:
-        sale_id_query = normalized_search.removeprefix("tck-")
-        return_id_query = normalized_search.removeprefix("dev-")
+        sale_id_query = normalized_search.removeprefix("tck-").replace("-", "")
+        return_id_query = normalized_search.removeprefix("dev-").replace("-", "")
         line_match = exists(
             select(SaleReturnLine.id)
             .join(
@@ -449,10 +450,12 @@ def _build_return_conditions(
         )
         conditions.append(
             or_(
-                func.lower(cast(SaleReturn.id, String)).like(f"{return_id_query}%"),
-                func.lower(cast(SaleReturn.id, String)).contains(return_id_query),
-                func.lower(cast(SaleReturn.original_sale_id, String)).like(f"{sale_id_query}%"),
-                func.lower(cast(SaleReturn.original_sale_id, String)).contains(sale_id_query),
+                func.replace(func.lower(cast(SaleReturn.id, String)), "-", "").contains(
+                    return_id_query
+                ),
+                func.replace(
+                    func.lower(cast(SaleReturn.original_sale_id, String)), "-", ""
+                ).contains(sale_id_query),
                 func.lower(SaleReturn.reason_name).contains(normalized_search),
                 func.lower(User.full_name).contains(normalized_search),
                 func.lower(Branch.name).contains(normalized_search),
@@ -572,7 +575,7 @@ def _map_return_list_item(row: RowMapping) -> AdminReturnListItemView:
     original_sale_id = type_cast(uuid.UUID, row["original_sale_id"])
     return AdminReturnListItemView(
         id=return_id,
-        folio=_build_return_folio(return_id),
+        folio=build_return_folio(return_id),
         original_sale_id=original_sale_id,
         original_ticket_folio=_build_sale_folio(original_sale_id),
         created_at=type_cast(datetime, row["created_at_utc"]),
@@ -637,10 +640,6 @@ def _is_partial_return(session: Session, *, sale_id: uuid.UUID) -> bool:
 
 def _build_sale_folio(sale_id: uuid.UUID) -> str:
     return f"TCK-{sale_id.hex.upper()}"
-
-
-def _build_return_folio(return_id: uuid.UUID) -> str:
-    return f"DEV-{return_id.hex.upper()}"
 
 
 def _normalize_search(value: str | None) -> str | None:

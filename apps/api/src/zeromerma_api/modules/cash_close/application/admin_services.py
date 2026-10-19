@@ -79,6 +79,7 @@ from zeromerma_api.modules.payments.infrastructure.models import (
     OperationalPayment,
     OperationalPaymentCategory,
 )
+from zeromerma_api.modules.returns.domain.folios import build_return_folio
 from zeromerma_api.modules.returns.infrastructure.models import SaleReturn
 from zeromerma_api.modules.sales.domain.constants import (
     SALE_PAYMENT_METHOD_CARD,
@@ -1207,7 +1208,7 @@ class AdminCashCutService:
                 financial_entry_id=row["financial_entry_id"],
                 financial_operation_id=row["financial_operation_id"],
                 id=type_cast(uuid.UUID, row["id"]),
-                folio=_build_return_folio(type_cast(uuid.UUID, row["id"])),
+                folio=build_return_folio(type_cast(uuid.UUID, row["id"])),
                 original_ticket_folio=build_ticket_folio(
                     type_cast(uuid.UUID, row["original_sale_id"])
                 ),
@@ -1656,10 +1657,6 @@ def _build_close_folio(close_id: uuid.UUID) -> str:
 
 def _build_payment_folio(payment_id: uuid.UUID) -> str:
     return f"PAG-{str(payment_id).split('-', maxsplit=1)[0].upper()}"
-
-
-def _build_return_folio(return_id: uuid.UUID) -> str:
-    return f"DEV-{str(return_id).split('-', maxsplit=1)[0].upper()}"
 
 
 def _build_discount_folio(discount_id: uuid.UUID) -> str:

@@ -95,6 +95,23 @@ expectations preserves the original financial rejection and no-effect assertions
 all three invalid-sale cases passed in isolated run
 `3b91f8b047324a59ba3fa059f077a4d7` (3/3), including card overpayment.
 
+Hosted run `39337862170` for `fbb3013` passed seven stages. Backend passed
+1,526 of 1,528 cases with no skips; its two failures exposed actual return-folio
+search defects. Issued receipts use the full UUID, while return history and
+administrative searches still compared truncated or hyphenated identifiers.
+The correction normalizes identity predicates and retains the full issued folio.
+Return documents, cash-cut details, cash flow and reconciliation now share one
+domain formatter, so related-document links and searches use the same reference.
+No amount, stock effect or immutable receipt is rewritten. Repository-wide Ruff
+and static typing passed for all 440 source files after this correction.
+Both return API modules passed 11/11 cases in
+`return-folio-normalization/results.xml`; the three cash-cut/cash-flow/reconciliation
+API modules passed 9/9 in
+`operation-context/return-folio-cash-projections/96a4810169b14a01814ee90dcb35e7f5/operation-context.xml`.
+These regressions cover full folios, UUID/case/whitespace normalization, wrong
+suffixes and exact references across financial views. Final hosted acceptance
+still requires the corrected commit's complete Foundation workflow.
+
 ## Operational information still needed
 
 1. Choose the branch production commitment lead time. The Backoffice form accepts

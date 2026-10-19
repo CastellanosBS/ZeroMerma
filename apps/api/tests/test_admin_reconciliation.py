@@ -229,6 +229,9 @@ def test_admin_reconciliation_can_create_review_resolve_and_keep_cut_immutable(
 ) -> None:
     prepared = _prepare_closed_cash_cut(client)
     close_payload = prepared["close"]
+    returned = prepared["return"]
+    return_folio = returned["folio"]
+    assert return_folio == f"DEV-{UUID(str(returned['id'])).hex.upper()}"
     close_id = str(close_payload["id"])
     headers = _admin_headers(client)
 
@@ -256,6 +259,11 @@ def test_admin_reconciliation_can_create_review_resolve_and_keep_cut_immutable(
     assert created["available_actions"]["can_resolve"] is True
     assert created["evidence"]["has_evidence"] is True
     assert any(document["document_type"] == "TICKET" for document in created["related_documents"])
+    assert [
+        (document["id"], document["folio"])
+        for document in created["related_documents"]
+        if document["document_type"] == "RETURN_REFUND"
+    ] == [(returned["id"], return_folio)]
 
     duplicate_response = client.post(
         "/v1/admin/reconciliation",

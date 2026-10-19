@@ -58,6 +58,7 @@ from zeromerma_api.modules.payments.infrastructure.models import (
     OperationalPayment,
     OperationalPaymentCategory,
 )
+from zeromerma_api.modules.returns.domain.folios import build_return_folio
 from zeromerma_api.modules.returns.infrastructure.models import SaleReturn
 from zeromerma_api.modules.sales.domain.constants import (
     SALE_PAYMENT_METHOD_CARD,
@@ -529,7 +530,7 @@ class AdminCashFlowService:
                 reconciliation_status=RECONCILIATION_STATUS_NOT_REQUIRED,
                 signed_effect=-_money(type_cast(Decimal, row["total_refund_amount"])),
                 source_document_id=type_cast(uuid.UUID, row["id"]),
-                source_reference=_build_return_folio(type_cast(uuid.UUID, row["id"])),
+                source_reference=build_return_folio(type_cast(uuid.UUID, row["id"])),
                 source_status=type_cast(str, row["status"]),
                 source_type=SOURCE_TYPE_RETURN_REFUND,
                 workstation_id=type_cast(uuid.UUID, row["workstation_id"]),
@@ -1314,10 +1315,6 @@ def _dedupe_options(
 
 def _build_cash_cut_folio(close_id: uuid.UUID) -> str:
     return f"CC-{str(close_id).split('-')[0].upper()}"
-
-
-def _build_return_folio(return_id: uuid.UUID) -> str:
-    return f"DEV-{str(return_id).split('-')[0].upper()}"
 
 
 def _build_operational_payment_folio(payment_id: uuid.UUID) -> str:

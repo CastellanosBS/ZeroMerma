@@ -68,6 +68,7 @@ from zeromerma_api.modules.payments.infrastructure.models import (
     OperationalPayment,
     OperationalPaymentCategory,
 )
+from zeromerma_api.modules.returns.domain.folios import build_return_folio
 from zeromerma_api.modules.returns.infrastructure.models import SaleReturn
 from zeromerma_api.modules.sales.domain.constants import (
     SALE_PAYMENT_METHOD_CARD,
@@ -1135,7 +1136,7 @@ class AdminReconciliationService:
             AdminReconciliationRelatedDocumentView(
                 amount=_money(type_cast(Decimal, return_row["total_refund_amount"])),
                 document_type="RETURN_REFUND",
-                folio=_build_return_folio(type_cast(uuid.UUID, return_row["id"])),
+                folio=build_return_folio(type_cast(uuid.UUID, return_row["id"])),
                 id=str(return_row["id"]),
                 occurred_at=type_cast(datetime, return_row["created_at_utc"]),
                 route_hint=f"/admin/devoluciones-correcciones?return={return_row['id']}",
@@ -1359,10 +1360,6 @@ def _build_reconciliation_folio(reconciliation_id: uuid.UUID) -> str:
 
 def _build_cash_cut_folio(close_id: uuid.UUID) -> str:
     return f"CC-{str(close_id).split('-')[0].upper()}"
-
-
-def _build_return_folio(return_id: uuid.UUID) -> str:
-    return f"DEV-{str(return_id).split('-')[0].upper()}"
 
 
 def _build_operational_payment_folio(payment_id: uuid.UUID) -> str:

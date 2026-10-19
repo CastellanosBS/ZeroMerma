@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from decimal import Decimal
+from uuid import UUID
 
 from fastapi.testclient import TestClient
 from return_fixtures import seed_return_stock
@@ -273,6 +274,9 @@ def test_admin_cash_cut_detail_exposes_financial_and_related_context(
 ) -> None:
     prepared = _prepare_closed_cash_cut(client)
     close_payload = prepared["close"]
+    returned = prepared["return"]
+    return_folio = returned["folio"]
+    assert return_folio == f"DEV-{UUID(str(returned['id'])).hex.upper()}"
     headers = _admin_headers(client)
     cash_session_id = close_payload["cash_session_id"]
 
@@ -287,12 +291,18 @@ def test_admin_cash_cut_detail_exposes_financial_and_related_context(
     assert Decimal(str(detail["expected_vs_counted"]["difference_amount"])) == Decimal("5.00")
     assert detail["payment_breakdown"][0]["payment_method_code"] == "CASH"
     assert detail["included_tickets"][0]["folio"].startswith("TCK-")
-    assert detail["returns_refunds"][0]["folio"].startswith("DEV-")
+    assert detail["returns_refunds"][0]["id"] == returned["id"]
+    assert detail["returns_refunds"][0]["folio"] == return_folio
     assert detail["operational_payments"][0]["folio"].startswith("PAG-")
     assert detail["denomination_count"]["is_supported"] is False
     assert detail["available_actions"]["can_remote_close"] is False
     assert detail["available_actions"]["can_export_report"] is False
     assert any(document["document_type"] == "ticket" for document in detail["related_documents"])
+    assert [
+        (document["id"], document["folio"])
+        for document in detail["related_documents"]
+        if document["document_type"] == "return"
+    ] == [(returned["id"], return_folio)]
     assert any(event["event_code"] == "CASH_SESSION_CLOSED" for event in detail["audit_timeline"])
 
 

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from decimal import Decimal
+from uuid import UUID
 
 from fastapi.testclient import TestClient
 from return_fixtures import seed_return_stock
@@ -205,6 +206,9 @@ def _prepare_cash_flow(client: TestClient) -> dict[str, object]:
 def test_admin_cash_flow_lists_source_movements_metrics_and_trend(client: TestClient) -> None:
     prepared = _prepare_cash_flow(client)
     sale = prepared["sale"]
+    returned = prepared["return"]
+    return_folio = returned["folio"]
+    assert return_folio == f"DEV-{UUID(str(returned['id'])).hex.upper()}"
     headers = _admin_headers(client)
 
     response = client.get(
@@ -240,6 +244,30 @@ def test_admin_cash_flow_lists_source_movements_metrics_and_trend(client: TestCl
     )
     assert payment_response.status_code == 200
     assert payment_response.json()["total"] == 1
+
+    return_response = client.get(
+        "/v1/admin/cash-flow",
+        headers=headers,
+        params={"source_type": "RETURN_REFUND", "search": return_folio},
+    )
+    assert return_response.status_code == 200, return_response.json()
+    assert return_response.json()["total"] == 1
+    returned_movement = return_response.json()["items"][0]
+    assert returned_movement["source_document_id"] == returned["id"]
+    assert returned_movement["source_reference"] == return_folio
+
+    return_detail_response = client.get(
+        f"/v1/admin/cash-flow/{returned_movement['id']}", headers=headers
+    )
+    assert return_detail_response.status_code == 200, return_detail_response.json()
+    return_detail = return_detail_response.json()
+    assert return_detail["overview"]["source_reference"] == return_folio
+    assert return_detail["source_document_context"]["source_reference"] == return_folio
+    assert [
+        (document["id"], document["folio"])
+        for document in return_detail["related_documents"]
+        if document["document_type"] == "RETURN_REFUND"
+    ] == [(returned["id"], return_folio)]
 
 
 def test_admin_cash_flow_detail_links_source_cut_and_reconciliation(client: TestClient) -> None:

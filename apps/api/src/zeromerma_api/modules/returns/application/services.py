@@ -93,6 +93,7 @@ from zeromerma_api.modules.returns.domain.exceptions import (
     SaleReturnNotFoundError,
     SaleReturnValidationError,
 )
+from zeromerma_api.modules.returns.domain.folios import build_return_folio
 from zeromerma_api.modules.returns.infrastructure.models import (
     ReturnDispositionAllocation,
     SaleReturn,
@@ -487,15 +488,18 @@ class ReturnsQueryService:
             )
         if normalized_query is not None:
             pattern = f"%{normalized_query}%"
+            return_id_query = normalized_query.removeprefix("dev-").replace("-", "")
+            sale_id_query = normalized_query.removeprefix("tck-").replace("-", "")
             filtered_statement = filtered_statement.where(
                 or_(
                     SaleReturn.reason_name.ilike(pattern),
                     User.full_name.ilike(pattern),
-                    SaleReturn.id.cast(String).ilike(pattern),
-                    func.concat("DEV-", func.substr(SaleReturn.id.cast(String), 1, 8)).ilike(
-                        pattern
+                    func.replace(func.lower(cast(SaleReturn.id, String)), "-", "").contains(
+                        return_id_query
                     ),
-                    SaleReturn.original_sale_id.cast(String).ilike(pattern),
+                    func.replace(
+                        func.lower(cast(SaleReturn.original_sale_id, String)), "-", ""
+                    ).contains(sale_id_query),
                 )
             )
 
@@ -540,7 +544,7 @@ class ReturnsQueryService:
             records=[
                 ReturnHistoryListItemView(
                     id=row["id"],
-                    folio=_build_return_folio(row["id"]),
+                    folio=build_return_folio(row["id"]),
                     original_sale_id=row["original_sale_id"],
                     original_sale_folio=_build_sale_folio(row["original_sale_id"]),
                     status=row["status"],
@@ -787,7 +791,7 @@ class ReturnsQueryService:
         return SaleReturnDetailResponse(
             receipt=read_receipt(session, "RETURN", sale_return.id),
             id=sale_return.id,
-            folio=_build_return_folio(sale_return.id),
+            folio=build_return_folio(sale_return.id),
             original_sale_id=original_sale.id,
             original_sale_folio=_build_sale_folio(original_sale.id),
             branch=BranchSummary(
@@ -1165,7 +1169,7 @@ class ReturnsCommandService:
             request_id=resolved_request_id,
             metadata={
                 **trace,
-                "folio": _build_return_folio(sale_return.id),
+                "folio": build_return_folio(sale_return.id),
                 "original_sale_id": str(sale_detail.id),
                 "original_sale_folio": _build_sale_folio(sale_detail.id),
                 "branch_code": context.branch_code,
@@ -1196,7 +1200,7 @@ class ReturnsCommandService:
                 "refund_cash_movement_id": None,
                 "financial_refund": financial_refund.model_dump(mode="json"),
                 "sale_return_id": str(sale_return.id),
-                "folio": _build_return_folio(sale_return.id),
+                "folio": build_return_folio(sale_return.id),
                 "original_sale_id": str(sale_detail.id),
                 "original_sale_folio": _build_sale_folio(sale_detail.id),
                 "branch_id": str(context.branch_id),
@@ -1255,7 +1259,7 @@ class ReturnsCommandService:
                 metadata={
                     **trace,
                     "sale_return_id": str(sale_return.id),
-                    "folio": _build_return_folio(sale_return.id),
+                    "folio": build_return_folio(sale_return.id),
                     "notification_target": "backoffice",
                     "original_sale_id": str(sale_detail.id),
                     "original_sale_folio": _build_sale_folio(sale_detail.id),
@@ -1274,7 +1278,7 @@ class ReturnsCommandService:
                 payload={
                     "refund_cash_movement_id": None,
                     "sale_return_id": str(sale_return.id),
-                    "folio": _build_return_folio(sale_return.id),
+                    "folio": build_return_folio(sale_return.id),
                     "notification_target": "backoffice",
                     "branch_code": context.branch_code,
                     "workstation_code": context.workstation_code,
@@ -1296,7 +1300,7 @@ class ReturnsCommandService:
                 source_kind="RETURN",
                 source_id=sale_return.id,
                 currency_code=sale_detail.currency_code,
-                folio=_build_return_folio(sale_return.id),
+                folio=build_return_folio(sale_return.id),
                 occurred_at=created_at,
                 related_document_folio=_build_sale_folio(sale_detail.id),
                 context=ReceiptContextView(
@@ -1479,7 +1483,7 @@ def _build_commit_result(
     return ReturnCommitResultView.model_validate(
         {
             "id": sale_return.id,
-            "folio": _build_return_folio(sale_return.id),
+            "folio": build_return_folio(sale_return.id),
             "status": sale_return.status,
             "original_sale_id": sale_return.original_sale_id,
             "original_sale_folio": _build_sale_folio(sale_return.original_sale_id),
@@ -1782,7 +1786,7 @@ def _apply_search_filters(
     if normalized_query is None:
         return statement
 
-    sale_id_prefix = normalized_query.removeprefix("tck-")
+    sale_id_prefix = normalized_query.removeprefix("tck-").replace("-", "")
     matching_line = exists(
         select(SaleLine.id).where(
             SaleLine.sale_id == Sale.id,
@@ -1791,7 +1795,7 @@ def _apply_search_filters(
     )
     return statement.where(
         or_(
-            func.lower(cast(Sale.id, String)).like(f"{sale_id_prefix}%"),
+            func.replace(func.lower(cast(Sale.id, String)), "-", "").like(f"{sale_id_prefix}%"),
             func.lower(cast(Sale.id, String)).contains(normalized_query),
             func.lower(User.full_name).contains(normalized_query),
             matching_line,
@@ -1801,10 +1805,6 @@ def _apply_search_filters(
 
 def _build_sale_folio(sale_id: uuid.UUID) -> str:
     return f"TCK-{sale_id.hex.upper()}"
-
-
-def _build_return_folio(return_id: uuid.UUID) -> str:
-    return f"DEV-{return_id.hex.upper()}"
 
 
 def _get_branch_brand_key(branch_code: str) -> str:

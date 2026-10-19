@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal
+from uuid import UUID
 
 from fastapi.testclient import TestClient
 from return_fixtures import seed_return_stock
@@ -764,6 +765,73 @@ def test_returns_history_and_detail_expose_safe_audit_summary(client: TestClient
     assert history_payload["records"][0]["branch_code"] == "MAIN"
     assert history_payload["records"][0]["workstation_code"] == SEED_WORKSTATION_CODE
     assert history_payload["records"][0]["reason_code"] == "WRONG_ITEM"
+
+    return_folio = f"DEV-{UUID(created_payload['id']).hex.upper()}"
+    sale_folio = f"TCK-{UUID(sale_payload['id']).hex.upper()}"
+    assert created_payload["folio"] == return_folio
+    assert history_payload["records"][0]["folio"] == return_folio
+    assert history_payload["records"][0]["original_sale_folio"] == sale_folio
+    search_headers = _authorization_header(client)
+    for query in (
+        f"  {return_folio.lower()}  ",
+        created_payload["id"],
+        f"dev-{created_payload['id']}",
+        sale_folio,
+        f"  {sale_folio.lower()}  ",
+        sale_payload["id"],
+    ):
+        response = client.get(
+            "/v1/returns/history",
+            headers=search_headers,
+            params={
+                "workstation_code": SEED_WORKSTATION_CODE,
+                "scope": "CURRENT_SHIFT",
+                "query": query,
+                "reason_code": "WRONG_ITEM",
+            },
+        )
+        assert response.status_code == 200
+        assert len(response.json()["records"]) == 1
+        assert response.json()["records"][0]["id"] == created_payload["id"]
+        assert response.json()["records"][0]["folio"] == return_folio
+    for query in (sale_folio, f"  {sale_folio.lower()}  ", sale_payload["id"]):
+        response = client.get(
+            "/v1/returns/search-sales",
+            headers=search_headers,
+            params={
+                "workstation_code": SEED_WORKSTATION_CODE,
+                "scope": "CURRENT_SHIFT",
+                "query": query,
+            },
+        )
+        assert response.status_code == 200
+        assert len(response.json()["sales"]) == 1
+        assert response.json()["sales"][0]["id"] == sale_payload["id"]
+    for folio in (return_folio, sale_folio):
+        wrong_suffix = "0" if folio[-1] != "0" else "1"
+        response = client.get(
+            "/v1/returns/history",
+            headers=search_headers,
+            params={
+                "workstation_code": SEED_WORKSTATION_CODE,
+                "scope": "CURRENT_SHIFT",
+                "query": folio[:-1] + wrong_suffix,
+            },
+        )
+        assert response.status_code == 200
+        assert response.json()["records"] == []
+        if folio == sale_folio:
+            response = client.get(
+                "/v1/returns/search-sales",
+                headers=search_headers,
+                params={
+                    "workstation_code": SEED_WORKSTATION_CODE,
+                    "scope": "CURRENT_SHIFT",
+                    "query": folio[:-1] + wrong_suffix,
+                },
+            )
+            assert response.status_code == 200
+            assert response.json()["sales"] == []
 
     detail_response = client.get(
         f"/v1/returns/{created_payload['id']}",

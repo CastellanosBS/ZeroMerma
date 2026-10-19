@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from decimal import Decimal
+from uuid import UUID
 
 from fastapi.testclient import TestClient
 from return_fixtures import seed_return_stock
@@ -216,6 +217,39 @@ def test_admin_returns_list_and_detail_use_real_return_records(client: TestClien
     assert Decimal(str(payload["metrics"]["refunded_amount"])) == Decimal("18.00")
     assert payload["filter_options"]["branches"]
     assert payload["filter_options"]["refund_methods"][0]["id"] == "CASH"
+
+    return_folio = f"DEV-{UUID(str(sale_return['id'])).hex.upper()}"
+    sale_folio = f"TCK-{UUID(str(sale['id'])).hex.upper()}"
+    assert sale_return["folio"] == return_folio
+    assert payload["items"][0]["folio"] == return_folio
+    assert payload["items"][0]["original_ticket_folio"] == sale_folio
+    for query in (
+        f"  {return_folio.lower()}  ",
+        str(sale_return["id"]),
+        f"dev-{sale_return['id']}",
+        sale_folio,
+        f"  {sale_folio.lower()}  ",
+        str(sale["id"]),
+    ):
+        response = client.get(
+            "/v1/admin/returns-corrections/returns",
+            headers=headers,
+            params={"search": query, "refund_method": "CASH", "status": "COMMITTED"},
+        )
+        assert response.status_code == 200
+        assert response.json()["total"] == 1
+        assert response.json()["items"][0]["id"] == sale_return["id"]
+        assert response.json()["items"][0]["folio"] == return_folio
+    for folio in (return_folio, sale_folio):
+        wrong_suffix = "0" if folio[-1] != "0" else "1"
+        response = client.get(
+            "/v1/admin/returns-corrections/returns",
+            headers=headers,
+            params={"search": folio[:-1] + wrong_suffix},
+        )
+        assert response.status_code == 200
+        assert response.json()["total"] == 0
+        assert response.json()["items"] == []
 
     detail_response = client.get(
         f"/v1/admin/returns-corrections/returns/{sale_return['id']}",
