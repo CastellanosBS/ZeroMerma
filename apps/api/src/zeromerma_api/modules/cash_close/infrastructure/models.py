@@ -128,11 +128,11 @@ class CashSessionClosePaymentMethodCount(Base):
             name="ck_cash_session_close_payment_method_counts_method_valid",
         ),
         CheckConstraint(
-            "counted_amount >= 0",
+            "payment_method_code = 'CARD' OR counted_amount >= 0",
             name="ck_cash_session_close_payment_method_counts_counted_non_negative",
         ),
         CheckConstraint(
-            "expected_amount IS NULL OR expected_amount >= 0",
+            "expected_amount IS NULL OR payment_method_code <> 'CASH' OR expected_amount >= 0",
             name="ck_cash_session_close_payment_method_counts_expected_non_negative",
         ),
     )
@@ -145,7 +145,7 @@ class CashSessionClosePaymentMethodCount(Base):
     )
     payment_method_code: Mapped[str] = mapped_column(String(40), nullable=False)
     currency_code: Mapped[str] = mapped_column(String(3), nullable=False)
-    counted_amount: Mapped[Decimal] = mapped_column(Numeric(12, 2), nullable=False)
+    counted_amount: Mapped[Decimal | None] = mapped_column(Numeric(12, 2), nullable=True)
     expected_amount: Mapped[Decimal | None] = mapped_column(Numeric(12, 2), nullable=True)
     variance_amount: Mapped[Decimal | None] = mapped_column(Numeric(12, 2), nullable=True)
 

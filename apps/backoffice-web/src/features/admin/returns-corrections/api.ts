@@ -182,6 +182,7 @@ function mapCorrectionsListFromApi(response: ApiCorrectionsListResponse): AdminC
 
 function mapReturnDetailFromApi(response: ApiReturnDetail): AdminReturnDetail {
   return {
+    financialRefund: response.financial_refund ?? null,
     auditSummary: response.audit_summary ?? null,
     availableActions: {
       canCreateFromBackoffice: response.available_actions.can_create_from_backoffice,
@@ -222,7 +223,7 @@ function mapReturnDetailFromApi(response: ApiReturnDetail): AdminReturnDetail {
       workstationName: response.overview.workstation_name,
     },
     refundImpact: {
-      cashImpactAmount: String(response.refund_impact.cash_impact_amount),
+      cashImpactAmount: response.refund_impact.cash_impact_amount == null ? null : String(response.refund_impact.cash_impact_amount),
       cashSessionId: response.refund_impact.cash_session_id,
       currencyCode: response.refund_impact.currency_code,
       linkedCashMovementId: response.refund_impact.linked_cash_movement_id ?? null,

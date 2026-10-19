@@ -46,6 +46,7 @@ import {
 import { toOperationalErrorMessage } from "../../lib/http";
 import { usePosAuthStore } from "../auth/auth-store";
 import { useCurrentCashSessionQuery } from "../cash-session-open/queries";
+import { RefundSettlementPanel } from "../refunds/refund-settlement-panel";
 import { parseMoneyToCents, sanitizeQuantityInput } from "../pos-terminal/model";
 import { posInputClass } from "../pos-theme/theme";
 import { useStatusMessageStore } from "../status-messages/store";
@@ -869,7 +870,7 @@ function ReturnHistoryDetailPanel({
       stateTone={getReturnStatusTone(selectedHistoryRecord?.status ?? "COMMITTED")}
       title="Detalle de devolucion"
     >
-      <div className="grid h-full min-h-0 gap-3 overflow-hidden">
+      <div className="grid h-full min-h-0 gap-3 overflow-y-auto">
         <div className="grid gap-1 rounded-xl border border-[var(--pos-shell-border)] bg-[var(--pos-shell-muted)] px-3 py-2.5">
           <KeyValueRow label="Folio" title={returnDetail.folio} value={returnDetail.folio} />
           <KeyValueRow
@@ -884,7 +885,10 @@ function ReturnHistoryDetailPanel({
             title={returnDetail.created_by.full_name}
             value={returnDetail.created_by.full_name}
           />
-          <KeyValueRow label="Monto" value={formatCurrency(returnDetail.total_refund_amount)} />
+          <KeyValueRow
+            label="Importe autorizado"
+            value={formatCurrency(returnDetail.total_refund_amount)}
+          />
           <KeyValueRow
             label="Metodo"
             value={getRefundMethodLabel(returnDetail.refund_method_code)}
@@ -896,6 +900,7 @@ function ReturnHistoryDetailPanel({
           />
         </div>
 
+        <RefundSettlementPanel key={returnDetail.id} refund={returnDetail.financial_refund} />
         <div className="min-h-0 overflow-hidden rounded-xl border border-[var(--pos-shell-border)] bg-white">
           <div className="grid grid-cols-[minmax(0,1fr)_4.25rem_5rem] gap-2 border-b border-[var(--pos-shell-border)] bg-[var(--pos-shell-muted)] px-3 py-2 text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-500">
             <span>Producto</span>

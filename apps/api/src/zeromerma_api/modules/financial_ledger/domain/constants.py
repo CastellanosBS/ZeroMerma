@@ -104,7 +104,7 @@ SOURCE_TYPES: dict[OperationKind, frozenset[str]] = {
     OperationKind.ORDER_ADVANCE: frozenset({"ORDER_PAYMENT"}),
     OperationKind.ORDER_SETTLEMENT: frozenset({"ORDER_PAYMENT"}),
     OperationKind.SALE_REFUND: frozenset({"SALE_RETURN"}),
-    OperationKind.ORDER_REFUND: frozenset({"ORDER_PAYMENT"}),
+    OperationKind.ORDER_REFUND: frozenset({"ORDER_PAYMENT", "ORDER_CANCELLATION"}),
     OperationKind.OPERATIONAL_PAYMENT: frozenset({"OPERATIONAL_PAYMENT"}),
     OperationKind.OPERATIONAL_CHARGE: frozenset({"OPERATIONAL_DISCOUNT"}),
     OperationKind.CASH_DEPOSIT: frozenset({"CASH_DEPOSIT"}),

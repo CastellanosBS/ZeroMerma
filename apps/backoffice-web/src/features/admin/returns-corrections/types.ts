@@ -1,3 +1,4 @@
+import type { components } from "@zeromerma/api-client";
 export type AdminReturnsCorrectionsTab = "returns" | "corrections";
 
 export interface AdminReturnCorrectionFilterOption {
@@ -148,6 +149,7 @@ export interface AdminCorrectionsListResponse {
 }
 
 export interface AdminReturnDetail {
+  financialRefund?: components["schemas"]["FinancialRefundView"] | null;
   auditSummary: unknown | null;
   availableActions: {
     canCreateFromBackoffice: boolean;
@@ -188,7 +190,7 @@ export interface AdminReturnDetail {
     workstationName: string;
   };
   refundImpact: {
-    cashImpactAmount: string;
+    cashImpactAmount: string | null;
     cashSessionId: string;
     currencyCode: string;
     linkedCashMovementId: string | null;

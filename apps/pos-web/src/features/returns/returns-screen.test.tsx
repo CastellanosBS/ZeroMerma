@@ -257,6 +257,29 @@ const historyRecords = [
 
 const returnDetailsById = {
   "return-1": {
+    financial_refund: {
+      financial_operation_id: "refund-1",
+      source_type: "SALE_RETURN",
+      source_id: "return-1",
+      amount_due: "12.00",
+      amount_settled: "7.00",
+      amount_pending: "5.00",
+      state: "PARTIALLY_SETTLED",
+      cash_settled_amount: "7.00",
+      card_settled_amount: "0.00",
+      original_collection_operation_ids: ["sale-collection"],
+      entries: [
+        {
+          id: "refund-cash",
+          amount: "7.00",
+          payment_method_code: "CASH",
+          execution_mode: "LOCAL",
+          state: "CONFIRMED",
+          cash_session_id: "cash-session-1",
+          occurred_at: "2026-04-22T20:00:00Z",
+        },
+      ],
+    },
     audit_summary: {
       acknowledged_at_utc: null,
       acknowledged_by: null,
@@ -758,6 +781,10 @@ describe("ReturnsScreen", () => {
       await vi.waitFor(() => expect(commitSaleReturnMock).toHaveBeenCalledTimes(1));
     });
     await flush();
+    const refundPanel = rightPanelHost.querySelector('[aria-label="Estado del reembolso"]');
+    expect(refundPanel?.textContent).toContain("Entrega confirmada: $7.00");
+    expect(refundPanel?.textContent).toContain("Pendiente de entregar: $5.00");
+    expect(refundPanel?.closest(".overflow-y-auto")).not.toBeNull();
 
     expect(commitSaleReturnMock).toHaveBeenCalledWith(
       expect.objectContaining({

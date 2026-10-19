@@ -7,6 +7,7 @@ from uuid import UUID
 from pydantic import BaseModel
 
 from zeromerma_api.modules.audit.application.schemas import AuditSummaryView
+from zeromerma_api.modules.financial_ledger.application.refund_schemas import FinancialRefundView
 
 
 class AdminReturnCorrectionFilterOptionView(BaseModel):
@@ -119,7 +120,7 @@ class AdminReturnRefundImpactView(BaseModel):
     refund_method: str
     refund_amount: Decimal
     cash_session_id: UUID
-    cash_impact_amount: Decimal
+    cash_impact_amount: Decimal | None
     linked_cash_movement_id: UUID | None = None
     currency_code: str
 
@@ -142,6 +143,7 @@ class AdminReturnAvailableActionsView(BaseModel):
 
 
 class AdminReturnDetailView(BaseModel):
+    financial_refund: FinancialRefundView | None = None
     audit_summary: AuditSummaryView | None = None
     available_actions: AdminReturnAvailableActionsView
     backend_contract: AdminReturnsBackendContractView

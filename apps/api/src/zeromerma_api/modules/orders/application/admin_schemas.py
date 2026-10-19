@@ -6,6 +6,8 @@ from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict
 
+from zeromerma_api.modules.financial_ledger.application.refund_schemas import FinancialRefundView
+
 
 class AdminOrderFilterOptionView(BaseModel):
     id: str
@@ -166,6 +168,7 @@ class AdminOrderAvailableActionsView(BaseModel):
 
 
 class AdminOrderDetailView(BaseModel):
+    financial_refund: FinancialRefundView | None = None
     available_actions: AdminOrderAvailableActionsView
     backend_contract: AdminOrdersBackendContractView
     customer: AdminOrderCustomerView

@@ -35,6 +35,8 @@ describe("real browser integration safety", () => {
       "/v1/admin/inventory",
       "/v1/admin/production/invalid/complete",
       "/v1/admin/suppliers",
+      "/v1/returns/invalid/refund-settlements",
+      "/v1/returns/019a0000-0000-7000-8000-000000000001/refund-settlements?override=true",
     ]) {
       await expect(
         dropNextOperationalCommandResponse(page, "https://127.0.0.1:41201", evidence, path),
@@ -50,6 +52,41 @@ describe("real browser integration safety", () => {
       ),
     ).rejects.toThrow("allowlisted");
   });
+  it.each(["returns", "orders"])(
+    "drops a real %s refund continuation response only after fetching the committed result",
+    async (source) => {
+      isolatedEnvironment();
+      const route = {
+        request: () => ({ method: () => "POST" }),
+        fetch: vi.fn(async () => ({
+          status: () => 200,
+          json: async () => ({ amount_pending: "0.00" }),
+        })),
+        abort: vi.fn(async () => {}),
+      };
+      let handler: ((value: typeof route) => Promise<void>) | undefined;
+      const page = {
+        on: vi.fn(),
+        route: vi.fn(async (_url: string, callback: typeof handler) => {
+          handler = callback;
+        }),
+      };
+      const evidence = observeRealApi({ on: vi.fn() }, page, "https://127.0.0.1:41201");
+      const fault = await dropNextOperationalCommandResponse(
+        page,
+        "https://127.0.0.1:41201",
+        evidence,
+        `/v1/${source}/019a0000-0000-7000-8000-000000000001/refund-settlements`,
+      );
+      await handler!(route);
+      await expect(fault.committed).resolves.toEqual({ amount_pending: "0.00" });
+      expect(route.fetch).toHaveBeenCalledWith({ maxRedirects: 0 });
+      expect(route.abort).toHaveBeenCalledWith("failed");
+      expect(evidence).toEqual([
+        { method: "POST", path: `/v1/${source}/{id}/refund-settlements`, status: 200 },
+      ]);
+    },
+  );
   it.each([200, 409])(
     "drops an actual operational PATCH only after a successful commit (%i)",
     async (status) => {

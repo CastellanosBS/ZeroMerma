@@ -284,6 +284,8 @@ function mapDetailFromApi(response: ApiCashCutDetail): AdminCashCutDetail {
     })),
     returnsRefunds: response.returns_refunds.map((refund) => ({
       amount: String(refund.amount),
+      financialEntryId: refund.financial_entry_id ?? null,
+      financialOperationId: refund.financial_operation_id ?? null,
       folio: refund.folio,
       id: refund.id,
       occurredAt: refund.occurred_at,

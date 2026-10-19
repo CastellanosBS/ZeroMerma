@@ -9,6 +9,7 @@ from pydantic import AwareDatetime, BaseModel, ConfigDict, Field, field_validato
 
 from zeromerma_api.modules.branches.application.schemas import BranchSummary, WorkstationSummary
 from zeromerma_api.modules.cash.application.schemas import CashSessionView
+from zeromerma_api.modules.financial_ledger.application.refund_schemas import FinancialRefundView
 from zeromerma_api.modules.identity.application.schemas import AuthenticatedUser
 
 
@@ -190,6 +191,7 @@ class OrderCommandResultView(BaseModel):
     remaining_balance_amount: Decimal
     updated_at_utc: datetime
     payments: list[OrderCommandPaymentView]
+    financial_refund: FinancialRefundView | None = None
 
 
 class CustomerOrderListItemView(BaseModel):
@@ -248,6 +250,7 @@ class CustomerOrderPaymentView(BaseModel):
 
 
 class CustomerOrderDetailResponse(BaseModel):
+    financial_refund: FinancialRefundView | None = None
     id: UUID
     folio: str
     status: str

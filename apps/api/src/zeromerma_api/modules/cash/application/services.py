@@ -24,6 +24,17 @@ from zeromerma_api.modules.cash.domain.constants import (
 )
 from zeromerma_api.modules.cash.domain.exceptions import CashSessionConflictError
 from zeromerma_api.modules.cash.infrastructure.models import CashSession
+from zeromerma_api.modules.financial_ledger.application.recording import (
+    FinancialCommandScope,
+    create_financial_operation,
+    record_confirmed_entry,
+)
+from zeromerma_api.modules.financial_ledger.domain.constants import (
+    Direction,
+    OperationKind,
+    PaymentMethod,
+)
+from zeromerma_api.modules.financial_ledger.domain.money import FinancialModelError
 from zeromerma_api.modules.identity.application.schemas import AuthenticatedUser
 from zeromerma_api.modules.identity.infrastructure.models import User
 from zeromerma_api.modules.outbox.application.service import OutboxWriter
@@ -172,6 +183,49 @@ class CashSessionCommandService:
         session.add(cash_session)
         session.flush()
 
+        financial_scope = FinancialCommandScope(
+            branch_id=context.branch_id,
+            workstation_id=context.workstation_id,
+            cash_session_id=cash_session.id,
+            actor_id=current_user.id,
+        )
+        try:
+            financial_operation = create_financial_operation(
+                session,
+                kind=OperationKind.CASH_OPENING,
+                source_type="CASH_SESSION",
+                source_id=cash_session.id,
+                subject_type="CASH_SESSION",
+                subject_id=cash_session.id,
+                amount_due=command.opening_amount,
+                currency_code="MXN",
+                scope=financial_scope,
+                occurred_at=opened_at,
+            )
+            financial_entry = (
+                record_confirmed_entry(
+                    session,
+                    operation=financial_operation,
+                    leg_key="opening",
+                    payment_method=PaymentMethod.CASH,
+                    direction=Direction.IN,
+                    amount=command.opening_amount,
+                    tendered_amount=command.opening_amount,
+                    scope=financial_scope,
+                    occurred_at=opened_at,
+                )
+                if command.opening_amount > Decimal("0.00")
+                else None
+            )
+        except FinancialModelError as error:
+            raise CashSessionConflictError(
+                "Opening requires a valid monetary amount in MXN."
+            ) from error
+        financial_trace = {
+            "financial_operation_id": str(financial_operation.id),
+            "financial_entry_ids": [str(financial_entry.id)] if financial_entry else [],
+        }
+
         self._audit_recorder.record(
             session,
             actor_id=current_user.id,
@@ -183,6 +237,7 @@ class CashSessionCommandService:
             request_id=resolved_request_id,
             metadata={
                 **trace,
+                **financial_trace,
                 "branch_code": context.branch_code,
                 "workstation_code": context.workstation_code,
                 "opening_amount": str(command.opening_amount),
@@ -196,6 +251,7 @@ class CashSessionCommandService:
             event_name=OUTBOX_EVENT_CASH_SESSION_OPENED_V1,
             cash_session_id=cash_session.id,
             payload={
+                **financial_trace,
                 "cash_session_id": str(cash_session.id),
                 "branch_id": str(context.branch_id),
                 "branch_code": context.branch_code,
@@ -206,7 +262,7 @@ class CashSessionCommandService:
                 "opening_amount": str(command.opening_amount),
                 "opened_at": opened_at.isoformat(),
             },
-            headers={"request_id": resolved_request_id, **trace},
+            headers={"request_id": resolved_request_id, **trace, **financial_trace},
         )
 
         session.flush()

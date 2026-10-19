@@ -92,7 +92,7 @@ export function buildReturnReceiptDocument(document: SaleReturnDetailResponse): 
           <p class="value">${escapeHtml(document.original_sale_folio)}</p>
         </div>
         <div>
-          <p class="label">Reembolso</p>
+          <p class="label">Metodo previsto</p>
           <p class="value">${escapeHtml(getRefundMethodLabel(document.refund_method_code))}</p>
         </div>
         <div>
@@ -121,9 +121,19 @@ export function buildReturnReceiptDocument(document: SaleReturnDetailResponse): 
 
       <section class="totals">
         <div class="total-row strong">
-          <span>Total reembolsado</span>
+          <span>Importe autorizado</span>
           <span>${formatCurrency(document.total_refund_amount)}</span>
         </div>
+        ${
+          document.financial_refund
+            ? `
+        <div class="total-row"><span>Entrega confirmada</span><span>${formatCurrency(document.financial_refund.amount_settled)}</span></div>
+        <div class="total-row strong"><span>Pendiente de entregar</span><span>${formatCurrency(document.financial_refund.amount_pending)}</span></div>
+        <div class="total-row"><span>Efectivo confirmado</span><span>${formatCurrency(document.financial_refund.cash_settled_amount)}</span></div>
+        <div class="total-row"><span>Tarjeta confirmada</span><span>${formatCurrency(document.financial_refund.card_settled_amount)}</span></div>
+        `
+            : "<p>Sin evidencia financiera del reembolso; requiere revision.</p>"
+        }
       </section>
 
       <p class="footer">Comprobante de devolucion generado desde la caja</p>

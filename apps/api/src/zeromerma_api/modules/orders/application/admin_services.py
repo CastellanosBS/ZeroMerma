@@ -13,6 +13,7 @@ from sqlalchemy.sql.selectable import Subquery
 
 from zeromerma_api.modules.audit.application.service import AuditRecorder
 from zeromerma_api.modules.branches.infrastructure.models import Branch, Workstation
+from zeromerma_api.modules.financial_ledger.application.refunds import find_refund
 from zeromerma_api.modules.identity.application.actions import restrict_actions
 from zeromerma_api.modules.identity.infrastructure.models import User
 from zeromerma_api.modules.orders.application.admin_schemas import (
@@ -682,6 +683,7 @@ def _build_order_detail(session: Session, order: CustomerOrder) -> AdminOrderDet
         remaining_balance_amount=_quantize_money(order.remaining_balance_amount),
     )
     return AdminOrderDetailView(
+        financial_refund=find_refund(session, source_type="ORDER_CANCELLATION", source_id=order.id),
         available_actions=_build_available_actions(session, order, refund_amount=refund_amount),
         backend_contract=_backend_contract(),
         customer=AdminOrderCustomerView(

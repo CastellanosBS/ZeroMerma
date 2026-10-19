@@ -101,8 +101,11 @@ export function createInitialCashCloseDraftState(): CashCloseDraftState {
   };
 }
 
-export function sanitizeMoneyInput(value: string): string {
-  return sanitizeScaledDecimalInput(value, 2);
+export function sanitizeMoneyInput(value: string, allowNegative = false): string {
+  const negative = value.trim().startsWith("-");
+  if (negative && !allowNegative) return "";
+  const magnitude = sanitizeScaledDecimalInput(value, 2);
+  return negative ? `-${magnitude}` : magnitude;
 }
 
 export function sanitizeCashCloseObservation(value: string): string {
@@ -302,27 +305,18 @@ export function buildCashClosePreviewRequest(
 
   const parsedPaymentRows = Object.entries(draftState.countedPaymentAmounts).map(
     ([paymentMethodCode, countedAmountText]) => ({
-      countedAmountCents: parseScaledDecimalToUnits(countedAmountText, 2),
+      countedAmountCents: parseCountedPaymentCents(paymentMethodCode, countedAmountText),
       paymentMethodCode,
     }),
   );
-  const hasAnyCapturedPayment = parsedPaymentRows.some((row) => row.countedAmountCents !== null);
 
   return {
     workstation_code: workstationCode,
     close_mode: CASH_CLOSE_MODE_WITH_COUNT,
     counter_empty_confirmed: counterEmptyConfirmed,
     counted_payment_methods: parsedPaymentRows
-      .filter((row) => {
-        if (row.countedAmountCents !== null) {
-          return true;
-        }
-
-        return (
-          hasAnyCapturedPayment &&
-          (row.paymentMethodCode === "CASH" || row.paymentMethodCode === "CARD")
-        );
-      })
+      .filter((row) => row.countedAmountCents !== null &&
+        (row.paymentMethodCode === "CASH" || row.paymentMethodCode === "CARD"))
       .map((row) => ({
         payment_method_code: row.paymentMethodCode,
         counted_amount: formatMoneyFromCents(row.countedAmountCents ?? 0),
@@ -356,9 +350,9 @@ export function getDraftPaymentMethodRows(
 ): CashCloseDisplayPaymentMethodRow[] {
   return paymentMethodCatalog.map((paymentMethod) => ({
     countedAmountCents:
-      parseScaledDecimalToUnits(
+      parseCountedPaymentCents(
+        paymentMethod.payment_method_code,
         countedPaymentAmounts[paymentMethod.payment_method_code] ?? "",
-        2,
       ) ?? 0,
     countedAmountText: countedPaymentAmounts[paymentMethod.payment_method_code] ?? "",
     isExpectedSupported: paymentMethod.is_expected_supported,
@@ -382,11 +376,8 @@ export function hasCashCloseExpectedPaymentCounts(
     return false;
   }
 
-  return Object.entries(countedPaymentAmounts).some(
-    ([paymentMethodCode, countedAmount]) =>
-      knownPaymentMethodCodes.has(paymentMethodCode) &&
-      getCashCloseCountValueState(countedAmount) === "CAPTURED",
-  );
+  return knownPaymentMethodCodes.has("CASH") &&
+    parseScaledDecimalToUnits(countedPaymentAmounts.CASH ?? "", 2) !== null;
 }
 
 export function hasCashClosePhysicalCounts(draftState: CashCloseDraftState): boolean {
@@ -508,7 +499,7 @@ export function getDraftCountedCashCents(countedPaymentAmounts: Record<string, s
 export function getDraftCountedTotalCents(countedPaymentAmounts: Record<string, string>): number {
   return (
     (parseScaledDecimalToUnits(countedPaymentAmounts.CASH ?? "", 2) ?? 0) +
-    (parseScaledDecimalToUnits(countedPaymentAmounts.CARD ?? "", 2) ?? 0)
+    (parseExpectedCashCents(countedPaymentAmounts.CARD ?? "") ?? 0)
   );
 }
 
@@ -585,9 +576,16 @@ function sanitizeScaledDecimalInput(value: string, decimalPlaces: number): strin
 }
 
 function formatMoneyFromCents(cents: number): string {
-  const wholePart = Math.floor(cents / 100);
-  const decimalPart = String(cents % 100).padStart(2, "0");
-  return `${wholePart}.${decimalPart}`;
+  const magnitude = Math.abs(cents);
+  const wholePart = Math.floor(magnitude / 100);
+  const decimalPart = String(magnitude % 100).padStart(2, "0");
+  return `${cents < 0 ? "-" : ""}${wholePart}.${decimalPart}`;
+}
+
+function parseCountedPaymentCents(paymentMethodCode: string, value: string): number | null {
+  return paymentMethodCode === "CARD"
+    ? parseExpectedCashCents(value)
+    : parseScaledDecimalToUnits(value, 2);
 }
 
 function buildCashCloseCountedProductLine(

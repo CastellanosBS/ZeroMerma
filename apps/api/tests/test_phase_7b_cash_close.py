@@ -411,7 +411,7 @@ def test_cash_close_empty_counter_still_requires_money_count(
     )
 
     assert response.status_code == 400
-    assert "conteo monetario" in response.json()["message"]
+    assert "conteo de efectivo" in response.json()["message"]
 
 
 def test_cash_close_commit_with_manual_override_and_auto_discrepancy_resolution(

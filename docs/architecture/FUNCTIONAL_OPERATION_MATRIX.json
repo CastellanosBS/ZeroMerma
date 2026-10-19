@@ -26109,7 +26109,7 @@
       "domain_or_use_case_symbol": "CashSessionOpenService.open",
       "router_business_logic_present": false,
       "transaction_owner": "zeromerma_api.modules.idempotency.application.service.IdempotencyExecutor.execute",
-      "transaction_boundary": "One executor-owned transaction for command effects, business audit, outbox and durable result; domain actions may flush but cannot commit separately.",
+      "transaction_boundary": "The existing idempotent command atomically owns business source, canonical financial facts, audit/outbox and immutable acknowledgement; no mirrored CashMovement",
       "persistence": "WRITE",
       "external_side_effect": "NONE_OBSERVED_STATICALLY",
       "reads_entities": [
@@ -26123,7 +26123,9 @@
         "auth_sessions",
         "audit_log",
         "outbox_events",
-        "idempotency_records"
+        "idempotency_records",
+        "FinancialOperation",
+        "FinancialEntry"
       ],
       "locks_or_concurrency_control": "Opening retains its user/workstation FOR NO KEY UPDATE uniqueness boundary, compatible with reservation FK KEY SHARE. Existing cash commands now share one exact-shift lock after reservation; independent shifts have no global cash lock.",
       "audit_required": true,
@@ -26135,7 +26137,7 @@
       "idempotency_required": true,
       "idempotency_actual": "DEC07_COMPLIANT",
       "idempotency_business_identity": "Global UUIDv7 Idempotency-Key; operation=cash_session.open; actor, POS surface, branch and workstation are fingerprint context. Opening has no preexisting cash session ID.",
-      "idempotency_replay_behavior": "Returns the original minimized snapshot with stable resource/movement IDs and amounts; current authorization/context checks precede replay, no business action is repeated and historical shift closure does not redirect the intention.",
+      "idempotency_replay_behavior": "Return stored acknowledgement without repeating canonical financial facts; positive sale components use applied amounts after change; zero opening is an explicit operation without a zero entry",
       "generated_client_operation": "open_cash_session_v1_cash_sessions_open_post",
       "consumer_contract_state": "CLIENT_GENERATED_USED",
       "consumer_disposition": "LOCAL_UI_PRESENT",
@@ -26200,7 +26202,8 @@
         "apps/api/src/zeromerma_api/modules/cash/application/command_context.py",
         "docs/implementation/cash-idempotency-validation.md",
         "docs/architecture/concurrency.md",
-        "docs/implementation/concurrency-validation.md"
+        "docs/implementation/concurrency-validation.md",
+        "docs/implementation/financial-block-validation.md"
       ],
       "verification_notes": "ZM-FIN-036/037 local evidence: 42 unique PostgreSQL cases passed across the 28-case cash-boundary and 14-case complementary runs (29 new cases, 3 adapted concurrency cases, 10 prior cash/FK cases). The final combined runner also passed all 49 cases (29 cash, 9 transient conflicts, 11 inventory). Same-user HTTP authentication may serialize earlier; domain races use separate real transactions. Exact-commit Foundation acceptance accompanies delivery."
     },
@@ -26501,7 +26504,7 @@
       "domain_or_use_case_symbol": "OperationalDiscountCommitService.commit",
       "router_business_logic_present": false,
       "transaction_owner": "zeromerma_api.modules.idempotency.application.service.IdempotencyExecutor.execute",
-      "transaction_boundary": "One executor-owned transaction for command effects, business audit, outbox and durable result; domain actions may flush but cannot commit separately.",
+      "transaction_boundary": "The existing idempotent command atomically owns business source, canonical financial facts, audit/outbox and immutable acknowledgement; no mirrored CashMovement",
       "persistence": "WRITE",
       "external_side_effect": "NONE_OBSERVED_STATICALLY",
       "reads_entities": [
@@ -26513,10 +26516,11 @@
       ],
       "writes_entities": [
         "operational_discounts",
-        "cash_movements",
         "audit_log",
         "outbox_events",
-        "idempotency_records"
+        "idempotency_records",
+        "FinancialOperation",
+        "FinancialEntry"
       ],
       "locks_or_concurrency_control": "After the UUIDv7 reservation, the exact CashSession is locked FOR NO KEY UPDATE with populate_existing before dependent business rows or effects. Actor, branch, workstation and OPEN are revalidated under that lock; committed historical replay bypasses the action without requiring OPEN. Reservation FK KEY SHARE remains compatible. Both CASH inflows and existing CARD non-cash commands obey close admission.",
       "audit_required": true,
@@ -26528,7 +26532,7 @@
       "idempotency_required": true,
       "idempotency_actual": "DEC07_COMPLIANT",
       "idempotency_business_identity": "Global UUIDv7 Idempotency-Key; operation=operational_discount.commit; actor, POS surface, branch and workstation are fingerprint context; explicit original intention cash_session_id is required.",
-      "idempotency_replay_behavior": "Returns the original minimized snapshot with stable resource/movement IDs and amounts; current authorization/context checks precede replay, no business action is repeated and historical shift closure does not redirect the intention.",
+      "idempotency_replay_behavior": "Return stored acknowledgement without repeating canonical financial facts; positive sale components use applied amounts after change; zero opening is an explicit operation without a zero entry",
       "generated_client_operation": "create_discount_v1_discounts_post",
       "consumer_contract_state": "CLIENT_GENERATED_USED",
       "consumer_disposition": "LOCAL_UI_PRESENT",
@@ -26587,7 +26591,8 @@
         "apps/api/src/zeromerma_api/modules/cash/application/command_context.py",
         "docs/implementation/cash-idempotency-validation.md",
         "docs/architecture/concurrency.md",
-        "docs/implementation/concurrency-validation.md"
+        "docs/implementation/concurrency-validation.md",
+        "docs/implementation/financial-block-validation.md"
       ],
       "verification_notes": "ZM-FIN-036/037 local evidence: 42 unique PostgreSQL cases passed across the 28-case cash-boundary and 14-case complementary runs (29 new cases, 3 adapted concurrency cases, 10 prior cash/FK cases). The final combined runner also passed all 49 cases (29 cash, 9 transient conflicts, 11 inventory). Same-user HTTP authentication may serialize earlier; domain races use separate real transactions. Exact-commit Foundation acceptance accompanies delivery."
     },
@@ -27286,7 +27291,7 @@
       "domain_or_use_case_symbol": "OrdersIdempotencyService.execute_pos",
       "router_business_logic_present": false,
       "transaction_owner": "zeromerma_api.modules.idempotency.application.service.IdempotencyExecutor.execute",
-      "transaction_boundary": "Executor-owned root transaction and action savepoint; order/items, actual-method CustomerOrderPayment receipts, one FinancialOperation and confirmed FinancialEntry per payment, existing audit/outbox and terminal acknowledgement commit or roll back together.",
+      "transaction_boundary": "Executor-owned transaction: cancellation, immutable ORDER_CANCELLATION refund obligation, available CASH_FIRST confirmed legs, payment links, audit/outbox and acknowledgement commit or roll back together; unallocated debt remains explicit",
       "persistence": "WRITE",
       "external_side_effect": "NONE_OBSERVED_STATICALLY",
       "reads_entities": [
@@ -27345,7 +27350,7 @@
       "missing_test_types": [
         "FULL_DEC10_ORDER_WORKFLOW"
       ],
-      "approved_target_state": "Preserve durable replay and the 042 order-payment ledger adoption while completing the full approved order workflow in ZM-FIN-058 and ZM-FIN-078. Cancellation policy, CASH_FIRST/partial refunds and provider execution remain ZM-FIN-044/046.",
+      "approved_target_state": "Preserve canonical CASH_FIRST refund obligation/resumption while completing remaining commercial order lifecycle in ZM-FIN-058/078; provider execution remains gated in ZM-FIN-046",
       "feature_complete_blocker": true,
       "later_ZM_FIN_tasks": [
         "ZM-FIN-058"
@@ -27382,7 +27387,9 @@
         "docs/architecture/concurrency.md",
         "docs/implementation/concurrency-validation.md",
         "docs/implementation/order-cash-flow-validation.md",
-        "apps/api/src/zeromerma_api/modules/orders/application/financial_services.py"
+        "apps/api/src/zeromerma_api/modules/orders/application/financial_services.py",
+        "docs/implementation/financial-block-validation.md",
+        "docs/operations/refund-settlement.md"
       ],
       "verification_notes": "ZM-FIN-036/037 local evidence: 42 unique PostgreSQL cases passed across the 28-case cash-boundary and 14-case complementary runs (29 new cases, 3 adapted concurrency cases, 10 prior cash/FK cases). The final combined runner also passed all 49 cases (29 cash, 9 transient conflicts, 11 inventory). Same-user HTTP authentication may serialize earlier; domain races use separate real transactions. Exact-commit Foundation acceptance accompanies delivery. 042 implementation adds CASH LOCAL and CARD ACCOUNTING_ONLY actual-method facts (MIXED is two real legs), actual receiving/refunding turn, no historical backfill and no duplicate cash movement. New 042 acceptance is tracked separately in order_financial_evidence; prior successful run counts above are unchanged."
     },
@@ -27705,7 +27712,7 @@
       "domain_or_use_case_symbol": "OperationalPaymentCommitService.commit",
       "router_business_logic_present": false,
       "transaction_owner": "zeromerma_api.modules.idempotency.application.service.IdempotencyExecutor.execute",
-      "transaction_boundary": "One executor-owned transaction for command effects, business audit, outbox and durable result; domain actions may flush but cannot commit separately.",
+      "transaction_boundary": "The existing idempotent command atomically owns business source, canonical financial facts, audit/outbox and immutable acknowledgement; no mirrored CashMovement",
       "persistence": "WRITE",
       "external_side_effect": "NONE_OBSERVED_STATICALLY",
       "reads_entities": [
@@ -27717,10 +27724,11 @@
       ],
       "writes_entities": [
         "operational_payments",
-        "cash_movements",
         "audit_log",
         "outbox_events",
-        "idempotency_records"
+        "idempotency_records",
+        "FinancialOperation",
+        "FinancialEntry"
       ],
       "locks_or_concurrency_control": "After the UUIDv7 reservation, the exact CashSession is locked FOR NO KEY UPDATE with populate_existing before dependent business rows or effects. Actor, branch, workstation and OPEN are revalidated under that lock; committed historical replay bypasses the action without requiring OPEN. Reservation FK KEY SHARE remains compatible. Both CASH outflows and existing CARD non-cash commands obey close admission.",
       "audit_required": true,
@@ -27732,7 +27740,7 @@
       "idempotency_required": true,
       "idempotency_actual": "DEC07_COMPLIANT",
       "idempotency_business_identity": "Global UUIDv7 Idempotency-Key; operation=operational_payment.commit; actor, POS surface, branch and workstation are fingerprint context; explicit original intention cash_session_id is required.",
-      "idempotency_replay_behavior": "Returns the original minimized snapshot with stable resource/movement IDs and amounts; current authorization/context checks precede replay, no business action is repeated and historical shift closure does not redirect the intention.",
+      "idempotency_replay_behavior": "Return stored acknowledgement without repeating canonical financial facts; positive sale components use applied amounts after change; zero opening is an explicit operation without a zero entry",
       "generated_client_operation": "create_payment_v1_payments_post",
       "consumer_contract_state": "CLIENT_GENERATED_USED",
       "consumer_disposition": "LOCAL_UI_PRESENT",
@@ -27796,7 +27804,8 @@
         "apps/api/src/zeromerma_api/modules/cash/application/command_context.py",
         "docs/implementation/cash-idempotency-validation.md",
         "docs/architecture/concurrency.md",
-        "docs/implementation/concurrency-validation.md"
+        "docs/implementation/concurrency-validation.md",
+        "docs/implementation/financial-block-validation.md"
       ],
       "verification_notes": "ZM-FIN-036/037 local evidence: 42 unique PostgreSQL cases passed across the 28-case cash-boundary and 14-case complementary runs (29 new cases, 3 adapted concurrency cases, 10 prior cash/FK cases). The final combined runner also passed all 49 cases (29 cash, 9 transient conflicts, 11 inventory). Same-user HTTP authentication may serialize earlier; domain races use separate real transactions. Exact-commit Foundation acceptance accompanies delivery."
     },
@@ -27843,7 +27852,7 @@
       "domain_or_use_case_symbol": "ReturnCommitService.commit",
       "router_business_logic_present": false,
       "transaction_owner": "zeromerma_api.modules.idempotency.application.service.IdempotencyExecutor.execute",
-      "transaction_boundary": "One executor transaction commits the reserved identity, sale return and lines, CASH refund movement, business audit/outbox and minimized terminal result; the return command flushes but never commits independently.",
+      "transaction_boundary": "The existing idempotent command atomically owns business source, canonical financial facts, audit/outbox and immutable acknowledgement; no mirrored CashMovement",
       "persistence": "WRITE",
       "external_side_effect": "NONE_OBSERVED_STATICALLY",
       "reads_entities": [
@@ -27862,9 +27871,10 @@
         "idempotency_records",
         "sale_returns",
         "sale_return_lines",
-        "cash_movements",
         "audit_log",
-        "outbox_events"
+        "outbox_events",
+        "FinancialOperation",
+        "FinancialEntry"
       ],
       "locks_or_concurrency_control": "After the UUIDv7 reservation, the exact CashSession is locked FOR NO KEY UPDATE with populate_existing before dependent business rows or effects. Actor, branch, workstation and OPEN are revalidated under that lock; committed historical replay bypasses the action without requiring OPEN. Reservation FK KEY SHARE remains compatible. The original Sale is locked only after CashSession, and remaining quantity/net-value budgets are recalculated under that sale-local lock.",
       "audit_required": true,
@@ -27876,7 +27886,7 @@
       "idempotency_required": true,
       "idempotency_actual": "DEC07_COMPLIANT",
       "idempotency_business_identity": "Global UUIDv7 Idempotency-Key identifies return.commit with canonical payload and original actor/POS/branch/workstation/explicit cash_session_id context; X-Request-ID is attempt tracing only.",
-      "idempotency_replay_behavior": "Same authorized key and payload returns the saved safe acknowledgement and explicit refund_cash_movement_id without another return/refund/audit/outbox event; changed identity context conflicts, unresolved lookup never authorizes a replacement key, and completed recovery survives cash closure.",
+      "idempotency_replay_behavior": "Return the original immutable acknowledgement and admitted refund obligation; actual confirmed CASH_FIRST legs are never repeated. Historical nullable refund_cash_movement_id is null for new canonical refunds.",
       "generated_client_operation": "commit_sale_return_v1_returns_commit_post",
       "consumer_contract_state": "CLIENT_GENERATED_USED",
       "consumer_disposition": "LOCAL_UI_PRESENT",
@@ -27948,7 +27958,8 @@
         "docs/architecture/idempotency.md",
         "apps/api/src/zeromerma_api/modules/cash/application/command_context.py",
         "docs/architecture/concurrency.md",
-        "docs/implementation/concurrency-validation.md"
+        "docs/implementation/concurrency-validation.md",
+        "docs/implementation/financial-block-validation.md"
       ],
       "verification_notes": "ZM-FIN-036/037 local evidence: 42 unique PostgreSQL cases passed across the 28-case cash-boundary and 14-case complementary runs (29 new cases, 3 adapted concurrency cases, 10 prior cash/FK cases). The final combined runner also passed all 49 cases (29 cash, 9 transient conflicts, 11 inventory). Same-user HTTP authentication may serialize earlier; domain races use separate real transactions. Exact-commit Foundation acceptance accompanies delivery."
     },
@@ -27994,7 +28005,7 @@
       "domain_or_use_case_symbol": "SaleConfirmationService.confirm",
       "router_business_logic_present": false,
       "transaction_owner": "zeromerma_api.modules.idempotency.application.service.IdempotencyExecutor.execute",
-      "transaction_boundary": "One executor-owned root transaction; sale action flushes without committing; sale, payment, cash, audit, outbox and terminal result commit or roll back together",
+      "transaction_boundary": "The existing idempotent command atomically owns business source, canonical financial facts, audit/outbox and immutable acknowledgement; no mirrored CashMovement",
       "persistence": "WRITE",
       "external_side_effect": "NONE_OBSERVED_STATICALLY",
       "reads_entities": [
@@ -28013,9 +28024,10 @@
         "sales",
         "sale_lines",
         "sale_payments",
-        "cash_movements",
         "audit_logs",
-        "outbox_events"
+        "outbox_events",
+        "FinancialOperation",
+        "FinancialEntry"
       ],
       "locks_or_concurrency_control": "After the UUIDv7 reservation, the exact CashSession is locked FOR NO KEY UPDATE with populate_existing before dependent business rows or effects. Actor, branch, workstation and OPEN are revalidated under that lock; committed historical replay bypasses the action without requiring OPEN. Reservation FK KEY SHARE remains compatible. Cash collection effects commit before a later close recalculates its existing projection; a winning close rejects the later new sale.",
       "audit_required": true,
@@ -28027,7 +28039,7 @@
       "idempotency_required": true,
       "idempotency_actual": "DEC07_COMPLIANT",
       "idempotency_business_identity": "Global UUIDv7 Idempotency-Key; sale.confirm; actor, branch, workstation and explicit cash_session_id plus versioned canonical payload fingerprint",
-      "idempotency_replay_behavior": "Original HTTP 201 minimized SaleConfirmationView snapshot with current authorization; no repricing or repeated sale action. Sequential and concurrent retries, pre-commit rollback, lost committed response and browser reload/tab recovery verified by the ZM-FIN-029 acceptance suites.",
+      "idempotency_replay_behavior": "Return stored acknowledgement without repeating canonical financial facts; positive sale components use applied amounts after change; zero opening is an explicit operation without a zero entry",
       "generated_client_operation": "confirm_sale_v1_sales_confirm_post",
       "consumer_contract_state": "CLIENT_GENERATED_USED",
       "consumer_disposition": "LOCAL_UI_PRESENT",
@@ -28099,7 +28111,8 @@
         "docs/implementation/sale-idempotency-validation.md",
         "apps/api/src/zeromerma_api/modules/cash/application/command_context.py",
         "docs/architecture/concurrency.md",
-        "docs/implementation/concurrency-validation.md"
+        "docs/implementation/concurrency-validation.md",
+        "docs/implementation/financial-block-validation.md"
       ],
       "verification_notes": "ZM-FIN-036/037 local evidence: 42 unique PostgreSQL cases passed across the 28-case cash-boundary and 14-case complementary runs (29 new cases, 3 adapted concurrency cases, 10 prior cash/FK cases). The final combined runner also passed all 49 cases (29 cash, 9 transient conflicts, 11 inventory). Same-user HTTP authentication may serialize earlier; domain races use separate real transactions. Exact-commit Foundation acceptance accompanies delivery."
     },
@@ -30184,6 +30197,1013 @@
         "apps/api/src/zeromerma_api/modules/identity/presentation/dependencies.py",
         "apps/api/alembic/versions/20261018_0041_auth_sessions.py"
       ]
+    },
+    {
+      "operation_key": "API:GET:/v1/orders/refund-settlements/{idempotency_key}",
+      "surface": "POS",
+      "method": "GET",
+      "path": "/v1/orders/refund-settlements/{idempotency_key}",
+      "operation_id": "recover_orders_refund_settlement_v1_orders_refund_settlements__idempotency_key__get",
+      "include_in_schema": true,
+      "tags": [
+        "orders"
+      ],
+      "router_file": "apps/api/src/zeromerma_api/modules/orders/presentation/router.py",
+      "router_symbol": "recover_orders_refund_settlement",
+      "module_owner": "API:financial-refunds",
+      "use_case": "recover_orders_refund_settlement",
+      "implementation_state": "IMPLEMENTED_VERIFIED",
+      "verification_state": "TESTED_IN_THIS_TASK",
+      "auth_requirement": "AUTHENTICATED",
+      "actual_auth_dependency": [
+        "fastapi.security.api_key:APIKeyCookie",
+        "zeromerma_api.db.session:get_session",
+        "zeromerma_api.modules.identity.presentation.dependencies:get_current_authentication",
+        "zeromerma_api.modules.identity.presentation.dependencies:get_current_user",
+        "zeromerma_api.presentation.access_policy:enforce_operation_policy"
+      ],
+      "actual_surface_guard": "EXPLICIT_POS_POLICY_WITH_EFFECTIVE_GRANTS",
+      "required_capability": "orders.cancel",
+      "capability_enforcement_state": "CAPABILITY_ENFORCED",
+      "required_scope": "Fresh source-specific authority for the actual branch; POS actor/station context; original saved context for recovery",
+      "scope_source": "Authenticated cookie audience and persisted source/entry context",
+      "scope_enforcement_state": "SCOPE_ENFORCED",
+      "request_schema": [
+        "NONE"
+      ],
+      "response_schema": "FinancialRefundView",
+      "error_contract_state": "CANONICAL_API_ERROR_RESPONSE",
+      "application_service": [
+        "zeromerma_api.modules.financial_ledger.application.refund_commands.RefundSettlementService"
+      ],
+      "domain_or_use_case_symbol": "recover_orders_refund_settlement",
+      "router_business_logic_present": false,
+      "transaction_owner": "REQUEST_READ_ONLY",
+      "transaction_boundary": "Authenticated recovery of the original admitted immutable settlement acknowledgement; no business posting",
+      "persistence": "READ_ONLY",
+      "external_side_effect": "NONE_OBSERVED_STATICALLY",
+      "reads_entities": [
+        "FinancialOperation",
+        "FinancialEntry"
+      ],
+      "writes_entities": [
+        "NONE"
+      ],
+      "locks_or_concurrency_control": "Fresh read authorization; no economic mutation",
+      "audit_required": false,
+      "audit_actual": "NOT_REQUIRED",
+      "audit_atomicity": "NOT_REQUIRED",
+      "outbox_required": false,
+      "outbox_actual": "NOT_REQUIRED",
+      "outbox_atomicity": "NOT_REQUIRED",
+      "idempotency_required": false,
+      "idempotency_actual": "NOT_REQUIRED",
+      "idempotency_business_identity": "NONE",
+      "idempotency_replay_behavior": "Read-only recovery by original UUIDv7 key",
+      "generated_client_operation": "recover_orders_refund_settlement_v1_orders_refund_settlements__idempotency_key__get",
+      "consumer_contract_state": "CLIENT_GENERATED_USED",
+      "consumer_disposition": "LOCAL_UI_PRESENT",
+      "consumer_reason": "POS refund settlement panel preserves durable intention and resumes an outstanding obligation in the actual open shift.",
+      "pos_consumers": [
+        "apps/pos-web/src/features/refunds/refund-command-intent.ts",
+        "apps/pos-web/src/features/refunds/refund-settlement-panel.tsx",
+        "apps/pos-web/src/features/refunds/refund-recovery-panel.tsx",
+        "apps/pos-web/src/features/refunds/use-refund-intention.ts"
+      ],
+      "backoffice_consumers": [
+        "NONE"
+      ],
+      "other_consumers": [
+        "NONE"
+      ],
+      "direct_tests": [
+        "apps/api/tests/test_refund_financial_ledger.py"
+      ],
+      "indirect_tests": [
+        "NONE"
+      ],
+      "missing_test_types": [
+        "NONE"
+      ],
+      "approved_target_state": "CASH_FIRST obligation settlement without repeated completed legs",
+      "feature_complete_blocker": false,
+      "later_ZM_FIN_tasks": [
+        "ZM-FIN-067"
+      ],
+      "decision_refs": [
+        "DEC-06",
+        "DEC-07",
+        "DEC-11",
+        "DEC-14",
+        "DEC-19"
+      ],
+      "gate_refs": [
+        "G5"
+      ],
+      "gap_ids": [
+        "NONE"
+      ],
+      "evidence": [
+        "apps/api/src/zeromerma_api/modules/orders/presentation/router.py#recover_orders_refund_settlement",
+        "docs/implementation/financial-block-validation.md"
+      ],
+      "verification_notes": "ZM-FIN-036/037 local evidence: 42 unique PostgreSQL cases passed across the 28-case cash-boundary and 14-case complementary runs (29 new cases, 3 adapted concurrency cases, 10 prior cash/FK cases). The final combined runner also passed all 49 cases (29 cash, 9 transient conflicts, 11 inventory). Same-user HTTP authentication may serialize earlier; domain races use separate real transactions. Exact-commit Foundation acceptance accompanies delivery."
+    },
+    {
+      "operation_key": "API:GET:/v1/payment-terminal/bootstrap",
+      "surface": "API",
+      "method": "GET",
+      "path": "/v1/payment-terminal/bootstrap",
+      "operation_id": "bootstrap_v1_payment_terminal_bootstrap_get",
+      "include_in_schema": true,
+      "tags": [
+        "payment-terminal"
+      ],
+      "router_file": "apps/api/src/zeromerma_api/modules/payment_terminal/presentation/router.py",
+      "router_symbol": "bootstrap",
+      "module_owner": "API:payment-terminal",
+      "use_case": "bootstrap",
+      "implementation_state": "PARTIAL",
+      "verification_state": "TESTED_IN_THIS_TASK",
+      "auth_requirement": "AUTHENTICATED",
+      "actual_auth_dependency": [
+        "fastapi.security.api_key:APIKeyCookie",
+        "zeromerma_api.db.session:get_session",
+        "zeromerma_api.modules.identity.presentation.dependencies:get_current_authentication",
+        "zeromerma_api.modules.identity.presentation.dependencies:get_current_user",
+        "zeromerma_api.modules.payment_terminal.presentation.router:terminal_service"
+      ],
+      "actual_surface_guard": "COOKIE_AUDIENCE_AND_FRESH_SOURCE_AUTHORITY",
+      "required_capability": "SOURCE_SPECIFIC_ECONOMIC_AUTHORITY",
+      "capability_enforcement_state": "CAPABILITY_ENFORCED",
+      "required_scope": "Fresh source-specific authority for the actual branch; POS actor/station context; original saved context for recovery",
+      "scope_source": "Authenticated cookie audience and persisted source/entry context",
+      "scope_enforcement_state": "SCOPE_ENFORCED",
+      "request_schema": [
+        "NONE"
+      ],
+      "response_schema": "TerminalBootstrapView",
+      "error_contract_state": "CANONICAL_API_ERROR_RESPONSE",
+      "application_service": [
+        "zeromerma_api.modules.payment_terminal.application.services.PaymentTerminalService"
+      ],
+      "domain_or_use_case_symbol": "bootstrap",
+      "router_business_logic_present": false,
+      "transaction_owner": "REQUEST_READ_ONLY",
+      "transaction_boundary": "Authenticated read of current bootstrap/operation state; no provider call or business posting",
+      "persistence": "READ_ONLY",
+      "external_side_effect": "NONE_OBSERVED_STATICALLY",
+      "reads_entities": [
+        "FinancialOperation",
+        "FinancialEntry"
+      ],
+      "writes_entities": [
+        "NONE"
+      ],
+      "locks_or_concurrency_control": "Fresh read authorization; no economic mutation",
+      "audit_required": false,
+      "audit_actual": "NOT_REQUIRED",
+      "audit_atomicity": "NOT_REQUIRED",
+      "outbox_required": false,
+      "outbox_actual": "NOT_REQUIRED",
+      "outbox_atomicity": "NOT_REQUIRED",
+      "idempotency_required": false,
+      "idempotency_actual": "NOT_REQUIRED",
+      "idempotency_business_identity": "NONE",
+      "idempotency_replay_behavior": "Read current state by durable operation identity",
+      "generated_client_operation": "bootstrap_v1_payment_terminal_bootstrap_get",
+      "consumer_contract_state": "NOT_CONSUMED",
+      "consumer_disposition": "FUTURE_CONSUMER_NOT_IMPLEMENTED",
+      "consumer_reason": "bootstrap: the real BBVA adapter, pending-leg business admission and terminal UI require provider/hardware evidence before activation.",
+      "pos_consumers": [
+        "NONE"
+      ],
+      "backoffice_consumers": [
+        "NONE"
+      ],
+      "other_consumers": [
+        "NONE"
+      ],
+      "direct_tests": [
+        "apps/api/tests/test_payment_terminal.py"
+      ],
+      "indirect_tests": [
+        "NONE"
+      ],
+      "missing_test_types": [
+        "REAL_BBVA_SANDBOX_AND_HARDWARE"
+      ],
+      "approved_target_state": "Certified BBVA capture/refund/reconciliation with workstation binding and no uncertain duplicate charges",
+      "feature_complete_blocker": true,
+      "later_ZM_FIN_tasks": [
+        "ZM-FIN-046",
+        "ZM-FIN-065"
+      ],
+      "decision_refs": [
+        "DEC-06",
+        "DEC-07",
+        "DEC-11",
+        "DEC-14",
+        "DEC-19"
+      ],
+      "gate_refs": [
+        "G5",
+        "G8"
+      ],
+      "gap_ids": [
+        "ZM-GAP-046-bootstrap_v1_payment_terminal_bootstrap_get"
+      ],
+      "evidence": [
+        "apps/api/src/zeromerma_api/modules/payment_terminal/presentation/router.py#bootstrap",
+        "docs/implementation/financial-block-validation.md"
+      ],
+      "verification_notes": "ZM-FIN-036/037 local evidence: 42 unique PostgreSQL cases passed across the 28-case cash-boundary and 14-case complementary runs (29 new cases, 3 adapted concurrency cases, 10 prior cash/FK cases). The final combined runner also passed all 49 cases (29 cash, 9 transient conflicts, 11 inventory). Same-user HTTP authentication may serialize earlier; domain races use separate real transactions. Exact-commit Foundation acceptance accompanies delivery."
+    },
+    {
+      "operation_key": "API:GET:/v1/payment-terminal/operations/{operation_id}",
+      "surface": "API",
+      "method": "GET",
+      "path": "/v1/payment-terminal/operations/{operation_id}",
+      "operation_id": "get_operation_v1_payment_terminal_operations__operation_id__get",
+      "include_in_schema": true,
+      "tags": [
+        "payment-terminal"
+      ],
+      "router_file": "apps/api/src/zeromerma_api/modules/payment_terminal/presentation/router.py",
+      "router_symbol": "get_operation",
+      "module_owner": "API:payment-terminal",
+      "use_case": "get_operation",
+      "implementation_state": "PARTIAL",
+      "verification_state": "TESTED_IN_THIS_TASK",
+      "auth_requirement": "AUTHENTICATED",
+      "actual_auth_dependency": [
+        "fastapi.security.api_key:APIKeyCookie",
+        "zeromerma_api.db.session:get_session",
+        "zeromerma_api.modules.identity.presentation.dependencies:get_current_authentication",
+        "zeromerma_api.modules.identity.presentation.dependencies:get_current_user",
+        "zeromerma_api.modules.payment_terminal.presentation.router:terminal_service"
+      ],
+      "actual_surface_guard": "COOKIE_AUDIENCE_AND_FRESH_SOURCE_AUTHORITY",
+      "required_capability": "SOURCE_SPECIFIC_ECONOMIC_AUTHORITY",
+      "capability_enforcement_state": "CAPABILITY_ENFORCED",
+      "required_scope": "Fresh source-specific authority for the actual branch; POS actor/station context; original saved context for recovery",
+      "scope_source": "Authenticated cookie audience and persisted source/entry context",
+      "scope_enforcement_state": "SCOPE_ENFORCED",
+      "request_schema": [
+        "NONE"
+      ],
+      "response_schema": "TerminalOperationView",
+      "error_contract_state": "CANONICAL_API_ERROR_RESPONSE",
+      "application_service": [
+        "zeromerma_api.modules.payment_terminal.application.services.PaymentTerminalService"
+      ],
+      "domain_or_use_case_symbol": "get_operation",
+      "router_business_logic_present": false,
+      "transaction_owner": "REQUEST_READ_ONLY",
+      "transaction_boundary": "Authenticated read of current bootstrap/operation state; no provider call or business posting",
+      "persistence": "READ_ONLY",
+      "external_side_effect": "NONE_OBSERVED_STATICALLY",
+      "reads_entities": [
+        "FinancialOperation",
+        "FinancialEntry"
+      ],
+      "writes_entities": [
+        "NONE"
+      ],
+      "locks_or_concurrency_control": "Fresh read authorization; no economic mutation",
+      "audit_required": false,
+      "audit_actual": "NOT_REQUIRED",
+      "audit_atomicity": "NOT_REQUIRED",
+      "outbox_required": false,
+      "outbox_actual": "NOT_REQUIRED",
+      "outbox_atomicity": "NOT_REQUIRED",
+      "idempotency_required": false,
+      "idempotency_actual": "NOT_REQUIRED",
+      "idempotency_business_identity": "NONE",
+      "idempotency_replay_behavior": "Read current state by durable operation identity",
+      "generated_client_operation": "get_operation_v1_payment_terminal_operations__operation_id__get",
+      "consumer_contract_state": "NOT_CONSUMED",
+      "consumer_disposition": "FUTURE_CONSUMER_NOT_IMPLEMENTED",
+      "consumer_reason": "get_operation: the real BBVA adapter, pending-leg business admission and terminal UI require provider/hardware evidence before activation.",
+      "pos_consumers": [
+        "NONE"
+      ],
+      "backoffice_consumers": [
+        "NONE"
+      ],
+      "other_consumers": [
+        "NONE"
+      ],
+      "direct_tests": [
+        "apps/api/tests/test_payment_terminal.py"
+      ],
+      "indirect_tests": [
+        "NONE"
+      ],
+      "missing_test_types": [
+        "REAL_BBVA_SANDBOX_AND_HARDWARE"
+      ],
+      "approved_target_state": "Certified BBVA capture/refund/reconciliation with workstation binding and no uncertain duplicate charges",
+      "feature_complete_blocker": true,
+      "later_ZM_FIN_tasks": [
+        "ZM-FIN-046",
+        "ZM-FIN-065"
+      ],
+      "decision_refs": [
+        "DEC-06",
+        "DEC-07",
+        "DEC-11",
+        "DEC-14",
+        "DEC-19"
+      ],
+      "gate_refs": [
+        "G5",
+        "G8"
+      ],
+      "gap_ids": [
+        "ZM-GAP-046-get_operation_v1_payment_terminal_operations__operation_id__get"
+      ],
+      "evidence": [
+        "apps/api/src/zeromerma_api/modules/payment_terminal/presentation/router.py#get_operation",
+        "docs/implementation/financial-block-validation.md"
+      ],
+      "verification_notes": "ZM-FIN-036/037 local evidence: 42 unique PostgreSQL cases passed across the 28-case cash-boundary and 14-case complementary runs (29 new cases, 3 adapted concurrency cases, 10 prior cash/FK cases). The final combined runner also passed all 49 cases (29 cash, 9 transient conflicts, 11 inventory). Same-user HTTP authentication may serialize earlier; domain races use separate real transactions. Exact-commit Foundation acceptance accompanies delivery."
+    },
+    {
+      "operation_key": "API:GET:/v1/returns/refund-settlements/{idempotency_key}",
+      "surface": "POS",
+      "method": "GET",
+      "path": "/v1/returns/refund-settlements/{idempotency_key}",
+      "operation_id": "recover_returns_refund_settlement_v1_returns_refund_settlements__idempotency_key__get",
+      "include_in_schema": true,
+      "tags": [
+        "returns"
+      ],
+      "router_file": "apps/api/src/zeromerma_api/modules/returns/presentation/router.py",
+      "router_symbol": "recover_returns_refund_settlement",
+      "module_owner": "API:financial-refunds",
+      "use_case": "recover_returns_refund_settlement",
+      "implementation_state": "IMPLEMENTED_VERIFIED",
+      "verification_state": "TESTED_IN_THIS_TASK",
+      "auth_requirement": "AUTHENTICATED",
+      "actual_auth_dependency": [
+        "fastapi.security.api_key:APIKeyCookie",
+        "zeromerma_api.db.session:get_session",
+        "zeromerma_api.modules.identity.presentation.dependencies:get_current_authentication",
+        "zeromerma_api.modules.identity.presentation.dependencies:get_current_user",
+        "zeromerma_api.presentation.access_policy:enforce_operation_policy"
+      ],
+      "actual_surface_guard": "EXPLICIT_POS_POLICY_WITH_EFFECTIVE_GRANTS",
+      "required_capability": "returns_corrections.manage",
+      "capability_enforcement_state": "CAPABILITY_ENFORCED",
+      "required_scope": "Fresh source-specific authority for the actual branch; POS actor/station context; original saved context for recovery",
+      "scope_source": "Authenticated cookie audience and persisted source/entry context",
+      "scope_enforcement_state": "SCOPE_ENFORCED",
+      "request_schema": [
+        "NONE"
+      ],
+      "response_schema": "FinancialRefundView",
+      "error_contract_state": "CANONICAL_API_ERROR_RESPONSE",
+      "application_service": [
+        "zeromerma_api.modules.financial_ledger.application.refund_commands.RefundSettlementService"
+      ],
+      "domain_or_use_case_symbol": "recover_returns_refund_settlement",
+      "router_business_logic_present": false,
+      "transaction_owner": "REQUEST_READ_ONLY",
+      "transaction_boundary": "Authenticated recovery of the original admitted immutable settlement acknowledgement; no business posting",
+      "persistence": "READ_ONLY",
+      "external_side_effect": "NONE_OBSERVED_STATICALLY",
+      "reads_entities": [
+        "FinancialOperation",
+        "FinancialEntry"
+      ],
+      "writes_entities": [
+        "NONE"
+      ],
+      "locks_or_concurrency_control": "Fresh read authorization; no economic mutation",
+      "audit_required": false,
+      "audit_actual": "NOT_REQUIRED",
+      "audit_atomicity": "NOT_REQUIRED",
+      "outbox_required": false,
+      "outbox_actual": "NOT_REQUIRED",
+      "outbox_atomicity": "NOT_REQUIRED",
+      "idempotency_required": false,
+      "idempotency_actual": "NOT_REQUIRED",
+      "idempotency_business_identity": "NONE",
+      "idempotency_replay_behavior": "Read-only recovery by original UUIDv7 key",
+      "generated_client_operation": "recover_returns_refund_settlement_v1_returns_refund_settlements__idempotency_key__get",
+      "consumer_contract_state": "CLIENT_GENERATED_USED",
+      "consumer_disposition": "LOCAL_UI_PRESENT",
+      "consumer_reason": "POS refund settlement panel preserves durable intention and resumes an outstanding obligation in the actual open shift.",
+      "pos_consumers": [
+        "apps/pos-web/src/features/refunds/refund-command-intent.ts",
+        "apps/pos-web/src/features/refunds/refund-settlement-panel.tsx",
+        "apps/pos-web/src/features/refunds/refund-recovery-panel.tsx",
+        "apps/pos-web/src/features/refunds/use-refund-intention.ts"
+      ],
+      "backoffice_consumers": [
+        "NONE"
+      ],
+      "other_consumers": [
+        "NONE"
+      ],
+      "direct_tests": [
+        "apps/api/tests/test_refund_financial_ledger.py"
+      ],
+      "indirect_tests": [
+        "NONE"
+      ],
+      "missing_test_types": [
+        "NONE"
+      ],
+      "approved_target_state": "CASH_FIRST obligation settlement without repeated completed legs",
+      "feature_complete_blocker": false,
+      "later_ZM_FIN_tasks": [
+        "ZM-FIN-067"
+      ],
+      "decision_refs": [
+        "DEC-06",
+        "DEC-07",
+        "DEC-11",
+        "DEC-14",
+        "DEC-19"
+      ],
+      "gate_refs": [
+        "G5"
+      ],
+      "gap_ids": [
+        "NONE"
+      ],
+      "evidence": [
+        "apps/api/src/zeromerma_api/modules/returns/presentation/router.py#recover_returns_refund_settlement",
+        "docs/implementation/financial-block-validation.md"
+      ],
+      "verification_notes": "ZM-FIN-036/037 local evidence: 42 unique PostgreSQL cases passed across the 28-case cash-boundary and 14-case complementary runs (29 new cases, 3 adapted concurrency cases, 10 prior cash/FK cases). The final combined runner also passed all 49 cases (29 cash, 9 transient conflicts, 11 inventory). Same-user HTTP authentication may serialize earlier; domain races use separate real transactions. Exact-commit Foundation acceptance accompanies delivery."
+    },
+    {
+      "operation_key": "API:POST:/v1/orders/{order_id}/refund-settlements",
+      "surface": "POS",
+      "method": "POST",
+      "path": "/v1/orders/{order_id}/refund-settlements",
+      "operation_id": "settle_orders_refund_v1_orders__order_id__refund_settlements_post",
+      "include_in_schema": true,
+      "tags": [
+        "orders"
+      ],
+      "router_file": "apps/api/src/zeromerma_api/modules/orders/presentation/router.py",
+      "router_symbol": "settle_orders_refund",
+      "module_owner": "API:financial-refunds",
+      "use_case": "settle_orders_refund",
+      "implementation_state": "IMPLEMENTED_VERIFIED",
+      "verification_state": "TESTED_IN_THIS_TASK",
+      "auth_requirement": "AUTHENTICATED",
+      "actual_auth_dependency": [
+        "fastapi.security.api_key:APIKeyCookie",
+        "zeromerma_api.db.session:get_session",
+        "zeromerma_api.modules.idempotency.presentation.http:require_idempotency_key",
+        "zeromerma_api.modules.identity.presentation.dependencies:get_current_authentication",
+        "zeromerma_api.modules.identity.presentation.dependencies:get_current_user",
+        "zeromerma_api.presentation.access_policy:enforce_operation_policy"
+      ],
+      "actual_surface_guard": "EXPLICIT_POS_POLICY_WITH_EFFECTIVE_GRANTS",
+      "required_capability": "orders.cancel",
+      "capability_enforcement_state": "CAPABILITY_ENFORCED",
+      "required_scope": "Fresh source-specific authority for the actual branch; POS actor/station context; original saved context for recovery",
+      "scope_source": "Authenticated cookie audience and persisted source/entry context",
+      "scope_enforcement_state": "SCOPE_ENFORCED",
+      "request_schema": [
+        "RefundSettlementRequest"
+      ],
+      "response_schema": "FinancialRefundView",
+      "error_contract_state": "CANONICAL_API_ERROR_RESPONSE",
+      "application_service": [
+        "zeromerma_api.modules.financial_ledger.application.refund_commands.RefundSettlementService"
+      ],
+      "domain_or_use_case_symbol": "settle_orders_refund",
+      "router_business_logic_present": false,
+      "transaction_owner": "IDEMPOTENT_COMMAND",
+      "transaction_boundary": "Business source lock and actual cash-session boundary inside idempotent command",
+      "persistence": "WRITE",
+      "external_side_effect": "NONE_OBSERVED_STATICALLY",
+      "reads_entities": [
+        "FinancialOperation",
+        "FinancialEntry"
+      ],
+      "writes_entities": [
+        "FinancialEntry",
+        "AuditLog",
+        "OutboxEvent"
+      ],
+      "locks_or_concurrency_control": "Actual cash-session lock; immutable causal identity; row-locked obligation or provider operation",
+      "audit_required": true,
+      "audit_actual": "ATOMIC",
+      "audit_atomicity": "ATOMIC",
+      "outbox_required": true,
+      "outbox_actual": "ATOMIC",
+      "outbox_atomicity": "ATOMIC",
+      "idempotency_required": true,
+      "idempotency_actual": "DEC07_COMPLIANT",
+      "idempotency_business_identity": "Source obligation + admitted actual-turn settlement key",
+      "idempotency_replay_behavior": "Return stored admission acknowledgement; query current state separately",
+      "generated_client_operation": "settle_orders_refund_v1_orders__order_id__refund_settlements_post",
+      "consumer_contract_state": "CLIENT_GENERATED_USED",
+      "consumer_disposition": "LOCAL_UI_PRESENT",
+      "consumer_reason": "POS refund settlement panel preserves durable intention and resumes an outstanding obligation in the actual open shift.",
+      "pos_consumers": [
+        "apps/pos-web/src/features/refunds/refund-command-intent.ts",
+        "apps/pos-web/src/features/refunds/refund-settlement-panel.tsx",
+        "apps/pos-web/src/features/refunds/refund-recovery-panel.tsx",
+        "apps/pos-web/src/features/refunds/use-refund-intention.ts"
+      ],
+      "backoffice_consumers": [
+        "NONE"
+      ],
+      "other_consumers": [
+        "NONE"
+      ],
+      "direct_tests": [
+        "apps/api/tests/test_refund_financial_ledger.py"
+      ],
+      "indirect_tests": [
+        "NONE"
+      ],
+      "missing_test_types": [
+        "NONE"
+      ],
+      "approved_target_state": "CASH_FIRST obligation settlement without repeated completed legs",
+      "feature_complete_blocker": false,
+      "later_ZM_FIN_tasks": [
+        "ZM-FIN-067"
+      ],
+      "decision_refs": [
+        "DEC-06",
+        "DEC-07",
+        "DEC-11",
+        "DEC-14",
+        "DEC-19"
+      ],
+      "gate_refs": [
+        "G5"
+      ],
+      "gap_ids": [
+        "NONE"
+      ],
+      "evidence": [
+        "apps/api/src/zeromerma_api/modules/orders/presentation/router.py#settle_orders_refund",
+        "docs/implementation/financial-block-validation.md"
+      ],
+      "verification_notes": "ZM-FIN-036/037 local evidence: 42 unique PostgreSQL cases passed across the 28-case cash-boundary and 14-case complementary runs (29 new cases, 3 adapted concurrency cases, 10 prior cash/FK cases). The final combined runner also passed all 49 cases (29 cash, 9 transient conflicts, 11 inventory). Same-user HTTP authentication may serialize earlier; domain races use separate real transactions. Exact-commit Foundation acceptance accompanies delivery."
+    },
+    {
+      "operation_key": "API:POST:/v1/payment-terminal/operations",
+      "surface": "API",
+      "method": "POST",
+      "path": "/v1/payment-terminal/operations",
+      "operation_id": "request_operation_v1_payment_terminal_operations_post",
+      "include_in_schema": true,
+      "tags": [
+        "payment-terminal"
+      ],
+      "router_file": "apps/api/src/zeromerma_api/modules/payment_terminal/presentation/router.py",
+      "router_symbol": "request_operation",
+      "module_owner": "API:payment-terminal",
+      "use_case": "request_operation",
+      "implementation_state": "PARTIAL",
+      "verification_state": "TESTED_IN_THIS_TASK",
+      "auth_requirement": "AUTHENTICATED",
+      "actual_auth_dependency": [
+        "fastapi.security.api_key:APIKeyCookie",
+        "zeromerma_api.db.session:get_session",
+        "zeromerma_api.modules.idempotency.presentation.http:require_idempotency_key",
+        "zeromerma_api.modules.identity.presentation.dependencies:get_current_authentication",
+        "zeromerma_api.modules.identity.presentation.dependencies:get_current_user",
+        "zeromerma_api.modules.payment_terminal.presentation.router:terminal_service"
+      ],
+      "actual_surface_guard": "COOKIE_AUDIENCE_AND_FRESH_SOURCE_AUTHORITY",
+      "required_capability": "SOURCE_SPECIFIC_ECONOMIC_AUTHORITY",
+      "capability_enforcement_state": "CAPABILITY_ENFORCED",
+      "required_scope": "Fresh source-specific authority for the actual branch; POS actor/station context; original saved context for recovery",
+      "scope_source": "Authenticated cookie audience and persisted source/entry context",
+      "scope_enforcement_state": "SCOPE_ENFORCED",
+      "request_schema": [
+        "TerminalOperationRequest"
+      ],
+      "response_schema": "TerminalOperationAcknowledgement",
+      "error_contract_state": "CANONICAL_API_ERROR_RESPONSE",
+      "application_service": [
+        "zeromerma_api.modules.payment_terminal.application.services.PaymentTerminalService"
+      ],
+      "domain_or_use_case_symbol": "request_operation",
+      "router_business_logic_present": false,
+      "transaction_owner": "DURABLE_PROVIDER_COMMAND_AND_GUARDED_CONTINUATIONS",
+      "transaction_boundary": "Durable local admission before provider call; separate guarded evidence transaction",
+      "persistence": "WRITE",
+      "external_side_effect": "GATED_PROVIDER_ADAPTER_ONLY",
+      "reads_entities": [
+        "FinancialOperation",
+        "FinancialEntry"
+      ],
+      "writes_entities": [
+        "ExternalPaymentOperation",
+        "ExternalPaymentEvidence",
+        "FinancialEntry"
+      ],
+      "locks_or_concurrency_control": "Actual cash-session lock; immutable causal identity; row-locked obligation or provider operation",
+      "audit_required": true,
+      "audit_actual": "ATOMIC",
+      "audit_atomicity": "ATOMIC",
+      "outbox_required": true,
+      "outbox_actual": "ATOMIC",
+      "outbox_atomicity": "ATOMIC",
+      "idempotency_required": true,
+      "idempotency_actual": "DEC07_COMPLIANT",
+      "idempotency_business_identity": "Immutable provider operation and original key; continuations cannot create another capture",
+      "idempotency_replay_behavior": "Return stored admission acknowledgement; query current state separately",
+      "generated_client_operation": "request_operation_v1_payment_terminal_operations_post",
+      "consumer_contract_state": "NOT_CONSUMED",
+      "consumer_disposition": "FUTURE_CONSUMER_NOT_IMPLEMENTED",
+      "consumer_reason": "request_operation: the real BBVA adapter, pending-leg business admission and terminal UI require provider/hardware evidence before activation.",
+      "pos_consumers": [
+        "NONE"
+      ],
+      "backoffice_consumers": [
+        "NONE"
+      ],
+      "other_consumers": [
+        "NONE"
+      ],
+      "direct_tests": [
+        "apps/api/tests/test_payment_terminal.py"
+      ],
+      "indirect_tests": [
+        "NONE"
+      ],
+      "missing_test_types": [
+        "REAL_BBVA_SANDBOX_AND_HARDWARE"
+      ],
+      "approved_target_state": "Certified BBVA capture/refund/reconciliation with workstation binding and no uncertain duplicate charges",
+      "feature_complete_blocker": true,
+      "later_ZM_FIN_tasks": [
+        "ZM-FIN-046",
+        "ZM-FIN-065"
+      ],
+      "decision_refs": [
+        "DEC-06",
+        "DEC-07",
+        "DEC-11",
+        "DEC-14",
+        "DEC-19"
+      ],
+      "gate_refs": [
+        "G5",
+        "G8"
+      ],
+      "gap_ids": [
+        "ZM-GAP-046-request_operation_v1_payment_terminal_operations_post"
+      ],
+      "evidence": [
+        "apps/api/src/zeromerma_api/modules/payment_terminal/presentation/router.py#request_operation",
+        "docs/implementation/financial-block-validation.md"
+      ],
+      "verification_notes": "ZM-FIN-036/037 local evidence: 42 unique PostgreSQL cases passed across the 28-case cash-boundary and 14-case complementary runs (29 new cases, 3 adapted concurrency cases, 10 prior cash/FK cases). The final combined runner also passed all 49 cases (29 cash, 9 transient conflicts, 11 inventory). Same-user HTTP authentication may serialize earlier; domain races use separate real transactions. Exact-commit Foundation acceptance accompanies delivery."
+    },
+    {
+      "operation_key": "API:POST:/v1/payment-terminal/operations/{operation_id}/dispatch",
+      "surface": "API",
+      "method": "POST",
+      "path": "/v1/payment-terminal/operations/{operation_id}/dispatch",
+      "operation_id": "dispatch_v1_payment_terminal_operations__operation_id__dispatch_post",
+      "include_in_schema": true,
+      "tags": [
+        "payment-terminal"
+      ],
+      "router_file": "apps/api/src/zeromerma_api/modules/payment_terminal/presentation/router.py",
+      "router_symbol": "dispatch",
+      "module_owner": "API:payment-terminal",
+      "use_case": "dispatch",
+      "implementation_state": "PARTIAL",
+      "verification_state": "TESTED_IN_THIS_TASK",
+      "auth_requirement": "AUTHENTICATED",
+      "actual_auth_dependency": [
+        "fastapi.security.api_key:APIKeyCookie",
+        "zeromerma_api.db.session:get_session",
+        "zeromerma_api.modules.identity.presentation.dependencies:get_current_authentication",
+        "zeromerma_api.modules.identity.presentation.dependencies:get_current_user",
+        "zeromerma_api.modules.payment_terminal.presentation.router:terminal_service"
+      ],
+      "actual_surface_guard": "COOKIE_AUDIENCE_AND_FRESH_SOURCE_AUTHORITY",
+      "required_capability": "SOURCE_SPECIFIC_ECONOMIC_AUTHORITY",
+      "capability_enforcement_state": "CAPABILITY_ENFORCED",
+      "required_scope": "Fresh source-specific authority for the actual branch; POS actor/station context; original saved context for recovery",
+      "scope_source": "Authenticated cookie audience and persisted source/entry context",
+      "scope_enforcement_state": "SCOPE_ENFORCED",
+      "request_schema": [
+        "NONE"
+      ],
+      "response_schema": "TerminalOperationView",
+      "error_contract_state": "CANONICAL_API_ERROR_RESPONSE",
+      "application_service": [
+        "zeromerma_api.modules.payment_terminal.application.services.PaymentTerminalService"
+      ],
+      "domain_or_use_case_symbol": "dispatch",
+      "router_business_logic_present": false,
+      "transaction_owner": "DURABLE_PROVIDER_COMMAND_AND_GUARDED_CONTINUATIONS",
+      "transaction_boundary": "Durable local admission before provider call; separate guarded evidence transaction",
+      "persistence": "WRITE",
+      "external_side_effect": "GATED_PROVIDER_ADAPTER_ONLY",
+      "reads_entities": [
+        "FinancialOperation",
+        "FinancialEntry"
+      ],
+      "writes_entities": [
+        "ExternalPaymentOperation",
+        "ExternalPaymentEvidence",
+        "FinancialEntry"
+      ],
+      "locks_or_concurrency_control": "Actual cash-session lock; immutable causal identity; row-locked obligation or provider operation",
+      "audit_required": true,
+      "audit_actual": "ATOMIC",
+      "audit_atomicity": "ATOMIC",
+      "outbox_required": true,
+      "outbox_actual": "ATOMIC",
+      "outbox_atomicity": "ATOMIC",
+      "idempotency_required": true,
+      "idempotency_actual": "DEC07_COMPLIANT",
+      "idempotency_business_identity": "Existing durable operation ID; these continuations accept no new idempotency key or amount",
+      "idempotency_replay_behavior": "Resume/query the same provider intention; terminal states are returned without a second execution",
+      "generated_client_operation": "dispatch_v1_payment_terminal_operations__operation_id__dispatch_post",
+      "consumer_contract_state": "NOT_CONSUMED",
+      "consumer_disposition": "FUTURE_CONSUMER_NOT_IMPLEMENTED",
+      "consumer_reason": "dispatch: the real BBVA adapter, pending-leg business admission and terminal UI require provider/hardware evidence before activation.",
+      "pos_consumers": [
+        "NONE"
+      ],
+      "backoffice_consumers": [
+        "NONE"
+      ],
+      "other_consumers": [
+        "NONE"
+      ],
+      "direct_tests": [
+        "apps/api/tests/test_payment_terminal.py"
+      ],
+      "indirect_tests": [
+        "NONE"
+      ],
+      "missing_test_types": [
+        "REAL_BBVA_SANDBOX_AND_HARDWARE"
+      ],
+      "approved_target_state": "Certified BBVA capture/refund/reconciliation with workstation binding and no uncertain duplicate charges",
+      "feature_complete_blocker": true,
+      "later_ZM_FIN_tasks": [
+        "ZM-FIN-046",
+        "ZM-FIN-065"
+      ],
+      "decision_refs": [
+        "DEC-06",
+        "DEC-07",
+        "DEC-11",
+        "DEC-14",
+        "DEC-19"
+      ],
+      "gate_refs": [
+        "G5",
+        "G8"
+      ],
+      "gap_ids": [
+        "ZM-GAP-046-dispatch_v1_payment_terminal_operations__operation_id__dispatch_post"
+      ],
+      "evidence": [
+        "apps/api/src/zeromerma_api/modules/payment_terminal/presentation/router.py#dispatch",
+        "docs/implementation/financial-block-validation.md"
+      ],
+      "verification_notes": "ZM-FIN-036/037 local evidence: 42 unique PostgreSQL cases passed across the 28-case cash-boundary and 14-case complementary runs (29 new cases, 3 adapted concurrency cases, 10 prior cash/FK cases). The final combined runner also passed all 49 cases (29 cash, 9 transient conflicts, 11 inventory). Same-user HTTP authentication may serialize earlier; domain races use separate real transactions. Exact-commit Foundation acceptance accompanies delivery."
+    },
+    {
+      "operation_key": "API:POST:/v1/payment-terminal/operations/{operation_id}/reconcile",
+      "surface": "API",
+      "method": "POST",
+      "path": "/v1/payment-terminal/operations/{operation_id}/reconcile",
+      "operation_id": "reconcile_v1_payment_terminal_operations__operation_id__reconcile_post",
+      "include_in_schema": true,
+      "tags": [
+        "payment-terminal"
+      ],
+      "router_file": "apps/api/src/zeromerma_api/modules/payment_terminal/presentation/router.py",
+      "router_symbol": "reconcile",
+      "module_owner": "API:payment-terminal",
+      "use_case": "reconcile",
+      "implementation_state": "PARTIAL",
+      "verification_state": "TESTED_IN_THIS_TASK",
+      "auth_requirement": "AUTHENTICATED",
+      "actual_auth_dependency": [
+        "fastapi.security.api_key:APIKeyCookie",
+        "zeromerma_api.db.session:get_session",
+        "zeromerma_api.modules.identity.presentation.dependencies:get_current_authentication",
+        "zeromerma_api.modules.identity.presentation.dependencies:get_current_user",
+        "zeromerma_api.modules.payment_terminal.presentation.router:terminal_service"
+      ],
+      "actual_surface_guard": "COOKIE_AUDIENCE_AND_FRESH_SOURCE_AUTHORITY",
+      "required_capability": "SOURCE_SPECIFIC_ECONOMIC_AUTHORITY",
+      "capability_enforcement_state": "CAPABILITY_ENFORCED",
+      "required_scope": "Fresh source-specific authority for the actual branch; POS actor/station context; original saved context for recovery",
+      "scope_source": "Authenticated cookie audience and persisted source/entry context",
+      "scope_enforcement_state": "SCOPE_ENFORCED",
+      "request_schema": [
+        "NONE"
+      ],
+      "response_schema": "TerminalOperationView",
+      "error_contract_state": "CANONICAL_API_ERROR_RESPONSE",
+      "application_service": [
+        "zeromerma_api.modules.payment_terminal.application.services.PaymentTerminalService"
+      ],
+      "domain_or_use_case_symbol": "reconcile",
+      "router_business_logic_present": false,
+      "transaction_owner": "DURABLE_PROVIDER_COMMAND_AND_GUARDED_CONTINUATIONS",
+      "transaction_boundary": "Durable local admission before provider call; separate guarded evidence transaction",
+      "persistence": "WRITE",
+      "external_side_effect": "GATED_PROVIDER_ADAPTER_ONLY",
+      "reads_entities": [
+        "FinancialOperation",
+        "FinancialEntry"
+      ],
+      "writes_entities": [
+        "ExternalPaymentOperation",
+        "ExternalPaymentEvidence",
+        "FinancialEntry"
+      ],
+      "locks_or_concurrency_control": "Actual cash-session lock; immutable causal identity; row-locked obligation or provider operation",
+      "audit_required": true,
+      "audit_actual": "ATOMIC",
+      "audit_atomicity": "ATOMIC",
+      "outbox_required": true,
+      "outbox_actual": "ATOMIC",
+      "outbox_atomicity": "ATOMIC",
+      "idempotency_required": true,
+      "idempotency_actual": "DEC07_COMPLIANT",
+      "idempotency_business_identity": "Existing durable operation ID; these continuations accept no new idempotency key or amount",
+      "idempotency_replay_behavior": "Resume/query the same provider intention; terminal states are returned without a second execution",
+      "generated_client_operation": "reconcile_v1_payment_terminal_operations__operation_id__reconcile_post",
+      "consumer_contract_state": "NOT_CONSUMED",
+      "consumer_disposition": "FUTURE_CONSUMER_NOT_IMPLEMENTED",
+      "consumer_reason": "reconcile: the real BBVA adapter, pending-leg business admission and terminal UI require provider/hardware evidence before activation.",
+      "pos_consumers": [
+        "NONE"
+      ],
+      "backoffice_consumers": [
+        "NONE"
+      ],
+      "other_consumers": [
+        "NONE"
+      ],
+      "direct_tests": [
+        "apps/api/tests/test_payment_terminal.py"
+      ],
+      "indirect_tests": [
+        "NONE"
+      ],
+      "missing_test_types": [
+        "REAL_BBVA_SANDBOX_AND_HARDWARE"
+      ],
+      "approved_target_state": "Certified BBVA capture/refund/reconciliation with workstation binding and no uncertain duplicate charges",
+      "feature_complete_blocker": true,
+      "later_ZM_FIN_tasks": [
+        "ZM-FIN-046",
+        "ZM-FIN-065"
+      ],
+      "decision_refs": [
+        "DEC-06",
+        "DEC-07",
+        "DEC-11",
+        "DEC-14",
+        "DEC-19"
+      ],
+      "gate_refs": [
+        "G5",
+        "G8"
+      ],
+      "gap_ids": [
+        "ZM-GAP-046-reconcile_v1_payment_terminal_operations__operation_id__reconcile_post"
+      ],
+      "evidence": [
+        "apps/api/src/zeromerma_api/modules/payment_terminal/presentation/router.py#reconcile",
+        "docs/implementation/financial-block-validation.md"
+      ],
+      "verification_notes": "ZM-FIN-036/037 local evidence: 42 unique PostgreSQL cases passed across the 28-case cash-boundary and 14-case complementary runs (29 new cases, 3 adapted concurrency cases, 10 prior cash/FK cases). The final combined runner also passed all 49 cases (29 cash, 9 transient conflicts, 11 inventory). Same-user HTTP authentication may serialize earlier; domain races use separate real transactions. Exact-commit Foundation acceptance accompanies delivery."
+    },
+    {
+      "operation_key": "API:POST:/v1/returns/{return_id}/refund-settlements",
+      "surface": "POS",
+      "method": "POST",
+      "path": "/v1/returns/{return_id}/refund-settlements",
+      "operation_id": "settle_returns_refund_v1_returns__return_id__refund_settlements_post",
+      "include_in_schema": true,
+      "tags": [
+        "returns"
+      ],
+      "router_file": "apps/api/src/zeromerma_api/modules/returns/presentation/router.py",
+      "router_symbol": "settle_returns_refund",
+      "module_owner": "API:financial-refunds",
+      "use_case": "settle_returns_refund",
+      "implementation_state": "IMPLEMENTED_VERIFIED",
+      "verification_state": "TESTED_IN_THIS_TASK",
+      "auth_requirement": "AUTHENTICATED",
+      "actual_auth_dependency": [
+        "fastapi.security.api_key:APIKeyCookie",
+        "zeromerma_api.db.session:get_session",
+        "zeromerma_api.modules.idempotency.presentation.http:require_idempotency_key",
+        "zeromerma_api.modules.identity.presentation.dependencies:get_current_authentication",
+        "zeromerma_api.modules.identity.presentation.dependencies:get_current_user",
+        "zeromerma_api.presentation.access_policy:enforce_operation_policy"
+      ],
+      "actual_surface_guard": "EXPLICIT_POS_POLICY_WITH_EFFECTIVE_GRANTS",
+      "required_capability": "returns_corrections.manage",
+      "capability_enforcement_state": "CAPABILITY_ENFORCED",
+      "required_scope": "Fresh source-specific authority for the actual branch; POS actor/station context; original saved context for recovery",
+      "scope_source": "Authenticated cookie audience and persisted source/entry context",
+      "scope_enforcement_state": "SCOPE_ENFORCED",
+      "request_schema": [
+        "RefundSettlementRequest"
+      ],
+      "response_schema": "FinancialRefundView",
+      "error_contract_state": "CANONICAL_API_ERROR_RESPONSE",
+      "application_service": [
+        "zeromerma_api.modules.financial_ledger.application.refund_commands.RefundSettlementService"
+      ],
+      "domain_or_use_case_symbol": "settle_returns_refund",
+      "router_business_logic_present": false,
+      "transaction_owner": "IDEMPOTENT_COMMAND",
+      "transaction_boundary": "Business source lock and actual cash-session boundary inside idempotent command",
+      "persistence": "WRITE",
+      "external_side_effect": "NONE_OBSERVED_STATICALLY",
+      "reads_entities": [
+        "FinancialOperation",
+        "FinancialEntry"
+      ],
+      "writes_entities": [
+        "FinancialEntry",
+        "AuditLog",
+        "OutboxEvent"
+      ],
+      "locks_or_concurrency_control": "Actual cash-session lock; immutable causal identity; row-locked obligation or provider operation",
+      "audit_required": true,
+      "audit_actual": "ATOMIC",
+      "audit_atomicity": "ATOMIC",
+      "outbox_required": true,
+      "outbox_actual": "ATOMIC",
+      "outbox_atomicity": "ATOMIC",
+      "idempotency_required": true,
+      "idempotency_actual": "DEC07_COMPLIANT",
+      "idempotency_business_identity": "Source obligation + admitted actual-turn settlement key",
+      "idempotency_replay_behavior": "Return stored admission acknowledgement; query current state separately",
+      "generated_client_operation": "settle_returns_refund_v1_returns__return_id__refund_settlements_post",
+      "consumer_contract_state": "CLIENT_GENERATED_USED",
+      "consumer_disposition": "LOCAL_UI_PRESENT",
+      "consumer_reason": "POS refund settlement panel preserves durable intention and resumes an outstanding obligation in the actual open shift.",
+      "pos_consumers": [
+        "apps/pos-web/src/features/refunds/refund-command-intent.ts",
+        "apps/pos-web/src/features/refunds/refund-settlement-panel.tsx",
+        "apps/pos-web/src/features/refunds/refund-recovery-panel.tsx",
+        "apps/pos-web/src/features/refunds/use-refund-intention.ts"
+      ],
+      "backoffice_consumers": [
+        "NONE"
+      ],
+      "other_consumers": [
+        "NONE"
+      ],
+      "direct_tests": [
+        "apps/api/tests/test_refund_financial_ledger.py"
+      ],
+      "indirect_tests": [
+        "NONE"
+      ],
+      "missing_test_types": [
+        "NONE"
+      ],
+      "approved_target_state": "CASH_FIRST obligation settlement without repeated completed legs",
+      "feature_complete_blocker": false,
+      "later_ZM_FIN_tasks": [
+        "ZM-FIN-067"
+      ],
+      "decision_refs": [
+        "DEC-06",
+        "DEC-07",
+        "DEC-11",
+        "DEC-14",
+        "DEC-19"
+      ],
+      "gate_refs": [
+        "G5"
+      ],
+      "gap_ids": [
+        "NONE"
+      ],
+      "evidence": [
+        "apps/api/src/zeromerma_api/modules/returns/presentation/router.py#settle_returns_refund",
+        "docs/implementation/financial-block-validation.md"
+      ],
+      "verification_notes": "ZM-FIN-036/037 local evidence: 42 unique PostgreSQL cases passed across the 28-case cash-boundary and 14-case complementary runs (29 new cases, 3 adapted concurrency cases, 10 prior cash/FK cases). The final combined runner also passed all 49 cases (29 cash, 9 transient conflicts, 11 inventory). Same-user HTTP authentication may serialize earlier; domain races use separate real transactions. Exact-commit Foundation acceptance accompanies delivery."
     }
   ],
   "pos_routes": [
@@ -35529,22 +36549,75 @@
         "docs/operations/runtime-secrets.md",
         "apps/api/src/zeromerma_api/core/runtime_secret_cli.py"
       ]
+    },
+    {
+      "operation_key": "INTERNAL:scripts.dev.financial-reconciliation:command",
+      "trigger": "AUTHORIZED_LOCAL_OPERATOR_COMMAND",
+      "symbol": "command",
+      "source_event_or_schedule": "Explicit diagnose/dry-run/apply with evidenced manifest and controlled window",
+      "reads": [
+        "Scoped canonical financial graph",
+        "Immutable evidence manifest"
+      ],
+      "writes": [
+        "FinancialImportManifest",
+        "FinancialImportRow",
+        "FinancialOperation",
+        "FinancialEntry",
+        "AuditLog",
+        "OutboxEvent"
+      ],
+      "external_effect": "No bank effect; explicit validated financial import only",
+      "idempotency": "Manifest hash and per-row source identity; interrupted jobs resume without duplicate posting",
+      "claim_or_lease": "Idempotent command with branch scope and actual source/session locks",
+      "retry": "Same manifest and row identity; changed evidence is a conflict",
+      "completion_state": "Before/after counts and Decimal totals reconcile; ambiguous real sources remain manual",
+      "audit": "Atomic source evidence and operator declaration; no cryptographic signature assertion",
+      "outbox": "Atomic financial import event",
+      "direct_tests": [
+        "apps/api/tests/test_financial_reconciliation.py",
+        "apps/api/unit_tests/test_financial_import_manifest.py"
+      ],
+      "indirect_tests": [
+        "NONE"
+      ],
+      "implementation_state": "INTERNAL_ONLY",
+      "verification_state": "TESTED_IN_THIS_TASK",
+      "later_ZM_FIN_tasks": [
+        "ZM-FIN-108"
+      ],
+      "decision_refs": [
+        "DEC-19"
+      ],
+      "gate_refs": [
+        "G4"
+      ],
+      "feature_complete_blocker": false,
+      "gap_ids": [
+        "NONE"
+      ],
+      "evidence": [
+        "scripts/dev/financial-reconciliation.py",
+        "docs/implementation/financial-block-validation.md",
+        "docs/operations/financial-reconciliation.md"
+      ],
+      "source_file": "scripts/dev/financial-reconciliation.py"
     }
   ],
   "module_summary": {
     "surface_counts": {
-      "api": 258,
+      "api": 267,
       "pos": 16,
       "backoffice": 41,
       "worker": 3,
-      "internal": 15
+      "internal": 16
     },
     "implementation_state_counts": {
       "DEPRECATED": 4,
       "FRAMEWORK_ONLY": 6,
-      "IMPLEMENTED_VERIFIED": 34,
-      "INTERNAL_ONLY": 16,
-      "PARTIAL": 269,
+      "IMPLEMENTED_VERIFIED": 38,
+      "INTERNAL_ONLY": 17,
+      "PARTIAL": 274,
       "PLACEHOLDER": 4
     },
     "verification_state_counts": {
@@ -35552,16 +36625,16 @@
       "INDIRECT_TEST_ONLY": 1,
       "NOT_APPLICABLE": 12,
       "NO_TEST": 63,
-      "TESTED_IN_THIS_TASK": 141
+      "TESTED_IN_THIS_TASK": 151
     },
     "consumer_contract_state_counts": {
-      "CLIENT_GENERATED_USED": 207,
-      "NOT_CONSUMED": 50,
+      "CLIENT_GENERATED_USED": 211,
+      "NOT_CONSUMED": 55,
       "NO_CLIENT_OPERATION": 1
     },
     "consumer_disposition_counts": {
-      "FUTURE_CONSUMER_NOT_IMPLEMENTED": 4,
-      "LOCAL_UI_PRESENT": 207,
+      "FUTURE_CONSUMER_NOT_IMPLEMENTED": 9,
+      "LOCAL_UI_PRESENT": 211,
       "LOCAL_UI_REQUIRED_NOT_WIRED": 46,
       "NOT_APPLICABLE": 1
     },
@@ -35574,21 +36647,21 @@
       "SCOPE_GAP": 6,
       "TEST_GAP": 102,
       "TRANSACTION_GAP": 1,
-      "UI_DISCONNECTED": 51,
+      "UI_DISCONNECTED": 56,
       "WORKER_GAP": 2
     },
-    "feature_complete_blocker_count": 273,
+    "feature_complete_blocker_count": 278,
     "test_gap_count": 102,
-    "operation_count": 333
+    "operation_count": 343
   },
   "openapi_comparison": {
-    "runtime_operation_count": 257,
-    "tracked_operation_count": 257,
+    "runtime_operation_count": 266,
+    "tracked_operation_count": 266,
     "runtime_only": [],
     "tracked_only": [],
     "operation_id_drift": [],
-    "runtime_sha256_canonical_json": "b5692bf4cbaddb09bc8a09a457eb7d30cb8c312b3a4380f6e9ac227f8af93b6b",
-    "tracked_sha256_canonical_json": "b5692bf4cbaddb09bc8a09a457eb7d30cb8c312b3a4380f6e9ac227f8af93b6b",
+    "runtime_sha256_canonical_json": "7902126fd256792056bf4a9967b164a4003bfc6d9318b0eaed3d57fd1cd1e2ab",
+    "tracked_sha256_canonical_json": "7902126fd256792056bf4a9967b164a4003bfc6d9318b0eaed3d57fd1cd1e2ab",
     "schema_drift_suspected": false,
     "classification": "NO_DRIFT_OBSERVED"
   },
@@ -38225,6 +39298,71 @@
         "apps/backoffice-web/src/features/admin/purchases/pages/AdminPurchasesPage.tsx",
         "apps/backoffice-web/src/features/admin/purchases/api.ts"
       ]
+    },
+    {
+      "gap_id": "ZM-GAP-046-bootstrap_v1_payment_terminal_bootstrap_get",
+      "operation_key": "API:GET:/v1/payment-terminal/bootstrap",
+      "gap_type": "UI_DISCONNECTED",
+      "current_state": "Technical provider boundary validated with injected fake only; actual CARD remains ACCOUNTING_ONLY.",
+      "approved_target": "Certified BBVA capture/refund/reconciliation with workstation binding and no uncertain duplicate charges",
+      "risk": "Unverified integrated payment must not be presented as completed bank capture.",
+      "later_task": "ZM-FIN-046",
+      "gate": "G8",
+      "evidence": [
+        "apps/api/src/zeromerma_api/modules/payment_terminal/presentation/router.py#bootstrap"
+      ]
+    },
+    {
+      "gap_id": "ZM-GAP-046-get_operation_v1_payment_terminal_operations__operation_id__get",
+      "operation_key": "API:GET:/v1/payment-terminal/operations/{operation_id}",
+      "gap_type": "UI_DISCONNECTED",
+      "current_state": "Technical provider boundary validated with injected fake only; actual CARD remains ACCOUNTING_ONLY.",
+      "approved_target": "Certified BBVA capture/refund/reconciliation with workstation binding and no uncertain duplicate charges",
+      "risk": "Unverified integrated payment must not be presented as completed bank capture.",
+      "later_task": "ZM-FIN-046",
+      "gate": "G8",
+      "evidence": [
+        "apps/api/src/zeromerma_api/modules/payment_terminal/presentation/router.py#get_operation"
+      ]
+    },
+    {
+      "gap_id": "ZM-GAP-046-request_operation_v1_payment_terminal_operations_post",
+      "operation_key": "API:POST:/v1/payment-terminal/operations",
+      "gap_type": "UI_DISCONNECTED",
+      "current_state": "Technical provider boundary validated with injected fake only; actual CARD remains ACCOUNTING_ONLY.",
+      "approved_target": "Certified BBVA capture/refund/reconciliation with workstation binding and no uncertain duplicate charges",
+      "risk": "Unverified integrated payment must not be presented as completed bank capture.",
+      "later_task": "ZM-FIN-046",
+      "gate": "G8",
+      "evidence": [
+        "apps/api/src/zeromerma_api/modules/payment_terminal/presentation/router.py#request_operation"
+      ]
+    },
+    {
+      "gap_id": "ZM-GAP-046-dispatch_v1_payment_terminal_operations__operation_id__dispatch_post",
+      "operation_key": "API:POST:/v1/payment-terminal/operations/{operation_id}/dispatch",
+      "gap_type": "UI_DISCONNECTED",
+      "current_state": "Technical provider boundary validated with injected fake only; actual CARD remains ACCOUNTING_ONLY.",
+      "approved_target": "Certified BBVA capture/refund/reconciliation with workstation binding and no uncertain duplicate charges",
+      "risk": "Unverified integrated payment must not be presented as completed bank capture.",
+      "later_task": "ZM-FIN-046",
+      "gate": "G8",
+      "evidence": [
+        "apps/api/src/zeromerma_api/modules/payment_terminal/presentation/router.py#dispatch"
+      ]
+    },
+    {
+      "gap_id": "ZM-GAP-046-reconcile_v1_payment_terminal_operations__operation_id__reconcile_post",
+      "operation_key": "API:POST:/v1/payment-terminal/operations/{operation_id}/reconcile",
+      "gap_type": "UI_DISCONNECTED",
+      "current_state": "Technical provider boundary validated with injected fake only; actual CARD remains ACCOUNTING_ONLY.",
+      "approved_target": "Certified BBVA capture/refund/reconciliation with workstation binding and no uncertain duplicate charges",
+      "risk": "Unverified integrated payment must not be presented as completed bank capture.",
+      "later_task": "ZM-FIN-046",
+      "gate": "G8",
+      "evidence": [
+        "apps/api/src/zeromerma_api/modules/payment_terminal/presentation/router.py#reconcile"
+      ]
     }
   ],
   "authorization_evidence": {
@@ -38367,7 +39505,7 @@
     "task": "ZM-FIN-042",
     "state": "IMPLEMENTED_LOCALLY_VALIDATED",
     "validation_record": "docs/implementation/order-cash-flow-validation.md",
-    "scope": "Actual order advances, settlements and eligible cancellation refunds persist one immutable operation and confirmed actual-method entry per payment, atomically with the existing command. POS close and Backoffice cash projections consume confirmed entries once using their actual cash session and workstation.",
+    "scope": "Historical acceptance of 042 order collections. Current 044 cancellation creates an explicit ORDER_CANCELLATION obligation with available CASH_FIRST settlement and pending debt; see financial_block_evidence for current adoption.",
     "producer_tests": "apps/api/tests/test_order_financial_entries.py",
     "consumer_tests": "apps/api/tests/test_order_cash_flow.py",
     "browser_evidence": {
@@ -38401,5 +39539,18 @@
       "Existing cancellation eligibility and original-method split remain; full refund policy is 044 and provider flow is 046",
       "Full order product workflows 058/078 and release readiness remain open"
     ]
+  },
+  "financial_block_evidence": {
+    "tasks": [
+      "ZM-FIN-043",
+      "ZM-FIN-044",
+      "ZM-FIN-045",
+      "ZM-FIN-046",
+      "ZM-FIN-047"
+    ],
+    "validation_record": "docs/implementation/financial-block-validation.md",
+    "state": "IMPLEMENTED_LOCALLY_VALIDATED_WITH_046_EXTERNAL_GATE_OPEN",
+    "provider_limit": "No real BBVA adapter, integrated source producer/UI or hardware/PCI certification; 046 remains partial and final pilot postponed",
+    "history_limit": "Schema changes do not promote development/test history; 047 requires explicit legitimate evidence"
   }
 }

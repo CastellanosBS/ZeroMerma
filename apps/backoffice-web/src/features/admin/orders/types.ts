@@ -183,6 +183,9 @@ export interface AdminOrderOperationalContext {
 }
 
 export interface AdminOrderDetail {
+  financialRefund?:
+    | import("@zeromerma/api-client").components["schemas"]["FinancialRefundView"]
+    | null;
   availableActions: AdminOrderAvailableActions;
   backendContract: AdminOrderBackendContract;
   customer: AdminOrderCustomer;

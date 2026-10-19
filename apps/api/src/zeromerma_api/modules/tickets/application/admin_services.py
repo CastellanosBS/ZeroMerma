@@ -13,6 +13,11 @@ from sqlalchemy.sql.elements import ColumnElement
 from zeromerma_api.db.transactions import rollback_on_failure
 from zeromerma_api.modules.audit.application.service import AuditRecorder
 from zeromerma_api.modules.branches.infrastructure.models import Branch, Workstation
+from zeromerma_api.modules.financial_ledger.application.classification import mixed_sale_ids
+from zeromerma_api.modules.financial_ledger.infrastructure.models import (
+    FinancialEntry,
+    FinancialOperation,
+)
 from zeromerma_api.modules.identity.application.schemas import AuthenticatedUser
 from zeromerma_api.modules.identity.infrastructure.models import User
 from zeromerma_api.modules.outbox.application.service import OutboxWriter
@@ -401,14 +406,24 @@ class AdminSalesTicketService:
         if payment_method:
             if payment_method not in VALID_SALE_PAYMENT_METHOD_CODES:
                 raise SaleValidationError("Unsupported payment method filter.")
-            conditions.append(
-                exists(
-                    select(SalePayment.id).where(
-                        SalePayment.sale_id == Sale.id,
-                        SalePayment.payment_method_code == payment_method,
+            if payment_method == "MIXED":
+                conditions.append(Sale.id.in_(mixed_sale_ids()))
+            else:
+                conditions.append(
+                    exists(
+                        select(FinancialEntry.id)
+                        .join(
+                            FinancialOperation,
+                            FinancialOperation.id == FinancialEntry.financial_operation_id,
+                        )
+                        .where(
+                            FinancialOperation.source_id == Sale.id,
+                            FinancialOperation.kind == "SALE_COLLECTION",
+                            FinancialEntry.state == "CONFIRMED",
+                            FinancialEntry.payment_method_code == payment_method,
+                        )
                     )
                 )
-            )
         normalized_search = _normalize_search(search)
         if normalized_search:
             sale_id_query = normalized_search.removeprefix("tck-")
@@ -537,11 +552,19 @@ class AdminSalesTicketService:
         payment_rows = (
             session.execute(
                 select(
-                    SalePayment.payment_method_code,
-                    func.coalesce(func.sum(SalePayment.applied_amount), ZERO_MONEY).label("amount"),
+                    FinancialEntry.payment_method_code,
+                    func.coalesce(func.sum(FinancialEntry.amount), ZERO_MONEY).label("amount"),
                 )
-                .where(SalePayment.sale_id.in_(sale_ids_statement))
-                .group_by(SalePayment.payment_method_code)
+                .select_from(FinancialOperation)
+                .join(
+                    FinancialEntry, FinancialEntry.financial_operation_id == FinancialOperation.id
+                )
+                .where(
+                    FinancialOperation.kind == "SALE_COLLECTION",
+                    FinancialEntry.state == "CONFIRMED",
+                )
+                .where(FinancialOperation.source_id.in_(sale_ids_statement))
+                .group_by(FinancialEntry.payment_method_code)
             )
             .mappings()
             .all()
@@ -577,16 +600,28 @@ class AdminSalesTicketService:
         rows = (
             session.execute(
                 select(
-                    SalePayment.sale_id,
-                    SalePayment.payment_method_code,
-                    SalePayment.currency_code,
-                    func.coalesce(func.sum(SalePayment.applied_amount), ZERO_MONEY).label("amount"),
+                    FinancialOperation.source_id.label("sale_id"),
+                    FinancialEntry.payment_method_code,
+                    FinancialEntry.currency_code,
+                    func.coalesce(func.sum(FinancialEntry.amount), ZERO_MONEY).label("amount"),
                 )
-                .where(SalePayment.sale_id.in_(sale_ids))
+                .select_from(FinancialOperation)
+                .join(
+                    FinancialEntry, FinancialEntry.financial_operation_id == FinancialOperation.id
+                )
+                .where(
+                    FinancialOperation.kind == "SALE_COLLECTION",
+                    FinancialEntry.state == "CONFIRMED",
+                )
+                .where(FinancialOperation.source_id.in_(sale_ids))
                 .group_by(
-                    SalePayment.sale_id, SalePayment.payment_method_code, SalePayment.currency_code
+                    FinancialOperation.source_id.label("sale_id"),
+                    FinancialEntry.payment_method_code,
+                    FinancialEntry.currency_code,
                 )
-                .order_by(SalePayment.sale_id.asc(), SalePayment.payment_method_code.asc())
+                .order_by(
+                    FinancialOperation.source_id.asc(), FinancialEntry.payment_method_code.asc()
+                )
             )
             .mappings()
             .all()

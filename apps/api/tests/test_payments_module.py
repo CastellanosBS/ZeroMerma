@@ -16,6 +16,10 @@ from zeromerma_api.db.session import SessionLocal
 from zeromerma_api.modules.audit.infrastructure.models import AuditLog
 from zeromerma_api.modules.cash.domain.constants import CASH_SESSION_STATUS_CLOSED
 from zeromerma_api.modules.cash.infrastructure.models import CashSession
+from zeromerma_api.modules.financial_ledger.infrastructure.models import (
+    FinancialEntry,
+    FinancialOperation,
+)
 from zeromerma_api.modules.identity.infrastructure.models import User, UserBranchAssignment
 from zeromerma_api.modules.outbox.infrastructure.models import OutboxEvent
 from zeromerma_api.modules.payments.infrastructure.models import (
@@ -146,13 +150,20 @@ def test_payments_bootstrap_list_detail_and_cash_commit_work_end_to_end(
         payment_record = session.execute(
             select(OperationalPayment).where(OperationalPayment.id == detail_payload["id"])
         ).scalar_one()
-        cash_movement = session.execute(
-            select(CashMovement).where(
-                CashMovement.movement_type == "OPERATIONAL_PAYMENT",
-                CashMovement.sale_id.is_(None),
-                CashMovement.amount == Decimal("125.50"),
+        assert (
+            session.scalar(
+                select(CashMovement).where(
+                    CashMovement.movement_type == "OPERATIONAL_PAYMENT",
+                )
             )
-        ).scalar_one()
+            is None
+        )
+        operation = session.scalars(
+            select(FinancialOperation).where(FinancialOperation.source_id == payment_record.id)
+        ).one()
+        entry = session.scalars(
+            select(FinancialEntry).where(FinancialEntry.financial_operation_id == operation.id)
+        ).one()
         audit_record = session.execute(
             select(AuditLog).where(
                 AuditLog.action == "operational_payment.committed",
@@ -166,10 +177,26 @@ def test_payments_bootstrap_list_detail_and_cash_commit_work_end_to_end(
             )
         ).scalar_one()
 
-    assert cash_movement.direction == "OUT"
-    assert cash_movement.sale_id is None
+    assert detail_payload["cash_movement_id"] is None
+    assert operation.kind == "OPERATIONAL_PAYMENT"
+    assert operation.source_type == operation.subject_type == "OPERATIONAL_PAYMENT"
+    assert operation.subject_id == payment_record.id
+    assert operation.amount_due == entry.amount == Decimal("125.50")
+    assert entry.direction == "OUT" and entry.payment_method_code == "CASH"
+    assert entry.state == "CONFIRMED" and entry.execution_mode == "LOCAL"
+    assert operation.branch_id == entry.branch_id == payment_record.branch_id
+    assert operation.workstation_id == entry.workstation_id == payment_record.workstation_id
+    assert (
+        operation.cash_session_id == entry.cash_session_id == payment_record.active_cash_session_id
+    )
+    assert operation.actor_id == entry.actor_id == payment_record.created_by_user_id
     assert audit_record.request_id == "27921abc-d7ae-5243-ac86-33b40dceb1bd"
     assert outbox_event.payload["payment_method_code"] == "CASH"
+    for trace in (audit_record.metadata_, outbox_event.payload, outbox_event.headers):
+        assert trace["financial_operation_id"] == str(operation.id)
+        assert trace["financial_entry_ids"] == [str(entry.id)]
+    assert operation.operation_id == entry.operation_id == audit_record.operation_id
+    assert operation.operation_id == outbox_event.operation_id
 
 
 def test_card_payment_does_not_reduce_drawer_cash_but_stays_visible_in_close_summary(
@@ -220,18 +247,37 @@ def test_card_payment_does_not_reduce_drawer_cash_but_stays_visible_in_close_sum
     assert cash_response.status_code == 201
 
     with SessionLocal() as session:
-        movement_rows = (
+        assert (
+            session.scalar(
+                select(CashMovement).where(CashMovement.movement_type == "OPERATIONAL_PAYMENT")
+            )
+            is None
+        )
+        entries = (
             session.execute(
-                select(CashMovement)
-                .where(CashMovement.movement_type == "OPERATIONAL_PAYMENT")
-                .order_by(CashMovement.occurred_at.asc())
+                select(FinancialEntry)
+                .join(
+                    FinancialOperation,
+                    FinancialOperation.id == FinancialEntry.financial_operation_id,
+                )
+                .where(FinancialOperation.kind == "OPERATIONAL_PAYMENT")
             )
             .scalars()
             .all()
         )
 
-    assert len(movement_rows) == 1
-    assert Decimal(str(movement_rows[0].amount)) == Decimal("40.00")
+    assert len(entries) == 2
+    by_method = {entry.payment_method_code: entry for entry in entries}
+    assert set(by_method) == {"CASH", "CARD"}
+    assert by_method["CASH"].amount == Decimal("40.00")
+    assert by_method["CASH"].execution_mode == "LOCAL"
+    assert by_method["CARD"].amount == Decimal("90.00")
+    assert by_method["CARD"].execution_mode == "ACCOUNTING_ONLY"
+    assert by_method["CARD"].resolution_kind == "EXTERNAL_RECORDING"
+    assert by_method["CARD"].resolution_reference == uuid.UUID(card_response.json()["id"])
+    for entry in entries:
+        assert entry.state == "CONFIRMED" and entry.direction == "OUT"
+        assert str(entry.cash_session_id) == cash_command_cash_session_id
 
     close_summary_response = client.get(
         "/v1/cash-close/summary",

@@ -9,7 +9,7 @@ from uuid import UUID, uuid4
 
 import pytest
 from fastapi.testclient import TestClient
-from sqlalchemy import func, select
+from sqlalchemy import and_, func, or_, select
 
 from zeromerma_api.bootstrap.seed_local import (
     SEED_PRODUCT_BOLILLO_STD_CODE,
@@ -242,13 +242,32 @@ def test_actual_order_payment_legs_have_one_causal_fact_and_replay_without_dupli
     with SessionLocal() as session:
         rows = session.execute(
             select(CustomerOrderPayment, FinancialOperation, FinancialEntry)
-            .join(FinancialOperation, FinancialOperation.source_id == CustomerOrderPayment.id)
+            .join(
+                FinancialOperation,
+                or_(
+                    and_(
+                        FinancialOperation.source_type == "ORDER_PAYMENT",
+                        FinancialOperation.source_id == CustomerOrderPayment.id,
+                    ),
+                    and_(
+                        FinancialOperation.source_type == "ORDER_CANCELLATION",
+                        FinancialOperation.subject_id == CustomerOrderPayment.customer_order_id,
+                        CustomerOrderPayment.payment_type == "REFUND",
+                    ),
+                ),
+            )
             .join(FinancialEntry, FinancialEntry.financial_operation_id == FinancialOperation.id)
-            .where(FinancialOperation.idempotency_key == UUID(key))
+            .where(
+                FinancialOperation.idempotency_key == UUID(key),
+                or_(
+                    CustomerOrderPayment.financial_entry_id.is_(None),
+                    CustomerOrderPayment.financial_entry_id == FinancialEntry.id,
+                ),
+            )
         ).all()
-        assert len(rows) == (2 if method == "MIXED" else 1)
+        assert len(rows) == (2 if method == "MIXED" and action != "cancel" else 1)
         assert {row[0].payment_method_code for row in rows} == (
-            {"CASH", "CARD"} if method == "MIXED" else {method}
+            {"CASH"} if action == "cancel" else {"CASH", "CARD"} if method == "MIXED" else {method}
         )
         record = session.scalars(
             select(IdempotencyRecord).where(IdempotencyRecord.idempotency_key == UUID(key))
@@ -261,8 +280,12 @@ def test_actual_order_payment_legs_have_one_causal_fact_and_replay_without_dupli
         for payment, operation, entry in rows:
             assert payment.payment_type == expected_type
             assert operation.kind == operation.effect_code == f"ORDER_{expected_type}"
-            assert operation.source_type == "ORDER_PAYMENT"
-            assert operation.source_id == payment.id
+            assert operation.source_type == (
+                "ORDER_CANCELLATION" if action == "cancel" else "ORDER_PAYMENT"
+            )
+            assert operation.source_id == (
+                payment.customer_order_id if action == "cancel" else payment.id
+            )
             assert operation.subject_type == "ORDER" and operation.subject_id == UUID(ack["id"])
             assert entry.amount == operation.amount_due == payment.amount
             assert entry.currency_code == operation.currency_code == payment.currency_code == "MXN"
@@ -300,8 +323,23 @@ def test_actual_order_payment_legs_have_one_causal_fact_and_replay_without_dupli
                     "financial_entry_id": str(entry.id),
                 }
             )
-        assert sorted(audit.metadata_["financial_records"], key=str) == sorted(references, key=str)
-        assert sorted(event.payload["financial_records"], key=str) == sorted(references, key=str)
+        if action == "cancel":
+            for trace in (audit.metadata_, event.payload):
+                assert (
+                    trace["financial_refund"]["financial_operation_id"]
+                    == references[0]["financial_operation_id"]
+                )
+                assert (
+                    trace["financial_refund"]["entries"][0]["id"]
+                    == references[0]["financial_entry_id"]
+                )
+        else:
+            assert sorted(audit.metadata_["financial_records"], key=str) == sorted(
+                references, key=str
+            )
+            assert sorted(event.payload["financial_records"], key=str) == sorted(
+                references, key=str
+            )
         assert session.scalar(select(func.count()).select_from(CashMovement)) == 0
     admin = owner_headers()
     for url, auth, params in (
@@ -328,6 +366,7 @@ def test_failed_order_trace_rolls_back_flushed_payment_and_ledger_then_same_key_
     headers, _, path, body = _prepare(client, action, "MIXED")
     before = _state()
     key = new_idempotency_key()
+    expected_facts = 1 if action == "cancel" else 2
     target, method = (AuditRecorder, "record") if writer == "audit" else (OutboxWriter, "append")
     original = getattr(target, method)
 
@@ -339,8 +378,8 @@ def test_failed_order_trace_rolls_back_flushed_payment_and_ledger_then_same_key_
             facts = session.scalars(
                 select(FinancialEntry).where(FinancialEntry.idempotency_key == UUID(key))
             ).all()
-            assert len(facts) == 2, (
-                "The fault must occur after both real payment facts were flushed."
+            assert len(facts) == expected_facts, (
+                "The fault must occur after the actual payment facts were flushed."
             )
             raise RuntimeError("Injected order trace failure after financial flush")
         return result
@@ -360,8 +399,8 @@ def test_failed_order_trace_rolls_back_flushed_payment_and_ledger_then_same_key_
     retried = _post(client, headers, path, body, key)
     assert retried.status_code == (201 if action == "create" else 200)
     after = _state()
-    assert after[0][3] == before[0][3] + 2
-    assert after[0][4] == before[0][4] + 2
+    assert after[0][3] == before[0][3] + expected_facts
+    assert after[0][4] == before[0][4] + expected_facts
     replay = _post(client, headers, path, body, key)
     assert replay.json() == retried.json() and _state() == after
 
@@ -374,6 +413,7 @@ def test_nonfinancial_transitions_do_not_create_facts_and_legacy_detail_does_not
     created = _post(client, headers, "/v1/orders", create)
     assert created.status_code == 201
     order_id = UUID(created.json()["id"])
+    financial_counts_before = _state()[0][3:5]
     # A deliberately unadopted demo payment remains visible without fabricated ledger identity.
     with SessionLocal() as session:
         cash = session.get(CashSession, UUID(context["cash_session_id"]))
@@ -413,6 +453,4 @@ def test_nonfinancial_transitions_do_not_create_facts_and_legacy_detail_does_not
         assert rows[0]["financial_operation_id"] is None
         assert rows[0]["financial_entry_id"] is None
         assert rows[0]["cash_session_id"] == context["cash_session_id"]
-    with SessionLocal() as session:
-        assert session.scalar(select(func.count()).select_from(FinancialOperation)) == 0
-        assert session.scalar(select(func.count()).select_from(FinancialEntry)) == 0
+    assert _state()[0][3:5] == financial_counts_before

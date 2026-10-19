@@ -348,6 +348,7 @@ export async function dropNextOperationalCommandResponse(
           "/v1/admin/inventory/adjustments",
         ].includes(path) ||
         [
+          `^/v1/(returns|orders)/${id}/refund-settlements$`,
           `^/v1/transfers/${id}/receive$`,
           `^/v1/admin/transfers/${id}/(dispatch|receive|cancel)$`,
           `^/v1/admin/purchases/${id}/(confirm|receive|cancel)$`,

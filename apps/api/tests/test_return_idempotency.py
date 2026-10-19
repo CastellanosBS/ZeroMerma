@@ -33,6 +33,10 @@ from zeromerma_api.modules.audit.infrastructure.models import AuditLog
 from zeromerma_api.modules.branches.infrastructure.models import Workstation
 from zeromerma_api.modules.cash.infrastructure.models import CashSession
 from zeromerma_api.modules.catalog.infrastructure.models import Product, ProductClass
+from zeromerma_api.modules.financial_ledger.infrastructure.models import (
+    FinancialEntry,
+    FinancialOperation,
+)
 from zeromerma_api.modules.idempotency.application.schemas import IdempotencyResult
 from zeromerma_api.modules.idempotency.domain.exceptions import (
     IdempotencyInProgress,
@@ -60,7 +64,7 @@ from zeromerma_api.modules.returns.application.idempotency import ReturnCommitSe
 from zeromerma_api.modules.returns.application.schemas import ReturnCommitRequest
 from zeromerma_api.modules.returns.domain.exceptions import SaleReturnConflictError
 from zeromerma_api.modules.returns.infrastructure.models import SaleReturn, SaleReturnLine
-from zeromerma_api.modules.sales.infrastructure.models import CashMovement, Sale, SaleLine
+from zeromerma_api.modules.sales.infrastructure.models import Sale, SaleLine
 from zeromerma_api.testing.authorization import owner_headers
 from zeromerma_api.testing.concurrency import transaction_probe, wait_until_blocked
 from zeromerma_api.testing.idempotency import new_idempotency_key
@@ -196,7 +200,12 @@ def _counts() -> dict[str, int]:
             for model in (SaleReturn, SaleReturnLine, InventoryMovement)
         }
         for model, predicate in (
-            (CashMovement, CashMovement.movement_type == "SALE_RETURN_REFUND"),
+            (
+                FinancialEntry,
+                FinancialEntry.financial_operation_id.in_(
+                    select(FinancialOperation.id).where(FinancialOperation.kind == "SALE_REFUND")
+                ),
+            ),
             (AuditLog, AuditLog.action.like("sale_return.%")),
             (OutboxEvent, OutboxEvent.event_name.like("sale_return.%")),
             (IdempotencyRecord, IdempotencyRecord.operation_code == "return.commit"),
@@ -220,9 +229,13 @@ def _state() -> tuple[Any, ...]:
             ).order_by(SaleReturnLine.id)
         ).all()
         movements = session.execute(
-            select(CashMovement.id, CashMovement.amount)
-            .where(CashMovement.movement_type == "SALE_RETURN_REFUND")
-            .order_by(CashMovement.id)
+            select(FinancialEntry.id, FinancialEntry.amount)
+            .where(
+                FinancialEntry.financial_operation_id.in_(
+                    select(FinancialOperation.id).where(FinancialOperation.kind == "SALE_REFUND")
+                )
+            )
+            .order_by(FinancialEntry.id)
         ).all()
     return _counts(), returns, lines, movements
 
@@ -274,7 +287,7 @@ def test_replay_preserves_return_refund_and_disposition_without_repeating_effect
     for table in (
         "sale_returns",
         "sale_return_lines",
-        "cash_movements",
+        "financial_entries",
         "audit_log",
         "outbox_events",
         "idempotency_records",
@@ -283,8 +296,13 @@ def test_replay_preserves_return_refund_and_disposition_without_repeating_effect
     # Dispositions are durable declarations; canonical physical materialization remains 051.
     assert after["inventory_movements"] == before["inventory_movements"]
     with SessionLocal() as session:
-        movement = session.get(CashMovement, UUID(receipt["refund_cash_movement_id"]))
-        assert movement.direction == "OUT" and movement.sale_id == UUID(sale["id"])
+        movement = session.get(
+            FinancialEntry, UUID(receipt["financial_refund"]["entries"][0]["id"])
+        )
+        assert movement.direction == "OUT"
+        assert session.get(FinancialOperation, movement.financial_operation_id).subject_id == UUID(
+            sale["id"]
+        )
         assert movement.cash_session_id == UUID(body["cash_session_id"])
         assert movement.amount == Decimal(receipt["total_refund_amount"])
         record = session.scalar(
@@ -310,7 +328,10 @@ def test_distinct_partial_returns_keep_exact_admin_cash_links(
     assert all(result.status_code == 201 for result in receipts)
     payloads = [result.json() for result in receipts]
     assert payloads[0]["total_refund_amount"] == payloads[1]["total_refund_amount"]
-    assert payloads[0]["refund_cash_movement_id"] != payloads[1]["refund_cash_movement_id"]
+    assert (
+        payloads[0]["financial_refund"]["financial_operation_id"]
+        != payloads[1]["financial_refund"]["financial_operation_id"]
+    )
     admin = owner_headers()
     for receipt in payloads:
         detail = client.get(
@@ -497,8 +518,14 @@ def test_failure_after_real_effect_flush_rolls_back_the_entire_command(
             assert (
                 session.scalar(
                     select(func.count())
-                    .select_from(CashMovement)
-                    .where(CashMovement.movement_type == "SALE_RETURN_REFUND")
+                    .select_from(FinancialEntry)
+                    .where(
+                        FinancialEntry.financial_operation_id.in_(
+                            select(FinancialOperation.id).where(
+                                FinancialOperation.kind == "SALE_REFUND"
+                            )
+                        )
+                    )
                 )
                 == 1
             )
@@ -531,7 +558,7 @@ def test_response_lost_after_commit_recovers_without_another_refund(
         with pytest.raises(RuntimeError, match="Lost return acknowledgement"):
             _post(client, headers, body, key)
     committed = _state()
-    assert committed[0]["sale_returns"] == committed[0]["cash_movements"] == 1
+    assert committed[0]["sale_returns"] == committed[0]["financial_entries"] == 1
     recovered = _recover(client, headers, body, key)
     replay = _post(client, headers, body, key)
     assert recovered.status_code == 200 and replay.status_code == 201
@@ -769,7 +796,7 @@ def test_same_key_contention_is_bounded_and_uncommitted_result_stays_unknown(
         result = first.result(timeout=15)
     replay = _domain(headers, body, key)
     assert replay.replayed and replay.payload == result.payload
-    assert _counts()["sale_returns"] == _counts()["cash_movements"] == 1
+    assert _counts()["sale_returns"] == _counts()["financial_entries"] == 1
 
 
 @pytest.mark.parametrize("quantity", ["1.000", "3.000"])
@@ -858,7 +885,7 @@ def test_competing_partial_returns_recalculate_remaining_right_under_real_postgr
     counts = _counts()
     assert (
         counts["sale_returns"]
-        == counts["cash_movements"]
+        == counts["financial_entries"]
         == counts["idempotency_records"]
         == expected
     )
@@ -909,7 +936,7 @@ def test_two_http_clients_replay_one_refund(client: TestClient) -> None:
         "false",
         "true",
     ]
-    assert _counts()["sale_returns"] == _counts()["cash_movements"] == 1
+    assert _counts()["sale_returns"] == _counts()["financial_entries"] == 1
 
 
 def test_return_latency_is_observed_without_a_production_sla(

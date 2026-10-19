@@ -601,6 +601,50 @@ afterEach(() => {
 });
 
 describe("cash close screen", () => {
+  it("submits a negative net card count with zero variance while rejecting negative cash", async () => {
+    previewCashCloseMock.mockImplementation(async (payload) => {
+      const result = buildPreviewResponse(payload);
+      return {
+        ...result,
+        payment_method_rows: result.payment_method_rows.map((row) =>
+          row.payment_method_code === "CARD"
+            ? {
+                ...row,
+                expected_amount: "-10.00",
+                is_expected_supported: true,
+                variance_amount: (Number(row.counted_amount) + 10).toFixed(2),
+              }
+            : row,
+        ),
+      };
+    });
+    const view = renderUi(<CashCloseScreen />);
+    mountedRoots.push(view.unmount);
+    await addPhysicalCountWithKeyboard(view.container);
+    click(getButtonByText(view.container, "Cerrar con conteo"));
+    await flushAsync();
+    const cashInput = getInputByLabel(view.container, "Efectivo");
+    const cardInput = getInputByLabel(view.container, "Tarjeta");
+    if (!cashInput || !cardInput) throw new Error("Expected both payment count inputs.");
+    setInputValue(cashInput, "-10.00");
+    expect(cashInput.value).toBe("");
+    setInputValue(cashInput, "180.00");
+    setInputValue(cardInput, "-10.00");
+    expect(cardInput.value).toBe("-10.00");
+    await advancePreview();
+    const label = Array.from(view.container.querySelectorAll("span")).find(
+      (element) => element.textContent === "Diferencia de tarjeta",
+    );
+    expect(label?.parentElement?.textContent).toContain("$0.00");
+    expect(view.container.textContent).toContain("-$10.00");
+    click(getButtonByText(view.container, "Cerrar turno"));
+    await waitForMutation(() => expect(commitCashCloseMock).toHaveBeenCalledTimes(1));
+    expect(commitCashCloseMock.mock.calls[0]?.[0].counted_payment_methods).toContainEqual({
+      payment_method_code: "CARD",
+      counted_amount: "-10.00",
+    });
+  });
+
   it("does not expose close actions before the current cash session finishes loading", async () => {
     mockBootstrapIsPending = true;
     const view = renderUi(<CashCloseScreen />);
@@ -719,10 +763,6 @@ describe("cash close screen", () => {
         {
           counted_amount: "180.00",
           payment_method_code: "CASH",
-        },
-        {
-          counted_amount: "0.00",
-          payment_method_code: "CARD",
         },
       ],
       counted_product_lines: [
@@ -858,10 +898,6 @@ describe("cash close screen", () => {
         {
           counted_amount: "180.00",
           payment_method_code: "CASH",
-        },
-        {
-          counted_amount: "0.00",
-          payment_method_code: "CARD",
         },
       ],
       counted_product_lines: [],

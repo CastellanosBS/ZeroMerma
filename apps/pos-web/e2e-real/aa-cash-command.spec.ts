@@ -77,7 +77,7 @@ test("real cash opening, outflow and close recover lost responses across reload 
   const paid =
     (await paymentFault.committed) as components["schemas"]["OperationalPaymentCommitResultView"];
   expect(paid.cash_session_id).toBe(opened.id);
-  expect(paid.cash_movement_id).toBeTruthy();
+  expect(paid.cash_movement_id).toBeNull();
   await page.reload();
   const payment = await recover("/v1/payments/confirmations/", paid.id);
   expect(payment.cash_movement_id).toBe(paid.cash_movement_id);
@@ -137,7 +137,7 @@ test("real cash opening, outflow and close recover lost responses across reload 
   expect(repeated.status()).toBe(201);
   expect(repeated.headers()["idempotency-replayed"]).toBe("true");
   expect(await repeated.json()).toEqual(discount);
-  expect(discount.cash_movement_id).toBeTruthy();
+  expect(discount.cash_movement_id).toBeNull();
   const restoredDiscount = await page.request.get(
     `${environment.apiUrl}/v1/discounts/confirmations/${discountKey}?workstation_code=${station}&cash_session_id=${opened.id}`,
     { headers },
@@ -179,6 +179,21 @@ test("real cash opening, outflow and close recover lost responses across reload 
   ).toHaveCount(0);
   const recovered = await recover("/v1/cash-close/confirmations/", closed.id);
   expect(recovered).toEqual(closed);
+  const detailResponse = await page.request.get(
+    `${environment.apiUrl}/v1/cash-close/${closed.id}?workstation_code=${station}`,
+    { headers },
+  );
+  expect(detailResponse.status()).toBe(200);
+  const detail =
+    (await detailResponse.json()) as components["schemas"]["CashCloseDetailResponse"];
+  const methods = Object.fromEntries(
+    detail.payment_method_rows.map((row) => [row.payment_method_code, row]),
+  );
+  expect(Object.keys(methods).sort()).toEqual(["CARD", "CASH"]);
+  expect(methods.CASH?.variance_amount).toBe("0.00");
+  expect(methods.CARD?.expected_amount).toBe("0.00");
+  expect(methods.CARD?.counted_amount).toBeNull();
+  expect(methods.CARD?.variance_amount).toBeNull();
   const current = await page.request.get(
     `${environment.apiUrl}/v1/cash-sessions/current?workstation_code=${station}`,
     { headers },

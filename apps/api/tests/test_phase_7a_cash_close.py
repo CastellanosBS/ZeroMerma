@@ -124,7 +124,6 @@ def test_cash_close_bootstrap_reports_blockers_and_payment_method_catalog(
     assert [item["payment_method_code"] for item in payload["payment_method_catalog"]] == [
         "CASH",
         "CARD",
-        "MIXED",
     ]
     assert payload["baseline_snapshot"]["is_available"] is False
     assert payload["pending_class_capture"]["has_pending_class_capture"] is False
@@ -252,7 +251,7 @@ def test_cash_close_preview_rejects_duplicate_payment_methods(client: TestClient
     assert response.status_code == 400
     assert (
         response.json()["message"]
-        == "No se puede repetir un metodo de pago en el conteo del cierre."
+        == "No se puede repetir un metodo de pago en el conteo."
     )
 
 

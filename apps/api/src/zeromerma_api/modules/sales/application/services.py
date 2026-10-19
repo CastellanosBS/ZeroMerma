@@ -19,6 +19,17 @@ from zeromerma_api.modules.cash.application.command_context import lock_cash_ses
 from zeromerma_api.modules.cash.domain.constants import CASH_SESSION_STATUS_OPEN
 from zeromerma_api.modules.cash.infrastructure.models import CashSession
 from zeromerma_api.modules.catalog.infrastructure.models import Product, ProductClass
+from zeromerma_api.modules.financial_ledger.application.recording import (
+    FinancialCommandScope,
+    create_financial_operation,
+    record_confirmed_entry,
+)
+from zeromerma_api.modules.financial_ledger.domain.constants import (
+    Direction,
+    OperationKind,
+    PaymentMethod,
+)
+from zeromerma_api.modules.financial_ledger.domain.money import FinancialModelError
 from zeromerma_api.modules.identity.application.schemas import AuthenticatedUser
 from zeromerma_api.modules.identity.infrastructure.models import User, UserBranchAssignment
 from zeromerma_api.modules.outbox.application.service import OutboxWriter
@@ -32,8 +43,6 @@ from zeromerma_api.modules.sales.application.schemas import (
     SalePaymentView,
 )
 from zeromerma_api.modules.sales.domain.constants import (
-    CASH_MOVEMENT_DIRECTION_IN,
-    CASH_MOVEMENT_TYPE_SALE_COLLECTION,
     NON_CASH_SALE_PAYMENT_METHOD_CODES,
     OUTBOX_EVENT_SALE_CONFIRMED_V1,
     SALE_PAYMENT_METHOD_CASH,
@@ -403,36 +412,68 @@ class SaleCommandService:
                 )
             )
 
+        sale_payments: list[SalePayment] = []
         for sequence, payment in enumerate(prepared_payments, start=1):
-            session.add(
-                SalePayment(
-                    sale_id=sale.id,
-                    sequence=sequence,
-                    payment_method_code=payment.payment_method_code,
-                    tendered_amount=payment.tendered_amount,
-                    applied_amount=payment.applied_amount,
-                    change_amount=payment.change_amount,
-                    currency_code=sale_currency,
-                    received_at=confirmed_at,
-                )
+            sale_payment = SalePayment(
+                id=uuid.uuid4(),
+                sale_id=sale.id,
+                sequence=sequence,
+                payment_method_code=payment.payment_method_code,
+                tendered_amount=payment.tendered_amount,
+                applied_amount=payment.applied_amount,
+                change_amount=payment.change_amount,
+                currency_code=sale_currency,
+                received_at=confirmed_at,
             )
+            session.add(sale_payment)
+            sale_payments.append(sale_payment)
 
-            if payment.payment_method_code == SALE_PAYMENT_METHOD_CASH:
-                session.add(
-                    CashMovement(
-                        sale_id=sale.id,
-                        cash_session_id=prepared.cash_session_id,
-                        branch_id=context.branch_id,
-                        workstation_id=context.workstation_id,
-                        operator_id=current_user.id,
-                        movement_type=CASH_MOVEMENT_TYPE_SALE_COLLECTION,
-                        direction=CASH_MOVEMENT_DIRECTION_IN,
-                        payment_method_code=SALE_PAYMENT_METHOD_CASH,
-                        amount=payment.applied_amount,
-                        currency_code=sale_currency,
-                        occurred_at=confirmed_at,
-                    )
+        financial_scope = FinancialCommandScope(
+            branch_id=context.branch_id,
+            workstation_id=context.workstation_id,
+            cash_session_id=prepared.cash_session_id,
+            actor_id=current_user.id,
+        )
+        try:
+            financial_operation = create_financial_operation(
+                session,
+                kind=OperationKind.SALE_COLLECTION,
+                source_type="SALE",
+                source_id=sale.id,
+                subject_type="SALE",
+                subject_id=sale.id,
+                amount_due=total_amount,
+                currency_code=sale_currency,
+                scope=financial_scope,
+                occurred_at=confirmed_at,
+            )
+            financial_entries = [
+                record_confirmed_entry(
+                    session,
+                    operation=financial_operation,
+                    leg_key=str(payment.id),
+                    payment_method=PaymentMethod(payment.payment_method_code),
+                    direction=Direction.IN,
+                    amount=payment.applied_amount,
+                    tendered_amount=payment.tendered_amount,
+                    change_amount=payment.change_amount,
+                    external_recording_reference=(
+                        payment.id if payment.payment_method_code == PaymentMethod.CARD else None
+                    ),
+                    scope=financial_scope,
+                    occurred_at=confirmed_at,
                 )
+                for payment in sale_payments
+                if payment.applied_amount > Decimal("0.00")
+            ]
+        except FinancialModelError as error:
+            raise SaleValidationError(
+                "Sales require valid positive financial amounts in MXN."
+            ) from error
+        financial_trace = {
+            "financial_operation_id": str(financial_operation.id),
+            "financial_entry_ids": [str(entry.id) for entry in financial_entries],
+        }
 
         self._audit_recorder.record(
             session,
@@ -443,6 +484,7 @@ class SaleCommandService:
             branch_id=context.branch_id,
             request_id=resolved_request_id,
             metadata={
+                **financial_trace,
                 "branch_code": context.branch_code,
                 "idempotency_key": str(idempotency_key),
                 "operation_id": str(operation_id),
@@ -465,6 +507,7 @@ class SaleCommandService:
             aggregate_id=str(sale.id),
             event_name=OUTBOX_EVENT_SALE_CONFIRMED_V1,
             payload={
+                **financial_trace,
                 "sale_id": str(sale.id),
                 "branch_id": str(context.branch_id),
                 "branch_code": context.branch_code,
@@ -510,6 +553,7 @@ class SaleCommandService:
                 ],
             },
             headers={
+                **financial_trace,
                 "request_id": resolved_request_id,
                 "idempotency_key": str(idempotency_key),
                 "operation_id": str(operation_id),
@@ -564,79 +608,54 @@ def _prepare_sale_payments(
     command: ConfirmSaleRequest,
     total_amount: Decimal,
 ) -> list[PreparedSalePayment]:
-    if len(command.payments) == 0:
+    if not command.payments:
         raise SaleValidationError("Agrega al menos un metodo de pago para confirmar la venta.")
-
-    normalized_payments: list[tuple[str, Decimal]] = []
-    seen_payment_methods: set[str] = set()
+    normalized: list[tuple[str, Decimal]] = []
     for payment in command.payments:
-        payment_method_code = payment.payment_method_code.strip().upper()
-        if payment_method_code not in VALID_SALE_PAYMENT_METHOD_CODES:
-            raise UnsupportedPaymentMethodError(
-                f"El metodo de pago {payment_method_code} no esta disponible."
-            )
-        if payment_method_code == SALE_PAYMENT_METHOD_MIXED:
-            raise UnsupportedPaymentMethodError(
-                "Mixto debe enviarse como efectivo combinado con tarjeta u otro."
-            )
-        if payment_method_code in seen_payment_methods:
-            raise SaleValidationError(
-                f"El metodo de pago {payment_method_code} no puede repetirse en la misma venta."
-            )
-
-        tendered_amount = _quantize_money(payment.tendered_amount)
-        if tendered_amount <= Decimal("0.00"):
-            raise SaleValidationError(f"El monto de {payment_method_code} debe ser mayor que cero.")
-
-        normalized_payments.append((payment_method_code, tendered_amount))
-        seen_payment_methods.add(payment_method_code)
-
-    remaining_amount = total_amount
-    prepared_payments_by_code: dict[str, PreparedSalePayment] = {}
-
-    for payment_method_code, tendered_amount in normalized_payments:
-        if payment_method_code not in NON_CASH_SALE_PAYMENT_METHOD_CODES:
+        method = payment.payment_method_code.strip().upper()
+        if method not in VALID_SALE_PAYMENT_METHOD_CODES or method == SALE_PAYMENT_METHOD_MIXED:
+            raise UnsupportedPaymentMethodError("Envía componentes reales de efectivo o tarjeta.")
+        tendered = _quantize_money(payment.tendered_amount)
+        if tendered <= Decimal("0.00"):
+            raise SaleValidationError(f"El monto de {method} debe ser mayor que cero.")
+        normalized.append((method, tendered))
+    remaining = total_amount
+    prepared: dict[int, PreparedSalePayment] = {}
+    # Non-cash amounts cannot fund change; preserve each original leg and its sequence.
+    for index, (method, tendered) in enumerate(normalized):
+        if method not in NON_CASH_SALE_PAYMENT_METHOD_CODES:
             continue
-
-        if tendered_amount > remaining_amount:
+        if tendered > remaining:
             raise SaleValidationError(
                 "Los pagos sin efectivo no pueden exceder el total pendiente."
             )
-
-        prepared_payments_by_code[payment_method_code] = PreparedSalePayment(
-            payment_method_code=payment_method_code,
-            tendered_amount=tendered_amount,
-            applied_amount=tendered_amount,
+        prepared[index] = PreparedSalePayment(
+            payment_method_code=method,
+            tendered_amount=tendered,
+            applied_amount=tendered,
             change_amount=Decimal("0.00"),
         )
-        remaining_amount = _quantize_money(remaining_amount - tendered_amount)
-
-    cash_payment = next(
-        (payment for payment in normalized_payments if payment[0] == SALE_PAYMENT_METHOD_CASH),
-        None,
-    )
-    if cash_payment is not None:
-        cash_tendered_amount = cash_payment[1]
-        if cash_tendered_amount < remaining_amount:
+        remaining = _quantize_money(remaining - tendered)
+    has_cash = False
+    for index, (method, tendered) in enumerate(normalized):
+        if method != SALE_PAYMENT_METHOD_CASH:
+            continue
+        has_cash = True
+        applied = min(remaining, tendered)
+        prepared[index] = PreparedSalePayment(
+            payment_method_code=method,
+            tendered_amount=tendered,
+            applied_amount=applied,
+            change_amount=_quantize_money(tendered - applied),
+        )
+        remaining = _quantize_money(remaining - applied)
+    if remaining > Decimal("0.00"):
+        if has_cash:
             raise InsufficientCashPaymentError(
                 "El efectivo registrado no cubre el total pendiente."
             )
-
-        prepared_payments_by_code[SALE_PAYMENT_METHOD_CASH] = PreparedSalePayment(
-            payment_method_code=SALE_PAYMENT_METHOD_CASH,
-            tendered_amount=cash_tendered_amount,
-            applied_amount=remaining_amount,
-            change_amount=_quantize_money(cash_tendered_amount - remaining_amount),
-        )
-        remaining_amount = Decimal("0.00")
-
-    if remaining_amount > Decimal("0.00"):
         raise SaleValidationError("El monto registrado no cubre el total de la compra.")
-
-    return [
-        prepared_payments_by_code[payment_method_code]
-        for payment_method_code, _ in normalized_payments
-    ]
+    return [prepared[index] for index in range(len(normalized))]
 
 
 def _resolve_sale_currency(priced_lines: Sequence[PricedSaleLine]) -> str:

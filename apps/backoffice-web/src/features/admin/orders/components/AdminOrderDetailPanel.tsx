@@ -1,5 +1,6 @@
 import { AdminActionButton } from "../../components/AdminActionButton";
 import { AdminEmptyState } from "../../components/AdminEmptyState";
+import { FinancialRefundSummary } from "../../components/FinancialRefundSummary";
 import type { AdminOrderDetail, AdminOrderListItem } from "../types";
 import { formatOrderPaymentType, recordedCardExplanation } from "../payment-labels";
 
@@ -151,6 +152,7 @@ export function AdminOrderDetailPanel({
       </div>
 
       <div className="min-h-0 flex-1 overflow-y-auto p-3">
+        <FinancialRefundSummary refund={detail.financialRefund} />
         <section className="rounded-[18px] border border-[var(--ui-color-border)] bg-slate-50/80 p-3">
           <div className="flex items-center justify-between gap-3">
             <span className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">

@@ -178,6 +178,12 @@ class CustomerOrderPayment(Base):
     )
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    financial_entry_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("financial_entries.id", ondelete="RESTRICT"),
+        nullable=True,
+        unique=True,
+    )
     customer_order_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True),
         ForeignKey("customer_orders.id", ondelete="CASCADE"),

@@ -36,6 +36,7 @@ SOURCE_CHECK = (
     "(kind = 'SALE_COLLECTION' AND source_type = 'SALE') OR "
     "(kind IN ('ORDER_ADVANCE','ORDER_SETTLEMENT','ORDER_REFUND') "
     "AND source_type = 'ORDER_PAYMENT') OR "
+    "(kind = 'ORDER_REFUND' AND source_type = 'ORDER_CANCELLATION') OR "
     "(kind = 'SALE_REFUND' AND source_type = 'SALE_RETURN') OR "
     "(kind = 'OPERATIONAL_PAYMENT' AND source_type = 'OPERATIONAL_PAYMENT') OR "
     "(kind = 'OPERATIONAL_CHARGE' AND source_type = 'OPERATIONAL_DISCOUNT') OR "

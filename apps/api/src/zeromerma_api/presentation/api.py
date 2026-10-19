@@ -60,6 +60,9 @@ from zeromerma_api.modules.orders.presentation.router import (
 from zeromerma_api.modules.orders.presentation.router import (
     router as orders_router,
 )
+from zeromerma_api.modules.payment_terminal.presentation.router import (
+    router as payment_terminal_router,
+)
 from zeromerma_api.modules.payments.presentation.router import router as payments_router
 from zeromerma_api.modules.production.presentation.router import (
     admin_router as admin_production_router,
@@ -137,6 +140,7 @@ api_router.include_router(discounts_router)
 api_router.include_router(operations_router)
 api_router.include_router(orders_router)
 api_router.include_router(payments_router)
+api_router.include_router(payment_terminal_router)
 api_router.include_router(returns_router)
 api_router.include_router(tickets_router)
 api_router.include_router(transfers_router)

@@ -1,11 +1,15 @@
 import { createIdempotencyKey, type components } from "@zeromerma/api-client";
-import { dropNextReturnConfirmationResponse } from "../../../scripts/dev/web-integration-support.mjs";
+import {
+  dropNextOperationalCommandResponse,
+  dropNextReturnConfirmationResponse,
+} from "../../../scripts/dev/web-integration-support.mjs";
 import { environment, expect, test } from "./fixtures";
 
 test("real partial refund survives a lost response, reload and another tab and reconciles with backoffice", async ({
   page,
   network,
 }) => {
+  test.setTimeout(90_000);
   await page.goto("/login");
   await page.getByLabel("Correo", { exact: true }).fill(environment.email);
   await page.getByLabel("Contrasena", { exact: true }).fill(environment.password);
@@ -60,6 +64,34 @@ test("real partial refund survives a lost response, reload and another tab and r
   });
   expect(saleResponse.status()).toBe(201);
   const sale = (await saleResponse.json()) as components["schemas"]["SaleConfirmationView"];
+  const summaryResponse = await page.request.get(
+    `${environment.apiUrl}/v1/cash-close/summary?workstation_code=${station}`,
+    { headers },
+  );
+  expect(summaryResponse.status()).toBe(200);
+  const summary =
+    (await summaryResponse.json()) as components["schemas"]["CashCloseSummaryResponse"];
+  const availableCents = Math.round(Number(summary.expected_cash_amount) * 100);
+  expect(availableCents).toBeGreaterThan(1);
+  expect(Number(sale.lines[0]!.unit_price)).toBeGreaterThan(0.01);
+  // A real operational outflow leaves only one cent available for CASH_FIRST.
+  const outflow = await page.request.post(`${environment.apiUrl}/v1/payments`, {
+    headers: {
+      ...headers,
+      "X-CSRF-Token": session.csrf_token,
+      "Idempotency-Key": createIdempotencyKey(),
+    },
+    data: {
+      workstation_code: station,
+      cash_session_id: cash.id,
+      payee_name: "Integration supplier",
+      concept: "Refund capacity acceptance fixture",
+      category_code: "SUPPLIER",
+      payment_method_code: "CASH",
+      total_amount: ((availableCents - 1) / 100).toFixed(2),
+    } satisfies components["schemas"]["CreateOperationalPaymentRequest"],
+  });
+  expect(outflow.status()).toBe(201);
   await page.goto(`/devoluciones?saleId=${sale.id}`);
   const other = await page.context().newPage();
   await other.goto(`${environment.baseUrl}/devoluciones?saleId=${sale.id}`);
@@ -92,7 +124,19 @@ test("real partial refund survives a lost response, reload and another tab and r
   const committed = (await fault.committed) as components["schemas"]["ReturnCommitResultView"];
   expect(committed.original_sale_id).toBe(sale.id);
   expect(committed.total_refund_amount).toBe(sale.lines[0]!.unit_price);
-  expect(committed.refund_cash_movement_id).toBeTruthy();
+  expect(committed.refund_cash_movement_id).toBeNull();
+  const refund = committed.financial_refund!;
+  expect(refund.amount_due).toBe(committed.total_refund_amount);
+  expect(refund.amount_settled).toBe("0.01");
+  expect(refund.amount_pending).toBe((Number(refund.amount_due) - 0.01).toFixed(2));
+  expect(refund.state).toBe("PARTIALLY_SETTLED");
+  expect(refund.entries).toHaveLength(1);
+  expect(refund.entries[0]).toMatchObject({
+    payment_method_code: "CASH",
+    state: "CONFIRMED",
+    amount: "0.01",
+    cash_session_id: cash.id,
+  });
   expect(committed).not.toHaveProperty("created_by");
   expect(committed).not.toHaveProperty("notes");
   for (const tab of [page, other])
@@ -166,6 +210,88 @@ test("real partial refund survives a lost response, reload and another tab and r
   expect(detail.return_count).toBe(1);
   expect(detail.lines[0]!.already_refunded_amount).toBe(committed.total_refund_amount);
   expect(detail.lines[0]!.already_returned_quantity).toBe("1.000");
+  await page
+    .getByRole("table", { name: "Historial de devoluciones", exact: true })
+    .getByRole("row")
+    .filter({ hasText: committed.folio })
+    .click();
+  const refundPanel = page.getByRole("region", { name: "Estado del reembolso", exact: true });
+  await expect(refundPanel).toContainText("Entrega confirmada: $0.01");
+  await expect(refundPanel).toContainText(`Pendiente de entregar: $${refund.amount_pending}`);
+  // A later real collection makes the remainder payable in this drawer.
+  const replenished = await page.request.post(`${environment.apiUrl}/v1/sales/confirm`, {
+    headers: {
+      ...headers,
+      "X-CSRF-Token": session.csrf_token,
+      "Idempotency-Key": createIdempotencyKey(),
+    },
+    data: {
+      workstation_code: station,
+      cash_session_id: cash.id,
+      lines: [{ capture_mode: "PRODUCT_DIRECT", product_id: product.id, quantity: "1" }],
+      payments: [{ payment_method_code: "CASH", tendered_amount: "1000.00" }],
+    },
+  });
+  expect(replenished.status()).toBe(201);
+  const settlementPath = `/v1/returns/${committed.id}/refund-settlements`;
+  const settlementFault = await dropNextOperationalCommandResponse(
+    page,
+    environment.apiUrl,
+    network,
+    settlementPath,
+  );
+  const settlementRequest = page.waitForRequest(
+    (request) => new URL(request.url()).pathname === settlementPath && request.method() === "POST",
+  );
+  await refundPanel.getByRole("button", { name: "Continuar reembolso en efectivo" }).click();
+  const settlementKey = (await settlementRequest).headers()["idempotency-key"];
+  const settled = (await settlementFault.committed) as components["schemas"]["FinancialRefundView"];
+  expect(settled.financial_operation_id).toBe(refund.financial_operation_id);
+  expect(settled.amount_settled).toBe(refund.amount_due);
+  expect(settled.amount_pending).toBe("0.00");
+  expect(settled.entries).toHaveLength(2);
+  expect(settled.entries[0]).toEqual(refund.entries[0]);
+  expect(settled.entries[1]).toMatchObject({
+    payment_method_code: "CASH",
+    amount: refund.amount_pending,
+    state: "CONFIRMED",
+    cash_session_id: cash.id,
+  });
+  await expect(
+    page.getByRole("heading", { name: "Entrega de reembolso por verificar" }),
+  ).toBeVisible();
+  await page.reload();
+  await expect(page.getByRole("button", { name: "Reintentar la misma entrega" })).toHaveCount(0);
+  const settlementRecovery = page.waitForResponse(
+    (response) =>
+      new URL(response.url()).pathname === `/v1/returns/refund-settlements/${settlementKey}`,
+  );
+  await page.getByRole("button", { name: "Consultar entrega de reembolso", exact: true }).click();
+  const recoveredSettlement = await settlementRecovery;
+  expect(recoveredSettlement.status()).toBe(200);
+  expect(await recoveredSettlement.json()).toEqual(settled);
+  await expect(
+    page.getByRole("heading", { name: "Entrega de reembolso por verificar" }),
+  ).toHaveCount(0);
+  expect(
+    network.filter(
+      (item) => item.method === "POST" && item.path === "/v1/returns/{id}/refund-settlements",
+    ),
+  ).toHaveLength(1);
+  const historyTable = page.getByRole("table", { name: "Historial de devoluciones", exact: true });
+  const historyNavigation = page.getByRole("button", { name: "Ver historial", exact: true });
+  // Recovery can already return the screen to history when its saved return identity loads.
+  await expect(historyTable.or(historyNavigation)).toBeVisible();
+  if (!(await historyTable.isVisible())) await historyNavigation.click();
+  await historyTable
+    .getByRole("row")
+    .filter({ hasText: committed.folio })
+    .click();
+  await expect(refundPanel).toContainText(`Entrega confirmada: $${refund.amount_due}`);
+  await expect(refundPanel).toContainText("Pendiente de entregar: $0.00");
+  await expect(
+    refundPanel.getByRole("button", { name: "Continuar reembolso en efectivo" }),
+  ).toHaveCount(0);
   const backofficeHeaders = {
     Origin: new URL(process.env.ZM_E2E_BACKOFFICE_URL!).origin,
     "X-ZeroMerma-Surface": "BACKOFFICE",
@@ -187,5 +313,7 @@ test("real partial refund survives a lost response, reload and another tab and r
   const admin = (await adminResponse.json()) as components["schemas"]["AdminReturnDetailView"];
   expect(admin.refund_impact.linked_cash_movement_id).toBe(committed.refund_cash_movement_id);
   expect(admin.refund_impact.refund_amount).toBe(committed.total_refund_amount);
+  expect(admin.refund_impact.cash_impact_amount).toBe(refund.amount_due);
+  expect(admin.financial_refund).toEqual(settled);
   await other.close();
 });

@@ -1,6 +1,6 @@
 # Canonical financial ledger
 
-Status: ZM-FIN-041 foundation implemented and locally validated. This ADR records
+Status: ZM-FIN-041 foundation and 042-045 operational adoption implemented. This ADR records
 the design derived from approved decisions and its adoption boundary. Executed checks are recorded in
 [financial-ledger-validation.md](../implementation/financial-ledger-validation.md).
 The numerical examples below are derived acceptance cases from approved decisions;
@@ -22,19 +22,20 @@ obligation explain those entries. Pending allocation and completed economic effe
 are different facts. Operation summaries are derived from the operation, its legs
 and explicit compensations.
 
-041 added this foundation without admitting operational writes to it. ZM-FIN-042
-now adopts order payments and their cash-flow/close consumers as described below.
-Other producers retain their current sources. The new tables start empty;
-migration does not interpret existing rows,
-backfill demo data or turn on a second stream of production postings. There is no
-new POS/Backoffice workflow, provider adapter, general accounting system or bank
-integration in this task.
+041 added the foundation; 042 adopted order payments; 043-045 adopt opening funds,
+sales, operating receipts/payments, refund obligations and financial close/flow
+consumers. Newly admitted monetary effects use FinancialEntry without a mirrored
+CashMovement. Source documents retain their commercial and receipt evidence.
+Migrations create structures without promoting demo history. 047 provides explicit
+evidence-gated diagnosis/import tools. 046 supplies a tested provider boundary but
+has no registered real BBVA adapter, integrated business producer or terminal UI.
+It remains incomplete and cannot enable integrated production payments.
 
 The adoption map below assigns each producer and consumer to its later task. An
 adopting flow must designate one source for each effect and move its consumers
 deliberately. Adding new totals to the same legacy totals is never a transition
-strategy. The inactive foundation does not prove that today's cash close already
-includes every approved financial flow.
+strategy. The adoption and validation records distinguish these financial flows
+from unimplemented provider, revenue and physical-inventory workflows.
 
 ## Authority
 
@@ -221,8 +222,12 @@ proof that cash was physically received at cutover.
 
 A count of zero differs from missing count. A discrepancy requires its approved
 reason; it never rewrites expected cash or creates a fictitious balancing entry.
-These equations specify the target projection; integrating them into operational
-cash close is 045.
+045 integrates these equations into operational cash close. CASH is mandatory;
+CARD may remain uncounted. Both expected method amounts are frozen on close,
+including a nullable count/variance for an uncounted CARD row. MIXED is a sale
+classification derived from distinct positive confirmed methods, never a third
+method to count. Three components and repeated same-method components retain
+their individual financial identities without changing this classification.
 
 Every admitted effect that can change a turn must participate in its CashSession
 boundary. A pending or UNKNOWN admitted effect can block close even while it is
@@ -331,24 +336,25 @@ model/projection examples, not claims of operational integration.
 
 ## Current sources and adoption map
 
-The source references below describe the inspected implementation before adoption,
-not an assertion that its current behavior already implements every decision.
+The following table records the current financial adoption boundary.
 
-| Flow/source today | Remaining adoption and limit |
+| Flow/source today | Adoption and retained limit |
 |---|---|
-| `sales/infrastructure/models.py`: SalePayment and CashMovement; sale service writes a CASH movement | 043 maps actual sale legs and causal effects; 045 moves consumers/classification. Do not sum legacy and new representations. |
+| `sales/application/services.py`: commercial SalePayment plus canonical financial entries | 043 records one positive entry per applied component, with no mirrored CashMovement. 045 derives mixed classification and reports from confirmed actual methods. |
 | `orders/infrastructure/models.py`: CustomerOrderPayment; order service writes ADVANCE/SETTLEMENT/REFUND separately | 042 admits one financial operation/confirmed entry per actual payment in the same transaction. Order consumers read these entries, without a mirrored CashMovement or a historical payment fallback. |
-| `payments/application/services.py`: OPERATIONAL_PAYMENT creates a CASH OUT movement | 043 preserves its outflow cause and actual method. This is not a sale discount. |
-| `discounts/application/services.py`: OPERATIONAL_DISCOUNT creates a CASH IN movement | 043 preserves the inspected internal collection semantics. CommercialDiscount remains a pricing rule; the hidden operational-discount UI is not enabled here. |
-| `returns/application/services.py`: cash refund and linked CashMovement | 044 implements the unified obligation/legs, partial settlement and causal compensation; provider refunds remain 046. |
-| `cash_close/application/services.py` and `admin_services.py`: non-order totals read CashMovement; cash-flow uses existing non-order module sources | 042 adds only canonical confirmed order entries and their causal compensations, with actual session attribution and separate order fields. The sources are disjoint. 045 retains full consumer adoption, method reconciliation and unresolved-effect blockers. |
-| Existing CARD rows | 046 implements provider evidence, UNKNOWN resolution, callbacks, terminal binding and reconciliation. Current CARD registration is not verified BBVA capture. |
-| Existing demo/test history and future legitimate cutover evidence | 047 supplies diagnosis, dry run, selective transformation and reconciliation. No historical financial backfill is part of 041. |
+| `payments/application/services.py`: OPERATIONAL_PAYMENT | 043 records the actual method OUT once; it is an operating expense, not a commercial discount. |
+| `discounts/application/services.py`: OPERATIONAL_CHARGE | 043 records the actual method IN once. 045 adds the amount to cash/flow. CommercialDiscount remains a separate pricing rule; the hidden operating-charge UI is not enabled here. |
+| `returns/application/services.py` and order cancellation | 044 admits the refund obligation, settles available CASH_FIRST, and exposes later-turn remainder settlement and exact-key recovery. No negative drawer or invented CARD refund. See the refund runbook. |
+| Cash summary/preview/commit, Backoffice flow/cuts/tickets/reports | 045 reads confirmed FinancialEntry with actual session and causal IDs; there is no CashMovement fallback. Frozen expected/count/variance, unresolved-leg blockers and mixed-sale classification are implemented. |
+| Current CARD commands and `payment_terminal` | Current CARD remains ACCOUNTING_ONLY. 046 has a durable tested provider boundary and no real registered adapter, integrated source producer or terminal UI. Hardware/contract/PCI acceptance remains pending. |
+| Development history and future real cutover evidence | 047 supplies read-only diagnosis/dry-run, approved opening state and selected exact causal source adapters. Demo/test history is rejected for productive import; ambiguous sources and closed-turn history require manual reconciliation. |
 
-043-047 remain separate work even though this foundation can represent their
-required states and examples. Pricing/admission, physical ledgers, order workflow,
-provider capabilities, analytics and the production cutover retain their assigned
-tasks. No source gap is closed solely by adding these two tables.
+043-045 and 047 have implementation and focused evidence in the
+[financial block validation record](../implementation/financial-block-validation.md).
+046 remains partial, as detailed in the
+[terminal boundary runbook](../operations/payment-terminal-boundary.md).
+Pricing, physical ledgers, the remaining order lifecycle, analytics and production
+cutover retain their assigned tasks. These changes do not declare Pilot Ready.
 
 For the adopted order workflow, see the
 [order payments and cash-close manual](../operations/order-payments-and-cash-close.md)
@@ -360,7 +366,7 @@ unchanged; financial references are exposed on authenticated detail GETs.
 
 ## Migration and productive-data boundary
 
-The migration is `20261019_0044_financial_ledger`, following
+The foundation migration is `20261019_0044_financial_ledger`, following
 `20261018_0043_operation_context`. It creates empty structures and preserves
 existing financial tables, operational rows, audit and outbox. A downgrade may
 remove the new schema only while both tables are empty; economic evidence must
@@ -377,3 +383,10 @@ See [database-migrations.md](../operations/database-migrations.md) for the guard
 harness, supported history and restore procedure. Local acceptance uses disposable
 PostgreSQL, never the operational database. A passing foundation does not declare
 financial integration, Data Integrity Ready or production readiness.
+
+The 043-047 schema extension follows one chain: 0045 refund obligations/order-entry
+link, `20261019_0046_close_counts` nullable method counts and signed CARD expectation,
+0047 durable terminal intention/evidence, and `20261019_0048_financial_import`
+immutable manifests/rows. None performs historical data backfill. Downgrade refuses
+to erase new economic evidence or coerce missing counts/negative expectations into
+the older schema. Use a reviewed forward correction or complete verified restore.

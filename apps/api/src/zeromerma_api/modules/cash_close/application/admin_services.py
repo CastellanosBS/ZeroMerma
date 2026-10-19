@@ -43,7 +43,6 @@ from zeromerma_api.modules.cash_close.application.admin_schemas import (
 from zeromerma_api.modules.cash_close.domain.constants import (
     CASH_CLOSE_PAYMENT_METHOD_CARD,
     CASH_CLOSE_PAYMENT_METHOD_CASH,
-    CASH_CLOSE_PAYMENT_METHOD_MIXED,
     CASH_CLOSE_RECONCILIATION_STATUS_NOT_EVALUATED,
     CASH_CLOSE_STATUS_COMMITTED,
 )
@@ -61,12 +60,19 @@ from zeromerma_api.modules.discounts.infrastructure.models import (
     OperationalDiscount,
     OperationalDiscountCategory,
 )
+from zeromerma_api.modules.financial_ledger.application.classification import mixed_sale_ids
+from zeromerma_api.modules.financial_ledger.application.session_queries import (
+    read_session_financials,
+)
+from zeromerma_api.modules.financial_ledger.domain.money import financial_calculation
+from zeromerma_api.modules.financial_ledger.infrastructure.models import (
+    FinancialEntry,
+    FinancialOperation,
+)
 from zeromerma_api.modules.identity.application.actions import restrict_actions
 from zeromerma_api.modules.identity.infrastructure.models import User
 from zeromerma_api.modules.operations.infrastructure.models import OperationDocument
 from zeromerma_api.modules.orders.application.financial_queries import (
-    order_cash_amounts,
-    order_financial_session_ids_statement,
     read_order_financial_entries,
 )
 from zeromerma_api.modules.payments.infrastructure.models import (
@@ -75,20 +81,13 @@ from zeromerma_api.modules.payments.infrastructure.models import (
 )
 from zeromerma_api.modules.returns.infrastructure.models import SaleReturn
 from zeromerma_api.modules.sales.domain.constants import (
-    CASH_MOVEMENT_DIRECTION_IN,
-    CASH_MOVEMENT_DIRECTION_OUT,
-    CASH_MOVEMENT_TYPE_OPERATIONAL_DISCOUNT,
-    CASH_MOVEMENT_TYPE_OPERATIONAL_PAYMENT,
-    CASH_MOVEMENT_TYPE_SALE_COLLECTION,
     SALE_PAYMENT_METHOD_CARD,
     SALE_PAYMENT_METHOD_CASH,
     SALE_PAYMENT_METHOD_MIXED,
     VALID_SALE_PAYMENT_METHOD_CODES,
 )
 from zeromerma_api.modules.sales.infrastructure.models import (
-    CashMovement,
     Sale,
-    SalePayment,
 )
 from zeromerma_api.modules.tickets.application.admin_services import build_ticket_folio
 
@@ -581,37 +580,37 @@ class AdminCashCutService:
         if normalized_payment_method:
             if normalized_payment_method not in VALID_SALE_PAYMENT_METHOD_CODES:
                 raise CashCloseValidationError("Unsupported payment method filter.")
-            conditions.append(
-                or_(
-                    CashSession.id.in_(
-                        order_financial_session_ids_statement(
-                            payment_method=normalized_payment_method
-                        )
-                    ),
+            if normalized_payment_method == "MIXED":
+                conditions.append(
                     exists(
-                        select(SalePayment.id)
-                        .select_from(SalePayment)
-                        .join(Sale, Sale.id == SalePayment.sale_id)
-                        .where(
-                            Sale.cash_session_id == CashSession.id,
-                            SalePayment.payment_method_code == normalized_payment_method,
+                        select(Sale.id).where(
+                            Sale.cash_session_id == CashSession.id, Sale.id.in_(mixed_sale_ids())
                         )
-                    ),
-                    exists(
-                        select(CashSessionClosePaymentMethodCount.id).where(
-                            CashSessionClosePaymentMethodCount.cash_session_close_id
-                            == CashSessionClose.id,
-                            CashSessionClosePaymentMethodCount.payment_method_code
-                            == normalized_payment_method,
-                        )
-                    ),
+                    )
                 )
-            )
+            else:
+                conditions.append(
+                    exists(
+                        select(FinancialEntry.id).where(
+                            FinancialEntry.cash_session_id == CashSession.id,
+                            FinancialEntry.state == "CONFIRMED",
+                            FinancialEntry.payment_method_code == normalized_payment_method,
+                        )
+                    )
+                )
 
         if has_refunds is not None:
-            refund_exists = or_(
-                CashSession.id.in_(order_financial_session_ids_statement(refunds_only=True)),
-                exists(select(SaleReturn.id).where(SaleReturn.cash_session_id == CashSession.id)),
+            refund_exists = exists(
+                select(FinancialEntry.id)
+                .join(
+                    FinancialOperation,
+                    FinancialOperation.id == FinancialEntry.financial_operation_id,
+                )
+                .where(
+                    FinancialEntry.cash_session_id == CashSession.id,
+                    FinancialEntry.state == "CONFIRMED",
+                    FinancialOperation.kind.in_(("SALE_REFUND", "ORDER_REFUND")),
+                )
             )
             conditions.append(refund_exists if has_refunds else ~refund_exists)
         if has_operational_payments is not None:
@@ -788,35 +787,11 @@ class AdminCashCutService:
         cash_session_id: uuid.UUID,
         opening_amount: Decimal,
     ) -> dict[str, Decimal]:
-        rows = (
-            session.execute(
-                select(
-                    CashMovement.direction,
-                    func.coalesce(func.sum(CashMovement.amount), ZERO_MONEY).label("amount"),
-                )
-                .where(CashMovement.cash_session_id == cash_session_id)
-                .group_by(CashMovement.direction)
-            )
-            .mappings()
-            .all()
-        )
-        total_cash_in = ZERO_MONEY
-        total_cash_out = ZERO_MONEY
-        for row in rows:
-            amount = _money(type_cast(Decimal, row["amount"]))
-            if row["direction"] == CASH_MOVEMENT_DIRECTION_IN:
-                total_cash_in += amount
-            elif row["direction"] == CASH_MOVEMENT_DIRECTION_OUT:
-                total_cash_out += amount
-        orders = order_cash_amounts(
-            read_order_financial_entries(session, cash_session_ids=(cash_session_id,))
-        )
-        total_cash_in += orders["total_cash_in"]
-        total_cash_out += orders["total_cash_out"]
+        facts = read_session_financials(session, cash_session_id)
         return {
-            "expected_cash_amount": _money(opening_amount + total_cash_in - total_cash_out),
-            "total_cash_in": _money(total_cash_in),
-            "total_cash_out": _money(total_cash_out),
+            "expected_cash_amount": facts.expected_cash_amount,
+            "total_cash_in": facts.total_cash_in,
+            "total_cash_out": facts.total_cash_out,
         }
 
     def _get_current_expected_cash_by_session_id(
@@ -875,24 +850,24 @@ class AdminCashCutService:
             return {}
         rows = (
             session.execute(
-                select(Sale.cash_session_id, SalePayment.payment_method_code)
-                .select_from(SalePayment)
-                .join(Sale, Sale.id == SalePayment.sale_id)
-                .where(Sale.cash_session_id.in_(cash_session_ids))
-                .group_by(Sale.cash_session_id, SalePayment.payment_method_code)
-                .order_by(SalePayment.payment_method_code.asc())
+                select(FinancialEntry.cash_session_id, FinancialEntry.payment_method_code)
+                .join(
+                    FinancialOperation,
+                    FinancialOperation.id == FinancialEntry.financial_operation_id,
+                )
+                .where(
+                    FinancialEntry.cash_session_id.in_(cash_session_ids),
+                    FinancialEntry.state == "CONFIRMED",
+                    FinancialOperation.kind != "CASH_OPENING",
+                )
+                .distinct()
             )
             .mappings()
             .all()
         )
         methods_by_session_id: dict[uuid.UUID, list[str]] = defaultdict(list)
         for row in rows:
-            methods_by_session_id[type_cast(uuid.UUID, row["cash_session_id"])].append(
-                type_cast(str, row["payment_method_code"])
-            )
-        for entry in read_order_financial_entries(session, cash_session_ids=cash_session_ids):
-            if entry.payment_method_code not in methods_by_session_id[entry.cash_session_id]:
-                methods_by_session_id[entry.cash_session_id].append(entry.payment_method_code)
+            methods_by_session_id[row["cash_session_id"]].append(row["payment_method_code"])
         return {
             cash_session_id: _format_payment_methods(methods)
             for cash_session_id, methods in methods_by_session_id.items()
@@ -907,16 +882,22 @@ class AdminCashCutService:
         if not cash_session_ids:
             return set()
         return {
-            entry.cash_session_id
-            for entry in read_order_financial_entries(session, cash_session_ids=cash_session_ids)
-            if entry.operation_kind == "ORDER_REFUND"
-        } | set(
-            session.execute(
-                select(SaleReturn.cash_session_id)
-                .where(SaleReturn.cash_session_id.in_(cash_session_ids))
-                .group_by(SaleReturn.cash_session_id)
-            ).scalars()
-        )
+            session_id
+            for session_id in session.scalars(
+                select(FinancialEntry.cash_session_id)
+                .join(
+                    FinancialOperation,
+                    FinancialOperation.id == FinancialEntry.financial_operation_id,
+                )
+                .where(
+                    FinancialEntry.cash_session_id.in_(cash_session_ids),
+                    FinancialEntry.state == "CONFIRMED",
+                    FinancialOperation.kind.in_(("SALE_REFUND", "ORDER_REFUND")),
+                )
+                .distinct()
+            )
+            if session_id is not None
+        }
 
     def _get_operational_payment_flags(
         self,
@@ -962,65 +943,42 @@ class AdminCashCutService:
             for row in rows
         }
 
+    @financial_calculation
     def _get_cash_movement_amounts(
         self,
         session: Session,
         *,
         cash_session_id: uuid.UUID,
     ) -> dict[str, Decimal]:
-        rows = (
-            session.execute(
-                select(
-                    CashMovement.movement_type,
-                    CashMovement.direction,
-                    func.coalesce(func.sum(CashMovement.amount), ZERO_MONEY).label("amount"),
-                )
-                .where(CashMovement.cash_session_id == cash_session_id)
-                .group_by(CashMovement.movement_type, CashMovement.direction)
-            )
-            .mappings()
-            .all()
-        )
+        facts = read_session_financials(session, cash_session_id)
         result = {
-            "cash_sales_amount": ZERO_MONEY,
-            "cash_refunds_amount": ZERO_MONEY,
-            "cash_operational_payments_amount": ZERO_MONEY,
-            "cash_operational_discounts_amount": ZERO_MONEY,
+            "cash_sales_amount": facts.amount(method="CASH", kind="SALE_COLLECTION"),
+            "cash_refunds_amount": facts.amount(method="CASH", kind="SALE_REFUND"),
+            "cash_operational_payments_amount": facts.amount(
+                method="CASH", kind="OPERATIONAL_PAYMENT"
+            ),
+            "cash_operational_discounts_amount": facts.amount(
+                method="CASH", kind="OPERATIONAL_CHARGE"
+            ),
+            "cash_order_collections_amount": facts.amount(method="CASH", kind="ORDER_ADVANCE")
+            + facts.amount(method="CASH", kind="ORDER_SETTLEMENT"),
+            "cash_order_refunds_amount": facts.amount(method="CASH", kind="ORDER_REFUND"),
+            "cash_order_technical_reversal_amount": ZERO_MONEY,
             "cash_adjustments_amount": ZERO_MONEY,
         }
-        known_types = {
-            CASH_MOVEMENT_TYPE_SALE_COLLECTION,
-            CASH_MOVEMENT_TYPE_SALE_RETURN_REFUND,
-            CASH_MOVEMENT_TYPE_OPERATIONAL_PAYMENT,
-            CASH_MOVEMENT_TYPE_OPERATIONAL_DISCOUNT,
-        }
-        for row in rows:
-            amount = _money(type_cast(Decimal, row["amount"]))
-            movement_type = type_cast(str, row["movement_type"])
-            if movement_type == CASH_MOVEMENT_TYPE_SALE_COLLECTION:
-                result["cash_sales_amount"] += amount
-            elif movement_type == CASH_MOVEMENT_TYPE_SALE_RETURN_REFUND:
-                result["cash_refunds_amount"] += amount
-            elif movement_type == CASH_MOVEMENT_TYPE_OPERATIONAL_PAYMENT:
-                result["cash_operational_payments_amount"] += amount
-            elif movement_type == CASH_MOVEMENT_TYPE_OPERATIONAL_DISCOUNT:
-                result["cash_operational_discounts_amount"] += amount
-            elif movement_type not in known_types:
-                if row["direction"] == CASH_MOVEMENT_DIRECTION_IN:
-                    result["cash_adjustments_amount"] += amount
-                else:
-                    result["cash_adjustments_amount"] -= amount
-        orders = order_cash_amounts(
-            read_order_financial_entries(session, cash_session_ids=(cash_session_id,))
-        )
-        for key in (
-            "cash_order_collections_amount",
-            "cash_order_refunds_amount",
-            "cash_order_technical_reversal_amount",
-        ):
-            result[key] = orders[key]
-        return {key: _money(value) for key, value in result.items()}
+        for operation, entry in facts.entries:
+            if entry.payment_method_code != "CASH":
+                continue
+            if operation.kind in {"TECHNICAL_REVERSAL", "CASH_DEPOSIT", "CASH_WITHDRAWAL"}:
+                key = (
+                    "cash_order_technical_reversal_amount"
+                    if operation.subject_type == "ORDER"
+                    else "cash_adjustments_amount"
+                )
+                result[key] += entry.amount if entry.direction == "IN" else -entry.amount
+        return result
 
+    @financial_calculation
     def _get_payment_breakdown(
         self,
         session: Session,
@@ -1029,68 +987,7 @@ class AdminCashCutService:
         close_id: uuid.UUID | None,
         expected_cash_amount: Decimal,
     ) -> list[AdminCashCutPaymentBreakdownView]:
-        sales_rows = (
-            session.execute(
-                select(
-                    SalePayment.payment_method_code,
-                    SalePayment.currency_code,
-                    func.coalesce(func.sum(SalePayment.applied_amount), ZERO_MONEY).label("amount"),
-                )
-                .select_from(SalePayment)
-                .join(Sale, Sale.id == SalePayment.sale_id)
-                .where(Sale.cash_session_id == cash_session_id)
-                .group_by(SalePayment.payment_method_code, SalePayment.currency_code)
-            )
-            .mappings()
-            .all()
-        )
-        refunds_rows = (
-            session.execute(
-                select(
-                    SaleReturn.refund_method_code.label("payment_method_code"),
-                    SaleReturn.currency_code,
-                    func.coalesce(func.sum(SaleReturn.total_refund_amount), ZERO_MONEY).label(
-                        "amount"
-                    ),
-                )
-                .where(SaleReturn.cash_session_id == cash_session_id)
-                .group_by(SaleReturn.refund_method_code, SaleReturn.currency_code)
-            )
-            .mappings()
-            .all()
-        )
-        payment_rows = (
-            session.execute(
-                select(
-                    OperationalPayment.payment_method_code,
-                    OperationalPayment.currency_code,
-                    func.coalesce(func.sum(OperationalPayment.total_amount), ZERO_MONEY).label(
-                        "amount"
-                    ),
-                )
-                .where(OperationalPayment.active_cash_session_id == cash_session_id)
-                .group_by(OperationalPayment.payment_method_code, OperationalPayment.currency_code)
-            )
-            .mappings()
-            .all()
-        )
-        discount_rows = (
-            session.execute(
-                select(
-                    OperationalDiscount.payment_method_code,
-                    OperationalDiscount.currency_code,
-                    func.coalesce(func.sum(OperationalDiscount.total_amount), ZERO_MONEY).label(
-                        "amount"
-                    ),
-                )
-                .where(OperationalDiscount.active_cash_session_id == cash_session_id)
-                .group_by(
-                    OperationalDiscount.payment_method_code, OperationalDiscount.currency_code
-                )
-            )
-            .mappings()
-            .all()
-        )
+        facts = read_session_financials(session, cash_session_id)
         close_rows_by_method: dict[str, RowMapping] = {}
         if close_id is not None:
             close_rows_by_method = {
@@ -1108,17 +1005,10 @@ class AdminCashCutService:
                 .all()
             }
 
-        sales_by_method = _amounts_by_method(sales_rows)
-        refunds_by_method = _amounts_by_method(refunds_rows)
-        payments_by_method = _amounts_by_method(payment_rows)
-        discounts_by_method = _amounts_by_method(discount_rows)
-        order_entries = read_order_financial_entries(session, cash_session_ids=(cash_session_id,))
-
         result: list[AdminCashCutPaymentBreakdownView] = []
         for method in [
             CASH_CLOSE_PAYMENT_METHOD_CASH,
             CASH_CLOSE_PAYMENT_METHOD_CARD,
-            CASH_CLOSE_PAYMENT_METHOD_MIXED,
         ]:
             close_row = close_rows_by_method.get(method)
             counted_amount = (
@@ -1126,27 +1016,40 @@ class AdminCashCutService:
                 if close_row is not None and close_row["counted_amount"] is not None
                 else None
             )
-            expected_amount = (
-                _money(type_cast(Decimal, close_row["expected_amount"]))
-                if close_row is not None and close_row["expected_amount"] is not None
-                else (expected_cash_amount if method == CASH_CLOSE_PAYMENT_METHOD_CASH else None)
-            )
+            if close_id is not None:
+                expected_amount = (
+                    _money(type_cast(Decimal, close_row["expected_amount"]))
+                    if close_row is not None and close_row["expected_amount"] is not None
+                    else expected_cash_amount
+                    if method == CASH_CLOSE_PAYMENT_METHOD_CASH
+                    else None
+                )
+            else:
+                expected_amount = (
+                    expected_cash_amount
+                    if method == CASH_CLOSE_PAYMENT_METHOD_CASH
+                    else facts.expected_card_amount
+                )
             variance_amount = (
                 _money(type_cast(Decimal, close_row["variance_amount"]))
                 if close_row is not None and close_row["variance_amount"] is not None
                 else None
             )
-            sales_amount = sales_by_method.get(method, ZERO_MONEY)
-            refund_amount = refunds_by_method.get(method, ZERO_MONEY)
-            operational_payment_amount = payments_by_method.get(method, ZERO_MONEY)
-            operational_discount_amount = discounts_by_method.get(method, ZERO_MONEY)
+            sales_amount = facts.amount(method=method, kind="SALE_COLLECTION")
+            refund_amount = facts.amount(method=method, kind="SALE_REFUND")
+            operational_payment_amount = facts.amount(method=method, kind="OPERATIONAL_PAYMENT")
+            operational_discount_amount = facts.amount(method=method, kind="OPERATIONAL_CHARGE")
             order_amounts = {
                 kind: _money(
                     sum(
                         (
-                            entry.signed_amount if kind == "TECHNICAL_REVERSAL" else entry.amount
-                            for entry in order_entries
-                            if entry.payment_method_code == method and entry.operation_kind == kind
+                            (entry.amount if entry.direction == "IN" else -entry.amount)
+                            if kind == "TECHNICAL_REVERSAL"
+                            else entry.amount
+                            for operation, entry in facts.entries
+                            if entry.payment_method_code == method
+                            and operation.kind == kind
+                            and operation.subject_type == "ORDER"
                         ),
                         ZERO_MONEY,
                     )
@@ -1177,16 +1080,8 @@ class AdminCashCutService:
                     expected_amount=expected_amount,
                     counted_amount=counted_amount,
                     variance_amount=variance_amount,
-                    net_amount=_money(
-                        sales_amount
-                        - refund_amount
-                        - operational_payment_amount
-                        - operational_discount_amount
-                        + order_amounts["ORDER_ADVANCE"]
-                        + order_amounts["ORDER_SETTLEMENT"]
-                        - order_amounts["ORDER_REFUND"]
-                        + order_amounts["TECHNICAL_REVERSAL"]
-                    ),
+                    net_amount=facts.net(method)
+                    - (facts.opening_amount if method == "CASH" else ZERO_MONEY),
                     is_counted_supported=close_id is not None,
                 )
             )
@@ -1245,10 +1140,19 @@ class AdminCashCutService:
             return {}
         rows = (
             session.execute(
-                select(SalePayment.sale_id, SalePayment.payment_method_code)
-                .where(SalePayment.sale_id.in_(sale_ids))
-                .group_by(SalePayment.sale_id, SalePayment.payment_method_code)
-                .order_by(SalePayment.payment_method_code.asc())
+                select(
+                    FinancialOperation.source_id.label("sale_id"),
+                    FinancialEntry.payment_method_code,
+                )
+                .join(
+                    FinancialEntry, FinancialEntry.financial_operation_id == FinancialOperation.id
+                )
+                .where(
+                    FinancialOperation.kind == "SALE_COLLECTION",
+                    FinancialOperation.source_id.in_(sale_ids),
+                    FinancialEntry.state == "CONFIRMED",
+                )
+                .distinct()
             )
             .mappings()
             .all()
@@ -1271,17 +1175,28 @@ class AdminCashCutService:
             session.execute(
                 select(
                     SaleReturn.id,
+                    FinancialEntry.id.label("financial_entry_id"),
+                    FinancialOperation.id.label("financial_operation_id"),
                     SaleReturn.original_sale_id,
                     SaleReturn.status,
                     SaleReturn.reason_name,
-                    SaleReturn.refund_method_code,
-                    SaleReturn.total_refund_amount,
-                    SaleReturn.created_at_utc,
+                    FinancialEntry.payment_method_code.label("refund_method_code"),
+                    FinancialEntry.amount.label("total_refund_amount"),
+                    FinancialEntry.occurred_at.label("created_at_utc"),
                     operator_alias.full_name.label("operator_name"),
                 )
-                .select_from(SaleReturn)
-                .join(operator_alias, operator_alias.id == SaleReturn.created_by_user_id)
-                .where(SaleReturn.cash_session_id == cash_session_id)
+                .select_from(FinancialEntry)
+                .join(
+                    FinancialOperation,
+                    FinancialOperation.id == FinancialEntry.financial_operation_id,
+                )
+                .join(SaleReturn, SaleReturn.id == FinancialOperation.source_id)
+                .join(operator_alias, operator_alias.id == FinancialEntry.actor_id)
+                .where(
+                    FinancialEntry.cash_session_id == cash_session_id,
+                    FinancialEntry.state == "CONFIRMED",
+                    FinancialOperation.kind == "SALE_REFUND",
+                )
                 .order_by(SaleReturn.created_at_utc.desc(), SaleReturn.id.desc())
             )
             .mappings()
@@ -1289,6 +1204,8 @@ class AdminCashCutService:
         )
         return [
             AdminCashCutRefundItemView(
+                financial_entry_id=row["financial_entry_id"],
+                financial_operation_id=row["financial_operation_id"],
                 id=type_cast(uuid.UUID, row["id"]),
                 folio=_build_return_folio(type_cast(uuid.UUID, row["id"])),
                 original_ticket_folio=build_ticket_folio(

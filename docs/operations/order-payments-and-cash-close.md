@@ -64,21 +64,23 @@ is the approved revenue-recognition event, but this task does not implement new
 revenue analytics or create a synthetic `Sale` when an order is delivered. Cash flow
 records the time of collection/refund, independently of that recognition event.
 
-The existing cancellation eligibility and original-method refund split remain in
-place. They are not the complete approved cancellation/CASH_FIRST/partial-refund
-workflow. ZM-FIN-044 and the order workflow task retain that work; ZM-FIN-046 retains
-provider evidence, UNKNOWN resolution and integrated refunds. Confirm the external
-refund before recording the current CARD cancellation workflow. A financial reversal
-is distinct from a commercial cancellation; no new reversal command is exposed here.
+044 replaces the original-method cancellation split with an explicit refund
+obligation and CASH_FIRST settlement. Available canonical drawer cash is paid in
+the actual turn; any remainder persists and can resume in a later authorized turn.
+No CARD refund is invented when the real provider workflow is unavailable. See
+[refund settlement](refund-settlement.md). Remaining commercial cancellation and
+order-lifecycle rules retain their assigned task. A financial reversal is distinct
+from commercial cancellation; no generic manual reversal command is exposed.
 
 Only CONFIRMED entries enter these totals. Pending, processing, unknown, rejected
-and cancelled entries are not cash received or returned. General close blockers for
-unresolved financial obligations belong to ZM-FIN-045.
+and cancelled entries are not cash received or returned. 045 blocks close for an
+admitted PENDING/PROCESSING/UNKNOWN leg in that turn. An unassigned refund debt can
+continue into a later turn. See [canonical close](canonical-cash-close.md).
 
 Existing development payments are not backfilled or silently counted from another
 table. Their missing financial references remain explicit. Do not use pre-adoption
 test history as a productive opening balance. Productive cutover and historical
-reconciliation remain ZM-FIN-047 under DEC-19.
+reconciliation use the explicit 047 evidence process under DEC-19.
 
-The schema remains at revision 0044. There is no migration, provider configuration,
-terminal integration or modification of an operational database in this task.
+The financial block extends the schema through revision0048. No operational
+database has been migrated and no BBVA adapter or hardware has been activated.

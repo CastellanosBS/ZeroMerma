@@ -203,7 +203,7 @@ class TicketsQueryService:
                     SalePayment.applied_amount,
                     SalePayment.currency_code,
                 )
-                .where(SalePayment.sale_id.in_(sale_ids))
+                .where(SalePayment.sale_id.in_(sale_ids), SalePayment.applied_amount > 0)
                 .order_by(SalePayment.sale_id.asc(), SalePayment.sequence.asc())
             )
             .mappings()

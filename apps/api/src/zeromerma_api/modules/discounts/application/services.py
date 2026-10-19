@@ -93,15 +93,21 @@ from zeromerma_api.modules.discounts.infrastructure.models import (
     OperationalDiscount,
     OperationalDiscountCategory,
 )
+from zeromerma_api.modules.financial_ledger.application.recording import (
+    FinancialCommandScope,
+    create_financial_operation,
+    record_confirmed_entry,
+)
+from zeromerma_api.modules.financial_ledger.domain.constants import (
+    Direction,
+    OperationKind,
+    PaymentMethod,
+)
+from zeromerma_api.modules.financial_ledger.domain.money import FinancialModelError
 from zeromerma_api.modules.identity.application.schemas import AuthenticatedUser
 from zeromerma_api.modules.identity.infrastructure.models import User
 from zeromerma_api.modules.operations.domain.constants import BRANCH_BRAND_MAPPING
 from zeromerma_api.modules.outbox.application.service import OutboxWriter
-from zeromerma_api.modules.sales.domain.constants import (
-    CASH_MOVEMENT_DIRECTION_IN,
-    CASH_MOVEMENT_TYPE_OPERATIONAL_DISCOUNT,
-)
-from zeromerma_api.modules.sales.infrastructure.models import CashMovement
 
 _ADMIN_COMMERCIAL_DISCOUNT_STATUS_ADAPTER: TypeAdapter[AdminCommercialDiscountStatus] = TypeAdapter(
     AdminCommercialDiscountStatus
@@ -1229,7 +1235,7 @@ class DiscountsCommandService:
         created_at = datetime.now(tz=UTC)
         resolved_request_id = request_id or str(uuid.uuid4())
         cash_amount = total_amount if payment_method_code == PAYMENT_METHOD_CASH else ZERO_MONEY
-        cash_movement_id = uuid.uuid4() if cash_amount > ZERO_MONEY else None
+        cash_movement_id = None
         trace = {
             "idempotency_key": str(idempotency_key),
             "operation_id": str(operation_id),
@@ -1260,23 +1266,49 @@ class DiscountsCommandService:
         session.add(discount)
         session.flush()
 
-        if cash_amount > ZERO_MONEY:
-            session.add(
-                CashMovement(
-                    id=cash_movement_id,
-                    sale_id=None,
-                    cash_session_id=current_open_cash_session.id,
-                    branch_id=context.branch_id,
-                    workstation_id=context.workstation_id,
-                    operator_id=current_user.id,
-                    movement_type=CASH_MOVEMENT_TYPE_OPERATIONAL_DISCOUNT,
-                    direction=CASH_MOVEMENT_DIRECTION_IN,
-                    payment_method_code=PAYMENT_METHOD_CASH,
-                    amount=cash_amount,
-                    currency_code="MXN",
-                    occurred_at=created_at,
-                )
+        financial_scope = FinancialCommandScope(
+            branch_id=context.branch_id,
+            workstation_id=context.workstation_id,
+            cash_session_id=current_open_cash_session.id,
+            actor_id=current_user.id,
+        )
+        try:
+            financial_operation = create_financial_operation(
+                session,
+                kind=OperationKind.OPERATIONAL_CHARGE,
+                source_type="OPERATIONAL_DISCOUNT",
+                source_id=discount.id,
+                subject_type="OPERATIONAL_DISCOUNT",
+                subject_id=discount.id,
+                amount_due=total_amount,
+                currency_code="MXN",
+                scope=financial_scope,
+                occurred_at=created_at,
             )
+            financial_entry = record_confirmed_entry(
+                session,
+                operation=financial_operation,
+                leg_key="charge",
+                payment_method=PaymentMethod(payment_method_code),
+                direction=Direction.IN,
+                amount=total_amount,
+                tendered_amount=total_amount
+                if payment_method_code == PAYMENT_METHOD_CASH
+                else None,
+                external_recording_reference=discount.id
+                if payment_method_code == PAYMENT_METHOD_CARD
+                else None,
+                scope=financial_scope,
+                occurred_at=created_at,
+            )
+        except FinancialModelError as error:
+            raise OperationalDiscountValidationError(
+                "Charges require valid positive amounts in MXN."
+            ) from error
+        financial_trace = {
+            "financial_operation_id": str(financial_operation.id),
+            "financial_entry_ids": [str(financial_entry.id)],
+        }
 
         discount_folio = _build_discount_folio(discount.id)
         self._audit_recorder.record(
@@ -1289,6 +1321,7 @@ class DiscountsCommandService:
             request_id=resolved_request_id,
             metadata={
                 **trace,
+                **financial_trace,
                 "folio": discount_folio,
                 "branch_code": context.branch_code,
                 "workstation_code": context.workstation_code,
@@ -1315,6 +1348,7 @@ class DiscountsCommandService:
             aggregate_id=str(discount.id),
             event_name=OUTBOX_EVENT_OPERATIONAL_DISCOUNT_COMMITTED_V1,
             payload={
+                **financial_trace,
                 "discount_id": str(discount.id),
                 "folio": discount_folio,
                 "branch_id": str(context.branch_id),
@@ -1339,7 +1373,7 @@ class DiscountsCommandService:
                 ),
                 "committed_at_utc": created_at.isoformat(),
             },
-            headers={"request_id": resolved_request_id, **trace},
+            headers={"request_id": resolved_request_id, **trace, **financial_trace},
         )
         if is_high_value:
             self._audit_recorder.record(
@@ -1352,6 +1386,7 @@ class DiscountsCommandService:
                 request_id=resolved_request_id,
                 metadata={
                     **trace,
+                    **financial_trace,
                     "folio": discount_folio,
                     "notification_target": "backoffice",
                     "threshold_amount": str(self._settings.discount_high_value_amount_threshold),
@@ -1365,6 +1400,7 @@ class DiscountsCommandService:
                 aggregate_id=str(discount.id),
                 event_name=OUTBOX_EVENT_OPERATIONAL_DISCOUNT_HIGH_VALUE_ALERT_V1,
                 payload={
+                    **financial_trace,
                     "discount_id": str(discount.id),
                     "folio": discount_folio,
                     "notification_target": "backoffice",
@@ -1379,7 +1415,7 @@ class DiscountsCommandService:
                     "threshold_amount": str(self._settings.discount_high_value_amount_threshold),
                     "committed_at_utc": created_at.isoformat(),
                 },
-                headers={"request_id": resolved_request_id, **trace},
+                headers={"request_id": resolved_request_id, **trace, **financial_trace},
             )
 
         session.flush()

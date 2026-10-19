@@ -16,6 +16,7 @@ import {
   hasCashCloseExpectedPaymentCounts,
   parseExpectedCashCents,
   parseScaledDecimalToUnits,
+  sanitizeMoneyInput,
   selectClassForCashCloseCount,
   selectProductForCashCloseCount,
   setCashClosePendingQuantityText,
@@ -59,6 +60,31 @@ const bolilloProduct: OperationsCatalogProductView = {
 };
 
 describe("cash close model", () => {
+  it.each(["-10.00", "-10.25", "-0.01"])(
+    "preserves signed CARD counts and serializes %s without changing its cents",
+    (card) => {
+      const draft = createInitialCashCloseDraftState();
+      draft.countedPaymentAmounts = { CASH: "100.00", CARD: sanitizeMoneyInput(card, true) };
+      expect(buildCashClosePreviewRequest("POS-01", draft).counted_payment_methods).toEqual([
+        { payment_method_code: "CASH", counted_amount: "100.00" },
+        { payment_method_code: "CARD", counted_amount: card },
+      ]);
+      expect(getDraftCountedTotalCents(draft.countedPaymentAmounts)).toBe(
+        10000 + parseExpectedCashCents(card)!,
+      );
+    },
+  );
+
+  it("rejects negative cash input without turning it into a positive count", () => {
+    expect(sanitizeMoneyInput("-10.00")).toBe("");
+    const draft = createInitialCashCloseDraftState();
+    draft.countedPaymentAmounts = { CASH: "-10.00", CARD: "" };
+    expect(buildCashClosePreviewRequest("POS-01", draft).counted_payment_methods).toEqual([]);
+    expect(hasCashCloseExpectedPaymentCounts(paymentMethodCatalog, draft.countedPaymentAmounts)).toBe(false);
+    draft.countedPaymentAmounts = { CASH: "0.00", CARD: "0.00" };
+    expect(buildCashClosePreviewRequest("POS-01", draft).counted_payment_methods).toHaveLength(2);
+  });
+
   it("accepts signed expected cash without allowing negative user counts", () => {
     expect(parseExpectedCashCents("-3.00")).toBe(-300);
     expect(parseExpectedCashCents("0.00")).toBe(0);
@@ -161,17 +187,13 @@ describe("cash close model", () => {
     });
   });
 
-  it("normalizes empty cash or card values to zero when another payment amount is captured", () => {
+  it("preserves a missing cash count when only card was counted", () => {
     const draft = syncCashCloseDraftState(createInitialCashCloseDraftState(), {
       paymentMethodCatalog,
     });
     draft.countedPaymentAmounts.CARD = "180.00";
 
     expect(buildCashClosePreviewRequest("POS-01", draft).counted_payment_methods).toEqual([
-      {
-        counted_amount: "0.00",
-        payment_method_code: "CASH",
-      },
       {
         counted_amount: "180.00",
         payment_method_code: "CARD",
@@ -278,7 +300,7 @@ describe("cash close model", () => {
     draft.countedPaymentAmounts.CARD = "180.00";
     expect(
       hasCashCloseExpectedPaymentCounts(paymentMethodCatalog, draft.countedPaymentAmounts),
-    ).toBe(true);
+    ).toBe(false);
   });
 
   it("derives ui state and blocking reason canonically from draft and preview state", () => {

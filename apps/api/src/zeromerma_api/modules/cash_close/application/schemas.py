@@ -2,10 +2,10 @@ from __future__ import annotations
 
 from datetime import datetime
 from decimal import Decimal
-from typing import Literal
+from typing import Literal, Self
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from zeromerma_api.modules.branches.application.schemas import BranchSummary, WorkstationSummary
 from zeromerma_api.modules.cash.application.schemas import CashSessionView
@@ -94,12 +94,18 @@ class CashCloseSummaryResponse(BaseModel):
 
 class CashCloseCountedPaymentMethodRequest(BaseModel):
     payment_method_code: str = Field(min_length=1, max_length=40)
-    counted_amount: Decimal = Field(ge=Decimal("0.00"), max_digits=12, decimal_places=2)
+    counted_amount: Decimal = Field(max_digits=12, decimal_places=2)
 
     @field_validator("payment_method_code")
     @classmethod
     def normalize_code(cls, value: str) -> str:
         return value.strip().upper()
+
+    @model_validator(mode="after")
+    def validate_cash_count(self) -> Self:
+        if self.payment_method_code == "CASH" and self.counted_amount < Decimal("0.00"):
+            raise ValueError("Counted cash cannot be negative.")
+        return self
 
 
 class CashCloseCountedProductLineRequest(BaseModel):

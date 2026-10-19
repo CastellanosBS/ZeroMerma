@@ -17,9 +17,13 @@ from zeromerma_api.bootstrap.seed_local import (
 from zeromerma_api.db.session import SessionLocal
 from zeromerma_api.modules.audit.infrastructure.models import AuditLog
 from zeromerma_api.modules.catalog.infrastructure.models import Product, ProductClass
+from zeromerma_api.modules.financial_ledger.infrastructure.models import (
+    FinancialEntry,
+    FinancialOperation,
+)
 from zeromerma_api.modules.outbox.infrastructure.models import OutboxEvent
 from zeromerma_api.modules.returns.infrastructure.models import SaleReturn, SaleReturnLine
-from zeromerma_api.modules.sales.infrastructure.models import CashMovement, Sale
+from zeromerma_api.modules.sales.infrastructure.models import Sale
 from zeromerma_api.testing.idempotency import current_cash_session_id, new_idempotency_key
 from zeromerma_api.testing.sessions import login_headers
 
@@ -256,9 +260,11 @@ def test_product_direct_return_commits_refund_and_writes_audit_and_outbox(
             select(SaleReturnLine).where(SaleReturnLine.sale_return_id == return_record.id)
         ).scalar_one()
         cash_movement = session.execute(
-            select(CashMovement).where(
-                CashMovement.sale_id == sale_payload["id"],
-                CashMovement.movement_type == "SALE_RETURN_REFUND",
+            select(FinancialEntry)
+            .join(FinancialOperation)
+            .where(
+                FinancialOperation.source_id == return_record.id,
+                FinancialOperation.kind == "SALE_REFUND",
             )
         ).scalar_one()
         audit_record = session.execute(

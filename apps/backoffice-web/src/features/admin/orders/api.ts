@@ -139,6 +139,7 @@ function readContextValue(
 
 function mapDetailFromApi(response: ApiOrderDetail): AdminOrderDetail {
   return {
+    financialRefund: response.financial_refund ?? null,
     availableActions: {
       canCancel: response.available_actions.can_cancel,
       canCaptureBalance: response.available_actions.can_capture_balance,

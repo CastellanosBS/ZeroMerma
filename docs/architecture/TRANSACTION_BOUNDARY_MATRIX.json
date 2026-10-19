@@ -4168,6 +4168,186 @@
       "evidence_refs": [
         "apps/api/unit_tests/test_transaction_ownership.py"
       ]
+    },
+    {
+      "path": "apps/api/src/zeromerma_api/modules/financial_ledger/application/recording.py",
+      "symbol": "create_financial_operation",
+      "calls": [
+        {
+          "method": "flush",
+          "receiver": "session",
+          "count": 1
+        }
+      ],
+      "role": "PARTICIPANT",
+      "owner": "group:IDEMPOTENT_COMMAND",
+      "ownership_group": "IDEMPOTENT_COMMAND",
+      "entry_points": [
+        "apps/api/src/zeromerma_api/modules/financial_ledger/application/recording.py#create_financial_operation"
+      ],
+      "cleanup": {
+        "kind": "CALLER_OWNS_ROLLBACK",
+        "reference": "group:IDEMPOTENT_COMMAND"
+      },
+      "evidence_refs": [
+        "apps/api/unit_tests/test_transaction_ownership.py",
+        "apps/api/tests/test_financial_producers.py"
+      ]
+    },
+    {
+      "path": "apps/api/src/zeromerma_api/modules/financial_ledger/application/recording.py",
+      "symbol": "record_confirmed_entry",
+      "calls": [
+        {
+          "method": "flush",
+          "receiver": "session",
+          "count": 1
+        }
+      ],
+      "role": "PARTICIPANT",
+      "owner": "group:IDEMPOTENT_COMMAND",
+      "ownership_group": "IDEMPOTENT_COMMAND",
+      "entry_points": [
+        "apps/api/src/zeromerma_api/modules/financial_ledger/application/recording.py#record_confirmed_entry"
+      ],
+      "cleanup": {
+        "kind": "CALLER_OWNS_ROLLBACK",
+        "reference": "group:IDEMPOTENT_COMMAND"
+      },
+      "evidence_refs": [
+        "apps/api/unit_tests/test_transaction_ownership.py",
+        "apps/api/tests/test_financial_producers.py"
+      ]
+    },
+    {
+      "path": "apps/api/src/zeromerma_api/modules/financial_ledger/application/refunds.py",
+      "symbol": "settle_refund_cash",
+      "calls": [
+        {
+          "method": "flush",
+          "receiver": "session",
+          "count": 1
+        }
+      ],
+      "role": "PARTICIPANT",
+      "owner": "group:IDEMPOTENT_COMMAND",
+      "ownership_group": "IDEMPOTENT_COMMAND",
+      "entry_points": [
+        "apps/api/src/zeromerma_api/modules/financial_ledger/application/refunds.py#settle_refund_cash"
+      ],
+      "cleanup": {
+        "kind": "CALLER_OWNS_ROLLBACK",
+        "reference": "group:IDEMPOTENT_COMMAND"
+      },
+      "evidence_refs": [
+        "apps/api/unit_tests/test_transaction_ownership.py",
+        "apps/api/tests/test_financial_producers.py"
+      ]
+    },
+    {
+      "path": "apps/api/src/zeromerma_api/modules/payment_terminal/application/services.py",
+      "symbol": "PaymentTerminalService._mark_unknown",
+      "calls": [
+        {
+          "method": "commit",
+          "receiver": "session",
+          "count": 1
+        }
+      ],
+      "role": "STANDALONE_OWNER",
+      "owner": "apps/api/src/zeromerma_api/modules/payment_terminal/application/services.py#PaymentTerminalService._mark_unknown",
+      "ownership_group": "EXTERNAL_PAYMENT",
+      "entry_points": [
+        "apps/api/src/zeromerma_api/modules/payment_terminal/application/services.py#PaymentTerminalService._mark_unknown"
+      ],
+      "cleanup": {
+        "kind": "ROLLBACK_ON_FAILURE_GUARD",
+        "reference": "apps/api/src/zeromerma_api/modules/payment_terminal/application/services.py#PaymentTerminalService._mark_unknown"
+      },
+      "evidence_refs": [
+        "apps/api/unit_tests/test_transaction_ownership.py",
+        "apps/api/tests/test_payment_terminal.py"
+      ]
+    },
+    {
+      "path": "apps/api/src/zeromerma_api/modules/payment_terminal/application/services.py",
+      "symbol": "PaymentTerminalService.apply_evidence",
+      "calls": [
+        {
+          "method": "commit",
+          "receiver": "session",
+          "count": 3
+        },
+        {
+          "method": "flush",
+          "receiver": "session",
+          "count": 2
+        }
+      ],
+      "role": "STANDALONE_OWNER",
+      "owner": "apps/api/src/zeromerma_api/modules/payment_terminal/application/services.py#PaymentTerminalService.apply_evidence",
+      "ownership_group": "EXTERNAL_PAYMENT",
+      "entry_points": [
+        "apps/api/src/zeromerma_api/modules/payment_terminal/application/services.py#PaymentTerminalService.apply_evidence"
+      ],
+      "cleanup": {
+        "kind": "ROLLBACK_ON_FAILURE_GUARD",
+        "reference": "apps/api/src/zeromerma_api/modules/payment_terminal/application/services.py#PaymentTerminalService.apply_evidence"
+      },
+      "evidence_refs": [
+        "apps/api/unit_tests/test_transaction_ownership.py",
+        "apps/api/tests/test_payment_terminal.py"
+      ]
+    },
+    {
+      "path": "apps/api/src/zeromerma_api/modules/payment_terminal/application/services.py",
+      "symbol": "PaymentTerminalService.callback",
+      "calls": [
+        {
+          "method": "commit",
+          "receiver": "session",
+          "count": 1
+        }
+      ],
+      "role": "STANDALONE_OWNER",
+      "owner": "apps/api/src/zeromerma_api/modules/payment_terminal/application/services.py#PaymentTerminalService.callback",
+      "ownership_group": "EXTERNAL_PAYMENT",
+      "entry_points": [
+        "apps/api/src/zeromerma_api/modules/payment_terminal/application/services.py#PaymentTerminalService.callback"
+      ],
+      "cleanup": {
+        "kind": "ROLLBACK_ON_FAILURE_GUARD",
+        "reference": "apps/api/src/zeromerma_api/modules/payment_terminal/application/services.py#PaymentTerminalService.callback"
+      },
+      "evidence_refs": [
+        "apps/api/unit_tests/test_transaction_ownership.py",
+        "apps/api/tests/test_payment_terminal.py"
+      ]
+    },
+    {
+      "path": "apps/api/src/zeromerma_api/modules/payment_terminal/application/services.py",
+      "symbol": "PaymentTerminalService.dispatch",
+      "calls": [
+        {
+          "method": "commit",
+          "receiver": "session",
+          "count": 2
+        }
+      ],
+      "role": "STANDALONE_OWNER",
+      "owner": "apps/api/src/zeromerma_api/modules/payment_terminal/application/services.py#PaymentTerminalService.dispatch",
+      "ownership_group": "EXTERNAL_PAYMENT",
+      "entry_points": [
+        "apps/api/src/zeromerma_api/modules/payment_terminal/application/services.py#PaymentTerminalService.dispatch"
+      ],
+      "cleanup": {
+        "kind": "ROLLBACK_ON_FAILURE_GUARD",
+        "reference": "apps/api/src/zeromerma_api/modules/payment_terminal/application/services.py#PaymentTerminalService.dispatch"
+      },
+      "evidence_refs": [
+        "apps/api/unit_tests/test_transaction_ownership.py",
+        "apps/api/tests/test_payment_terminal.py"
+      ]
     }
   ],
   "command_entries": [
@@ -4353,7 +4533,10 @@
         "apps/api/src/zeromerma_api/modules/sales/application/idempotency.py#SaleConfirmationService.confirm",
         "apps/api/src/zeromerma_api/modules/transfers/application/idempotency.py#TransferCommandServiceWrapper.execute_admin",
         "apps/api/src/zeromerma_api/modules/transfers/application/idempotency.py#TransferCommandServiceWrapper.execute_pos",
-        "apps/api/src/zeromerma_api/modules/waste/application/idempotency.py#AdminWasteCommitService.commit"
+        "apps/api/src/zeromerma_api/modules/waste/application/idempotency.py#AdminWasteCommitService.commit",
+        "apps/api/src/zeromerma_api/modules/financial_ledger/application/refund_commands.py#RefundSettlementService.settle",
+        "apps/api/src/zeromerma_api/modules/financial_ledger/application/reconciliation.py#apply_financial_import_row",
+        "apps/api/src/zeromerma_api/modules/payment_terminal/application/services.py#PaymentTerminalService.admit"
       ],
       "owners": [
         "apps/api/src/zeromerma_api/modules/idempotency/application/service.py#IdempotencyExecutor.execute"
@@ -4399,7 +4582,13 @@
         "apps/api/src/zeromerma_api/modules/transfers/application/services.py#TransferCommandService.commit_dispatch",
         "apps/api/src/zeromerma_api/modules/transfers/application/services.py#TransferCommandService.receive_transfer",
         "apps/api/src/zeromerma_api/modules/transfers/application/workflow.py#command_snapshot",
-        "apps/api/src/zeromerma_api/modules/waste/application/admin_services.py#AdminWasteService.create_waste"
+        "apps/api/src/zeromerma_api/modules/waste/application/admin_services.py#AdminWasteService.create_waste",
+        "apps/api/src/zeromerma_api/modules/financial_ledger/application/refund_commands.py#RefundSettlementService.settle",
+        "apps/api/src/zeromerma_api/modules/financial_ledger/application/reconciliation.py#apply_financial_import_row",
+        "apps/api/src/zeromerma_api/modules/payment_terminal/application/services.py#PaymentTerminalService.admit",
+        "apps/api/src/zeromerma_api/modules/financial_ledger/application/recording.py#create_financial_operation",
+        "apps/api/src/zeromerma_api/modules/financial_ledger/application/recording.py#record_confirmed_entry",
+        "apps/api/src/zeromerma_api/modules/financial_ledger/application/refunds.py#settle_refund_cash"
       ],
       "atomic_effects": [
         "idempotency identity and terminal acknowledgement",
@@ -4941,6 +5130,24 @@
         "apps/api/unit_tests/test_transaction_ownership.py"
       ],
       "verification": "STATIC_GATE_PASSED_BEHAVIOR_NOT_REEXECUTED_IN_039"
+    },
+    {
+      "id": "EXTERNAL_PAYMENT",
+      "owners": [
+        "apps/api/src/zeromerma_api/modules/payment_terminal/application/services.py#PaymentTerminalService.dispatch",
+        "apps/api/src/zeromerma_api/modules/payment_terminal/application/services.py#PaymentTerminalService._mark_unknown",
+        "apps/api/src/zeromerma_api/modules/payment_terminal/application/services.py#PaymentTerminalService.apply_evidence",
+        "apps/api/src/zeromerma_api/modules/payment_terminal/application/services.py#PaymentTerminalService.callback"
+      ],
+      "participants": [],
+      "entry_points": [
+        "apps/api/src/zeromerma_api/modules/payment_terminal/application/services.py#PaymentTerminalService.dispatch",
+        "apps/api/src/zeromerma_api/modules/payment_terminal/application/services.py#PaymentTerminalService._mark_unknown",
+        "apps/api/src/zeromerma_api/modules/payment_terminal/application/services.py#PaymentTerminalService.apply_evidence",
+        "apps/api/src/zeromerma_api/modules/payment_terminal/application/services.py#PaymentTerminalService.callback"
+      ],
+      "failure_behavior": "Commit the durable claim before the provider call, release database locks, then reconcile authoritative evidence in a separate guarded transaction. Any incomplete local transaction rolls back; uncertain provider outcomes retain the same identity.",
+      "post_commit": "No provider call is retried as a new charge after UNKNOWN; read the same provider operation. Evidence and local terminal state are durable before acknowledgement."
     }
   ],
   "read_only_boundaries": [

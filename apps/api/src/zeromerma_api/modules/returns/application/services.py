@@ -37,6 +37,10 @@ from zeromerma_api.modules.catalog.domain.exceptions import (
     ProductNotFoundError,
 )
 from zeromerma_api.modules.catalog.infrastructure.models import Product, ProductClass
+from zeromerma_api.modules.financial_ledger.application.recording import FinancialCommandScope
+from zeromerma_api.modules.financial_ledger.application.refund_schemas import FinancialRefundView
+from zeromerma_api.modules.financial_ledger.application.refunds import admit_refund, find_refund
+from zeromerma_api.modules.financial_ledger.domain.money import FinancialModelError
 from zeromerma_api.modules.identity.application.schemas import AuthenticatedUser
 from zeromerma_api.modules.identity.infrastructure.models import User
 from zeromerma_api.modules.operations.domain.constants import BRANCH_BRAND_MAPPING
@@ -87,19 +91,16 @@ from zeromerma_api.modules.returns.infrastructure.models import SaleReturn, Sale
 from zeromerma_api.modules.sales.application.schemas import SaleLineView
 from zeromerma_api.modules.sales.application.services import SaleQueryService
 from zeromerma_api.modules.sales.domain.constants import (
-    CASH_MOVEMENT_DIRECTION_OUT,
-    SALE_PAYMENT_METHOD_CASH,
     SALE_STATUS_CONFIRMED,
 )
 from zeromerma_api.modules.sales.domain.exceptions import SaleNotFoundError
-from zeromerma_api.modules.sales.infrastructure.models import CashMovement, Sale, SaleLine
+from zeromerma_api.modules.sales.infrastructure.models import Sale, SaleLine
 
 MAX_RETURN_SEARCH_RESULTS = 80
 MONEY_QUANTIZER = Decimal("0.01")
 QUANTITY_QUANTIZER = Decimal("0.001")
 ZERO_MONEY = Decimal("0.00")
 ZERO_QUANTITY = Decimal("0.000")
-CASH_MOVEMENT_TYPE_SALE_RETURN_REFUND = "SALE_RETURN_REFUND"
 RETURN_STATUS_NOT_RETURNED = "NOT_RETURNED"
 RETURN_STATUS_PARTIALLY_RETURNED = "PARTIALLY_RETURNED"
 RETURN_STATUS_FULLY_RETURNED = "FULLY_RETURNED"
@@ -793,6 +794,9 @@ class ReturnsQueryService:
             reason_code=sale_return.reason_code,
             reason_name=sale_return.reason_name,
             refund_method_code=sale_return.refund_method_code,
+            financial_refund=find_refund(
+                session, source_type="SALE_RETURN", source_id=sale_return.id
+            ),
             currency_code=sale_return.currency_code,
             total_refund_amount=_quantize_money(sale_return.total_refund_amount),
             notes=sale_return.notes,
@@ -1051,12 +1055,11 @@ class ReturnsCommandService:
             created_at_utc=created_at,
         )
 
-        refund_cash_movement_id = uuid.uuid4()
         trace = {
             "idempotency_key": str(idempotency_key),
             "operation_id": str(operation_id),
             "operation_code": "return.commit",
-            "refund_cash_movement_id": str(refund_cash_movement_id),
+            "refund_cash_movement_id": None,
         }
         session.add(sale_return)
         session.flush()
@@ -1083,21 +1086,31 @@ class ReturnsCommandService:
                 )
             )
 
-        session.add(
-            CashMovement(
-                id=refund_cash_movement_id,
-                sale_id=sale_detail.id,
-                cash_session_id=current_open_cash_session.id,
-                branch_id=context.branch_id,
-                workstation_id=context.workstation_id,
-                operator_id=current_user.id,
-                movement_type=CASH_MOVEMENT_TYPE_SALE_RETURN_REFUND,
-                direction=CASH_MOVEMENT_DIRECTION_OUT,
-                payment_method_code=SALE_PAYMENT_METHOD_CASH,
-                amount=total_refund_amount,
-                currency_code=sale_detail.currency_code,
+        try:
+            financial_refund = admit_refund(
+                session,
+                source_type="SALE_RETURN",
+                source_id=sale_return.id,
+                subject_type="SALE",
+                subject_id=sale.id,
+                amount_due=total_refund_amount,
+                currency_code=sale.currency_code,
+                scope=FinancialCommandScope(
+                    branch_id=context.branch_id,
+                    workstation_id=context.workstation_id,
+                    cash_session_id=current_open_cash_session.id,
+                    actor_id=current_user.id,
+                ),
                 occurred_at=created_at,
             )
+        except FinancialModelError as error:
+            raise SaleReturnConflictError(str(error)) from error
+        trace.update(
+            {
+                "financial_operation_id": str(financial_refund.financial_operation_id),
+                "refund_amount_settled": str(financial_refund.amount_settled),
+                "refund_amount_pending": str(financial_refund.amount_pending),
+            }
         )
 
         self._audit_recorder.record(
@@ -1138,7 +1151,8 @@ class ReturnsCommandService:
             aggregate_id=str(sale_return.id),
             event_name=OUTBOX_EVENT_SALE_RETURN_COMMITTED_V1,
             payload={
-                "refund_cash_movement_id": str(refund_cash_movement_id),
+                "refund_cash_movement_id": None,
+                "financial_refund": financial_refund.model_dump(mode="json"),
                 "sale_return_id": str(sale_return.id),
                 "folio": _build_return_folio(sale_return.id),
                 "original_sale_id": str(sale_detail.id),
@@ -1211,7 +1225,7 @@ class ReturnsCommandService:
                 aggregate_id=str(sale_return.id),
                 event_name=OUTBOX_EVENT_SALE_RETURN_BACKOFFICE_REVIEW_REQUESTED_V1,
                 payload={
-                    "refund_cash_movement_id": str(refund_cash_movement_id),
+                    "refund_cash_movement_id": None,
                     "sale_return_id": str(sale_return.id),
                     "folio": _build_return_folio(sale_return.id),
                     "notification_target": "backoffice",
@@ -1230,7 +1244,7 @@ class ReturnsCommandService:
             )
         session.flush()
         return _build_commit_result(
-            session, sale_return=sale_return, refund_cash_movement_id=refund_cash_movement_id
+            session, sale_return=sale_return, financial_refund=financial_refund
         )
 
 
@@ -1354,7 +1368,7 @@ def _calculate_refund_amount(
 
 
 def _build_commit_result(
-    session: Session, *, sale_return: SaleReturn, refund_cash_movement_id: uuid.UUID
+    session: Session, *, sale_return: SaleReturn, financial_refund: FinancialRefundView
 ) -> ReturnCommitResultView:
     lines = session.scalars(
         select(SaleReturnLine)
@@ -1371,7 +1385,8 @@ def _build_commit_result(
             "branch_id": sale_return.branch_id,
             "workstation_id": sale_return.workstation_id,
             "cash_session_id": sale_return.cash_session_id,
-            "refund_cash_movement_id": refund_cash_movement_id,
+            "refund_cash_movement_id": None,
+            "financial_refund": financial_refund,
             "refund_method_code": sale_return.refund_method_code,
             "currency_code": sale_return.currency_code,
             "total_refund_amount": sale_return.total_refund_amount,

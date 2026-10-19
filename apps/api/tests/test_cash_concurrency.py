@@ -434,32 +434,43 @@ def test_financial_commands_and_close_share_exact_shift_boundary(
                 CashMovement.cash_session_id == shift.id
             )
         ).all()
-        expected = Decimal("1000") + sum(
-            (amount if direction == "IN" else -amount for direction, amount in movements),
-            Decimal("0"),
-        )
-        order_entries = session.execute(
-            select(FinancialEntry.direction, FinancialEntry.amount).where(
+        assert movements == []
+        cash_entries = session.execute(
+            select(FinancialEntry.direction, FinancialEntry.amount, FinancialOperation.kind)
+            .join(FinancialOperation)
+            .where(
                 FinancialEntry.cash_session_id == shift.id,
                 FinancialEntry.payment_method_code == "CASH",
                 FinancialEntry.state == "CONFIRMED",
             )
         ).all()
-        expected += sum(
-            (amount if direction == "IN" else -amount for direction, amount in order_entries),
+        expected = sum(
+            (amount if direction == "IN" else -amount for direction, amount, _ in cash_entries),
             Decimal("0"),
+        )
+        opening_entries = [entry for entry in cash_entries if entry.kind == "CASH_OPENING"]
+        assert opening_entries == [("IN", Decimal("1000.00"), "CASH_OPENING")]
+        prior_cash = {"return": Decimal("36"), "deliver": Decimal("20"), "cancel": Decimal("20")}
+        command_cash = {
+            "sale": Decimal("36"),
+            "return": Decimal("-18"),
+            "create": Decimal("20"),
+            "deliver": Decimal("14"),
+            "cancel": Decimal("-20"),
+        }
+        assert expected == Decimal("1000") + prior_cash.get(kind, Decimal("0")) + (
+            Decimal("0") if close_first else command_cash[kind]
         )
         assert closed.expected_cash_amount == expected
         # Each order effect has one canonical entry and no mirrored CashMovement.
         if kind in {"create", "deliver", "cancel"}:
-            assert movements == []
             count = session.scalar(
                 select(func.count())
                 .select_from(CustomerOrderPayment)
                 .where(CustomerOrderPayment.cash_session_id == shift.id)
             )
             assert count == before[1] + (0 if close_first else 1)
-            assert len(order_entries) == count
+            assert len(cash_entries) == count + 1  # Opening is also a canonical financial entry.
     fresh = login_headers(
         client,
         email=transfer_cashier_email(command.body["workstation_code"]),
@@ -586,7 +597,20 @@ def test_two_distinct_sale_intentions_serialize_without_losing_either_effect(
     assert a.payload["id"] != b.payload["id"]
     with SessionLocal() as session:
         assert session.scalar(select(func.count()).select_from(Sale)) == 2
-        assert session.scalar(select(func.sum(CashMovement.amount))) == Decimal("72.00")
+        assert session.scalar(select(func.count()).select_from(CashMovement)) == 0
+        sale_entries = session.scalars(
+            select(FinancialEntry)
+            .join(FinancialOperation)
+            .where(FinancialOperation.kind == "SALE_COLLECTION")
+        ).all()
+        assert len(sale_entries) == 2
+        assert all(
+            entry.amount == Decimal("36.00")
+            and entry.direction == "IN"
+            and entry.payment_method_code == "CASH"
+            and entry.state == "CONFIRMED"
+            for entry in sale_entries
+        )
 
 
 def test_two_order_settlement_intentions_cannot_collect_the_same_remaining_balance(
@@ -619,7 +643,7 @@ def test_two_order_settlement_intentions_cannot_collect_the_same_remaining_balan
 
 @pytest.mark.parametrize("kind", ["create", "deliver", "cancel"])
 @pytest.mark.parametrize("close_first", [False, True])
-def test_card_order_effects_serialize_with_close_without_affecting_cash(
+def test_card_order_effects_and_cash_first_refunds_serialize_with_close(
     client: TestClient, monkeypatch: pytest.MonkeyPatch, kind: str, close_first: bool
 ) -> None:
     command, close = _setup(client, kind, payment="CARD")
@@ -631,8 +655,17 @@ def test_card_order_effects_serialize_with_close_without_affecting_cash(
         assert _effect_counts()[-2:] == before[-2:]
     else:
         assert isinstance(second, IdempotencyResult), repr(second)
-        assert second.payload["expected_cash_amount"] == "1000.00"
+        assert second.payload["expected_cash_amount"] == (
+            "980.00" if kind == "cancel" else "1000.00"
+        )
         assert _effect_counts()[-2:] == (before[-2] + 1, before[-1] + 1)
+        with SessionLocal() as session:
+            effect = session.scalars(
+                select(FinancialEntry).where(FinancialEntry.idempotency_key == UUID(command.key))
+            ).one()
+            assert effect.payment_method_code == ("CASH" if kind == "cancel" else "CARD")
+            assert effect.direction == ("OUT" if kind == "cancel" else "IN")
+            assert effect.state == "CONFIRMED"
 
 
 def test_cash_lock_timeout_rolls_back_sale_identity_then_retries_same_intention(
@@ -680,7 +713,20 @@ def test_cash_lock_timeout_rolls_back_sale_identity_then_retries_same_intention(
     assert replay.replayed and replay.payload == retried.payload
     with SessionLocal() as session:
         assert session.scalar(select(func.count()).select_from(Sale)) == 2
-        assert session.scalar(select(func.sum(CashMovement.amount))) == Decimal("72.00")
+        assert session.scalar(select(func.count()).select_from(CashMovement)) == 0
+        sale_entries = session.scalars(
+            select(FinancialEntry)
+            .join(FinancialOperation)
+            .where(FinancialOperation.kind == "SALE_COLLECTION")
+        ).all()
+        assert len(sale_entries) == 2
+        assert all(
+            entry.amount == Decimal("36.00")
+            and entry.direction == "IN"
+            and entry.payment_method_code == "CASH"
+            and entry.state == "CONFIRMED"
+            for entry in sale_entries
+        )
 
 
 @pytest.mark.parametrize("kind", ["payment", "discount"])

@@ -75,6 +75,10 @@ def _order_financial_entries_statement() -> Select[
     causal_payment_id = case(
         (is_reversal, original_operation.source_id), else_=FinancialOperation.source_id
     )
+    causal_source_type = case(
+        (is_reversal, original_operation.source_type), else_=FinancialOperation.source_type
+    )
+    causal_entry_id = case((is_reversal, original_entry.id), else_=FinancialEntry.id)
     return (
         select(
             FinancialEntry,
@@ -92,7 +96,20 @@ def _order_financial_entries_statement() -> Select[
         .outerjoin(
             original_operation, original_operation.id == original_entry.financial_operation_id
         )
-        .join(CustomerOrderPayment, CustomerOrderPayment.id == causal_payment_id)
+        .join(
+            CustomerOrderPayment,
+            or_(
+                and_(
+                    causal_source_type == "ORDER_PAYMENT",
+                    CustomerOrderPayment.id == causal_payment_id,
+                ),
+                and_(
+                    causal_source_type == "ORDER_CANCELLATION",
+                    CustomerOrderPayment.financial_entry_id == causal_entry_id,
+                    CustomerOrderPayment.payment_type == "REFUND",
+                ),
+            ),
+        )
         .join(
             CustomerOrder,
             and_(
@@ -114,13 +131,13 @@ def _order_financial_entries_statement() -> Select[
             or_(
                 and_(
                     FinancialOperation.kind.in_(ORDER_FINANCIAL_KINDS),
-                    FinancialOperation.source_type == "ORDER_PAYMENT",
+                    FinancialOperation.source_type.in_(("ORDER_PAYMENT", "ORDER_CANCELLATION")),
                 ),
                 and_(
                     is_reversal,
                     FinancialOperation.source_type == "FINANCIAL_ENTRY",
                     original_operation.kind.in_(ORDER_FINANCIAL_KINDS),
-                    original_operation.source_type == "ORDER_PAYMENT",
+                    original_operation.source_type.in_(("ORDER_PAYMENT", "ORDER_CANCELLATION")),
                     original_operation.subject_type == "ORDER",
                     original_operation.subject_id == CustomerOrder.id,
                     original_entry.state == "CONFIRMED",

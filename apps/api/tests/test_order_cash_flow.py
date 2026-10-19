@@ -164,14 +164,18 @@ def test_audited_missing_six_pesos_reconciles_to_527_in_pos_and_backoffice(
     assert closed["expected_cash_amount"] == "527.00"
     assert closed["cash_variance_amount"] == "0.00"
     with SessionLocal() as session:
-        operation = session.scalars(select(FinancialOperation)).one()
-        entry = session.scalars(select(FinancialEntry)).one()
+        operation = session.scalars(
+            select(FinancialOperation).where(FinancialOperation.subject_id == UUID(order["id"]))
+        ).one()
+        entry = session.scalars(
+            select(FinancialEntry).where(FinancialEntry.financial_operation_id == operation.id)
+        ).one()
         assert operation.subject_id == UUID(order["id"])
         assert str(operation.source_id) == paid.json()["payments"][0]["id"]
         assert entry.financial_operation_id == operation.id
         assert str(entry.cash_session_id) == context["cash_session_id"]
         assert entry.amount == Decimal("6.00")
-        assert session.scalar(select(func.count()).select_from(CashMovement)) == 1
+        assert session.scalar(select(func.count()).select_from(CashMovement)) == 0
         assert session.scalar(select(func.count()).select_from(Sale)) == 1
     admin = owner_headers()
     cut = client.get(f"/v1/admin/cash-cuts/{context['cash_session_id']}", headers=admin)
@@ -201,7 +205,7 @@ def test_audited_missing_six_pesos_reconciles_to_527_in_pos_and_backoffice(
     ("method", "cash_amount", "card_amount"),
     [("CASH", "6.00", "0.00"), ("CARD", "0.00", "6.00"), ("MIXED", "2.00", "4.00")],
 )
-def test_order_advance_and_refund_use_real_methods_once_without_becoming_sales(
+def test_order_advance_and_cash_first_refund_use_actual_methods_without_becoming_sales(
     client: TestClient, method: str, cash_amount: str, card_amount: str
 ) -> None:
     headers, context = _setup(client)
@@ -224,7 +228,8 @@ def test_order_advance_and_refund_use_real_methods_once_without_becoming_sales(
     assert flow.json()["summary"]["cash_total"] == cash_amount
     assert flow.json()["summary"]["card_total"] == card_amount
     for filter_method, expected_count in (
-        ("CASH", int(Decimal(cash_amount) > 0)),
+        # The confirmed canonical opening also establishes CASH activity in this cut.
+        ("CASH", 1),
         ("CARD", int(Decimal(card_amount) > 0)),
     ):
         filtered = client.get(
@@ -241,7 +246,7 @@ def test_order_advance_and_refund_use_real_methods_once_without_becoming_sales(
         classification = detail.json()["financial_classification"]
         assert classification["affects_cash_drawer"] is False
         assert classification["affects_bank_settlement"] is False
-    _post(
+    cancelled = _post(
         client,
         headers,
         f"/v1/orders/{order['id']}/cancel",
@@ -252,9 +257,15 @@ def test_order_advance_and_refund_use_real_methods_once_without_becoming_sales(
     )
     summary = _summary(client, headers)
     assert summary["total_cash_in"] == cash_amount
-    assert summary["total_cash_out"] == cash_amount
-    assert summary["expected_cash_amount"] == "500.00"
-    closed = _close(client, headers, context, "500.00")
+    assert summary["total_cash_out"] == "6.00"
+    expected_after_refund = format(expected - Decimal("6.00"), ".2f")
+    assert summary["expected_cash_amount"] == expected_after_refund
+    refund = cancelled["financial_refund"]
+    assert refund["amount_due"] == refund["amount_settled"] == "6.00"
+    assert refund["amount_pending"] == "0.00"
+    assert len(refund["entries"]) == 1
+    assert refund["entries"][0]["payment_method_code"] == "CASH"
+    closed = _close(client, headers, context, expected_after_refund)
     assert closed["cash_variance_amount"] == "0.00"
     cut = client.get(f"/v1/admin/cash-cuts/{context['cash_session_id']}", headers=admin)
     assert cut.status_code == 200
@@ -263,13 +274,15 @@ def test_order_advance_and_refund_use_real_methods_once_without_becoming_sales(
     for row in cut.json()["payment_breakdown"]:
         amount = {"CASH": cash_amount, "CARD": card_amount}.get(row["payment_method_code"], "0.00")
         assert row["order_advance_amount"] == amount
-        assert row["order_refund_amount"] == amount
+        assert row["order_refund_amount"] == (
+            "6.00" if row["payment_method_code"] == "CASH" else "0.00"
+        )
         assert row["sales_amount"] == "0.00"
-    assert len(cut.json()["order_payments"]) == (4 if method == "MIXED" else 2)
+    assert len(cut.json()["order_payments"]) == (3 if method == "MIXED" else 2)
     refunded = client.get(
         "/v1/admin/cash-cuts",
         headers=admin,
-        params={"payment_method": "CARD" if method == "CARD" else "CASH", "has_refunds": "true"},
+        params={"payment_method": "CASH", "has_refunds": "true"},
     )
     assert refunded.status_code == 200 and refunded.json()["total"] == 1
     assert refunded.json()["items"][0]["has_refunds"] is True
@@ -346,7 +359,11 @@ def test_unconfirmed_order_entries_are_excluded_from_all_cash_consumers(
     order = _create(client, headers, context, amount="3.00", method="CASH")
     # Diagnostic fixture models an unresolved future payment, never an HTTP-confirmed receipt.
     with SessionLocal() as session:
-        original = session.scalars(select(FinancialEntry)).one()
+        original = session.scalars(
+            select(FinancialEntry)
+            .join(FinancialOperation)
+            .where(FinancialOperation.subject_id == UUID(order["id"]))
+        ).one()
         trace = _financial_context(original)
         payment = CustomerOrderPayment(
             id=uuid4(),
@@ -406,7 +423,11 @@ def test_confirmed_order_compensation_is_included_once_and_keeps_its_original(
     order = _create(client, headers, context, amount="6.00", method="CASH")
     # There is deliberately no new public reversal endpoint in 042.
     with SessionLocal() as session:
-        original = session.scalars(select(FinancialEntry)).one()
+        original = session.scalars(
+            select(FinancialEntry)
+            .join(FinancialOperation)
+            .where(FinancialOperation.subject_id == UUID(order["id"]))
+        ).one()
         trace = _financial_context(original)
         reversal = make_operation(
             trace,

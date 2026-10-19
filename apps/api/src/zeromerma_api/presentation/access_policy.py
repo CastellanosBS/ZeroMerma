@@ -34,6 +34,52 @@ class EndpointPolicy:
 # Each method/path is deliberate. Unlisted operations are denied, never inferred.
 # Shared masters have no branch owner: mutations require explicit GLOBAL (DEC-04).
 ENDPOINT_POLICIES: dict[tuple[str, str], EndpointPolicy] = {
+    ("POST", "/v1/returns/{return_id}/refund-settlements"): EndpointPolicy(
+        ("returns_corrections.manage",), "POS", mutation=True
+    ),
+    ("GET", "/v1/returns/refund-settlements/{idempotency_key}"): EndpointPolicy(
+        ("returns_corrections.manage",), "POS"
+    ),
+    ("POST", "/v1/orders/{order_id}/refund-settlements"): EndpointPolicy(
+        ("orders.cancel",), "POS", mutation=True
+    ),
+    ("GET", "/v1/orders/refund-settlements/{idempotency_key}"): EndpointPolicy(
+        ("orders.cancel",), "POS"
+    ),
+    ("GET", "/v1/payment-terminal/bootstrap"): EndpointPolicy(
+        (),
+        None,
+        exception_reason="Terminal bootstrap checks POS operation or Backoffice finance authority.",
+    ),
+    ("POST", "/v1/payment-terminal/operations"): EndpointPolicy(
+        (),
+        None,
+        mutation=True,
+        exception_reason=(
+            "Terminal service refreshes source-specific authority and branch/session scope."
+        ),
+    ),
+    ("GET", "/v1/payment-terminal/operations/{operation_id}"): EndpointPolicy(
+        (),
+        None,
+        exception_reason="Terminal service validates source-specific authority and branch scope.",
+    ),
+    ("POST", "/v1/payment-terminal/operations/{operation_id}/dispatch"): EndpointPolicy(
+        (),
+        None,
+        mutation=True,
+        exception_reason=(
+            "Terminal dispatch validates source authority and reuses durable provider identity."
+        ),
+    ),
+    ("POST", "/v1/payment-terminal/operations/{operation_id}/reconcile"): EndpointPolicy(
+        (),
+        None,
+        mutation=True,
+        exception_reason=(
+            "Terminal reconciliation validates source authority and reuses provider identity."
+        ),
+    ),
     ("GET", "/v1/auth/session"): EndpointPolicy(
         (),
         None,

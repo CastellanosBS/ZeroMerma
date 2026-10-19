@@ -159,6 +159,8 @@ export interface AdminCashCutTicketItem {
 
 export interface AdminCashCutRefundItem {
   id: string;
+  financialEntryId?: string | null;
+  financialOperationId?: string | null;
   folio: string;
   originalTicketFolio: string;
   amount: string;

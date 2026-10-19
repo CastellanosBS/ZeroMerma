@@ -453,6 +453,40 @@ Ready ni Production Ready. La aceptación integrada requiere ocho etapas
 Foundation y **Foundation required** del commit inmutable entregado; SHA y enlace
 acompañan la entrega.
 
+### 0.15 Registro de ejecución — ZM-FIN-043–047
+
+El bloque financiero incorpora apertura, ventas, cobros/pagos operativos y
+devoluciones al ledger canónico. POS, cortes, flujo, tickets y reportes leen
+entradas confirmadas sin sumar una segunda representación en `CashMovement`.
+El cambio se excluye del efectivo aplicado; los cobros operativos son entradas.
+Mixto se deriva de medios positivos distintos, incluso con tres componentes,
+y no constituye un tercer medio monetario que contar.
+
+044 distingue la obligación de reembolso del dinero entregado. La política
+CASH_FIRST paga hasta la capacidad canónica de la caja; el saldo restante puede
+continuar en otro turno autorizado, conservando su identidad y sin repetir
+tramos ya pagados. POS permite recuperar resultados perdidos; Backoffice muestra
+pagado y pendiente. 045 exige conteo CASH y conserva CARD sin conteo como nulo,
+distinto de cero; congela esperados/conteos/variaciones y bloquea efectos admitidos
+pendientes o inciertos. No se reescriben cierres históricos.
+
+047 incorpora diagnóstico y ensayo de sólo lectura e importación explícita,
+idempotente y reanudable de fuentes reales soportadas/opening state. Rechaza
+historia demo/test y conserva evidencia inmutable. Las nuevas revisiones0045–0048
+crean estructuras sin backfill ni modificación de la base operativa.
+
+**046 permanece parcial y no habilitada para operación real.** Su frontera técnica
+de intención durable, binding, consulta tras timeout y aplicación de evidencia
+está probada con proveedor simulado. Faltan modelo/contrato BBVA, adaptador real,
+productores e interfaz integrados, certificación/hardware/PCI, VOID y conciliación
+bancaria según contrato. `FINAL_PILOT_START=POSTPONED`; no se declara completo el
+bloque mientras falte esa aceptación externa.
+
+El [registro del bloque](implementation/financial-block-validation.md) separa
+implementación, pruebas locales y aceptación Foundation del commit entregado.
+Incluye migraciones, contratos y manuales operativos. No equivale a Data Integrity
+Ready ni Production Ready. El bloque posterior del plan es inventario048–055.
+
 ## 1. Resumen ejecutivo
 
 ZeroMerma posee una base adecuada para evolucionar sin reescritura: monolito modular, FastAPI/SQLAlchemy/PostgreSQL, POS y Backoffice separados, OpenAPI generado, precisión decimal, auditoría y outbox transaccionales. La auditoría activa demostró que una parte importante de ventas, pagos, pedidos, documentos y administración es real. También demostró defectos sistémicos: el POS no alimenta el inventario canónico; el pago de pedido no entra en caja/corte; el worker no procesa eventos; la trazabilidad de identidad/origen es incorrecta; y varias superficies administrativas son simuladas o incompletas.

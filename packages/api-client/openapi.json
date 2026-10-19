@@ -3810,6 +3810,32 @@
             "type": "string",
             "x-zeromerma-decimal-representation": "JSON_STRING"
           },
+          "financial_entry_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string",
+                "x-zeromerma-id-representation": "JSON_STRING"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Financial Entry Id"
+          },
+          "financial_operation_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string",
+                "x-zeromerma-id-representation": "JSON_STRING"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Financial Operation Id"
+          },
           "folio": {
             "title": "Folio",
             "type": "string"
@@ -15255,6 +15281,16 @@
           "customer": {
             "$ref": "#/components/schemas/AdminOrderCustomerView"
           },
+          "financial_refund": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/FinancialRefundView"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "lines": {
             "items": {
               "$ref": "#/components/schemas/AdminOrderLineView"
@@ -24001,6 +24037,16 @@
           "backend_contract": {
             "$ref": "#/components/schemas/AdminReturnsBackendContractView"
           },
+          "financial_refund": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/FinancialRefundView"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "original_ticket": {
             "$ref": "#/components/schemas/AdminReturnOriginalTicketView"
           },
@@ -24407,10 +24453,17 @@
       "AdminReturnRefundImpactView": {
         "properties": {
           "cash_impact_amount": {
-            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
-            "title": "Cash Impact Amount",
-            "type": "string",
-            "x-zeromerma-decimal-representation": "JSON_STRING"
+            "anyOf": [
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string",
+                "x-zeromerma-decimal-representation": "JSON_STRING"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cash Impact Amount"
           },
           "cash_session_id": {
             "format": "uuid",
@@ -36338,7 +36391,6 @@
           "counted_amount": {
             "anyOf": [
               {
-                "minimum": 0.0,
                 "type": "number"
               },
               {
@@ -39706,6 +39758,16 @@
               }
             ]
           },
+          "financial_refund": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/FinancialRefundView"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "folio": {
             "title": "Folio",
             "type": "string"
@@ -40448,6 +40510,151 @@
           "branch_ids"
         ],
         "title": "EffectiveGrant",
+        "type": "object"
+      },
+      "FinancialRefundEntryView": {
+        "additionalProperties": false,
+        "properties": {
+          "amount": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Amount",
+            "type": "string",
+            "x-zeromerma-decimal-representation": "JSON_STRING"
+          },
+          "cash_session_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string",
+                "x-zeromerma-id-representation": "JSON_STRING"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cash Session Id"
+          },
+          "execution_mode": {
+            "title": "Execution Mode",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string",
+            "x-zeromerma-id-representation": "JSON_STRING"
+          },
+          "occurred_at": {
+            "format": "date-time",
+            "title": "Occurred At",
+            "type": "string",
+            "x-zeromerma-instant-format": "ISO8601_DATETIME"
+          },
+          "payment_method_code": {
+            "title": "Payment Method Code",
+            "type": "string"
+          },
+          "state": {
+            "title": "State",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "payment_method_code",
+          "execution_mode",
+          "state",
+          "amount",
+          "cash_session_id",
+          "occurred_at"
+        ],
+        "title": "FinancialRefundEntryView",
+        "type": "object"
+      },
+      "FinancialRefundView": {
+        "additionalProperties": false,
+        "properties": {
+          "amount_due": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Amount Due",
+            "type": "string",
+            "x-zeromerma-decimal-representation": "JSON_STRING"
+          },
+          "amount_pending": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Amount Pending",
+            "type": "string",
+            "x-zeromerma-decimal-representation": "JSON_STRING"
+          },
+          "amount_settled": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Amount Settled",
+            "type": "string",
+            "x-zeromerma-decimal-representation": "JSON_STRING"
+          },
+          "card_settled_amount": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Card Settled Amount",
+            "type": "string",
+            "x-zeromerma-decimal-representation": "JSON_STRING"
+          },
+          "cash_settled_amount": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Cash Settled Amount",
+            "type": "string",
+            "x-zeromerma-decimal-representation": "JSON_STRING"
+          },
+          "entries": {
+            "items": {
+              "$ref": "#/components/schemas/FinancialRefundEntryView"
+            },
+            "title": "Entries",
+            "type": "array"
+          },
+          "financial_operation_id": {
+            "format": "uuid",
+            "title": "Financial Operation Id",
+            "type": "string",
+            "x-zeromerma-id-representation": "JSON_STRING"
+          },
+          "original_collection_operation_ids": {
+            "items": {
+              "format": "uuid",
+              "type": "string",
+              "x-zeromerma-id-representation": "JSON_STRING"
+            },
+            "title": "Original Collection Operation Ids",
+            "type": "array"
+          },
+          "source_id": {
+            "format": "uuid",
+            "title": "Source Id",
+            "type": "string",
+            "x-zeromerma-id-representation": "JSON_STRING"
+          },
+          "source_type": {
+            "title": "Source Type",
+            "type": "string"
+          },
+          "state": {
+            "title": "State",
+            "type": "string"
+          }
+        },
+        "required": [
+          "financial_operation_id",
+          "source_type",
+          "source_id",
+          "amount_due",
+          "amount_settled",
+          "amount_pending",
+          "state",
+          "cash_settled_amount",
+          "card_settled_amount",
+          "original_collection_operation_ids",
+          "entries"
+        ],
+        "title": "FinancialRefundView",
         "type": "object"
       },
       "HealthResponse": {
@@ -42858,6 +43065,16 @@
             "title": "Currency Code",
             "type": "string"
           },
+          "financial_refund": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/FinancialRefundView"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "folio": {
             "title": "Folio",
             "type": "string"
@@ -44373,6 +44590,29 @@
         "title": "ReauthenticationRequest",
         "type": "object"
       },
+      "RefundSettlementRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "cash_session_id": {
+            "format": "uuid",
+            "title": "Cash Session Id",
+            "type": "string",
+            "x-zeromerma-id-representation": "JSON_STRING"
+          },
+          "workstation_code": {
+            "maxLength": 64,
+            "minLength": 1,
+            "title": "Workstation Code",
+            "type": "string"
+          }
+        },
+        "required": [
+          "workstation_code",
+          "cash_session_id"
+        ],
+        "title": "RefundSettlementRequest",
+        "type": "object"
+      },
       "ReturnCommitLineRequest": {
         "properties": {
           "disposition_code": {
@@ -44583,6 +44823,16 @@
             "title": "Currency Code",
             "type": "string"
           },
+          "financial_refund": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/FinancialRefundView"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "folio": {
             "title": "Folio",
             "type": "string"
@@ -44611,10 +44861,17 @@
             "x-zeromerma-id-representation": "JSON_STRING"
           },
           "refund_cash_movement_id": {
-            "format": "uuid",
-            "title": "Refund Cash Movement Id",
-            "type": "string",
-            "x-zeromerma-id-representation": "JSON_STRING"
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string",
+                "x-zeromerma-id-representation": "JSON_STRING"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Refund Cash Movement Id"
           },
           "refund_method_code": {
             "const": "CASH",
@@ -46167,6 +46424,16 @@
             "title": "Currency Code",
             "type": "string"
           },
+          "financial_refund": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/FinancialRefundView"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "folio": {
             "title": "Folio",
             "type": "string"
@@ -46245,6 +46512,245 @@
           "lines"
         ],
         "title": "SaleReturnDetailResponse",
+        "type": "object"
+      },
+      "TerminalBootstrapView": {
+        "properties": {
+          "accounting_only_available": {
+            "const": true,
+            "default": true,
+            "title": "Accounting Only Available",
+            "type": "boolean"
+          },
+          "blockers": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Blockers",
+            "type": "array"
+          },
+          "final_pilot_start": {
+            "default": "POSTPONED",
+            "enum": [
+              "POSTPONED",
+              "EXTERNAL_GATE_REQUIRED"
+            ],
+            "title": "Final Pilot Start",
+            "type": "string"
+          },
+          "integrated_payments_enabled": {
+            "title": "Integrated Payments Enabled",
+            "type": "boolean"
+          },
+          "manual_fallback_enabled": {
+            "const": false,
+            "default": false,
+            "title": "Manual Fallback Enabled",
+            "type": "boolean"
+          },
+          "provider_code": {
+            "const": "BBVA",
+            "default": "BBVA",
+            "title": "Provider Code",
+            "type": "string"
+          }
+        },
+        "required": [
+          "integrated_payments_enabled",
+          "blockers"
+        ],
+        "title": "TerminalBootstrapView",
+        "type": "object"
+      },
+      "TerminalOperationAcknowledgement": {
+        "additionalProperties": false,
+        "properties": {
+          "financial_entry_id": {
+            "format": "uuid",
+            "title": "Financial Entry Id",
+            "type": "string",
+            "x-zeromerma-id-representation": "JSON_STRING"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string",
+            "x-zeromerma-id-representation": "JSON_STRING"
+          },
+          "status": {
+            "const": "CREATED",
+            "default": "CREATED",
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "financial_entry_id"
+        ],
+        "title": "TerminalOperationAcknowledgement",
+        "type": "object"
+      },
+      "TerminalOperationRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "financial_entry_id": {
+            "format": "uuid",
+            "title": "Financial Entry Id",
+            "type": "string",
+            "x-zeromerma-id-representation": "JSON_STRING"
+          },
+          "original_operation_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string",
+                "x-zeromerma-id-representation": "JSON_STRING"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Original Operation Id"
+          },
+          "terminal_binding_id": {
+            "format": "uuid",
+            "title": "Terminal Binding Id",
+            "type": "string",
+            "x-zeromerma-id-representation": "JSON_STRING"
+          }
+        },
+        "required": [
+          "financial_entry_id",
+          "terminal_binding_id"
+        ],
+        "title": "TerminalOperationRequest",
+        "type": "object"
+      },
+      "TerminalOperationView": {
+        "additionalProperties": false,
+        "properties": {
+          "amount": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Amount",
+            "type": "string",
+            "x-zeromerma-decimal-representation": "JSON_STRING"
+          },
+          "branch_id": {
+            "format": "uuid",
+            "title": "Branch Id",
+            "type": "string",
+            "x-zeromerma-id-representation": "JSON_STRING"
+          },
+          "cash_session_id": {
+            "format": "uuid",
+            "title": "Cash Session Id",
+            "type": "string",
+            "x-zeromerma-id-representation": "JSON_STRING"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string",
+            "x-zeromerma-instant-format": "ISO8601_DATETIME"
+          },
+          "currency_code": {
+            "const": "MXN",
+            "title": "Currency Code",
+            "type": "string"
+          },
+          "environment": {
+            "enum": [
+              "SANDBOX",
+              "PRODUCTION"
+            ],
+            "title": "Environment",
+            "type": "string"
+          },
+          "financial_entry_id": {
+            "format": "uuid",
+            "title": "Financial Entry Id",
+            "type": "string",
+            "x-zeromerma-id-representation": "JSON_STRING"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string",
+            "x-zeromerma-id-representation": "JSON_STRING"
+          },
+          "operation_type": {
+            "enum": [
+              "CAPTURE",
+              "REFUND"
+            ],
+            "title": "Operation Type",
+            "type": "string"
+          },
+          "provider_code": {
+            "title": "Provider Code",
+            "type": "string"
+          },
+          "reconciliation_status": {
+            "enum": [
+              "PENDING",
+              "MATCHED",
+              "DISCREPANCY"
+            ],
+            "title": "Reconciliation Status",
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "CREATED",
+              "PROCESSING",
+              "AUTHORIZED",
+              "UNKNOWN",
+              "CAPTURED",
+              "REFUNDED",
+              "DECLINED",
+              "FAILED"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "terminal_binding_id": {
+            "format": "uuid",
+            "title": "Terminal Binding Id",
+            "type": "string",
+            "x-zeromerma-id-representation": "JSON_STRING"
+          },
+          "updated_at": {
+            "format": "date-time",
+            "title": "Updated At",
+            "type": "string",
+            "x-zeromerma-instant-format": "ISO8601_DATETIME"
+          },
+          "workstation_id": {
+            "format": "uuid",
+            "title": "Workstation Id",
+            "type": "string",
+            "x-zeromerma-id-representation": "JSON_STRING"
+          }
+        },
+        "required": [
+          "id",
+          "financial_entry_id",
+          "branch_id",
+          "workstation_id",
+          "cash_session_id",
+          "terminal_binding_id",
+          "operation_type",
+          "status",
+          "reconciliation_status",
+          "amount",
+          "currency_code",
+          "provider_code",
+          "environment",
+          "created_at",
+          "updated_at"
+        ],
+        "title": "TerminalOperationView",
         "type": "object"
       },
       "TicketDetailResponse": {
@@ -106469,6 +106975,260 @@
         "x-zeromerma-operation-id-policy": "FASTAPI_STABLE_GENERATED"
       }
     },
+    "/v1/orders/refund-settlements/{idempotency_key}": {
+      "get": {
+        "operationId": "recover_orders_refund_settlement_v1_orders_refund_settlements__idempotency_key__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "idempotency_key",
+            "required": true,
+            "schema": {
+              "maxLength": 36,
+              "minLength": 36,
+              "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-7[0-9a-fA-F]{3}-[89aAbB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$",
+              "title": "Idempotency Key",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "workstation_code",
+            "required": true,
+            "schema": {
+              "maxLength": 64,
+              "minLength": 1,
+              "title": "Workstation Code",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "cash_session_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Cash Session Id",
+              "type": "string",
+              "x-zeromerma-id-representation": "JSON_STRING"
+            }
+          },
+          {
+            "description": "UUID for this HTTP attempt. Missing, duplicate or invalid IDs are replaced.",
+            "in": "header",
+            "name": "X-Request-ID",
+            "required": false,
+            "schema": {
+              "format": "uuid",
+              "type": "string",
+              "x-zeromerma-id-representation": "JSON_STRING"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FinancialRefundView"
+                }
+              }
+            },
+            "description": "Successful Response",
+            "headers": {
+              "Idempotency-Replayed": {
+                "$ref": "#/components/headers/IdempotencyReplayed"
+              },
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/CorrelationId"
+              },
+              "X-Request-ID": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Bad Request",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/CorrelationId"
+              },
+              "X-Request-ID": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Authentication Required",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/CorrelationId"
+              },
+              "X-Request-ID": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Forbidden",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/CorrelationId"
+              },
+              "X-Request-ID": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/CorrelationId"
+              },
+              "X-Request-ID": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/CorrelationId"
+              },
+              "X-Request-ID": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Validation Error",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/CorrelationId"
+              },
+              "X-Request-ID": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "423": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Session Locked",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/CorrelationId"
+              },
+              "X-Request-ID": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Login Rate Limited",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/CorrelationId"
+              },
+              "X-Request-ID": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Internal Server Error",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/CorrelationId"
+              },
+              "X-Request-ID": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "PosSessionCookie": []
+          },
+          {
+            "BackofficeSessionCookie": []
+          }
+        ],
+        "summary": "Recover Orders Refund Settlement",
+        "tags": [
+          "orders"
+        ],
+        "x-authorization-policy": "explicit-deny-by-default",
+        "x-required-capabilities": [
+          "orders.cancel"
+        ],
+        "x-zeromerma-operation-id-policy": "FASTAPI_STABLE_GENERATED"
+      }
+    },
     "/v1/orders/{order_id}": {
       "get": {
         "operationId": "get_order_detail_v1_orders__order_id__get",
@@ -107468,6 +108228,1386 @@
         "x-authorization-policy": "explicit-deny-by-default",
         "x-required-capabilities": [
           "orders.manage"
+        ],
+        "x-zeromerma-operation-id-policy": "FASTAPI_STABLE_GENERATED"
+      }
+    },
+    "/v1/orders/{order_id}/refund-settlements": {
+      "post": {
+        "operationId": "settle_orders_refund_v1_orders__order_id__refund_settlements_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "order_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Order Id",
+              "type": "string",
+              "x-zeromerma-id-representation": "JSON_STRING"
+            }
+          },
+          {
+            "description": "A globally unique UUIDv7 identifying this business intention.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": true,
+            "schema": {
+              "description": "A globally unique UUIDv7 identifying this business intention.",
+              "maxLength": 36,
+              "minLength": 36,
+              "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-7[0-9a-fA-F]{3}-[89aAbB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$",
+              "title": "Idempotency-Key",
+              "type": "string"
+            }
+          },
+          {
+            "description": "UUID for this HTTP attempt. Missing, duplicate or invalid IDs are replaced.",
+            "in": "header",
+            "name": "X-Request-ID",
+            "required": false,
+            "schema": {
+              "format": "uuid",
+              "type": "string",
+              "x-zeromerma-id-representation": "JSON_STRING"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RefundSettlementRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FinancialRefundView"
+                }
+              }
+            },
+            "description": "Successful Response",
+            "headers": {
+              "Idempotency-Replayed": {
+                "$ref": "#/components/headers/IdempotencyReplayed"
+              },
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/CorrelationId"
+              },
+              "X-Request-ID": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Bad Request",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/CorrelationId"
+              },
+              "X-Request-ID": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Authentication Required",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/CorrelationId"
+              },
+              "X-Request-ID": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Forbidden",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/CorrelationId"
+              },
+              "X-Request-ID": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/CorrelationId"
+              },
+              "X-Request-ID": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/CorrelationId"
+              },
+              "X-Request-ID": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Validation Error",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/CorrelationId"
+              },
+              "X-Request-ID": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "423": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Session Locked",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/CorrelationId"
+              },
+              "X-Request-ID": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Login Rate Limited",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/CorrelationId"
+              },
+              "X-Request-ID": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Internal Server Error",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/CorrelationId"
+              },
+              "X-Request-ID": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "PosSessionCookie": []
+          },
+          {
+            "BackofficeSessionCookie": []
+          }
+        ],
+        "summary": "Settle Orders Refund",
+        "tags": [
+          "orders"
+        ],
+        "x-authorization-policy": "explicit-deny-by-default",
+        "x-required-capabilities": [
+          "orders.cancel"
+        ],
+        "x-zeromerma-operation-id-policy": "FASTAPI_STABLE_GENERATED"
+      }
+    },
+    "/v1/payment-terminal/bootstrap": {
+      "get": {
+        "operationId": "bootstrap_v1_payment_terminal_bootstrap_get",
+        "parameters": [
+          {
+            "description": "UUID for this HTTP attempt. Missing, duplicate or invalid IDs are replaced.",
+            "in": "header",
+            "name": "X-Request-ID",
+            "required": false,
+            "schema": {
+              "format": "uuid",
+              "type": "string",
+              "x-zeromerma-id-representation": "JSON_STRING"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TerminalBootstrapView"
+                }
+              }
+            },
+            "description": "Successful Response",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/CorrelationId"
+              },
+              "X-Request-ID": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Bad Request",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/CorrelationId"
+              },
+              "X-Request-ID": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Authentication Required",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/CorrelationId"
+              },
+              "X-Request-ID": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Forbidden",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/CorrelationId"
+              },
+              "X-Request-ID": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/CorrelationId"
+              },
+              "X-Request-ID": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/CorrelationId"
+              },
+              "X-Request-ID": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Validation Error",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/CorrelationId"
+              },
+              "X-Request-ID": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "423": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Session Locked",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/CorrelationId"
+              },
+              "X-Request-ID": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Login Rate Limited",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/CorrelationId"
+              },
+              "X-Request-ID": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Internal Server Error",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/CorrelationId"
+              },
+              "X-Request-ID": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "PosSessionCookie": []
+          },
+          {
+            "BackofficeSessionCookie": []
+          }
+        ],
+        "summary": "Bootstrap",
+        "tags": [
+          "payment-terminal"
+        ],
+        "x-zeromerma-operation-id-policy": "FASTAPI_STABLE_GENERATED"
+      }
+    },
+    "/v1/payment-terminal/operations": {
+      "post": {
+        "operationId": "request_operation_v1_payment_terminal_operations_post",
+        "parameters": [
+          {
+            "description": "A globally unique UUIDv7 identifying this business intention.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": true,
+            "schema": {
+              "description": "A globally unique UUIDv7 identifying this business intention.",
+              "maxLength": 36,
+              "minLength": 36,
+              "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-7[0-9a-fA-F]{3}-[89aAbB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$",
+              "title": "Idempotency-Key",
+              "type": "string"
+            }
+          },
+          {
+            "description": "UUID for this HTTP attempt. Missing, duplicate or invalid IDs are replaced.",
+            "in": "header",
+            "name": "X-Request-ID",
+            "required": false,
+            "schema": {
+              "format": "uuid",
+              "type": "string",
+              "x-zeromerma-id-representation": "JSON_STRING"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TerminalOperationRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TerminalOperationAcknowledgement"
+                }
+              }
+            },
+            "description": "Successful Response",
+            "headers": {
+              "Idempotency-Replayed": {
+                "$ref": "#/components/headers/IdempotencyReplayed"
+              },
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/CorrelationId"
+              },
+              "X-Request-ID": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Bad Request",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/CorrelationId"
+              },
+              "X-Request-ID": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Authentication Required",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/CorrelationId"
+              },
+              "X-Request-ID": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Forbidden",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/CorrelationId"
+              },
+              "X-Request-ID": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/CorrelationId"
+              },
+              "X-Request-ID": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/CorrelationId"
+              },
+              "X-Request-ID": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Validation Error",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/CorrelationId"
+              },
+              "X-Request-ID": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "423": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Session Locked",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/CorrelationId"
+              },
+              "X-Request-ID": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Login Rate Limited",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/CorrelationId"
+              },
+              "X-Request-ID": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Internal Server Error",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/CorrelationId"
+              },
+              "X-Request-ID": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "PosSessionCookie": []
+          },
+          {
+            "BackofficeSessionCookie": []
+          }
+        ],
+        "summary": "Request Operation",
+        "tags": [
+          "payment-terminal"
+        ],
+        "x-zeromerma-operation-id-policy": "FASTAPI_STABLE_GENERATED"
+      }
+    },
+    "/v1/payment-terminal/operations/{operation_id}": {
+      "get": {
+        "operationId": "get_operation_v1_payment_terminal_operations__operation_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "operation_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Operation Id",
+              "type": "string",
+              "x-zeromerma-id-representation": "JSON_STRING"
+            }
+          },
+          {
+            "description": "UUID for this HTTP attempt. Missing, duplicate or invalid IDs are replaced.",
+            "in": "header",
+            "name": "X-Request-ID",
+            "required": false,
+            "schema": {
+              "format": "uuid",
+              "type": "string",
+              "x-zeromerma-id-representation": "JSON_STRING"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TerminalOperationView"
+                }
+              }
+            },
+            "description": "Successful Response",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/CorrelationId"
+              },
+              "X-Request-ID": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Bad Request",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/CorrelationId"
+              },
+              "X-Request-ID": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Authentication Required",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/CorrelationId"
+              },
+              "X-Request-ID": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Forbidden",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/CorrelationId"
+              },
+              "X-Request-ID": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/CorrelationId"
+              },
+              "X-Request-ID": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/CorrelationId"
+              },
+              "X-Request-ID": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Validation Error",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/CorrelationId"
+              },
+              "X-Request-ID": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "423": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Session Locked",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/CorrelationId"
+              },
+              "X-Request-ID": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Login Rate Limited",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/CorrelationId"
+              },
+              "X-Request-ID": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Internal Server Error",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/CorrelationId"
+              },
+              "X-Request-ID": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "PosSessionCookie": []
+          },
+          {
+            "BackofficeSessionCookie": []
+          }
+        ],
+        "summary": "Get Operation",
+        "tags": [
+          "payment-terminal"
+        ],
+        "x-zeromerma-operation-id-policy": "FASTAPI_STABLE_GENERATED"
+      }
+    },
+    "/v1/payment-terminal/operations/{operation_id}/dispatch": {
+      "post": {
+        "operationId": "dispatch_v1_payment_terminal_operations__operation_id__dispatch_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "operation_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Operation Id",
+              "type": "string",
+              "x-zeromerma-id-representation": "JSON_STRING"
+            }
+          },
+          {
+            "description": "UUID for this HTTP attempt. Missing, duplicate or invalid IDs are replaced.",
+            "in": "header",
+            "name": "X-Request-ID",
+            "required": false,
+            "schema": {
+              "format": "uuid",
+              "type": "string",
+              "x-zeromerma-id-representation": "JSON_STRING"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TerminalOperationView"
+                }
+              }
+            },
+            "description": "Successful Response",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/CorrelationId"
+              },
+              "X-Request-ID": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Bad Request",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/CorrelationId"
+              },
+              "X-Request-ID": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Authentication Required",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/CorrelationId"
+              },
+              "X-Request-ID": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Forbidden",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/CorrelationId"
+              },
+              "X-Request-ID": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/CorrelationId"
+              },
+              "X-Request-ID": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/CorrelationId"
+              },
+              "X-Request-ID": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Validation Error",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/CorrelationId"
+              },
+              "X-Request-ID": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "423": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Session Locked",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/CorrelationId"
+              },
+              "X-Request-ID": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Login Rate Limited",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/CorrelationId"
+              },
+              "X-Request-ID": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Internal Server Error",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/CorrelationId"
+              },
+              "X-Request-ID": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "PosSessionCookie": []
+          },
+          {
+            "BackofficeSessionCookie": []
+          }
+        ],
+        "summary": "Dispatch",
+        "tags": [
+          "payment-terminal"
+        ],
+        "x-zeromerma-operation-id-policy": "FASTAPI_STABLE_GENERATED"
+      }
+    },
+    "/v1/payment-terminal/operations/{operation_id}/reconcile": {
+      "post": {
+        "operationId": "reconcile_v1_payment_terminal_operations__operation_id__reconcile_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "operation_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Operation Id",
+              "type": "string",
+              "x-zeromerma-id-representation": "JSON_STRING"
+            }
+          },
+          {
+            "description": "UUID for this HTTP attempt. Missing, duplicate or invalid IDs are replaced.",
+            "in": "header",
+            "name": "X-Request-ID",
+            "required": false,
+            "schema": {
+              "format": "uuid",
+              "type": "string",
+              "x-zeromerma-id-representation": "JSON_STRING"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TerminalOperationView"
+                }
+              }
+            },
+            "description": "Successful Response",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/CorrelationId"
+              },
+              "X-Request-ID": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Bad Request",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/CorrelationId"
+              },
+              "X-Request-ID": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Authentication Required",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/CorrelationId"
+              },
+              "X-Request-ID": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Forbidden",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/CorrelationId"
+              },
+              "X-Request-ID": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/CorrelationId"
+              },
+              "X-Request-ID": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/CorrelationId"
+              },
+              "X-Request-ID": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Validation Error",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/CorrelationId"
+              },
+              "X-Request-ID": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "423": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Session Locked",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/CorrelationId"
+              },
+              "X-Request-ID": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Login Rate Limited",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/CorrelationId"
+              },
+              "X-Request-ID": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Internal Server Error",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/CorrelationId"
+              },
+              "X-Request-ID": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "PosSessionCookie": []
+          },
+          {
+            "BackofficeSessionCookie": []
+          }
+        ],
+        "summary": "Reconcile",
+        "tags": [
+          "payment-terminal"
         ],
         "x-zeromerma-operation-id-policy": "FASTAPI_STABLE_GENERATED"
       }
@@ -110787,6 +112927,260 @@
         "x-zeromerma-operation-id-policy": "FASTAPI_STABLE_GENERATED"
       }
     },
+    "/v1/returns/refund-settlements/{idempotency_key}": {
+      "get": {
+        "operationId": "recover_returns_refund_settlement_v1_returns_refund_settlements__idempotency_key__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "idempotency_key",
+            "required": true,
+            "schema": {
+              "maxLength": 36,
+              "minLength": 36,
+              "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-7[0-9a-fA-F]{3}-[89aAbB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$",
+              "title": "Idempotency Key",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "workstation_code",
+            "required": true,
+            "schema": {
+              "maxLength": 64,
+              "minLength": 1,
+              "title": "Workstation Code",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "cash_session_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Cash Session Id",
+              "type": "string",
+              "x-zeromerma-id-representation": "JSON_STRING"
+            }
+          },
+          {
+            "description": "UUID for this HTTP attempt. Missing, duplicate or invalid IDs are replaced.",
+            "in": "header",
+            "name": "X-Request-ID",
+            "required": false,
+            "schema": {
+              "format": "uuid",
+              "type": "string",
+              "x-zeromerma-id-representation": "JSON_STRING"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FinancialRefundView"
+                }
+              }
+            },
+            "description": "Successful Response",
+            "headers": {
+              "Idempotency-Replayed": {
+                "$ref": "#/components/headers/IdempotencyReplayed"
+              },
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/CorrelationId"
+              },
+              "X-Request-ID": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Bad Request",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/CorrelationId"
+              },
+              "X-Request-ID": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Authentication Required",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/CorrelationId"
+              },
+              "X-Request-ID": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Forbidden",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/CorrelationId"
+              },
+              "X-Request-ID": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/CorrelationId"
+              },
+              "X-Request-ID": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/CorrelationId"
+              },
+              "X-Request-ID": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Validation Error",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/CorrelationId"
+              },
+              "X-Request-ID": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "423": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Session Locked",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/CorrelationId"
+              },
+              "X-Request-ID": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Login Rate Limited",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/CorrelationId"
+              },
+              "X-Request-ID": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Internal Server Error",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/CorrelationId"
+              },
+              "X-Request-ID": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "PosSessionCookie": []
+          },
+          {
+            "BackofficeSessionCookie": []
+          }
+        ],
+        "summary": "Recover Returns Refund Settlement",
+        "tags": [
+          "returns"
+        ],
+        "x-authorization-policy": "explicit-deny-by-default",
+        "x-required-capabilities": [
+          "returns_corrections.manage"
+        ],
+        "x-zeromerma-operation-id-policy": "FASTAPI_STABLE_GENERATED"
+      }
+    },
     "/v1/returns/sales/{sale_id}": {
       "get": {
         "operationId": "get_return_sale_detail_v1_returns_sales__sale_id__get",
@@ -111556,6 +113950,261 @@
         "x-authorization-policy": "explicit-deny-by-default",
         "x-required-capabilities": [
           "pos.operate"
+        ],
+        "x-zeromerma-operation-id-policy": "FASTAPI_STABLE_GENERATED"
+      }
+    },
+    "/v1/returns/{return_id}/refund-settlements": {
+      "post": {
+        "operationId": "settle_returns_refund_v1_returns__return_id__refund_settlements_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "return_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Return Id",
+              "type": "string",
+              "x-zeromerma-id-representation": "JSON_STRING"
+            }
+          },
+          {
+            "description": "A globally unique UUIDv7 identifying this business intention.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": true,
+            "schema": {
+              "description": "A globally unique UUIDv7 identifying this business intention.",
+              "maxLength": 36,
+              "minLength": 36,
+              "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-7[0-9a-fA-F]{3}-[89aAbB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$",
+              "title": "Idempotency-Key",
+              "type": "string"
+            }
+          },
+          {
+            "description": "UUID for this HTTP attempt. Missing, duplicate or invalid IDs are replaced.",
+            "in": "header",
+            "name": "X-Request-ID",
+            "required": false,
+            "schema": {
+              "format": "uuid",
+              "type": "string",
+              "x-zeromerma-id-representation": "JSON_STRING"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RefundSettlementRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FinancialRefundView"
+                }
+              }
+            },
+            "description": "Successful Response",
+            "headers": {
+              "Idempotency-Replayed": {
+                "$ref": "#/components/headers/IdempotencyReplayed"
+              },
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/CorrelationId"
+              },
+              "X-Request-ID": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Bad Request",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/CorrelationId"
+              },
+              "X-Request-ID": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Authentication Required",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/CorrelationId"
+              },
+              "X-Request-ID": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Forbidden",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/CorrelationId"
+              },
+              "X-Request-ID": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/CorrelationId"
+              },
+              "X-Request-ID": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/CorrelationId"
+              },
+              "X-Request-ID": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Validation Error",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/CorrelationId"
+              },
+              "X-Request-ID": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "423": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Session Locked",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/CorrelationId"
+              },
+              "X-Request-ID": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Login Rate Limited",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/CorrelationId"
+              },
+              "X-Request-ID": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Internal Server Error",
+            "headers": {
+              "X-Correlation-ID": {
+                "$ref": "#/components/headers/CorrelationId"
+              },
+              "X-Request-ID": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "PosSessionCookie": []
+          },
+          {
+            "BackofficeSessionCookie": []
+          }
+        ],
+        "summary": "Settle Returns Refund",
+        "tags": [
+          "returns"
+        ],
+        "x-authorization-policy": "explicit-deny-by-default",
+        "x-required-capabilities": [
+          "returns_corrections.manage"
         ],
         "x-zeromerma-operation-id-policy": "FASTAPI_STABLE_GENERATED"
       }

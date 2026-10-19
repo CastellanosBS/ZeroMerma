@@ -4,6 +4,7 @@ import { useState } from "react";
 import { usePosAuthStore } from "../auth/auth-store";
 import { returnIntentions } from "./return-command-intent";
 import { useReturnIntention } from "./use-return-intention";
+import { formatCurrency } from "../../lib/formatters";
 
 export function ReturnRecoveryPanel({ workstationId }: { workstationId: string }) {
   const { metadata, error } = useReturnIntention(workstationId);
@@ -21,7 +22,9 @@ export function ReturnRecoveryPanel({ workstationId }: { workstationId: string }
         ? returnIntentions.retry(metadata)
         : returnIntentions.recover(metadata));
       setMessage(
-        `Devolución ${result.folio} confirmada. No repitas el reembolso. Consulta su detalle en el historial.`,
+        result.financial_refund
+          ? `Devolución ${result.folio} registrada. Entrega confirmada: ${formatCurrency(result.financial_refund.amount_settled)}. Pendiente: ${formatCurrency(result.financial_refund.amount_pending)}. Revisa las entregas antes de repetir dinero.`
+          : `Devolución ${result.folio} registrada. Consulta la evidencia del reembolso en el historial.`,
       );
       void queryClient.invalidateQueries();
     } catch (failure) {

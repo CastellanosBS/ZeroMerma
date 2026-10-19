@@ -19,6 +19,9 @@ from zeromerma_api.modules.configuration.infrastructure import models as configu
 from zeromerma_api.modules.corrections.infrastructure import models as corrections_models
 from zeromerma_api.modules.discounts.infrastructure import models as discounts_models
 from zeromerma_api.modules.financial_ledger.infrastructure import models as financial_ledger_models
+from zeromerma_api.modules.financial_ledger.infrastructure import (
+    reconciliation_models as financial_reconciliation_models,
+)
 from zeromerma_api.modules.idempotency.infrastructure import models as idempotency_models
 from zeromerma_api.modules.identity.infrastructure import models as identity_models
 from zeromerma_api.modules.identity.infrastructure import (
@@ -29,6 +32,7 @@ from zeromerma_api.modules.inventory.infrastructure import models as inventory_m
 from zeromerma_api.modules.operations.infrastructure import models as operations_models
 from zeromerma_api.modules.orders.infrastructure import models as orders_models
 from zeromerma_api.modules.outbox.infrastructure import models as outbox_models
+from zeromerma_api.modules.payment_terminal.infrastructure import models as payment_terminal_models
 from zeromerma_api.modules.payments.infrastructure import models as payments_models
 from zeromerma_api.modules.production.infrastructure import models as production_models
 from zeromerma_api.modules.purchases.infrastructure import models as purchases_models
@@ -70,6 +74,7 @@ _ = (
     corrections_models,
     discounts_models,
     financial_ledger_models,
+    financial_reconciliation_models,
     idempotency_models,
     identity_models,
     identity_privileged_models,
@@ -77,6 +82,7 @@ _ = (
     operations_models,
     orders_models,
     payments_models,
+    payment_terminal_models,
     production_models,
     purchases_models,
     quality_models,

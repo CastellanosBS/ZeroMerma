@@ -25,6 +25,9 @@ from zeromerma_api.modules.catalog.domain.exceptions import (
     ProductNotFoundError,
 )
 from zeromerma_api.modules.catalog.infrastructure.models import Product, ProductClass
+from zeromerma_api.modules.financial_ledger.application.recording import FinancialCommandScope
+from zeromerma_api.modules.financial_ledger.application.refunds import admit_refund, find_refund
+from zeromerma_api.modules.financial_ledger.domain.money import FinancialModelError
 from zeromerma_api.modules.identity.application.schemas import AuthenticatedUser
 from zeromerma_api.modules.identity.infrastructure.models import User
 from zeromerma_api.modules.operations.domain.constants import BRANCH_BRAND_MAPPING
@@ -58,7 +61,6 @@ from zeromerma_api.modules.orders.domain.constants import (
     ORDER_PAYMENT_METHOD_CASH,
     ORDER_PAYMENT_METHOD_MIXED,
     ORDER_PAYMENT_TYPE_ADVANCE,
-    ORDER_PAYMENT_TYPE_REFUND,
     ORDER_PAYMENT_TYPE_SETTLEMENT,
     ORDER_STATUS_CANCELED,
     ORDER_STATUS_DELIVERED,
@@ -954,42 +956,27 @@ class OrdersCommandService:
             effective_at=canceled_at,
         )
         cancellation_refund_eligible = cancellation_refund_amount > ZERO_MONEY
-        refund_payments = _prepare_cancellation_refund_payments(
-            session,
-            order=order,
-            refund_amount=cancellation_refund_amount,
-        )
-        next_sequence = (
-            int(
-                session.execute(
-                    select(func.coalesce(func.max(CustomerOrderPayment.sequence), 0)).where(
-                        CustomerOrderPayment.customer_order_id == order.id
-                    )
-                ).scalar_one()
-            )
-            + 1
-        )
-        financial_references = []
-        for sequence_offset, payment in enumerate(refund_payments):
-            financial_references.append(
-                record_order_payment(
+        financial_refund = None
+        if cancellation_refund_eligible:
+            try:
+                financial_refund = admit_refund(
                     session,
-                    branch_id=context.branch_id,
-                    payment=CustomerOrderPayment(
-                        id=uuid.uuid4(),
-                        customer_order_id=order.id,
-                        sequence=next_sequence + sequence_offset,
-                        payment_type=ORDER_PAYMENT_TYPE_REFUND,
-                        payment_method_code=payment.payment_method_code,
-                        amount=payment.amount,
-                        currency_code=order.currency_code,
+                    source_type="ORDER_CANCELLATION",
+                    source_id=order.id,
+                    subject_type="ORDER",
+                    subject_id=order.id,
+                    amount_due=cancellation_refund_amount,
+                    currency_code=order.currency_code,
+                    scope=FinancialCommandScope(
+                        branch_id=context.branch_id,
                         workstation_id=context.workstation_id,
                         cash_session_id=cash_session.id,
-                        recorded_by_user_id=current_user.id,
-                        recorded_at_utc=canceled_at,
+                        actor_id=current_user.id,
                     ),
+                    occurred_at=canceled_at,
                 )
-            )
+            except FinancialModelError as error:
+                raise OrderStateConflictError(str(error)) from error
 
         order.status = ORDER_STATUS_CANCELED
         if cancellation_refund_eligible:
@@ -1020,8 +1007,10 @@ class OrdersCommandService:
                 "cancellation_reason": order.cancellation_reason,
                 "cancellation_refund_eligible": cancellation_refund_eligible,
                 "cancellation_refund_amount": str(cancellation_refund_amount),
-                "refund_payment_count": len(refund_payments),
-                "financial_records": [item.trace_fields() for item in financial_references],
+                "refund_payment_count": len(financial_refund.entries) if financial_refund else 0,
+                "financial_refund": financial_refund.model_dump(mode="json")
+                if financial_refund
+                else None,
             },
         )
         self._outbox_writer.append(
@@ -1043,13 +1032,15 @@ class OrdersCommandService:
                 "cancellation_refund_eligible": cancellation_refund_eligible,
                 "cancellation_refund_amount": str(cancellation_refund_amount),
                 "refund_payments": [
-                    {
-                        "payment_method_code": payment.payment_method_code,
-                        "amount": str(payment.amount),
-                    }
-                    for payment in refund_payments
-                ],
-                "financial_records": [item.trace_fields() for item in financial_references],
+                    {"payment_method_code": entry.payment_method_code, "amount": str(entry.amount)}
+                    for entry in financial_refund.entries
+                    if entry.state == "CONFIRMED"
+                ]
+                if financial_refund
+                else [],
+                "financial_refund": financial_refund.model_dump(mode="json")
+                if financial_refund
+                else None,
                 "canceled_at_utc": canceled_at.isoformat(),
             },
             headers={"request_id": resolved_request_id, **trace.metadata},
@@ -1204,6 +1195,7 @@ def _build_order_detail(session: Session, order: CustomerOrder) -> CustomerOrder
     )
 
     return CustomerOrderDetailResponse(
+        financial_refund=find_refund(session, source_type="ORDER_CANCELLATION", source_id=order.id),
         id=order.id,
         folio=_build_order_folio(order.id),
         status=order.status,
@@ -1324,6 +1316,9 @@ def _build_command_result(session: Session, order: CustomerOrder) -> OrderComman
             "advance_amount": order.advance_amount,
             "remaining_balance_amount": order.remaining_balance_amount,
             "updated_at_utc": order.updated_at_utc,
+            "financial_refund": find_refund(
+                session, source_type="ORDER_CANCELLATION", source_id=order.id
+            ),
             "payments": [
                 {
                     name: getattr(payment, name)
@@ -1514,40 +1509,6 @@ def _prepare_settlement_payments(
         )
 
     return normalized_payments
-
-
-def _prepare_cancellation_refund_payments(
-    session: Session,
-    *,
-    order: CustomerOrder,
-    refund_amount: Decimal,
-) -> list[PreparedOrderAdvancePayment]:
-    if refund_amount == ZERO_MONEY:
-        return []
-
-    advance_payment_records = session.execute(
-        select(CustomerOrderPayment)
-        .where(
-            CustomerOrderPayment.customer_order_id == order.id,
-            CustomerOrderPayment.payment_type == ORDER_PAYMENT_TYPE_ADVANCE,
-        )
-        .order_by(CustomerOrderPayment.sequence)
-    ).scalars()
-    prepared_refund_payments = [
-        PreparedOrderAdvancePayment(
-            payment_method_code=payment.payment_method_code,
-            amount=_quantize_money(payment.amount),
-        )
-        for payment in advance_payment_records
-    ]
-    recorded_advance_amount = _quantize_money(
-        sum((payment.amount for payment in prepared_refund_payments), ZERO_MONEY)
-    )
-    if recorded_advance_amount != refund_amount:
-        raise OrderStateConflictError(
-            "No fue posible reconstruir el anticipo para registrar su devolucion."
-        )
-    return prepared_refund_payments
 
 
 def _get_cancellation_refund_amount(

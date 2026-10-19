@@ -23,6 +23,11 @@ from zeromerma_api.modules.audit.application.service import AuditRecorder
 from zeromerma_api.modules.branches.infrastructure.models import Branch, Workstation
 from zeromerma_api.modules.cash_close.infrastructure.models import CashSessionClose
 from zeromerma_api.modules.catalog.infrastructure.models import Product
+from zeromerma_api.modules.financial_ledger.application.classification import mixed_sale_ids
+from zeromerma_api.modules.financial_ledger.infrastructure.models import (
+    FinancialEntry,
+    FinancialOperation,
+)
 from zeromerma_api.modules.identity.application.privileged_access import user_scope_predicate
 from zeromerma_api.modules.identity.application.schemas import AuthenticatedUser, CapabilityCode
 from zeromerma_api.modules.identity.domain.constants import (
@@ -72,7 +77,7 @@ from zeromerma_api.modules.reports.domain.exceptions import (
     ReportUnavailableError,
     ReportValidationError,
 )
-from zeromerma_api.modules.sales.infrastructure.models import Sale, SalePayment
+from zeromerma_api.modules.sales.infrastructure.models import Sale
 
 REPORT_STATUS_AVAILABLE = "available"
 REPORT_STATUS_REQUIRES_BACKEND = "requires_backend"
@@ -316,14 +321,19 @@ class AdminReportService:
             session.execute(
                 select(
                     Sale.branch_id,
-                    SalePayment.payment_method_code,
-                    func.coalesce(func.sum(SalePayment.applied_amount), Decimal("0")).label(
-                        "amount"
-                    ),
+                    FinancialEntry.payment_method_code,
+                    func.coalesce(func.sum(FinancialEntry.amount), Decimal("0")).label("amount"),
                 )
-                .join(SalePayment, SalePayment.sale_id == Sale.id)
+                .join(FinancialOperation, FinancialOperation.source_id == Sale.id)
+                .join(
+                    FinancialEntry, FinancialEntry.financial_operation_id == FinancialOperation.id
+                )
+                .where(
+                    FinancialOperation.kind == "SALE_COLLECTION",
+                    FinancialEntry.state == "CONFIRMED",
+                )
                 .where(*sale_conditions)
-                .group_by(Sale.branch_id, SalePayment.payment_method_code)
+                .group_by(Sale.branch_id, FinancialEntry.payment_method_code)
             )
             .mappings()
             .all()
@@ -331,6 +341,15 @@ class AdminReportService:
         payments_by_branch: dict[uuid.UUID, dict[str, Decimal]] = defaultdict(dict)
         for row in payment_rows:
             payments_by_branch[row["branch_id"]][row["payment_method_code"]] = row["amount"]
+
+        mixed_by_branch = {
+            branch_id: count
+            for branch_id, count in session.execute(
+                select(Sale.branch_id, func.count(Sale.id))
+                .where(*sale_conditions, Sale.id.in_(mixed_sale_ids()))
+                .group_by(Sale.branch_id)
+            )
+        }
 
         rows: list[AdminReportRowView] = []
         for row in sale_rows[:MAX_PREVIEW_ROWS]:
@@ -346,7 +365,7 @@ class AdminReportService:
                         "average_ticket": _money(row["average_ticket"]),
                         "cash_total": _money(payments.get("CASH", Decimal("0"))),
                         "card_total": _money(payments.get("CARD", Decimal("0"))),
-                        "mixed_total": _money(payments.get("MIXED", Decimal("0"))),
+                        "mixed_transaction_count": str(mixed_by_branch.get(branch_uuid, 0)),
                     },
                     source_document_links=[
                         _link("Abrir ventas", "sales", "/admin/ventas"),
@@ -376,7 +395,7 @@ class AdminReportService:
                 _column("average_ticket", "Ticket promedio", "money"),
                 _column("cash_total", "Efectivo", "money"),
                 _column("card_total", "Tarjeta", "money"),
-                _column("mixed_total", "Mixto", "money"),
+                _column("mixed_transaction_count", "Ventas mixtas", "number"),
             ],
             rows=rows,
             related_links=[_link("Ventas / tickets", "sales", "/admin/ventas")],

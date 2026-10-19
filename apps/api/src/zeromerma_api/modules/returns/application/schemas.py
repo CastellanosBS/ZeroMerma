@@ -10,6 +10,7 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator
 from zeromerma_api.modules.audit.application.schemas import AuditSummaryView
 from zeromerma_api.modules.branches.application.schemas import BranchSummary, WorkstationSummary
 from zeromerma_api.modules.cash.application.schemas import CashSessionView
+from zeromerma_api.modules.financial_ledger.application.refund_schemas import FinancialRefundView
 from zeromerma_api.modules.identity.application.schemas import AuthenticatedUser
 
 
@@ -241,12 +242,13 @@ class ReturnCommitResultView(BaseModel):
     branch_id: UUID
     workstation_id: UUID
     cash_session_id: UUID
-    refund_cash_movement_id: UUID
+    refund_cash_movement_id: UUID | None
     refund_method_code: Literal["CASH"]
     currency_code: str
     total_refund_amount: Decimal
     created_at_utc: datetime
     lines: list[ReturnCommitLineResultView]
+    financial_refund: FinancialRefundView | None = None
 
 
 class SaleReturnCommittedLineView(BaseModel):
@@ -262,6 +264,7 @@ class SaleReturnCommittedLineView(BaseModel):
 
 
 class SaleReturnDetailResponse(BaseModel):
+    financial_refund: FinancialRefundView | None = None
     id: UUID
     folio: str
     original_sale_id: UUID

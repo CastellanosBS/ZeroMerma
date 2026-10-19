@@ -99,7 +99,6 @@ type CashCloseScreenStage = "counting" | "review";
 const PAYMENT_METHOD_LABELS: Record<string, string> = {
   CARD: "Tarjeta",
   CASH: "Efectivo",
-  MIXED: "Mixto",
 };
 
 function useDebouncedValue(value: string, delayMs: number): string {
@@ -185,7 +184,6 @@ function getPaymentRowsForDisplay(
 ): CashClosePaymentMethodRowView[] {
   return (rows ?? [])
     .filter((row) => row.payment_method_code !== "CASH")
-    .filter((row) => row.payment_method_code !== "CARD")
     .filter((row) => row.expected_amount !== null && row.expected_amount !== undefined)
     .sort((left, right) => left.display_order - right.display_order);
 }
@@ -501,7 +499,7 @@ function ClosingRightPanel({
                 "border-[var(--pos-primary)] ring-2 ring-[var(--pos-ring)]",
               )}
               disabled={isClosed || isClosing}
-              inputMode="decimal"
+              inputMode="text"
               onChange={(event) => onCardChange(event.target.value)}
               onFocus={(event) => event.currentTarget.select()}
               onKeyDown={onCardKeyDown}
@@ -529,14 +527,19 @@ function ClosingRightPanel({
         </p>
 
         {otherPaymentRows.length > 0 ? (
-          <RightPanelBlock title="Otros pagos" tone="muted">
+          <RightPanelBlock title="Conciliación por medio" tone="muted">
             <div className="grid gap-2">
               {otherPaymentRows.map((row) => (
-                <ReadOnlyAmountRow
-                  key={row.payment_method_code}
-                  label={formatPaymentMethodLabel(row.payment_method_code)}
-                  value={formatMaybeCurrency(row.expected_amount)}
-                />
+                <div key={row.payment_method_code} className="grid gap-2">
+                  <ReadOnlyAmountRow
+                    label={`${formatPaymentMethodLabel(row.payment_method_code)} esperada`}
+                    value={formatMaybeCurrency(row.expected_amount)}
+                  />
+                  <ReadOnlyAmountRow
+                    label="Diferencia de tarjeta"
+                    value={row.counted_amount == null ? "Sin conteo" : formatMaybeCurrency(row.variance_amount)}
+                  />
+                </div>
               ))}
             </div>
           </RightPanelBlock>
@@ -1263,7 +1266,7 @@ export function CashCloseScreen() {
             ...state,
             countedPaymentAmounts: {
               ...state.countedPaymentAmounts,
-              CARD: sanitizeMoneyInput(value),
+              CARD: sanitizeMoneyInput(value, true),
             },
           }))
         }

@@ -404,7 +404,9 @@ export function AdminCashCutDetailPanel({
           <SectionTitle count={detail.returnsRefunds.length} title="Devoluciones" />
           <div className="mt-3 grid gap-1.5">
             {detail.returnsRefunds.length > 0 ? (
-              detail.returnsRefunds.map((refund) => <RefundRow key={refund.id} refund={refund} />)
+              detail.returnsRefunds.map((refund) => (
+                <RefundRow key={refund.financialEntryId ?? refund.id} refund={refund} />
+              ))
             ) : (
               <p className="rounded-[14px] border border-dashed border-[var(--ui-color-border)] px-3 py-3 text-sm text-slate-600">
                 Este corte no tiene devoluciones asociadas.

@@ -47,6 +47,11 @@ from zeromerma_api.modules.discounts.infrastructure.models import (
     OperationalDiscount,
     OperationalDiscountCategory,
 )
+from zeromerma_api.modules.financial_ledger.domain.money import financial_calculation
+from zeromerma_api.modules.financial_ledger.infrastructure.models import (
+    FinancialEntry,
+    FinancialOperation,
+)
 from zeromerma_api.modules.identity.infrastructure.models import User
 from zeromerma_api.modules.orders.application.financial_queries import read_order_financial_entries
 from zeromerma_api.modules.payments.infrastructure.models import (
@@ -57,9 +62,8 @@ from zeromerma_api.modules.returns.infrastructure.models import SaleReturn
 from zeromerma_api.modules.sales.domain.constants import (
     SALE_PAYMENT_METHOD_CARD,
     SALE_PAYMENT_METHOD_CASH,
-    SALE_PAYMENT_METHOD_MIXED,
 )
-from zeromerma_api.modules.sales.infrastructure.models import Sale, SalePayment
+from zeromerma_api.modules.sales.infrastructure.models import Sale
 from zeromerma_api.modules.tickets.application.admin_services import build_ticket_folio
 
 ADMIN_CASH_FLOW_PAGE_SIZE_MAX = 100
@@ -243,10 +247,74 @@ class AdminCashFlowService:
             *self._operational_payment_movements(session),
             *self._operational_discount_movements(session),
             *self._order_payment_movements(session),
+            *self._compensation_movements(session),
             *self._cash_cut_difference_movements(
                 session,
                 reconciliations_by_close_id=reconciliations_by_close_id,
             ),
+        ]
+
+    def _compensation_movements(self, session: Session) -> list[CashFlowMovement]:
+        rows = session.execute(
+            select(
+                FinancialEntry,
+                FinancialOperation,
+                Branch.name,
+                Workstation.name,
+                User.full_name,
+                CashSessionClose.id,
+            )
+            .join(
+                FinancialOperation, FinancialOperation.id == FinancialEntry.financial_operation_id
+            )
+            .join(Branch, Branch.id == FinancialEntry.branch_id)
+            .join(Workstation, Workstation.id == FinancialEntry.workstation_id)
+            .outerjoin(User, User.id == FinancialEntry.actor_id)
+            .outerjoin(
+                CashSessionClose, CashSessionClose.cash_session_id == FinancialEntry.cash_session_id
+            )
+            .where(
+                FinancialEntry.state == "CONFIRMED",
+                FinancialOperation.subject_type != "ORDER",
+                FinancialOperation.kind.in_(
+                    ("TECHNICAL_REVERSAL", "CASH_DEPOSIT", "CASH_WITHDRAWAL")
+                ),
+            )
+        )
+        return [
+            CashFlowMovement(
+                id=f"FINANCIAL_COMPENSATION:{entry.id}",
+                occurred_at=entry.occurred_at,
+                branch_id=entry.branch_id,
+                branch_name=branch_name,
+                workstation_id=type_cast(uuid.UUID, entry.workstation_id),
+                workstation_name=station_name,
+                operator_id=entry.actor_id,
+                operator_name=actor_name or "Sistema",
+                direction=MOVEMENT_DIRECTION_INFLOW
+                if entry.direction == "IN"
+                else MOVEMENT_DIRECTION_OUTFLOW,
+                source_type="FINANCIAL_COMPENSATION",
+                source_document_id=operation.source_id,
+                source_reference=str(operation.source_id),
+                source_status=entry.state,
+                category_code=operation.kind,
+                category_label="Compensación financiera",
+                payment_method=entry.payment_method_code,
+                amount=entry.amount,
+                signed_effect=entry.amount if entry.direction == "IN" else -entry.amount,
+                currency=entry.currency_code,
+                reconciliation_status=RECONCILIATION_STATUS_NOT_REQUIRED,
+                reconciliation_id=None,
+                reconciliation_folio=None,
+                reconciliation_reason_code=None,
+                cash_session_id=entry.cash_session_id,
+                cash_cut_id=close_id,
+                cash_cut_folio=_build_cash_cut_folio(close_id) if close_id else None,
+                financial_operation_id=operation.id,
+                financial_entry_id=entry.id,
+            )
+            for entry, operation, branch_name, station_name, actor_name, close_id in rows
         ]
 
     def _order_payment_movements(self, session: Session) -> list[CashFlowMovement]:
@@ -304,31 +372,42 @@ class AdminCashFlowService:
         rows = (
             session.execute(
                 select(
-                    SalePayment.id.label("movement_row_id"),
-                    SalePayment.payment_method_code,
-                    SalePayment.applied_amount,
-                    SalePayment.currency_code,
-                    SalePayment.received_at,
+                    FinancialEntry.id.label("financial_entry_id"),
+                    FinancialOperation.id.label("financial_operation_id"),
+                    FinancialEntry.id.label("movement_row_id"),
+                    FinancialEntry.payment_method_code,
+                    FinancialEntry.amount.label("applied_amount"),
+                    FinancialEntry.currency_code,
+                    FinancialEntry.occurred_at.label("received_at"),
                     Sale.id.label("sale_id"),
                     Sale.total_amount,
                     Sale.status,
-                    Sale.branch_id,
+                    FinancialEntry.branch_id,
                     Branch.name.label("branch_name"),
-                    Sale.workstation_id,
+                    FinancialEntry.workstation_id,
                     Workstation.name.label("workstation_name"),
-                    Sale.operator_id,
+                    FinancialEntry.actor_id.label("operator_id"),
                     User.full_name.label("operator_name"),
-                    Sale.cash_session_id,
+                    FinancialEntry.cash_session_id.label("cash_session_id"),
                     CashSessionClose.id.label("cash_cut_id"),
                     CashSessionClose.cash_variance_amount,
                 )
-                .select_from(SalePayment)
-                .join(Sale, Sale.id == SalePayment.sale_id)
-                .join(Branch, Branch.id == Sale.branch_id)
-                .join(Workstation, Workstation.id == Sale.workstation_id)
-                .join(User, User.id == Sale.operator_id)
+                .select_from(FinancialEntry)
+                .join(
+                    FinancialOperation,
+                    FinancialOperation.id == FinancialEntry.financial_operation_id,
+                )
+                .join(Sale, Sale.id == FinancialOperation.source_id)
+                .join(Branch, Branch.id == FinancialEntry.branch_id)
+                .join(Workstation, Workstation.id == FinancialEntry.workstation_id)
+                .join(User, User.id == FinancialEntry.actor_id)
                 .outerjoin(
-                    CashSessionClose, CashSessionClose.cash_session_id == Sale.cash_session_id
+                    CashSessionClose,
+                    CashSessionClose.cash_session_id == FinancialEntry.cash_session_id,
+                )
+                .where(
+                    FinancialOperation.kind == "SALE_COLLECTION",
+                    FinancialEntry.state == "CONFIRMED",
                 )
             )
             .mappings()
@@ -336,6 +415,8 @@ class AdminCashFlowService:
         )
         return [
             CashFlowMovement(
+                financial_entry_id=row["financial_entry_id"],
+                financial_operation_id=row["financial_operation_id"],
                 amount=_money(type_cast(Decimal, row["applied_amount"])),
                 branch_id=type_cast(uuid.UUID, row["branch_id"]),
                 branch_name=type_cast(str, row["branch_name"]),
@@ -374,31 +455,42 @@ class AdminCashFlowService:
         rows = (
             session.execute(
                 select(
+                    FinancialEntry.id.label("financial_entry_id"),
+                    FinancialOperation.id.label("financial_operation_id"),
                     SaleReturn.id,
                     SaleReturn.original_sale_id,
-                    SaleReturn.branch_id,
+                    FinancialEntry.branch_id,
                     Branch.name.label("branch_name"),
-                    SaleReturn.workstation_id,
+                    FinancialEntry.workstation_id,
                     Workstation.name.label("workstation_name"),
-                    SaleReturn.cash_session_id,
-                    SaleReturn.created_by_user_id,
+                    FinancialEntry.cash_session_id.label("cash_session_id"),
+                    FinancialEntry.actor_id.label("created_by_user_id"),
                     User.full_name.label("operator_name"),
                     SaleReturn.status,
                     SaleReturn.reason_code,
                     SaleReturn.reason_name,
-                    SaleReturn.refund_method_code,
-                    SaleReturn.currency_code,
-                    SaleReturn.total_refund_amount,
-                    SaleReturn.created_at_utc,
+                    FinancialEntry.payment_method_code.label("refund_method_code"),
+                    FinancialEntry.currency_code,
+                    FinancialEntry.amount.label("total_refund_amount"),
+                    FinancialEntry.occurred_at.label("created_at_utc"),
                     CashSessionClose.id.label("cash_cut_id"),
                 )
-                .select_from(SaleReturn)
-                .join(Branch, Branch.id == SaleReturn.branch_id)
-                .join(Workstation, Workstation.id == SaleReturn.workstation_id)
-                .join(User, User.id == SaleReturn.created_by_user_id)
+                .select_from(FinancialEntry)
+                .join(
+                    FinancialOperation,
+                    FinancialOperation.id == FinancialEntry.financial_operation_id,
+                )
+                .join(SaleReturn, SaleReturn.id == FinancialOperation.source_id)
+                .join(Branch, Branch.id == FinancialEntry.branch_id)
+                .join(Workstation, Workstation.id == FinancialEntry.workstation_id)
+                .join(User, User.id == FinancialEntry.actor_id)
                 .outerjoin(
                     CashSessionClose,
-                    CashSessionClose.cash_session_id == SaleReturn.cash_session_id,
+                    CashSessionClose.cash_session_id
+                    == FinancialEntry.cash_session_id.label("cash_session_id"),
+                )
+                .where(
+                    FinancialOperation.kind == "SALE_REFUND", FinancialEntry.state == "CONFIRMED"
                 )
             )
             .mappings()
@@ -406,6 +498,8 @@ class AdminCashFlowService:
         )
         return [
             CashFlowMovement(
+                financial_entry_id=row["financial_entry_id"],
+                financial_operation_id=row["financial_operation_id"],
                 amount=_money(type_cast(Decimal, row["total_refund_amount"])),
                 branch_id=type_cast(uuid.UUID, row["branch_id"]),
                 branch_name=type_cast(str, row["branch_name"]),
@@ -420,7 +514,7 @@ class AdminCashFlowService:
                 category_label=type_cast(str, row["reason_name"]),
                 currency=type_cast(str, row["currency_code"]),
                 direction=MOVEMENT_DIRECTION_OUTFLOW,
-                id=f"{SOURCE_TYPE_RETURN_REFUND}:{row['id']}",
+                id=f"{SOURCE_TYPE_RETURN_REFUND}:{row['financial_entry_id']}",
                 occurred_at=type_cast(datetime, row["created_at_utc"]),
                 operator_id=type_cast(uuid.UUID, row["created_by_user_id"]),
                 operator_name=type_cast(str, row["operator_name"]),
@@ -448,36 +542,48 @@ class AdminCashFlowService:
         rows = (
             session.execute(
                 select(
+                    FinancialEntry.id.label("financial_entry_id"),
+                    FinancialOperation.id.label("financial_operation_id"),
                     OperationalPayment.id,
-                    OperationalPayment.branch_id,
+                    FinancialEntry.branch_id,
                     Branch.name.label("branch_name"),
-                    OperationalPayment.workstation_id,
+                    FinancialEntry.workstation_id,
                     Workstation.name.label("workstation_name"),
-                    OperationalPayment.active_cash_session_id,
-                    OperationalPayment.created_by_user_id,
+                    FinancialEntry.cash_session_id.label("active_cash_session_id"),
+                    FinancialEntry.actor_id.label("created_by_user_id"),
                     User.full_name.label("operator_name"),
                     OperationalPayment.status,
                     OperationalPayment.payee_name,
                     OperationalPayment.concept,
                     OperationalPayment.category_code,
                     OperationalPaymentCategory.name.label("category_name"),
-                    OperationalPayment.payment_method_code,
-                    OperationalPayment.currency_code,
-                    OperationalPayment.total_amount,
-                    OperationalPayment.created_at_utc,
+                    FinancialEntry.payment_method_code,
+                    FinancialEntry.currency_code,
+                    FinancialEntry.amount.label("total_amount"),
+                    FinancialEntry.occurred_at.label("created_at_utc"),
                     CashSessionClose.id.label("cash_cut_id"),
                 )
-                .select_from(OperationalPayment)
-                .join(Branch, Branch.id == OperationalPayment.branch_id)
-                .join(Workstation, Workstation.id == OperationalPayment.workstation_id)
-                .join(User, User.id == OperationalPayment.created_by_user_id)
+                .select_from(FinancialEntry)
+                .join(
+                    FinancialOperation,
+                    FinancialOperation.id == FinancialEntry.financial_operation_id,
+                )
+                .join(OperationalPayment, OperationalPayment.id == FinancialOperation.source_id)
+                .join(Branch, Branch.id == FinancialEntry.branch_id)
+                .join(Workstation, Workstation.id == FinancialEntry.workstation_id)
+                .join(User, User.id == FinancialEntry.actor_id)
                 .outerjoin(
                     OperationalPaymentCategory,
                     OperationalPaymentCategory.code == OperationalPayment.category_code,
                 )
                 .outerjoin(
                     CashSessionClose,
-                    CashSessionClose.cash_session_id == OperationalPayment.active_cash_session_id,
+                    CashSessionClose.cash_session_id
+                    == FinancialEntry.cash_session_id.label("active_cash_session_id"),
+                )
+                .where(
+                    FinancialOperation.kind == "OPERATIONAL_PAYMENT",
+                    FinancialEntry.state == "CONFIRMED",
                 )
             )
             .mappings()
@@ -485,6 +591,8 @@ class AdminCashFlowService:
         )
         return [
             CashFlowMovement(
+                financial_entry_id=row["financial_entry_id"],
+                financial_operation_id=row["financial_operation_id"],
                 amount=_money(type_cast(Decimal, row["total_amount"])),
                 branch_id=type_cast(uuid.UUID, row["branch_id"]),
                 branch_name=type_cast(str, row["branch_name"]),
@@ -500,7 +608,7 @@ class AdminCashFlowService:
                 concept=type_cast(str, row["concept"]),
                 currency=type_cast(str, row["currency_code"]),
                 direction=MOVEMENT_DIRECTION_OUTFLOW,
-                id=f"{SOURCE_TYPE_OPERATIONAL_PAYMENT}:{row['id']}",
+                id=f"{SOURCE_TYPE_OPERATIONAL_PAYMENT}:{row['financial_entry_id']}",
                 occurred_at=type_cast(datetime, row["created_at_utc"]),
                 operator_id=type_cast(uuid.UUID, row["created_by_user_id"]),
                 operator_name=type_cast(str, row["operator_name"]),
@@ -524,36 +632,48 @@ class AdminCashFlowService:
         rows = (
             session.execute(
                 select(
+                    FinancialEntry.id.label("financial_entry_id"),
+                    FinancialOperation.id.label("financial_operation_id"),
                     OperationalDiscount.id,
-                    OperationalDiscount.branch_id,
+                    FinancialEntry.branch_id,
                     Branch.name.label("branch_name"),
-                    OperationalDiscount.workstation_id,
+                    FinancialEntry.workstation_id,
                     Workstation.name.label("workstation_name"),
-                    OperationalDiscount.active_cash_session_id,
-                    OperationalDiscount.created_by_user_id,
+                    FinancialEntry.cash_session_id.label("active_cash_session_id"),
+                    FinancialEntry.actor_id.label("created_by_user_id"),
                     User.full_name.label("operator_name"),
                     OperationalDiscount.status,
                     OperationalDiscount.subject_name,
                     OperationalDiscount.concept,
                     OperationalDiscount.category_code,
                     OperationalDiscountCategory.name.label("category_name"),
-                    OperationalDiscount.payment_method_code,
-                    OperationalDiscount.currency_code,
-                    OperationalDiscount.total_amount,
-                    OperationalDiscount.created_at_utc,
+                    FinancialEntry.payment_method_code,
+                    FinancialEntry.currency_code,
+                    FinancialEntry.amount.label("total_amount"),
+                    FinancialEntry.occurred_at.label("created_at_utc"),
                     CashSessionClose.id.label("cash_cut_id"),
                 )
-                .select_from(OperationalDiscount)
-                .join(Branch, Branch.id == OperationalDiscount.branch_id)
-                .join(Workstation, Workstation.id == OperationalDiscount.workstation_id)
-                .join(User, User.id == OperationalDiscount.created_by_user_id)
+                .select_from(FinancialEntry)
+                .join(
+                    FinancialOperation,
+                    FinancialOperation.id == FinancialEntry.financial_operation_id,
+                )
+                .join(OperationalDiscount, OperationalDiscount.id == FinancialOperation.source_id)
+                .join(Branch, Branch.id == FinancialEntry.branch_id)
+                .join(Workstation, Workstation.id == FinancialEntry.workstation_id)
+                .join(User, User.id == FinancialEntry.actor_id)
                 .outerjoin(
                     OperationalDiscountCategory,
                     OperationalDiscountCategory.code == OperationalDiscount.category_code,
                 )
                 .outerjoin(
                     CashSessionClose,
-                    CashSessionClose.cash_session_id == OperationalDiscount.active_cash_session_id,
+                    CashSessionClose.cash_session_id
+                    == FinancialEntry.cash_session_id.label("active_cash_session_id"),
+                )
+                .where(
+                    FinancialOperation.kind == "OPERATIONAL_CHARGE",
+                    FinancialEntry.state == "CONFIRMED",
                 )
             )
             .mappings()
@@ -561,6 +681,8 @@ class AdminCashFlowService:
         )
         return [
             CashFlowMovement(
+                financial_entry_id=row["financial_entry_id"],
+                financial_operation_id=row["financial_operation_id"],
                 amount=_money(type_cast(Decimal, row["total_amount"])),
                 branch_id=type_cast(uuid.UUID, row["branch_id"]),
                 branch_name=type_cast(str, row["branch_name"]),
@@ -572,11 +694,11 @@ class AdminCashFlowService:
                 cash_cut_id=type_cast(uuid.UUID | None, row["cash_cut_id"]),
                 cash_session_id=type_cast(uuid.UUID, row["active_cash_session_id"]),
                 category_code=type_cast(str | None, row["category_code"]),
-                category_label=type_cast(str | None, row["category_name"]) or "Descuento operativo",
+                category_label=type_cast(str | None, row["category_name"]) or "Cargo operativo",
                 concept=type_cast(str, row["concept"]),
                 currency=type_cast(str, row["currency_code"]),
-                direction=MOVEMENT_DIRECTION_OUTFLOW,
-                id=f"{SOURCE_TYPE_OPERATIONAL_DISCOUNT}:{row['id']}",
+                direction=MOVEMENT_DIRECTION_INFLOW,
+                id=f"{SOURCE_TYPE_OPERATIONAL_DISCOUNT}:{row['financial_entry_id']}",
                 occurred_at=type_cast(datetime, row["created_at_utc"]),
                 operator_id=type_cast(uuid.UUID, row["created_by_user_id"]),
                 operator_name=type_cast(str, row["operator_name"]),
@@ -585,7 +707,7 @@ class AdminCashFlowService:
                 reconciliation_id=None,
                 reconciliation_reason_code=None,
                 reconciliation_status=RECONCILIATION_STATUS_NOT_REQUIRED,
-                signed_effect=-_money(type_cast(Decimal, row["total_amount"])),
+                signed_effect=_money(type_cast(Decimal, row["total_amount"])),
                 source_document_id=type_cast(uuid.UUID, row["id"]),
                 source_reference=_build_operational_discount_folio(type_cast(uuid.UUID, row["id"])),
                 source_status=type_cast(str, row["status"]),
@@ -815,7 +937,6 @@ class AdminCashFlowService:
             payment_methods=[
                 AdminCashFlowFilterOptionView(id=SALE_PAYMENT_METHOD_CASH, label="Efectivo"),
                 AdminCashFlowFilterOptionView(id=SALE_PAYMENT_METHOD_CARD, label="Tarjeta"),
-                AdminCashFlowFilterOptionView(id=SALE_PAYMENT_METHOD_MIXED, label="Mixto"),
             ],
             reconciliation_states=[
                 AdminCashFlowFilterOptionView(
@@ -898,6 +1019,7 @@ def _to_list_item(movement: CashFlowMovement) -> AdminCashFlowMovementListItemVi
     )
 
 
+@financial_calculation
 def _build_summary(movements: list[CashFlowMovement]) -> AdminCashFlowSummaryView:
     inflows = _sum_money(m.amount for m in movements if m.direction == MOVEMENT_DIRECTION_INFLOW)
     outflows = _sum_money(m.amount for m in movements if m.direction == MOVEMENT_DIRECTION_OUTFLOW)
@@ -952,6 +1074,7 @@ def _build_summary(movements: list[CashFlowMovement]) -> AdminCashFlowSummaryVie
     )
 
 
+@financial_calculation
 def _build_trend(movements: list[CashFlowMovement]) -> list[AdminCashFlowTrendPointView]:
     by_date: dict[date, dict[str, Decimal]] = {}
     for movement in movements:
@@ -1014,10 +1137,14 @@ def _financial_classification(
     is_cash = movement.payment_method == SALE_PAYMENT_METHOD_CASH
     is_card = movement.payment_method == SALE_PAYMENT_METHOD_CARD
     return AdminCashFlowFinancialClassificationView(
-        affects_bank_settlement=is_card and movement.source_type != SOURCE_TYPE_ORDER_PAYMENT,
-        affects_cash_drawer=is_cash,
+        affects_bank_settlement=False,
+        affects_cash_drawer=is_cash and movement.direction != MOVEMENT_DIRECTION_ADJUSTMENT,
         card_impact=movement.signed_effect if is_card else ZERO_MONEY,
-        cash_impact=movement.signed_effect if is_cash else ZERO_MONEY,
+        cash_impact=(
+            movement.signed_effect
+            if is_cash and movement.direction != MOVEMENT_DIRECTION_ADJUSTMENT
+            else ZERO_MONEY
+        ),
         direction=movement.direction,
         net_effect=movement.signed_effect
         if movement.direction != MOVEMENT_DIRECTION_ADJUSTMENT
@@ -1027,7 +1154,7 @@ def _financial_classification(
             "no modifica el flujo neto."
             if movement.direction == MOVEMENT_DIRECTION_ADJUSTMENT
             else "Registro contable externo; no acredita captura ni liquidación bancaria."
-            if is_card and movement.source_type == SOURCE_TYPE_ORDER_PAYMENT
+            if is_card
             else None
         ),
         payment_method=movement.payment_method,

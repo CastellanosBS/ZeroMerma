@@ -21,6 +21,14 @@ from zeromerma_api.modules.catalog.domain.exceptions import (
     ProductClassNotFoundError,
     ProductNotFoundError,
 )
+from zeromerma_api.modules.financial_ledger.application.refund_commands import (
+    RefundSettlementService,
+)
+from zeromerma_api.modules.financial_ledger.application.refund_schemas import (
+    FinancialRefundView,
+    RefundSettlementCommand,
+    RefundSettlementRequest,
+)
 from zeromerma_api.modules.idempotency.application.canonicalization import (
     IDEMPOTENCY_KEY_PATTERN,
     parse_idempotency_key,
@@ -78,6 +86,54 @@ def _require_backoffice_user(current_user: AuthenticatedUser) -> AuthenticatedUs
             detail="Backoffice access is required.",
         )
     return current_user
+
+
+@router.post(
+    "/{order_id}/refund-settlements",
+    response_model=FinancialRefundView,
+    responses={200: _REPLAY_RESPONSE},
+)
+def settle_orders_refund(
+    order_id: UUID,
+    payload: RefundSettlementRequest,
+    request: Request,
+    current_user: Annotated[AuthenticatedUser, Depends(get_current_user)],
+    session: Annotated[Session, Depends(get_session)],
+    key: Annotated[UUID, Depends(require_idempotency_key)],
+) -> Response:
+    result = RefundSettlementService("ORDER_CANCELLATION").settle(
+        session,
+        current_user=current_user,
+        command=RefundSettlementCommand(source_id=order_id, **payload.model_dump()),
+        key=key,
+        request_id=request.headers.get("X-Request-ID"),
+    )
+    return idempotency_response(result, request)
+
+
+@router.get(
+    "/refund-settlements/{idempotency_key}",
+    response_model=FinancialRefundView,
+    responses={200: _REPLAY_RESPONSE},
+)
+def recover_orders_refund_settlement(
+    idempotency_key: Annotated[
+        str, Path(min_length=36, max_length=36, pattern=IDEMPOTENCY_KEY_PATTERN)
+    ],
+    workstation_code: Annotated[str, Query(min_length=1, max_length=64)],
+    cash_session_id: UUID,
+    request: Request,
+    current_user: Annotated[AuthenticatedUser, Depends(get_current_user)],
+    session: Annotated[Session, Depends(get_session)],
+) -> Response:
+    result = RefundSettlementService("ORDER_CANCELLATION").recover(
+        session,
+        current_user=current_user,
+        key=parse_idempotency_key(idempotency_key),
+        workstation_code=workstation_code,
+        cash_session_id=cash_session_id,
+    )
+    return idempotency_response(result, request)
 
 
 def _to_http_exception(error: Exception) -> HTTPException:

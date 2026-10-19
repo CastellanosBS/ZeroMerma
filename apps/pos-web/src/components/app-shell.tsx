@@ -22,6 +22,7 @@ import { PosCheckoutPanel } from "../features/pos-terminal/pos-checkout-panel";
 import { useSaleIntention } from "../features/pos-terminal/use-sale-intention";
 import { isSaleIntentionPending } from "../features/pos-terminal/sale-confirmation-intent";
 import { ReturnRecoveryPanel } from "../features/returns/return-recovery-panel";
+import { RefundRecoveryPanel } from "../features/refunds/refund-recovery-panel";
 import { OrderRecoveryPanel } from "../features/orders/order-recovery-panel";
 import { usePosTerminalStore } from "../features/pos-terminal/store";
 import { useCashCloseSummaryQuery } from "../features/cash-close/queries";
@@ -830,6 +831,7 @@ function AppShellFrame({ bootstrap, cashSession, children, onSignOut, onLock }: 
               <TransferRecoveryPanel workstationId={bootstrap.workstation.id} />
               <OrderRecoveryPanel workstationId={bootstrap.workstation.id} />
               <ReturnRecoveryPanel workstationId={bootstrap.workstation.id} />
+              <RefundRecoveryPanel workstationId={bootstrap.workstation.id} />
               {children}
             </main>
 

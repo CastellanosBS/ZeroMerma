@@ -5,9 +5,9 @@ from datetime import datetime
 from decimal import Decimal
 from typing import cast as type_cast
 
-from sqlalchemy import Select, String, and_, cast, exists, func, or_, select
+from sqlalchemy import Select, String, and_, case, cast, exists, func, or_, select
 from sqlalchemy.engine import RowMapping
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, aliased
 from sqlalchemy.sql.elements import ColumnElement
 
 from zeromerma_api.modules.audit.application.visibility import (
@@ -17,6 +17,11 @@ from zeromerma_api.modules.audit.application.visibility import (
 )
 from zeromerma_api.modules.audit.infrastructure.models import AuditLog
 from zeromerma_api.modules.branches.infrastructure.models import Branch, Workstation
+from zeromerma_api.modules.financial_ledger.application.refunds import find_refund
+from zeromerma_api.modules.financial_ledger.infrastructure.models import (
+    FinancialEntry,
+    FinancialOperation,
+)
 from zeromerma_api.modules.identity.infrastructure.models import User
 from zeromerma_api.modules.returns.application.admin_schemas import (
     AdminReturnAvailableActionsView,
@@ -189,6 +194,7 @@ class AdminReturnsService:
             user_id=type_cast(uuid.UUID, overview_row["sale_operator_id"]),
         )
         cash_movement_id = _linked_refund_cash_movement_id(session, overview_row)
+        financial_refund = find_refund(session, source_type="SALE_RETURN", source_id=return_id)
         audit_summary = self._audit_visibility.build_summary(
             session,
             created_actor=build_audit_actor_snapshot(
@@ -209,6 +215,7 @@ class AdminReturnsService:
         )
 
         return AdminReturnDetailView(
+            financial_refund=financial_refund,
             audit_summary=audit_summary,
             available_actions=AdminReturnAvailableActionsView(
                 creation_note=(
@@ -255,7 +262,9 @@ class AdminReturnsService:
                 refund_method=type_cast(str, overview_row["refund_method_code"]),
                 refund_amount=type_cast(Decimal, overview_row["total_refund_amount"]),
                 cash_session_id=type_cast(uuid.UUID, overview_row["cash_session_id"]),
-                cash_impact_amount=type_cast(Decimal, overview_row["total_refund_amount"]),
+                cash_impact_amount=financial_refund.cash_settled_amount
+                if financial_refund
+                else None,
                 linked_cash_movement_id=cash_movement_id,
                 currency_code=type_cast(str, overview_row["currency_code"]),
             ),
@@ -489,16 +498,50 @@ def _build_metrics(
         session.execute(
             select(
                 func.count(SaleReturn.id).label("returns_count"),
-                func.coalesce(func.sum(SaleReturn.total_refund_amount), ZERO_MONEY).label(
-                    "refunded_amount"
-                ),
+            ).where(SaleReturn.id.in_(return_ids_statement))
+        )
+        .mappings()
+        .one()
+    )
+    original_entry = aliased(FinancialEntry)
+    original_operation = aliased(FinancialOperation)
+    signed_amount = case(
+        (FinancialEntry.direction == "OUT", FinancialEntry.amount), else_=-FinancialEntry.amount
+    )
+    financial_row = (
+        session.execute(
+            select(
+                func.coalesce(func.sum(signed_amount), ZERO_MONEY).label("refunded_amount"),
                 func.coalesce(
-                    func.sum(SaleReturn.total_refund_amount).filter(
-                        SaleReturn.refund_method_code == RETURN_REFUND_METHOD_CASH
-                    ),
+                    func.sum(signed_amount).filter(FinancialEntry.payment_method_code == "CASH"),
                     ZERO_MONEY,
                 ).label("cash_refunded_amount"),
-            ).where(SaleReturn.id.in_(return_ids_statement))
+            )
+            .select_from(FinancialEntry)
+            .join(
+                FinancialOperation, FinancialOperation.id == FinancialEntry.financial_operation_id
+            )
+            .outerjoin(original_entry, original_entry.id == FinancialEntry.reverses_entry_id)
+            .outerjoin(
+                original_operation, original_operation.id == original_entry.financial_operation_id
+            )
+            .where(
+                FinancialEntry.state == "CONFIRMED",
+                or_(
+                    and_(
+                        FinancialOperation.kind == "SALE_REFUND",
+                        FinancialOperation.source_type == "SALE_RETURN",
+                        FinancialOperation.source_id.in_(return_ids_statement),
+                    ),
+                    and_(
+                        FinancialOperation.kind == "TECHNICAL_REVERSAL",
+                        original_entry.state == "CONFIRMED",
+                        original_operation.kind == "SALE_REFUND",
+                        original_operation.source_type == "SALE_RETURN",
+                        original_operation.source_id.in_(return_ids_statement),
+                    ),
+                ),
+            )
         )
         .mappings()
         .one()
@@ -512,8 +555,8 @@ def _build_metrics(
     )
     return AdminReturnMetricsView(
         returns_count=int(metric_row["returns_count"] or 0),
-        refunded_amount=type_cast(Decimal, metric_row["refunded_amount"]),
-        cash_refunded_amount=type_cast(Decimal, metric_row["cash_refunded_amount"]),
+        refunded_amount=type_cast(Decimal, financial_row["refunded_amount"]),
+        cash_refunded_amount=type_cast(Decimal, financial_row["cash_refunded_amount"]),
         returned_line_count=returned_line_count,
         pending_review_count=0,
     )

@@ -169,6 +169,8 @@ class AdminCashCutTicketItemView(BaseModel):
 
 
 class AdminCashCutRefundItemView(BaseModel):
+    financial_entry_id: UUID | None = None
+    financial_operation_id: UUID | None = None
     id: UUID
     folio: str
     original_ticket_folio: str

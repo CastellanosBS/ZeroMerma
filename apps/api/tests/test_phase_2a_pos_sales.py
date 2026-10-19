@@ -21,6 +21,10 @@ from zeromerma_api.bootstrap.seed_local import (
 from zeromerma_api.db.session import SessionLocal
 from zeromerma_api.modules.audit.infrastructure.models import AuditLog
 from zeromerma_api.modules.catalog.infrastructure.models import Product, ProductClass
+from zeromerma_api.modules.financial_ledger.infrastructure.models import (
+    FinancialEntry,
+    FinancialOperation,
+)
 from zeromerma_api.modules.outbox.infrastructure.models import OutboxEvent
 from zeromerma_api.modules.sales.infrastructure.models import CashMovement, Sale, SalePayment
 from zeromerma_api.testing.idempotency import current_cash_session_id, new_idempotency_key
@@ -112,7 +116,7 @@ def test_pos_catalog_orders_classes_by_capture_mode_and_display_order(client: Te
     ]
 
 
-def test_class_capture_sale_confirmation_writes_sale_payment_cash_movement_audit_and_outbox(
+def test_class_capture_sale_confirmation_writes_financial_fact_audit_and_outbox_without_mirror(
     client: TestClient,
 ) -> None:
     _open_cash_session(client)
@@ -170,9 +174,16 @@ def test_class_capture_sale_confirmation_writes_sale_payment_cash_movement_audit
         payment_record = session.execute(
             select(SalePayment).where(SalePayment.sale_id == sale_record.id)
         ).scalar_one()
-        cash_movement_record = session.execute(
-            select(CashMovement).where(CashMovement.sale_id == sale_record.id)
-        ).scalar_one()
+        assert (
+            session.scalar(select(CashMovement).where(CashMovement.sale_id == sale_record.id))
+            is None
+        )
+        operation = session.scalars(
+            select(FinancialOperation).where(FinancialOperation.source_id == sale_record.id)
+        ).one()
+        entry = session.scalars(
+            select(FinancialEntry).where(FinancialEntry.financial_operation_id == operation.id)
+        ).one()
         audit_record = session.execute(
             select(AuditLog).where(AuditLog.action == "sale.confirmed")
         ).scalar_one()
@@ -181,10 +192,27 @@ def test_class_capture_sale_confirmation_writes_sale_payment_cash_movement_audit
         ).scalar_one()
 
     assert Decimal(str(payment_record.applied_amount)) == Decimal("24.00")
-    assert Decimal(str(cash_movement_record.amount)) == Decimal("24.00")
+    assert operation.kind == "SALE_COLLECTION"
+    assert operation.source_type == operation.subject_type == "SALE"
+    assert operation.subject_id == sale_record.id
+    assert operation.amount_due == entry.amount == Decimal("24.00")
+    assert entry.payment_method_code == "CASH" and entry.direction == "IN"
+    assert entry.state == "CONFIRMED" and entry.execution_mode == "LOCAL"
+    assert entry.tendered_amount == Decimal("50.00")
+    assert entry.change_amount == Decimal("26.00")
+    assert entry.leg_key == str(payment_record.id)
+    assert operation.branch_id == entry.branch_id == sale_record.branch_id
+    assert operation.workstation_id == entry.workstation_id == sale_record.workstation_id
+    assert operation.cash_session_id == entry.cash_session_id == sale_record.cash_session_id
+    assert operation.actor_id == entry.actor_id == sale_record.operator_id
     assert audit_record.request_id == "e820f01b-c850-5472-889c-4e6570b14467"
     assert audit_record.resource_id == payload["id"]
     assert outbox_event.payload["sale_id"] == payload["id"]
+    for trace in (audit_record.metadata_, outbox_event.payload, outbox_event.headers):
+        assert trace["financial_operation_id"] == str(operation.id)
+        assert trace["financial_entry_ids"] == [str(entry.id)]
+    assert operation.operation_id == entry.operation_id == audit_record.operation_id
+    assert operation.operation_id == outbox_event.operation_id
 
 
 def test_product_direct_sale_confirmation_uses_product_reference_and_direct_assignment(
@@ -324,9 +352,22 @@ def test_sale_confirmation_supports_card_payment_without_cash_movement(
             .scalars()
             .all()
         )
+        operation = session.scalars(
+            select(FinancialOperation).where(FinancialOperation.source_id == sale_record.id)
+        ).one()
+        entry = session.scalars(
+            select(FinancialEntry).where(FinancialEntry.financial_operation_id == operation.id)
+        ).one()
 
     assert payment_record.payment_method_code == "CARD"
     assert cash_movement_records == []
+    assert operation.kind == "SALE_COLLECTION"
+    assert operation.amount_due == entry.amount == Decimal("18.00")
+    assert entry.payment_method_code == "CARD" and entry.direction == "IN"
+    assert entry.state == "CONFIRMED" and entry.execution_mode == "ACCOUNTING_ONLY"
+    assert entry.resolution_kind == "EXTERNAL_RECORDING"
+    assert entry.resolution_reference == payment_record.id
+    assert entry.cash_session_id == sale_record.cash_session_id
 
 
 def test_sale_confirmation_supports_mixed_cash_and_card_payment(
@@ -386,9 +427,16 @@ def test_sale_confirmation_supports_mixed_cash_and_card_payment(
             .scalars()
             .all()
         )
-        cash_movement_record = session.execute(
-            select(CashMovement).where(CashMovement.sale_id == sale_record.id)
-        ).scalar_one()
+        assert (
+            session.scalar(select(CashMovement).where(CashMovement.sale_id == sale_record.id))
+            is None
+        )
+        operation = session.scalars(
+            select(FinancialOperation).where(FinancialOperation.source_id == sale_record.id)
+        ).one()
+        entries = session.scalars(
+            select(FinancialEntry).where(FinancialEntry.financial_operation_id == operation.id)
+        ).all()
 
     assert [record.payment_method_code for record in payment_records] == ["CARD", "CASH"]
     assert [Decimal(str(record.applied_amount)) for record in payment_records] == [
@@ -396,7 +444,23 @@ def test_sale_confirmation_supports_mixed_cash_and_card_payment(
         Decimal("14.00"),
     ]
     assert Decimal(str(payment_records[1].change_amount)) == Decimal("6.00")
-    assert Decimal(str(cash_movement_record.amount)) == Decimal("14.00")
+    assert operation.kind == "SALE_COLLECTION" and operation.amount_due == Decimal("24.00")
+    assert len(entries) == 2
+    by_method = {entry.payment_method_code: entry for entry in entries}
+    assert set(by_method) == {"CASH", "CARD"}
+    assert by_method["CASH"].amount == Decimal("14.00")
+    assert by_method["CASH"].tendered_amount == Decimal("20.00")
+    assert by_method["CASH"].change_amount == Decimal("6.00")
+    assert by_method["CASH"].execution_mode == "LOCAL"
+    assert by_method["CARD"].amount == Decimal("10.00")
+    assert by_method["CARD"].execution_mode == "ACCOUNTING_ONLY"
+    assert by_method["CARD"].resolution_reference == payment_records[0].id
+    assert sum(entry.amount for entry in entries) == operation.amount_due
+    for entry in entries:
+        assert entry.state == "CONFIRMED" and entry.direction == "IN"
+        assert entry.cash_session_id == sale_record.cash_session_id
+        assert entry.branch_id == sale_record.branch_id
+        assert entry.workstation_id == sale_record.workstation_id
 
 
 def test_sale_confirmation_rejects_removed_other_payment_method(
@@ -433,7 +497,17 @@ def test_sale_confirmation_rejects_removed_other_payment_method(
     )
 
     assert response.status_code == 409
-    assert response.json()["message"] == "El metodo de pago OTHER no esta disponible."
+    assert response.json()["message"] == "Envía componentes reales de efectivo o tarjeta."
+    with SessionLocal() as session:
+        assert session.scalar(select(Sale.id)) is None
+        assert session.scalar(select(SalePayment.id)) is None
+        assert session.scalar(select(CashMovement.id)) is None
+        assert (
+            session.scalar(
+                select(FinancialOperation.id).where(FinancialOperation.kind == "SALE_COLLECTION")
+            )
+            is None
+        )
 
 
 def test_sale_confirmation_rejects_insufficient_cash(client: TestClient) -> None:

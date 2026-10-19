@@ -64,6 +64,10 @@ def record_order_payment(
     owner = execution(session)
     if owner is None or owner.record is None or not owner.action_running:
         raise IdempotencyBoundaryError("Order payments require the admitted command action.")
+    if payment.payment_type not in {"ADVANCE", "SETTLEMENT"}:
+        raise OrderValidationError(
+            "Los reembolsos requieren su obligación financiera y capacidad de caja."
+        )
     context = replace(
         get_operation_context(session),
         actor_id=payment.recorded_by_user_id,
@@ -87,7 +91,7 @@ def record_order_payment(
         ) from error
     method = PaymentMethod(payment.payment_method_code)
     kind = _PAYMENT_KINDS[payment.payment_type]
-    direction = Direction.OUT if kind == OperationKind.ORDER_REFUND else Direction.IN
+    direction = Direction.IN
     session.add(payment)
     session.flush()
     lineage = dict(
@@ -185,7 +189,32 @@ def order_payment_financial_references(
         )
         .where(CustomerOrderPayment.customer_order_id == order_id)
     )
-    return {
+    references = {
         payment_id: (operation_id, entry_id)
         for payment_id, operation_id, entry_id in session.execute(statement)
     }
+    refund_rows = session.execute(
+        select(CustomerOrderPayment.id, FinancialOperation.id, FinancialEntry.id)
+        .join(FinancialEntry, FinancialEntry.id == CustomerOrderPayment.financial_entry_id)
+        .join(FinancialOperation, FinancialOperation.id == FinancialEntry.financial_operation_id)
+        .where(
+            CustomerOrderPayment.customer_order_id == order_id,
+            CustomerOrderPayment.payment_type == "REFUND",
+            FinancialOperation.kind == "ORDER_REFUND",
+            FinancialOperation.source_type == "ORDER_CANCELLATION",
+            FinancialOperation.subject_type == "ORDER",
+            FinancialOperation.subject_id == order_id,
+            FinancialOperation.branch_id == branch_id,
+            FinancialEntry.state == "CONFIRMED",
+            FinancialEntry.amount == CustomerOrderPayment.amount,
+            FinancialEntry.currency_code == CustomerOrderPayment.currency_code,
+            FinancialEntry.actor_id == CustomerOrderPayment.recorded_by_user_id,
+            FinancialEntry.cash_session_id == CustomerOrderPayment.cash_session_id,
+            FinancialEntry.workstation_id == CustomerOrderPayment.workstation_id,
+            FinancialEntry.payment_method_code == CustomerOrderPayment.payment_method_code,
+        )
+    )
+    references.update(
+        {payment_id: (operation_id, entry_id) for payment_id, operation_id, entry_id in refund_rows}
+    )
+    return references

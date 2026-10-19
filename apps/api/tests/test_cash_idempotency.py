@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from concurrent.futures import ThreadPoolExecutor
 from copy import deepcopy
+from decimal import Decimal
 from http.cookies import SimpleCookie
 from importlib import import_module
 from statistics import median
@@ -41,6 +42,10 @@ from zeromerma_api.modules.cash_close.infrastructure.models import (
 )
 from zeromerma_api.modules.catalog.infrastructure.models import Product, ProductClass
 from zeromerma_api.modules.discounts.infrastructure.models import OperationalDiscount
+from zeromerma_api.modules.financial_ledger.infrastructure.models import (
+    FinancialEntry,
+    FinancialOperation,
+)
 from zeromerma_api.modules.idempotency.application.schemas import IdempotencyResult
 from zeromerma_api.modules.idempotency.domain.exceptions import (
     IdempotencyError,
@@ -180,6 +185,8 @@ def _state() -> dict[str, Any]:
                 OperationalPayment,
                 OperationalDiscount,
                 CashMovement,
+                FinancialOperation,
+                FinancialEntry,
                 IdempotencyRecord,
             )
         }
@@ -225,6 +232,26 @@ def _state() -> dict[str, Any]:
                 CashMovement.direction,
             ).order_by(CashMovement.id)
         ).all()
+        state["financial_facts"] = session.execute(
+            select(
+                FinancialEntry.id,
+                FinancialEntry.financial_operation_id,
+                FinancialEntry.cash_session_id,
+                FinancialEntry.payment_method_code,
+                FinancialEntry.direction,
+                FinancialEntry.amount,
+                FinancialEntry.state,
+            ).order_by(FinancialEntry.id)
+        ).all()
+        state["operational_financial_entries"] = session.scalar(
+            select(func.count())
+            .select_from(FinancialEntry)
+            .join(
+                FinancialOperation,
+                FinancialOperation.id == FinancialEntry.financial_operation_id,
+            )
+            .where(FinancialOperation.kind.in_(("OPERATIONAL_PAYMENT", "OPERATIONAL_CHARGE")))
+        )
         return state
 
 
@@ -396,6 +423,7 @@ def test_cash_history_replays_after_shift_change_without_touching_new_session(
         result = _post(client, kind, fresh, body, new_idempotency_key())
         assert result.status_code == 409
         assert _state()["movements"] == before["movements"]
+        assert _state()["financial_facts"] == before["financial_facts"]
     with SessionLocal() as session:
         assert session.get(CashSession, UUID(opened.json()["id"])).status == "OPEN"
 
@@ -456,15 +484,30 @@ def test_distinct_operational_intentions_create_correct_single_cash_effects(
     assert snapshots[0]["id"] != snapshots[1]["id"]
     state = _state()
     assert state["operational_payments" if kind == "payment" else "operational_discounts"] == 2
-    assert state["cash_movements"] == (2 if method == "CASH" else 0)
+    assert state["cash_movements"] == 0
+    assert state["operational_financial_entries"] == 2
     with SessionLocal() as session:
         for snapshot in snapshots:
-            if method == "CARD":
-                assert snapshot["cash_movement_id"] is None
-            else:
-                movement = session.get(CashMovement, UUID(snapshot["cash_movement_id"]))
-                assert movement.direction == ("OUT" if kind == "payment" else "IN")
-                assert movement.cash_session_id == UUID(body["cash_session_id"])
+            assert snapshot["cash_movement_id"] is None
+            operation = session.scalars(
+                select(FinancialOperation).where(
+                    FinancialOperation.source_id == UUID(snapshot["id"])
+                )
+            ).one()
+            entry = session.scalars(
+                select(FinancialEntry).where(FinancialEntry.financial_operation_id == operation.id)
+            ).one()
+            assert operation.kind == (
+                "OPERATIONAL_PAYMENT" if kind == "payment" else "OPERATIONAL_CHARGE"
+            )
+            assert entry.direction == ("OUT" if kind == "payment" else "IN")
+            assert entry.payment_method_code == method
+            assert entry.amount == operation.amount_due == Decimal(body["total_amount"])
+            assert entry.state == "CONFIRMED"
+            assert entry.execution_mode == ("LOCAL" if method == "CASH" else "ACCOUNTING_ONLY")
+            assert (
+                entry.cash_session_id == operation.cash_session_id == UUID(body["cash_session_id"])
+            )
 
 
 def test_already_closed_session_has_one_durable_conflict_for_a_new_key(client: TestClient) -> None:
@@ -759,7 +802,8 @@ def test_distinct_cash_reservations_do_not_deadlock_when_both_precede_domain_loc
             for result in results
         )
         assert len({result.payload["id"] for result in results}) == 2
-        assert _state()["cash_movements"] == 2
+        assert _state()["cash_movements"] == 0
+        assert _state()["operational_financial_entries"] == 2
 
 
 @pytest.mark.parametrize("movement", ["payment", "discount"])
@@ -779,14 +823,15 @@ def test_cash_movements_and_close_revalidate_under_same_session_lock(
     )
     first, second = _contend(monkeypatch, headers, first_kind, first_body, second_kind, second_body)
     assert first.status_code == COMMANDS[first_kind][4]
+    assert _state()["cash_movements"] == 0
     if close_first:
         assert isinstance(second, IdempotencyError) and second.code == "CASH_SESSION_CLOSED"
-        assert _state()["cash_movements"] == 0
+        assert _state()["operational_financial_entries"] == 0
     else:
         assert isinstance(second, IdempotencyResult) and second.status_code == 200
         expected = "90.00" if movement == "payment" else "110.00"
         assert second.payload["expected_cash_amount"] == expected
-        assert _state()["cash_movements"] == 1
+        assert _state()["operational_financial_entries"] == 1
     assert _state()["cash_session_closes"] == 1
 
 

@@ -52,7 +52,7 @@ from zeromerma_api.testing.database_safety import (
 REPO_ROOT = Path(__file__).resolve().parents[3]
 VERSIONS_DIR = REPO_ROOT / "apps" / "api" / "alembic" / "versions"
 ALEMBIC_INI = REPO_ROOT / "apps" / "api" / "alembic.ini"
-CANONICAL_HEAD = "20261019_0044_financial_ledger"
+CANONICAL_HEAD = "20261019_0048_financial_import"
 EXPECTED_POSTGRES_MAJOR = 16
 TEST_CONTAINER_VARIABLE = "ZEROMERMA_TEST_CONTAINER_NAME"
 
@@ -61,7 +61,7 @@ KNOWN_NAMING_ONLY = "KNOWN_NAMING_ONLY"
 KNOWN_MODEL_OBJECT = "KNOWN_MODEL_OBJECT"
 REAL_SCHEMA_DRIFT = "REAL_SCHEMA_DRIFT"
 UNKNOWN_SCHEMA_DRIFT = "UNKNOWN_SCHEMA_DRIFT"
-DRIFT_BASELINE_VERSION = "2026-10-19.zm-fin-041.1"
+DRIFT_BASELINE_VERSION = "2026-10-19.zm-fin-047.1"
 
 
 @dataclass(frozen=True, order=True, slots=True)
@@ -905,6 +905,68 @@ KNOWN_MODEL_CHECKS: frozenset[ModelCheckFingerprint] = frozenset(
     {
         ModelCheckFingerprint(
             "public",
+            "external_payment_operations",
+            "ck_external_payment_operations_status_valid",
+            "ck_external_payment_operations_status_valid",
+            "ck_external_payment_operations_status_valid",
+            "status IN ('CREATED','PROCESSING','AUTHORIZED','UNKNOWN',"
+            "'CAPTURED','REFUNDED','DECLINED','FAILED')",
+            "status::text = ANY (ARRAY['CREATED'::character varying, 'PROCESSING'::character "
+            "varying, 'AUTHORIZED'::character varying, 'UNKNOWN'::character varying, "
+            "'CAPTURED'::character varying, 'REFUNDED'::character varying, 'DECLINED'::character "
+            "varying, 'FAILED'::character varying]::text[])",
+        ),
+        ModelCheckFingerprint(
+            "public",
+            "external_payment_operations",
+            "ck_external_payment_operations_reconciliation_valid",
+            "ck_external_payment_operations_reconciliation_valid",
+            "ck_external_payment_operations_reconciliation_valid",
+            "reconciliation_status IN ('PENDING','MATCHED','DISCREPANCY')",
+            "reconciliation_status::text = ANY (ARRAY['PENDING'::character varying, "
+            "'MATCHED'::character varying, 'DISCREPANCY'::character varying]::text[])",
+        ),
+        ModelCheckFingerprint(
+            "public",
+            "external_payment_operations",
+            "ck_external_payment_operations_amount_valid",
+            "ck_external_payment_operations_amount_valid",
+            "ck_external_payment_operations_amount_valid",
+            "amount > 0 AND amount <> 'NaN'::numeric AND currency_code = 'MXN'",
+            "amount > 0::numeric AND amount <> 'NaN'::numeric "
+            "AND currency_code::text = 'MXN'::text",
+        ),
+        ModelCheckFingerprint(
+            "public",
+            "external_payment_operations",
+            "ck_external_payment_operations_type_valid",
+            "ck_external_payment_operations_type_valid",
+            "ck_external_payment_operations_type_valid",
+            "operation_type IN ('CAPTURE','REFUND')",
+            "operation_type::text = ANY (ARRAY['CAPTURE'::character varying, "
+            "'REFUND'::character varying]::text[])",
+        ),
+        ModelCheckFingerprint(
+            "public",
+            "external_payment_operations",
+            "ck_external_payment_operations_original_valid",
+            "ck_external_payment_operations_original_valid",
+            "ck_external_payment_operations_original_valid",
+            "(operation_type = 'REFUND') = (original_operation_id IS NOT NULL)",
+            "operation_type::text = 'REFUND'::text) = (original_operation_id IS NOT NULL",
+        ),
+        ModelCheckFingerprint(
+            "public",
+            "payment_terminal_bindings",
+            "ck_payment_terminal_bindings_environment_valid",
+            "ck_payment_terminal_bindings_environment_valid",
+            "ck_payment_terminal_bindings_environment_valid",
+            "environment IN ('SANDBOX','PRODUCTION')",
+            "environment::text = ANY (ARRAY['SANDBOX'::character varying, "
+            "'PRODUCTION'::character varying]::text[])",
+        ),
+        ModelCheckFingerprint(
+            "public",
             "financial_entries",
             "ck_financial_entries_amount_valid",
             "ck_financial_entries_amount_valid",
@@ -1255,7 +1317,8 @@ KNOWN_MODEL_CHECKS: frozenset[ModelCheckFingerprint] = frozenset(
                 "('CASH_SESSION','OPENING_STATE')) OR (kind = 'SALE_COLLECTION' AND "
                 "source_type = 'SALE') OR (kind IN "
                 "('ORDER_ADVANCE','ORDER_SETTLEMENT','ORDER_REFUND') AND source_type = "
-                "'ORDER_PAYMENT') OR (kind = 'SALE_REFUND' AND source_type = 'SALE_RETURN') OR"
+                "'ORDER_PAYMENT') OR (kind = 'ORDER_REFUND' AND source_type = "
+                "'ORDER_CANCELLATION') OR (kind = 'SALE_REFUND' AND source_type = 'SALE_RETURN') OR"
                 " (kind = 'OPERATIONAL_PAYMENT' AND source_type = 'OPERATIONAL_PAYMENT') OR "
                 "(kind = 'OPERATIONAL_CHARGE' AND source_type = 'OPERATIONAL_DISCOUNT') OR "
                 "(kind = 'CASH_DEPOSIT' AND source_type = 'CASH_DEPOSIT') OR (kind = "
@@ -1270,7 +1333,9 @@ KNOWN_MODEL_CHECKS: frozenset[ModelCheckFingerprint] = frozenset(
                 "'SALE_COLLECTION'::text AND source_type::text = 'SALE'::text OR (kind::text ="
                 " ANY (ARRAY['ORDER_ADVANCE'::character varying, 'ORDER_SETTLEMENT'::character"
                 " varying, 'ORDER_REFUND'::character varying]::text[])) AND source_type::text "
-                "= 'ORDER_PAYMENT'::text OR kind::text = 'SALE_REFUND'::text AND "
+                "= 'ORDER_PAYMENT'::text OR kind::text = 'ORDER_REFUND'::text AND "
+                "source_type::text = 'ORDER_CANCELLATION'::text OR kind::text = "
+                "'SALE_REFUND'::text AND "
                 "source_type::text = 'SALE_RETURN'::text OR kind::text = "
                 "'OPERATIONAL_PAYMENT'::text AND source_type::text = "
                 "'OPERATIONAL_PAYMENT'::text OR kind::text = 'OPERATIONAL_CHARGE'::text AND "
@@ -1764,8 +1829,8 @@ KNOWN_MODEL_CHECKS: frozenset[ModelCheckFingerprint] = frozenset(
             ),
             "ck_cash_session_close_payment_method_counts_ck_cash_ses_0254",
             "ck_cash_session_close_payment_method_counts_ck_cash_ses_0254",
-            "counted_amount >= 0",
-            "counted_amount >= 0::numeric",
+            "payment_method_code = 'CARD' OR counted_amount >= 0",
+            "payment_method_code::text = 'CARD'::text OR counted_amount >= 0::numeric",
         ),
         ModelCheckFingerprint(
             "public",
@@ -1776,8 +1841,9 @@ KNOWN_MODEL_CHECKS: frozenset[ModelCheckFingerprint] = frozenset(
             ),
             "ck_cash_session_close_payment_method_counts_ck_cash_ses_f859",
             "ck_cash_session_close_payment_method_counts_ck_cash_ses_f859",
-            "expected_amount IS NULL OR expected_amount >= 0",
-            "expected_amount IS NULL OR expected_amount >= 0::numeric",
+            "expected_amount IS NULL OR payment_method_code <> 'CASH' OR expected_amount >= 0",
+            "expected_amount IS NULL OR payment_method_code::text <> 'CASH'::text "
+            "OR expected_amount >= 0::numeric",
         ),
         ModelCheckFingerprint(
             "public",
@@ -3832,6 +3898,7 @@ MODEL_MODULES = (
     "zeromerma_api.modules.corrections.infrastructure.models",
     "zeromerma_api.modules.discounts.infrastructure.models",
     "zeromerma_api.modules.financial_ledger.infrastructure.models",
+    "zeromerma_api.modules.financial_ledger.infrastructure.reconciliation_models",
     "zeromerma_api.modules.idempotency.infrastructure.models",
     "zeromerma_api.modules.identity.infrastructure.models",
     "zeromerma_api.modules.identity.infrastructure.privileged_models",
@@ -3840,6 +3907,7 @@ MODEL_MODULES = (
     "zeromerma_api.modules.operations.infrastructure.models",
     "zeromerma_api.modules.orders.infrastructure.models",
     "zeromerma_api.modules.outbox.infrastructure.models",
+    "zeromerma_api.modules.payment_terminal.infrastructure.models",
     "zeromerma_api.modules.payments.infrastructure.models",
     "zeromerma_api.modules.production.infrastructure.models",
     "zeromerma_api.modules.purchases.infrastructure.models",
@@ -5487,7 +5555,7 @@ def test_drift_classifier_accepts_only_exact_known_fingerprints() -> None:
     assert len(KNOWN_DB_ONLY_INDEXES) == 75
     assert len(KNOWN_DB_ONLY_DEFAULTS) == 51
     assert len(KNOWN_DB_ONLY_CHECKS) == 6
-    assert len(KNOWN_MODEL_CHECKS) == 225
+    assert len(KNOWN_MODEL_CHECKS) == 231
     assert len(KNOWN_MODEL_INDEXES) == 3
     assert (
         sum(item.expected_database_name != item.database_name for item in KNOWN_MODEL_CHECKS) == 87
@@ -6322,8 +6390,8 @@ def test_static_graph() -> None:
     for row in inventory:
         _emit("REVISION", row)
     _emit("GRAPH", graph)
-    assert graph["revision_count"] == 44
-    assert graph["unique_revision_count"] == 44
+    assert graph["revision_count"] == 48
+    assert graph["unique_revision_count"] == 48
     assert graph["duplicate_revisions"] == []
     assert graph["roots"] == ["0001_foundation_schema"]
     assert graph["heads"] == [CANONICAL_HEAD]
@@ -6332,7 +6400,7 @@ def test_static_graph() -> None:
     assert graph["unreachable"] == []
     assert graph["branches"] == {}
     assert graph["merge_revisions"] == []
-    assert len(_topological_revisions(inventory)) == 44
+    assert len(_topological_revisions(inventory)) == 48
 
 
 def test_financial_ledger_transition_is_empty_preserves_history_and_protects_evidence() -> None:
@@ -6422,6 +6490,321 @@ def test_financial_ledger_transition_is_empty_preserves_history_and_protects_evi
                     "new_tables_initially_empty": True,
                     "empty_downgrade": "PASS",
                     "evidence_downgrade": "REJECTED",
+                },
+            )
+
+
+def _financial_guard_snapshot(connection: Connection) -> dict[str, object]:
+    """Pin persisted rows and schema, including triggers, across a rejected downgrade."""
+    inspector = inspect(connection)
+    tables = sorted(inspector.get_table_names())
+    return {
+        "rows": {
+            table: connection.scalar(
+                text(
+                    f"SELECT md5(coalesce(string_agg(row_to_json(t)::text, '|' "
+                    f"ORDER BY row_to_json(t)::text), '')) FROM {table} t"
+                )
+            )
+            for table in tables
+        },
+        "columns": {
+            table: [
+                (column["name"], str(column["type"]), column["nullable"], column["default"])
+                for column in inspector.get_columns(table)
+            ]
+            for table in tables
+        },
+        "constraints": connection.execute(
+            text(
+                "SELECT conrelid::regclass::text, conname, pg_get_constraintdef(oid) "
+                "FROM pg_constraint WHERE connamespace='public'::regnamespace "
+                "ORDER BY conrelid::regclass::text, conname"
+            )
+        ).all(),
+        "triggers": connection.execute(
+            text(
+                "SELECT tgrelid::regclass::text, tgname, pg_get_triggerdef(oid) "
+                "FROM pg_trigger WHERE NOT tgisinternal "
+                "ORDER BY tgrelid::regclass::text, tgname"
+            )
+        ).all(),
+    }
+
+
+@pytest.mark.parametrize(
+    ("case", "downgrade_target", "message"),
+    [
+        ("refund_obligation", "20261019_0044_financial_ledger", "Refund evidence"),
+        ("refund_receipt", "20261019_0044_financial_ledger", "Refund evidence"),
+        ("card_count_absent", "20261019_0045_refund_obligations", "Financial snapshots"),
+        ("card_expected_negative", "20261019_0045_refund_obligations", "Financial snapshots"),
+        ("card_counted_negative", "20261019_0045_refund_obligations", "Financial snapshots"),
+        ("provider_evidence", "20261019_0046_close_counts", "provider evidence"),
+        ("import_manifest", "20261019_0047_payment_terminal", "Financial import evidence"),
+        ("import_progress", "20261019_0047_payment_terminal", "Financial import evidence"),
+    ],
+)
+def test_financial_block_downgrade_guards_preserve_evidence_and_schema(
+    case: str, downgrade_target: str, message: str
+) -> None:
+    with _root_runtime() as (root_config, root_engine):
+        with _temporary_database(root_engine, root_config, "financial_guard") as (config, engine):
+            _upgrade(engine, config, "head")
+            with engine.begin() as connection:
+                assert_authorized_destructive_connection(connection, config)
+                identity = _insert_identity(connection, case)
+                now = datetime.now(UTC)
+                financial_id, entry_id = uuid.uuid4(), uuid.uuid4()
+                owner = _idempotency_result_values(identity)
+                _insert_row(connection, "idempotency_records", owner)
+                context = {
+                    "branch_id": identity["branch"],
+                    "workstation_id": identity["workstation"],
+                    "cash_session_id": identity["cash_session"],
+                    "actor_id": identity["user"],
+                    "currency_code": "MXN",
+                    "context_version": 1,
+                    "source_app": "POS",
+                    "actor_type": "USER",
+                    "operation_id": owner["id"],
+                    "correlation_id": uuid.uuid4(),
+                    "causation_id": uuid.uuid4(),
+                    "request_id": "migration-financial-guard",
+                    "idempotency_key": owner["idempotency_key"],
+                    "operation_code": "migration.validation",
+                    "related_branch_ids": json.dumps([str(identity["branch"])]),
+                    "occurred_at": now,
+                }
+                refund_case = case in {"refund_obligation", "refund_receipt"}
+                refund_payment_id = uuid.uuid4()
+                if refund_case or case in {"provider_evidence", "import_progress"}:
+                    source_id = uuid.uuid4() if refund_case else _insert_sale(connection, identity)
+                    if refund_case:
+                        _insert_row(
+                            connection,
+                            "customer_orders",
+                            {
+                                "id": source_id,
+                                "branch_id": identity["branch"],
+                                "workstation_id_created": identity["workstation"],
+                                "created_by_user_id": identity["user"],
+                                "active_cash_session_id": identity["cash_session"],
+                                "status": "CANCELED",
+                                "customer_name": "Synthetic refund migration fixture",
+                                "requested_for_at": now + timedelta(days=1),
+                                "currency_code": "MXN",
+                                "subtotal_amount": Decimal("12.30"),
+                                "total_amount": Decimal("12.30"),
+                                "advance_amount": Decimal("12.30"),
+                                "remaining_balance_amount": Decimal("0.00"),
+                                "canceled_at": now,
+                                "canceled_by_user_id": identity["user"],
+                                "cancellation_reason": "Synthetic fixture cancellation",
+                                "created_at_utc": now,
+                                "updated_at_utc": now,
+                            },
+                        )
+                    _insert_row(
+                        connection,
+                        "financial_operations",
+                        {
+                            **context,
+                            "id": financial_id,
+                            "kind": "ORDER_REFUND" if refund_case else "SALE_COLLECTION",
+                            "source_type": "ORDER_CANCELLATION"
+                            if case == "refund_obligation"
+                            else "ORDER_PAYMENT"
+                            if case == "refund_receipt"
+                            else "SALE",
+                            "source_id": refund_payment_id
+                            if case == "refund_receipt"
+                            else source_id,
+                            "effect_code": "ORDER_REFUND" if refund_case else "SALE_COLLECTION",
+                            "subject_type": "ORDER" if refund_case else "SALE",
+                            "subject_id": source_id,
+                            "amount_due": Decimal("12.30"),
+                        },
+                    )
+                    if case == "refund_receipt":
+                        _insert_row(
+                            connection,
+                            "financial_entries",
+                            {
+                                **context,
+                                "id": entry_id,
+                                "financial_operation_id": financial_id,
+                                "leg_key": "settled-refund",
+                                "payment_method_code": "CASH",
+                                "direction": "OUT",
+                                "amount": Decimal("12.30"),
+                                "execution_mode": "LOCAL",
+                                "state": "CONFIRMED",
+                                "confirmed_at": now,
+                                "resolution_kind": "LOCAL_CASH",
+                            },
+                        )
+                        _insert_row(
+                            connection,
+                            "customer_order_payments",
+                            {
+                                "id": refund_payment_id,
+                                "customer_order_id": source_id,
+                                "financial_entry_id": entry_id,
+                                "sequence": 1,
+                                "payment_type": "REFUND",
+                                "payment_method_code": "CASH",
+                                "amount": Decimal("12.30"),
+                                "currency_code": "MXN",
+                                "workstation_id": identity["workstation"],
+                                "cash_session_id": identity["cash_session"],
+                                "recorded_by_user_id": identity["user"],
+                                "recorded_at_utc": now,
+                            },
+                        )
+                card_snapshots = {
+                    "card_count_absent": (None, Decimal("12.30"), None),
+                    "card_expected_negative": (Decimal("0"), Decimal("-12.30"), Decimal("12.30")),
+                    "card_counted_negative": (Decimal("-12.30"), Decimal("0"), Decimal("-12.30")),
+                }
+                if case in card_snapshots:
+                    close_id = _insert_cash_close(connection, identity)
+                    counted, expected, variance = card_snapshots[case]
+                    _insert_row(
+                        connection,
+                        "cash_session_close_payment_method_counts",
+                        {
+                            "id": uuid.uuid4(),
+                            "cash_session_close_id": close_id,
+                            "payment_method_code": "CARD",
+                            "currency_code": "MXN",
+                            "counted_amount": counted,
+                            "expected_amount": expected,
+                            "variance_amount": variance,
+                        },
+                    )
+                if case == "provider_evidence":
+                    _insert_row(
+                        connection,
+                        "financial_entries",
+                        {
+                            **context,
+                            "id": entry_id,
+                            "financial_operation_id": financial_id,
+                            "leg_key": "provider-1",
+                            "payment_method_code": "CARD",
+                            "direction": "IN",
+                            "amount": Decimal("12.30"),
+                            "execution_mode": "PROVIDER_INTEGRATED",
+                            "state": "UNKNOWN",
+                        },
+                    )
+                    binding_id, external_id = uuid.uuid4(), uuid.uuid4()
+                    provider = {
+                        "provider_code": "SYNTHETIC",
+                        "environment": "SANDBOX",
+                        "account_reference": "migration-guard-account",
+                    }
+                    _insert_row(
+                        connection,
+                        "payment_terminal_bindings",
+                        {
+                            **provider,
+                            "id": binding_id,
+                            "branch_id": identity["branch"],
+                            "workstation_id": identity["workstation"],
+                            "terminal_reference": "migration-guard-terminal",
+                            "is_active": True,
+                            "contract_evidence_id": uuid.uuid4(),
+                            "hardware_evidence_id": uuid.uuid4(),
+                            "certification_evidence_id": uuid.uuid4(),
+                        },
+                    )
+                    _insert_row(
+                        connection,
+                        "external_payment_operations",
+                        {
+                            **provider,
+                            "id": external_id,
+                            "financial_entry_id": entry_id,
+                            "branch_id": identity["branch"],
+                            "workstation_id": identity["workstation"],
+                            "cash_session_id": identity["cash_session"],
+                            "actor_id": identity["user"],
+                            "terminal_binding_id": binding_id,
+                            "idempotency_record_id": owner["id"],
+                            "operation_type": "CAPTURE",
+                            "status": "UNKNOWN",
+                            "reconciliation_status": "PENDING",
+                            "terminal_reference": "migration-guard-terminal",
+                            "provider_idempotency_key": owner["idempotency_key"],
+                            "amount": Decimal("12.30"),
+                            "currency_code": "MXN",
+                        },
+                    )
+                    _insert_row(
+                        connection,
+                        "external_payment_evidence",
+                        {
+                            **provider,
+                            "id": uuid.uuid4(),
+                            "external_operation_id": external_id,
+                            "branch_id": identity["branch"],
+                            "event_id": "migration-guard-event",
+                            "state": "UNKNOWN",
+                            "fingerprint": "b" * 64,
+                            "occurred_at": now,
+                        },
+                    )
+                if case in {"import_manifest", "import_progress"}:
+                    manifest_id = uuid.uuid4()
+                    _insert_row(
+                        connection,
+                        "financial_import_manifests",
+                        {
+                            "id": manifest_id,
+                            "branch_id": identity["branch"],
+                            "manifest_sha256": "a" * 64,
+                            "evidence": json.dumps({"synthetic_migration_fixture": True}),
+                            "admitted_by_user_id": identity["user"],
+                        },
+                    )
+                    if case == "import_progress":
+                        _insert_row(
+                            connection,
+                            "financial_import_rows",
+                            {
+                                "id": uuid.uuid4(),
+                                "manifest_id": manifest_id,
+                                "branch_id": identity["branch"],
+                                "row_key": "migration-guard-row",
+                                "row_sha256": "b" * 64,
+                                "financial_operation_id": financial_id,
+                                "operation_id": owner["id"],
+                                "reconciliation": json.dumps({"operation_count": 1}),
+                            },
+                        )
+            with engine.connect() as connection:
+                assert_authorized_destructive_connection(connection, config)
+                before = _financial_guard_snapshot(connection)
+            with pytest.raises(DBAPIError, match=message):
+                with engine.connect() as connection:
+                    assert_authorized_destructive_connection(connection, config)
+                    connection.commit()
+                    command.downgrade(_alembic_config(connection, config), downgrade_target)
+            assert _current_revision(engine, config) == CANONICAL_HEAD
+            with engine.connect() as connection:
+                assert_authorized_destructive_connection(connection, config)
+                assert _financial_guard_snapshot(connection) == before
+            _emit(
+                "FINANCIAL_DOWNGRADE_GUARD",
+                {
+                    "case": case,
+                    "starting_revision": CANONICAL_HEAD,
+                    "rejected_target_revision": downgrade_target,
+                    "ending_revision": CANONICAL_HEAD,
+                    "rows_and_schema_preserved": True,
+                    "result": "PASS",
                 },
             )
 

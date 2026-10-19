@@ -16,6 +16,7 @@ import { useAppShellRightPanel } from "../../components/app-shell-right-panel";
 import { CapturedProductLineRow } from "../../components/captured-product-lines";
 import { CatalogSelectionCard } from "../../components/catalog-selection-card";
 import { OrderPaymentHistory } from "./order-payment-history";
+import { RefundSettlementPanel } from "../refunds/refund-settlement-panel";
 import { CatalogVisual } from "../../components/catalog-visual";
 import { OperationalStatus } from "../../components/operational-status";
 import { PosEmptyState, PosErrorState, PosLoadingState } from "../../components/pos-feedback";
@@ -1681,6 +1682,9 @@ function OrdersDecisionPanel({
           </div>
         </div>
         <OrderPaymentHistory payments={orderDetail.payments} />
+        {orderDetail.financial_refund ? (
+          <RefundSettlementPanel key={orderDetail.id} refund={orderDetail.financial_refund} />
+        ) : null}
       </div>
 
       <div className="grid gap-1.5 border-t border-[var(--pos-shell-border)] pt-2">

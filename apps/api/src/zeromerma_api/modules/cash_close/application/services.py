@@ -78,7 +78,6 @@ from zeromerma_api.modules.cash_close.domain.constants import (
     CASH_CLOSE_MODE_WITH_COUNT,
     CASH_CLOSE_PAYMENT_METHOD_CARD,
     CASH_CLOSE_PAYMENT_METHOD_CASH,
-    CASH_CLOSE_PAYMENT_METHOD_MIXED,
     CASH_CLOSE_RECONCILIATION_STATUS_BLOCKED,
     CASH_CLOSE_RECONCILIATION_STATUS_NOT_EVALUATED,
     CASH_CLOSE_RECONCILIATION_STATUS_PENDING,
@@ -121,6 +120,10 @@ from zeromerma_api.modules.corrections.infrastructure.models import (
     CorrectionDocument,
     CorrectionDocumentLine,
 )
+from zeromerma_api.modules.financial_ledger.application.session_queries import (
+    read_session_financials,
+)
+from zeromerma_api.modules.financial_ledger.domain.money import financial_calculation
 from zeromerma_api.modules.idempotency.domain.exceptions import DeterministicRejection
 from zeromerma_api.modules.identity.application.schemas import AuthenticatedUser
 from zeromerma_api.modules.identity.infrastructure.models import User, UserBranchAssignment
@@ -141,10 +144,6 @@ from zeromerma_api.modules.operations.infrastructure.models import (
     OperationDocument,
     OperationDocumentLine,
 )
-from zeromerma_api.modules.orders.application.financial_queries import (
-    order_cash_amounts,
-    read_order_financial_entries,
-)
 from zeromerma_api.modules.outbox.application.service import OutboxWriter
 from zeromerma_api.modules.returns.domain.constants import (
     RETURN_DISPOSITION_RESTOCK_COUNTER,
@@ -152,12 +151,10 @@ from zeromerma_api.modules.returns.domain.constants import (
 )
 from zeromerma_api.modules.returns.infrastructure.models import SaleReturn, SaleReturnLine
 from zeromerma_api.modules.sales.domain.constants import (
-    CASH_MOVEMENT_DIRECTION_IN,
-    CASH_MOVEMENT_DIRECTION_OUT,
     SALE_LINE_PHYSICAL_ATTRIBUTION_PENDING_RECONCILIATION,
     SALE_LINE_PHYSICAL_ATTRIBUTION_RECONCILED,
 )
-from zeromerma_api.modules.sales.infrastructure.models import CashMovement, Sale, SaleLine
+from zeromerma_api.modules.sales.infrastructure.models import Sale, SaleLine
 
 MONEY_QUANTIZER = Decimal("0.01")
 QUANTITY_QUANTIZER = Decimal("0.001")
@@ -174,11 +171,6 @@ PAYMENT_METHOD_CATALOG = (
         CASH_CLOSE_PAYMENT_METHOD_CARD,
         20,
         CASH_CLOSE_PAYMENT_METHOD_CARD in EXPECTED_CASH_CLOSE_PAYMENT_METHOD_CODES,
-    ),
-    (
-        CASH_CLOSE_PAYMENT_METHOD_MIXED,
-        30,
-        CASH_CLOSE_PAYMENT_METHOD_MIXED in EXPECTED_CASH_CLOSE_PAYMENT_METHOD_CODES,
     ),
 )
 
@@ -201,6 +193,8 @@ class CashCloseFinancialSummary:
     cash_order_refunds_amount: Decimal
     cash_order_technical_reversal_amount: Decimal
     expected_cash_amount: Decimal
+    expected_card_amount: Decimal
+    financial_blockers: list[CashCloseIssueView]
     movement_breakdown: list[CashCloseMovementBreakdownView]
 
 
@@ -449,6 +443,8 @@ class CashCloseQueryService:
             counted_cash_amount=None,
             cash_variance_amount=None,
         )
+
+        blockers = _merge_issues(blockers, financial_summary.financial_blockers)
 
         return CashCloseSummaryResponse(
             cash_session=active_cash_session,
@@ -934,6 +930,7 @@ class CashCloseQueryService:
                 close_mode=close_mode,
                 counted_payment_methods=command.counted_payment_methods,
                 expected_cash_amount=financial_summary.expected_cash_amount,
+                expected_card_amount=financial_summary.expected_card_amount,
             )
         )
         cash_variance_amount = (
@@ -952,7 +949,14 @@ class CashCloseQueryService:
             context_state=context_state,
             baseline_snapshot=baseline_snapshot,
         )
+        blockers = _merge_issues(blockers, financial_summary.financial_blockers)
         blockers = _merge_issues(blockers, _build_physical_count_blockers(command))
+        if not has_counted_monetary_input:
+            _append_issue(
+                blockers,
+                code=CASH_CLOSE_BLOCKER_MISSING_COUNTED_PAYMENT_TOTALS,
+                message="Falta capturar el conteo de efectivo para poder cerrar.",
+            )
 
         computation = _compute_reconciliation(
             session,
@@ -1106,8 +1110,6 @@ class CashCloseCommandService:
         session.flush()
 
         for row in prepared.payment_method_rows:
-            if row.counted_amount is None:
-                continue
             session.add(
                 CashSessionClosePaymentMethodCount(
                     cash_session_close_id=close_row.id,
@@ -1491,134 +1493,100 @@ def _build_preview_payment_method_rows(
     close_mode: str,
     counted_payment_methods: Sequence[CashCloseCountedPaymentMethodRequest],
     expected_cash_amount: Decimal,
+    expected_card_amount: Decimal,
 ) -> tuple[list[CashClosePaymentMethodRowView], Decimal | None, bool]:
-    catalog = _get_payment_method_catalog()
     input_amounts: dict[str, Decimal] = {}
-
     for count_row in counted_payment_methods:
-        payment_method_code = count_row.payment_method_code.strip().upper()
-        if payment_method_code in input_amounts:
+        code = count_row.payment_method_code.strip().upper()
+        if code in input_amounts:
+            raise CashCloseValidationError("No se puede repetir un metodo de pago en el conteo.")
+        if code not in VALID_CASH_CLOSE_PAYMENT_METHOD_CODES:
             raise CashCloseValidationError(
-                "No se puede repetir un metodo de pago en el conteo del cierre."
+                f"El metodo de pago {code} no esta disponible para el cierre."
             )
-        if payment_method_code not in VALID_CASH_CLOSE_PAYMENT_METHOD_CODES:
-            raise CashCloseValidationError(
-                f"El metodo de pago {payment_method_code} no esta disponible para el cierre."
-            )
-        input_amounts[payment_method_code] = _quantize_money(count_row.counted_amount)
-
-    preview_rows: list[CashClosePaymentMethodRowView] = []
-    counted_cash_amount: Decimal | None = ZERO_MONEY
-    has_counted_monetary_input = len(input_amounts) > 0
-
-    for catalog_row in catalog:
-        counted_amount = input_amounts.get(catalog_row.payment_method_code, ZERO_MONEY)
-        expected_amount = (
-            expected_cash_amount
-            if catalog_row.payment_method_code in EXPECTED_CASH_CLOSE_PAYMENT_METHOD_CODES
-            else None
+        if code == "CASH" and count_row.counted_amount < ZERO_MONEY:
+            raise CashCloseValidationError("El efectivo contado no puede ser negativo.")
+        input_amounts[code] = _quantize_money(count_row.counted_amount)
+    rows = []
+    for item in _get_payment_method_catalog():
+        counted = input_amounts.get(item.payment_method_code)
+        expected = (
+            expected_cash_amount if item.payment_method_code == "CASH" else expected_card_amount
         )
-        variance_amount = (
-            _quantize_money(counted_amount - expected_amount)
-            if expected_amount is not None
-            else None
-        )
-        preview_rows.append(
+        rows.append(
             CashClosePaymentMethodRowView(
-                payment_method_code=catalog_row.payment_method_code,
-                currency_code=catalog_row.currency_code,
-                display_order=catalog_row.display_order,
-                counted_amount=counted_amount,
-                expected_amount=expected_amount,
-                variance_amount=variance_amount,
-                is_expected_supported=catalog_row.is_expected_supported,
+                payment_method_code=item.payment_method_code,
+                currency_code=item.currency_code,
+                display_order=item.display_order,
+                counted_amount=counted,
+                expected_amount=expected,
+                variance_amount=(counted - expected if counted is not None else None),
+                is_expected_supported=True,
             )
         )
-        if catalog_row.payment_method_code == CASH_CLOSE_PAYMENT_METHOD_CASH:
-            counted_cash_amount = counted_amount
-
-    return preview_rows, counted_cash_amount, has_counted_monetary_input
+    return rows, input_amounts.get("CASH"), "CASH" in input_amounts
 
 
+@financial_calculation
 def _get_financial_summary(
     session: Session,
     *,
     cash_session_id: uuid.UUID,
     opening_amount: Decimal,
 ) -> CashCloseFinancialSummary:
-    records = (
-        session.execute(
-            select(
-                CashMovement.movement_type,
-                CashMovement.direction,
-                CashMovement.currency_code,
-                func.count(CashMovement.id).label("movement_count"),
-                func.coalesce(func.sum(CashMovement.amount), 0).label("total_amount"),
-            )
-            .where(CashMovement.cash_session_id == cash_session_id)
-            .group_by(
-                CashMovement.movement_type,
-                CashMovement.direction,
-                CashMovement.currency_code,
-            )
-            .order_by(CashMovement.direction.asc(), CashMovement.movement_type.asc())
-        )
-        .mappings()
-        .all()
-    )
-
-    total_cash_in = ZERO_MONEY
-    total_cash_out = ZERO_MONEY
-    movement_breakdown: list[CashCloseMovementBreakdownView] = []
-    currency_code = CASH_CLOSE_CURRENCY_MXN
-
-    for record in records:
-        amount = _quantize_money(Decimal(record["total_amount"]))
-        currency_code = record["currency_code"]
-        movement_breakdown.append(
-            CashCloseMovementBreakdownView(
-                movement_type=record["movement_type"],
-                direction=record["direction"],
-                currency_code=record["currency_code"],
-                movement_count=int(record["movement_count"]),
-                total_amount=amount,
-            )
-        )
-        if record["direction"] == CASH_MOVEMENT_DIRECTION_IN:
-            total_cash_in += amount
-        elif record["direction"] == CASH_MOVEMENT_DIRECTION_OUT:
-            total_cash_out += amount
-
-    order_entries = read_order_financial_entries(session, cash_session_ids=(cash_session_id,))
-    order_amounts = order_cash_amounts(order_entries)
-    order_breakdown: dict[tuple[str, str, str], tuple[int, Decimal]] = {}
-    for entry in order_entries:
-        if entry.payment_method_code != "CASH":
+    facts = read_session_financials(session, cash_session_id)
+    grouped: dict[tuple[str, str, str], tuple[int, Decimal]] = {}
+    for operation, entry in facts.entries:
+        if entry.payment_method_code != "CASH" or operation.kind == "CASH_OPENING":
             continue
-        key = (entry.operation_kind, entry.direction, entry.currency_code)
-        count, amount = order_breakdown.get(key, (0, ZERO_MONEY))
-        order_breakdown[key] = count + 1, amount + entry.amount
-    for (kind, direction, currency), (count, amount) in sorted(order_breakdown.items()):
-        movement_breakdown.append(
+        key = (operation.kind, entry.direction, entry.currency_code)
+        count, amount = grouped.get(key, (0, ZERO_MONEY))
+        grouped[key] = count + 1, amount + entry.amount
+    blockers: list[CashCloseIssueView] = []
+    if not facts.opening_valid or facts.opening_amount != opening_amount:
+        _append_issue(
+            blockers,
+            code="FINANCIAL_OPENING_INVALID",
+            message="El fondo inicial no tiene evidencia financiera completa.",
+        )
+    if facts.unresolved_count:
+        _append_issue(
+            blockers,
+            code="UNRESOLVED_FINANCIAL_EFFECT",
+            message="Hay pagos pendientes o inciertos que deben resolverse antes del cierre.",
+        )
+    return CashCloseFinancialSummary(
+        currency_code="MXN",
+        total_cash_in=facts.total_cash_in,
+        total_cash_out=facts.total_cash_out,
+        cash_order_collections_amount=(
+            facts.amount(method="CASH", kind="ORDER_ADVANCE")
+            + facts.amount(method="CASH", kind="ORDER_SETTLEMENT")
+        ),
+        cash_order_refunds_amount=facts.amount(method="CASH", kind="ORDER_REFUND"),
+        cash_order_technical_reversal_amount=sum(
+            (
+                entry.amount if entry.direction == "IN" else -entry.amount
+                for operation, entry in facts.entries
+                if operation.kind == "TECHNICAL_REVERSAL"
+                and operation.subject_type == "ORDER"
+                and entry.payment_method_code == "CASH"
+            ),
+            ZERO_MONEY,
+        ),
+        expected_cash_amount=facts.expected_cash_amount,
+        expected_card_amount=facts.expected_card_amount,
+        financial_blockers=blockers,
+        movement_breakdown=[
             CashCloseMovementBreakdownView(
                 movement_type=kind,
                 direction=direction,
                 currency_code=currency,
                 movement_count=count,
-                total_amount=_quantize_money(amount),
+                total_amount=amount,
             )
-        )
-    total_cash_in += order_amounts["total_cash_in"]
-    total_cash_out += order_amounts["total_cash_out"]
-    return CashCloseFinancialSummary(
-        currency_code=currency_code,
-        total_cash_in=_quantize_money(total_cash_in),
-        total_cash_out=_quantize_money(total_cash_out),
-        cash_order_collections_amount=order_amounts["cash_order_collections_amount"],
-        cash_order_refunds_amount=order_amounts["cash_order_refunds_amount"],
-        cash_order_technical_reversal_amount=order_amounts["cash_order_technical_reversal_amount"],
-        expected_cash_amount=_quantize_money(opening_amount + total_cash_in - total_cash_out),
-        movement_breakdown=movement_breakdown,
+            for (kind, direction, currency), (count, amount) in sorted(grouped.items())
+        ],
     )
 
 
@@ -2837,7 +2805,7 @@ def _build_commit_blockers(
     prepared: CashClosePreparedPreview,
 ) -> list[CashCloseIssueView]:
     blockers = list(prepared.blockers)
-    has_counted_monetary_input = len(command.counted_payment_methods) > 0
+    has_counted_monetary_input = prepared.counted_cash_amount is not None
 
     if not has_counted_monetary_input:
         _append_issue(
@@ -2897,7 +2865,7 @@ def _to_payment_method_rows(
         counted_amount = (
             _quantize_money(Decimal(str(row["counted_amount"])))
             if row is not None and row["counted_amount"] is not None
-            else ZERO_MONEY
+            else None
         )
         expected_amount = (
             _quantize_money(Decimal(str(row["expected_amount"])))
@@ -2914,6 +2882,7 @@ def _to_payment_method_rows(
             else (
                 _quantize_money(counted_amount - expected_cash_amount)
                 if catalog_row.payment_method_code == CASH_CLOSE_PAYMENT_METHOD_CASH
+                and counted_amount is not None
                 else None
             )
         )

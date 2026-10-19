@@ -31,6 +31,10 @@ from zeromerma_api.modules.audit.infrastructure.models import AuditLog
 from zeromerma_api.modules.branches.infrastructure.models import Branch
 from zeromerma_api.modules.cash.infrastructure.models import CashSession
 from zeromerma_api.modules.catalog.infrastructure.models import Product, ProductClass
+from zeromerma_api.modules.financial_ledger.infrastructure.models import (
+    FinancialEntry,
+    FinancialOperation,
+)
 from zeromerma_api.modules.idempotency.application.schemas import IdempotencyResult
 from zeromerma_api.modules.idempotency.domain.exceptions import (
     IdempotencyInProgress,
@@ -130,7 +134,15 @@ def _counts() -> dict[str, int]:
     with SessionLocal() as session:
         result = {
             model.__tablename__: session.scalar(select(func.count()).select_from(model))
-            for model in (Sale, SaleLine, SalePayment, CashMovement, InventoryMovement)
+            for model in (
+                Sale,
+                SaleLine,
+                SalePayment,
+                CashMovement,
+                InventoryMovement,
+                FinancialOperation,
+                FinancialEntry,
+            )
         }
         for model, predicate in (
             (AuditLog, AuditLog.action == "sale.confirmed"),
@@ -166,7 +178,9 @@ def test_retries_recover_exact_sale_and_ticket_without_repeating_effects(
         "sales": 1,
         "sale_lines": 2,
         "sale_payments": len(body["payments"]),
-        "cash_movements": int(payment != "CARD"),
+        "cash_movements": 0,
+        "financial_operations": 1,
+        "financial_entries": len(body["payments"]),
         "inventory_movements": 0,
         "audit_log": 1,
         "outbox_events": 1,
