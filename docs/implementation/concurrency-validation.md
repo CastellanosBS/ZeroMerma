@@ -128,6 +128,8 @@ clean checkout, archive digests and source fingerprints for delivered CI evidenc
 | Cash boundary, run `36ebda8e0fd54ca880188fac8655e863` | 28 passed, 0 failures/errors/skips; 153.603 s: 25 dedicated cases and 3 prior sale/order/return concurrency regressions | `.tmp/validation-published/cash-boundary-final/acceptance.xml` |
 | Complementary cash coverage, run `2477bae112a34428b6a5552d1143cb42` | 14 passed, 0 failures/errors/skips; 65.469 s: 4 new CARD operational cases and 10 prior CASH/close/FK-reservation cases | `.tmp/validation-published/cash-boundary-operational/acceptance.xml` |
 | Transient command conflicts, run `053f9720f7b640a0941b1bdf63b7e506` | 9 passed, 0 failures/errors/skips; 23.756 s; edited working tree | `.tmp/validation-published/concurrency/053f9720f7b640a0941b1bdf63b7e506/concurrency.xml` and `result.json` |
+| Full shared-executor regression, run `ee3bea92f2f6491cae64f078eeb6458a` | 49 passed, 0 failures/errors/skips; 108.762 s | `.tmp/validation-published/concurrency-executor/acceptance.xml` |
+| Shared-document regression across independent cash contexts, run `31f4cfe05ec74a35b749b254e0709de9` | 6 passed, 0 failures/errors/skips; 36.547 s: 2 return, 3 POS order and 1 cross-surface order case | `.tmp/validation-published/document-lock-coverage/acceptance.xml` |
 | API-client coordinator | 29 tests passed; lint and typecheck passed | Local execution reported by the implementation owner |
 | Repository Ruff | Passed | `uv run ruff check .` |
 | API and worker mypy | 352 source files passed | `uv run mypy apps/api/src apps/worker/src` |
@@ -157,3 +159,21 @@ suites; those repeated cases must not be added to the unique total.
 
 No production load, deployment, backup/restore or external-device acceptance is
 implied by these bounded local concurrency tests.
+
+The shared-executor regression updates the prior raw-DBAPI-error expectations for
+serialization/deadlock aborts to `CommandConcurrencyConflict`, verifies the original
+SQLSTATE in the cause, proves full rollback and retries the same key successfully.
+An unrelated connection termination still propagates its database error. The
+reservation timeout test checks restoration of the 5-second business budget before
+the action; the dedicated command suite separately verifies restoration of the
+caller's prior setting after success and replay. The complete 49-case rerun passed
+after correcting these expectations; the preceding run had 48 passes and one
+obsolete timeout assertion and is not acceptance evidence.
+
+The six shared-document cases strengthen prior coverage without adding new test
+counts. POS competitors use distinct cash sessions, workstations and users in the
+same branch against one sale or customer order, so the cash boundary cannot mask
+the document lock. PostgreSQL must report the exact winning backend as the blocker;
+the original effect, entitlement and state-conflict assertions remain in place.
+The focused JUnit records the passing outcomes but does not retain passing-test
+stdout; it is not substituted for the combined runner's captured PID/XID evidence.

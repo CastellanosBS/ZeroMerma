@@ -30,6 +30,7 @@ from zeromerma_api.db.access_scope import bind_authorization_scope
 from zeromerma_api.db.session import SessionLocal
 from zeromerma_api.main import create_app
 from zeromerma_api.modules.audit.infrastructure.models import AuditLog
+from zeromerma_api.modules.branches.infrastructure.models import Workstation
 from zeromerma_api.modules.cash.infrastructure.models import CashSession
 from zeromerma_api.modules.catalog.infrastructure.models import Product, ProductClass
 from zeromerma_api.modules.idempotency.application.schemas import IdempotencyResult
@@ -61,6 +62,7 @@ from zeromerma_api.modules.returns.domain.exceptions import SaleReturnConflictEr
 from zeromerma_api.modules.returns.infrastructure.models import SaleReturn, SaleReturnLine
 from zeromerma_api.modules.sales.infrastructure.models import CashMovement, Sale, SaleLine
 from zeromerma_api.testing.authorization import owner_headers
+from zeromerma_api.testing.concurrency import transaction_probe, wait_until_blocked
 from zeromerma_api.testing.idempotency import new_idempotency_key
 from zeromerma_api.testing.sessions import login_headers
 from zeromerma_api.testing.transfer_operators import transfer_cashier_email
@@ -772,14 +774,55 @@ def test_competing_partial_returns_recalculate_remaining_right_under_real_postgr
     monkeypatch: pytest.MonkeyPatch,
     quantity: str,
 ) -> None:
+    """Separate cash rows leave the shared sale entitlement as the contested boundary."""
     headers, body, _ = _setup(client)
     body["lines"][0]["returned_quantity"] = quantity
+    rival_station = "POS-RETURN-RACE-02"
+    with SessionLocal() as session:
+        first_cash = session.get(CashSession, UUID(body["cash_session_id"]))
+        assert first_cash is not None
+        session.add(
+            Workstation(
+                branch_id=first_cash.branch_id,
+                code=rival_station,
+                name="Concurrent return workstation",
+            )
+        )
+        session.commit()
+    rival_headers = login_headers(
+        client,
+        email=transfer_cashier_email(rival_station),
+        password=SEED_USER_PASSWORD,
+        audience="POS",
+        workstation_code=rival_station,
+    )
+    opened = client.post(
+        "/v1/cash-sessions/open",
+        headers={**rival_headers, "Idempotency-Key": new_idempotency_key()},
+        json={"workstation_code": rival_station, "opening_amount": "200.00"},
+    )
+    assert opened.status_code == 201
+    rival_body = {
+        **deepcopy(body),
+        "workstation_code": rival_station,
+        "cash_session_id": opened.json()["id"],
+    }
+    with SessionLocal() as session:
+        first_cash = session.get(CashSession, UUID(body["cash_session_id"]))
+        rival_cash = session.get(CashSession, UUID(rival_body["cash_session_id"]))
+        assert first_cash is not None and rival_cash is not None
+        assert first_cash.branch_id == rival_cash.branch_id
+        assert first_cash.id != rival_cash.id
+        assert first_cash.workstation_id != rival_cash.workstation_id
+        assert first_cash.user_id != rival_cash.user_id
     held, release, entered, pid = Event(), Event(), Event(), {}
+    blocker_pid: dict[str, int] = {}
     append = OutboxWriter.append
 
     def hold(self: OutboxWriter, session: Any, **kwargs: Any) -> Any:
         result = append(self, session, **kwargs)
         if kwargs["event_name"] == "sale_return.committed.v1" and not held.is_set():
+            blocker_pid["pid"] = transaction_probe(session).backend_pid
             held.set()
             assert release.wait(timeout=20)
         return result
@@ -790,18 +833,15 @@ def test_competing_partial_returns_recalculate_remaining_right_under_real_postgr
         try:
             assert held.wait(timeout=15)
             second = pool.submit(
-                _domain, headers, body, new_idempotency_key(), backend_pid=pid, entered=entered
+                _domain,
+                rival_headers,
+                rival_body,
+                new_idempotency_key(),
+                backend_pid=pid,
+                entered=entered,
             )
             assert entered.wait(timeout=10)
-            deadline, blocked = monotonic() + 10, False
-            while monotonic() < deadline:
-                with SessionLocal() as probe:
-                    blocked = bool(probe.scalar(select(func.pg_blocking_pids(pid["pid"]))))
-                if blocked:
-                    break
-                assert not second.done()
-                Event().wait(0.025)
-            assert blocked, "The rival must wait on the original sale's transaction"
+            wait_until_blocked(pid["pid"], blocker_pid["pid"])
         finally:
             release.set()
         assert first.result(timeout=15).status_code == 201

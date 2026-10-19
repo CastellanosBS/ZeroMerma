@@ -98,8 +98,9 @@ The executor owns the transaction. The sale action can flush but cannot commit
 independently. Sale, sale lines, sale payments, cash movements, `sale.confirmed`
 audit, the sale outbox event and the terminal idempotency result succeed or roll
 back together. Audit and outbox preserve the durable operation identity separately
-from the HTTP attempt's request ID. This adoption does not implement the pending
-canonical inventory ledger or the separate sale-versus-close locking task.
+from the HTTP attempt's request ID. The canonical inventory ledger remains pending;
+ZM-FIN-036–038 implements the sale-versus-close boundary described in
+[concurrency.md](concurrency.md).
 
 The existing authentication boundary locks the user and authentication session.
 Concurrent HTTP requests for that same user can therefore serialize before sale
@@ -259,12 +260,14 @@ result; a new intention resolves its current context again.
 
 ## Concurrency and external outcomes
 
-Requests compete only for the same key using the unique index. The executor uses
+Idempotency reservations compete for the same key using the unique index. The executor uses
 a transaction-local lock timeout for reservation, restores the previous timeout,
 and translates contention to `409 IDEMPOTENCY_IN_PROGRESS` with `Retry-After: 1`.
 Its default wait is one second; this is a technical bound, not a declared business
-SLA. Different keys, unrelated
-commands and independent branches must progress concurrently. There is no global
+SLA. Different keys do not share a reservation lock, but commands that touch the
+same cash session, business document or inventory balance still serialize under
+the [domain concurrency protocol](concurrency.md). Independent write sets can
+progress concurrently. There is no global
 queue, lock by operation code, human approval or external dependency on the
 synchronous internal-command path.
 
@@ -348,8 +351,9 @@ its bound POS sessions, historical recovery uses a fresh valid login without
 opening another shift. Browser metadata cannot recreate an economic body after
 reload; no replacement key is generated automatically for an unknown outcome.
 
-This adoption does not apply the cash lock to all other economic commands or
-release the hidden operational-discount UI. Its executed evidence and remaining
+ZM-FIN-036–038 extends this cash boundary to sale, POS order and return actions,
+as described in [concurrency.md](concurrency.md). The operational-discount UI
+remains hidden. The original four-command adoption's evidence and remaining
 boundaries are recorded in
 [the cash validation record](../implementation/cash-idempotency-validation.md).
 

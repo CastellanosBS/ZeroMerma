@@ -9,7 +9,7 @@ from decimal import Decimal
 from http.cookies import SimpleCookie
 from statistics import median
 from threading import Barrier, Event
-from time import monotonic, perf_counter
+from time import perf_counter
 from typing import Any
 from uuid import UUID, uuid4
 
@@ -29,6 +29,7 @@ from zeromerma_api.db.access_scope import bind_authorization_scope
 from zeromerma_api.db.session import SessionLocal
 from zeromerma_api.main import create_app
 from zeromerma_api.modules.audit.infrastructure.models import AuditLog
+from zeromerma_api.modules.branches.infrastructure.models import Workstation
 from zeromerma_api.modules.cash.infrastructure.models import CashSession
 from zeromerma_api.modules.catalog.infrastructure.models import Product
 from zeromerma_api.modules.idempotency.application.schemas import IdempotencyResult
@@ -72,6 +73,7 @@ from zeromerma_api.modules.outbox.application.service import OutboxWriter
 from zeromerma_api.modules.outbox.infrastructure.models import OutboxEvent
 from zeromerma_api.modules.sales.infrastructure.models import CashMovement
 from zeromerma_api.testing.authorization import owner_headers
+from zeromerma_api.testing.concurrency import transaction_probe, wait_until_blocked
 from zeromerma_api.testing.idempotency import new_idempotency_key
 from zeromerma_api.testing.sessions import login_headers
 from zeromerma_api.testing.transfer_operators import transfer_cashier_email
@@ -852,6 +854,7 @@ def test_same_key_contention_and_uncommitted_recovery_are_bounded(
 def test_order_lock_serializes_competing_payments_and_cross_surface_transitions(
     client: TestClient, monkeypatch: pytest.MonkeyPatch, winner: str, rival: str, rival_surface: str
 ) -> None:
+    """Distinct POS cash rows cannot substitute for the shared customer-order lock."""
     headers, create = _setup(client)
     if rival_surface == "BACKOFFICE":
         create["advance_amount"] = "34.00"
@@ -868,15 +871,43 @@ def test_order_lock_serializes_competing_payments_and_cross_surface_transitions(
     )
     cancel = {**context, "cancellation_reason": "Concurrent cancellation requested"}
     winner_body = deliver if winner == "deliver" else cancel
-    rival_body = (deliver if rival == "deliver" else cancel) if rival_surface == "POS" else {}
-    rival_headers = headers if rival_surface == "POS" else owner_headers()
+    if rival_surface == "POS":
+        rival_station = "POS-ORDER-RACE-02"
+        with SessionLocal() as session:
+            first_cash = session.get(CashSession, UUID(create["cash_session_id"]))
+            assert first_cash is not None
+            session.add(
+                Workstation(
+                    branch_id=first_cash.branch_id,
+                    code=rival_station,
+                    name="Concurrent order workstation",
+                )
+            )
+            session.commit()
+        rival_headers, rival_create = _setup(client, rival_station)
+        rival_body = {
+            **(deliver if rival == "deliver" else cancel),
+            **_context(rival_create),
+        }
+        with SessionLocal() as session:
+            first_cash = session.get(CashSession, UUID(create["cash_session_id"]))
+            rival_cash = session.get(CashSession, UUID(rival_create["cash_session_id"]))
+            assert first_cash is not None and rival_cash is not None
+            assert first_cash.branch_id == rival_cash.branch_id
+            assert first_cash.id != rival_cash.id
+            assert first_cash.workstation_id != rival_cash.workstation_id
+            assert first_cash.user_id != rival_cash.user_id
+    else:
+        rival_headers, rival_body = owner_headers(), {}
     held, release, entered = Event(), Event(), Event()
     rival_pid: dict[str, int] = {}
+    blocker_pid: dict[str, int] = {}
     before, original = _counts(), OutboxWriter.append
 
     def hold(self: OutboxWriter, session: Any, **kwargs: Any) -> Any:
         result = original(self, session, **kwargs)
         if kwargs["event_name"] == f"order.{EVENTS[winner]}.v1" and not held.is_set():
+            blocker_pid["pid"] = transaction_probe(session).backend_pid
             held.set()
             assert release.wait(timeout=20)
         return result
@@ -900,15 +931,7 @@ def test_order_lock_serializes_competing_payments_and_cross_surface_transitions(
                 entered=entered,
             )
             assert entered.wait(timeout=10)
-            deadline, blocked = monotonic() + 10, False
-            while monotonic() < deadline:
-                with SessionLocal() as probe:
-                    blocked = bool(probe.scalar(select(func.pg_blocking_pids(rival_pid["pid"]))))
-                if blocked:
-                    break
-                assert not second.done(), "The rival must wait for the order's transaction"
-                Event().wait(0.025)
-            assert blocked, "PostgreSQL must report actual transaction lock contention"
+            wait_until_blocked(rival_pid["pid"], blocker_pid["pid"])
         finally:
             release.set()
         assert first.result(timeout=15).status_code == 200

@@ -31,6 +31,7 @@ from zeromerma_api.bootstrap.seed_local import (
     SEED_WORKSTATION_CODE,
 )
 from zeromerma_api.db.access_scope import bind_authorization_scope
+from zeromerma_api.db.concurrency import CommandConcurrencyConflict
 from zeromerma_api.db.session import SessionLocal, get_session
 from zeromerma_api.main import create_app
 from zeromerma_api.modules.audit.application.service import AuditRecorder
@@ -592,7 +593,7 @@ def test_domain_cannot_own_the_transaction_boundary(method: str) -> None:
     assert_effects(0)
 
 
-def test_executor_restores_connection_lock_timeout() -> None:
+def test_executor_restores_command_timeout_after_key_reservation() -> None:
     context = context_for()
     observed: list[str] = []
     with SessionLocal() as session:
@@ -612,7 +613,8 @@ def test_executor_restores_connection_lock_timeout() -> None:
             action=action,
             response_policy=ResponsePolicy(snapshot_model=ProbeSnapshot),
         )
-    assert observed == ["7s"]
+    # The key reservation restores the business command budget before the action.
+    assert observed == ["5s"]
 
 
 def test_persisted_record_contains_no_original_payload_or_session_credential() -> None:
@@ -865,8 +867,10 @@ def test_postgres_transient_failure_after_writes_releases_the_key(sqlstate: str)
         session.execute(text(statement[sqlstate]))
         return outcome
 
-    with pytest.raises(DBAPIError):
+    with pytest.raises(CommandConcurrencyConflict) as failure:
         execute_probe(key, context, action=interrupted)
+    assert isinstance(failure.value.__cause__, DBAPIError)
+    assert failure.value.__cause__.orig.sqlstate == sqlstate
     assert_effects(0)
     execute_probe(key, context)
     assert_effects(1)
