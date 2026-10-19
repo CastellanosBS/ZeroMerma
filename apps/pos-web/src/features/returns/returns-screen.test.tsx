@@ -411,13 +411,15 @@ vi.mock("../../components/app-shell-right-panel", () => ({
   },
 }));
 
-vi.mock("../auth/auth-store", () => ({
-  usePosAuthStore: Object.assign(
-    (selector: (state: { isAuthenticated: boolean }) => unknown) =>
-      selector({ isAuthenticated: true }),
-    { subscribe: vi.fn(() => () => undefined) },
-  ),
-}));
+vi.mock("../auth/auth-store", () => {
+  const state = { isAuthenticated: true, generation: 0, user: null, session: null };
+  return {
+    usePosAuthStore: Object.assign(
+      (selector?: (value: typeof state) => unknown) => selector ? selector(state) : state,
+      { getState: () => state, subscribe: vi.fn(() => () => undefined) },
+    ),
+  };
+});
 
 vi.mock("../cash-session-open/queries", () => ({
   useCurrentCashSessionQuery: () => ({

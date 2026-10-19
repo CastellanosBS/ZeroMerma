@@ -69,6 +69,15 @@ implementation, not final hosted acceptance.
 |Contracts and operation registry|Foundation Contracts passed, run `9c3f608495eb47229f237cb889951b76`: 112 tests; 287 generated API operations; zero unknown operations, unjustified raw API calls or handwritten contract types.|
 |Validation evidence publication|15 existing Foundation/publication tests passed after adding an optional migration JUnit report. The earlier full migration diagnostic failed without individual published cases; focused corrections passed, but only the final full run can resolve that diagnostic.|
 
+Hosted run `39331588486` for commit `f2923a3` passed the full migration suite
+(34/34), Contracts, Worker, Preflight, Negative and the 19 real browser scenarios.
+This resolves the earlier incomplete migration diagnostic. Web exposed three stale
+authentication mocks in the return-screen tests; the mock now follows the actual
+optional-selector/getState API, with 17 related tests passing. That run is diagnostic,
+not final acceptance: the corrected commit must pass the complete Foundation workflow.
+The corrected full local Web stage passed in run `c65704e8d8cb4bc0912db7e70aede658`,
+including lint, TypeScript, all unit tests, both builds and 16 mocked browser scenarios.
+
 ## Operational information still needed
 
 1. Choose the branch production commitment lead time. The Backoffice form accepts
