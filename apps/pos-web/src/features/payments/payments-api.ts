@@ -70,18 +70,15 @@ export function getPaymentDetail({
 export function createPayment({
   idempotencyKey,
   payload,
-  requestId,
 }: {
   idempotencyKey: string;
   payload: CreateOperationalPaymentRequest;
-  requestId: string;
 }): Promise<OperationalPaymentCommitResultView> {
   return requestJson<OperationalPaymentCommitResultView>({
     body: payload,
     method: "POST",
     path: "/v1/payments",
     headers: {
-      "X-Request-ID": requestId,
       "Idempotency-Key": idempotencyKey,
     },
   });

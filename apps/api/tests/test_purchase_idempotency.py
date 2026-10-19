@@ -157,7 +157,14 @@ def test_purchase_replay_recovery_and_private_snapshot(client: TestClient, code:
     assert result.status_code == (201 if code in {"create", "direct-entry"} else 200)
     assert result.headers["Idempotency-Replayed"] == "false"
     effects = _effects()
-    replay = _post(client, code, {**headers, "X-Request-ID": "new-attempt"}, body, key, purchase_id)
+    replay = _post(
+        client,
+        code,
+        {**headers, "X-Request-ID": "69c557b2-ba73-5788-ae47-6c728571a809"},
+        body,
+        key,
+        purchase_id,
+    )
     assert replay.status_code == result.status_code
     assert replay.json() == result.json()
     assert replay.headers["Idempotency-Replayed"] == "true"

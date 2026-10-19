@@ -41,6 +41,7 @@ from zeromerma_api.modules.idempotency.application.schemas import (
 )
 from zeromerma_api.modules.idempotency.application.service import IdempotencyExecutor
 from zeromerma_api.presentation.errors import install_error_handlers
+from zeromerma_api.presentation.operation_context import OperationContextMiddleware
 from zeromerma_api.testing.concurrency import (
     TransactionProbe,
     transaction_probe,
@@ -201,13 +202,16 @@ def test_only_known_transaction_abort_codes_are_retryable(error_type: type[Excep
 def test_retryable_http_conflict_uses_canonical_safe_error_contract() -> None:
     app = FastAPI()
     install_error_handlers(app)
+    app.add_middleware(OperationContextMiddleware)
 
     @app.get("/conflict")
     def conflict() -> None:
         raise CommandConcurrencyConflict() from RuntimeError("private SQL and parameters")
 
     with TestClient(app) as client:
-        response = client.get("/conflict", headers={"X-Request-ID": "concurrency-probe"})
+        response = client.get(
+            "/conflict", headers={"X-Request-ID": "e1232bb2-ae23-55d0-94ce-159ce7c484e1"}
+        )
     assert response.status_code == 409
     assert response.headers["Cache-Control"] == "no-store"
     assert response.headers["Retry-After"] == "1"
@@ -215,7 +219,7 @@ def test_retryable_http_conflict_uses_canonical_safe_error_contract() -> None:
         "code": "CONCURRENCY_RETRY",
         "message": CommandConcurrencyConflict.message,
         "details": {"retryable": True},
-        "request_id": "concurrency-probe",
+        "request_id": "e1232bb2-ae23-55d0-94ce-159ce7c484e1",
         "field_errors": None,
     }
     assert "private" not in response.text

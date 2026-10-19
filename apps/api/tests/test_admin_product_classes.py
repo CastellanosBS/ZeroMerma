@@ -116,7 +116,7 @@ def test_admin_product_class_create_product_direct_persists_and_audits(
     brand_id = _get_brand_id(SEED_BRAND_EL_MEJOR_PAN_CODE)
     response = client.post(
         "/v1/admin/product-classes",
-        headers={**_admin_headers(client), "X-Request-ID": "admin-class-direct-create-test"},
+        headers={**_admin_headers(client), "X-Request-ID": "58bc495a-005b-5c88-973e-c08b3f39bf3a"},
         json={
             "brand_id": brand_id,
             "code": "ADMIN-DIRECT-TEST",
@@ -149,7 +149,7 @@ def test_admin_product_class_create_product_direct_persists_and_audits(
         ).scalar_one()
 
     assert audit_record.action == "admin.product_class.created"
-    assert audit_record.request_id == "admin-class-direct-create-test"
+    assert audit_record.request_id == "58bc495a-005b-5c88-973e-c08b3f39bf3a"
     assert outbox_event.event_name == "admin.product_class.created.v1"
 
 
@@ -249,7 +249,7 @@ def test_admin_product_class_patch_updates_status_order_and_audit(
     class_id = _get_product_class_id(SEED_PRODUCT_CLASS_BEBIDAS_CODE)
     response = client.patch(
         f"/v1/admin/product-classes/{class_id}",
-        headers={**_admin_headers(client), "X-Request-ID": "admin-class-update-test"},
+        headers={**_admin_headers(client), "X-Request-ID": "d778403b-9506-5b19-81d6-982e7ed30dbe"},
         json={
             "display_order": 777,
             "status": "inactive",
@@ -282,5 +282,5 @@ def test_admin_product_class_patch_updates_status_order_and_audit(
 
     assert product_class.display_order == 777
     assert product_class.is_active is False
-    assert audit_record.request_id == "admin-class-update-test"
+    assert audit_record.request_id == "d778403b-9506-5b19-81d6-982e7ed30dbe"
     assert outbox_event.aggregate_id == str(product_class.id)

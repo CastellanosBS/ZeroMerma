@@ -123,7 +123,7 @@ def test_open_cash_session_writes_audit_and_outbox_and_exposes_current_session(
         "/v1/cash-sessions/open",
         headers={
             **_authorization_header(client),
-            "X-Request-ID": "phase-1a-open-session",
+            "X-Request-ID": "aa72f502-17ac-5181-a575-00090f0744a2",
             "Idempotency-Key": new_idempotency_key(),
         },
         json={
@@ -155,7 +155,7 @@ def test_open_cash_session_writes_audit_and_outbox_and_exposes_current_session(
         ).scalar_one()
 
     assert audit_record.action == "cash_session.opened"
-    assert audit_record.request_id == "phase-1a-open-session"
+    assert audit_record.request_id == "aa72f502-17ac-5181-a575-00090f0744a2"
     assert audit_record.metadata_["workstation_code"] == SEED_WORKSTATION_CODE
     assert outbox_event.event_name == "cash.session.opened.v1"
     assert outbox_event.payload["cash_session_id"] == payload["id"]

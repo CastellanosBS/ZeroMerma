@@ -118,7 +118,7 @@ def test_class_capture_sale_confirmation_writes_sale_payment_cash_movement_audit
     _open_cash_session(client)
     headers = {
         **_authorization_header(client),
-        "X-Request-ID": "phase-2a-class-capture",
+        "X-Request-ID": "e820f01b-c850-5472-889c-4e6570b14467",
     }
 
     cash_session_id = current_cash_session_id(
@@ -182,7 +182,7 @@ def test_class_capture_sale_confirmation_writes_sale_payment_cash_movement_audit
 
     assert Decimal(str(payment_record.applied_amount)) == Decimal("24.00")
     assert Decimal(str(cash_movement_record.amount)) == Decimal("24.00")
-    assert audit_record.request_id == "phase-2a-class-capture"
+    assert audit_record.request_id == "e820f01b-c850-5472-889c-4e6570b14467"
     assert audit_record.resource_id == payload["id"]
     assert outbox_event.payload["sale_id"] == payload["id"]
 

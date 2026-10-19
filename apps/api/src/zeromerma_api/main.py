@@ -11,6 +11,7 @@ from zeromerma_api.modules.idempotency.presentation.http import install_idempote
 from zeromerma_api.presentation.api import api_router
 from zeromerma_api.presentation.contracts import install_contract_openapi
 from zeromerma_api.presentation.errors import error_responses, install_error_handlers
+from zeromerma_api.presentation.operation_context import OperationContextMiddleware
 
 
 def _build_allowed_origins(settings: ApiSettings) -> list[str]:
@@ -43,7 +44,7 @@ def create_app() -> FastAPI:
             "X-Request-ID",
             "Idempotency-Key",
         ],
-        expose_headers=["Idempotency-Replayed", "Retry-After"],
+        expose_headers=["Idempotency-Replayed", "Retry-After", "X-Request-ID", "X-Correlation-ID"],
     )
 
     app.include_router(api_router)
@@ -56,6 +57,7 @@ def create_app() -> FastAPI:
     install_error_handlers(app)
     install_idempotency_error_handler(app)
     install_security_boundary(app, settings)
+    app.add_middleware(OperationContextMiddleware)
     install_contract_openapi(app)
     return app
 

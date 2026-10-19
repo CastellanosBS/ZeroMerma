@@ -25,6 +25,7 @@ from zeromerma_api.modules.cash.application.services import CashSessionQueryServ
 from zeromerma_api.modules.identity.application.schemas import AuthenticatedUser
 from zeromerma_api.modules.identity.infrastructure.models import User
 from zeromerma_api.modules.operations.domain.constants import BRANCH_BRAND_MAPPING
+from zeromerma_api.modules.outbox.application.service import OutboxWriter
 from zeromerma_api.modules.returns.infrastructure.models import SaleReturn, SaleReturnLine
 from zeromerma_api.modules.sales.application.schemas import SaleDetailView
 from zeromerma_api.modules.sales.application.services import SaleQueryService
@@ -42,6 +43,7 @@ from zeromerma_api.modules.tickets.application.schemas import (
 )
 from zeromerma_api.modules.tickets.domain.constants import (
     AUDIT_ACTION_TICKET_REPRINTED,
+    OUTBOX_EVENT_TICKET_REPRINTED_V1,
     TICKET_RESOURCE_TYPE,
     TICKET_RETURN_STATUS_FULLY_RETURNED,
     TICKET_RETURN_STATUS_NOT_RETURNED,
@@ -184,21 +186,29 @@ class TicketsQueryService:
             current_cash_session_id=current_open_cash_session.id,
         )
         sale_statement = _apply_search_filters(sale_statement, normalized_query)
-        sale_rows = session.execute(
-            sale_statement.order_by(Sale.confirmed_at.desc()).limit(MAX_TICKETS_PER_LIST)
-        ).mappings().all()
+        sale_rows = (
+            session.execute(
+                sale_statement.order_by(Sale.confirmed_at.desc()).limit(MAX_TICKETS_PER_LIST)
+            )
+            .mappings()
+            .all()
+        )
 
         sale_ids = [row["id"] for row in sale_rows]
-        payment_rows = session.execute(
-            select(
-                SalePayment.sale_id,
-                SalePayment.payment_method_code,
-                SalePayment.applied_amount,
-                SalePayment.currency_code,
+        payment_rows = (
+            session.execute(
+                select(
+                    SalePayment.sale_id,
+                    SalePayment.payment_method_code,
+                    SalePayment.applied_amount,
+                    SalePayment.currency_code,
+                )
+                .where(SalePayment.sale_id.in_(sale_ids))
+                .order_by(SalePayment.sale_id.asc(), SalePayment.sequence.asc())
             )
-            .where(SalePayment.sale_id.in_(sale_ids))
-            .order_by(SalePayment.sale_id.asc(), SalePayment.sequence.asc())
-        ).mappings().all()
+            .mappings()
+            .all()
+        )
         payment_summary_by_sale: dict[uuid.UUID, list[TicketPaymentSummaryView]] = {}
         for record in payment_rows:
             payment_summary_by_sale.setdefault(record["sale_id"], []).append(
@@ -272,11 +282,13 @@ class TicketsCommandService:
         cash_session_query: CashSessionQueryService | None = None,
         sale_query_service: SaleQueryService | None = None,
         audit_recorder: AuditRecorder | None = None,
+        outbox_writer: OutboxWriter | None = None,
     ) -> None:
         self._workstation_access = workstation_access or WorkstationAccessService()
         self._cash_session_query = cash_session_query or CashSessionQueryService()
         self._sale_query_service = sale_query_service or SaleQueryService()
         self._audit_recorder = audit_recorder or AuditRecorder()
+        self._outbox_writer = outbox_writer or OutboxWriter()
 
     @rollback_on_failure
     def reprint_ticket(
@@ -293,7 +305,7 @@ class TicketsCommandService:
             user_id=current_user.id,
             workstation_code=workstation_code,
         )
-        _require_open_cash_session(
+        cash_session = _require_open_cash_session(
             session,
             cash_session_query=self._cash_session_query,
             current_user=current_user,
@@ -316,11 +328,24 @@ class TicketsCommandService:
             resource_id=str(ticket_id),
             branch_id=context.branch_id,
             request_id=request_id,
+            workstation_id=context.workstation_id,
+            cash_session_id=cash_session.id,
             metadata={
                 "ticket_id": str(ticket_id),
                 "folio": _build_ticket_folio(ticket_id),
                 "workstation_code": workstation_code,
             },
+        )
+        self._outbox_writer.append(
+            session,
+            aggregate_type=TICKET_RESOURCE_TYPE,
+            aggregate_id=str(ticket_id),
+            event_name=OUTBOX_EVENT_TICKET_REPRINTED_V1,
+            actor_id=current_user.id,
+            branch_id=context.branch_id,
+            workstation_id=context.workstation_id,
+            cash_session_id=cash_session.id,
+            payload={"ticket_id": str(ticket_id)},
         )
         response = _to_ticket_detail_response(
             sale_detail,
@@ -401,9 +426,7 @@ def _require_open_cash_session(
             "Necesitas una caja abierta en esta estacion para consultar tickets."
         )
     if current_open_cash_session.user_id != current_user.id:
-        raise TicketConflictError(
-            "La caja abierta de esta estacion pertenece a otro cajero."
-        )
+        raise TicketConflictError("La caja abierta de esta estacion pertenece a otro cajero.")
     if (
         current_open_cash_session.branch_id != context.branch_id
         or current_open_cash_session.workstation_id != context.workstation_id

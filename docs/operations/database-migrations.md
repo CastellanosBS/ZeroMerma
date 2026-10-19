@@ -3,7 +3,7 @@
 ## Authority and safety boundary
 
 The canonical Alembic chain is `0001_foundation_schema` through
-`20260520_0039_system_settings`. PostgreSQL 16 is the supported validation engine. Migration tests
+`20261018_0043_operation_context`. PostgreSQL 16 is the supported validation engine. Migration tests
 must run through `scripts/dev/run-migration-validation.ps1`, which reuses the ZM-FIN-005 ephemeral
 PostgreSQL harness and its preconnect and postconnect guards. A migration validation run must never
 use the local Compose database, staging, production, `zeromerma-postgres`,
@@ -86,6 +86,27 @@ can reject existing rows. Lock risk is qualitative; it is not a production timin
 | 37 | `20260520_0037_admin_users` | `20260520_0036_incidents` | user fields and deterministic assignment backfills | Yes | No | High | Lossy |
 | 38 | `20260520_0038_roles_permissions` | `20260520_0037_admin_users` | role, permission, and assignment tables | No | No | Low | Lossy |
 | 39 | `20260520_0039_system_settings` | `20260520_0038_roles_permissions` | settings/history tables and index | No | No | Medium | Lossy |
+| 40 | `20260912_0040_authorization` | `20260520_0039_system_settings` | explicit assignment scopes, permission catalog, privileged lifecycle and migration evidence | Yes | Yes | High | Rejected; roll-forward/restore |
+| 41 | `20261018_0041_auth_sessions` | `20260912_0040_authorization` | opaque sessions, rate/reset state and authentication audit/revocation triggers | No | No | Medium | Lossy |
+| 42 | `20261018_0042_idempotency` | `20261018_0041_auth_sessions` | durable command identities, immutable results and deferred terminal-state guard | No | No | Medium | Rejected when identities exist |
+| 43 | `20261018_0043_operation_context` | `20261018_0042_idempotency` | typed audit/outbox context, correlation indexes and contextual authentication trigger | Yes | No | High | Rejected when version-1 context exists |
+
+Revision 0043 preserves existing audit/outbox IDs, payloads, states and occurrence
+times. Existing rows receive context version 0 and explicit `UNKNOWN` source/actor
+type; unproven operation, correlation, causation and recorded-at values remain
+null. The database default for `recorded_at` applies to subsequent inserts, without
+backfilling a fictitious historical recording instant. New canonical writers use
+context version 1 and event schema version 1; historical/raw outbox rows keep
+schema version 0 rather than an inferred payload version. The changed trigger uses
+transaction-local context; a pooled connection must not supply a previous request's
+identity. No new foreign key rewrites historical trace relationships.
+
+The migration's guarded downgrade refuses to discard version-1 trace evidence.
+Use a reviewed forward correction or verified restore of the complete database;
+do not restore only audit/outbox or erase new records to make downgrade pass.
+Lock risk is a conservative classification for constraint/index installation, not
+measured production downtime. Final 0043 execution evidence belongs to
+[operation-context-validation.md](../implementation/operation-context-validation.md).
 
 ## Data-preservation evidence
 

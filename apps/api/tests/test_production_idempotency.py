@@ -170,7 +170,14 @@ def test_production_replay_recovery_and_snapshot_privacy(client: TestClient, cod
     first = _send(client, code, headers, body, key, batch_id)
     assert first.status_code == (201 if code == "create" else 200)
     state = _state()
-    replay = _send(client, code, {**headers, "X-Request-ID": "second"}, body, key, batch_id)
+    replay = _send(
+        client,
+        code,
+        {**headers, "X-Request-ID": "9719fe08-9a79-59fe-a5eb-a84656b6519c"},
+        body,
+        key,
+        batch_id,
+    )
     recovery = client.get(
         f"/v1/admin/production/commands/{code}/{key}?branch_id={branch_id}", headers=headers
     )

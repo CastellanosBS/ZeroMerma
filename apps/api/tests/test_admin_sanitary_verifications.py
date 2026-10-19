@@ -158,7 +158,7 @@ def _create_verification(client: TestClient, **overrides: object) -> dict[str, o
     payload.update(overrides)
     response = client.post(
         "/v1/admin/sanitary-verifications",
-        headers={**_admin_headers(client), "X-Request-ID": "sanitary-test"},
+        headers={**_admin_headers(client), "X-Request-ID": "cd1774f5-bd2b-53ab-9270-6ca0a8383ebb"},
         json=payload,
     )
     assert response.status_code == 201
@@ -242,7 +242,7 @@ def test_admin_sanitary_verification_create_persists_checklist_audit_and_outbox(
     assert verification.folio == payload["overview"]["folio"]
     assert len(checklist_items) == 2
     assert audit_records[0].action == "admin.sanitary_verification.created"
-    assert audit_records[0].request_id == "sanitary-test"
+    assert audit_records[0].request_id == "cd1774f5-bd2b-53ab-9270-6ca0a8383ebb"
     assert any(
         record.action == "admin.sanitary_verification.high_risk.notified"
         for record in audit_records
@@ -347,7 +347,7 @@ def test_admin_sanitary_completion_validates_failure_notes_evidence_and_follow_u
 
     start_response = client.post(
         f"/v1/admin/sanitary-verifications/{verification_id}/start",
-        headers={**_admin_headers(client), "X-Request-ID": "sanitary-start-test"},
+        headers={**_admin_headers(client), "X-Request-ID": "700b0caf-dcbf-55e3-a79d-8cbc6143b28e"},
     )
     assert start_response.status_code == 200
     assert start_response.json()["overview"]["status"] == "IN_PROGRESS"
@@ -405,7 +405,7 @@ def test_admin_sanitary_completion_validates_failure_notes_evidence_and_follow_u
 
     complete_response = client.post(
         f"/v1/admin/sanitary-verifications/{verification_id}/complete",
-        headers={**_admin_headers(client), "X-Request-ID": "sanitary-complete-test"},
+        headers={**_admin_headers(client), "X-Request-ID": "d06df6db-d11b-561d-a68f-4895196cd3df"},
         json={
             "checklist_results": [
                 {
@@ -451,5 +451,5 @@ def test_admin_sanitary_completion_validates_failure_notes_evidence_and_follow_u
             )
         ).scalar_one()
 
-    assert completed_audit.request_id == "sanitary-complete-test"
+    assert completed_audit.request_id == "d06df6db-d11b-561d-a68f-4895196cd3df"
     assert completed_event.payload["status"] == "REQUIRES_FOLLOW_UP"

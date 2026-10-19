@@ -98,20 +98,24 @@ class AuditVisibilityQueryService:
         *,
         config: BackofficeNotificationConfig,
     ) -> AuditNotificationSummaryView | None:
-        event = session.execute(
-            select(
-                OutboxEvent.status,
-                OutboxEvent.occurred_at,
-                OutboxEvent.processed_at,
+        event = (
+            session.execute(
+                select(
+                    OutboxEvent.status,
+                    OutboxEvent.occurred_at,
+                    OutboxEvent.processed_at,
+                )
+                .where(
+                    OutboxEvent.aggregate_type == config.aggregate_type,
+                    OutboxEvent.aggregate_id == config.aggregate_id,
+                    OutboxEvent.event_name.in_(config.event_names),
+                )
+                .order_by(OutboxEvent.occurred_at.desc())
+                .limit(1)
             )
-            .where(
-                OutboxEvent.aggregate_type == config.aggregate_type,
-                OutboxEvent.aggregate_id == config.aggregate_id,
-                OutboxEvent.event_name.in_(config.event_names),
-            )
-            .order_by(OutboxEvent.occurred_at.desc())
-            .limit(1)
-        ).mappings().first()
+            .mappings()
+            .first()
+        )
 
         if event is None:
             return None

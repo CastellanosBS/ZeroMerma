@@ -111,11 +111,9 @@ export function getReturnsClassProducts({
 
 export function commitSaleReturn({
   payload,
-  requestId,
   idempotencyKey,
 }: {
   payload: ReturnCommitRequest;
-  requestId: string;
   idempotencyKey: string;
 }): Promise<ReturnCommitResultView> {
   return requestJson<ReturnCommitResultView>({
@@ -123,7 +121,6 @@ export function commitSaleReturn({
     method: "POST",
     path: "/v1/returns/commit",
     headers: {
-      "X-Request-ID": requestId,
       "Idempotency-Key": idempotencyKey,
     },
   });

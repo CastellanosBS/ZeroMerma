@@ -1017,7 +1017,6 @@ describe("CounterTransferScreen", () => {
             workstation_code: "POS-01",
           },
           idempotencyKey: expect.stringMatching(/^[0-9a-f-]{36}$/),
-          requestId: expect.stringMatching(/^correction-/),
         }),
       );
     });

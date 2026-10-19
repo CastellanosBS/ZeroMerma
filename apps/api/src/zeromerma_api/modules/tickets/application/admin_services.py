@@ -15,6 +15,7 @@ from zeromerma_api.modules.audit.application.service import AuditRecorder
 from zeromerma_api.modules.branches.infrastructure.models import Branch, Workstation
 from zeromerma_api.modules.identity.application.schemas import AuthenticatedUser
 from zeromerma_api.modules.identity.infrastructure.models import User
+from zeromerma_api.modules.outbox.application.service import OutboxWriter
 from zeromerma_api.modules.returns.infrastructure.models import SaleReturn, SaleReturnLine
 from zeromerma_api.modules.sales.domain.constants import (
     SALE_PAYMENT_METHOD_CARD,
@@ -42,6 +43,7 @@ from zeromerma_api.modules.tickets.application.admin_schemas import (
 )
 from zeromerma_api.modules.tickets.domain.constants import (
     AUDIT_ACTION_TICKET_REPRINTED,
+    OUTBOX_EVENT_TICKET_REPRINTED_V1,
     TICKET_RESOURCE_TYPE,
     TICKET_RETURN_STATUS_FULLY_RETURNED,
     TICKET_RETURN_STATUS_NOT_RETURNED,
@@ -56,8 +58,13 @@ STATUS_WITHOUT_RETURNS = "WITHOUT_RETURNS"
 
 
 class AdminSalesTicketService:
-    def __init__(self, audit_recorder: AuditRecorder | None = None) -> None:
+    def __init__(
+        self,
+        audit_recorder: AuditRecorder | None = None,
+        outbox_writer: OutboxWriter | None = None,
+    ) -> None:
         self._audit_recorder = audit_recorder or AuditRecorder()
+        self._outbox_writer = outbox_writer or OutboxWriter()
 
     def list_tickets(
         self,
@@ -349,6 +356,15 @@ class AdminSalesTicketService:
                 "folio": detail.overview.folio,
                 "source": "backoffice",
             },
+        )
+        self._outbox_writer.append(
+            session,
+            aggregate_type=TICKET_RESOURCE_TYPE,
+            aggregate_id=str(ticket_id),
+            event_name=OUTBOX_EVENT_TICKET_REPRINTED_V1,
+            actor_id=current_user.id,
+            branch_id=detail.operational_context.branch_id,
+            payload={"ticket_id": str(ticket_id)},
         )
         session.commit()
         return detail

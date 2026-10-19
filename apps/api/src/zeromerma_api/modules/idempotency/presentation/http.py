@@ -15,6 +15,7 @@ from zeromerma_api.modules.idempotency.application.schemas import IdempotencyRes
 from zeromerma_api.modules.idempotency.domain.constants import IdempotencyStatus
 from zeromerma_api.modules.idempotency.domain.exceptions import IdempotencyError
 from zeromerma_api.presentation.errors import ApiErrorResponse
+from zeromerma_api.presentation.operation_context import request_id as _request_id
 
 IdempotencyKeyValue = Annotated[
     str,
@@ -58,11 +59,6 @@ def require_idempotency_key(
             message="Exactly one valid Idempotency-Key is required.",
         )
     return parse_idempotency_key(value)
-
-
-def _request_id(request: Request) -> str | None:
-    value = request.headers.get("X-Request-ID", "").strip()
-    return value[:128] or None
 
 
 async def idempotency_exception_handler(request: Request, exc: Exception) -> JSONResponse:

@@ -76,7 +76,7 @@ def test_admin_setting_update_validates_persists_history_and_audit(
 ) -> None:
     response = client.patch(
         "/v1/admin/settings/general.business_name",
-        headers={**_admin_headers(client), "X-Request-ID": "settings-update-test"},
+        headers={**_admin_headers(client), "X-Request-ID": "55ee0c2f-9c17-5f6e-a1fa-0a486f266e25"},
         json={"value": "Panaderia Central", "change_note": "Brand default update"},
     )
 
@@ -104,7 +104,7 @@ def test_admin_setting_update_validates_persists_history_and_audit(
 
     assert setting.value == "Panaderia Central"
     assert history.change_note == "Brand default update"
-    assert audit_event.request_id == "settings-update-test"
+    assert audit_event.request_id == "55ee0c2f-9c17-5f6e-a1fa-0a486f266e25"
     assert audit_event.metadata_["module"] == "configuration"
 
 
@@ -166,7 +166,7 @@ def test_admin_setting_reset_restores_default_and_audits(client: TestClient) -> 
 
     reset = client.post(
         "/v1/admin/settings/tickets.receipt_footer_text/reset",
-        headers={**headers, "X-Request-ID": "settings-reset-test"},
+        headers={**headers, "X-Request-ID": "0d50354e-755a-5003-806c-f6725d255645"},
         json={"change_note": "Back to default"},
     )
 
@@ -186,4 +186,4 @@ def test_admin_setting_reset_restores_default_and_audits(client: TestClient) -> 
         ).scalar_one()
 
     assert setting is None
-    assert audit_event.request_id == "settings-reset-test"
+    assert audit_event.request_id == "0d50354e-755a-5003-806c-f6725d255645"

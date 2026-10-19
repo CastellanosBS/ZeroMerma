@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal
+from uuid import UUID, uuid4
 from zoneinfo import ZoneInfo
 
 from fastapi.testclient import TestClient
@@ -116,7 +117,7 @@ def _create_order(
         headers={
             "Idempotency-Key": new_idempotency_key(),
             **command_headers,
-            "X-Request-ID": f"orders-create-{customer_name}",
+            "X-Request-ID": str(uuid4()),
         },
         json={**payload, "cash_session_id": cash_session_id},
     )
@@ -259,7 +260,8 @@ def test_create_order_lists_and_details_with_advance_payment_audit_and_outbox(
 
     assert payment_record.payment_type == "ADVANCE"
     assert Decimal(str(payment_record.amount)) == Decimal("20.00")
-    assert audit_record.request_id == "orders-create-Cliente Anticipo"
+    assert UUID(audit_record.request_id).int
+    assert audit_record.request_id == outbox_event.request_id
     assert outbox_event.payload["customer_name"] == "Cliente Anticipo"
 
 
@@ -330,7 +332,7 @@ def test_order_lifecycle_marks_ready_and_delivers_with_final_settlement(client: 
         headers={
             "Idempotency-Key": new_idempotency_key(),
             **command_headers,
-            "X-Request-ID": "orders-ready-cliente-entrega",
+            "X-Request-ID": "2a3bce81-e926-54e1-b530-c77bea543ca4",
         },
         json={"cash_session_id": cash_session_id, "workstation_code": SEED_WORKSTATION_CODE},
     )
@@ -351,7 +353,7 @@ def test_order_lifecycle_marks_ready_and_delivers_with_final_settlement(client: 
         headers={
             "Idempotency-Key": new_idempotency_key(),
             **command_headers,
-            "X-Request-ID": "orders-deliver-cliente-entrega",
+            "X-Request-ID": "3c9a0308-3caa-5bb7-838b-e7518a8246cd",
         },
         json={
             "cash_session_id": cash_session_id,
@@ -431,7 +433,7 @@ def test_order_delivery_records_mixed_final_settlement_as_cash_and_card(client: 
         headers={
             "Idempotency-Key": new_idempotency_key(),
             **command_headers,
-            "X-Request-ID": "orders-deliver-cliente-entrega-mixta",
+            "X-Request-ID": "effe379b-71e2-50cc-b871-8401ce7ef737",
         },
         json={
             "cash_session_id": cash_session_id,
@@ -620,7 +622,7 @@ def test_cancel_refunds_advance_when_order_is_canceled_before_cutoff(client: Tes
         headers={
             "Idempotency-Key": new_idempotency_key(),
             **command_headers,
-            "X-Request-ID": "orders-cancel-advance-refund",
+            "X-Request-ID": "5763a435-9abc-5abd-9823-975cf7e9700d",
         },
         json={
             "cash_session_id": cash_session_id,
@@ -661,7 +663,7 @@ def test_cancel_refunds_advance_when_order_is_canceled_before_cutoff(client: Tes
         ("ADVANCE", Decimal("5.00")),
         ("REFUND", Decimal("5.00")),
     ]
-    assert audit_record.request_id == "orders-cancel-advance-refund"
+    assert audit_record.request_id == "5763a435-9abc-5abd-9823-975cf7e9700d"
     assert audit_record.metadata_["cancellation_reason"] == "Cliente cancelo con anticipacion."
     assert audit_record.metadata_["cancellation_refund_eligible"] is True
     assert audit_record.metadata_["cancellation_refund_amount"] == "5.00"
@@ -736,7 +738,7 @@ def test_cancel_rules_still_block_delivered_orders_and_allow_safe_cancel(
         headers={
             "Idempotency-Key": new_idempotency_key(),
             **command_headers,
-            "X-Request-ID": "orders-cancel-cliente-cancelable",
+            "X-Request-ID": "64b0154b-22c9-5105-ab9f-1f2715b07455",
         },
         json={
             "cash_session_id": cash_session_id,
@@ -808,7 +810,7 @@ def test_cancel_rules_still_block_delivered_orders_and_allow_safe_cancel(
             )
         ).scalar_one()
 
-    assert audit_record.request_id == "orders-cancel-cliente-cancelable"
+    assert audit_record.request_id == "64b0154b-22c9-5105-ab9f-1f2715b07455"
     assert audit_record.metadata_["cancellation_reason"] == "Cliente ya no requiere el pedido."
     assert outbox_event.payload["status"] == "CANCELED"
 

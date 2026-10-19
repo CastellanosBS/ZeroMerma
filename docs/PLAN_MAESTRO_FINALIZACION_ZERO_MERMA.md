@@ -345,6 +345,43 @@ funcional. Se mantienen las 19 brechas administrativas de idempotencia, `GAP-099
 y las brechas de conciliación. La entrega exige las ocho etapas Foundation y
 **Foundation required** del SHA publicado, sin presumir el resultado de una CI futura.
 
+### 0.12 Registro de ejecución — ZM-FIN-040
+
+El bloque unifica el contexto tipado de request, operación, actor, superficie,
+sucursal, estación y turno en API, auditoría, outbox y logging del worker. El
+diseño exige UUID estricto para cada intento HTTP; un valor ausente o inválido se
+sustituye por uno nuevo. La superficie confiable proviene de la sesión verificada,
+no de cabeceras de origen del cliente. Los comandos y su recuperación conservan
+como operación/correlación el UUID del registro idempotente, sin reescribir las
+trazas originales durante replay ni inventar un evento causante.
+
+La implementación y las comprobaciones locales están registradas. El
+[catálogo de contexto](architecture/operation-context.md) define autoridad,
+propagación, privacidad y tratamiento histórico; el
+[registro de validación](implementation/operation-context-validation.md) separa
+criterios, resultados y límites. La revisión 0043 añade el contexto de forma
+explícita a auditoría/outbox: los registros históricos conservan procedencia
+desconocida, versión de contexto y esquema outbox 0, e instante de registro
+desconocido; no fabrica causalidad ni promueve datos demo a historia productiva.
+Los escritores actuales generan contexto/esquema 1 y PostgreSQL registra el
+instante de persistencia. La corrección del ID de mantenimiento antes de la traza forma parte
+de 040; las fronteras transaccionales de 039 permanecen vigentes.
+
+Los 26 hallazgos AUDIT/OUTBOX asignados a 040 se reconciliaron con sus productores:
+12 productores faltantes quedaron implementados con pruebas de éxito/rollback;
+12 hallazgos eran falsos positivos sobre delegaciones o helpers existentes;
+dos hallazgos de disponibilidad permanecen en 068. Los productores tienen 25
+casos únicos aprobados entre una tanda de 24 y una focal de tres con solapamiento.
+La migración final pasó tres casos de esquema/historia/restore; el contexto final
+pasó diez pruebas de transacción/rechazo después de corregir un fallo de la
+regresión de autenticación. El registro enlazado conserva resultados parciales
+y reruns sin presentarlos como una única corrida completa. El worker continúa sin handlers ni
+acknowledgement durable; 087, 093 y 109 conservan procesamiento, proyecciones y
+observabilidad productiva. No se completan los ledgers, disponibilidad pendiente,
+conciliación ni las 19 brechas de idempotencia administrativa. La aceptación
+integrada se establece mediante las ocho etapas Foundation y **Foundation
+required** del commit inmutable entregado; SHA y enlace acompañan la entrega.
+
 ## 1. Resumen ejecutivo
 
 ZeroMerma posee una base adecuada para evolucionar sin reescritura: monolito modular, FastAPI/SQLAlchemy/PostgreSQL, POS y Backoffice separados, OpenAPI generado, precisión decimal, auditoría y outbox transaccionales. La auditoría activa demostró que una parte importante de ventas, pagos, pedidos, documentos y administración es real. También demostró defectos sistémicos: el POS no alimenta el inventario canónico; el pago de pedido no entra en caja/corte; el worker no procesa eventos; la trazabilidad de identidad/origen es incorrecta; y varias superficies administrativas son simuladas o incompletas.

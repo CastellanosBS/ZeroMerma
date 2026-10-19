@@ -244,7 +244,9 @@ def test_replay_preserves_return_refund_and_disposition_without_repeating_effect
     if full:
         body["lines"][0]["returned_quantity"] = original["quantity"]
     key, before = new_idempotency_key(), _counts()
-    first = _post(client, {**headers, "X-Request-ID": "return-first-attempt"}, body, key)
+    first = _post(
+        client, {**headers, "X-Request-ID": "81c07ab4-e624-5fce-81dc-4793d455993f"}, body, key
+    )
     assert first.status_code == 201
     assert first.headers["Idempotency-Replayed"] == "false"
     receipt, committed = first.json(), _state()
@@ -256,7 +258,9 @@ def test_replay_preserves_return_refund_and_disposition_without_repeating_effect
         not {"notes", "created_by", "operator_email", "operator_full_name", "audit_summary"}
         & receipt.keys()
     )
-    second = _post(client, {**headers, "X-Request-ID": "return-second-attempt"}, body, key)
+    second = _post(
+        client, {**headers, "X-Request-ID": "972dfdc1-1db0-5f31-a1ea-8b7bd668a356"}, body, key
+    )
     recovered = _recover(client, headers, body, key)
     assert second.status_code == 201 and recovered.status_code == 200
     assert second.json() == recovered.json() == receipt

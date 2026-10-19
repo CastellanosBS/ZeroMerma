@@ -110,7 +110,7 @@ def _create_log(client: TestClient, **overrides: object) -> dict[str, object]:
     payload.update(overrides)
     response = client.post(
         "/v1/admin/cleaning-logs",
-        headers={**_admin_headers(client), "X-Request-ID": "cleaning-test"},
+        headers={**_admin_headers(client), "X-Request-ID": "2c7a0202-7280-5631-9d65-ace129d203c6"},
         json=payload,
     )
     assert response.status_code == 201
@@ -185,7 +185,7 @@ def test_admin_cleaning_log_create_persists_checklist_audit_and_outbox(client: T
     assert log.folio == payload["overview"]["folio"]
     assert len(checklist_items) == 2
     assert audit_records[0].action == "admin.cleaning_log.created"
-    assert audit_records[0].request_id == "cleaning-test"
+    assert audit_records[0].request_id == "2c7a0202-7280-5631-9d65-ace129d203c6"
     assert any(record.action == "admin.cleaning_log.high_risk.notified" for record in audit_records)
     assert outbox_events[0].event_name == "cleaning_log.created.v1"
     assert any(event.event_name == "cleaning_log.high_risk_alert.v1" for event in outbox_events)
@@ -267,7 +267,7 @@ def test_admin_cleaning_completion_validates_required_checklist_and_evidence(
 
     complete_response = client.post(
         f"/v1/admin/cleaning-logs/{log_id}/complete",
-        headers={**_admin_headers(client), "X-Request-ID": "cleaning-complete-test"},
+        headers={**_admin_headers(client), "X-Request-ID": "78099de7-eb0a-5d9d-bcbe-f64eb8d11fa2"},
         json={
             "checklist_items": [
                 {"is_completed": True, "is_required": True, "label": "Retirar residuos"},
@@ -297,7 +297,7 @@ def test_admin_cleaning_completion_validates_required_checklist_and_evidence(
             )
         ).scalar_one()
 
-    assert audit_record.request_id == "cleaning-complete-test"
+    assert audit_record.request_id == "78099de7-eb0a-5d9d-bcbe-f64eb8d11fa2"
     assert outbox_event.payload["status"] == "COMPLETED"
 
 

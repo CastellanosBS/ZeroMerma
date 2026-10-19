@@ -77,7 +77,7 @@ def _create_waste(
     response = client.post(
         "/v1/admin/waste",
         headers={
-            **{**_admin_headers(client), "X-Request-ID": "admin-waste-test"},
+            **{**_admin_headers(client), "X-Request-ID": "c4df92bb-3ed5-52a3-b6af-c3cfb47c12cc"},
             "Idempotency-Key": new_idempotency_key(),
         },
         json={
@@ -157,7 +157,7 @@ def test_admin_waste_create_confirms_document_inventory_movement_audit_and_outbo
     assert movement.balance_after == Decimal("17.000")
     assert balance.quantity_on_hand == Decimal("17.000")
     assert audit_record.action == "admin.waste.confirmed"
-    assert audit_record.request_id == "admin-waste-test"
+    assert audit_record.request_id == "c4df92bb-3ed5-52a3-b6af-c3cfb47c12cc"
     assert outbox_event.event_name == "waste_record.committed.v1"
 
 

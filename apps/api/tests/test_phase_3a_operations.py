@@ -182,7 +182,7 @@ def test_counter_transfer_commit_writes_document_audit_and_outbox(client: TestCl
         headers={
             **{
                 **_authorization_header(client),
-                "X-Request-ID": "phase-3a-counter-transfer",
+                "X-Request-ID": "3f519c50-62ac-5e42-98b9-b64fd727a453",
             },
             "Idempotency-Key": new_idempotency_key(),
         },
@@ -217,7 +217,7 @@ def test_counter_transfer_commit_writes_document_audit_and_outbox(client: TestCl
         ).scalar_one()
 
     assert audit_record.action == "counter_transfer.committed"
-    assert audit_record.request_id == "phase-3a-counter-transfer"
+    assert audit_record.request_id == "3f519c50-62ac-5e42-98b9-b64fd727a453"
     assert outbox_event.event_name == "counter_transfer.committed.v1"
 
 
@@ -316,7 +316,7 @@ def test_waste_commit_requires_exact_product_and_reason_and_writes_audit_and_out
         headers={
             **{
                 **_authorization_header(client),
-                "X-Request-ID": "phase-3a-waste",
+                "X-Request-ID": "3d1f44af-4ef3-5587-8bcf-0afc4a43caaf",
             },
             "Idempotency-Key": new_idempotency_key(),
         },
@@ -422,7 +422,7 @@ def test_high_impact_waste_requires_acknowledgement_and_emits_alert_outbox(
         headers={
             **{
                 **_authorization_header(client),
-                "X-Request-ID": "phase-3a-waste-high-impact",
+                "X-Request-ID": "42f4394a-080e-5afe-beb4-cb76a5077f36",
             },
             "Idempotency-Key": new_idempotency_key(),
         },
@@ -537,7 +537,7 @@ def test_transfer_dispatch_pending_detail_and_receive_work_end_to_end(client: Te
 
     headers = {
         **_authorization_header(client),
-        "X-Request-ID": "phase-3a-transfer-dispatch",
+        "X-Request-ID": "46820610-99ec-5fc5-8f0b-72a7c8ff416c",
     }
     dispatch_response = client.post(
         "/v1/transfers/dispatch/commit",
@@ -605,7 +605,7 @@ def test_transfer_dispatch_pending_detail_and_receive_work_end_to_end(client: Te
         headers={
             **{
                 **_authorization_header(client, SEED_DESTINATION_WORKSTATION_CODE),
-                "X-Request-ID": "phase-3a-transfer-receive",
+                "X-Request-ID": "e68f39eb-2ffb-5a44-8131-cc6d0803ca77",
             },
             "Idempotency-Key": new_idempotency_key(),
         },
@@ -690,8 +690,8 @@ def test_transfer_dispatch_pending_detail_and_receive_work_end_to_end(client: Te
         "transfer.dispatched",
         "transfer.received",
     ]
-    assert transfer_audit_records[0].request_id == "phase-3a-transfer-dispatch"
-    assert transfer_audit_records[1].request_id == "phase-3a-transfer-receive"
+    assert transfer_audit_records[0].request_id == "46820610-99ec-5fc5-8f0b-72a7c8ff416c"
+    assert transfer_audit_records[1].request_id == "e68f39eb-2ffb-5a44-8131-cc6d0803ca77"
 
 
 def test_transfer_dispatch_history_returns_folio_status_and_filters(client: TestClient) -> None:
@@ -934,7 +934,7 @@ def test_transfer_receive_with_variance_marks_receipt_and_shipment(client: TestC
         headers={
             **{
                 **_authorization_header(client, SEED_DESTINATION_WORKSTATION_CODE),
-                "X-Request-ID": "phase-3c-transfer-variance",
+                "X-Request-ID": "b5537665-6d30-5666-846e-e9dc76fa4ad0",
             },
             "Idempotency-Key": new_idempotency_key(),
         },
@@ -1003,7 +1003,7 @@ def test_transfer_receive_with_variance_marks_receipt_and_shipment(client: TestC
     assert shipment_record.status == "IN_TRANSIT"
     assert receipt_record.status == "RECEIVED_WITH_VARIANCE"
     assert len(outbox_events) == 1
-    assert audit_record.request_id == "phase-3c-transfer-variance"
+    assert audit_record.request_id == "b5537665-6d30-5666-846e-e9dc76fa4ad0"
 
 
 def test_transfer_receive_requires_variance_reason_when_quantity_differs(

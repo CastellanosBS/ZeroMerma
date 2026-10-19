@@ -52,7 +52,7 @@ from zeromerma_api.testing.database_safety import (
 REPO_ROOT = Path(__file__).resolve().parents[3]
 VERSIONS_DIR = REPO_ROOT / "apps" / "api" / "alembic" / "versions"
 ALEMBIC_INI = REPO_ROOT / "apps" / "api" / "alembic.ini"
-CANONICAL_HEAD = "20261018_0042_idempotency"
+CANONICAL_HEAD = "20261018_0043_operation_context"
 EXPECTED_POSTGRES_MAJOR = 16
 TEST_CONTAINER_VARIABLE = "ZEROMERMA_TEST_CONTAINER_NAME"
 
@@ -61,7 +61,7 @@ KNOWN_NAMING_ONLY = "KNOWN_NAMING_ONLY"
 KNOWN_MODEL_OBJECT = "KNOWN_MODEL_OBJECT"
 REAL_SCHEMA_DRIFT = "REAL_SCHEMA_DRIFT"
 UNKNOWN_SCHEMA_DRIFT = "UNKNOWN_SCHEMA_DRIFT"
-DRIFT_BASELINE_VERSION = "2026-10-18.zm-fin-028.1"
+DRIFT_BASELINE_VERSION = "2026-10-18.zm-fin-040.1"
 
 
 @dataclass(frozen=True, order=True, slots=True)
@@ -885,6 +885,50 @@ KNOWN_DB_ONLY_CHECKS: frozenset[CheckConstraintFingerprint] = frozenset(
 )
 KNOWN_MODEL_CHECKS: frozenset[ModelCheckFingerprint] = frozenset(
     {
+        *(
+            ModelCheckFingerprint(
+                "public",
+                table,
+                f"ck_{table}_operation_context_valid",
+                f"ck_{table}_operation_context_valid",
+                f"ck_{table}_operation_context_valid",
+                "(context_version = 0 AND source_app = 'UNKNOWN' AND actor_type = 'UNKNOWN') OR "
+                "(context_version = 1 AND source_app IN "
+                "('POS','BACKOFFICE','API','SYSTEM','WORKER') "
+                "AND operation_id IS NOT NULL AND correlation_id IS NOT NULL "
+                "AND actor_type IN ('USER','SYSTEM','ANONYMOUS'))",
+                "context_version = 0 AND source_app::text = 'UNKNOWN'::text AND "
+                "actor_type::text = 'UNKNOWN'::text OR context_version = 1 AND "
+                "(source_app::text = ANY (ARRAY['POS'::character varying, "
+                "'BACKOFFICE'::character varying, 'API'::character varying, "
+                "'SYSTEM'::character varying, 'WORKER'::character varying]::text[])) "
+                "AND operation_id IS NOT NULL AND correlation_id IS NOT NULL AND "
+                "(actor_type::text = ANY (ARRAY['USER'::character varying, "
+                "'SYSTEM'::character varying, 'ANONYMOUS'::character varying]::text[]))",
+            )
+            for table in ("audit_log", "outbox_events")
+        ),
+        *(
+            ModelCheckFingerprint(
+                "public",
+                table,
+                f"ck_{table}_related_branches_array",
+                f"ck_{table}_related_branches_array",
+                f"ck_{table}_related_branches_array",
+                "jsonb_typeof(related_branch_ids) = 'array'",
+                "jsonb_typeof(related_branch_ids) = 'array'::text",
+            )
+            for table in ("audit_log", "outbox_events")
+        ),
+        ModelCheckFingerprint(
+            "public",
+            "outbox_events",
+            "ck_outbox_events_schema_version_valid",
+            "ck_outbox_events_schema_version_valid",
+            "ck_outbox_events_schema_version_valid",
+            "schema_version >= 0 AND (context_version = 0 OR schema_version > 0)",
+            "schema_version >= 0 AND (context_version = 0 OR schema_version > 0)",
+        ),
         ModelCheckFingerprint(
             "public",
             "idempotency_records",
@@ -5000,7 +5044,7 @@ def test_drift_classifier_accepts_only_exact_known_fingerprints() -> None:
     assert len(KNOWN_DB_ONLY_INDEXES) == 75
     assert len(KNOWN_DB_ONLY_DEFAULTS) == 51
     assert len(KNOWN_DB_ONLY_CHECKS) == 6
-    assert len(KNOWN_MODEL_CHECKS) == 198
+    assert len(KNOWN_MODEL_CHECKS) == 203
     assert len(KNOWN_MODEL_INDEXES) == 2
     assert (
         sum(item.expected_database_name != item.database_name for item in KNOWN_MODEL_CHECKS) == 87
@@ -5451,7 +5495,7 @@ def test_idempotency_transition_preserves_data_and_downgrade_protects_identity()
                     for table in preserved_tables
                     if table != "alembic_version"
                 }
-            _upgrade(engine, config, "head")
+            _upgrade(engine, config, "20261018_0042_idempotency")
             with engine.begin() as connection:
                 assert_authorized_destructive_connection(connection, config)
                 after = {
@@ -5473,7 +5517,7 @@ def test_idempotency_transition_preserves_data_and_downgrade_protects_identity()
                     _alembic_config(connection, config), "20261018_0041_auth_sessions"
                 )
             assert _current_revision(engine, config) == "20261018_0041_auth_sessions"
-            _upgrade(engine, config, "head")
+            _upgrade(engine, config, "20261018_0042_idempotency")
             with engine.begin() as connection:
                 assert_authorized_destructive_connection(connection, config)
                 values = _idempotency_result_values(identity)
@@ -5514,7 +5558,7 @@ def test_idempotency_transition_preserves_data_and_downgrade_protects_identity()
                     command.downgrade(
                         _alembic_config(connection, config), "20261018_0041_auth_sessions"
                     )
-            assert _current_revision(engine, config) == CANONICAL_HEAD
+            assert _current_revision(engine, config) == "20261018_0042_idempotency"
             with engine.connect() as connection:
                 assert_authorized_destructive_connection(connection, config)
                 assert connection.scalar(text("SELECT count(*) FROM idempotency_records")) == 1
@@ -5522,13 +5566,130 @@ def test_idempotency_transition_preserves_data_and_downgrade_protects_identity()
                 "IDEMPOTENCY_TRANSITION",
                 {
                     "source_revision": "20261018_0041_auth_sessions",
-                    "target_revision": CANONICAL_HEAD,
+                    "target_revision": "20261018_0042_idempotency",
                     "existing_tables_preserved": len(before),
                     "historical_records_imported": 0,
                     "global_key_unique": True,
                     "checks_rejected_invalid_rows": len(invalid_cases),
                     "empty_downgrade": "PASS",
                     "populated_downgrade": "REJECTED",
+                },
+            )
+
+
+def test_operation_context_transition_preserves_history_and_protects_new_evidence() -> None:
+    with _root_runtime() as (root_config, root_engine):
+        with _temporary_database(root_engine, root_config, "operation-context") as (config, engine):
+            _upgrade(engine, config, "20261018_0042_idempotency")
+            now = datetime.now(UTC)
+            audit_id, event_id = uuid.uuid4(), uuid.uuid4()
+            with engine.begin() as connection:
+                assert_authorized_destructive_connection(connection, config)
+                _insert_row(
+                    connection,
+                    "audit_log",
+                    {
+                        "id": audit_id,
+                        "occurred_at": now,
+                        "action": "historical.action",
+                        "resource_type": "history",
+                        "resource_id": "preserved",
+                        "actor_id": None,
+                        "branch_id": None,
+                        "request_id": "historical-label",
+                        "metadata": '{"surface":"POS","marker":"preserve"}',
+                    },
+                )
+                _insert_row(
+                    connection,
+                    "outbox_events",
+                    {
+                        "id": event_id,
+                        "occurred_at": now,
+                        "available_at": now,
+                        "aggregate_type": "history",
+                        "aggregate_id": "preserved",
+                        "event_name": "historical.action.v1",
+                        "payload": '{"amount":"12.30"}',
+                        "headers": '{"marker":"preserve"}',
+                        "status": "pending",
+                        "attempts": 0,
+                    },
+                )
+                before = {
+                    table: connection.scalar(text(f"SELECT row_to_json(t) FROM {table} t"))
+                    for table in ("audit_log", "outbox_events")
+                }
+            _upgrade(engine, config, "head")
+            with engine.begin() as connection:
+                assert_authorized_destructive_connection(connection, config)
+                for table in before:
+                    row = connection.scalar(text(f"SELECT row_to_json(t) FROM {table} t"))
+                    assert {key: row[key] for key in before[table]} == before[table]
+                    assert row["source_app"] == row["actor_type"] == "UNKNOWN"
+                    assert row["context_version"] == 0
+                    if table == "outbox_events":
+                        assert row["schema_version"] == 0
+                    assert all(
+                        row[key] is None
+                        for key in (
+                            "operation_id",
+                            "correlation_id",
+                            "causation_id",
+                            "idempotency_key",
+                            "workstation_id",
+                            "cash_session_id",
+                            "recorded_at",
+                        )
+                    )
+            # A legacy-only downgrade remains lossless, and re-upgrade preserves that history.
+            with engine.connect() as connection:
+                assert_authorized_destructive_connection(connection, config)
+                connection.commit()
+                command.downgrade(_alembic_config(connection, config), "20261018_0042_idempotency")
+            _upgrade(engine, config, "head")
+            operation = uuid.uuid4()
+            with engine.begin() as connection:
+                assert_authorized_destructive_connection(connection, config)
+                _insert_row(
+                    connection,
+                    "audit_log",
+                    {
+                        "id": uuid.uuid4(),
+                        "occurred_at": now,
+                        "action": "current.action",
+                        "resource_type": "current",
+                        "resource_id": "preserved",
+                        "metadata": "{}",
+                        "context_version": 1,
+                        "source_app": "SYSTEM",
+                        "actor_type": "SYSTEM",
+                        "operation_id": operation,
+                        "correlation_id": operation,
+                    },
+                )
+                recorded = connection.scalar(
+                    text("SELECT recorded_at FROM audit_log WHERE operation_id=:id"),
+                    {"id": operation},
+                )
+                assert recorded is not None and recorded >= now
+            with pytest.raises(DBAPIError, match="Operation context evidence"):
+                with engine.connect() as connection:
+                    assert_authorized_destructive_connection(connection, config)
+                    connection.commit()
+                    command.downgrade(
+                        _alembic_config(connection, config), "20261018_0042_idempotency"
+                    )
+            assert _current_revision(engine, config) == CANONICAL_HEAD
+            _emit(
+                "OPERATION_CONTEXT_TRANSITION",
+                {
+                    "source_revision": "20261018_0042_idempotency",
+                    "target_revision": CANONICAL_HEAD,
+                    "historical_rows_preserved": 2,
+                    "unknown_provenance_preserved": True,
+                    "legacy_only_downgrade": "PASS",
+                    "current_evidence_downgrade": "REJECTED",
                 },
             )
 
@@ -5718,8 +5879,8 @@ def test_static_graph() -> None:
     for row in inventory:
         _emit("REVISION", row)
     _emit("GRAPH", graph)
-    assert graph["revision_count"] == 42
-    assert graph["unique_revision_count"] == 42
+    assert graph["revision_count"] == 43
+    assert graph["unique_revision_count"] == 43
     assert graph["duplicate_revisions"] == []
     assert graph["roots"] == ["0001_foundation_schema"]
     assert graph["heads"] == [CANONICAL_HEAD]
@@ -5728,7 +5889,7 @@ def test_static_graph() -> None:
     assert graph["unreachable"] == []
     assert graph["branches"] == {}
     assert graph["merge_revisions"] == []
-    assert len(_topological_revisions(inventory)) == 42
+    assert len(_topological_revisions(inventory)) == 43
 
 
 def test_fresh_schema_drift_and_seed() -> None:
@@ -5942,6 +6103,31 @@ def test_dump_restore_sanity() -> None:
                         "available_at": now,
                     },
                 )
+                original_traces = {}
+                for table, row_id in (("audit_log", audit_id), ("outbox_events", event_id)):
+                    connection.execute(
+                        text(
+                            f"UPDATE {table} SET context_version=1,source_app='SYSTEM',"
+                            "actor_type='SYSTEM',operation_id=:operation,correlation_id=:operation,"
+                            "causation_id=:cause,idempotency_key=:key,branch_id=:branch,"
+                            "workstation_id=:workstation,cash_session_id=:cash,"
+                            "operation_code='restore.probe'"
+                            + (",schema_version=1" if table == "outbox_events" else "")
+                            + " WHERE id=:id"
+                        ),
+                        {
+                            "id": row_id,
+                            "operation": idempotency_values["id"],
+                            "cause": uuid.uuid4(),
+                            "key": idempotency_values["idempotency_key"],
+                            "branch": identity["branch"],
+                            "workstation": identity["workstation"],
+                            "cash": identity["cash_session"],
+                        },
+                    )
+                    original_traces[table] = connection.scalar(
+                        text(f"SELECT row_to_json(t) FROM {table} t WHERE id=:id"), {"id": row_id}
+                    )
             with _temporary_database(root_engine, root_config, "dump_target") as (
                 target_config,
                 target_engine,
@@ -5999,6 +6185,12 @@ def test_dump_restore_sanity() -> None:
                             text("SELECT row_to_json(t) FROM idempotency_records t WHERE id=:id"),
                             {"id": idempotency_values["id"]},
                         )
+                        for table, row_id in (("audit_log", audit_id), ("outbox_events", event_id)):
+                            restored_trace = connection.scalar(
+                                text(f"SELECT row_to_json(t) FROM {table} t WHERE id=:id"),
+                                {"id": row_id},
+                            )
+                            assert restored_trace == original_traces[table]
                     assert restored_revision == CANONICAL_HEAD
                     assert restored_audit == 1
                     assert restored_event == 1
@@ -6016,6 +6208,7 @@ def test_dump_restore_sanity() -> None:
                     "audit_rows": restored_audit,
                     "outbox_rows": restored_event,
                     "idempotency_identity_preserved": restored_idempotency == original_idempotency,
+                    "operation_context_preserved": True,
                     "format": "pg_dump custom",
                     "result": "PASS",
                 },

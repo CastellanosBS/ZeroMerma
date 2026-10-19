@@ -217,7 +217,7 @@ def test_admin_reconciliation_can_create_review_resolve_and_keep_cut_immutable(
 
     create_response = client.post(
         "/v1/admin/reconciliation",
-        headers={**headers, "X-Request-ID": "reconciliation-test-create"},
+        headers={**headers, "X-Request-ID": "a21faa90-bdda-5720-a555-e8533fe1cdda"},
         json={
             "evidence_note": "Foto de conteo en caja.",
             "final_status": "IN_REVIEW",
@@ -255,7 +255,7 @@ def test_admin_reconciliation_can_create_review_resolve_and_keep_cut_immutable(
 
     resolve_response = client.post(
         f"/v1/admin/reconciliation/{reconciliation_id}/resolve",
-        headers={**headers, "X-Request-ID": "reconciliation-test-resolve"},
+        headers={**headers, "X-Request-ID": "a933d65c-98d9-5509-9c42-6ee15555e353"},
         json={
             "evidence_note": "Conteo validado contra reporte impreso.",
             "notes": "Se documenta como sobrante aceptado.",

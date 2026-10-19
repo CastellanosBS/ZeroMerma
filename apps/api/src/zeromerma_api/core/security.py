@@ -12,6 +12,7 @@ from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
 from zeromerma_api.core.config import ApiSettings
 from zeromerma_api.presentation.errors import ApiErrorResponse, unhandled_exception_handler
+from zeromerma_api.presentation.operation_context import request_id
 
 API_SECURITY_HEADERS = {
     "X-Content-Type-Options": "nosniff",
@@ -111,7 +112,11 @@ class SecurityBoundaryMiddleware:
 
         if error:
             payload = ApiErrorResponse(
-                code="FORBIDDEN", message=error, details=None, request_id=None, field_errors=None
+                code="FORBIDDEN",
+                message=error,
+                details=None,
+                request_id=request_id(Request(scope)),
+                field_errors=None,
             )
             await JSONResponse(status_code=403, content=payload.model_dump(mode="json"))(
                 scope, receive, secure_send
@@ -130,6 +135,15 @@ def install_security_boundary(app: FastAPI, settings: ApiSettings) -> None:
                 https=bool(request.scope.get("state", {}).get("zeromerma_verified_https"))
             )
         )
+        origin = request.headers.get("Origin")
+        if origin in settings.cors_origins:
+            # Starlette's outer server-error handler does not pass through user middleware.
+            response.headers["Access-Control-Allow-Origin"] = origin
+            response.headers["Access-Control-Allow-Credentials"] = "true"
+            response.headers["Access-Control-Expose-Headers"] = (
+                "Idempotency-Replayed, Retry-After, X-Request-ID, X-Correlation-ID"
+            )
+            response.headers.add_vary_header("Origin")
         return response
 
     app.add_exception_handler(Exception, safe_server_error)

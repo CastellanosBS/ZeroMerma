@@ -7,6 +7,7 @@ from datetime import UTC, datetime
 from typing import Any
 
 from zeromerma_api.core.log_redaction import redact_log
+from zeromerma_api.core.operation_context import OperationContext, current_operation_context
 
 
 class JsonFormatter(logging.Formatter):
@@ -19,6 +20,12 @@ class JsonFormatter(logging.Formatter):
         }
         if record.exc_info:
             payload["exception_type"] = type(record.exc_info[1]).__name__
+        context = getattr(record, "operation_context", None) or current_operation_context()
+        if isinstance(context, OperationContext):
+            payload.update(context.log_fields())
+        status = getattr(record, "http_status", None)
+        if isinstance(status, int):
+            payload["http_status"] = status
         return json.dumps(redact_log(payload), separators=(",", ":"))
 
 

@@ -239,7 +239,9 @@ def test_cash_replay_and_recovery_preserve_exact_result_and_all_effects(
     if kind == "close":
         headers = _login(client)
     before = _state()
-    replay = _post(client, kind, {**headers, "X-Request-ID": "new-attempt"}, body, key)
+    replay = _post(
+        client, kind, {**headers, "X-Request-ID": "69c557b2-ba73-5788-ae47-6c728571a809"}, body, key
+    )
     recovered = _recover(client, kind, headers, body, key)
     assert replay.status_code == original.status_code and recovered.status_code == 200
     assert replay.json() == recovered.json() == original.json()

@@ -711,7 +711,7 @@ def probe_headers(client: TestClient, key: UUID | str) -> dict[str, str]:
     return {
         **login_headers(client, email=SEED_USER_EMAIL, password=SEED_USER_PASSWORD),
         "Idempotency-Key": str(key),
-        "X-Request-ID": "first-http-request",
+        "X-Request-ID": "01aa53c3-3416-5f60-a3a7-c0030b94d192",
     }
 
 
@@ -724,7 +724,7 @@ def test_http_replay_conflict_and_current_correlation(probe_client: TestClient) 
     assert first.headers["Idempotency-Replayed"] == "false"
     replay = probe_client.post(
         "/__validation/idempotency",
-        headers={**headers, "X-Request-ID": "retry-http-request"},
+        headers={**headers, "X-Request-ID": "62c121fe-4914-55cd-8d7c-6c8204dc0a09"},
         json={"amount": "12.300", "labels": []},
     )
     assert replay.status_code == 201, replay.text
@@ -735,7 +735,7 @@ def test_http_replay_conflict_and_current_correlation(probe_client: TestClient) 
     )
     assert mismatch.status_code == 409
     assert mismatch.json()["code"] == "IDEMPOTENCY_KEY_REUSED"
-    assert mismatch.json()["request_id"] == "first-http-request"
+    assert mismatch.json()["request_id"] == "01aa53c3-3416-5f60-a3a7-c0030b94d192"
     assert_effects(1)
 
 
@@ -794,11 +794,11 @@ def test_http_rejection_replay_uses_current_request_id(probe_client: TestClient)
     assert first.json()["code"] == "PROBE_REJECTED"
     replay = probe_client.post(
         "/__validation/idempotency",
-        headers={**headers, "X-Request-ID": "rejected-retry"},
+        headers={**headers, "X-Request-ID": "acce04cc-d329-5953-a1aa-37c5b91ffdab"},
         json={"labels": ["reject"]},
     )
     assert replay.status_code == 409
-    assert replay.json() == {**first.json(), "request_id": "rejected-retry"}
+    assert replay.json() == {**first.json(), "request_id": "acce04cc-d329-5953-a1aa-37c5b91ffdab"}
     assert replay.headers["Idempotency-Replayed"] == "true"
     assert_effects(0, records=1)
 

@@ -58,14 +58,12 @@ export const orderIntentions = createCommandIntentionCoordinator<
     ["create", "mark-ready", "deliver", "cancel"].includes(context.commandCode) &&
     (context.commandCode === "create" ? context.orderId === null : context.orderId !== null),
   send: (context, payload, idempotencyKey) => {
-    const requestId = `orders-${context.commandCode}-${crypto.randomUUID()}`;
     if (context.commandCode === "create")
       return createOrder({
         payload: payload as CreateCustomerOrderRequest,
-        requestId,
         idempotencyKey,
       });
-    const args = { orderId: context.orderId!, payload, requestId, idempotencyKey };
+    const args = { orderId: context.orderId!, payload, idempotencyKey };
     if (context.commandCode === "mark-ready") return markOrderReady(args);
     if (context.commandCode === "deliver") return deliverOrder(args);
     return cancelOrder({ ...args, payload: payload as CancelCustomerOrderRequest });

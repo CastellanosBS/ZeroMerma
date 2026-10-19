@@ -60,7 +60,7 @@ from zeromerma_api.modules.outbox.infrastructure.models import OutboxEvent
 from zeromerma_api.testing.authorization import provision_test_owner
 from zeromerma_api.testing.sessions import login_headers
 
-REQUEST_ID = "auth-transaction-boundary"
+REQUEST_ID = "4e39d274-80cd-4856-b904-0f1057542027"
 NEW_PASSWORD = "Only-test-new-password-039!"
 
 

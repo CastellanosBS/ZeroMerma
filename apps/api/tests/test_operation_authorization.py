@@ -609,7 +609,7 @@ def test_denial_audit_commits_only_after_all_flushed_business_writes_are_rolled_
     with TestClient(app, base_url="https://testserver") as client:
         response = client.post(
             "/v1/admin/inventory/adjustments",
-            headers={**headers, "X-Request-ID": "denial-rollback-proof"},
+            headers={**headers, "X-Request-ID": "710f66b3-98c4-5a6c-b002-ff29c73aec5e"},
             json={"secret": "must-not-be-audited"},
         )
     assert response.status_code == 403
@@ -624,7 +624,7 @@ def test_denial_audit_commits_only_after_all_flushed_business_writes_are_rolled_
         record = records[0]
         assert record.action == "authorization.denied"
         assert record.actor_id == actor.id
-        assert record.request_id == "denial-rollback-proof"
+        assert record.request_id == "710f66b3-98c4-5a6c-b002-ff29c73aec5e"
         assert record.metadata_["required_capabilities"] == ["inventory.adjust"]
         assert (
             record.metadata_["authorization"]["authorization_version"]

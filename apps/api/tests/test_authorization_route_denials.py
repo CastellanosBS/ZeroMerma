@@ -75,9 +75,9 @@ def test_every_mutating_route_denies_without_capabilities_before_body_validation
     assert set(operations).issubset(registered)
     body_secret = f"rejected-body-{uuid4().hex}"
     request_ids = {}
-    for index, (method, template) in enumerate(operations):
+    for method, template in operations:
         path = re.sub(r"\{[^}]+\}", str(uuid4()), template)
-        request_id = f"denied-{surface.lower()}-{index}"
+        request_id = str(uuid4())
         request_ids[(method, template)] = request_id
         # Deliberately invalid domain data must never be accepted as evidence of denial (422).
         body = {"password": body_secret, "notes": body_secret}

@@ -55,7 +55,7 @@ def _create_adjustment(
     response = client.post(
         "/v1/admin/inventory/adjustments",
         headers={
-            **{**_admin_headers(client), "X-Request-ID": "admin-inventory-adjustment-test"},
+            **{**_admin_headers(client), "X-Request-ID": "23792e65-ef7f-5c69-8511-2c6e8833986b"},
             "Idempotency-Key": new_idempotency_key(),
         },
         json={
@@ -123,7 +123,7 @@ def test_admin_inventory_adjustment_persists_balance_movement_audit_and_outbox(
     assert movement.direction == "IN"
     assert movement.balance_after == Decimal("12.000")
     assert audit_record.action == "admin.inventory.adjustment.created"
-    assert audit_record.request_id == "admin-inventory-adjustment-test"
+    assert audit_record.request_id == "23792e65-ef7f-5c69-8511-2c6e8833986b"
     assert outbox_event.event_name == "admin.inventory_adjustment.created.v1"
 
 

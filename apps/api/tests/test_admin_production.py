@@ -136,7 +136,10 @@ def _create_production(
 ) -> dict[str, object]:
     response = client.post(
         "/v1/admin/production",
-        headers={**_production_headers(client), "X-Request-ID": "admin-production-create"},
+        headers={
+            **_production_headers(client),
+            "X-Request-ID": "c5a5cc30-2aa4-5eeb-a9f8-19762f81fb01",
+        },
         json={
             "branch_id": _get_branch_id(SEED_BRANCH_CODE),
             "notes": "Backoffice production draft",
@@ -177,7 +180,10 @@ def _create_started_production(
 
     start_response = client.post(
         f"/v1/admin/production/{production_id}/start",
-        headers={**_production_headers(client), "X-Request-ID": "admin-production-start"},
+        headers={
+            **_production_headers(client),
+            "X-Request-ID": "61b333e9-587e-532c-9911-e6ed53c6b744",
+        },
         json={"notes": "Start batch"},
     )
 
@@ -336,7 +342,10 @@ def test_admin_production_complete_writes_inventory_movements_audit_and_outbox(
 
     complete_response = client.post(
         f"/v1/admin/production/{production_id}/complete",
-        headers={**_production_headers(client), "X-Request-ID": "admin-production-complete"},
+        headers={
+            **_production_headers(client),
+            "X-Request-ID": "df0ed90e-1935-5b00-8a8c-55833b435843",
+        },
         json={
             "actual_output_qty": "18.000",
             "notes": "Yield below plan after cooling",
@@ -390,7 +399,7 @@ def test_admin_production_complete_writes_inventory_movements_audit_and_outbox(
     }
     assert {movement.direction for movement in movements} == {"IN", "OUT"}
     assert output_balance.quantity_on_hand == Decimal("18.000")
-    assert audit_record.request_id == "admin-production-complete"
+    assert audit_record.request_id == "df0ed90e-1935-5b00-8a8c-55833b435843"
     assert outbox_event.aggregate_id == production_id
 
 

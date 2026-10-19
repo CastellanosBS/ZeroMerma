@@ -70,23 +70,19 @@ export const cashIntentions = createCommandIntentionCoordinator<
       ? context.cashSessionId === null
       : context.cashSessionId !== null),
   send: (context, payload, idempotencyKey) => {
-    const requestId = `cash-${context.commandCode}-${crypto.randomUUID()}`;
     if (context.commandCode === "open")
       return openCashSession({
         payload: payload as OpenCashSessionRequest,
-        requestId,
         idempotencyKey,
       });
     if (context.commandCode === "payment")
       return createPayment({
         payload: payload as CreateOperationalPaymentRequest,
-        requestId,
         idempotencyKey,
       });
     if (context.commandCode === "discount")
       return createDiscount({
         payload: payload as CreateOperationalDiscountRequest,
-        requestId,
         idempotencyKey,
       });
     return commitCashClose(payload as CashCloseCommitRequest, idempotencyKey);

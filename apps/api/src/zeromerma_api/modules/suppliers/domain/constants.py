@@ -30,6 +30,11 @@ AUDIT_ACTION_ADMIN_SUPPLIER_PRODUCT_UPDATED = "admin.supplier.product.updated"
 OUTBOX_EVENT_ADMIN_SUPPLIER_CREATED_V1 = "admin.supplier.created.v1"
 OUTBOX_EVENT_ADMIN_SUPPLIER_UPDATED_V1 = "admin.supplier.updated.v1"
 OUTBOX_EVENT_ADMIN_SUPPLIER_STATUS_CHANGED_V1 = "admin.supplier.status_changed.v1"
+OUTBOX_EVENT_ADMIN_SUPPLIER_CONTACT_CREATED_V1 = "admin.supplier.contact.created.v1"
+OUTBOX_EVENT_ADMIN_SUPPLIER_CONTACT_UPDATED_V1 = "admin.supplier.contact.updated.v1"
+OUTBOX_EVENT_ADMIN_SUPPLIER_PRODUCT_LINKED_V1 = "admin.supplier.product.linked.v1"
+OUTBOX_EVENT_ADMIN_SUPPLIER_PRODUCT_UPDATED_V1 = "admin.supplier.product.updated.v1"
+OUTBOX_EVENT_ADMIN_SUPPLIER_BRANCH_UPDATED_V1 = "admin.supplier.branch.updated.v1"
 
 VALID_SUPPLIER_STATUSES = {
     SUPPLIER_STATUS_ACTIVE,

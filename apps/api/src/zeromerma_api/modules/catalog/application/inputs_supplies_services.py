@@ -74,6 +74,9 @@ AUDIT_ACTION_ADMIN_INPUT_SUPPLY_SUPPLIER_UPDATED = "admin.input_supply.supplier_
 AUDIT_ACTION_ADMIN_INPUT_SUPPLY_UPDATED = "admin.input_supply.updated"
 OUTBOX_EVENT_ADMIN_INPUT_SUPPLY_CREATED_V1 = "admin.input_supply.created.v1"
 OUTBOX_EVENT_ADMIN_INPUT_SUPPLY_UPDATED_V1 = "admin.input_supply.updated.v1"
+OUTBOX_EVENT_ADMIN_INPUT_SUPPLY_SUPPLIER_UPDATED_V1 = (
+    "admin.input_supply.supplier_relation.updated.v1"
+)
 INPUT_SUPPLY_RESOURCE_TYPE = "input_supply"
 ZERO = Decimal("0")
 
@@ -353,10 +356,12 @@ class AdminInputSupplyService:
             relation = SupplierProduct(product_id=product.id, supplier_id=supplier.id)
             session.add(relation)
         self._apply_supplier_relation(relation, command)
-        self._record_audit_only(
+        self._record_change(
             session,
             action=AUDIT_ACTION_ADMIN_INPUT_SUPPLY_SUPPLIER_UPDATED,
             current_user=current_user,
+            event_name=OUTBOX_EVENT_ADMIN_INPUT_SUPPLY_SUPPLIER_UPDATED_V1,
+            event_payload={"product_id": str(product.id), "supplier_id": str(supplier.id)},
             metadata={**self._metadata(product), "supplier_id": str(supplier.id)},
             product=product,
             request_id=request_id,
@@ -382,10 +387,16 @@ class AdminInputSupplyService:
             raise ProductNotFoundError("Supplier relation was not found.")
         relation.supplier_id = supplier.id
         self._apply_supplier_relation(relation, command)
-        self._record_audit_only(
+        self._record_change(
             session,
             action=AUDIT_ACTION_ADMIN_INPUT_SUPPLY_SUPPLIER_UPDATED,
             current_user=current_user,
+            event_name=OUTBOX_EVENT_ADMIN_INPUT_SUPPLY_SUPPLIER_UPDATED_V1,
+            event_payload={
+                "product_id": str(product.id),
+                "supplier_id": str(supplier.id),
+                "relation_id": str(relation.id),
+            },
             metadata={**self._metadata(product), "relation_id": str(relation.id)},
             product=product,
             request_id=request_id,
@@ -1161,6 +1172,7 @@ class AdminInputSupplyService:
         metadata: dict[str, object],
         product: Product,
         request_id: str | None,
+        event_payload: dict[str, object] | None = None,
     ) -> None:
         self._record_audit_only(
             session,
@@ -1175,8 +1187,10 @@ class AdminInputSupplyService:
             aggregate_type=INPUT_SUPPLY_RESOURCE_TYPE,
             aggregate_id=str(product.id),
             event_name=event_name,
-            payload=metadata,
+            payload=metadata if event_payload is None else event_payload,
             headers={"request_id": request_id} if request_id else {},
+            actor_id=current_user.id,
+            branch_id=None,
         )
 
     def _record_audit_only(

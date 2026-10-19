@@ -54,7 +54,7 @@ def _branch_id() -> str:
 def _create_supplier(client: TestClient, *, code: str = "SUP-INSUMOS") -> dict[str, object]:
     response = client.post(
         "/v1/admin/suppliers",
-        headers={**_admin_headers(client), "X-Request-ID": "input-supply-supplier"},
+        headers={**_admin_headers(client), "X-Request-ID": "1b04c68e-a09b-5603-b275-b271e8d57749"},
         json={
             "branch_ids": [_branch_id()],
             "category": "RAW_MATERIALS",
@@ -129,7 +129,7 @@ def _create_input(client: TestClient, *, code: str = "HARINA-TRIGO") -> dict[str
     supplier_id = str(supplier["overview"]["id"])
     response = client.post(
         "/v1/admin/inputs-supplies",
-        headers={**_admin_headers(client), "X-Request-ID": "input-supply-create"},
+        headers={**_admin_headers(client), "X-Request-ID": "f08b065f-ad31-559b-b855-aeee1464e1d6"},
         json=_input_payload(code=code, supplier_id=supplier_id),
     )
     assert response.status_code == 201
@@ -187,7 +187,7 @@ def test_admin_inputs_supplies_create_detail_audit_and_supplier_relation(
     assert product.purchase_unit_of_measure == "SACK"
     assert relation.conversion_factor == Decimal("44.000000")
     assert audit_record.action == "admin.input_supply.created"
-    assert audit_record.request_id == "input-supply-create"
+    assert audit_record.request_id == "f08b065f-ad31-559b-b855-aeee1464e1d6"
     assert outbox_event.event_name == "admin.input_supply.created.v1"
 
 

@@ -55,7 +55,12 @@ from zeromerma_api.modules.suppliers.domain.constants import (
     AUDIT_ACTION_ADMIN_SUPPLIER_PRODUCT_UPDATED,
     AUDIT_ACTION_ADMIN_SUPPLIER_STATUS_CHANGED,
     AUDIT_ACTION_ADMIN_SUPPLIER_UPDATED,
+    OUTBOX_EVENT_ADMIN_SUPPLIER_BRANCH_UPDATED_V1,
+    OUTBOX_EVENT_ADMIN_SUPPLIER_CONTACT_CREATED_V1,
+    OUTBOX_EVENT_ADMIN_SUPPLIER_CONTACT_UPDATED_V1,
     OUTBOX_EVENT_ADMIN_SUPPLIER_CREATED_V1,
+    OUTBOX_EVENT_ADMIN_SUPPLIER_PRODUCT_LINKED_V1,
+    OUTBOX_EVENT_ADMIN_SUPPLIER_PRODUCT_UPDATED_V1,
     OUTBOX_EVENT_ADMIN_SUPPLIER_STATUS_CHANGED_V1,
     OUTBOX_EVENT_ADMIN_SUPPLIER_UPDATED_V1,
     SUPPLIER_CATEGORY_MIXED,
@@ -385,11 +390,13 @@ class AdminSupplierService:
         supplier_id: uuid.UUID,
     ) -> AdminSupplierDetailView:
         supplier = self._get_supplier(session, supplier_id)
-        self._upsert_contact(session, supplier=supplier, command=command)
-        self._record_audit_only(
+        contact = self._upsert_contact(session, supplier=supplier, command=command)
+        self._record_change(
             session,
             action=AUDIT_ACTION_ADMIN_SUPPLIER_CONTACT_CREATED,
             current_user=current_user,
+            event_name=OUTBOX_EVENT_ADMIN_SUPPLIER_CONTACT_CREATED_V1,
+            event_payload={"supplier_id": str(supplier.id), "contact_id": str(contact.id)},
             metadata=self._metadata(supplier),
             request_id=request_id,
             supplier=supplier,
@@ -417,10 +424,12 @@ class AdminSupplierService:
             self._clear_other_primary_contacts(
                 session, supplier_id=supplier.id, except_contact_id=contact.id
             )
-        self._record_audit_only(
+        self._record_change(
             session,
             action=AUDIT_ACTION_ADMIN_SUPPLIER_CONTACT_UPDATED,
             current_user=current_user,
+            event_name=OUTBOX_EVENT_ADMIN_SUPPLIER_CONTACT_UPDATED_V1,
+            event_payload={"supplier_id": str(supplier.id), "contact_id": str(contact.id)},
             metadata=self._metadata(supplier),
             request_id=request_id,
             supplier=supplier,
@@ -440,12 +449,20 @@ class AdminSupplierService:
     ) -> AdminSupplierDetailView:
         supplier = self._get_supplier(session, supplier_id)
         created = self._upsert_product_relation(session, supplier=supplier, command=command)
-        self._record_audit_only(
+        self._record_change(
             session,
             action=AUDIT_ACTION_ADMIN_SUPPLIER_PRODUCT_LINKED
             if created
             else AUDIT_ACTION_ADMIN_SUPPLIER_PRODUCT_UPDATED,
             current_user=current_user,
+            event_name=OUTBOX_EVENT_ADMIN_SUPPLIER_PRODUCT_LINKED_V1
+            if created
+            else OUTBOX_EVENT_ADMIN_SUPPLIER_PRODUCT_UPDATED_V1,
+            event_payload={
+                "supplier_id": str(supplier.id),
+                "product_id": str(command.product_id),
+                "is_active": command.is_active,
+            },
             metadata={
                 **self._metadata(supplier),
                 "product_id": str(command.product_id),
@@ -475,10 +492,17 @@ class AdminSupplierService:
         self._apply_product_relation(
             relation, command, self._get_product(session, command.product_id)
         )
-        self._record_audit_only(
+        self._record_change(
             session,
             action=AUDIT_ACTION_ADMIN_SUPPLIER_PRODUCT_UPDATED,
             current_user=current_user,
+            event_name=OUTBOX_EVENT_ADMIN_SUPPLIER_PRODUCT_UPDATED_V1,
+            event_payload={
+                "supplier_id": str(supplier.id),
+                "product_id": str(relation.product_id),
+                "relation_id": str(relation.id),
+                "is_active": relation.is_active,
+            },
             metadata={
                 **self._metadata(supplier),
                 "relation_id": str(relation.id),
@@ -518,10 +542,17 @@ class AdminSupplierService:
         else:
             relation.delivery_notes = command.delivery_notes
             relation.is_active = command.is_active
-        self._record_audit_only(
+        self._record_change(
             session,
             action=AUDIT_ACTION_ADMIN_SUPPLIER_UPDATED,
             current_user=current_user,
+            event_name=OUTBOX_EVENT_ADMIN_SUPPLIER_BRANCH_UPDATED_V1,
+            event_payload={
+                "supplier_id": str(supplier.id),
+                "branch_id": str(branch.id),
+                "is_active": relation.is_active,
+            },
+            branch_id=branch.id,
             metadata={
                 **self._metadata(supplier),
                 "branch_id": str(branch.id),
@@ -880,7 +911,7 @@ class AdminSupplierService:
     ) -> SupplierContact:
         if command.is_primary:
             self._clear_other_primary_contacts(session, supplier_id=supplier.id)
-        contact = SupplierContact(supplier_id=supplier.id)
+        contact = SupplierContact(id=uuid.uuid4(), supplier_id=supplier.id)
         self._apply_contact(contact, command)
         session.add(contact)
         return contact
@@ -1112,6 +1143,8 @@ class AdminSupplierService:
         metadata: dict[str, object],
         request_id: str | None,
         supplier: Supplier,
+        event_payload: dict[str, object] | None = None,
+        branch_id: uuid.UUID | None = None,
     ) -> None:
         self._record_audit_only(
             session,
@@ -1120,14 +1153,17 @@ class AdminSupplierService:
             metadata=metadata,
             request_id=request_id,
             supplier=supplier,
+            branch_id=branch_id,
         )
         self._outbox_writer.append(
             session,
             aggregate_type=SUPPLIER_RESOURCE_TYPE,
             aggregate_id=str(supplier.id),
             event_name=event_name,
-            payload=metadata,
+            payload=metadata if event_payload is None else event_payload,
             headers={"request_id": request_id} if request_id else {},
+            actor_id=current_user.id,
+            branch_id=branch_id,
         )
 
     def _record_audit_only(
@@ -1139,6 +1175,7 @@ class AdminSupplierService:
         metadata: dict[str, object],
         request_id: str | None,
         supplier: Supplier,
+        branch_id: uuid.UUID | None = None,
     ) -> None:
         self._audit_recorder.record(
             session,
@@ -1146,7 +1183,7 @@ class AdminSupplierService:
             action=action,
             resource_type=SUPPLIER_RESOURCE_TYPE,
             resource_id=str(supplier.id),
-            branch_id=None,
+            branch_id=branch_id,
             request_id=request_id,
             metadata=metadata,
         )

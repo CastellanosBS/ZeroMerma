@@ -141,6 +141,13 @@ session. DEC-18 requires business effects and the events describing them to comm
 together. An outbox failure must not leave a successful sale, stock movement or
 administrative change without its required trace.
 
+[Operation context](operation-context.md) is captured by these participants and
+propagated to authentication triggers using transaction-local PostgreSQL settings.
+Context binding and savepoint restoration do not create new owners. Independent
+denial auditing explicitly retains the failed operation's safe context without
+committing its business writes. Metadata-only export and reprint events record
+the accepted application action; they do not prove delivery or physical printing.
+
 The independent worker currently owns a read transaction through
 `OutboxPoller.poll_once` and `Engine.begin`. Its `FOR UPDATE SKIP LOCKED` query
 releases locks when that transaction ends. It neither claims events durably nor
@@ -165,6 +172,6 @@ must retain all effects and allow result recovery.
 
 ZM-FIN-039 does not add missing ledgers, change close totals, complete physical POS
 effects or introduce a new worker processor. Order-payment ledger integration
-remains 042. Request/event correlation remains 040, including the separately
-recorded equipment-maintenance identifier issue. The 19 administrative idempotency
+remains 042. Request/event correlation and pre-trace aggregate identity are covered
+by the 040 design and its separate validation record. The 19 administrative idempotency
 gaps in 077/080/085, reconciliation gaps and purchase PATCH UI gap remain open.

@@ -1383,6 +1383,8 @@ class AdminUserService:
             aggregate_type=USER_RESOURCE_TYPE,
             aggregate_id=str(user.id),
             event_name=event_name,
+            actor_id=current_user.id,
+            branch_id=None,
             payload=metadata,
             headers={"request_id": request_id} if request_id else {},
         )
@@ -1412,6 +1414,8 @@ class AdminUserService:
             aggregate_type=USER_RESOURCE_TYPE,
             aggregate_id=str(user.id),
             event_name=OUTBOX_EVENT_ADMIN_USER_BRANCH_ASSIGNMENT_CHANGED_V1,
+            actor_id=current_user.id,
+            branch_id=branch.id,
             payload={**metadata, "branch_id": str(branch.id), "branch_code": branch.code},
             headers={"request_id": request_id} if request_id else {},
         )
@@ -1447,6 +1451,8 @@ class AdminUserService:
             aggregate_type=USER_RESOURCE_TYPE,
             aggregate_id=str(user.id),
             event_name=OUTBOX_EVENT_ADMIN_USER_ROLE_ASSIGNMENT_CHANGED_V1,
+            actor_id=current_user.id,
+            branch_id=None,
             payload=payload,
             headers={"request_id": request_id} if request_id else {},
         )

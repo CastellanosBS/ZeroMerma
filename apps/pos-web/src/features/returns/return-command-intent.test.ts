@@ -49,13 +49,11 @@ beforeEach(() => {
     value: { request: vi.fn(async (_name, _options, callback) => callback({ name: "lock" })) },
   });
   Object.values(mocks).forEach((mock) =>
-    mock
-      .mockReset()
-      .mockResolvedValue({
-        id: "return",
-        original_sale_id: "sale",
-        refund_cash_movement_id: "refund",
-      }),
+    mock.mockReset().mockResolvedValue({
+      id: "return",
+      original_sale_id: "sale",
+      refund_cash_movement_id: "refund",
+    }),
   );
 });
 afterEach(() => vi.unstubAllGlobals());
@@ -69,7 +67,7 @@ it("retries the frozen return with the same identity and persists metadata only"
   const [first, second] = mocks.commit.mock.calls.map((call) => call[0]);
   expect(second.payload.lines[0].returned_quantity).toBe("0.333");
   expect(second.idempotencyKey).toBe(first.idempotencyKey);
-  expect(second.requestId).not.toBe(first.requestId);
+  expect(second).not.toHaveProperty("requestId");
   const saved = JSON.parse(localStorage.getItem("zeromerma-return-intention:station")!);
   expect(Object.keys(saved).sort()).toEqual(
     [

@@ -61,7 +61,7 @@ def test_discounts_bootstrap_list_detail_and_cash_commit_work_end_to_end(
     _open_cash_session(client)
     headers = {
         **_authorization_header(client),
-        "X-Request-ID": "discounts-cash-commit",
+        "X-Request-ID": "8ff80c16-e473-5f5d-bd95-2437501d5660",
     }
 
     bootstrap_response = client.get(
@@ -170,7 +170,7 @@ def test_discounts_bootstrap_list_detail_and_cash_commit_work_end_to_end(
 
     assert cash_movement.direction == "IN"
     assert cash_movement.sale_id is None
-    assert audit_record.request_id == "discounts-cash-commit"
+    assert audit_record.request_id == "8ff80c16-e473-5f5d-bd95-2437501d5660"
     assert outbox_event.payload["payment_method_code"] == "CASH"
 
 
@@ -305,7 +305,7 @@ def test_discounts_list_supports_scope_and_operator_filters_and_high_value_alert
     _open_cash_session(client)
     headers = {
         **_authorization_header(client),
-        "X-Request-ID": "discounts-high-value",
+        "X-Request-ID": "343f3f88-2ffa-5e93-9ea5-e0d1242e0a8f",
     }
 
     cash_command_headers = {**headers, "Idempotency-Key": new_idempotency_key()}

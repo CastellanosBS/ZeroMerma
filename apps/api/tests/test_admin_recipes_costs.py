@@ -79,7 +79,7 @@ def test_admin_recipe_create_calculates_cost_and_writes_audit(
 
     response = client.post(
         "/v1/admin/recipes-costs/recipes",
-        headers={**_admin_headers(client), "X-Request-ID": "admin-recipe-create-test"},
+        headers={**_admin_headers(client), "X-Request-ID": "25f5ad06-353c-50bc-a5cc-ebff6977d980"},
         json={
             "product_id": product_id,
             "version_name": "Base",
@@ -110,7 +110,7 @@ def test_admin_recipe_create_calculates_cost_and_writes_audit(
         ).scalar_one()
 
     assert audit_record.action == "admin.recipe.created"
-    assert audit_record.request_id == "admin-recipe-create-test"
+    assert audit_record.request_id == "25f5ad06-353c-50bc-a5cc-ebff6977d980"
     assert outbox_event.event_name == "admin.recipe.created.v1"
 
 
@@ -286,7 +286,7 @@ def test_admin_recipe_apply_standard_cost_updates_product(client: TestClient) ->
 
     response = client.post(
         f"/v1/admin/recipes-costs/recipes/{recipe_id}/apply-standard-cost",
-        headers={**headers, "X-Request-ID": "admin-standard-cost-test"},
+        headers={**headers, "X-Request-ID": "3d1c2e16-eecb-5c03-8030-684d88085c93"},
     )
 
     assert response.status_code == 200
@@ -304,4 +304,4 @@ def test_admin_recipe_apply_standard_cost_updates_product(client: TestClient) ->
         ).scalar_one()
 
     assert product.standard_cost == Decimal("10.0000")
-    assert audit_record.request_id == "admin-standard-cost-test"
+    assert audit_record.request_id == "3d1c2e16-eecb-5c03-8030-684d88085c93"

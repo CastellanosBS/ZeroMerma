@@ -96,7 +96,7 @@ def _create_incident(client: TestClient, **overrides: object) -> dict[str, objec
     payload.update(overrides)
     response = client.post(
         "/v1/admin/incidents",
-        headers={**_admin_headers(client), "X-Request-ID": "incident-test"},
+        headers={**_admin_headers(client), "X-Request-ID": "8f46424c-6a2a-58cb-ba77-32c289c01caa"},
         json=payload,
     )
     assert response.status_code == 201

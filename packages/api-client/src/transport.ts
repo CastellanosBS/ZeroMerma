@@ -16,6 +16,12 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
+function safeTraceId(value: string | null): string | null {
+  return value && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value)
+    ? value.toLowerCase()
+    : null;
+}
+
 export function isApiErrorResponse(value: unknown): value is ApiErrorResponse {
   if (!isRecord(value)) {
     return false;
@@ -49,17 +55,23 @@ export class ApiError extends Error {
   readonly responseBody: unknown;
   readonly statusCode: number;
   readonly idempotencyReplayed: boolean;
+  readonly requestId: string | null;
+  readonly correlationId: string | null;
 
   constructor(
     statusCode: number,
     message: string,
     responseBody: unknown,
     idempotencyReplayed = false,
+    requestId: string | null = null,
+    correlationId: string | null = null,
   ) {
     super(message);
     this.name = "ApiError";
     this.statusCode = statusCode;
     this.idempotencyReplayed = idempotencyReplayed;
+    this.requestId = safeTraceId(requestId);
+    this.correlationId = safeTraceId(correlationId);
     this.responseBody = responseBody;
     this.error = isApiErrorResponse(responseBody) ? responseBody : null;
   }
@@ -78,6 +90,10 @@ export async function requestApiJson<TResponse>({
 
   if (requestHeaders.has("Authorization"))
     throw new Error("Bearer authentication is not supported.");
+  // Each HTTP attempt is distinct; the intention key remains owned by its coordinator.
+  const requestId = crypto.randomUUID();
+  requestHeaders.set("X-Request-ID", requestId);
+  requestHeaders.delete("X-Correlation-ID");
   requestHeaders.set("X-ZeroMerma-Surface", surface);
   requestHeaders.delete("X-CSRF-Token");
   if (method !== "GET" && csrfToken) requestHeaders.set("X-CSRF-Token", csrfToken);
@@ -111,6 +127,8 @@ export async function requestApiJson<TResponse>({
       message,
       responseBody,
       response.headers.get("Idempotency-Replayed") === "true",
+      safeTraceId(response.headers.get("X-Request-ID")) ?? requestId,
+      safeTraceId(response.headers.get("X-Correlation-ID")),
     );
   }
 

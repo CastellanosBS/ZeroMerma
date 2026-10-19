@@ -41,6 +41,7 @@ from zeromerma_api.modules.configuration.infrastructure.models import (
 from zeromerma_api.modules.identity.application.actions import action_allowed
 from zeromerma_api.modules.identity.application.schemas import AuthenticatedUser
 from zeromerma_api.modules.identity.infrastructure.models import User
+from zeromerma_api.modules.outbox.application.service import OutboxWriter
 
 SETTING_SCOPE_GLOBAL = "global"
 SETTING_EMPTY_SCOPE_ID = ""
@@ -52,6 +53,8 @@ SETTING_WARNING_WARNING = "warning"
 SETTING_WARNING_BLOCKED = "blocked"
 AUDIT_ACTION_SETTING_UPDATED = "admin.setting.updated"
 AUDIT_ACTION_SETTING_RESET = "admin.setting.reset"
+OUTBOX_EVENT_SETTING_UPDATED_V1 = "admin.setting.updated.v1"
+OUTBOX_EVENT_SETTING_RESET_V1 = "admin.setting.reset.v1"
 SETTING_RESOURCE_TYPE = "system_setting"
 
 
@@ -87,9 +90,11 @@ class AdminSettingService:
         self,
         *,
         audit_recorder: AuditRecorder | None = None,
+        outbox_writer: OutboxWriter | None = None,
         settings: ApiSettings | None = None,
     ) -> None:
         self._audit_recorder = audit_recorder or AuditRecorder()
+        self._outbox_writer = outbox_writer or OutboxWriter()
         self._settings = settings or get_settings()
 
     def list_settings(
@@ -204,9 +209,10 @@ class AdminSettingService:
             new_value=normalized_value,
             change_note=change_note,
         )
-        self._record_audit(
+        self._record_change(
             session,
             action=AUDIT_ACTION_SETTING_UPDATED,
+            event_name=OUTBOX_EVENT_SETTING_UPDATED_V1,
             current_user=current_user,
             definition=definition,
             old_value=old_value,
@@ -248,9 +254,10 @@ class AdminSettingService:
             new_value=default_value,
             change_note=change_note or "Reset to default value.",
         )
-        self._record_audit(
+        self._record_change(
             session,
             action=AUDIT_ACTION_SETTING_RESET,
+            event_name=OUTBOX_EVENT_SETTING_RESET_V1,
             current_user=current_user,
             definition=definition,
             old_value=old_value,
@@ -526,11 +533,12 @@ class AdminSettingService:
             )
         )
 
-    def _record_audit(
+    def _record_change(
         self,
         session: Session,
         *,
         action: str,
+        event_name: str,
         current_user: AuthenticatedUser,
         definition: _SettingDefinition,
         old_value: Any,
@@ -555,6 +563,15 @@ class AdminSettingService:
                 "scope": SETTING_SCOPE_GLOBAL,
                 "setting_key": definition.key,
             },
+        )
+        self._outbox_writer.append(
+            session,
+            aggregate_type=SETTING_RESOURCE_TYPE,
+            aggregate_id=definition.key,
+            event_name=event_name,
+            actor_id=current_user.id,
+            branch_id=None,
+            payload={"setting_key": definition.key, "scope": SETTING_SCOPE_GLOBAL},
         )
 
     def _mask_for_audit(self, definition: _SettingDefinition, value: Any) -> Any:

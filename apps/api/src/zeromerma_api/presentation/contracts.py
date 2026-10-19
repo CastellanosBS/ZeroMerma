@@ -53,10 +53,52 @@ def normalize_contract_schema(schema: dict[str, Any]) -> dict[str, Any]:
     normalized["x-zeromerma-contract-schema-version"] = CONTRACT_SCHEMA_VERSION
     normalized["x-zeromerma-source"] = "FASTAPI_PYDANTIC"
     add_idempotency_contract(normalized)
+    components = normalized.setdefault("components", {})
+    components.setdefault("parameters", {})["RequestId"] = {
+        "name": "X-Request-ID",
+        "in": "header",
+        "required": False,
+        "description": (
+            "UUID for this HTTP attempt. Missing, duplicate or invalid IDs are replaced."
+        ),
+        "schema": {"type": "string", "format": "uuid"},
+    }
+    for name, description in {
+        "RequestId": "Validated UUID identifying this HTTP attempt.",
+        "CorrelationId": (
+            "Server-owned operation correlation; stable for authorized command replay."
+        ),
+    }.items():
+        components.setdefault("headers", {})[name] = {
+            "description": description,
+            "schema": {"type": "string", "format": "uuid"},
+        }
+    normalized["x-zeromerma-operation-context"] = {
+        "context_version": 1,
+        "request_id_format": "UUID",
+        "invalid_request_id": "REPLACE",
+        "client_correlation_id": "IGNORED",
+        "source_authority": "VERIFIED_SESSION_OR_EXPLICIT_SYSTEM_BOUNDARY",
+    }
     for path_item in normalized.get("paths", {}).values():
         for method, operation in path_item.items():
             if method in _HTTP_METHODS and isinstance(operation, dict):
                 operation["x-zeromerma-operation-id-policy"] = "FASTAPI_STABLE_GENERATED"
+                parameters = operation.setdefault("parameters", [])
+                parameters[:] = [
+                    item
+                    for item in parameters
+                    if item.get("name") != "X-Request-ID"
+                    and item.get("$ref") != "#/components/parameters/RequestId"
+                ]
+                parameters.append(deepcopy(components["parameters"]["RequestId"]))
+                for response in operation.get("responses", {}).values():
+                    response.setdefault("headers", {}).update(
+                        {
+                            "X-Request-ID": {"$ref": "#/components/headers/RequestId"},
+                            "X-Correlation-ID": {"$ref": "#/components/headers/CorrelationId"},
+                        }
+                    )
     _annotate_wire_types(normalized)
     return normalized
 

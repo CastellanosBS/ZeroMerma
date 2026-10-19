@@ -47,6 +47,7 @@ from zeromerma_api.modules.operations.infrastructure.models import (
     OperationDocumentLine,
     WasteReason,
 )
+from zeromerma_api.modules.outbox.application.service import OutboxWriter
 from zeromerma_api.modules.payments.infrastructure.models import (
     OperationalPayment,
     OperationalPaymentCategory,
@@ -78,6 +79,7 @@ REPORT_STATUS_REQUIRES_BACKEND = "requires_backend"
 REPORT_STATUS_COMING_SOON = "coming_soon"
 REPORT_EXPORT_JSON = "json"
 AUDIT_ACTION_REPORT_EXPORTED = "admin.report.exported"
+OUTBOX_EVENT_REPORT_EXPORTED_V1 = "admin.report.exported.v1"
 REPORT_RESOURCE_TYPE = "report"
 MAX_PREVIEW_ROWS = 100
 
@@ -140,8 +142,13 @@ _ReportPreviewBuilder = Callable[
 
 
 class AdminReportService:
-    def __init__(self, audit_recorder: AuditRecorder | None = None) -> None:
+    def __init__(
+        self,
+        audit_recorder: AuditRecorder | None = None,
+        outbox_writer: OutboxWriter | None = None,
+    ) -> None:
         self._audit_recorder = audit_recorder or AuditRecorder()
+        self._outbox_writer = outbox_writer or OutboxWriter()
 
     def list_reports(
         self,
@@ -246,6 +253,19 @@ class AdminReportService:
                 "result": "success",
                 "row_count": len(preview.rows),
                 "source_app": "BACKOFFICE",
+            },
+        )
+        self._outbox_writer.append(
+            session,
+            aggregate_type=REPORT_RESOURCE_TYPE,
+            aggregate_id=definition.code,
+            event_name=OUTBOX_EVENT_REPORT_EXPORTED_V1,
+            actor_id=current_user.id,
+            branch_id=_uuid_filter(preview.filters_applied, "branch_id"),
+            payload={
+                "report_code": definition.code,
+                "format": normalized_format,
+                "row_count": len(preview.rows),
             },
         )
         session.commit()

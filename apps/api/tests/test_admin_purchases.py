@@ -91,7 +91,7 @@ def _create_supplier(
 ) -> dict[str, object]:
     response = client.post(
         "/v1/admin/suppliers",
-        headers={**_admin_headers(client), "X-Request-ID": "admin-purchase-supplier"},
+        headers={**_admin_headers(client), "X-Request-ID": "1dc3991f-08be-58c1-b15b-e22942fb7338"},
         json=_supplier_payload(code=code, tax_id=tax_id),
     )
     assert response.status_code == 201
@@ -139,7 +139,7 @@ def _create_purchase(client: TestClient, *, confirm_now: bool = False) -> dict[s
     response = client.post(
         "/v1/admin/purchases",
         headers={
-            **{**_admin_headers(client), "X-Request-ID": "admin-purchase-create"},
+            **{**_admin_headers(client), "X-Request-ID": "3807aa3f-8067-5491-9ff9-16707079fbc3"},
             "Idempotency-Key": new_idempotency_key(),
         },
         json=_purchase_payload(
@@ -206,7 +206,7 @@ def test_admin_purchases_create_draft_detail_audit_and_no_inventory_movement(
 
     assert movement_count == []
     assert audit_record.action == "admin.purchase.created"
-    assert audit_record.request_id == "admin-purchase-create"
+    assert audit_record.request_id == "3807aa3f-8067-5491-9ff9-16707079fbc3"
     assert outbox_event.event_name == "admin.purchase.created.v1"
 
 
@@ -306,7 +306,7 @@ def test_admin_purchases_confirm_and_receive_full_purchase_creates_inventory_mov
     receive_response = client.post(
         f"/v1/admin/purchases/{purchase_id}/receive",
         headers={
-            **{**_admin_headers(client), "X-Request-ID": "admin-purchase-receive"},
+            **{**_admin_headers(client), "X-Request-ID": "b78d2f08-92cc-5af1-b562-be66b47f6d83"},
             "Idempotency-Key": new_idempotency_key(),
         },
         json={
@@ -344,7 +344,7 @@ def test_admin_purchases_confirm_and_receive_full_purchase_creates_inventory_mov
     assert movement.source_document_type == "PURCHASE_RECEIPT"
     assert supplier_product is not None
     assert supplier_product.last_known_price == Decimal("13.7500")
-    assert receipt_audit.request_id == "admin-purchase-receive"
+    assert receipt_audit.request_id == "b78d2f08-92cc-5af1-b562-be66b47f6d83"
     assert receipt_outbox.event_name == "admin.purchase.received.v1"
 
 
@@ -408,7 +408,7 @@ def test_admin_purchases_direct_entry_creates_received_document_and_inventory(
     response = client.post(
         "/v1/admin/purchases/direct-entry",
         headers={
-            **{**_admin_headers(client), "X-Request-ID": "admin-direct-entry"},
+            **{**_admin_headers(client), "X-Request-ID": "789c4ebb-e79a-5541-92c3-a08e90125951"},
             "Idempotency-Key": new_idempotency_key(),
         },
         json={

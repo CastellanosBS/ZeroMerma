@@ -70,7 +70,7 @@ def _create_equipment(client: TestClient, **overrides: object) -> dict[str, obje
     payload.update(overrides)
     response = client.post(
         "/v1/admin/equipment-maintenance/equipment",
-        headers={**_admin_headers(client), "X-Request-ID": "equipment-test"},
+        headers={**_admin_headers(client), "X-Request-ID": "291192ea-df69-5dcd-8eed-42c656bb0df9"},
         json=payload,
     )
     assert response.status_code == 201
@@ -198,7 +198,7 @@ def test_admin_equipment_create_persists_audit_outbox_and_related_quality_record
 
     assert equipment.code == "EQ-OVEN-01"
     assert audit_records[0].action == "admin.equipment.created"
-    assert audit_records[0].request_id == "equipment-test"
+    assert audit_records[0].request_id == "291192ea-df69-5dcd-8eed-42c656bb0df9"
     assert any(record.action == "admin.equipment.high_risk.notified" for record in audit_records)
     assert outbox_events[0].event_name == "equipment.created.v1"
     assert any(event.event_name == "equipment.high_risk_alert.v1" for event in outbox_events)
@@ -279,7 +279,7 @@ def test_admin_equipment_maintenance_create_start_complete_and_validate(
 
     maintenance_response = client.post(
         "/v1/admin/equipment-maintenance/maintenance",
-        headers={**_admin_headers(client), "X-Request-ID": "maintenance-create-test"},
+        headers={**_admin_headers(client), "X-Request-ID": "b2894152-c8fe-5162-976c-855ea705ce13"},
         json={
             "description": "Revision de temperatura y sellos.",
             "equipment_id": equipment_id,
@@ -326,7 +326,7 @@ def test_admin_equipment_maintenance_create_start_complete_and_validate(
 
     complete_response = client.post(
         f"/v1/admin/equipment-maintenance/maintenance/{maintenance_id}/complete",
-        headers={**_admin_headers(client), "X-Request-ID": "maintenance-complete-test"},
+        headers={**_admin_headers(client), "X-Request-ID": "77e3b699-49b9-5486-b57f-42367b9ccd27"},
         json={
             "completed_at": datetime.now(tz=UTC).isoformat(),
             "cost": "1500.00",
@@ -363,5 +363,5 @@ def test_admin_equipment_maintenance_create_start_complete_and_validate(
         ).scalar_one()
 
     assert record.status == "COMPLETED"
-    assert completed_audit.request_id == "maintenance-complete-test"
+    assert completed_audit.request_id == "77e3b699-49b9-5486-b57f-42367b9ccd27"
     assert completed_event.payload["status"] == "COMPLETED"

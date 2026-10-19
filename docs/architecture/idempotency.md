@@ -368,9 +368,14 @@ nine recovery GETs, partial receipts and browser recovery behavior are described
 [the operational validation record](../implementation/operations-idempotency-validation.md).
 The common browser coordinator invalidates volatile bodies across login changes,
 including asynchronous lock/digest windows; unknown results keep their original key.
-The wider review of commit ownership belongs to 039 and unified causal context to
-040. Historical order request correlation is not converted into fabricated
-idempotency records during adoption.
+The commit-ownership convention is implemented in
+[transaction-boundaries.md](transaction-boundaries.md). The unified causal-context
+design for 040 is documented in [operation-context.md](operation-context.md): an
+HTTP attempt retains its own request UUID, while an authorized command/recovery
+binds the durable idempotency record UUID as its operation and correlation ID.
+Replay does not rewrite the original audit/outbox or immutable response. Historical
+order request correlation is not converted into fabricated idempotency records
+during adoption.
 
 Read-only endpoints do not require idempotency keys. The shared foundation is
 tested through isolated transactional commands; no diagnostic business endpoint

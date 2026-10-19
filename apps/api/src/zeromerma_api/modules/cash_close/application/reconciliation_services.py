@@ -905,6 +905,8 @@ class AdminReconciliationService:
         )
         self._outbox_writer.append(
             session,
+            actor_id=current_user.id,
+            branch_id=record.branch_id,
             aggregate_id=str(record.id),
             aggregate_type=ADMIN_RECONCILIATION_RESOURCE_TYPE,
             event_name=event_name,

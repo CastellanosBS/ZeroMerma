@@ -106,11 +106,9 @@ export function getOrdersClassProducts({
 
 export function createOrder({
   payload,
-  requestId,
   idempotencyKey,
 }: {
   payload: CreateCustomerOrderRequest;
-  requestId: string;
   idempotencyKey: string;
 }): Promise<OrderCommandResultView> {
   return requestJson<OrderCommandResultView>({
@@ -118,7 +116,6 @@ export function createOrder({
     method: "POST",
     path: "/v1/orders",
     headers: {
-      "X-Request-ID": requestId,
       "Idempotency-Key": idempotencyKey,
     },
   });
@@ -127,12 +124,10 @@ export function createOrder({
 export function markOrderReady({
   orderId,
   payload,
-  requestId,
   idempotencyKey,
 }: {
   orderId: string;
   payload: OrderActionRequest;
-  requestId: string;
   idempotencyKey: string;
 }): Promise<OrderCommandResultView> {
   return requestJson<OrderCommandResultView>({
@@ -140,7 +135,6 @@ export function markOrderReady({
     method: "POST",
     path: `/v1/orders/${encodeURIComponent(orderId)}/mark-ready`,
     headers: {
-      "X-Request-ID": requestId,
       "Idempotency-Key": idempotencyKey,
     },
   });
@@ -149,12 +143,10 @@ export function markOrderReady({
 export function deliverOrder({
   orderId,
   payload,
-  requestId,
   idempotencyKey,
 }: {
   orderId: string;
   payload: DeliverCustomerOrderRequest;
-  requestId: string;
   idempotencyKey: string;
 }): Promise<OrderCommandResultView> {
   return requestJson<OrderCommandResultView>({
@@ -162,7 +154,6 @@ export function deliverOrder({
     method: "POST",
     path: `/v1/orders/${encodeURIComponent(orderId)}/deliver`,
     headers: {
-      "X-Request-ID": requestId,
       "Idempotency-Key": idempotencyKey,
     },
   });
@@ -171,12 +162,10 @@ export function deliverOrder({
 export function cancelOrder({
   orderId,
   payload,
-  requestId,
   idempotencyKey,
 }: {
   orderId: string;
   payload: CancelCustomerOrderRequest;
-  requestId: string;
   idempotencyKey: string;
 }): Promise<OrderCommandResultView> {
   return requestJson<OrderCommandResultView>({
@@ -184,7 +173,6 @@ export function cancelOrder({
     method: "POST",
     path: `/v1/orders/${encodeURIComponent(orderId)}/cancel`,
     headers: {
-      "X-Request-ID": requestId,
       "Idempotency-Key": idempotencyKey,
     },
   });

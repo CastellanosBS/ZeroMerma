@@ -139,7 +139,7 @@ def test_ticket_detail_and_reprint_are_available_in_current_branch_context(
     sale_payload = _confirm_sale(client)
     headers = {
         **_authorization_header(client),
-        "X-Request-ID": "tickets-reprint-request",
+        "X-Request-ID": "39c4ca0e-02e9-5df4-915b-2567bcdaea67",
     }
 
     detail_response = client.get(
@@ -175,7 +175,7 @@ def test_ticket_detail_and_reprint_are_available_in_current_branch_context(
             )
         ).scalar_one()
 
-    assert audit_record.request_id == "tickets-reprint-request"
+    assert audit_record.request_id == "39c4ca0e-02e9-5df4-915b-2567bcdaea67"
     assert audit_record.metadata_["folio"].startswith("TCK-")
 
 

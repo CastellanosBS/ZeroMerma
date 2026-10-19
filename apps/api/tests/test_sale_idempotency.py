@@ -156,7 +156,9 @@ def test_retries_recover_exact_sale_and_ticket_without_repeating_effects(
             {"payment_method_code": "CASH", "tendered_amount": "20.00"},
         ]
     before, key = _counts(), new_idempotency_key()
-    first = _submit(client, {**headers, "X-Request-ID": "sale-first"}, body, key)
+    first = _submit(
+        client, {**headers, "X-Request-ID": "f8e0d861-8e1f-5a9e-8729-03d09d465bce"}, body, key
+    )
     assert first.status_code == 201
     assert first.headers["Idempotency-Replayed"] == "false"
     after = _counts()
@@ -198,7 +200,7 @@ def test_retries_recover_exact_sale_and_ticket_without_repeating_effects(
             select(OutboxEvent).where(OutboxEvent.event_name == "sale.confirmed.v1")
         ).one()
         assert record.resource_id == first.json()["id"]
-        assert record.first_request_id == "sale-first"
+        assert record.first_request_id == "f8e0d861-8e1f-5a9e-8729-03d09d465bce"
         assert record.response_payload == first.json()
         for metadata in (audit.metadata_, event.headers):
             assert metadata["idempotency_key"] == key

@@ -669,7 +669,11 @@ def _validate_entity(
             }
             if changed <= {"last_activity_at", "idle_expires_at"}:
                 return
-        if authentication.record.audience == "POS" and "workstation_id" in table.c:
+        if (
+            authentication.record.audience == "POS"
+            and "workstation_id" in table.c
+            and name not in _TRACE_TABLES
+        ):
             state = inspect(instance)
             history = state.attrs.workstation_id.history
             workstation_ids = {

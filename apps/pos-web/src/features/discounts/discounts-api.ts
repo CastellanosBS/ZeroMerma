@@ -72,18 +72,15 @@ export function getDiscountDetail({
 export function createDiscount({
   idempotencyKey,
   payload,
-  requestId,
 }: {
   idempotencyKey: string;
   payload: CreateOperationalDiscountRequest;
-  requestId: string;
 }): Promise<OperationalDiscountCommitResultView> {
   return requestJson<OperationalDiscountCommitResultView>({
     body: payload,
     method: "POST",
     path: "/v1/discounts",
     headers: {
-      "X-Request-ID": requestId,
       "Idempotency-Key": idempotencyKey,
     },
   });

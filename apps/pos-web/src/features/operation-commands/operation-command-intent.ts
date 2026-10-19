@@ -63,7 +63,6 @@ export const operationIntentions = createCommandIntentionCoordinator<
       return commitCorrection({
         payload: payload.body,
         idempotencyKey: key,
-        requestId: `correction-${crypto.randomUUID()}`,
       });
     if (payload.commandCode === "counter-transfer") return commitCounterTransfer(payload.body, key);
     return commitWasteRecord(payload.body, key);

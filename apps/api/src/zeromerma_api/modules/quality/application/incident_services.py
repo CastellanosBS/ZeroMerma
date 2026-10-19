@@ -320,7 +320,12 @@ class AdminIncidentService:
             incident=incident,
             request_id=request_id,
         )
-        self._append_event(session, event_name=OUTBOX_EVENT_INCIDENT_CREATED_V1, incident=incident)
+        self._append_event(
+            session,
+            actor_id=current_user.id,
+            event_name=OUTBOX_EVENT_INCIDENT_CREATED_V1,
+            incident=incident,
+        )
         if self._is_high_risk(incident):
             self._record_high_risk_alert(session, current_user.id, incident, request_id)
         session.commit()
@@ -380,7 +385,12 @@ class AdminIncidentService:
             incident=incident,
             request_id=request_id,
         )
-        self._append_event(session, event_name=OUTBOX_EVENT_INCIDENT_UPDATED_V1, incident=incident)
+        self._append_event(
+            session,
+            actor_id=current_user.id,
+            event_name=OUTBOX_EVENT_INCIDENT_UPDATED_V1,
+            incident=incident,
+        )
         if self._is_high_risk(incident):
             self._record_high_risk_alert(session, current_user.id, incident, request_id)
         session.commit()
@@ -422,6 +432,7 @@ class AdminIncidentService:
         )
         self._append_event(
             session,
+            actor_id=current_user.id,
             event_name=OUTBOX_EVENT_INCIDENT_FOLLOW_UP_ADDED_V1,
             incident=incident,
         )
@@ -470,6 +481,7 @@ class AdminIncidentService:
         )
         self._append_event(
             session,
+            actor_id=current_user.id,
             event_name=OUTBOX_EVENT_INCIDENT_STATUS_CHANGED_V1,
             incident=incident,
         )
@@ -516,7 +528,12 @@ class AdminIncidentService:
             incident=incident,
             request_id=request_id,
         )
-        self._append_event(session, event_name=OUTBOX_EVENT_INCIDENT_RESOLVED_V1, incident=incident)
+        self._append_event(
+            session,
+            actor_id=current_user.id,
+            event_name=OUTBOX_EVENT_INCIDENT_RESOLVED_V1,
+            incident=incident,
+        )
         session.commit()
         return self._to_detail(session, self._get_row(session, incident_id))
 
@@ -554,7 +571,12 @@ class AdminIncidentService:
             incident=incident,
             request_id=request_id,
         )
-        self._append_event(session, event_name=OUTBOX_EVENT_INCIDENT_REOPENED_V1, incident=incident)
+        self._append_event(
+            session,
+            actor_id=current_user.id,
+            event_name=OUTBOX_EVENT_INCIDENT_REOPENED_V1,
+            incident=incident,
+        )
         session.commit()
         return self._to_detail(session, self._get_row(session, incident_id))
 
@@ -1201,6 +1223,7 @@ class AdminIncidentService:
         self,
         session: Session,
         *,
+        actor_id: uuid.UUID,
         event_name: str,
         incident: QualityIncident,
     ) -> None:
@@ -1208,7 +1231,9 @@ class AdminIncidentService:
             session,
             aggregate_id=str(incident.id),
             aggregate_type=INCIDENT_RESOURCE_TYPE,
+            actor_id=actor_id,
             event_name=event_name,
+            branch_id=incident.branch_id,
             payload={
                 "branch_id": str(incident.branch_id),
                 "folio": incident.folio,
@@ -1239,6 +1264,8 @@ class AdminIncidentService:
             aggregate_id=str(incident.id),
             aggregate_type=INCIDENT_RESOURCE_TYPE,
             event_name=OUTBOX_EVENT_INCIDENT_HIGH_RISK_ALERT_V1,
+            actor_id=actor_id,
+            branch_id=incident.branch_id,
             payload={
                 "branch_id": str(incident.branch_id),
                 "folio": incident.folio,

@@ -176,6 +176,7 @@ class CashSessionCommandService:
             session,
             actor_id=current_user.id,
             action="cash_session.opened",
+            cash_session_id=cash_session.id,
             resource_type="cash_session",
             resource_id=str(cash_session.id),
             branch_id=context.branch_id,
@@ -193,6 +194,7 @@ class CashSessionCommandService:
             aggregate_type="cash_session",
             aggregate_id=str(cash_session.id),
             event_name=OUTBOX_EVENT_CASH_SESSION_OPENED_V1,
+            cash_session_id=cash_session.id,
             payload={
                 "cash_session_id": str(cash_session.id),
                 "branch_id": str(context.branch_id),

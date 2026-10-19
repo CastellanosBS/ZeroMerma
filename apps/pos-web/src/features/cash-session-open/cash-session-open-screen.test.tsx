@@ -257,7 +257,6 @@ describe("CashSessionOpenScreen", () => {
         opening_amount: "250.00",
         workstation_code: "POS-01",
       },
-      requestId: expect.stringMatching(/^cash-open-/),
       idempotencyKey: expect.any(String),
     });
     expect(statusMessageMocks.showSuccess).toHaveBeenCalledWith(

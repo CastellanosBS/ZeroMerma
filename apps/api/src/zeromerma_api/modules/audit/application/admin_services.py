@@ -410,7 +410,7 @@ class AdminAuditService:
                 if normalized_workstation
                 in " ".join(
                     [
-                        self._metadata_text(context.record, "workstation_id") or "",
+                        str(context.record.workstation_id) if context.record.workstation_id else "",
                         self._metadata_text(context.record, "workstation_code") or "",
                         self._metadata_text(context.record, "workstation_name") or "",
                     ],
@@ -438,7 +438,7 @@ class AdminAuditService:
             filtered = [
                 context
                 for context in filtered
-                if self._source_app(context.record) == normalized_source_app
+                if self._source_app(context.record).lower() == normalized_source_app
             ]
         normalized_related_reference = _normalize(related_reference)
         if normalized_related_reference:
@@ -459,7 +459,7 @@ class AdminAuditService:
     def _to_list_item(self, context: _AuditContext) -> AdminAuditEventListItemView:
         record = context.record
         metadata = record.metadata_ or {}
-        workstation_id = self._metadata_text(record, "workstation_id")
+        workstation_id = str(record.workstation_id) if record.workstation_id else None
         workstation_name = self._metadata_text(record, "workstation_name") or self._metadata_text(
             record,
             "workstation_code",
@@ -467,6 +467,10 @@ class AdminAuditService:
         return AdminAuditEventListItemView(
             id=record.id,
             occurred_at=record.occurred_at,
+            recorded_at=record.recorded_at,
+            context_version=record.context_version,
+            operation_id=record.operation_id,
+            correlation_id=record.correlation_id,
             actor_user_id=record.actor_id,
             actor_name=self._actor_name(context),
             actor_email=context.actor.email if context.actor is not None else None,
@@ -625,10 +629,10 @@ class AdminAuditService:
             entity_reference=self._entity_reference(record),
             branch_id=record.branch_id,
             branch_name=context.branch.name if context.branch is not None else None,
-            workstation_id=self._metadata_text(record, "workstation_id"),
+            workstation_id=str(record.workstation_id) if record.workstation_id else None,
             workstation_name=self._metadata_text(record, "workstation_name")
             or self._metadata_text(record, "workstation_code"),
-            cash_session_id=self._metadata_text(record, "cash_session_id"),
+            cash_session_id=str(record.cash_session_id) if record.cash_session_id else None,
             related_module=self._domain(record),
             can_open_related_document=False,
         )
@@ -640,10 +644,13 @@ class AdminAuditService:
             request_context = {}
 
         view = AdminAuditRequestContextView(
-            request_id=record.request_id or _to_optional_text(request_context.get("request_id")),
-            correlation_id=_to_optional_text(
-                metadata.get("correlation_id") or request_context.get("correlation_id"),
-            ),
+            request_id=record.request_id,
+            operation_id=record.operation_id,
+            correlation_id=record.correlation_id,
+            causation_id=record.causation_id,
+            idempotency_key=record.idempotency_key,
+            operation_code=record.operation_code,
+            related_branch_ids=[uuid.UUID(value) for value in record.related_branch_ids],
             endpoint=_to_optional_text(metadata.get("endpoint") or request_context.get("endpoint")),
             method=_to_optional_text(metadata.get("method") or request_context.get("method")),
             ip_address=_to_optional_text(
@@ -662,7 +669,7 @@ class AdminAuditService:
                 metadata.get("duration_ms") or request_context.get("duration_ms"),
             ),
         )
-        if not any(value is not None for value in view.model_dump().values()):
+        if not any(value is not None and value != [] for value in view.model_dump().values()):
             return None
         return view
 
@@ -775,6 +782,11 @@ class AdminAuditService:
             record.resource_type,
             record.resource_id or "",
             record.request_id or "",
+            str(record.operation_id) if record.operation_id else "",
+            str(record.correlation_id) if record.correlation_id else "",
+            str(record.causation_id) if record.causation_id else "",
+            str(record.idempotency_key) if record.idempotency_key else "",
+            record.operation_code or "",
             self._actor_name(context),
             context.actor.email if context.actor is not None else "",
             self._entity_reference(record) or "",
@@ -787,6 +799,9 @@ class AdminAuditService:
         references = [
             record.resource_id or "",
             record.request_id or "",
+            str(record.operation_id) if record.operation_id else "",
+            str(record.correlation_id) if record.correlation_id else "",
+            str(record.causation_id) if record.causation_id else "",
             self._entity_reference(record) or "",
         ]
         for key, value in metadata.items():
@@ -801,12 +816,7 @@ class AdminAuditService:
         return metadata_actor or "Sistema / Worker"
 
     def _actor_type(self, record: AuditLog) -> str:
-        metadata_value = _normalize_filter(self._metadata_text(record, "actor_type"))
-        if metadata_value:
-            return metadata_value
-        if record.actor_id is None:
-            return "system"
-        return "user"
+        return record.actor_type.lower()
 
     def _domain(self, record: AuditLog) -> str:
         metadata_module = _normalize_filter(self._metadata_text(record, "module"))
@@ -830,15 +840,7 @@ class AdminAuditService:
         return RESOURCE_DOMAIN_MAP.get(record.resource_type, "system")
 
     def _source_app(self, record: AuditLog) -> str:
-        value = self._metadata_text(record, "source_app") or self._metadata_text(record, "surface")
-        normalized = (value or "").upper()
-        if normalized in {SOURCE_APP_BACKOFFICE, SOURCE_APP_POS, SOURCE_APP_SYSTEM}:
-            return normalized
-        if record.actor_id is None:
-            return SOURCE_APP_SYSTEM
-        if record.action.startswith("pos.") or record.resource_type.startswith("pos"):
-            return SOURCE_APP_POS
-        return SOURCE_APP_BACKOFFICE
+        return record.source_app
 
     def _result(self, record: AuditLog) -> str:
         value = _normalize_filter(

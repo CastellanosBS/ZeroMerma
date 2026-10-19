@@ -98,7 +98,7 @@ def _dispatch_transfer(client: TestClient) -> dict[str, object]:
     response = client.post(
         f"/v1/admin/transfers/{transfer_id}/dispatch",
         headers={
-            **{**_admin_headers(client), "X-Request-ID": "admin-transfer-dispatch"},
+            **{**_admin_headers(client), "X-Request-ID": "427e9842-ed2c-5649-a50a-46e543dcdfa4"},
             "Idempotency-Key": new_idempotency_key(),
         },
         json={"notes": "Dispatch from backoffice"},
@@ -251,7 +251,7 @@ def test_admin_transfer_dispatch_writes_inventory_movements_audit_and_outbox(
 
     assert {movement.movement_type for movement in movements} == {"TRANSFER_DISPATCH"}
     assert {movement.direction for movement in movements} == {"IN", "OUT"}
-    assert audit_record.request_id == "admin-transfer-dispatch"
+    assert audit_record.request_id == "427e9842-ed2c-5649-a50a-46e543dcdfa4"
     assert outbox_event.aggregate_id == transfer_id
 
 
@@ -271,7 +271,7 @@ def test_admin_transfer_receive_full_transfer_and_prevents_double_receipt(
     receive_response = client.post(
         f"/v1/admin/transfers/{transfer_id}/receive",
         headers={
-            **{**_admin_headers(client), "X-Request-ID": "admin-transfer-receive"},
+            **{**_admin_headers(client), "X-Request-ID": "ae6335ad-334c-540f-9265-f93e46ff2e29"},
             "Idempotency-Key": new_idempotency_key(),
         },
         json={"lines": receipt_lines, "notes": "Received complete"},

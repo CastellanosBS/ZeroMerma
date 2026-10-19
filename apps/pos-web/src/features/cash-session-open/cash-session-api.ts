@@ -11,18 +11,15 @@ export function getCurrentCashSession(workstationCode: string): Promise<CashSess
 export function openCashSession({
   idempotencyKey,
   payload,
-  requestId,
 }: {
   idempotencyKey: string;
   payload: OpenCashSessionRequest;
-  requestId: string;
 }): Promise<CashSessionOpenResultView> {
   return requestJson<CashSessionOpenResultView>({
     method: "POST",
     path: "/v1/cash-sessions/open",
     body: payload,
     headers: {
-      "X-Request-ID": requestId,
       "Idempotency-Key": idempotencyKey,
     },
   });

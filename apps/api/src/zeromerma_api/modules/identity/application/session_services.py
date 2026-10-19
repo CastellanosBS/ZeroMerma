@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import hmac
 import secrets
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from datetime import UTC, datetime, timedelta
 from typing import cast
 from uuid import UUID
@@ -13,6 +13,8 @@ from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.orm import Session
 
 from zeromerma_api.core.config import ApiSettings, get_settings
+from zeromerma_api.core.operation_context import SourceApp, normalize_request_id
+from zeromerma_api.db.operation_context import bind_operation_context, get_operation_context
 from zeromerma_api.db.transactions import rollback_on_failure
 from zeromerma_api.modules.audit.application.service import AuditRecorder
 from zeromerma_api.modules.branches.infrastructure.models import Branch, Workstation
@@ -72,13 +74,23 @@ def lock_identity_boundary(session: Session, *, exclusive: bool = False) -> None
         session.execute(text("SELECT id FROM identity_privilege_state WHERE id=1 FOR SHARE"))
 
 
-def set_audit_context(session: Session, user_id: UUID | None, request_id: str | None) -> None:
-    session.execute(
-        text(
-            "SELECT set_config('zeromerma.actor_id', :actor, true), "
-            "set_config('zeromerma.request_id', :request, true)"
+def set_audit_context(
+    session: Session,
+    user_id: UUID | None,
+    request_id: str | None,
+    *,
+    audience: IdentitySurface | None = None,
+) -> None:
+    context = get_operation_context(session)
+    bind_operation_context(
+        session,
+        replace(
+            context,
+            actor_id=user_id,
+            source_app=SourceApp(audience) if audience else context.source_app,
+            request_id=context.request_id
+            or (normalize_request_id(request_id) if request_id is not None else None),
         ),
-        {"actor": str(user_id) if user_id else "", "request": (request_id or "")[:120]},
     )
 
 
@@ -131,12 +143,14 @@ class SessionService:
             else str(session_id)
             if session_id
             else None,
-            branch_id=None,
+            branch_id=get_operation_context(session).branch_id,
             request_id=request_id,
             metadata=metadata,
         )
         OutboxWriter().append(
             session,
+            actor_id=user_id,
+            branch_id=get_operation_context(session).branch_id,
             aggregate_type="auth_session",
             aggregate_id=str(session_id or user_id or "anonymous"),
             event_name=action,
@@ -168,7 +182,12 @@ class SessionService:
                 .execution_options(populate_existing=True)
             ).one()
             if limit.blocked_until is not None and limit.blocked_until > now:
-                self._event(session, "login.rate_limited", user_id=None, request_id=request_id)
+                self._event(
+                    session,
+                    "login.rate_limited",
+                    user_id=get_operation_context(session).actor_id,
+                    request_id=request_id,
+                )
                 return auth_error(
                     429, "LOGIN_RATE_LIMITED", "Too many authentication attempts. Try again later."
                 )
@@ -183,7 +202,12 @@ class SessionService:
                 limit.blocked_until = now + timedelta(
                     seconds=self.settings.auth_login_block_seconds
                 )
-                self._event(session, "login.rate_limited", user_id=None, request_id=request_id)
+                self._event(
+                    session,
+                    "login.rate_limited",
+                    user_id=get_operation_context(session).actor_id,
+                    request_id=request_id,
+                )
                 return auth_error(
                     429, "LOGIN_RATE_LIMITED", "Too many authentication attempts. Try again later."
                 )
@@ -231,7 +255,7 @@ class SessionService:
             raise auth_error(
                 401, "INVALID_CREDENTIALS", "Invalid credentials or unavailable account."
             )
-        set_audit_context(session, user.id, request_id)
+        set_audit_context(session, user.id, request_id, audience=command.audience)
         try:
             # Keep rejected context attempts durable without committing a partial replacement.
             with session.begin_nested():
@@ -322,6 +346,17 @@ class SessionService:
             if workstation_code is None:
                 raise auth_error(422, "VALIDATION_ERROR", "POS requires a workstation.")
             workstation = self._workstation(session, resolved_user, workstation_code)
+            bind_operation_context(
+                session,
+                replace(
+                    get_operation_context(session),
+                    source_app=SourceApp(audience),
+                    actor_id=user.id,
+                    branch_id=workstation.branch_id,
+                    workstation_id=workstation.id,
+                    related_branch_ids=(workstation.branch_id,),
+                ),
+            )
             for previous in session.scalars(
                 select(AuthSession)
                 .where(
@@ -347,6 +382,18 @@ class SessionService:
             )
         elif workstation_code is not None:
             raise auth_error(422, "VALIDATION_ERROR", "Backoffice does not accept a workstation.")
+        bind_operation_context(
+            session,
+            replace(
+                get_operation_context(session),
+                source_app=SourceApp(audience),
+                actor_id=user.id,
+                branch_id=workstation.branch_id if workstation else None,
+                workstation_id=workstation.id if workstation else None,
+                cash_session_id=cash_session_id,
+                related_branch_ids=(workstation.branch_id,) if workstation else (),
+            ),
+        )
         credential, csrf = new_session_secrets()
         record = AuthSession(
             credential_hash=secret_hash(credential),
@@ -407,7 +454,24 @@ class SessionService:
         )
         if user is None or record is None:
             raise auth_error(401, "AUTHENTICATION_REQUIRED", "Authentication is required.")
-        set_audit_context(session, user.id, request_id)
+        set_audit_context(session, user.id, request_id, audience=audience)
+        branch_id = (
+            session.scalar(
+                select(Workstation.branch_id).where(Workstation.id == record.workstation_id)
+            )
+            if record.workstation_id is not None
+            else None
+        )
+        bind_operation_context(
+            session,
+            replace(
+                get_operation_context(session),
+                branch_id=branch_id,
+                workstation_id=record.workstation_id,
+                cash_session_id=record.cash_session_id,
+                related_branch_ids=(branch_id,) if branch_id else (),
+            ),
+        )
         now = datetime.now(UTC)
         if (
             record.status == "REVOKED"

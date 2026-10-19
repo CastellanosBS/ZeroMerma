@@ -61,7 +61,7 @@ def test_payments_bootstrap_list_detail_and_cash_commit_work_end_to_end(
     _open_cash_session(client)
     headers = {
         **_authorization_header(client),
-        "X-Request-ID": "payments-cash-commit",
+        "X-Request-ID": "27921abc-d7ae-5243-ac86-33b40dceb1bd",
     }
 
     bootstrap_response = client.get(
@@ -168,7 +168,7 @@ def test_payments_bootstrap_list_detail_and_cash_commit_work_end_to_end(
 
     assert cash_movement.direction == "OUT"
     assert cash_movement.sale_id is None
-    assert audit_record.request_id == "payments-cash-commit"
+    assert audit_record.request_id == "27921abc-d7ae-5243-ac86-33b40dceb1bd"
     assert outbox_event.payload["payment_method_code"] == "CASH"
 
 

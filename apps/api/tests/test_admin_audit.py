@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+from dataclasses import replace
 from datetime import UTC, datetime, timedelta
+from uuid import uuid4
 
 from fastapi.testclient import TestClient
 from sqlalchemy import select
@@ -11,9 +13,12 @@ from zeromerma_api.bootstrap.seed_local import (
     SEED_USER_EMAIL,
     SEED_USER_PASSWORD,
 )
+from zeromerma_api.core.operation_context import OperationContext, SourceApp
+from zeromerma_api.db.operation_context import bind_operation_context
 from zeromerma_api.db.session import SessionLocal
+from zeromerma_api.modules.audit.application.service import AuditRecorder
 from zeromerma_api.modules.audit.infrastructure.models import AuditLog
-from zeromerma_api.modules.branches.infrastructure.models import Branch
+from zeromerma_api.modules.branches.infrastructure.models import Branch, Workstation
 from zeromerma_api.modules.identity.infrastructure.models import User
 from zeromerma_api.testing.authorization import owner_headers
 from zeromerma_api.testing.sessions import login_headers
@@ -173,3 +178,42 @@ def test_admin_audit_export_returns_filtered_safe_rows(client: TestClient) -> No
     assert payload["total"] == 1
     assert payload["rows"][0]["module"] == "inventory"
     assert payload["rows"][0]["result"] == "blocked"
+
+
+def test_admin_audit_filters_and_search_use_canonical_context(client: TestClient) -> None:
+    with SessionLocal() as session:
+        actor = session.scalars(select(User).where(User.email == SEED_ADMIN_EMAIL)).one()
+        station = session.scalars(select(Workstation).where(Workstation.code == "POS-01")).one()
+        context = replace(
+            OperationContext.start(SourceApp.POS, request_id=str(uuid4())),
+            actor_id=actor.id,
+            branch_id=station.branch_id,
+            workstation_id=station.id,
+        )
+        bind_operation_context(session, context)
+        record = AuditRecorder().record(
+            session,
+            actor_id=actor.id,
+            branch_id=station.branch_id,
+            request_id=context.request_id,
+            action="sale.confirmed",
+            resource_type="sale",
+            resource_id=str(uuid4()),
+            metadata={"source_app": "BACKOFFICE", "workstation_id": str(uuid4())},
+        )
+        session.commit()
+        event_id = str(record.id)
+    headers = _admin_headers(client)
+    for query in (
+        f"workstation={context.workstation_id}&source_app=POS",
+        f"search={context.operation_id}",
+        f"related_reference={context.correlation_id}",
+    ):
+        response = client.get(f"/v1/admin/audit?{query}", headers=headers)
+        assert response.status_code == 200
+        assert [item["id"] for item in response.json()["items"]] == [event_id]
+    detail = client.get(f"/v1/admin/audit/{event_id}", headers=headers)
+    assert detail.status_code == 200
+    assert detail.json()["overview"]["source_app"] == "POS"
+    assert detail.json()["request_context"]["operation_id"] == str(context.operation_id)
+    assert detail.json()["entity_context"]["workstation_id"] == str(context.workstation_id)

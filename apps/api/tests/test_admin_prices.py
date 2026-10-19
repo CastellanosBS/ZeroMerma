@@ -122,7 +122,7 @@ def test_admin_prices_update_product_direct_writes_product_owner_and_audits(
     product = _get_product(SEED_PRODUCT_COCA_355_CODE)
     response = client.patch(
         f"/v1/admin/prices/product/{product.id}",
-        headers={**_admin_headers(client), "X-Request-ID": "admin-price-product-update"},
+        headers={**_admin_headers(client), "X-Request-ID": "71d7e207-86fb-5fe4-9453-127d7a908c49"},
         json={"price": "19.50"},
     )
 
@@ -138,7 +138,7 @@ def test_admin_prices_update_product_direct_writes_product_owner_and_audits(
         audit_record = session.execute(
             select(AuditLog).where(
                 AuditLog.resource_id == str(product.id),
-                AuditLog.request_id == "admin-price-product-update",
+                AuditLog.request_id == "71d7e207-86fb-5fe4-9453-127d7a908c49",
             )
         ).scalar_one()
 
@@ -152,7 +152,7 @@ def test_admin_prices_update_class_capture_writes_class_owner_and_audits(
     product_class = _get_product_class(SEED_PRODUCT_CLASS_PAN_DULCE_CODE)
     response = client.patch(
         f"/v1/admin/prices/class/{product_class.id}",
-        headers={**_admin_headers(client), "X-Request-ID": "admin-price-class-update"},
+        headers={**_admin_headers(client), "X-Request-ID": "3b8f64f7-421b-5035-a495-b397d063d8f1"},
         json={"price": "13.50"},
     )
 
@@ -168,7 +168,7 @@ def test_admin_prices_update_class_capture_writes_class_owner_and_audits(
         audit_record = session.execute(
             select(AuditLog).where(
                 AuditLog.resource_id == str(product_class.id),
-                AuditLog.request_id == "admin-price-class-update",
+                AuditLog.request_id == "3b8f64f7-421b-5035-a495-b397d063d8f1",
             )
         ).scalar_one()
 

@@ -103,7 +103,7 @@ def test_admin_user_create_persists_access_branches_audit_and_outbox(
 
     response = client.post(
         "/v1/admin/users",
-        headers={**headers, "X-Request-ID": "admin-user-create-test"},
+        headers={**headers, "X-Request-ID": "43fb0234-5057-5706-a72a-d15eef189e27"},
         json={
             "full_name": "Backoffice Cash User",
             "email": "backoffice-cash-user@zeromerma.local",
@@ -139,7 +139,7 @@ def test_admin_user_create_persists_access_branches_audit_and_outbox(
 
     assert assignment.is_default is True
     assert audit_record.action == "admin.user.created"
-    assert audit_record.request_id == "admin-user-create-test"
+    assert audit_record.request_id == "43fb0234-5057-5706-a72a-d15eef189e27"
     assert outbox_event.event_name == "admin.user.created.v1"
 
 

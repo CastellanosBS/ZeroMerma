@@ -40,7 +40,7 @@ def test_admin_discounts_create_percentage_and_list_filters(client: TestClient) 
     product_id = _get_product_id(SEED_PRODUCT_COCA_355_CODE)
     response = client.post(
         "/v1/admin/discounts",
-        headers={**_admin_headers(client), "X-Request-ID": "admin-discount-create-product"},
+        headers={**_admin_headers(client), "X-Request-ID": "e43d014e-a94b-5229-9712-931db432cc40"},
         json={
             "code": "DISC-COCA-10",
             "name": "Coca 10 percent",
@@ -81,7 +81,7 @@ def test_admin_discounts_create_percentage_and_list_filters(client: TestClient) 
         audit_record = session.execute(
             select(AuditLog).where(
                 AuditLog.resource_id == str(discount.id),
-                AuditLog.request_id == "admin-discount-create-product",
+                AuditLog.request_id == "e43d014e-a94b-5229-9712-931db432cc40",
             )
         ).scalar_one()
         outbox_event = session.execute(
@@ -188,7 +188,7 @@ def test_admin_discounts_update_status_and_duplicate(client: TestClient) -> None
 
     update_response = client.patch(
         f"/v1/admin/discounts/{discount_id}",
-        headers={**_admin_headers(client), "X-Request-ID": "admin-discount-update"},
+        headers={**_admin_headers(client), "X-Request-ID": "52734da4-fe6b-5588-a756-1c449a6e1e95"},
         json={"status": "ACTIVE", "value": "7.50"},
     )
     duplicate_response = client.post(
@@ -208,7 +208,7 @@ def test_admin_discounts_update_status_and_duplicate(client: TestClient) -> None
         audit_record = session.execute(
             select(AuditLog).where(
                 AuditLog.resource_id == discount_id,
-                AuditLog.request_id == "admin-discount-update",
+                AuditLog.request_id == "52734da4-fe6b-5588-a756-1c449a6e1e95",
             )
         ).scalar_one()
 

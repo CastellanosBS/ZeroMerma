@@ -122,7 +122,7 @@ def test_admin_branch_create_persists_branch_and_writes_audit_and_outbox(
     brand_id = _get_brand_id(SEED_BRAND_EL_MEJOR_PAN_CODE)
     response = client.post(
         "/v1/admin/branches",
-        headers={**_admin_headers(client), "X-Request-ID": "admin-branch-create-test"},
+        headers={**_admin_headers(client), "X-Request-ID": "b9dfcc99-eb0b-5d75-8ad3-29d6be6fa02c"},
         json={
             "brand_id": brand_id,
             "code": "CENTRO",
@@ -154,7 +154,7 @@ def test_admin_branch_create_persists_branch_and_writes_audit_and_outbox(
         ).scalar_one()
 
     assert audit_record.action == "admin.branch.created"
-    assert audit_record.request_id == "admin-branch-create-test"
+    assert audit_record.request_id == "b9dfcc99-eb0b-5d75-8ad3-29d6be6fa02c"
     assert outbox_event.event_name == "admin.branch.created.v1"
 
 
@@ -195,7 +195,7 @@ def test_admin_branch_update_and_deactivation_flow(client: TestClient) -> None:
 
     update_response = client.patch(
         f"/v1/admin/branches/{branch_id}",
-        headers={**headers, "X-Request-ID": "admin-branch-update-test"},
+        headers={**headers, "X-Request-ID": "1598262a-e9b2-5f02-bd9a-e19278488bfc"},
         json={"name": "Main Branch Updated", "city": "Hermosillo"},
     )
     assert update_response.status_code == 200

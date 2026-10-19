@@ -8,6 +8,7 @@ from fastapi.testclient import TestClient
 from pydantic import BaseModel
 
 from zeromerma_api.presentation.errors import error_responses, install_error_handlers
+from zeromerma_api.presentation.operation_context import OperationContextMiddleware
 
 
 class ValidationPayload(BaseModel):
@@ -17,6 +18,7 @@ class ValidationPayload(BaseModel):
 def _test_app() -> FastAPI:
     app = FastAPI(responses=error_responses())
     install_error_handlers(app)
+    app.add_middleware(OperationContextMiddleware)
 
     @app.get("/error/{status_code}", response_model=None)
     def error(status_code: int) -> NoReturn:
@@ -46,7 +48,7 @@ def _test_app() -> FastAPI:
 def test_http_error_contract(status_code: int, expected_code: str) -> None:
     response = TestClient(_test_app()).get(
         f"/error/{status_code}",
-        headers={"X-Request-ID": "request-contract-test"},
+        headers={"X-Request-ID": "c43d8ec5-1af1-4e1b-9b29-011071580488"},
     )
 
     assert response.status_code == status_code
@@ -55,7 +57,7 @@ def test_http_error_contract(status_code: int, expected_code: str) -> None:
         "code": expected_code,
         "message": f"safe {status_code} message",
         "details": None,
-        "request_id": "request-contract-test",
+        "request_id": "c43d8ec5-1af1-4e1b-9b29-011071580488",
         "field_errors": None,
     }
 
@@ -71,7 +73,7 @@ def test_validation_error_contract_is_structured_and_redacted() -> None:
     assert payload["code"] == "VALIDATION_ERROR"
     assert payload["message"] == "Request validation failed."
     assert payload["details"] is None
-    assert payload["request_id"] is None
+    assert payload["request_id"] == response.headers["X-Request-ID"]
     assert payload["field_errors"] == [
         {
             "location": ["body", "quantity"],

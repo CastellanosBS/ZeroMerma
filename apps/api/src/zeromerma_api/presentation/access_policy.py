@@ -10,8 +10,9 @@ from fastapi.routing import APIRoute
 from sqlalchemy.orm import Session
 
 from zeromerma_api.db.access_scope import authorization_scope, bind_authorization_scope
+from zeromerma_api.db.operation_context import bind_operation_context, get_operation_context
 from zeromerma_api.db.session import get_session
-from zeromerma_api.modules.audit.infrastructure.models import AuditLog
+from zeromerma_api.modules.audit.application.service import AuditRecorder
 from zeromerma_api.modules.identity.application.authorization import require_branches
 from zeromerma_api.modules.identity.application.schemas import (
     AuthenticatedUser,
@@ -791,23 +792,25 @@ def _record_denied_operation(
         "surface": policy.surface if policy is not None else None,
     }
     # This independent audit transaction never carries the rejected request's identity map.
+    operation = get_operation_context(session)
     with Session(bind=session.get_bind()) as audit_session:
-        audit_session.add(
-            AuditLog(
-                actor_id=user.id,
-                action="authorization.denied",
-                resource_type="api_operation",
-                resource_id=f"{request.method} {route.path}"[:120],
-                request_id=(request.headers.get("X-Request-ID") or "").strip()[:120] or None,
-                metadata_={
-                    "authorization": provenance,
-                    "method": request.method,
-                    "path_template": route.path,
-                    "required_capabilities": capabilities,
-                    "reason": "CAPABILITY_SCOPE_OR_RESOURCE_UNAVAILABLE",
-                    "result": "denied",
-                },
-            )
+        bind_operation_context(audit_session, operation)
+        AuditRecorder().record(
+            audit_session,
+            actor_id=user.id,
+            action="authorization.denied",
+            resource_type="api_operation",
+            resource_id=f"{request.method} {route.path}"[:120],
+            branch_id=operation.branch_id,
+            request_id=operation.request_id,
+            metadata={
+                "authorization": provenance,
+                "method": request.method,
+                "path_template": route.path,
+                "required_capabilities": capabilities,
+                "reason": "CAPABILITY_SCOPE_OR_RESOURCE_UNAVAILABLE",
+                "result": "denied",
+            },
         )
         audit_session.commit()
 

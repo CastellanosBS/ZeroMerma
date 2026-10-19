@@ -429,6 +429,7 @@ class AdminEquipmentMaintenanceService:
             )
             self._append_equipment_event(
                 session,
+                actor_id=current_user.id,
                 event_name=OUTBOX_EVENT_EQUIPMENT_CREATED_V1,
                 equipment=equipment,
                 branch=branch,
@@ -493,6 +494,7 @@ class AdminEquipmentMaintenanceService:
         )
         self._append_equipment_event(
             session,
+            actor_id=current_user.id,
             event_name=OUTBOX_EVENT_EQUIPMENT_UPDATED_V1,
             equipment=equipment,
             branch=branch,
@@ -544,6 +546,7 @@ class AdminEquipmentMaintenanceService:
         )
         self._append_equipment_event(
             session,
+            actor_id=current_user.id,
             event_name=OUTBOX_EVENT_EQUIPMENT_STATUS_CHANGED_V1,
             equipment=row.equipment,
             branch=row.branch,
@@ -586,6 +589,7 @@ class AdminEquipmentMaintenanceService:
             status = MAINTENANCE_STATUS_OVERDUE
 
         record = EquipmentMaintenanceRecord(
+            id=uuid.uuid4(),
             created_by_user_id=current_user.id,
             description=command.description,
             equipment_id=row.equipment.id,
@@ -615,6 +619,7 @@ class AdminEquipmentMaintenanceService:
         )
         self._append_maintenance_event(
             session,
+            actor_id=current_user.id,
             event_name=OUTBOX_EVENT_MAINTENANCE_CREATED_V1,
             equipment=row.equipment,
             record=record,
@@ -632,6 +637,7 @@ class AdminEquipmentMaintenanceService:
             )
             self._append_maintenance_event(
                 session,
+                actor_id=current_user.id,
                 event_name=OUTBOX_EVENT_MAINTENANCE_STARTED_V1,
                 equipment=row.equipment,
                 record=record,
@@ -677,6 +683,7 @@ class AdminEquipmentMaintenanceService:
         )
         self._append_maintenance_event(
             session,
+            actor_id=current_user.id,
             event_name=OUTBOX_EVENT_MAINTENANCE_STARTED_V1,
             equipment=row.equipment,
             record=record,
@@ -728,6 +735,7 @@ class AdminEquipmentMaintenanceService:
         )
         self._append_maintenance_event(
             session,
+            actor_id=current_user.id,
             event_name=OUTBOX_EVENT_MAINTENANCE_COMPLETED_V1,
             equipment=row.equipment,
             record=record,
@@ -774,6 +782,7 @@ class AdminEquipmentMaintenanceService:
         )
         self._append_maintenance_event(
             session,
+            actor_id=current_user.id,
             event_name=OUTBOX_EVENT_MAINTENANCE_CANCELLED_V1,
             equipment=row.equipment,
             record=record,
@@ -1654,6 +1663,7 @@ class AdminEquipmentMaintenanceService:
         self,
         session: Session,
         *,
+        actor_id: uuid.UUID,
         event_name: str,
         equipment: EquipmentAsset,
         branch: Branch,
@@ -1662,7 +1672,9 @@ class AdminEquipmentMaintenanceService:
             session,
             aggregate_id=str(equipment.id),
             aggregate_type=EQUIPMENT_RESOURCE_TYPE,
+            actor_id=actor_id,
             event_name=event_name,
+            branch_id=branch.id,
             payload={
                 "branch_code": branch.code,
                 "branch_id": str(branch.id),
@@ -1678,6 +1690,7 @@ class AdminEquipmentMaintenanceService:
         self,
         session: Session,
         *,
+        actor_id: uuid.UUID,
         event_name: str,
         equipment: EquipmentAsset,
         record: EquipmentMaintenanceRecord,
@@ -1687,7 +1700,9 @@ class AdminEquipmentMaintenanceService:
             session,
             aggregate_id=str(record.id),
             aggregate_type=MAINTENANCE_RESOURCE_TYPE,
+            actor_id=actor_id,
             event_name=event_name,
+            branch_id=branch.id,
             payload={
                 "branch_code": branch.code,
                 "equipment_code": equipment.code,
@@ -1720,6 +1735,8 @@ class AdminEquipmentMaintenanceService:
             aggregate_id=str(equipment.id),
             aggregate_type=EQUIPMENT_RESOURCE_TYPE,
             event_name=OUTBOX_EVENT_EQUIPMENT_HIGH_RISK_ALERT_V1,
+            actor_id=actor_id,
+            branch_id=branch_id,
             payload={
                 "code": equipment.code,
                 "name": equipment.name,

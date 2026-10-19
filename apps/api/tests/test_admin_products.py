@@ -165,7 +165,7 @@ def test_admin_product_create_persists_product_and_writes_audit_and_outbox(
     class_id = _get_product_class_id(SEED_PRODUCT_CLASS_BEBIDAS_CODE)
     response = client.post(
         "/v1/admin/products",
-        headers={**_admin_headers(client), "X-Request-ID": "admin-product-create-test"},
+        headers={**_admin_headers(client), "X-Request-ID": "b50e4847-bce0-5204-b267-509a1a9298ad"},
         json={
             "code": "AGUA-500",
             "name": "Agua 500 ml",
@@ -193,7 +193,7 @@ def test_admin_product_create_persists_product_and_writes_audit_and_outbox(
         ).scalar_one()
 
     assert audit_record.action == "admin.product.created"
-    assert audit_record.request_id == "admin-product-create-test"
+    assert audit_record.request_id == "b50e4847-bce0-5204-b267-509a1a9298ad"
     assert outbox_event.event_name == "admin.product.created.v1"
 
 
@@ -219,7 +219,7 @@ def test_admin_product_patch_updates_supported_fields(client: TestClient) -> Non
     product_id = _get_product_id(SEED_PRODUCT_COCA_355_CODE)
     response = client.patch(
         f"/v1/admin/products/{product_id}",
-        headers={**_admin_headers(client), "X-Request-ID": "admin-product-update-test"},
+        headers={**_admin_headers(client), "X-Request-ID": "217bb5c5-5f93-5daa-b5ab-7710e9cab1c6"},
         json={
             "name": "Coca-Cola 355 ml retornable",
             "unit_price": "19.00",
@@ -241,7 +241,7 @@ def test_admin_product_patch_updates_supported_fields(client: TestClient) -> Non
             )
         ).scalar_one()
 
-    assert audit_record.request_id == "admin-product-update-test"
+    assert audit_record.request_id == "217bb5c5-5f93-5daa-b5ab-7710e9cab1c6"
 
 
 def test_admin_product_availability_reports_pending_schema(client: TestClient) -> None:
@@ -250,7 +250,7 @@ def test_admin_product_availability_reports_pending_schema(client: TestClient) -
         f"/v1/admin/products/{product_id}/availability",
         headers={
             **_admin_headers(client),
-            "X-Request-ID": "admin-product-availability-pending",
+            "X-Request-ID": "899fdbb2-57f8-5a0b-afe6-fd65ccab3488",
         },
         json={"branch_ids": [], "visible_in_pos": True},
     )
@@ -260,7 +260,7 @@ def test_admin_product_availability_reports_pending_schema(client: TestClient) -
         "code": "REQUEST_FAILED",
         "message": "An unexpected error occurred.",
         "details": None,
-        "request_id": "admin-product-availability-pending",
+        "request_id": "899fdbb2-57f8-5a0b-afe6-fd65ccab3488",
         "field_errors": None,
     }
     assert "availability schema" not in response.text

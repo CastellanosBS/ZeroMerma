@@ -686,6 +686,8 @@ class AdminBranchService:
         self._outbox_writer.append(
             session,
             aggregate_type=BRANCH_RESOURCE_TYPE,
+            actor_id=current_user.id,
+            branch_id=branch.id,
             aggregate_id=str(branch.id),
             event_name=event_name,
             payload=metadata,
@@ -1295,6 +1297,8 @@ class AdminWorkstationService:
         self._outbox_writer.append(
             session,
             aggregate_type=WORKSTATION_RESOURCE_TYPE,
+            actor_id=current_user.id,
+            branch_id=workstation.branch_id,
             aggregate_id=str(workstation.id),
             event_name=event_name,
             payload=metadata,

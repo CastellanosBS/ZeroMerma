@@ -111,7 +111,7 @@ def test_admin_report_export_returns_rows_and_audits_sensitive_export(
 ) -> None:
     response = client.post(
         "/v1/admin/reports/user_access_summary/export",
-        headers={**_admin_headers(client), "X-Request-ID": "report-export-test"},
+        headers={**_admin_headers(client), "X-Request-ID": "9cb2011b-1005-5f72-aca5-6df9a71ef612"},
         json={"format": "json", "filters": {"app_access": "BACKOFFICE"}},
     )
 
@@ -129,7 +129,7 @@ def test_admin_report_export_returns_rows_and_audits_sensitive_export(
             )
         ).scalar_one()
 
-    assert audit_event.request_id == "report-export-test"
+    assert audit_event.request_id == "9cb2011b-1005-5f72-aca5-6df9a71ef612"
     assert audit_event.metadata_["is_sensitive"] is True
     assert audit_event.metadata_["row_count"] == payload["total_rows"]
 

@@ -3,15 +3,9 @@ import { Navigate, useNavigate, useRouterState } from "@tanstack/react-router";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { useAppShellRightPanel } from "../../components/app-shell-right-panel";
-import {
-  CopyFolioAction,
-  PrintAction,
-} from "../../components/document-actions";
+import { CopyFolioAction, PrintAction } from "../../components/document-actions";
 import { OperationalStatus } from "../../components/operational-status";
-import {
-  PosErrorState,
-  PosInlineValidationMessage,
-} from "../../components/pos-feedback";
+import { PosErrorState, PosInlineValidationMessage } from "../../components/pos-feedback";
 import { PosButton, PosStatusBadge } from "../../components/pos-foundations";
 import {
   PosHistoryView,
@@ -44,7 +38,11 @@ import {
 import { toOperationalErrorMessage } from "../../lib/http";
 import { isEditableTarget } from "../../lib/keyboard-shortcuts";
 import { openBrowserPrintWindow } from "../../lib/browser-print";
-import { matchesScannerValue, normalizeScannerText, parseTicketScannerValue } from "../../lib/scanner";
+import {
+  matchesScannerValue,
+  normalizeScannerText,
+  parseTicketScannerValue,
+} from "../../lib/scanner";
 import { getDocumentActionAvailability } from "../../lib/document-actions";
 
 import { useCurrentCashSessionQuery } from "../cash-session-open/queries";
@@ -67,14 +65,6 @@ type ReprintFeedbackState =
   | { kind: "idle"; ticketId: null }
   | { kind: "success"; ticketId: string }
   | { kind: "error"; ticketId: string };
-
-function createRequestId(scope: string): string {
-  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
-    return `${scope}-${crypto.randomUUID()}`;
-  }
-
-  return `${scope}-${Date.now()}-${Math.random().toString(16).slice(2)}`;
-}
 
 function useDebouncedValue(value: string, delayMs: number): string {
   const [debouncedValue, setDebouncedValue] = useState(value);
@@ -326,7 +316,9 @@ export function TicketSummaryPanel({
                 !documentActionAvailability.print.isAvailable
               }
               isPending={isReprintPending}
-              label={selectedTicket.can_reprint ? "Reimprimir" : documentActionAvailability.print.label}
+              label={
+                selectedTicket.can_reprint ? "Reimprimir" : documentActionAvailability.print.label
+              }
               onPrint={() => onReprint(selectedTicket.id)}
               title={
                 !selectedTicket.can_reprint
@@ -399,9 +391,21 @@ export function TicketSummaryPanel({
               title={getPaymentSummaryLabel(selectedTicket.payments)}
               value={getPaymentSummaryLabel(selectedTicket.payments)}
             />
-            <KeyValueRow label="Cajero" title={selectedTicket.operator.full_name} value={selectedTicket.operator.full_name} />
-            <KeyValueRow label="Sucursal" title={selectedTicket.branch.name} value={selectedTicket.branch.name} />
-            <KeyValueRow label="Caja" title={selectedTicket.workstation.name} value={selectedTicket.workstation.name} />
+            <KeyValueRow
+              label="Cajero"
+              title={selectedTicket.operator.full_name}
+              value={selectedTicket.operator.full_name}
+            />
+            <KeyValueRow
+              label="Sucursal"
+              title={selectedTicket.branch.name}
+              value={selectedTicket.branch.name}
+            />
+            <KeyValueRow
+              label="Caja"
+              title={selectedTicket.workstation.name}
+              value={selectedTicket.workstation.name}
+            />
             <KeyValueRow label="Estado" value={getTicketStatusLabel(selectedTicket.status)} />
           </div>
 
@@ -465,7 +469,6 @@ export function TicketSummaryPanel({
 }
 
 export function TicketsScreen() {
-
   const navigate = useNavigate();
   const showError = useStatusMessageStore((state) => state.showError);
   const showSuccess = useStatusMessageStore((state) => state.showSuccess);
@@ -553,7 +556,9 @@ export function TicketsScreen() {
     }
 
     const tickets = ticketsListQuery.data?.tickets ?? [];
-    const exactMatch = tickets.find((ticket) => matchesScannerValue(ticket.folio, pendingScannerFolio));
+    const exactMatch = tickets.find((ticket) =>
+      matchesScannerValue(ticket.folio, pendingScannerFolio),
+    );
 
     if (exactMatch) {
       setSelectedTicketId(exactMatch.id);
@@ -601,7 +606,6 @@ export function TicketsScreen() {
 
       return reprintTicket({
         payload,
-        requestId: createRequestId("ticket-reprint"),
         ticketId,
       });
     },
@@ -617,38 +621,44 @@ export function TicketsScreen() {
     selectedTicket,
   });
 
-  const handleReprintTicket = useCallback((ticketId: string) => {
-    setSelectedTicketId(ticketId);
+  const handleReprintTicket = useCallback(
+    (ticketId: string) => {
+      setSelectedTicketId(ticketId);
 
-    const printWindow = openBrowserPrintWindow();
-    if (!printWindow) {
-      setReprintFeedback({ kind: "error", ticketId });
-      showError(
-        "El navegador bloqueo la ventana de impresion. Permite ventanas emergentes e intenta de nuevo.",
-      );
-      return;
-    }
-
-    reprintMutation
-      .mutateAsync(ticketId)
-      .then((ticketDetail) => {
-        writeTicketToPrintWindow(printWindow, ticketDetail);
-        setReprintFeedback({ kind: "success", ticketId: ticketDetail.id });
-        showSuccess("Reimpresion enviada.");
-      })
-      .catch((error) => {
-        printWindow.close();
+      const printWindow = openBrowserPrintWindow();
+      if (!printWindow) {
         setReprintFeedback({ kind: "error", ticketId });
-        showError(toOperationalErrorMessage(error, "No se pudo reimprimir. Intenta de nuevo."));
-      });
-  }, [reprintMutation, showError, showSuccess]);
+        showError(
+          "El navegador bloqueo la ventana de impresion. Permite ventanas emergentes e intenta de nuevo.",
+        );
+        return;
+      }
 
-  const handleStartReturn = useCallback((saleId: string) => {
-    void navigate({
-      search: { saleId } as never,
-      to: "/devoluciones",
-    });
-  }, [navigate]);
+      reprintMutation
+        .mutateAsync(ticketId)
+        .then((ticketDetail) => {
+          writeTicketToPrintWindow(printWindow, ticketDetail);
+          setReprintFeedback({ kind: "success", ticketId: ticketDetail.id });
+          showSuccess("Reimpresion enviada.");
+        })
+        .catch((error) => {
+          printWindow.close();
+          setReprintFeedback({ kind: "error", ticketId });
+          showError(toOperationalErrorMessage(error, "No se pudo reimprimir. Intenta de nuevo."));
+        });
+    },
+    [reprintMutation, showError, showSuccess],
+  );
+
+  const handleStartReturn = useCallback(
+    (saleId: string) => {
+      void navigate({
+        search: { saleId } as never,
+        to: "/devoluciones",
+      });
+    },
+    [navigate],
+  );
 
   const summaryPanel = useMemo(
     () => (
@@ -732,9 +742,7 @@ export function TicketsScreen() {
     {
       header: "Ticket",
       key: "folio",
-      renderCell: (ticket) => (
-        <span className="font-semibold text-slate-950">{ticket.folio}</span>
-      ),
+      renderCell: (ticket) => <span className="font-semibold text-slate-950">{ticket.folio}</span>,
       width: "18%",
     },
     {
@@ -790,8 +798,7 @@ export function TicketsScreen() {
   ];
 
   function handleTicketScanSubmit() {
-    const scannedValue =
-      parseTicketScannerValue(searchText) ?? normalizeScannerText(searchText);
+    const scannedValue = parseTicketScannerValue(searchText) ?? normalizeScannerText(searchText);
 
     if (scannedValue.length === 0) {
       return;
@@ -858,7 +865,10 @@ export function TicketsScreen() {
                 />
               ))}
             </div>
-            <PosStatusBadge className="justify-self-start whitespace-nowrap xl:justify-self-end" status="draft">
+            <PosStatusBadge
+              className="justify-self-start whitespace-nowrap xl:justify-self-end"
+              status="draft"
+            >
               {ticketCountLabel}
             </PosStatusBadge>
           </div>

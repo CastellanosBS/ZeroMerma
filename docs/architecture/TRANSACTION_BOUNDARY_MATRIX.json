@@ -5002,5 +5002,22 @@
         "apps/api/tests/test_admin_transaction_boundaries.py#test_nested_price_delegate_has_one_commit_and_rolls_back_failed_traces"
       ]
     }
-  ]
+  ],
+  "operation_context_extension": {
+    "task": "ZM-FIN-040",
+    "rule": "Immutable context snapshots and transaction-local GUC propagation do not change commit ownership. Savepoint rollback restores its parent context, root end clears Session context, and independent denial audit explicitly preserves safe request provenance.",
+    "trace_participants": [
+      "apps/api/src/zeromerma_api/modules/audit/application/service.py#AuditRecorder.record",
+      "apps/api/src/zeromerma_api/modules/outbox/application/service.py#OutboxWriter.append",
+      "apps/api/src/zeromerma_api/db/operation_context.py#bind_operation_context"
+    ],
+    "tests": [
+      "apps/api/tests/test_trace_producers.py",
+      "apps/api/tests/test_operation_trace_storage.py",
+      "apps/api/tests/test_operation_context_transactions.py",
+      "apps/api/unit_tests/test_transaction_ownership.py"
+    ],
+    "verification": "Four ownership gates passed; 25 unique producer cases passed across 24 initial and three final cases with overlap. Final context/authentication cleanup regression passed 10/10; storage/audit passed 13 unique cases. Full local results and diagnostic runs are recorded in operation-context-validation.md.",
+    "preserved_039_record": "The existing verification object and retained_boundaries record the historical 039 acceptance. The 040 correlation and maintenance-identifier follow-up is implemented and verified separately by this extension; later boundaries remain open."
+  }
 }

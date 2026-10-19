@@ -8,17 +8,40 @@ from typing import Any
 
 from zeromerma_worker.core.log_redaction import redact_log
 
-_BASE_RECORD_KEYS = set(
-    logging.LogRecord(
-        name="",
-        level=0,
-        pathname="",
-        lineno=0,
-        msg="",
-        args=(),
-        exc_info=None,
-    ).__dict__
+EVENT_CONTEXT_FIELDS = (
+    "event_id",
+    "event_type",
+    "context_version",
+    "schema_version",
+    "source_app",
+    "actor_type",
+    "operation_id",
+    "operation_code",
+    "correlation_id",
+    "causation_id",
+    "idempotency_key",
+    "entity_type",
+    "entity_id",
+    "actor_id",
+    "branch_id",
+    "workstation_id",
+    "cash_session_id",
+    "related_branch_ids",
+    "occurred_at",
+    "recorded_at",
+    "attempts",
 )
+_LOG_FIELDS = frozenset(EVENT_CONTEXT_FIELDS) | {
+    "request_id",
+    "message_count",
+    "environment",
+    "poll_interval_seconds",
+    "batch_size",
+    "skip_db_check",
+    "reason",
+    "error_type",
+    "fields",
+}
 
 
 class JsonFormatter(logging.Formatter):
@@ -28,9 +51,10 @@ class JsonFormatter(logging.Formatter):
             "level": record.levelname,
             "logger": record.name,
             "message": record.getMessage(),
+            "execution_source": "WORKER",
         }
         for key, value in record.__dict__.items():
-            if key not in _BASE_RECORD_KEYS:
+            if key in _LOG_FIELDS:
                 payload[key] = value
         if record.exc_info:
             payload["exception_type"] = type(record.exc_info[1]).__name__

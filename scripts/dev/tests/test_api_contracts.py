@@ -105,6 +105,30 @@ def test_schema_change_is_detected() -> None:
     assert _openapi_drift(changed)
 
 
+def test_operation_context_headers_are_published_once_for_every_http_operation() -> None:
+    normalized = normalize_contract_schema(SCHEMA)
+    assert normalize_contract_schema(normalized) == normalized
+    assert normalized["x-zeromerma-operation-context"]["client_correlation_id"] == "IGNORED"
+    for path_item in normalized["paths"].values():
+        for method in VALIDATOR.HTTP_METHODS:
+            if method not in path_item:
+                continue
+            operation = path_item[method]
+            parameters = [
+                item for item in operation["parameters"] if item.get("name") == "X-Request-ID"
+            ]
+            assert len(parameters) == 1
+            assert parameters[0]["required"] is False
+            assert parameters[0]["schema"]["format"] == "uuid"
+            for response in operation["responses"].values():
+                assert response["headers"]["X-Request-ID"] == {
+                    "$ref": "#/components/headers/RequestId"
+                }
+                assert response["headers"]["X-Correlation-ID"] == {
+                    "$ref": "#/components/headers/CorrelationId"
+                }
+
+
 def test_sale_confirmation_adopts_key_and_exposes_metadata_only_recovery() -> None:
     operation = SCHEMA["paths"]["/v1/sales/confirm"]["post"]
     key = next(item for item in operation["parameters"] if item["name"] == "Idempotency-Key")

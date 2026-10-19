@@ -252,7 +252,13 @@ def test_every_order_command_replays_its_original_result_without_effects(
     headers, body, order_id, branch_id = _prepare(client, surface, action)
     key, before = new_idempotency_key(), _counts()
     first = _post(
-        client, {**headers, "X-Request-ID": "order-first"}, action, body, key, order_id, surface
+        client,
+        {**headers, "X-Request-ID": "8fe29116-b257-58eb-b17c-6f1d72a9b68a"},
+        action,
+        body,
+        key,
+        order_id,
+        surface,
     )
     assert first.status_code == (201 if action == "create" else 200)
     assert first.headers["Idempotency-Replayed"] == "false"
@@ -289,7 +295,7 @@ def test_every_order_command_replays_its_original_result_without_effects(
         ).one()
         assert record.response_payload == first.json()
         assert record.resource_id == first.json()["id"]
-        assert record.first_request_id == "order-first"
+        assert record.first_request_id == "8fe29116-b257-58eb-b17c-6f1d72a9b68a"
         audits = session.scalars(
             select(AuditLog).where(AuditLog.action == f"order.{EVENTS[action]}")
         ).all()

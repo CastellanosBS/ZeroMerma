@@ -157,7 +157,7 @@ def test_admin_order_can_mark_ready_and_deliver_when_paid_without_mutating_pos_f
         headers={
             "Idempotency-Key": new_idempotency_key(),
             **_admin_headers(client),
-            "X-Request-ID": "admin-order-ready",
+            "X-Request-ID": "d08a9ce4-78e2-5240-94db-db68e14e4b47",
         },
         json={},
     )
@@ -169,7 +169,7 @@ def test_admin_order_can_mark_ready_and_deliver_when_paid_without_mutating_pos_f
         headers={
             "Idempotency-Key": new_idempotency_key(),
             **_admin_headers(client),
-            "X-Request-ID": "admin-order-deliver",
+            "X-Request-ID": "f4ab3402-0115-50ce-80a5-649b3a29727b",
         },
         json={},
     )
@@ -242,7 +242,7 @@ def test_admin_order_blocks_financial_actions_and_cancels_non_refundable_order(
         headers={
             "Idempotency-Key": new_idempotency_key(),
             **_admin_headers(client),
-            "X-Request-ID": "admin-order-cancel",
+            "X-Request-ID": "367e3602-8f8c-57a5-a3a8-d80c98398241",
         },
         json={},
     )

@@ -94,7 +94,7 @@ def _create_supplier(
 ) -> dict[str, object]:
     response = client.post(
         "/v1/admin/suppliers",
-        headers={**_admin_headers(client), "X-Request-ID": "admin-supplier-test"},
+        headers={**_admin_headers(client), "X-Request-ID": "0f5014a5-af69-5434-877f-ed114b54345b"},
         json=_supplier_payload(code=code, tax_id=tax_id),
     )
     assert response.status_code == 201
@@ -144,7 +144,7 @@ def test_admin_suppliers_create_detail_audit_and_outbox(client: TestClient) -> N
 
     assert supplier.tax_id == "XAXX010101000"
     assert audit_record.action == "admin.supplier.created"
-    assert audit_record.request_id == "admin-supplier-test"
+    assert audit_record.request_id == "0f5014a5-af69-5434-877f-ed114b54345b"
     assert outbox_event.event_name == "admin.supplier.created.v1"
 
 

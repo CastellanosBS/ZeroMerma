@@ -230,7 +230,7 @@ def test_admin_workstation_create_persists_and_writes_audit_and_outbox(
     branch_id = _get_branch_id(SEED_BRANCH_CODE)
     response = client.post(
         "/v1/admin/workstations",
-        headers={**_admin_headers(client), "X-Request-ID": "admin-workstation-create-test"},
+        headers={**_admin_headers(client), "X-Request-ID": "18ecd3dd-45e8-5db9-9e27-11703455728f"},
         json={
             "branch_id": branch_id,
             "code": "POS-CENTRO-02",
@@ -256,7 +256,7 @@ def test_admin_workstation_create_persists_and_writes_audit_and_outbox(
         ).scalar_one()
 
     assert audit_record.action == "admin.workstation.created"
-    assert audit_record.request_id == "admin-workstation-create-test"
+    assert audit_record.request_id == "18ecd3dd-45e8-5db9-9e27-11703455728f"
     assert outbox_event.event_name == "admin.workstation.created.v1"
 
 
@@ -295,7 +295,7 @@ def test_admin_workstation_update_and_activation_flow(client: TestClient) -> Non
 
     update_response = client.patch(
         f"/v1/admin/workstations/{workstation_id}",
-        headers={**headers, "X-Request-ID": "admin-workstation-update-test"},
+        headers={**headers, "X-Request-ID": "97cb3ea9-394c-5417-a9b4-50f716f590e7"},
         json={"name": "Front Register 01 Updated"},
     )
     assert update_response.status_code == 200

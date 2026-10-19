@@ -119,11 +119,9 @@ export function searchCorrectionProducts({
 
 export function commitCorrection({
   payload,
-  requestId,
   idempotencyKey,
 }: {
   payload: CorrectionCommitRequest;
-  requestId: string;
   idempotencyKey: string;
 }): Promise<CorrectionCommitResultView> {
   return requestJson<CorrectionCommitResultView>({
@@ -131,7 +129,6 @@ export function commitCorrection({
     method: "POST",
     path: "/v1/corrections/commit",
     headers: {
-      "X-Request-ID": requestId,
       "Idempotency-Key": idempotencyKey,
     },
   });

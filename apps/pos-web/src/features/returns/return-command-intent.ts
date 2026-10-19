@@ -33,8 +33,7 @@ export const returnIntentions = createCommandIntentionCoordinator<
     "originalSaleId",
   ],
   scope: (context) => context.workstationId,
-  send: (_context, payload, idempotencyKey) =>
-    commitSaleReturn({ payload, idempotencyKey, requestId: `return-${crypto.randomUUID()}` }),
+  send: (_context, payload, idempotencyKey) => commitSaleReturn({ payload, idempotencyKey }),
   recover: async (metadata) => {
     const result = await recoverSaleReturn(
       metadata.key,

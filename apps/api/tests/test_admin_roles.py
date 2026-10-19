@@ -102,7 +102,7 @@ def test_admin_role_create_update_status_audit_and_outbox(client: TestClient) ->
 
     create_response = client.post(
         "/v1/admin/roles",
-        headers={**headers, "X-Request-ID": "role-create-test"},
+        headers={**headers, "X-Request-ID": "5ab06346-70c7-517d-8ca8-8c9a6acf464c"},
         json={
             "code": "cash_auditor",
             "name": "Auditor de caja",

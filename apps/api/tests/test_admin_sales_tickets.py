@@ -147,7 +147,10 @@ def test_admin_sales_ticket_detail_reprint_and_related_returns(client: TestClien
     _open_cash_session(client)
     sale_payload = _confirm_sale(client)
     cashier_headers = _cashier_headers(client)
-    admin_headers = {**_admin_headers(client), "X-Request-ID": "admin-ticket-reprint"}
+    admin_headers = {
+        **_admin_headers(client),
+        "X-Request-ID": "030bdf22-6ac4-5f51-8c32-be40fe84dcd9",
+    }
 
     sale_return_source_response = client.get(
         f"/v1/returns/sales/{sale_payload['id']}",
@@ -211,7 +214,7 @@ def test_admin_sales_ticket_detail_reprint_and_related_returns(client: TestClien
             select(AuditLog).where(
                 AuditLog.action == "ticket.reprinted",
                 AuditLog.resource_id == sale_payload["id"],
-                AuditLog.request_id == "admin-ticket-reprint",
+                AuditLog.request_id == "030bdf22-6ac4-5f51-8c32-be40fe84dcd9",
             )
         ).scalar_one()
 

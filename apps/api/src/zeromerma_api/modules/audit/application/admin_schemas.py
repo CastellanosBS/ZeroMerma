@@ -46,6 +46,10 @@ class AdminAuditSummaryView(BaseModel):
 class AdminAuditEventListItemView(BaseModel):
     id: UUID
     occurred_at: datetime
+    recorded_at: datetime | None = None
+    context_version: int = 0
+    operation_id: UUID | None = None
+    correlation_id: UUID | None = None
     actor_user_id: UUID | None = None
     actor_name: str
     actor_email: str | None = None
@@ -117,7 +121,12 @@ class AdminAuditChangeItemView(BaseModel):
 
 class AdminAuditRequestContextView(BaseModel):
     request_id: str | None = None
-    correlation_id: str | None = None
+    operation_id: UUID | None = None
+    correlation_id: UUID | None = None
+    causation_id: UUID | None = None
+    idempotency_key: UUID | None = None
+    operation_code: str | None = None
+    related_branch_ids: list[UUID] = Field(default_factory=list)
     endpoint: str | None = None
     method: str | None = None
     ip_address: str | None = None

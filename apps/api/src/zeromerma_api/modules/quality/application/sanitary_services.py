@@ -424,6 +424,7 @@ class AdminSanitaryVerificationService:
             )
             self._append_event(
                 session,
+                actor_id=current_user.id,
                 event_name=OUTBOX_EVENT_SANITARY_VERIFICATION_CREATED_V1,
                 verification=verification,
                 branch=branch,
@@ -439,6 +440,7 @@ class AdminSanitaryVerificationService:
                 )
                 self._append_event(
                     session,
+                    actor_id=current_user.id,
                     event_name=OUTBOX_EVENT_SANITARY_VERIFICATION_COMPLETED_V1,
                     verification=verification,
                     branch=branch,
@@ -498,6 +500,7 @@ class AdminSanitaryVerificationService:
         )
         self._append_event(
             session,
+            actor_id=current_user.id,
             event_name=OUTBOX_EVENT_SANITARY_VERIFICATION_STARTED_V1,
             verification=row.verification,
             branch=row.branch,
@@ -594,6 +597,7 @@ class AdminSanitaryVerificationService:
         )
         self._append_event(
             session,
+            actor_id=current_user.id,
             event_name=OUTBOX_EVENT_SANITARY_VERIFICATION_COMPLETED_V1,
             verification=row.verification,
             branch=row.branch,
@@ -634,6 +638,7 @@ class AdminSanitaryVerificationService:
         )
         self._append_event(
             session,
+            actor_id=current_user.id,
             event_name=OUTBOX_EVENT_SANITARY_VERIFICATION_CANCELLED_V1,
             verification=row.verification,
             branch=row.branch,
@@ -1448,6 +1453,7 @@ class AdminSanitaryVerificationService:
         self,
         session: Session,
         *,
+        actor_id: uuid.UUID,
         event_name: str,
         verification: SanitaryVerification,
         branch: Branch,
@@ -1456,7 +1462,9 @@ class AdminSanitaryVerificationService:
             session,
             aggregate_id=str(verification.id),
             aggregate_type=SANITARY_RESOURCE_TYPE,
+            actor_id=actor_id,
             event_name=event_name,
+            branch_id=branch.id,
             payload={
                 "area_name": verification.area_name,
                 "branch_code": branch.code,
@@ -1490,6 +1498,8 @@ class AdminSanitaryVerificationService:
             aggregate_id=str(verification.id),
             aggregate_type=SANITARY_RESOURCE_TYPE,
             event_name=OUTBOX_EVENT_SANITARY_VERIFICATION_HIGH_RISK_ALERT_V1,
+            actor_id=actor_id,
+            branch_id=branch_id,
             payload={
                 "area_name": verification.area_name,
                 "folio": verification.folio,

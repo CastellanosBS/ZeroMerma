@@ -247,7 +247,7 @@ def test_correction_commit_keeps_original_document_and_writes_audit_and_outbox(
         headers={
             **{
                 **_authorization_header(client),
-                "X-Request-ID": "phase-4a-correction-commit",
+                "X-Request-ID": "46e5d359-477f-54eb-9920-aa206524db8e",
             },
             "Idempotency-Key": new_idempotency_key(),
         },
@@ -332,7 +332,7 @@ def test_correction_commit_keeps_original_document_and_writes_audit_and_outbox(
     assert Decimal(target_lines[0].quantity) == Decimal("4.000")
     assert Decimal(correction_lines[0].delta_quantity) == Decimal("-2.000")
     assert audit_record.action == "correction.committed"
-    assert audit_record.request_id == "phase-4a-correction-commit"
+    assert audit_record.request_id == "46e5d359-477f-54eb-9920-aa206524db8e"
     assert outbox_event.event_name == "correction.committed.v1"
 
 
@@ -502,7 +502,7 @@ def test_correction_history_and_detail_expose_safe_audit_summary(
         headers={
             **{
                 **_authorization_header(client),
-                "X-Request-ID": "phase-4a-correction-history",
+                "X-Request-ID": "a1aa8067-ba0c-5866-a446-d661886759c7",
             },
             "Idempotency-Key": new_idempotency_key(),
         },
@@ -609,7 +609,7 @@ def test_high_impact_correction_requires_acknowledgement_and_emits_alert_outbox(
         headers={
             **{
                 **_authorization_header(client),
-                "X-Request-ID": "phase-4a-correction-high-impact",
+                "X-Request-ID": "383a9d39-296a-59aa-9514-2182ee9d974b",
             },
             "Idempotency-Key": new_idempotency_key(),
         },

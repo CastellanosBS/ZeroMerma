@@ -58,7 +58,7 @@ def _get_product_class_id(code: str) -> str:
 def _confirm_sale(client: TestClient) -> str:
     headers = {
         **_authorization_header(client),
-        "X-Request-ID": "dev-audit-sale-confirmation",
+        "X-Request-ID": "23eec806-9309-5f2b-92ca-ba167dbf9e14",
     }
     cash_session_id = current_cash_session_id(
         client, headers=headers, workstation_code=SEED_WORKSTATION_CODE

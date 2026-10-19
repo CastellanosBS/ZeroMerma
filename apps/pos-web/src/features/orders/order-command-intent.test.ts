@@ -67,7 +67,7 @@ it.each(["create", "mark-ready", "deliver", "cancel"] as const)(
     const second = mock.mock.calls[1]![0];
     expect(second.payload).toEqual(first.payload);
     expect(second.idempotencyKey).toBe(first.idempotencyKey);
-    expect(second.requestId).not.toBe(first.requestId);
+    expect(second).not.toHaveProperty("requestId");
     expect(localStorage.getItem("zeromerma-order-intention:station")).not.toMatch(
       /private|settlement_amount|customer_name|items/,
     );

@@ -200,7 +200,7 @@ def test_product_direct_return_commits_refund_and_writes_audit_and_outbox(
 
     return_headers = {
         **_authorization_header(client),
-        "X-Request-ID": "returns-product-direct",
+        "X-Request-ID": "926b5536-bbd9-5289-880e-31b540667f89",
     }
     return_cash_session_id = current_cash_session_id(
         client, headers=return_headers, workstation_code=SEED_WORKSTATION_CODE
@@ -277,7 +277,7 @@ def test_product_direct_return_commits_refund_and_writes_audit_and_outbox(
     assert Decimal(str(return_line.refund_line_total_amount)) == Decimal("18.00")
     assert cash_movement.direction == "OUT"
     assert Decimal(str(cash_movement.amount)) == Decimal("18.00")
-    assert audit_record.request_id == "returns-product-direct"
+    assert audit_record.request_id == "926b5536-bbd9-5289-880e-31b540667f89"
     assert outbox_event.payload["original_sale_id"] == str(sale_payload["id"])
     assert return_record.reason_code == "WRONG_ITEM"
     assert reread_response.json()["reason_code"] == "WRONG_ITEM"
@@ -529,7 +529,7 @@ def test_old_sale_return_requires_acknowledgement_and_prepares_backoffice_review
 
     return_headers = {
         **_authorization_header(client),
-        "X-Request-ID": "returns-high-risk-blocked",
+        "X-Request-ID": "c507f8ae-39f4-50b7-89c0-f64676158fb4",
     }
     return_cash_session_id = current_cash_session_id(
         client, headers=return_headers, workstation_code=SEED_WORKSTATION_CODE
@@ -560,7 +560,7 @@ def test_old_sale_return_requires_acknowledgement_and_prepares_backoffice_review
 
     return_headers = {
         **_authorization_header(client),
-        "X-Request-ID": "returns-high-risk-confirmed",
+        "X-Request-ID": "78986b44-31c5-54b4-81d5-3b68ed55af89",
     }
     return_cash_session_id = current_cash_session_id(
         client, headers=return_headers, workstation_code=SEED_WORKSTATION_CODE
@@ -605,7 +605,7 @@ def test_old_sale_return_requires_acknowledgement_and_prepares_backoffice_review
             )
         ).scalar_one()
 
-    assert alert_audit.request_id == "returns-high-risk-confirmed"
+    assert alert_audit.request_id == "78986b44-31c5-54b4-81d5-3b68ed55af89"
     assert alert_outbox.payload["notification_target"] == "backoffice"
 
     detail_response = client.get(
@@ -631,7 +631,7 @@ def test_returns_history_and_detail_expose_safe_audit_summary(client: TestClient
 
     return_headers = {
         **_authorization_header(client),
-        "X-Request-ID": "returns-history-audit",
+        "X-Request-ID": "dfdb58d0-dbf3-5099-a7e2-e6b6a91d24ab",
     }
     return_cash_session_id = current_cash_session_id(
         client, headers=return_headers, workstation_code=SEED_WORKSTATION_CODE

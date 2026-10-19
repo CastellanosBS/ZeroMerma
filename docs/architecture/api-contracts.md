@@ -51,12 +51,21 @@ All API errors use `ApiErrorResponse`:
 - `code`: stable protocol code for the HTTP status;
 - `message`: safe user-facing message;
 - `details`: optional structured context after sensitive-key redaction;
-- `request_id`: the sanitized incoming `X-Request-ID`, when supplied;
+- `request_id`: the normalized UUID identifying the current HTTP attempt;
 - `field_errors`: structured locations/messages/types for request validation.
 
 The contract covers 400, 401, 403, 404, 409, 422, 423, 429, and safe 500 responses. All consumers and
 backend assertions use `message`; there is no legacy `detail` alias. POS and Backoffice
 consume the canonical fields through the shared transport.
+
+`X-Request-ID` accepts a strict UUID; missing, duplicate or invalid values are
+replaced with a fresh UUID. Responses expose `X-Request-ID` and the server-owned
+`X-Correlation-ID`, including errors and early security rejections. The shared
+transport generates a fresh request UUID per attempt and ignores caller-supplied
+correlation/source authority. An authorized idempotent replay keeps the original
+operation/correlation identity while receiving a new request identity. These
+headers are documented in runtime OpenAPI and exposed through CORS; they do not
+alter the durable response snapshot. See [operation-context.md](operation-context.md).
 
 ## Wire types
 

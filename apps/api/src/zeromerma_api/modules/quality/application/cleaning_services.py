@@ -384,6 +384,7 @@ class AdminCleaningLogService:
             )
             self._append_event(
                 session,
+                actor_id=current_user.id,
                 event_name=OUTBOX_EVENT_CLEANING_LOG_CREATED_V1,
                 log=log,
                 branch=branch,
@@ -401,6 +402,7 @@ class AdminCleaningLogService:
                 )
                 self._append_event(
                     session,
+                    actor_id=current_user.id,
                     event_name=OUTBOX_EVENT_CLEANING_LOG_COMPLETED_V1,
                     log=log,
                     branch=branch,
@@ -492,6 +494,7 @@ class AdminCleaningLogService:
         )
         self._append_event(
             session,
+            actor_id=current_user.id,
             event_name=OUTBOX_EVENT_CLEANING_LOG_COMPLETED_V1,
             log=row.log,
             branch=row.branch,
@@ -532,6 +535,7 @@ class AdminCleaningLogService:
         )
         self._append_event(
             session,
+            actor_id=current_user.id,
             event_name=OUTBOX_EVENT_CLEANING_LOG_CANCELLED_V1,
             log=row.log,
             branch=row.branch,
@@ -1113,6 +1117,7 @@ class AdminCleaningLogService:
         self,
         session: Session,
         *,
+        actor_id: uuid.UUID,
         event_name: str,
         log: CleaningLog,
         branch: Branch,
@@ -1121,7 +1126,9 @@ class AdminCleaningLogService:
             session,
             aggregate_id=str(log.id),
             aggregate_type=CLEANING_RESOURCE_TYPE,
+            actor_id=actor_id,
             event_name=event_name,
+            branch_id=branch.id,
             payload={
                 "area_name": log.area_name,
                 "branch_code": branch.code,
@@ -1154,6 +1161,8 @@ class AdminCleaningLogService:
             aggregate_id=str(log.id),
             aggregate_type=CLEANING_RESOURCE_TYPE,
             event_name=OUTBOX_EVENT_CLEANING_LOG_HIGH_RISK_ALERT_V1,
+            actor_id=actor_id,
+            branch_id=branch_id,
             payload={
                 "area_name": log.area_name,
                 "folio": log.folio,

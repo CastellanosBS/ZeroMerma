@@ -14366,7 +14366,7 @@
       "module_owner": "API:admin-inputs-supplies",
       "use_case": "update_admin_input_supply_supplier",
       "implementation_state": "PARTIAL",
-      "verification_state": "NO_TEST",
+      "verification_state": "TESTED_IN_THIS_TASK",
       "auth_requirement": "AUTHENTICATED",
       "actual_auth_dependency": [
         "fastapi.security.api_key:APIKeyCookie",
@@ -14399,15 +14399,17 @@
         "inputs_supplies"
       ],
       "writes_entities": [
-        "inputs_supplies"
+        "inputs_supplies",
+        "audit_log",
+        "outbox_events"
       ],
       "locks_or_concurrency_control": "identity_privilege_state FOR UPDATE for identity administration; FOR SHARE for domain mutation; authorization revalidated under the shared transaction boundary",
       "audit_required": true,
       "audit_actual": "ATOMIC",
       "audit_atomicity": "ATOMIC",
       "outbox_required": true,
-      "outbox_actual": "ABSENT",
-      "outbox_atomicity": "ABSENT",
+      "outbox_actual": "ATOMIC",
+      "outbox_atomicity": "ATOMIC",
       "idempotency_required": false,
       "idempotency_actual": "NOT_REQUIRED",
       "idempotency_business_identity": "NOT_APPLICABLE",
@@ -14426,7 +14428,8 @@
         "NONE"
       ],
       "direct_tests": [
-        "NONE"
+        "apps/api/tests/test_trace_producers.py#test_existing_trace_gap_writes_one_minimal_correlated_event",
+        "apps/api/tests/test_trace_producers.py#test_trace_gap_outbox_failure_rolls_back_domain_and_audit"
       ],
       "indirect_tests": [
         "apps/api/tests/conftest.py",
@@ -14444,14 +14447,14 @@
       ],
       "decision_refs": [
         "DEC-03",
-        "DEC-04"
+        "DEC-04",
+        "DEC-18"
       ],
       "gate_refs": [
         "G1",
         "G5"
       ],
       "gap_ids": [
-        "GAP-0353",
         "GAP-0354",
         "GAP-0927"
       ],
@@ -14460,7 +14463,9 @@
         "apps/api/src/zeromerma_api/modules/catalog/application/inputs_supplies_services.py#class AdminInputSupplyService",
         "apps/api/src/zeromerma_api/presentation/access_policy.py#ENDPOINT_POLICIES",
         "apps/api/src/zeromerma_api/db/access_scope.py#bind_authorization_scope",
-        "docs/architecture/authorization.md"
+        "docs/architecture/authorization.md",
+        "docs/architecture/operation-context.md",
+        "docs/implementation/operation-context-validation.md"
       ]
     },
     {
@@ -14503,8 +14508,8 @@
       ],
       "domain_or_use_case_symbol": "update_admin_price",
       "router_business_logic_present": false,
-      "transaction_owner": "zeromerma_api.modules.catalog.application.admin_services.AdminPriceCatalogService.update_price",
-      "transaction_boundary": "commit=False;flush=False;rollback=False",
+      "transaction_owner": "SELECTED_DELEGATE: AdminProductCatalogService.update_product or AdminProductClassCatalogService.update_class",
+      "transaction_boundary": "The selected catalog owner commits domain, audit and outbox once; AdminPriceCatalogService.update_price does not own another commit.",
       "persistence": "WRITE",
       "external_side_effect": "NONE_OBSERVED_STATICALLY",
       "reads_entities": [
@@ -14513,15 +14518,17 @@
       ],
       "writes_entities": [
         "products",
-        "product_classes"
+        "product_classes",
+        "audit_log",
+        "outbox_events"
       ],
       "locks_or_concurrency_control": "identity_privilege_state FOR UPDATE for identity administration; FOR SHARE for domain mutation; authorization revalidated under the shared transaction boundary",
       "audit_required": true,
-      "audit_actual": "ABSENT",
-      "audit_atomicity": "ABSENT",
+      "audit_actual": "ATOMIC",
+      "audit_atomicity": "ATOMIC",
       "outbox_required": true,
-      "outbox_actual": "ABSENT",
-      "outbox_atomicity": "ABSENT",
+      "outbox_actual": "ATOMIC",
+      "outbox_atomicity": "ATOMIC",
       "idempotency_required": false,
       "idempotency_actual": "NOT_REQUIRED",
       "idempotency_business_identity": "NOT_APPLICABLE",
@@ -14541,7 +14548,8 @@
         "NONE"
       ],
       "direct_tests": [
-        "apps/api/tests/test_admin_prices.py"
+        "apps/api/tests/test_admin_prices.py",
+        "apps/api/tests/test_admin_transaction_boundaries.py#test_nested_price_delegate_has_one_commit_and_rolls_back_failed_traces"
       ],
       "indirect_tests": [
         "apps/api/tests/conftest.py",
@@ -14559,22 +14567,26 @@
       "decision_refs": [
         "DEC-03",
         "DEC-04",
-        "DEC-13"
+        "DEC-13",
+        "DEC-18"
       ],
       "gate_refs": [
         "G1",
         "G5"
       ],
       "gap_ids": [
-        "GAP-0357",
-        "GAP-0358"
+        "NONE"
       ],
       "evidence": [
         "apps/api/src/zeromerma_api/modules/catalog/presentation/admin_router.py#update_admin_price",
         "apps/api/src/zeromerma_api/modules/catalog/application/admin_services.py#class AdminPriceCatalogService",
         "apps/api/src/zeromerma_api/presentation/access_policy.py#ENDPOINT_POLICIES",
         "apps/api/src/zeromerma_api/db/access_scope.py#bind_authorization_scope",
-        "docs/architecture/authorization.md"
+        "docs/architecture/authorization.md",
+        "docs/architecture/operation-context.md",
+        "docs/implementation/operation-context-validation.md",
+        "apps/api/src/zeromerma_api/modules/catalog/application/admin_services.py#def update_product",
+        "apps/api/src/zeromerma_api/modules/catalog/application/admin_services.py#def update_class"
       ]
     },
     {
@@ -15188,7 +15200,7 @@
       "module_owner": "API:admin-settings",
       "use_case": "update_admin_setting",
       "implementation_state": "PARTIAL",
-      "verification_state": "DIRECT_TEST_EXISTS_NOT_RUN",
+      "verification_state": "TESTED_IN_THIS_TASK",
       "auth_requirement": "AUTHENTICATED",
       "actual_auth_dependency": [
         "fastapi.security.api_key:APIKeyCookie",
@@ -15223,15 +15235,17 @@
       ],
       "writes_entities": [
         "system_settings",
-        "system_setting_history"
+        "system_setting_history",
+        "audit_log",
+        "outbox_events"
       ],
       "locks_or_concurrency_control": "identity_privilege_state FOR UPDATE for identity administration; FOR SHARE for domain mutation; authorization revalidated under the shared transaction boundary",
       "audit_required": true,
       "audit_actual": "ATOMIC",
       "audit_atomicity": "ATOMIC",
       "outbox_required": true,
-      "outbox_actual": "ABSENT",
-      "outbox_atomicity": "ABSENT",
+      "outbox_actual": "ATOMIC",
+      "outbox_atomicity": "ATOMIC",
       "idempotency_required": true,
       "idempotency_actual": "REQUEST_ID_ONLY",
       "idempotency_business_identity": "NOT_IMPLEMENTED",
@@ -15251,7 +15265,9 @@
         "NONE"
       ],
       "direct_tests": [
-        "apps/api/tests/test_admin_settings.py"
+        "apps/api/tests/test_admin_settings.py",
+        "apps/api/tests/test_trace_producers.py#test_existing_trace_gap_writes_one_minimal_correlated_event",
+        "apps/api/tests/test_trace_producers.py#test_trace_gap_outbox_failure_rolls_back_domain_and_audit"
       ],
       "indirect_tests": [
         "apps/api/tests/conftest.py",
@@ -15268,14 +15284,14 @@
       ],
       "decision_refs": [
         "DEC-03",
-        "DEC-04"
+        "DEC-04",
+        "DEC-18"
       ],
       "gate_refs": [
         "G1",
         "G5"
       ],
       "gap_ids": [
-        "GAP-0380",
         "GAP-0381"
       ],
       "evidence": [
@@ -15283,7 +15299,9 @@
         "apps/api/src/zeromerma_api/modules/configuration/application/admin_services.py#class AdminSettingService",
         "apps/api/src/zeromerma_api/presentation/access_policy.py#ENDPOINT_POLICIES",
         "apps/api/src/zeromerma_api/db/access_scope.py#bind_authorization_scope",
-        "docs/architecture/authorization.md"
+        "docs/architecture/authorization.md",
+        "docs/architecture/operation-context.md",
+        "docs/implementation/operation-context-validation.md"
       ]
     },
     {
@@ -15415,7 +15433,7 @@
       "module_owner": "API:admin-suppliers",
       "use_case": "update_admin_supplier_contact",
       "implementation_state": "PARTIAL",
-      "verification_state": "NO_TEST",
+      "verification_state": "TESTED_IN_THIS_TASK",
       "auth_requirement": "AUTHENTICATED",
       "actual_auth_dependency": [
         "fastapi.security.api_key:APIKeyCookie",
@@ -15449,15 +15467,17 @@
         "suppliers"
       ],
       "writes_entities": [
-        "suppliers"
+        "suppliers",
+        "audit_log",
+        "outbox_events"
       ],
       "locks_or_concurrency_control": "identity_privilege_state FOR UPDATE for identity administration; FOR SHARE for domain mutation; authorization revalidated under the shared transaction boundary",
       "audit_required": true,
       "audit_actual": "ATOMIC",
       "audit_atomicity": "ATOMIC",
       "outbox_required": true,
-      "outbox_actual": "ABSENT",
-      "outbox_atomicity": "ABSENT",
+      "outbox_actual": "ATOMIC",
+      "outbox_atomicity": "ATOMIC",
       "idempotency_required": false,
       "idempotency_actual": "NOT_REQUIRED",
       "idempotency_business_identity": "NOT_APPLICABLE",
@@ -15476,7 +15496,8 @@
         "NONE"
       ],
       "direct_tests": [
-        "NONE"
+        "apps/api/tests/test_trace_producers.py#test_existing_trace_gap_writes_one_minimal_correlated_event",
+        "apps/api/tests/test_trace_producers.py#test_trace_gap_outbox_failure_rolls_back_domain_and_audit"
       ],
       "indirect_tests": [
         "apps/api/tests/conftest.py",
@@ -15494,14 +15515,14 @@
       ],
       "decision_refs": [
         "DEC-03",
-        "DEC-04"
+        "DEC-04",
+        "DEC-18"
       ],
       "gate_refs": [
         "G1",
         "G5"
       ],
       "gap_ids": [
-        "GAP-0388",
         "GAP-0389",
         "GAP-0928"
       ],
@@ -15510,7 +15531,9 @@
         "apps/api/src/zeromerma_api/modules/suppliers/application/admin_services.py#class AdminSupplierService",
         "apps/api/src/zeromerma_api/presentation/access_policy.py#ENDPOINT_POLICIES",
         "apps/api/src/zeromerma_api/db/access_scope.py#bind_authorization_scope",
-        "docs/architecture/authorization.md"
+        "docs/architecture/authorization.md",
+        "docs/architecture/operation-context.md",
+        "docs/implementation/operation-context-validation.md"
       ]
     },
     {
@@ -15528,7 +15551,7 @@
       "module_owner": "API:admin-suppliers",
       "use_case": "update_admin_supplier_product",
       "implementation_state": "PARTIAL",
-      "verification_state": "NO_TEST",
+      "verification_state": "TESTED_IN_THIS_TASK",
       "auth_requirement": "AUTHENTICATED",
       "actual_auth_dependency": [
         "fastapi.security.api_key:APIKeyCookie",
@@ -15562,15 +15585,17 @@
         "suppliers"
       ],
       "writes_entities": [
-        "suppliers"
+        "suppliers",
+        "audit_log",
+        "outbox_events"
       ],
       "locks_or_concurrency_control": "identity_privilege_state FOR UPDATE for identity administration; FOR SHARE for domain mutation; authorization revalidated under the shared transaction boundary",
       "audit_required": true,
       "audit_actual": "ATOMIC",
       "audit_atomicity": "ATOMIC",
       "outbox_required": true,
-      "outbox_actual": "ABSENT",
-      "outbox_atomicity": "ABSENT",
+      "outbox_actual": "ATOMIC",
+      "outbox_atomicity": "ATOMIC",
       "idempotency_required": false,
       "idempotency_actual": "NOT_REQUIRED",
       "idempotency_business_identity": "NOT_APPLICABLE",
@@ -15589,7 +15614,8 @@
         "NONE"
       ],
       "direct_tests": [
-        "NONE"
+        "apps/api/tests/test_trace_producers.py#test_existing_trace_gap_writes_one_minimal_correlated_event",
+        "apps/api/tests/test_trace_producers.py#test_trace_gap_outbox_failure_rolls_back_domain_and_audit"
       ],
       "indirect_tests": [
         "apps/api/tests/conftest.py",
@@ -15607,14 +15633,14 @@
       ],
       "decision_refs": [
         "DEC-03",
-        "DEC-04"
+        "DEC-04",
+        "DEC-18"
       ],
       "gate_refs": [
         "G1",
         "G5"
       ],
       "gap_ids": [
-        "GAP-0392",
         "GAP-0393",
         "GAP-0929"
       ],
@@ -15623,7 +15649,9 @@
         "apps/api/src/zeromerma_api/modules/suppliers/application/admin_services.py#class AdminSupplierService",
         "apps/api/src/zeromerma_api/presentation/access_policy.py#ENDPOINT_POLICIES",
         "apps/api/src/zeromerma_api/db/access_scope.py#bind_authorization_scope",
-        "docs/architecture/authorization.md"
+        "docs/architecture/authorization.md",
+        "docs/architecture/operation-context.md",
+        "docs/implementation/operation-context-validation.md"
       ]
     },
     {
@@ -16552,7 +16580,7 @@
       "module_owner": "API:admin-discounts",
       "use_case": "duplicate_admin_discount",
       "implementation_state": "PARTIAL",
-      "verification_state": "NO_TEST",
+      "verification_state": "DIRECT_TEST_EXISTS_NOT_RUN",
       "auth_requirement": "AUTHENTICATED",
       "actual_auth_dependency": [
         "fastapi.security.api_key:APIKeyCookie",
@@ -16585,15 +16613,17 @@
         "commercial_discounts"
       ],
       "writes_entities": [
-        "commercial_discounts"
+        "commercial_discounts",
+        "audit_log",
+        "outbox_events"
       ],
       "locks_or_concurrency_control": "identity_privilege_state FOR UPDATE for identity administration; FOR SHARE for domain mutation; authorization revalidated under the shared transaction boundary",
       "audit_required": true,
-      "audit_actual": "ABSENT",
-      "audit_atomicity": "ABSENT",
+      "audit_actual": "ATOMIC",
+      "audit_atomicity": "ATOMIC",
       "outbox_required": true,
-      "outbox_actual": "ABSENT",
-      "outbox_atomicity": "ABSENT",
+      "outbox_actual": "ATOMIC",
+      "outbox_atomicity": "ATOMIC",
       "idempotency_required": false,
       "idempotency_actual": "NOT_REQUIRED",
       "idempotency_business_identity": "NOT_APPLICABLE",
@@ -16612,7 +16642,7 @@
         "NONE"
       ],
       "direct_tests": [
-        "NONE"
+        "apps/api/tests/test_admin_discounts.py#test_admin_discounts_update_status_and_duplicate"
       ],
       "indirect_tests": [
         "apps/api/tests/conftest.py",
@@ -16630,15 +16660,14 @@
       ],
       "decision_refs": [
         "DEC-03",
-        "DEC-04"
+        "DEC-04",
+        "DEC-18"
       ],
       "gate_refs": [
         "G1",
         "G5"
       ],
       "gap_ids": [
-        "GAP-0424",
-        "GAP-0425",
         "GAP-0426",
         "GAP-0932"
       ],
@@ -16647,7 +16676,11 @@
         "apps/api/src/zeromerma_api/modules/discounts/application/services.py#class AdminCommercialDiscountService",
         "apps/api/src/zeromerma_api/presentation/access_policy.py#ENDPOINT_POLICIES",
         "apps/api/src/zeromerma_api/db/access_scope.py#bind_authorization_scope",
-        "docs/architecture/authorization.md"
+        "docs/architecture/authorization.md",
+        "docs/architecture/operation-context.md",
+        "docs/implementation/operation-context-validation.md",
+        "apps/api/src/zeromerma_api/modules/discounts/application/services.py#def duplicate_discount",
+        "apps/api/src/zeromerma_api/modules/discounts/application/services.py#def create_discount"
       ]
     },
     {
@@ -18127,7 +18160,7 @@
       "module_owner": "API:admin-inputs-supplies",
       "use_case": "upsert_admin_input_supply_supplier",
       "implementation_state": "PARTIAL",
-      "verification_state": "NO_TEST",
+      "verification_state": "TESTED_IN_THIS_TASK",
       "auth_requirement": "AUTHENTICATED",
       "actual_auth_dependency": [
         "fastapi.security.api_key:APIKeyCookie",
@@ -18160,15 +18193,17 @@
         "inputs_supplies"
       ],
       "writes_entities": [
-        "inputs_supplies"
+        "inputs_supplies",
+        "audit_log",
+        "outbox_events"
       ],
       "locks_or_concurrency_control": "identity_privilege_state FOR UPDATE for identity administration; FOR SHARE for domain mutation; authorization revalidated under the shared transaction boundary",
       "audit_required": true,
       "audit_actual": "ATOMIC",
       "audit_atomicity": "ATOMIC",
       "outbox_required": true,
-      "outbox_actual": "ABSENT",
-      "outbox_atomicity": "ABSENT",
+      "outbox_actual": "ATOMIC",
+      "outbox_atomicity": "ATOMIC",
       "idempotency_required": false,
       "idempotency_actual": "NOT_REQUIRED",
       "idempotency_business_identity": "NOT_APPLICABLE",
@@ -18187,7 +18222,8 @@
         "NONE"
       ],
       "direct_tests": [
-        "NONE"
+        "apps/api/tests/test_trace_producers.py#test_existing_trace_gap_writes_one_minimal_correlated_event",
+        "apps/api/tests/test_trace_producers.py#test_trace_gap_outbox_failure_rolls_back_domain_and_audit"
       ],
       "indirect_tests": [
         "apps/api/tests/conftest.py",
@@ -18205,14 +18241,14 @@
       ],
       "decision_refs": [
         "DEC-03",
-        "DEC-04"
+        "DEC-04",
+        "DEC-18"
       ],
       "gate_refs": [
         "G1",
         "G5"
       ],
       "gap_ids": [
-        "GAP-0468",
         "GAP-0469",
         "GAP-0942"
       ],
@@ -18221,7 +18257,9 @@
         "apps/api/src/zeromerma_api/modules/catalog/application/inputs_supplies_services.py#class AdminInputSupplyService",
         "apps/api/src/zeromerma_api/presentation/access_policy.py#ENDPOINT_POLICIES",
         "apps/api/src/zeromerma_api/db/access_scope.py#bind_authorization_scope",
-        "docs/architecture/authorization.md"
+        "docs/architecture/authorization.md",
+        "docs/architecture/operation-context.md",
+        "docs/implementation/operation-context-validation.md"
       ]
     },
     {
@@ -21330,7 +21368,7 @@
       "module_owner": "API:admin-reports",
       "use_case": "export_admin_report",
       "implementation_state": "PARTIAL",
-      "verification_state": "NO_TEST",
+      "verification_state": "TESTED_IN_THIS_TASK",
       "auth_requirement": "AUTHENTICATED",
       "actual_auth_dependency": [
         "fastapi.security.api_key:APIKeyCookie",
@@ -21365,15 +21403,16 @@
       ],
       "writes_entities": [
         "operational_domain_tables",
-        "audit_log"
+        "audit_log",
+        "outbox_events"
       ],
       "locks_or_concurrency_control": "identity_privilege_state FOR UPDATE for identity administration; FOR SHARE for domain mutation; authorization revalidated under the shared transaction boundary",
       "audit_required": true,
       "audit_actual": "ATOMIC",
       "audit_atomicity": "ATOMIC",
       "outbox_required": true,
-      "outbox_actual": "ABSENT",
-      "outbox_atomicity": "ABSENT",
+      "outbox_actual": "ATOMIC",
+      "outbox_atomicity": "ATOMIC",
       "idempotency_required": false,
       "idempotency_actual": "NOT_REQUIRED",
       "idempotency_business_identity": "NOT_APPLICABLE",
@@ -21392,7 +21431,8 @@
         "NONE"
       ],
       "direct_tests": [
-        "NONE"
+        "apps/api/tests/test_trace_producers.py#test_existing_trace_gap_writes_one_minimal_correlated_event",
+        "apps/api/tests/test_trace_producers.py#test_trace_gap_outbox_failure_rolls_back_domain_and_audit"
       ],
       "indirect_tests": [
         "apps/api/tests/conftest.py",
@@ -21419,7 +21459,6 @@
         "G5"
       ],
       "gap_ids": [
-        "GAP-0557",
         "GAP-0558",
         "GAP-0957"
       ],
@@ -21428,7 +21467,9 @@
         "apps/api/src/zeromerma_api/modules/reports/application/admin_services.py#class AdminReportService",
         "apps/api/src/zeromerma_api/presentation/access_policy.py#ENDPOINT_POLICIES",
         "apps/api/src/zeromerma_api/db/access_scope.py#bind_authorization_scope",
-        "docs/architecture/authorization.md"
+        "docs/architecture/authorization.md",
+        "docs/architecture/operation-context.md",
+        "docs/implementation/operation-context-validation.md"
       ]
     },
     {
@@ -22140,7 +22181,7 @@
       "module_owner": "API:admin-roles",
       "use_case": "assign_admin_role_to_user",
       "implementation_state": "PARTIAL",
-      "verification_state": "TESTED_IN_THIS_TASK",
+      "verification_state": "DIRECT_TEST_EXISTS_NOT_RUN",
       "auth_requirement": "AUTHENTICATED",
       "actual_auth_dependency": [
         "fastapi.security.api_key:APIKeyCookie",
@@ -22177,15 +22218,17 @@
       "writes_entities": [
         "roles",
         "permissions",
-        "user_role_assignments"
+        "user_role_assignments",
+        "audit_log",
+        "outbox_events"
       ],
       "locks_or_concurrency_control": "identity_privilege_state FOR UPDATE for identity administration; FOR SHARE for domain mutation; authorization revalidated under the shared transaction boundary",
       "audit_required": true,
       "audit_actual": "ATOMIC",
       "audit_atomicity": "ATOMIC",
       "outbox_required": true,
-      "outbox_actual": "ABSENT",
-      "outbox_atomicity": "ABSENT",
+      "outbox_actual": "ATOMIC",
+      "outbox_atomicity": "ATOMIC",
       "idempotency_required": true,
       "idempotency_actual": "REQUEST_ID_ONLY",
       "idempotency_business_identity": "NOT_IMPLEMENTED",
@@ -22204,7 +22247,7 @@
         "NONE"
       ],
       "direct_tests": [
-        "NONE"
+        "apps/api/tests/test_admin_roles.py#test_admin_role_user_assignment_flow_and_user_module_integration"
       ],
       "indirect_tests": [
         "apps/api/tests/conftest.py",
@@ -22223,14 +22266,14 @@
       ],
       "decision_refs": [
         "DEC-03",
-        "DEC-04"
+        "DEC-04",
+        "DEC-18"
       ],
       "gate_refs": [
         "G1",
         "G5"
       ],
       "gap_ids": [
-        "GAP-0572",
         "GAP-0573",
         "GAP-0574",
         "GAP-0960"
@@ -22240,7 +22283,11 @@
         "apps/api/src/zeromerma_api/modules/identity/application/admin_role_services.py#class AdminRoleService",
         "apps/api/src/zeromerma_api/presentation/access_policy.py#ENDPOINT_POLICIES",
         "apps/api/src/zeromerma_api/db/access_scope.py#bind_authorization_scope",
-        "docs/architecture/authorization.md"
+        "docs/architecture/authorization.md",
+        "docs/architecture/operation-context.md",
+        "docs/implementation/operation-context-validation.md",
+        "apps/api/src/zeromerma_api/modules/identity/application/admin_role_services.py#def _record_assignment_change",
+        "apps/api/src/zeromerma_api/modules/identity/application/admin_role_services.py#def _record_change"
       ]
     },
     {
@@ -22258,7 +22305,7 @@
       "module_owner": "API:admin-roles",
       "use_case": "remove_admin_role_from_user",
       "implementation_state": "PARTIAL",
-      "verification_state": "TESTED_IN_THIS_TASK",
+      "verification_state": "DIRECT_TEST_EXISTS_NOT_RUN",
       "auth_requirement": "AUTHENTICATED",
       "actual_auth_dependency": [
         "fastapi.security.api_key:APIKeyCookie",
@@ -22295,15 +22342,17 @@
       "writes_entities": [
         "roles",
         "permissions",
-        "user_role_assignments"
+        "user_role_assignments",
+        "audit_log",
+        "outbox_events"
       ],
       "locks_or_concurrency_control": "identity_privilege_state FOR UPDATE for identity administration; FOR SHARE for domain mutation; authorization revalidated under the shared transaction boundary",
       "audit_required": true,
       "audit_actual": "ATOMIC",
       "audit_atomicity": "ATOMIC",
       "outbox_required": true,
-      "outbox_actual": "ABSENT",
-      "outbox_atomicity": "ABSENT",
+      "outbox_actual": "ATOMIC",
+      "outbox_atomicity": "ATOMIC",
       "idempotency_required": true,
       "idempotency_actual": "REQUEST_ID_ONLY",
       "idempotency_business_identity": "NOT_IMPLEMENTED",
@@ -22322,7 +22371,7 @@
         "NONE"
       ],
       "direct_tests": [
-        "NONE"
+        "apps/api/tests/test_admin_roles.py#test_admin_role_user_assignment_flow_and_user_module_integration"
       ],
       "indirect_tests": [
         "apps/api/tests/conftest.py",
@@ -22341,14 +22390,14 @@
       ],
       "decision_refs": [
         "DEC-03",
-        "DEC-04"
+        "DEC-04",
+        "DEC-18"
       ],
       "gate_refs": [
         "G1",
         "G5"
       ],
       "gap_ids": [
-        "GAP-0577",
         "GAP-0578",
         "GAP-0579",
         "GAP-0961"
@@ -22358,7 +22407,11 @@
         "apps/api/src/zeromerma_api/modules/identity/application/admin_role_services.py#class AdminRoleService",
         "apps/api/src/zeromerma_api/presentation/access_policy.py#ENDPOINT_POLICIES",
         "apps/api/src/zeromerma_api/db/access_scope.py#bind_authorization_scope",
-        "docs/architecture/authorization.md"
+        "docs/architecture/authorization.md",
+        "docs/architecture/operation-context.md",
+        "docs/implementation/operation-context-validation.md",
+        "apps/api/src/zeromerma_api/modules/identity/application/admin_role_services.py#def _record_assignment_change",
+        "apps/api/src/zeromerma_api/modules/identity/application/admin_role_services.py#def _record_change"
       ]
     },
     {
@@ -22376,7 +22429,7 @@
       "module_owner": "API:admin-sales-tickets",
       "use_case": "reprint_admin_sales_ticket",
       "implementation_state": "PARTIAL",
-      "verification_state": "NO_TEST",
+      "verification_state": "TESTED_IN_THIS_TASK",
       "auth_requirement": "AUTHENTICATED",
       "actual_auth_dependency": [
         "fastapi.security.api_key:APIKeyCookie",
@@ -22413,15 +22466,17 @@
       "writes_entities": [
         "sales",
         "sale_lines",
-        "returns"
+        "returns",
+        "audit_log",
+        "outbox_events"
       ],
       "locks_or_concurrency_control": "identity_privilege_state FOR UPDATE for identity administration; FOR SHARE for domain mutation; authorization revalidated under the shared transaction boundary",
       "audit_required": true,
       "audit_actual": "ATOMIC",
       "audit_atomicity": "ATOMIC",
       "outbox_required": true,
-      "outbox_actual": "ABSENT",
-      "outbox_atomicity": "ABSENT",
+      "outbox_actual": "ATOMIC",
+      "outbox_atomicity": "ATOMIC",
       "idempotency_required": false,
       "idempotency_actual": "NOT_REQUIRED",
       "idempotency_business_identity": "NOT_APPLICABLE",
@@ -22440,7 +22495,8 @@
         "NONE"
       ],
       "direct_tests": [
-        "NONE"
+        "apps/api/tests/test_trace_producers.py#test_existing_trace_gap_writes_one_minimal_correlated_event",
+        "apps/api/tests/test_trace_producers.py#test_trace_gap_outbox_failure_rolls_back_domain_and_audit"
       ],
       "indirect_tests": [
         "apps/api/tests/conftest.py",
@@ -22458,14 +22514,14 @@
       ],
       "decision_refs": [
         "DEC-03",
-        "DEC-04"
+        "DEC-04",
+        "DEC-18"
       ],
       "gate_refs": [
         "G1",
         "G5"
       ],
       "gap_ids": [
-        "GAP-0582",
         "GAP-0583",
         "GAP-0962"
       ],
@@ -22474,7 +22530,9 @@
         "apps/api/src/zeromerma_api/modules/tickets/application/admin_services.py#class AdminSalesTicketService",
         "apps/api/src/zeromerma_api/presentation/access_policy.py#ENDPOINT_POLICIES",
         "apps/api/src/zeromerma_api/db/access_scope.py#bind_authorization_scope",
-        "docs/architecture/authorization.md"
+        "docs/architecture/authorization.md",
+        "docs/architecture/operation-context.md",
+        "docs/implementation/operation-context-validation.md"
       ]
     },
     {
@@ -22939,7 +22997,7 @@
       "module_owner": "API:admin-settings",
       "use_case": "reset_admin_setting",
       "implementation_state": "PARTIAL",
-      "verification_state": "NO_TEST",
+      "verification_state": "TESTED_IN_THIS_TASK",
       "auth_requirement": "AUTHENTICATED",
       "actual_auth_dependency": [
         "fastapi.security.api_key:APIKeyCookie",
@@ -22974,15 +23032,17 @@
       ],
       "writes_entities": [
         "system_settings",
-        "system_setting_history"
+        "system_setting_history",
+        "audit_log",
+        "outbox_events"
       ],
       "locks_or_concurrency_control": "identity_privilege_state FOR UPDATE for identity administration; FOR SHARE for domain mutation; authorization revalidated under the shared transaction boundary",
       "audit_required": true,
       "audit_actual": "ATOMIC",
       "audit_atomicity": "ATOMIC",
       "outbox_required": true,
-      "outbox_actual": "ABSENT",
-      "outbox_atomicity": "ABSENT",
+      "outbox_actual": "ATOMIC",
+      "outbox_atomicity": "ATOMIC",
       "idempotency_required": true,
       "idempotency_actual": "REQUEST_ID_ONLY",
       "idempotency_business_identity": "NOT_IMPLEMENTED",
@@ -23001,7 +23061,8 @@
         "NONE"
       ],
       "direct_tests": [
-        "NONE"
+        "apps/api/tests/test_trace_producers.py#test_existing_trace_gap_writes_one_minimal_correlated_event",
+        "apps/api/tests/test_trace_producers.py#test_trace_gap_outbox_failure_rolls_back_domain_and_audit"
       ],
       "indirect_tests": [
         "apps/api/tests/conftest.py",
@@ -23019,14 +23080,14 @@
       ],
       "decision_refs": [
         "DEC-03",
-        "DEC-04"
+        "DEC-04",
+        "DEC-18"
       ],
       "gate_refs": [
         "G1",
         "G5"
       ],
       "gap_ids": [
-        "GAP-0598",
         "GAP-0599",
         "GAP-0600",
         "GAP-0966"
@@ -23036,7 +23097,9 @@
         "apps/api/src/zeromerma_api/modules/configuration/application/admin_services.py#class AdminSettingService",
         "apps/api/src/zeromerma_api/presentation/access_policy.py#ENDPOINT_POLICIES",
         "apps/api/src/zeromerma_api/db/access_scope.py#bind_authorization_scope",
-        "docs/architecture/authorization.md"
+        "docs/architecture/authorization.md",
+        "docs/architecture/operation-context.md",
+        "docs/implementation/operation-context-validation.md"
       ]
     },
     {
@@ -23168,7 +23231,7 @@
       "module_owner": "API:admin-suppliers",
       "use_case": "upsert_admin_supplier_branch",
       "implementation_state": "PARTIAL",
-      "verification_state": "NO_TEST",
+      "verification_state": "TESTED_IN_THIS_TASK",
       "auth_requirement": "AUTHENTICATED",
       "actual_auth_dependency": [
         "fastapi.security.api_key:APIKeyCookie",
@@ -23202,15 +23265,17 @@
         "suppliers"
       ],
       "writes_entities": [
-        "suppliers"
+        "suppliers",
+        "audit_log",
+        "outbox_events"
       ],
       "locks_or_concurrency_control": "identity_privilege_state FOR UPDATE for identity administration; FOR SHARE for domain mutation; authorization revalidated under the shared transaction boundary",
       "audit_required": true,
       "audit_actual": "ATOMIC",
       "audit_atomicity": "ATOMIC",
       "outbox_required": true,
-      "outbox_actual": "ABSENT",
-      "outbox_atomicity": "ABSENT",
+      "outbox_actual": "ATOMIC",
+      "outbox_atomicity": "ATOMIC",
       "idempotency_required": false,
       "idempotency_actual": "NOT_REQUIRED",
       "idempotency_business_identity": "NOT_APPLICABLE",
@@ -23229,7 +23294,8 @@
         "NONE"
       ],
       "direct_tests": [
-        "NONE"
+        "apps/api/tests/test_trace_producers.py#test_existing_trace_gap_writes_one_minimal_correlated_event",
+        "apps/api/tests/test_trace_producers.py#test_trace_gap_outbox_failure_rolls_back_domain_and_audit"
       ],
       "indirect_tests": [
         "apps/api/tests/conftest.py",
@@ -23247,14 +23313,14 @@
       ],
       "decision_refs": [
         "DEC-03",
-        "DEC-04"
+        "DEC-04",
+        "DEC-18"
       ],
       "gate_refs": [
         "G1",
         "G5"
       ],
       "gap_ids": [
-        "GAP-0606",
         "GAP-0607",
         "GAP-0967"
       ],
@@ -23263,7 +23329,9 @@
         "apps/api/src/zeromerma_api/modules/suppliers/application/admin_services.py#class AdminSupplierService",
         "apps/api/src/zeromerma_api/presentation/access_policy.py#ENDPOINT_POLICIES",
         "apps/api/src/zeromerma_api/db/access_scope.py#bind_authorization_scope",
-        "docs/architecture/authorization.md"
+        "docs/architecture/authorization.md",
+        "docs/architecture/operation-context.md",
+        "docs/implementation/operation-context-validation.md"
       ]
     },
     {
@@ -23281,7 +23349,7 @@
       "module_owner": "API:admin-suppliers",
       "use_case": "create_admin_supplier_contact",
       "implementation_state": "PARTIAL",
-      "verification_state": "NO_TEST",
+      "verification_state": "TESTED_IN_THIS_TASK",
       "auth_requirement": "AUTHENTICATED",
       "actual_auth_dependency": [
         "fastapi.security.api_key:APIKeyCookie",
@@ -23315,15 +23383,17 @@
         "suppliers"
       ],
       "writes_entities": [
-        "suppliers"
+        "suppliers",
+        "audit_log",
+        "outbox_events"
       ],
       "locks_or_concurrency_control": "identity_privilege_state FOR UPDATE for identity administration; FOR SHARE for domain mutation; authorization revalidated under the shared transaction boundary",
       "audit_required": true,
       "audit_actual": "ATOMIC",
       "audit_atomicity": "ATOMIC",
       "outbox_required": true,
-      "outbox_actual": "ABSENT",
-      "outbox_atomicity": "ABSENT",
+      "outbox_actual": "ATOMIC",
+      "outbox_atomicity": "ATOMIC",
       "idempotency_required": false,
       "idempotency_actual": "NOT_REQUIRED",
       "idempotency_business_identity": "NOT_APPLICABLE",
@@ -23342,7 +23412,8 @@
         "NONE"
       ],
       "direct_tests": [
-        "NONE"
+        "apps/api/tests/test_trace_producers.py#test_existing_trace_gap_writes_one_minimal_correlated_event",
+        "apps/api/tests/test_trace_producers.py#test_trace_gap_outbox_failure_rolls_back_domain_and_audit"
       ],
       "indirect_tests": [
         "apps/api/tests/conftest.py",
@@ -23360,14 +23431,14 @@
       ],
       "decision_refs": [
         "DEC-03",
-        "DEC-04"
+        "DEC-04",
+        "DEC-18"
       ],
       "gate_refs": [
         "G1",
         "G5"
       ],
       "gap_ids": [
-        "GAP-0610",
         "GAP-0611",
         "GAP-0968"
       ],
@@ -23376,7 +23447,9 @@
         "apps/api/src/zeromerma_api/modules/suppliers/application/admin_services.py#class AdminSupplierService",
         "apps/api/src/zeromerma_api/presentation/access_policy.py#ENDPOINT_POLICIES",
         "apps/api/src/zeromerma_api/db/access_scope.py#bind_authorization_scope",
-        "docs/architecture/authorization.md"
+        "docs/architecture/authorization.md",
+        "docs/architecture/operation-context.md",
+        "docs/implementation/operation-context-validation.md"
       ]
     },
     {
@@ -23394,7 +23467,7 @@
       "module_owner": "API:admin-suppliers",
       "use_case": "upsert_admin_supplier_product",
       "implementation_state": "PARTIAL",
-      "verification_state": "NO_TEST",
+      "verification_state": "TESTED_IN_THIS_TASK",
       "auth_requirement": "AUTHENTICATED",
       "actual_auth_dependency": [
         "fastapi.security.api_key:APIKeyCookie",
@@ -23428,15 +23501,17 @@
         "suppliers"
       ],
       "writes_entities": [
-        "suppliers"
+        "suppliers",
+        "audit_log",
+        "outbox_events"
       ],
       "locks_or_concurrency_control": "identity_privilege_state FOR UPDATE for identity administration; FOR SHARE for domain mutation; authorization revalidated under the shared transaction boundary",
       "audit_required": true,
       "audit_actual": "ATOMIC",
       "audit_atomicity": "ATOMIC",
       "outbox_required": true,
-      "outbox_actual": "ABSENT",
-      "outbox_atomicity": "ABSENT",
+      "outbox_actual": "ATOMIC",
+      "outbox_atomicity": "ATOMIC",
       "idempotency_required": false,
       "idempotency_actual": "NOT_REQUIRED",
       "idempotency_business_identity": "NOT_APPLICABLE",
@@ -23455,7 +23530,8 @@
         "NONE"
       ],
       "direct_tests": [
-        "NONE"
+        "apps/api/tests/test_trace_producers.py#test_existing_trace_gap_writes_one_minimal_correlated_event",
+        "apps/api/tests/test_trace_producers.py#test_trace_gap_outbox_failure_rolls_back_domain_and_audit"
       ],
       "indirect_tests": [
         "apps/api/tests/conftest.py",
@@ -23473,14 +23549,14 @@
       ],
       "decision_refs": [
         "DEC-03",
-        "DEC-04"
+        "DEC-04",
+        "DEC-18"
       ],
       "gate_refs": [
         "G1",
         "G5"
       ],
       "gap_ids": [
-        "GAP-0614",
         "GAP-0615",
         "GAP-0969"
       ],
@@ -23489,7 +23565,9 @@
         "apps/api/src/zeromerma_api/modules/suppliers/application/admin_services.py#class AdminSupplierService",
         "apps/api/src/zeromerma_api/presentation/access_policy.py#ENDPOINT_POLICIES",
         "apps/api/src/zeromerma_api/db/access_scope.py#bind_authorization_scope",
-        "docs/architecture/authorization.md"
+        "docs/architecture/authorization.md",
+        "docs/architecture/operation-context.md",
+        "docs/implementation/operation-context-validation.md"
       ]
     },
     {
@@ -24260,7 +24338,7 @@
       "module_owner": "API:admin-users",
       "use_case": "add_admin_user_branch_assignment",
       "implementation_state": "PARTIAL",
-      "verification_state": "TESTED_IN_THIS_TASK",
+      "verification_state": "DIRECT_TEST_EXISTS_NOT_RUN",
       "auth_requirement": "AUTHENTICATED",
       "actual_auth_dependency": [
         "fastapi.security.api_key:APIKeyCookie",
@@ -24295,15 +24373,17 @@
       ],
       "writes_entities": [
         "users",
-        "user_branch_assignments"
+        "user_branch_assignments",
+        "audit_log",
+        "outbox_events"
       ],
       "locks_or_concurrency_control": "identity_privilege_state FOR UPDATE for identity administration; FOR SHARE for domain mutation; authorization revalidated under the shared transaction boundary",
       "audit_required": true,
-      "audit_actual": "ABSENT",
-      "audit_atomicity": "ABSENT",
+      "audit_actual": "ATOMIC",
+      "audit_atomicity": "ATOMIC",
       "outbox_required": true,
-      "outbox_actual": "ABSENT",
-      "outbox_atomicity": "ABSENT",
+      "outbox_actual": "ATOMIC",
+      "outbox_atomicity": "ATOMIC",
       "idempotency_required": true,
       "idempotency_actual": "REQUEST_ID_ONLY",
       "idempotency_business_identity": "NOT_IMPLEMENTED",
@@ -24322,7 +24402,7 @@
         "NONE"
       ],
       "direct_tests": [
-        "NONE"
+        "apps/api/tests/test_admin_users.py#test_admin_user_branch_assignment_rules"
       ],
       "indirect_tests": [
         "apps/api/tests/conftest.py",
@@ -24341,15 +24421,14 @@
       ],
       "decision_refs": [
         "DEC-03",
-        "DEC-04"
+        "DEC-04",
+        "DEC-18"
       ],
       "gate_refs": [
         "G1",
         "G5"
       ],
       "gap_ids": [
-        "GAP-0647",
-        "GAP-0648",
         "GAP-0649",
         "GAP-0650",
         "GAP-0974"
@@ -24359,7 +24438,10 @@
         "apps/api/src/zeromerma_api/modules/identity/application/admin_services.py#class AdminUserService",
         "apps/api/src/zeromerma_api/presentation/access_policy.py#ENDPOINT_POLICIES",
         "apps/api/src/zeromerma_api/db/access_scope.py#bind_authorization_scope",
-        "docs/architecture/authorization.md"
+        "docs/architecture/authorization.md",
+        "docs/architecture/operation-context.md",
+        "docs/implementation/operation-context-validation.md",
+        "apps/api/src/zeromerma_api/modules/identity/application/admin_services.py#def _record_branch_assignment_change"
       ]
     },
     {
@@ -24377,7 +24459,7 @@
       "module_owner": "API:admin-users",
       "use_case": "deactivate_admin_user_branch_assignment",
       "implementation_state": "PARTIAL",
-      "verification_state": "TESTED_IN_THIS_TASK",
+      "verification_state": "DIRECT_TEST_EXISTS_NOT_RUN",
       "auth_requirement": "AUTHENTICATED",
       "actual_auth_dependency": [
         "fastapi.security.api_key:APIKeyCookie",
@@ -24412,15 +24494,17 @@
       ],
       "writes_entities": [
         "users",
-        "user_branch_assignments"
+        "user_branch_assignments",
+        "audit_log",
+        "outbox_events"
       ],
       "locks_or_concurrency_control": "identity_privilege_state FOR UPDATE for identity administration; FOR SHARE for domain mutation; authorization revalidated under the shared transaction boundary",
       "audit_required": true,
-      "audit_actual": "ABSENT",
-      "audit_atomicity": "ABSENT",
+      "audit_actual": "ATOMIC",
+      "audit_atomicity": "ATOMIC",
       "outbox_required": true,
-      "outbox_actual": "ABSENT",
-      "outbox_atomicity": "ABSENT",
+      "outbox_actual": "ATOMIC",
+      "outbox_atomicity": "ATOMIC",
       "idempotency_required": true,
       "idempotency_actual": "REQUEST_ID_ONLY",
       "idempotency_business_identity": "NOT_IMPLEMENTED",
@@ -24439,7 +24523,7 @@
         "NONE"
       ],
       "direct_tests": [
-        "NONE"
+        "apps/api/tests/test_admin_users.py#test_admin_user_branch_assignment_rules"
       ],
       "indirect_tests": [
         "apps/api/tests/conftest.py",
@@ -24458,15 +24542,14 @@
       ],
       "decision_refs": [
         "DEC-03",
-        "DEC-04"
+        "DEC-04",
+        "DEC-18"
       ],
       "gate_refs": [
         "G1",
         "G5"
       ],
       "gap_ids": [
-        "GAP-0653",
-        "GAP-0654",
         "GAP-0655",
         "GAP-0656",
         "GAP-0975"
@@ -24476,7 +24559,10 @@
         "apps/api/src/zeromerma_api/modules/identity/application/admin_services.py#class AdminUserService",
         "apps/api/src/zeromerma_api/presentation/access_policy.py#ENDPOINT_POLICIES",
         "apps/api/src/zeromerma_api/db/access_scope.py#bind_authorization_scope",
-        "docs/architecture/authorization.md"
+        "docs/architecture/authorization.md",
+        "docs/architecture/operation-context.md",
+        "docs/implementation/operation-context-validation.md",
+        "apps/api/src/zeromerma_api/modules/identity/application/admin_services.py#def _record_branch_assignment_change"
       ]
     },
     {
@@ -24494,7 +24580,7 @@
       "module_owner": "API:admin-users",
       "use_case": "set_admin_user_default_branch_assignment",
       "implementation_state": "PARTIAL",
-      "verification_state": "TESTED_IN_THIS_TASK",
+      "verification_state": "DIRECT_TEST_EXISTS_NOT_RUN",
       "auth_requirement": "AUTHENTICATED",
       "actual_auth_dependency": [
         "fastapi.security.api_key:APIKeyCookie",
@@ -24529,15 +24615,17 @@
       ],
       "writes_entities": [
         "users",
-        "user_branch_assignments"
+        "user_branch_assignments",
+        "audit_log",
+        "outbox_events"
       ],
       "locks_or_concurrency_control": "identity_privilege_state FOR UPDATE for identity administration; FOR SHARE for domain mutation; authorization revalidated under the shared transaction boundary",
       "audit_required": true,
-      "audit_actual": "ABSENT",
-      "audit_atomicity": "ABSENT",
+      "audit_actual": "ATOMIC",
+      "audit_atomicity": "ATOMIC",
       "outbox_required": true,
-      "outbox_actual": "ABSENT",
-      "outbox_atomicity": "ABSENT",
+      "outbox_actual": "ATOMIC",
+      "outbox_atomicity": "ATOMIC",
       "idempotency_required": true,
       "idempotency_actual": "REQUEST_ID_ONLY",
       "idempotency_business_identity": "NOT_IMPLEMENTED",
@@ -24556,7 +24644,7 @@
         "NONE"
       ],
       "direct_tests": [
-        "NONE"
+        "apps/api/tests/test_admin_users.py#test_admin_user_branch_assignment_rules"
       ],
       "indirect_tests": [
         "apps/api/tests/conftest.py",
@@ -24575,15 +24663,14 @@
       ],
       "decision_refs": [
         "DEC-03",
-        "DEC-04"
+        "DEC-04",
+        "DEC-18"
       ],
       "gate_refs": [
         "G1",
         "G5"
       ],
       "gap_ids": [
-        "GAP-0659",
-        "GAP-0660",
         "GAP-0661",
         "GAP-0662",
         "GAP-0976"
@@ -24593,7 +24680,10 @@
         "apps/api/src/zeromerma_api/modules/identity/application/admin_services.py#class AdminUserService",
         "apps/api/src/zeromerma_api/presentation/access_policy.py#ENDPOINT_POLICIES",
         "apps/api/src/zeromerma_api/db/access_scope.py#bind_authorization_scope",
-        "docs/architecture/authorization.md"
+        "docs/architecture/authorization.md",
+        "docs/architecture/operation-context.md",
+        "docs/implementation/operation-context-validation.md",
+        "apps/api/src/zeromerma_api/modules/identity/application/admin_services.py#def _record_branch_assignment_change"
       ]
     },
     {
@@ -27953,7 +28043,7 @@
       "module_owner": "API:tickets",
       "use_case": "reprint_ticket",
       "implementation_state": "PARTIAL",
-      "verification_state": "NO_TEST",
+      "verification_state": "TESTED_IN_THIS_TASK",
       "auth_requirement": "AUTHENTICATED",
       "actual_auth_dependency": [
         "fastapi.security.api_key:APIKeyCookie",
@@ -27988,15 +28078,17 @@
       ],
       "writes_entities": [
         "sales",
-        "customer_orders"
+        "customer_orders",
+        "audit_log",
+        "outbox_events"
       ],
       "locks_or_concurrency_control": "identity_privilege_state FOR UPDATE for identity administration; FOR SHARE for domain mutation; authorization revalidated under the shared transaction boundary",
       "audit_required": true,
       "audit_actual": "ATOMIC",
       "audit_atomicity": "ATOMIC",
       "outbox_required": true,
-      "outbox_actual": "ABSENT",
-      "outbox_atomicity": "ABSENT",
+      "outbox_actual": "ATOMIC",
+      "outbox_atomicity": "ATOMIC",
       "idempotency_required": false,
       "idempotency_actual": "NOT_REQUIRED",
       "idempotency_business_identity": "NOT_APPLICABLE",
@@ -28015,7 +28107,9 @@
         "NONE"
       ],
       "direct_tests": [
-        "NONE"
+        "apps/api/tests/test_trace_producers.py#test_existing_trace_gap_writes_one_minimal_correlated_event",
+        "apps/api/tests/test_trace_producers.py#test_trace_gap_outbox_failure_rolls_back_domain_and_audit",
+        "apps/api/tests/test_trace_producers.py#test_direct_pos_reprint_resolves_cash_and_workstation_in_both_traces"
       ],
       "indirect_tests": [
         "apps/api/tests/conftest.py",
@@ -28033,14 +28127,14 @@
       ],
       "decision_refs": [
         "DEC-15",
-        "DEC-16"
+        "DEC-16",
+        "DEC-18"
       ],
       "gate_refs": [
         "G1",
         "G5"
       ],
       "gap_ids": [
-        "GAP-0753",
         "GAP-0754",
         "GAP-0985"
       ],
@@ -28049,7 +28143,9 @@
         "apps/api/src/zeromerma_api/modules/tickets/application/services.py#class TicketsCommandService",
         "apps/api/src/zeromerma_api/presentation/access_policy.py#ENDPOINT_POLICIES",
         "apps/api/src/zeromerma_api/db/access_scope.py#bind_authorization_scope",
-        "docs/architecture/authorization.md"
+        "docs/architecture/authorization.md",
+        "docs/architecture/operation-context.md",
+        "docs/implementation/operation-context-validation.md"
       ]
     },
     {
@@ -34625,7 +34721,7 @@
         "outbox_events"
       ],
       "writes": [
-        "logs only"
+        "allowlisted structured logs only; no outbox state mutation"
       ],
       "external_effect": "NONE",
       "idempotency": "ABSENT",
@@ -34636,7 +34732,10 @@
       "outbox": "READS_PENDING_ONLY",
       "direct_tests": [
         "apps/worker/tests/test_poller.py#test_empty_batch_reports_zero_without_writes",
-        "apps/worker/integration_tests/test_outbox_polling.py#test_poll_filters_due_pending_rows_limits_batch_and_preserves_all_columns"
+        "apps/worker/integration_tests/test_outbox_polling.py#test_poll_filters_due_pending_rows_limits_batch_and_preserves_all_columns",
+        "apps/worker/tests/test_poller.py#test_historical_context_is_unknown_without_inventing_identity_or_logging_free_text",
+        "apps/worker/tests/test_poller.py#test_each_event_keeps_its_context_across_batches",
+        "apps/worker/integration_tests/test_outbox_polling.py#test_correlated_and_historical_events_preserve_context_without_processing"
       ],
       "indirect_tests": [
         "NONE"
@@ -34660,7 +34759,8 @@
       ],
       "evidence": [
         "apps/worker/src/zeromerma_worker/outbox/poller.py",
-        "docs/implementation/worker-foundation-baseline.md"
+        "docs/implementation/worker-foundation-baseline.md",
+        "docs/architecture/operation-context.md"
       ]
     }
   ],
@@ -35373,11 +35473,11 @@
       "PLACEHOLDER": 4
     },
     "verification_state_counts": {
-      "DIRECT_TEST_EXISTS_NOT_RUN": 111,
+      "DIRECT_TEST_EXISTS_NOT_RUN": 116,
       "INDIRECT_TEST_ONLY": 1,
       "NOT_APPLICABLE": 12,
-      "NO_TEST": 75,
-      "TESTED_IN_THIS_TASK": 134
+      "NO_TEST": 63,
+      "TESTED_IN_THIS_TASK": 141
     },
     "consumer_contract_state_counts": {
       "CLIENT_GENERATED_USED": 207,
@@ -35391,10 +35491,10 @@
       "NOT_APPLICABLE": 1
     },
     "gap_type_counts": {
-      "AUDIT_GAP": 6,
+      "AUDIT_GAP": 1,
       "CAPABILITY_GAP": 6,
       "IDEMPOTENCY_GAP": 19,
-      "OUTBOX_GAP": 20,
+      "OUTBOX_GAP": 1,
       "PLACEHOLDER": 4,
       "SCOPE_GAP": 6,
       "TEST_GAP": 102,
@@ -35412,8 +35512,8 @@
     "runtime_only": [],
     "tracked_only": [],
     "operation_id_drift": [],
-    "runtime_sha256_canonical_json": "8d40ba0f7c9604df9012d2e1cd772567c9911e724ed8023e95a9c5a204405bab",
-    "tracked_sha256_canonical_json": "8d40ba0f7c9604df9012d2e1cd772567c9911e724ed8023e95a9c5a204405bab",
+    "runtime_sha256_canonical_json": "b3ba085429609e6ca11518803f0c1ca796721d561068cb04506ee02943318622",
+    "tracked_sha256_canonical_json": "b3ba085429609e6ca11518803f0c1ca796721d561068cb04506ee02943318622",
     "schema_drift_suspected": false,
     "classification": "NO_DRIFT_OBSERVED"
   },
@@ -35528,19 +35628,6 @@
       ]
     },
     {
-      "gap_id": "GAP-0353",
-      "operation_key": "API:PATCH:/v1/admin/inputs-supplies/{product_id}/suppliers/{relation_id}",
-      "gap_type": "OUTBOX_GAP",
-      "current_state": "No route-specific outbox call observed",
-      "approved_target": "DECISION_COMPLIANT_AND_DIRECTLY_VERIFIED",
-      "risk": "IN_SCOPE_NOT_IMPLEMENTED",
-      "later_task": "ZM-FIN-040",
-      "gate": "G2",
-      "evidence": [
-        "apps/api/src/zeromerma_api/modules/catalog/presentation/admin_router.py#update_admin_input_supply_supplier"
-      ]
-    },
-    {
       "gap_id": "GAP-0354",
       "operation_key": "API:PATCH:/v1/admin/inputs-supplies/{product_id}/suppliers/{relation_id}",
       "gap_type": "TEST_GAP",
@@ -35551,32 +35638,6 @@
       "gate": "G5",
       "evidence": [
         "apps/api/src/zeromerma_api/modules/catalog/presentation/admin_router.py#update_admin_input_supply_supplier"
-      ]
-    },
-    {
-      "gap_id": "GAP-0357",
-      "operation_key": "API:PATCH:/v1/admin/prices/{entity_type}/{entity_id}",
-      "gap_type": "AUDIT_GAP",
-      "current_state": "No route-specific audit call observed",
-      "approved_target": "DECISION_COMPLIANT_AND_DIRECTLY_VERIFIED",
-      "risk": "IN_SCOPE_NOT_IMPLEMENTED",
-      "later_task": "ZM-FIN-040",
-      "gate": "G2",
-      "evidence": [
-        "apps/api/src/zeromerma_api/modules/catalog/presentation/admin_router.py#update_admin_price"
-      ]
-    },
-    {
-      "gap_id": "GAP-0358",
-      "operation_key": "API:PATCH:/v1/admin/prices/{entity_type}/{entity_id}",
-      "gap_type": "OUTBOX_GAP",
-      "current_state": "No route-specific outbox call observed",
-      "approved_target": "DECISION_COMPLIANT_AND_DIRECTLY_VERIFIED",
-      "risk": "IN_SCOPE_NOT_IMPLEMENTED",
-      "later_task": "ZM-FIN-040",
-      "gate": "G2",
-      "evidence": [
-        "apps/api/src/zeromerma_api/modules/catalog/presentation/admin_router.py#update_admin_price"
       ]
     },
     {
@@ -35593,19 +35654,6 @@
       ]
     },
     {
-      "gap_id": "GAP-0380",
-      "operation_key": "API:PATCH:/v1/admin/settings/{setting_key:path}",
-      "gap_type": "OUTBOX_GAP",
-      "current_state": "No route-specific outbox call observed",
-      "approved_target": "DECISION_COMPLIANT_AND_DIRECTLY_VERIFIED",
-      "risk": "IN_SCOPE_NOT_IMPLEMENTED",
-      "later_task": "ZM-FIN-040",
-      "gate": "G2",
-      "evidence": [
-        "apps/api/src/zeromerma_api/modules/configuration/presentation/router.py#update_admin_setting"
-      ]
-    },
-    {
       "gap_id": "GAP-0381",
       "operation_key": "API:PATCH:/v1/admin/settings/{setting_key:path}",
       "gap_type": "IDEMPOTENCY_GAP",
@@ -35619,19 +35667,6 @@
       ]
     },
     {
-      "gap_id": "GAP-0388",
-      "operation_key": "API:PATCH:/v1/admin/suppliers/{supplier_id}/contacts/{contact_id}",
-      "gap_type": "OUTBOX_GAP",
-      "current_state": "No route-specific outbox call observed",
-      "approved_target": "DECISION_COMPLIANT_AND_DIRECTLY_VERIFIED",
-      "risk": "IN_SCOPE_NOT_IMPLEMENTED",
-      "later_task": "ZM-FIN-040",
-      "gate": "G2",
-      "evidence": [
-        "apps/api/src/zeromerma_api/modules/suppliers/presentation/router.py#update_admin_supplier_contact"
-      ]
-    },
-    {
       "gap_id": "GAP-0389",
       "operation_key": "API:PATCH:/v1/admin/suppliers/{supplier_id}/contacts/{contact_id}",
       "gap_type": "TEST_GAP",
@@ -35642,19 +35677,6 @@
       "gate": "G5",
       "evidence": [
         "apps/api/src/zeromerma_api/modules/suppliers/presentation/router.py#update_admin_supplier_contact"
-      ]
-    },
-    {
-      "gap_id": "GAP-0392",
-      "operation_key": "API:PATCH:/v1/admin/suppliers/{supplier_id}/products/{relation_id}",
-      "gap_type": "OUTBOX_GAP",
-      "current_state": "No route-specific outbox call observed",
-      "approved_target": "DECISION_COMPLIANT_AND_DIRECTLY_VERIFIED",
-      "risk": "IN_SCOPE_NOT_IMPLEMENTED",
-      "later_task": "ZM-FIN-040",
-      "gate": "G2",
-      "evidence": [
-        "apps/api/src/zeromerma_api/modules/suppliers/presentation/router.py#update_admin_supplier_product"
       ]
     },
     {
@@ -35707,32 +35729,6 @@
       "gate": "G5",
       "evidence": [
         "apps/api/src/zeromerma_api/modules/quality/presentation/router.py#complete_admin_cleaning_log"
-      ]
-    },
-    {
-      "gap_id": "GAP-0424",
-      "operation_key": "API:POST:/v1/admin/discounts/{discount_id}/duplicate",
-      "gap_type": "AUDIT_GAP",
-      "current_state": "No route-specific audit call observed",
-      "approved_target": "DECISION_COMPLIANT_AND_DIRECTLY_VERIFIED",
-      "risk": "IN_SCOPE_NOT_IMPLEMENTED",
-      "later_task": "ZM-FIN-040",
-      "gate": "G2",
-      "evidence": [
-        "apps/api/src/zeromerma_api/modules/discounts/presentation/router.py#duplicate_admin_discount"
-      ]
-    },
-    {
-      "gap_id": "GAP-0425",
-      "operation_key": "API:POST:/v1/admin/discounts/{discount_id}/duplicate",
-      "gap_type": "OUTBOX_GAP",
-      "current_state": "No route-specific outbox call observed",
-      "approved_target": "DECISION_COMPLIANT_AND_DIRECTLY_VERIFIED",
-      "risk": "IN_SCOPE_NOT_IMPLEMENTED",
-      "later_task": "ZM-FIN-040",
-      "gate": "G2",
-      "evidence": [
-        "apps/api/src/zeromerma_api/modules/discounts/presentation/router.py#duplicate_admin_discount"
       ]
     },
     {
@@ -35866,19 +35862,6 @@
       ]
     },
     {
-      "gap_id": "GAP-0468",
-      "operation_key": "API:POST:/v1/admin/inputs-supplies/{product_id}/suppliers",
-      "gap_type": "OUTBOX_GAP",
-      "current_state": "No route-specific outbox call observed",
-      "approved_target": "DECISION_COMPLIANT_AND_DIRECTLY_VERIFIED",
-      "risk": "IN_SCOPE_NOT_IMPLEMENTED",
-      "later_task": "ZM-FIN-040",
-      "gate": "G2",
-      "evidence": [
-        "apps/api/src/zeromerma_api/modules/catalog/presentation/admin_router.py#upsert_admin_input_supply_supplier"
-      ]
-    },
-    {
       "gap_id": "GAP-0469",
       "operation_key": "API:POST:/v1/admin/inputs-supplies/{product_id}/suppliers",
       "gap_type": "TEST_GAP",
@@ -35895,10 +35878,10 @@
       "gap_id": "GAP-0510",
       "operation_key": "API:POST:/v1/admin/products/{product_id}/availability",
       "gap_type": "AUDIT_GAP",
-      "current_state": "No route-specific audit call observed",
+      "current_state": "The endpoint returns 501 because canonical product-branch availability is not implemented. Its successful mutation and required traces must be implemented together in 068; request-context propagation does not implement this operation.",
       "approved_target": "DECISION_COMPLIANT_AND_DIRECTLY_VERIFIED",
       "risk": "IN_SCOPE_NOT_IMPLEMENTED",
-      "later_task": "ZM-FIN-040",
+      "later_task": "ZM-FIN-068",
       "gate": "G2",
       "evidence": [
         "apps/api/src/zeromerma_api/modules/catalog/presentation/admin_router.py#configure_admin_product_availability"
@@ -35908,10 +35891,10 @@
       "gap_id": "GAP-0511",
       "operation_key": "API:POST:/v1/admin/products/{product_id}/availability",
       "gap_type": "OUTBOX_GAP",
-      "current_state": "No route-specific outbox call observed",
+      "current_state": "The endpoint returns 501 because canonical product-branch availability is not implemented. Its successful mutation and required traces must be implemented together in 068; request-context propagation does not implement this operation.",
       "approved_target": "DECISION_COMPLIANT_AND_DIRECTLY_VERIFIED",
       "risk": "IN_SCOPE_NOT_IMPLEMENTED",
-      "later_task": "ZM-FIN-040",
+      "later_task": "ZM-FIN-068",
       "gate": "G2",
       "evidence": [
         "apps/api/src/zeromerma_api/modules/catalog/presentation/admin_router.py#configure_admin_product_availability"
@@ -36009,19 +35992,6 @@
       ]
     },
     {
-      "gap_id": "GAP-0557",
-      "operation_key": "API:POST:/v1/admin/reports/{report_code}/export",
-      "gap_type": "OUTBOX_GAP",
-      "current_state": "No route-specific outbox call observed",
-      "approved_target": "DECISION_COMPLIANT_AND_DIRECTLY_VERIFIED",
-      "risk": "IN_SCOPE_NOT_IMPLEMENTED",
-      "later_task": "ZM-FIN-040",
-      "gate": "G2",
-      "evidence": [
-        "apps/api/src/zeromerma_api/modules/reports/presentation/router.py#export_admin_report"
-      ]
-    },
-    {
       "gap_id": "GAP-0558",
       "operation_key": "API:POST:/v1/admin/reports/{report_code}/export",
       "gap_type": "TEST_GAP",
@@ -36087,19 +36057,6 @@
       ]
     },
     {
-      "gap_id": "GAP-0572",
-      "operation_key": "API:POST:/v1/admin/roles/{role_id}/users/{user_id}",
-      "gap_type": "OUTBOX_GAP",
-      "current_state": "No route-specific outbox call observed",
-      "approved_target": "DECISION_COMPLIANT_AND_DIRECTLY_VERIFIED",
-      "risk": "IN_SCOPE_NOT_IMPLEMENTED",
-      "later_task": "ZM-FIN-040",
-      "gate": "G2",
-      "evidence": [
-        "apps/api/src/zeromerma_api/modules/identity/presentation/router.py#assign_admin_role_to_user"
-      ]
-    },
-    {
       "gap_id": "GAP-0573",
       "operation_key": "API:POST:/v1/admin/roles/{role_id}/users/{user_id}",
       "gap_type": "IDEMPOTENCY_GAP",
@@ -36126,19 +36083,6 @@
       ]
     },
     {
-      "gap_id": "GAP-0577",
-      "operation_key": "API:POST:/v1/admin/roles/{role_id}/users/{user_id}/remove",
-      "gap_type": "OUTBOX_GAP",
-      "current_state": "No route-specific outbox call observed",
-      "approved_target": "DECISION_COMPLIANT_AND_DIRECTLY_VERIFIED",
-      "risk": "IN_SCOPE_NOT_IMPLEMENTED",
-      "later_task": "ZM-FIN-040",
-      "gate": "G2",
-      "evidence": [
-        "apps/api/src/zeromerma_api/modules/identity/presentation/router.py#remove_admin_role_from_user"
-      ]
-    },
-    {
       "gap_id": "GAP-0578",
       "operation_key": "API:POST:/v1/admin/roles/{role_id}/users/{user_id}/remove",
       "gap_type": "IDEMPOTENCY_GAP",
@@ -36162,19 +36106,6 @@
       "gate": "G5",
       "evidence": [
         "apps/api/src/zeromerma_api/modules/identity/presentation/router.py#remove_admin_role_from_user"
-      ]
-    },
-    {
-      "gap_id": "GAP-0582",
-      "operation_key": "API:POST:/v1/admin/sales/tickets/{ticket_id}/reprint",
-      "gap_type": "OUTBOX_GAP",
-      "current_state": "No route-specific outbox call observed",
-      "approved_target": "DECISION_COMPLIANT_AND_DIRECTLY_VERIFIED",
-      "risk": "IN_SCOPE_NOT_IMPLEMENTED",
-      "later_task": "ZM-FIN-040",
-      "gate": "G2",
-      "evidence": [
-        "apps/api/src/zeromerma_api/modules/tickets/presentation/router.py#reprint_admin_sales_ticket"
       ]
     },
     {
@@ -36230,19 +36161,6 @@
       ]
     },
     {
-      "gap_id": "GAP-0598",
-      "operation_key": "API:POST:/v1/admin/settings/{setting_key:path}/reset",
-      "gap_type": "OUTBOX_GAP",
-      "current_state": "No route-specific outbox call observed",
-      "approved_target": "DECISION_COMPLIANT_AND_DIRECTLY_VERIFIED",
-      "risk": "IN_SCOPE_NOT_IMPLEMENTED",
-      "later_task": "ZM-FIN-040",
-      "gate": "G2",
-      "evidence": [
-        "apps/api/src/zeromerma_api/modules/configuration/presentation/router.py#reset_admin_setting"
-      ]
-    },
-    {
       "gap_id": "GAP-0599",
       "operation_key": "API:POST:/v1/admin/settings/{setting_key:path}/reset",
       "gap_type": "IDEMPOTENCY_GAP",
@@ -36269,19 +36187,6 @@
       ]
     },
     {
-      "gap_id": "GAP-0606",
-      "operation_key": "API:POST:/v1/admin/suppliers/{supplier_id}/branches",
-      "gap_type": "OUTBOX_GAP",
-      "current_state": "No route-specific outbox call observed",
-      "approved_target": "DECISION_COMPLIANT_AND_DIRECTLY_VERIFIED",
-      "risk": "IN_SCOPE_NOT_IMPLEMENTED",
-      "later_task": "ZM-FIN-040",
-      "gate": "G2",
-      "evidence": [
-        "apps/api/src/zeromerma_api/modules/suppliers/presentation/router.py#upsert_admin_supplier_branch"
-      ]
-    },
-    {
       "gap_id": "GAP-0607",
       "operation_key": "API:POST:/v1/admin/suppliers/{supplier_id}/branches",
       "gap_type": "TEST_GAP",
@@ -36295,19 +36200,6 @@
       ]
     },
     {
-      "gap_id": "GAP-0610",
-      "operation_key": "API:POST:/v1/admin/suppliers/{supplier_id}/contacts",
-      "gap_type": "OUTBOX_GAP",
-      "current_state": "No route-specific outbox call observed",
-      "approved_target": "DECISION_COMPLIANT_AND_DIRECTLY_VERIFIED",
-      "risk": "IN_SCOPE_NOT_IMPLEMENTED",
-      "later_task": "ZM-FIN-040",
-      "gate": "G2",
-      "evidence": [
-        "apps/api/src/zeromerma_api/modules/suppliers/presentation/router.py#create_admin_supplier_contact"
-      ]
-    },
-    {
       "gap_id": "GAP-0611",
       "operation_key": "API:POST:/v1/admin/suppliers/{supplier_id}/contacts",
       "gap_type": "TEST_GAP",
@@ -36318,19 +36210,6 @@
       "gate": "G5",
       "evidence": [
         "apps/api/src/zeromerma_api/modules/suppliers/presentation/router.py#create_admin_supplier_contact"
-      ]
-    },
-    {
-      "gap_id": "GAP-0614",
-      "operation_key": "API:POST:/v1/admin/suppliers/{supplier_id}/products",
-      "gap_type": "OUTBOX_GAP",
-      "current_state": "No route-specific outbox call observed",
-      "approved_target": "DECISION_COMPLIANT_AND_DIRECTLY_VERIFIED",
-      "risk": "IN_SCOPE_NOT_IMPLEMENTED",
-      "later_task": "ZM-FIN-040",
-      "gate": "G2",
-      "evidence": [
-        "apps/api/src/zeromerma_api/modules/suppliers/presentation/router.py#upsert_admin_supplier_product"
       ]
     },
     {
@@ -36373,32 +36252,6 @@
       ]
     },
     {
-      "gap_id": "GAP-0647",
-      "operation_key": "API:POST:/v1/admin/users/{user_id}/branch-assignments",
-      "gap_type": "AUDIT_GAP",
-      "current_state": "No route-specific audit call observed",
-      "approved_target": "DECISION_COMPLIANT_AND_DIRECTLY_VERIFIED",
-      "risk": "IN_SCOPE_NOT_IMPLEMENTED",
-      "later_task": "ZM-FIN-040",
-      "gate": "G2",
-      "evidence": [
-        "apps/api/src/zeromerma_api/modules/identity/presentation/router.py#add_admin_user_branch_assignment"
-      ]
-    },
-    {
-      "gap_id": "GAP-0648",
-      "operation_key": "API:POST:/v1/admin/users/{user_id}/branch-assignments",
-      "gap_type": "OUTBOX_GAP",
-      "current_state": "No route-specific outbox call observed",
-      "approved_target": "DECISION_COMPLIANT_AND_DIRECTLY_VERIFIED",
-      "risk": "IN_SCOPE_NOT_IMPLEMENTED",
-      "later_task": "ZM-FIN-040",
-      "gate": "G2",
-      "evidence": [
-        "apps/api/src/zeromerma_api/modules/identity/presentation/router.py#add_admin_user_branch_assignment"
-      ]
-    },
-    {
       "gap_id": "GAP-0649",
       "operation_key": "API:POST:/v1/admin/users/{user_id}/branch-assignments",
       "gap_type": "IDEMPOTENCY_GAP",
@@ -36425,32 +36278,6 @@
       ]
     },
     {
-      "gap_id": "GAP-0653",
-      "operation_key": "API:POST:/v1/admin/users/{user_id}/branch-assignments/{branch_id}/deactivate",
-      "gap_type": "AUDIT_GAP",
-      "current_state": "No route-specific audit call observed",
-      "approved_target": "DECISION_COMPLIANT_AND_DIRECTLY_VERIFIED",
-      "risk": "IN_SCOPE_NOT_IMPLEMENTED",
-      "later_task": "ZM-FIN-040",
-      "gate": "G2",
-      "evidence": [
-        "apps/api/src/zeromerma_api/modules/identity/presentation/router.py#deactivate_admin_user_branch_assignment"
-      ]
-    },
-    {
-      "gap_id": "GAP-0654",
-      "operation_key": "API:POST:/v1/admin/users/{user_id}/branch-assignments/{branch_id}/deactivate",
-      "gap_type": "OUTBOX_GAP",
-      "current_state": "No route-specific outbox call observed",
-      "approved_target": "DECISION_COMPLIANT_AND_DIRECTLY_VERIFIED",
-      "risk": "IN_SCOPE_NOT_IMPLEMENTED",
-      "later_task": "ZM-FIN-040",
-      "gate": "G2",
-      "evidence": [
-        "apps/api/src/zeromerma_api/modules/identity/presentation/router.py#deactivate_admin_user_branch_assignment"
-      ]
-    },
-    {
       "gap_id": "GAP-0655",
       "operation_key": "API:POST:/v1/admin/users/{user_id}/branch-assignments/{branch_id}/deactivate",
       "gap_type": "IDEMPOTENCY_GAP",
@@ -36474,32 +36301,6 @@
       "gate": "G5",
       "evidence": [
         "apps/api/src/zeromerma_api/modules/identity/presentation/router.py#deactivate_admin_user_branch_assignment"
-      ]
-    },
-    {
-      "gap_id": "GAP-0659",
-      "operation_key": "API:POST:/v1/admin/users/{user_id}/branch-assignments/{branch_id}/default",
-      "gap_type": "AUDIT_GAP",
-      "current_state": "No route-specific audit call observed",
-      "approved_target": "DECISION_COMPLIANT_AND_DIRECTLY_VERIFIED",
-      "risk": "IN_SCOPE_NOT_IMPLEMENTED",
-      "later_task": "ZM-FIN-040",
-      "gate": "G2",
-      "evidence": [
-        "apps/api/src/zeromerma_api/modules/identity/presentation/router.py#set_admin_user_default_branch_assignment"
-      ]
-    },
-    {
-      "gap_id": "GAP-0660",
-      "operation_key": "API:POST:/v1/admin/users/{user_id}/branch-assignments/{branch_id}/default",
-      "gap_type": "OUTBOX_GAP",
-      "current_state": "No route-specific outbox call observed",
-      "approved_target": "DECISION_COMPLIANT_AND_DIRECTLY_VERIFIED",
-      "risk": "IN_SCOPE_NOT_IMPLEMENTED",
-      "later_task": "ZM-FIN-040",
-      "gate": "G2",
-      "evidence": [
-        "apps/api/src/zeromerma_api/modules/identity/presentation/router.py#set_admin_user_default_branch_assignment"
       ]
     },
     {
@@ -36630,19 +36431,6 @@
       "gate": "G5",
       "evidence": [
         "apps/api/src/zeromerma_api/modules/identity/presentation/router.py#unlock_admin_user"
-      ]
-    },
-    {
-      "gap_id": "GAP-0753",
-      "operation_key": "API:POST:/v1/tickets/{ticket_id}/reprint",
-      "gap_type": "OUTBOX_GAP",
-      "current_state": "No route-specific outbox call observed",
-      "approved_target": "DECISION_COMPLIANT_AND_DIRECTLY_VERIFIED",
-      "risk": "IN_SCOPE_NOT_IMPLEMENTED",
-      "later_task": "ZM-FIN-040",
-      "gate": "G2",
-      "evidence": [
-        "apps/api/src/zeromerma_api/modules/tickets/presentation/router.py#reprint_ticket"
       ]
     },
     {
@@ -38398,6 +38186,106 @@
       "GAP-0991 and reconciliation gaps",
       "GAP-0920 remains a later 068 unavailable product-branch schema workflow"
     ],
-    "verification_notes": "Four ownership gates passed against 162 transaction sites, 93 explicit-commit symbols and 32 executor delegators. Combined PostgreSQL passed 76/76; three subsequent tests passed after first-INSERT exception-boundary fixes (79 unique dedicated cases across separate runs). Seven-file regression passed 134/134. Verified immutable-commit Foundation SHA and workflow link accompany delivery. No downstream gap is closed."
+    "verification_notes": "Four ownership gates passed against 162 transaction sites, 93 explicit-commit symbols and 32 executor delegators. Combined PostgreSQL passed 76/76; three subsequent tests passed after first-INSERT exception-boundary fixes (79 unique dedicated cases across separate runs). Seven-file regression passed 134/134. Verified immutable-commit Foundation SHA and workflow link accompany delivery. No downstream gap is closed.",
+    "scope_note": "The 039 evidence below is historical. Its 040 follow-up is now tracked separately in operation_context_evidence without replacing the accepted 039 run record."
+  },
+  "operation_context_evidence": {
+    "task": "ZM-FIN-040",
+    "state": "LOCAL_VALIDATION_COMPLETE",
+    "convention": "docs/architecture/operation-context.md",
+    "validation_record": "docs/implementation/operation-context-validation.md",
+    "trace_gap_reconciliation": {
+      "new_atomic_producers_verified": [
+        "GAP-0353",
+        "GAP-0380",
+        "GAP-0388",
+        "GAP-0392",
+        "GAP-0468",
+        "GAP-0557",
+        "GAP-0582",
+        "GAP-0598",
+        "GAP-0606",
+        "GAP-0610",
+        "GAP-0614",
+        "GAP-0753"
+      ],
+      "existing_delegated_producers_confirmed_by_source": [
+        "GAP-0357",
+        "GAP-0358",
+        "GAP-0424",
+        "GAP-0425",
+        "GAP-0572",
+        "GAP-0577",
+        "GAP-0647",
+        "GAP-0648",
+        "GAP-0653",
+        "GAP-0654",
+        "GAP-0659",
+        "GAP-0660"
+      ],
+      "unimplemented_availability_retained_for_068": [
+        "GAP-0510",
+        "GAP-0511"
+      ],
+      "note": "Source corrections do not assert a new execution of the existing feature suites. Twelve new producer paths passed success and real flush-failure rollback cases; final direct reprint parity and its two HTTP reruns passed. Historical 039 evidence remains separately identified."
+    },
+    "producer_run": {
+      "run_id": "04dcc4c5762142ccb8ec4cb762c53f73",
+      "tests": 24,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "seconds": 119.097,
+      "evidence": ".tmp/validation-published/trace-producers/acceptance.xml"
+    },
+    "boundaries": [
+      "Historical context_version 0, outbox schema_version 0 and UNKNOWN source with unknown recorded_at; no fabricated operation/causation history",
+      "Current canonical trace writers use context_version 1 and schema_version 1",
+      "Original command traces and snapshots are unchanged by authorized replay/recovery",
+      "Worker context logging does not implement 087 processing, 093 projections or 109 production observability",
+      "19 administrative idempotency gaps in 077/080/085 remain",
+      "GAP-0920, GAP-0991, physical POS, ledger and reconciliation limits remain"
+    ],
+    "delivery": "Immutable-commit acceptance is established by all eight Foundation stages and Foundation required; exact SHA/run accompany delivery.",
+    "producer_final_run": {
+      "run_id": "32c8b0ac628d4e2d8c33d1cc673a4071",
+      "tests": 3,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "seconds": 19.415,
+      "evidence": ".tmp/validation-published/trace-reprint-final/acceptance.xml",
+      "coverage": "One additional direct POS reprint case and two repeated HTTP cases; 25 unique producer cases across the initial and final runs."
+    },
+    "context_final_run": {
+      "run_id": "368824ecc2f34d2fbf41a39ea6301a8a",
+      "tests": 10,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "seconds": 20.733,
+      "evidence": ".tmp/validation-published/operation-context/savepoint-final/368824ecc2f34d2fbf41a39ea6301a8a/operation-context.xml",
+      "coverage": "Nine context transaction cases plus the corrected authentication rejection. Earlier HTTP/auth regression passed 52 of 53; this is a focused corrected rerun, not a complete green rerun of all 53."
+    },
+    "migration_final_run": {
+      "run_id": "6543ed4033b24e3ba1e2f2c3899b647a",
+      "tests": 3,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "seconds": 13.605,
+      "coverage": "Fresh schema/model parity, historical 0042 transition and guarded downgrade, exact trace/idempotency dump restore. Full migration gate belongs to immutable-commit CI."
+    },
+    "additional_verified_evidence": {
+      "api_unit_tests": 173,
+      "api_contract_tests": 73,
+      "storage_and_audit_unique_cases": 13,
+      "worker_unit_tests": 29,
+      "worker_postgresql_tests": 5,
+      "api_client_tests": 35,
+      "affected_pos_tests": 84,
+      "mypy_source_files": 356,
+      "runtime_security_tests": 51
+    }
   }
 }

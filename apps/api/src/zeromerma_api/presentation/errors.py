@@ -12,6 +12,13 @@ from pydantic import BaseModel, ConfigDict
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from zeromerma_api.db.concurrency import CommandConcurrencyConflict
+from zeromerma_api.presentation.operation_context import (
+    request_context,
+    request_trace_headers,
+)
+from zeromerma_api.presentation.operation_context import (
+    request_id as _request_id,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -37,7 +44,6 @@ DOMAIN_ERROR_STATUS = {
     "INVALID_CREDENTIALS": 401,
 }
 _SENSITIVE_KEY = re.compile(r"(?:password|secret|token|authorization|cookie)", re.IGNORECASE)
-_REQUEST_ID_MAX_LENGTH = 128
 
 
 class ApiFieldError(BaseModel):
@@ -54,16 +60,6 @@ class ApiErrorResponse(BaseModel):
     details: dict[str, Any] | list[Any] | None
     request_id: str | None
     field_errors: list[ApiFieldError] | None
-
-
-def _request_id(request: Request) -> str | None:
-    value = request.headers.get("x-request-id")
-    if value is None:
-        return None
-    normalized = value.strip()
-    if not normalized:
-        return None
-    return normalized[:_REQUEST_ID_MAX_LENGTH]
 
 
 def _redact(value: Any) -> Any:
@@ -117,7 +113,7 @@ def _response(
     return JSONResponse(
         status_code=status_code,
         content=payload.model_dump(mode="json"),
-        headers=dict(headers or {}),
+        headers={**dict(headers or {}), **request_trace_headers(request)},
     )
 
 
@@ -175,6 +171,7 @@ async def unhandled_exception_handler(request: Request, exc: Exception) -> JSONR
         "Unhandled API exception request_id=%s exception_type=%s",
         _request_id(request),
         type(exc).__name__,
+        extra={"operation_context": request_context(request)},
     )
     return _response(
         status_code=500,

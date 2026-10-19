@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from collections.abc import Callable, Mapping
+from dataclasses import replace
 from datetime import UTC, datetime
 from typing import Any
 from uuid import UUID, uuid4
@@ -11,12 +12,14 @@ from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.exc import DBAPIError
 from sqlalchemy.orm import Session
 
+from zeromerma_api.core.operation_context import SourceApp
 from zeromerma_api.db.concurrency import (
     CommandConcurrencyConflict,
     is_retryable_transaction_error,
     restore_command_lock_timeout,
     set_command_lock_timeout,
 )
+from zeromerma_api.db.operation_context import bind_operation_context, get_operation_context
 from zeromerma_api.modules.idempotency.application.canonicalization import (
     canonical_fingerprint,
     parse_idempotency_key,
@@ -67,6 +70,35 @@ def _lookup(session: Session, key: UUID) -> IdempotencyRecord | None:
             .where(IdempotencyRecord.idempotency_key == key)
             .execution_options(populate_existing=True)
         )
+
+
+def _bind_trace_context(
+    session: Session, record: IdempotencyRecord, context: CommandContext
+) -> None:
+    """An authorized durable command owns identity; each HTTP attempt keeps its request ID."""
+    bind_operation_context(
+        session,
+        replace(
+            get_operation_context(session),
+            source_app=SourceApp(context.surface),
+            operation_id=record.id,
+            correlation_id=record.id,
+            causation_id=None,
+            actor_id=context.actor_user_id,
+            branch_id=context.branch_id,
+            workstation_id=context.workstation_id,
+            cash_session_id=context.cash_session_id,
+            related_branch_ids=tuple(
+                sorted(
+                    set(context.related_branch_ids)
+                    | ({context.branch_id} if context.branch_id else set()),
+                    key=str,
+                )
+            ),
+            idempotency_key=record.idempotency_key,
+            operation_code=record.operation_code,
+        ),
+    )
 
 
 class IdempotencyExecutor:
@@ -134,6 +166,7 @@ class IdempotencyExecutor:
                     raise IdempotencyKeyReused()
                 authorize(session, saved)
                 self._assert_transaction(session, owner)
+                _bind_trace_context(session, record, saved)
                 result = self._replay(session, record, response_policy)
                 self._assert_transaction(session, owner)
                 owner.finalizing = True
@@ -200,6 +233,7 @@ class IdempotencyExecutor:
                 if not inserted:
                     # Revalidate the durable context, including every related branch, on replay.
                     authorize(session, _saved_context(record))
+                    _bind_trace_context(session, record, _saved_context(record))
                     result = self._replay(session, record, response_policy)
                     self._assert_transaction(session, owner)
                     owner.finalizing = True
@@ -207,6 +241,7 @@ class IdempotencyExecutor:
                     session.commit()
                     return result
 
+                _bind_trace_context(session, record, context)
                 rejection = None
                 owner.action_running = True
                 try:
