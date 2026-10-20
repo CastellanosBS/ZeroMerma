@@ -190,6 +190,8 @@ class AdminBranchService:
             name=command.name.strip(),
             timezone=command.timezone.strip(),
             is_active=command.is_active,
+            receipt_commercial_name=command.receipt_commercial_name,
+            receipt_business_descriptor=command.receipt_business_descriptor,
             address_line=command.address_line,
             city=command.city,
             state=command.state,
@@ -236,6 +238,7 @@ class AdminBranchService:
         branch = row.branch
         brand = row.brand
         previous_status = branch.is_active
+        previous_receipt_identity = self._receipt_identity_metadata(branch)
 
         if command.brand_id is not None and command.brand_id != branch.brand_id:
             brand = self._get_brand(session, command.brand_id)
@@ -261,6 +264,8 @@ class AdminBranchService:
             branch.is_active = command.is_active
 
         for field_name in (
+            "receipt_commercial_name",
+            "receipt_business_descriptor",
             "address_line",
             "city",
             "state",
@@ -285,6 +290,7 @@ class AdminBranchService:
                 request_id=request_id,
                 metadata={
                     **self._branch_metadata(branch, brand),
+                    "previous_receipt_identity": previous_receipt_identity,
                     "previous_status": "active" if previous_status else "inactive",
                     "new_status": _branch_status(branch),
                 },
@@ -413,6 +419,8 @@ class AdminBranchService:
                 global_only=False,
             ),
             location_contact=AdminBranchLocationContactView(
+                receipt_commercial_name=row.branch.receipt_commercial_name,
+                receipt_business_descriptor=row.branch.receipt_business_descriptor,
                 address_line=row.branch.address_line,
                 city=row.branch.city,
                 state=row.branch.state,
@@ -702,6 +710,19 @@ class AdminBranchService:
             "name": branch.name,
             "status": _branch_status(branch),
             "timezone": branch.timezone,
+            "receipt_identity": self._receipt_identity_metadata(branch),
+        }
+
+    @staticmethod
+    def _receipt_identity_metadata(branch: Branch) -> dict[str, str | None]:
+        return {
+            "commercial_name": branch.receipt_commercial_name,
+            "business_descriptor": branch.receipt_business_descriptor,
+            "address_line": branch.address_line,
+            "city": branch.city,
+            "state": branch.state,
+            "country": branch.country,
+            "postal_code": branch.postal_code,
         }
 
 

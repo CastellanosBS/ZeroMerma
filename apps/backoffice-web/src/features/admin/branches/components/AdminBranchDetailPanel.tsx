@@ -172,8 +172,19 @@ export function AdminBranchDetailPanel({
                 <InfoRow label="Ciudad" value={branchDetail.locationContact.city} />
                 <InfoRow label="Estado" value={branchDetail.locationContact.state} />
                 <InfoRow label="Pais" value={branchDetail.locationContact.country} />
+                <InfoRow label="Código postal" value={branchDetail.locationContact.postalCode} />
                 <InfoRow label="Telefono" value={branchDetail.locationContact.phone} />
                 <InfoRow label="Correo" value={branchDetail.locationContact.contactEmail} />
+              </div>
+            </Section>
+
+            <Section title="Encabezado comercial del ticket">
+              <div className="grid gap-1.5">
+                <InfoRow label="Nombre comercial" value={branchDetail.locationContact.receiptCommercialName} />
+                <InfoRow label="Descripción" value={branchDetail.locationContact.receiptBusinessDescriptor} />
+                <p className="text-xs leading-5 text-slate-600">
+                  Se usa con la dirección de esta sucursal en tickets nuevos. La identidad fiscal se configura por separado.
+                </p>
               </div>
             </Section>
 

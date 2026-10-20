@@ -143,13 +143,14 @@ function buildTicketText(receipt: Receipt, variant: TicketPrintVariant): string 
   const title = receipt.source_kind === "RETURN" ? "COMPROBANTE DE DEVOLUCION"
     : receipt.source_kind === "ORDER_PAYMENT" ? "PAGO DE PEDIDO" : "NOTA DE VENTA";
   const rows: string[] = [
-    ...wrapText(context.branch_name.toUpperCase(), LINE_WIDTH).map(centerText),
+    ...wrapText(seller.commercial_name ?? context.branch_name.toUpperCase(), LINE_WIDTH).map(centerText),
+    ...(seller.business_descriptor ? wrapText(seller.business_descriptor, LINE_WIDTH).map(centerText) : []),
+    ...wrapText(`Direccion: ${seller.address ?? "No configurada"}`, LINE_WIDTH),
     centerText(variant === "reprint" ? "REIMPRESION" : title),
-    ...wrapText(`Vendedor: ${seller.legal_name ?? "No configurado"}`, LINE_WIDTH),
+    ...wrapText(`Razon social: ${seller.legal_name ?? "No configurada"}`, LINE_WIDTH),
     ...wrapText(`RFC: ${seller.tax_identifier ?? "No configurado"}`, LINE_WIDTH),
     ...wrapText(`Regimen fiscal: ${seller.fiscal_regime ?? "No configurado"}`, LINE_WIDTH),
     ...wrapText(`Sucursal: ${context.branch_name}`, LINE_WIDTH),
-    ...wrapText(`Direccion: ${seller.address ?? "No configurada"}`, LINE_WIDTH),
     ...(seller.configuration_status === "UNCONFIGURED" ? ["Identidad fiscal pendiente de configurar."] : []),
     separator(),
     ...wrapText(`Ticket: ${receipt.folio}`, LINE_WIDTH),

@@ -4808,6 +4808,10 @@ export interface components {
             phone?: string | null;
             /** Postal Code */
             postal_code?: string | null;
+            /** Receipt Business Descriptor */
+            receipt_business_descriptor?: string | null;
+            /** Receipt Commercial Name */
+            receipt_commercial_name?: string | null;
             /** State */
             state?: string | null;
             /** Timezone */
@@ -4897,6 +4901,10 @@ export interface components {
             phone?: string | null;
             /** Postal Code */
             postal_code?: string | null;
+            /** Receipt Business Descriptor */
+            receipt_business_descriptor?: string | null;
+            /** Receipt Commercial Name */
+            receipt_commercial_name?: string | null;
             /** State */
             state?: string | null;
         };
@@ -4998,6 +5006,10 @@ export interface components {
             phone?: string | null;
             /** Postal Code */
             postal_code?: string | null;
+            /** Receipt Business Descriptor */
+            receipt_business_descriptor?: string | null;
+            /** Receipt Commercial Name */
+            receipt_commercial_name?: string | null;
             /** State */
             state?: string | null;
             /** Timezone */
@@ -21118,6 +21130,10 @@ export interface components {
         ReceiptSellerView: {
             /** Address */
             address?: string | null;
+            /** Business Descriptor */
+            business_descriptor?: string | null;
+            /** Commercial Name */
+            commercial_name?: string | null;
             /**
              * Configuration Status
              * @default UNCONFIGURED

@@ -101,6 +101,38 @@ ticketFixture.receipt = {
 };
 
 describe("ticket print document", () => {
+  it("prints the frozen commercial heading and address without inventing fiscal identity", () => {
+    const receipt = structuredClone(ticketFixture.receipt!);
+    receipt.seller = {
+      ...receipt.seller,
+      commercial_name: "Merenna",
+      business_descriptor: "Panadería y repostería",
+      address: "Plaza Distrito H, Boulevard Juan Navarrete 492K, Hermosillo, Sonora 83249, Mexico",
+      legal_name: null, tax_identifier: null, fiscal_regime: null,
+      configuration_status: "UNCONFIGURED",
+    };
+    const document = buildTicketPrintDocument({ ...ticketFixture, receipt,
+      branch: { ...ticketFixture.branch, name: "Later branch name" },
+    });
+    const text = document.match(/<pre>([\s\S]*)<\/pre>/)![1]!;
+    const lines = text.split("\n").map(line => line.trim());
+    expect(lines.slice(0, 2)).toEqual(["Merenna", "Panadería y repostería"]);
+    expect(lines.join(" ")).toContain(receipt.seller.address);
+    expect(text).toContain("Razon social: No configurada");
+    expect(text).toContain("RFC: No configurado");
+    expect(text).toContain("Regimen fiscal: No configurado");
+    expect(text).not.toContain("Razon social: Merenna");
+    expect(text).not.toContain("Later branch name");
+  });
+
+  it("keeps historical receipts without commercial fields printable without a new identity", () => {
+    const document = buildTicketPrintDocument(ticketFixture);
+    expect(document).toContain("ORIGINAL BRANCH");
+    expect(document).toContain("Direccion: No configurada");
+    expect(document).not.toContain("Merenna");
+    expect(document).not.toContain("Panadería y repostería");
+  });
+
   it("renders a printable receipt with folio and line items", () => {
     const document = buildTicketPrintDocument(ticketFixture);
 

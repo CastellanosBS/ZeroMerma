@@ -5646,7 +5646,8 @@
     "migrations": [
       "apps/api/alembic/versions/20261019_0054_receipt_snapshots.py",
       "apps/api/alembic/versions/20261019_0055_order_lifecycle.py",
-      "apps/api/alembic/versions/20261019_0056_hardware_intents.py"
+      "apps/api/alembic/versions/20261019_0056_hardware_intents.py",
+      "apps/api/alembic/versions/20261019_0057_receipt_identity.py"
     ],
     "ownership_rule": "IdempotencyExecutor remains the only root owner of adopted order, receipt-print and hardware-intention commands. New helper flushes participate in that transaction; audit, outbox and acknowledgement are atomic with their local facts. A hardware call happens after economic confirmation and cannot roll it back.",
     "migration_rule": "Alembic owns schema migrations outside the runtime scanner roots. New immutable receipt, order-policy/revision and hardware-intention data are not fabricated for history. Downgrade guards and migration acceptance require their own isolated evidence.",

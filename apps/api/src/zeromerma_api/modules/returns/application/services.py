@@ -112,6 +112,7 @@ from zeromerma_api.modules.tickets.application.receipt_schemas import (
     ReceiptLineView,
     ReceiptPaymentView,
 )
+from zeromerma_api.modules.tickets.application.receipt_seller import snapshot_receipt_seller
 from zeromerma_api.modules.tickets.application.receipts import persist_receipt, read_receipt
 
 MAX_RETURN_SEARCH_RESULTS = 80
@@ -1298,6 +1299,7 @@ class ReturnsCommandService:
             session,
             OperationalReceiptView(
                 source_kind="RETURN",
+                seller=snapshot_receipt_seller(session, context.branch_id),
                 source_id=sale_return.id,
                 currency_code=sale_detail.currency_code,
                 folio=build_return_folio(sale_return.id),

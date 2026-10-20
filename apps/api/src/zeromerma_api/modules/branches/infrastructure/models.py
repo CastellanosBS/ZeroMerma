@@ -26,6 +26,8 @@ class Branch(Base):
     code: Mapped[str] = mapped_column(String(64), unique=True, nullable=False)
     name: Mapped[str] = mapped_column(String(160), nullable=False)
     timezone: Mapped[str] = mapped_column(String(64), nullable=False)
+    receipt_commercial_name: Mapped[str | None] = mapped_column(String(160), nullable=True)
+    receipt_business_descriptor: Mapped[str | None] = mapped_column(String(160), nullable=True)
     address_line: Mapped[str | None] = mapped_column(String(240), nullable=True)
     city: Mapped[str | None] = mapped_column(String(120), nullable=True)
     state: Mapped[str | None] = mapped_column(String(120), nullable=True)

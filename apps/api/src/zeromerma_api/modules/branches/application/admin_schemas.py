@@ -90,6 +90,8 @@ class AdminBranchOverviewView(BaseModel):
 
 
 class AdminBranchLocationContactView(BaseModel):
+    receipt_commercial_name: str | None = None
+    receipt_business_descriptor: str | None = None
     address_line: str | None = None
     city: str | None = None
     state: str | None = None
@@ -168,6 +170,8 @@ class AdminBranchCreateRequest(BaseModel):
     name: str = Field(min_length=1, max_length=160)
     timezone: str = Field(min_length=1, max_length=64)
     is_active: bool = True
+    receipt_commercial_name: str | None = Field(default=None, max_length=160)
+    receipt_business_descriptor: str | None = Field(default=None, max_length=160)
     address_line: str | None = Field(default=None, max_length=240)
     city: str | None = Field(default=None, max_length=120)
     state: str | None = Field(default=None, max_length=120)
@@ -178,6 +182,8 @@ class AdminBranchCreateRequest(BaseModel):
     notes: str | None = None
 
     @field_validator(
+        "receipt_commercial_name",
+        "receipt_business_descriptor",
         "code",
         "name",
         "timezone",
@@ -225,6 +231,8 @@ class AdminBranchUpdateRequest(BaseModel):
     name: str | None = Field(default=None, min_length=1, max_length=160)
     timezone: str | None = Field(default=None, min_length=1, max_length=64)
     is_active: bool | None = None
+    receipt_commercial_name: str | None = Field(default=None, max_length=160)
+    receipt_business_descriptor: str | None = Field(default=None, max_length=160)
     address_line: str | None = Field(default=None, max_length=240)
     city: str | None = Field(default=None, max_length=120)
     state: str | None = Field(default=None, max_length=120)
@@ -235,6 +243,8 @@ class AdminBranchUpdateRequest(BaseModel):
     notes: str | None = None
 
     @field_validator(
+        "receipt_commercial_name",
+        "receipt_business_descriptor",
         "code",
         "name",
         "timezone",

@@ -1605,6 +1605,30 @@
             ],
             "title": "Postal Code"
           },
+          "receipt_business_descriptor": {
+            "anyOf": [
+              {
+                "maxLength": 160,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Receipt Business Descriptor"
+          },
+          "receipt_commercial_name": {
+            "anyOf": [
+              {
+                "maxLength": 160,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Receipt Commercial Name"
+          },
           "state": {
             "anyOf": [
               {
@@ -1888,6 +1912,28 @@
               }
             ],
             "title": "Postal Code"
+          },
+          "receipt_business_descriptor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Receipt Business Descriptor"
+          },
+          "receipt_commercial_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Receipt Commercial Name"
           },
           "state": {
             "anyOf": [
@@ -2209,6 +2255,30 @@
               }
             ],
             "title": "Postal Code"
+          },
+          "receipt_business_descriptor": {
+            "anyOf": [
+              {
+                "maxLength": 160,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Receipt Business Descriptor"
+          },
+          "receipt_commercial_name": {
+            "anyOf": [
+              {
+                "maxLength": 160,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Receipt Commercial Name"
           },
           "state": {
             "anyOf": [
@@ -47821,6 +47891,30 @@
               }
             ],
             "title": "Address"
+          },
+          "business_descriptor": {
+            "anyOf": [
+              {
+                "maxLength": 160,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Business Descriptor"
+          },
+          "commercial_name": {
+            "anyOf": [
+              {
+                "maxLength": 160,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Commercial Name"
           },
           "configuration_status": {
             "default": "UNCONFIGURED",

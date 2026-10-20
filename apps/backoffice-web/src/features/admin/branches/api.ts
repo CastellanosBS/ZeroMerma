@@ -83,6 +83,8 @@ export function mapAdminBranchDetailFromApi(item: AdminBranchApiDetail): AdminBr
       canOpenWorkstations: item.available_actions.can_open_workstations,
     },
     locationContact: {
+      receiptCommercialName: item.location_contact.receipt_commercial_name ?? null,
+      receiptBusinessDescriptor: item.location_contact.receipt_business_descriptor ?? null,
       addressLine: item.location_contact.address_line ?? null,
       city: item.location_contact.city ?? null,
       contactEmail: item.location_contact.contact_email ?? null,
@@ -167,6 +169,8 @@ function mapAdminBranchesListFromApi(response: AdminBranchesApiListResponse): Ad
 
 function toCreateApiPayload(payload: AdminBranchCreatePayload): AdminBranchApiCreatePayload {
   return {
+    receipt_commercial_name: payload.receiptCommercialName ?? null,
+    receipt_business_descriptor: payload.receiptBusinessDescriptor ?? null,
     address_line: payload.addressLine ?? null,
     brand_id: payload.brandId,
     city: payload.city ?? null,
@@ -185,6 +189,8 @@ function toCreateApiPayload(payload: AdminBranchCreatePayload): AdminBranchApiCr
 
 function toUpdateApiPayload(payload: AdminBranchUpdatePayload): AdminBranchApiUpdatePayload {
   return {
+    receipt_commercial_name: payload.receiptCommercialName,
+    receipt_business_descriptor: payload.receiptBusinessDescriptor,
     address_line: payload.addressLine,
     brand_id: payload.brandId,
     city: payload.city,

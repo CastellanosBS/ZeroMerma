@@ -15,8 +15,12 @@ not enable a device. The test adapter exists only in tests.
 - TCK, OPR, and DEV references use the complete source UUID. Original names,
   amounts, currency, branch timezone, workstation and operator remain frozen.
   Return settlement/pending amounts describe the instant the receipt was issued.
-- Seller legal name, RFC, regime and address are currently **UNCONFIGURED**.
-  Production receipt identity/profile configuration and fiscal review remain open.
+- The branch's commercial name, optional business descriptor and structured
+  address are frozen into new receipts. Historical documents retain their original
+  identity, including an absent commercial profile. Seller legal name, RFC and
+  regime remain **UNCONFIGURED**; commercial configuration is not fiscal identity.
+  The [Merenna profile](merenna-opening-profile.md) is prepared for a new real branch
+  and has not been applied to demonstration branches. Fiscal review remains open.
   The receipt is operational; it is neither a CFDI nor a BBVA receipt. Rendering
   does not invent a QR, RFC, bank confirmation or digital-delivery result.
 - Browser print is an **UNCERTIFIED fallback**. Opening the print dialog records
@@ -100,7 +104,7 @@ behavior with simulated devices, not an installed physical system.
 | Actual PC OS/browser and POS origin/network deployment | Validate loopback permissions, process startup, private files and secure pairing. |
 | Physical normal print, paper-out, disconnect, timeout, restart, duplicate/reprint and drawer tests | Prove each physical state and recovery path without repeating economic effects. |
 | Signed installer/version/update and provisioning/revocation process | The repository currently has a diagnostic entrypoint and test registrations only. |
-| Seller identity/address and review of the required operational ticket fields | The frozen seller profile is currently explicitly unconfigured. |
+| Apply the prepared commercial profile to the real branch and review operational ticket fields | Software supports frozen branch identity; real onboarding and printed samples remain pending. Fiscal identity is separate and unconfigured. |
 | BBVA terminal model/firmware, merchant integration entitlement and official protocol/SDK | This bridge does not implement or certify a BBVA protocol. |
 
 No printer, drawer or terminal compatibility is claimed by these software tests.

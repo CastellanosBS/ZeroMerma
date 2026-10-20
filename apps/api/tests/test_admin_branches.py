@@ -114,6 +114,8 @@ def test_admin_branch_detail_includes_workstations_assignments_and_warnings(
     assert payload["workstations_summary"]["active"] >= 1
     assert payload["user_assignments_summary"]["active"] >= 1
     assert payload["related_operations_summary"]["open_cash_sessions"] == 0
+    assert payload["location_contact"]["receipt_commercial_name"] is None
+    assert payload["location_contact"]["receipt_business_descriptor"] is None
 
 
 def test_admin_branch_create_persists_branch_and_writes_audit_and_outbox(
@@ -129,6 +131,8 @@ def test_admin_branch_create_persists_branch_and_writes_audit_and_outbox(
             "name": "Sucursal Centro",
             "timezone": "America/Hermosillo",
             "is_active": True,
+            "receipt_commercial_name": "  Synthetic Bakery  ",
+            "receipt_business_descriptor": "  Bread and pastries  ",
             "address_line": "Calle Principal 100",
             "city": "Hermosillo",
             "state": "Sonora",
@@ -142,6 +146,8 @@ def test_admin_branch_create_persists_branch_and_writes_audit_and_outbox(
     payload = response.json()
     assert payload["overview"]["code"] == "CENTRO"
     assert payload["location_contact"]["city"] == "Hermosillo"
+    assert payload["location_contact"]["receipt_commercial_name"] == "Synthetic Bakery"
+    assert payload["location_contact"]["receipt_business_descriptor"] == "Bread and pastries"
     assert payload["warnings"]
 
     with SessionLocal() as session:
@@ -156,6 +162,51 @@ def test_admin_branch_create_persists_branch_and_writes_audit_and_outbox(
     assert audit_record.action == "admin.branch.created"
     assert audit_record.request_id == "b9dfcc99-eb0b-5d75-8ad3-29d6be6fa02c"
     assert outbox_event.event_name == "admin.branch.created.v1"
+    assert branch.receipt_commercial_name == "Synthetic Bakery"
+    assert audit_record.metadata_["receipt_identity"]["commercial_name"] == "Synthetic Bakery"
+    assert outbox_event.payload["receipt_identity"] == audit_record.metadata_["receipt_identity"]
+
+
+def test_branch_receipt_identity_updates_are_authorized_audited_and_explicitly_clearable(
+    client: TestClient,
+) -> None:
+    branch_id = _get_branch_id(SEED_BRANCH_CODE)
+    path = f"/v1/admin/branches/{branch_id}"
+    profile = {
+        "receipt_commercial_name": "Synthetic Bakery",
+        "receipt_business_descriptor": "Bread and pastries",
+        "address_line": "Synthetic Street 10",
+    }
+    denied = client.patch(path, headers=_login_cashier(client), json=profile)
+    assert denied.status_code == 403
+    headers = _admin_headers(client)
+    assert client.patch(path, headers=headers, json=profile).status_code == 200
+    preserved = client.patch(path, headers=headers, json={"notes": "Independent update"})
+    assert preserved.status_code == 200
+    assert preserved.json()["location_contact"]["receipt_commercial_name"] == "Synthetic Bakery"
+    rejected = client.patch(path, headers=headers, json={"receipt_commercial_name": "x" * 161})
+    assert rejected.status_code == 422
+    cleared = client.patch(
+        path,
+        headers={**headers, "X-Request-ID": "bdb9fa67-773f-4d6d-a263-3591ec246b7d"},
+        json={"receipt_commercial_name": None, "receipt_business_descriptor": "   "},
+    )
+    assert cleared.status_code == 200
+    assert cleared.json()["location_contact"]["receipt_commercial_name"] is None
+    assert cleared.json()["location_contact"]["receipt_business_descriptor"] is None
+    with SessionLocal() as session:
+        audit = session.scalars(
+            select(AuditLog).where(AuditLog.request_id == "bdb9fa67-773f-4d6d-a263-3591ec246b7d")
+        ).one()
+        event = session.scalars(
+            select(OutboxEvent).where(OutboxEvent.operation_id == audit.operation_id)
+        ).one()
+    assert audit.metadata_["previous_receipt_identity"]["commercial_name"] == "Synthetic Bakery"
+    assert audit.metadata_["receipt_identity"]["commercial_name"] is None
+    assert audit.metadata_["receipt_identity"]["address_line"] == "Synthetic Street 10"
+    assert (
+        event.payload["previous_receipt_identity"] == audit.metadata_["previous_receipt_identity"]
+    )
 
 
 def test_admin_branch_create_validates_required_unique_code_and_timezone(

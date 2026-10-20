@@ -117,6 +117,8 @@ function toUpdatePayload(
   payload: AdminBranchCreatePayload | AdminBranchUpdatePayload,
 ): AdminBranchUpdatePayload {
   return {
+    receiptCommercialName: payload.receiptCommercialName ?? null,
+    receiptBusinessDescriptor: payload.receiptBusinessDescriptor ?? null,
     addressLine: payload.addressLine ?? null,
     brandId: payload.brandId ?? null,
     city: payload.city ?? null,

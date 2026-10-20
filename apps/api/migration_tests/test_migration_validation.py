@@ -52,7 +52,7 @@ from zeromerma_api.testing.database_safety import (
 REPO_ROOT = Path(__file__).resolve().parents[3]
 VERSIONS_DIR = REPO_ROOT / "apps" / "api" / "alembic" / "versions"
 ALEMBIC_INI = REPO_ROOT / "apps" / "api" / "alembic.ini"
-CANONICAL_HEAD = "20261019_0056_hardware"
+CANONICAL_HEAD = "20261019_0057_receipt_identity"
 EXPECTED_POSTGRES_MAJOR = 16
 TEST_CONTAINER_VARIABLE = "ZEROMERMA_TEST_CONTAINER_NAME"
 
@@ -61,7 +61,7 @@ KNOWN_NAMING_ONLY = "KNOWN_NAMING_ONLY"
 KNOWN_MODEL_OBJECT = "KNOWN_MODEL_OBJECT"
 REAL_SCHEMA_DRIFT = "REAL_SCHEMA_DRIFT"
 UNKNOWN_SCHEMA_DRIFT = "UNKNOWN_SCHEMA_DRIFT"
-DRIFT_BASELINE_VERSION = "2026-10-19.zm-fin-067.1"
+DRIFT_BASELINE_VERSION = "2026-10-19.zm-fin-067.receipt-identity.1"
 
 
 @dataclass(frozen=True, order=True, slots=True)
@@ -6819,8 +6819,8 @@ def test_static_graph() -> None:
     for row in inventory:
         _emit("REVISION", row)
     _emit("GRAPH", graph)
-    assert graph["revision_count"] == 56
-    assert graph["unique_revision_count"] == 56
+    assert graph["revision_count"] == 57
+    assert graph["unique_revision_count"] == 57
     assert graph["duplicate_revisions"] == []
     assert graph["roots"] == ["0001_foundation_schema"]
     assert graph["heads"] == [CANONICAL_HEAD]
@@ -6829,7 +6829,7 @@ def test_static_graph() -> None:
     assert graph["unreachable"] == []
     assert graph["branches"] == {}
     assert graph["merge_revisions"] == []
-    assert len(_topological_revisions(inventory)) == 56
+    assert len(_topological_revisions(inventory)) == 57
 
 
 def test_financial_ledger_transition_is_empty_preserves_history_and_protects_evidence() -> None:
@@ -7661,6 +7661,142 @@ def test_pos_block_immutable_evidence_and_downgrade_guards(
                     "immutable_tables_checked": list(tables),
                     "rows_schema_triggers_preserved": True,
                     "result": "PASS",
+                },
+            )
+
+
+def test_receipt_identity_upgrade_preserves_configuration_and_issued_documents() -> None:
+    with _root_runtime() as (root_config, root_engine):
+        with _temporary_database(root_engine, root_config, "receipt_identity") as (config, engine):
+            _upgrade(engine, config, "20261019_0056_hardware")
+            with engine.begin() as connection:
+                assert_authorized_destructive_connection(connection, config)
+                identity = _insert_identity(connection, "receipt-identity")
+                connection.execute(
+                    text("UPDATE branches SET address_line=:address, notes=:notes WHERE id=:id"),
+                    {
+                        "id": identity["branch"],
+                        "address": "Synthetic historical address",
+                        "notes": "Existing branch configuration must remain unchanged",
+                    },
+                )
+                _insert_row(
+                    connection,
+                    "receipt_snapshots",
+                    {
+                        "id": uuid.uuid4(),
+                        "branch_id": identity["branch"],
+                        "workstation_id": identity["workstation"],
+                        "source_kind": "SALE",
+                        "source_id": uuid.uuid4(),
+                        "document": json.dumps(
+                            {
+                                "source": "SYNTHETIC_MIGRATION_ACCEPTANCE",
+                                "merchant_name": "Historical",
+                            }
+                        ),
+                        "document_sha256": "c" * 64,
+                        "created_at": datetime.now(UTC),
+                    },
+                )
+            with engine.connect() as connection:
+                before = _financial_guard_snapshot(connection)
+                original_branches = (
+                    connection.execute(text("SELECT * FROM branches ORDER BY id")).mappings().all()
+                )
+            _upgrade(engine, config, "head")
+            with engine.connect() as connection:
+                assert_authorized_destructive_connection(connection, config)
+                columns = {
+                    column["name"]: column for column in inspect(connection).get_columns("branches")
+                }
+                identity_columns = {"receipt_commercial_name", "receipt_business_descriptor"}
+                assert set(columns) == set(original_branches[0]) | identity_columns
+                for name in identity_columns:
+                    assert str(columns[name]["type"]) == "VARCHAR(160)"
+                    assert columns[name]["nullable"] is True
+                    assert columns[name]["default"] is None
+                branches = (
+                    connection.execute(text("SELECT * FROM branches ORDER BY id")).mappings().all()
+                )
+                for branch in branches:
+                    assert all(branch[name] is None for name in identity_columns)
+                assert [
+                    {key: value for key, value in branch.items() if key not in identity_columns}
+                    for branch in branches
+                ] == [dict(branch) for branch in original_branches]
+                after = _financial_guard_snapshot(connection)
+                for table, checksum in before["rows"].items():
+                    if table not in {"branches", "alembic_version"}:
+                        assert after["rows"][table] == checksum
+                assert after["constraints"] == before["constraints"]
+                assert after["triggers"] == before["triggers"]
+                connection.commit()
+                command.downgrade(_alembic_config(connection, config), "20261019_0056_hardware")
+                assert _financial_guard_snapshot(connection) == before
+            _upgrade(engine, config, "head")
+            assert _current_revision(engine, config) == CANONICAL_HEAD
+            _emit(
+                "RECEIPT_IDENTITY_TRANSITION",
+                {
+                    "existing_configuration_and_receipts_preserved": True,
+                    "fabricated_identity": 0,
+                    "unconfigured_downgrade": "PASS",
+                    "ending_revision": CANONICAL_HEAD,
+                },
+            )
+
+
+@pytest.mark.parametrize(
+    "commercial_name,business_descriptor",
+    [
+        ("Synthetic merchant", None),
+        (None, "Synthetic business descriptor"),
+        ("Synthetic merchant", "Synthetic business descriptor"),
+    ],
+)
+def test_receipt_identity_downgrade_preserves_configured_values_and_schema(
+    commercial_name: str | None, business_descriptor: str | None
+) -> None:
+    with _root_runtime() as (root_config, root_engine):
+        with _temporary_database(root_engine, root_config, "receipt_identity_guard") as (
+            config,
+            engine,
+        ):
+            _upgrade(engine, config, "head")
+            with engine.begin() as connection:
+                assert_authorized_destructive_connection(connection, config)
+                identity = _insert_identity(connection, "receipt-identity-guard")
+                connection.execute(
+                    text(
+                        "UPDATE branches SET receipt_commercial_name=:name, "
+                        "receipt_business_descriptor=:descriptor WHERE id=:id"
+                    ),
+                    {
+                        "id": identity["branch"],
+                        "name": commercial_name,
+                        "descriptor": business_descriptor,
+                    },
+                )
+            with engine.connect() as connection:
+                before = _financial_guard_snapshot(connection)
+            with pytest.raises(DBAPIError, match="Cannot discard configured receipt identity"):
+                with engine.connect() as connection:
+                    assert_authorized_destructive_connection(connection, config)
+                    connection.commit()
+                    command.downgrade(_alembic_config(connection, config), "20261019_0056_hardware")
+            assert _current_revision(engine, config) == CANONICAL_HEAD
+            with engine.connect() as connection:
+                assert _financial_guard_snapshot(connection) == before
+            _emit(
+                "RECEIPT_IDENTITY_DOWNGRADE_GUARD",
+                {
+                    "configured_columns": {
+                        "commercial_name": commercial_name is not None,
+                        "business_descriptor": business_descriptor is not None,
+                    },
+                    "rows_schema_triggers_preserved": True,
+                    "ending_revision": CANONICAL_HEAD,
                 },
             )
 

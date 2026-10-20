@@ -10,6 +10,13 @@ from pydantic import BaseModel, ConfigDict, Field
 
 class ReceiptSellerView(BaseModel):
     model_config = ConfigDict(extra="forbid", frozen=True)
+    # Absent optional identity fields must not change durable command digests.
+    commercial_name: str | None = Field(
+        default=None, max_length=160, exclude_if=lambda value: value is None
+    )
+    business_descriptor: str | None = Field(
+        default=None, max_length=160, exclude_if=lambda value: value is None
+    )
     legal_name: str | None = None
     tax_identifier: str | None = None
     fiscal_regime: str | None = None

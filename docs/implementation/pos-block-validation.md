@@ -18,7 +18,7 @@ artifact hashes. Focused results do not replace that acceptance.
 |056|Sale confirmation requires the displayed unit price and currency; pricing rows remain locked through commit. Empty, duplicate, invalid, unavailable or insufficient-stock lines are rejected by the canonical backend. Price conflict allows explicit catalog refresh, removal of unavailable items and a new review without automatic resubmission.|Full regression and real browser evidence for the delivered commit.|
 |057|Cash, separately charged card registration and mixed payments use exact amounts. Excess cash produces change; excess card cannot become change. Confirmation is bound to the reviewed cart; edits invalidate payment confirmation. Submission and uncertain results freeze edits until canonical recovery. Original command identity survives lost acknowledgements and reload uses read-only recovery.|Integrated provider states remain in 065; manual registration is not BBVA authorization. Changing the cart does not correct an already completed external charge.|
 |058|Explicit versioned branch policy, backend quotations, minimum 50% deposit, immutable order revisions and production commitment, intermediate payments, bounded amendments and explicit cancellation responsibility. READY reserves stock through the existing FEFO boundary; delivery requires full settlement. POS and Backoffice expose the applicable controls.|The owner must choose the commitment lead time; there is no runtime default. Legacy orders without policy evidence remain explicitly unsupported for new lifecycle commands.|
-|059|Immutable sale/payment/return receipts are written in the economic transaction. Reprint preserves the original document and never changes economics. Return settlement-at-issuance and current pending obligations are separate. Browser print records a request and cannot confirm physical output.|Real merchant identity/address configuration and printed samples on the selected equipment. Historic rows with no receipt snapshot are not fabricated from current data.|
+|059|Immutable sale/payment/return receipts are written in the economic transaction. Branch-scoped commercial identity, descriptor and address are frozen at issuance; profile changes do not rewrite receipts. Reprint never changes economics. Return settlement-at-issuance and current pending obligations are separate. Browser print records a request and cannot confirm physical output.|Apply the prepared Merenna profile to a new real branch and validate printed samples on selected equipment. Fiscal identity is separate and unspecified. Historic rows with no receipt snapshot are not fabricated from current data.|
 |060|Unavailable controls remain truthful; no recipient is collected or message sent.|Approved transactional channel/provider and privacy boundary 128, plus worker delivery infrastructure 087–090. No provider or consent is invented.|
 |061|Existing canonical opening, ledger movements and close are retained. Pending/processing/unknown financial entries already block close through the shared financial projection. Readiness and accessibility improvements apply to these screens.|Regression of same-turn and later-turn order effects, close races and physical counting.|
 |062|Existing causal dispatch, partial receipt, return/waste resolution and command recovery are retained. Modal keyboard behavior and connectivity admission apply to operations.|Regression of split receipt/disposition and lost acknowledgements.|
@@ -31,7 +31,10 @@ artifact hashes. Focused results do not replace that acceptance.
 ## Migration and contract changes
 
 The single migration chain adds 0054 immutable receipt snapshots, 0055 versioned
-order policy/revisions/commitments and 0056 hardware bindings/command intentions.
+order policy/revisions/commitments, 0056 hardware bindings/command intentions and
+0057 optional branch receipt identity. The latter has no tenant-specific defaults
+or backfill, preserves existing configuration/snapshots and refuses downgrade if
+it would discard a configured commercial name or descriptor.
 Downgrade guards preserve issued or executed facts. There is no fabricated
 historical receipt or policy backfill. API and both web applications must be
 deployed together because sales now require expected price/currency and orders
@@ -111,6 +114,44 @@ API modules passed 9/9 in
 These regressions cover full folios, UUID/case/whitespace normalization, wrong
 suffixes and exact references across financial views. Final hosted acceptance
 still requires the corrected commit's complete Foundation workflow.
+
+That correction subsequently passed all eight stages and the aggregate check in
+hosted run [39342696947](https://github.com/CastellanosBS/ZeroMerma/actions/runs/39342696947)
+for `6dc45365e02db6916e395056e85cdf278d679aeb`. The digest-verified Backend artifact
+reports 1,528/1,528 with zero skips. This validates the folio correction and prior
+POS implementation; it precedes the commercial profile follow-up below.
+
+### Commercial profile follow-up
+
+The owner supplied Merenna's commercial name and Distrito H address and selected
+preparation for a new real branch. The [opening profile](../operations/merenna-opening-profile.md)
+records those values and the chosen descriptor, Panadería y repostería. This is
+not a configuration change to a demonstration branch or a normal database.
+
+Migration 0057 adds two optional branch fields without defaults or backfill.
+The focused PostgreSQL migration suite passed 10/10 in
+`operation-context/receipt-identity-migration/c222a84695be4b049df5f17a838ad8bc/operation-context.xml`.
+It verifies preservation, guarded downgrade and schema parity: 57 revisions,
+269 checks and the same 82 historical naming fingerprints, with no new exception.
+Branch form/API mapping tests passed 9/9 and receipt rendering tests passed 7/7;
+both web applications passed type checking against the regenerated contract.
+Ruff and static typing passed for 441 production source files. These focused
+checks do not replace the complete Foundation run for the delivered commit.
+
+The complete local Web stage passed in
+`foundation/c76725221d06491f80774db16c3ae42a/Web.json`: lint, type checks, unit tests,
+both builds and 16 simulated browser scenarios. The Contracts stage passed all
+112 tests in Foundation run `e03d08391dc547399f03759a0ea37cbd`, with all 287 API
+operations generated and no unexplained client/contract drift.
+
+Receipt/profile PostgreSQL coverage comprises 29 distinct passing cases. The main
+run in `receipt-identity/results.xml` passed 27/28; its only failure used the wrong
+test selector for the order-payment foreign key. The corrected order-payment case
+and an additional persisted-hash tamper case passed 2/2 in
+`receipt-identity-revision/results.xml`. Coverage includes all three economic
+receipt producers, branch isolation, authorized and audited profile changes,
+immutable issued documents, historical print recovery and durable device recovery
+without a second print. No production defect remained from that focused run.
 
 ## Operational information still needed
 

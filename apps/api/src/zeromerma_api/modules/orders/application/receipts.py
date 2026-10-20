@@ -14,6 +14,7 @@ from zeromerma_api.modules.tickets.application.receipt_schemas import (
     ReceiptLineView,
     ReceiptPaymentView,
 )
+from zeromerma_api.modules.tickets.application.receipt_seller import snapshot_receipt_seller
 from zeromerma_api.modules.tickets.application.receipts import persist_receipt
 
 
@@ -32,6 +33,7 @@ def persist_order_payment_receipt(session: Session, payment: CustomerOrderPaymen
             source_id=payment.id,
             folio=f"OPR-{payment.id.hex.upper()}",
             currency_code=payment.currency_code,
+            seller=snapshot_receipt_seller(session, branch.id),
             occurred_at=payment.recorded_at_utc,
             context=ReceiptContextView(
                 branch_id=branch.id,

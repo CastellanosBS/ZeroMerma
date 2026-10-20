@@ -1,3 +1,7 @@
+import type { components } from "@zeromerma/api-client";
+
+type BranchReceiptFields = components["schemas"]["AdminBranchLocationContactView"];
+
 export type AdminBranchStatus = "active" | "inactive";
 export type AdminBranchReadiness = "ready" | "warning" | "inactive";
 export type AdminBranchWarningSeverity = "info" | "warning" | "critical";
@@ -45,6 +49,8 @@ export interface AdminBranchOverview {
 }
 
 export interface AdminBranchLocationContact {
+  receiptCommercialName?: BranchReceiptFields["receipt_commercial_name"];
+  receiptBusinessDescriptor?: BranchReceiptFields["receipt_business_descriptor"];
   addressLine?: string | null;
   city?: string | null;
   contactEmail?: string | null;
@@ -118,6 +124,8 @@ export interface AdminBranchDetail {
 }
 
 export interface AdminBranchCreatePayload {
+  receiptCommercialName?: components["schemas"]["AdminBranchCreateRequest"]["receipt_commercial_name"];
+  receiptBusinessDescriptor?: components["schemas"]["AdminBranchCreateRequest"]["receipt_business_descriptor"];
   addressLine?: string | null;
   brandId: string;
   city?: string | null;
@@ -134,6 +142,8 @@ export interface AdminBranchCreatePayload {
 }
 
 export interface AdminBranchUpdatePayload {
+  receiptCommercialName?: components["schemas"]["AdminBranchUpdateRequest"]["receipt_commercial_name"];
+  receiptBusinessDescriptor?: components["schemas"]["AdminBranchUpdateRequest"]["receipt_business_descriptor"];
   addressLine?: string | null;
   brandId?: string | null;
   city?: string | null;

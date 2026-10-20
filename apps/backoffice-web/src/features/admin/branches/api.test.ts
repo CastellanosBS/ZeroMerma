@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { buildAdminBranchesListPath, createAdminBranch, fetchAdminBranchDetail, fetchAdminBranches } from "./api";
+import { buildAdminBranchesListPath, createAdminBranch, fetchAdminBranchDetail, fetchAdminBranches, updateAdminBranch } from "./api";
 import type { AdminBranchListFilters } from "./types";
 
 const filters: AdminBranchListFilters = {
@@ -187,6 +187,8 @@ describe("admin branches API boundary", () => {
     expect(branch.overview.id).toBe("branch-1");
     expect(branch.workstationsSummary.active).toBe(1);
     expect(branch.userAssignmentsSummary.items[0]?.userName).toBe("Admin");
+    expect(branch.locationContact.receiptCommercialName).toBeNull();
+    expect(branch.locationContact.receiptBusinessDescriptor).toBeNull();
   });
 
   it("submits new branches through the backend contract", async () => {
@@ -197,6 +199,8 @@ describe("admin branches API boundary", () => {
       code: "CENTRO",
       isActive: true,
       name: "Sucursal Centro",
+      receiptCommercialName: "Merenna",
+      receiptBusinessDescriptor: "Panadería y repostería",
       timezone: "America/Hermosillo",
     });
 
@@ -204,6 +208,8 @@ describe("admin branches API boundary", () => {
       expect.stringContaining("/v1/admin/branches"),
       expect.objectContaining({
         body: JSON.stringify({
+          receipt_commercial_name: "Merenna",
+          receipt_business_descriptor: "Panadería y repostería",
           address_line: null,
           brand_id: "brand-1",
           city: null,
@@ -222,5 +228,56 @@ describe("admin branches API boundary", () => {
       }),
     );
     expect(branch.overview.name).toBe("Main Branch");
+  });
+
+  it("maps the commercial identity without replacing the branch name or adding fiscal data", async () => {
+    const fetchSpy = vi.spyOn(globalThis, "fetch").mockImplementation(() => mockJsonResponse({
+      ...apiDetail,
+      location_contact: {
+        ...apiDetail.location_contact,
+        receipt_commercial_name: "Merenna",
+        receipt_business_descriptor: "Panadería y repostería",
+        address_line: "Plaza Distrito H, Boulevard Juan Navarrete 492K",
+        postal_code: "83249",
+      },
+    }));
+
+    const branch = await updateAdminBranch("branch-1", {
+      receiptCommercialName: "Merenna",
+      receiptBusinessDescriptor: "Panadería y repostería",
+      addressLine: "Plaza Distrito H, Boulevard Juan Navarrete 492K",
+      postalCode: "83249",
+    });
+
+    const request = fetchSpy.mock.calls[0]![1]!;
+    expect(request.method).toBe("PATCH");
+    expect(JSON.parse(String(request.body))).toEqual({
+      receipt_commercial_name: "Merenna",
+      receipt_business_descriptor: "Panadería y repostería",
+      address_line: "Plaza Distrito H, Boulevard Juan Navarrete 492K",
+      postal_code: "83249",
+    });
+    expect(branch.overview.name).toBe("Main Branch");
+    expect(branch.locationContact).toMatchObject({
+      receiptCommercialName: "Merenna",
+      receiptBusinessDescriptor: "Panadería y repostería",
+      addressLine: "Plaza Distrito H, Boulevard Juan Navarrete 492K",
+      postalCode: "83249",
+    });
+  });
+
+  it("can clear commercial fields while unrelated branch updates leave them omitted", async () => {
+    const fetchSpy = vi.spyOn(globalThis, "fetch").mockImplementation(() => mockJsonResponse(apiDetail));
+    await updateAdminBranch("branch-1", { isActive: false });
+    expect(JSON.parse(String(fetchSpy.mock.calls[0]![1]!.body))).toEqual({ is_active: false });
+
+    await updateAdminBranch("branch-1", {
+      receiptCommercialName: null,
+      receiptBusinessDescriptor: null,
+    });
+    expect(JSON.parse(String(fetchSpy.mock.calls[1]![1]!.body))).toEqual({
+      receipt_commercial_name: null,
+      receipt_business_descriptor: null,
+    });
   });
 });

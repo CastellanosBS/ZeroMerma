@@ -3,6 +3,20 @@
 This guide describes the implemented POS workflow. Physical printer acceptance, a bank
 integration and a business-approved order lead time must be verified separately before opening.
 
+## Receipt commercial identity
+
+Configure the branch's receipt commercial name, optional business descriptor and
+structured address in the existing Backoffice branch form. These are independent
+of the internal branch name and fiscal identity. Sale, order-payment and return
+receipts freeze the configured values when issued; later profile changes do not
+change a reprint. Existing receipts without the optional identity stay readable
+without inheriting current values. A commercial name does not configure legal
+name, RFC or fiscal regime.
+
+The owner-approved identity for a new Merenna branch is prepared in the
+[Merenna opening profile](merenna-opening-profile.md). It has not been applied to
+any demonstration branch or normal development database.
+
 ## Before the first order
 
 An authorized backoffice operator must configure the branch's **Order commitment policy**.

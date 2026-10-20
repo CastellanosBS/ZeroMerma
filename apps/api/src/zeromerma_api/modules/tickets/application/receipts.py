@@ -2,6 +2,7 @@
 
 import hashlib
 import json
+from typing import Any
 from uuid import UUID
 
 from sqlalchemy import select
@@ -15,12 +16,17 @@ from zeromerma_api.modules.tickets.application.receipt_schemas import (
     ReceiptLineView,
     ReceiptPaymentView,
 )
+from zeromerma_api.modules.tickets.application.receipt_seller import snapshot_receipt_seller
 from zeromerma_api.modules.tickets.domain.exceptions import TicketConflictError
 from zeromerma_api.modules.tickets.infrastructure.models import ReceiptSnapshot
 
 
 def receipt_digest(document: OperationalReceiptView) -> str:
-    serialized = json.dumps(document.model_dump(mode="json"), sort_keys=True, separators=(",", ":"))
+    return _stored_document_digest(document.model_dump(mode="json"))
+
+
+def _stored_document_digest(document: dict[str, Any]) -> str:
+    serialized = json.dumps(document, sort_keys=True, separators=(",", ":"))
     return hashlib.sha256(serialized.encode()).hexdigest()
 
 
@@ -60,10 +66,9 @@ def read_receipt(
     )
     if row is None:
         return None
-    document = OperationalReceiptView.model_validate(row.document)
-    if receipt_digest(document) != row.document_sha256:
+    if _stored_document_digest(row.document) != row.document_sha256:
         raise TicketConflictError("The receipt integrity check failed.")
-    return document
+    return OperationalReceiptView.model_validate(row.document)
 
 
 def snapshot_sale(session: Session, detail: SaleDetailView) -> None:
@@ -76,6 +81,7 @@ def snapshot_sale(session: Session, detail: SaleDetailView) -> None:
             source_id=detail.id,
             folio=f"TCK-{detail.id.hex.upper()}",
             currency_code=detail.currency_code,
+            seller=snapshot_receipt_seller(session, detail.branch_id),
             occurred_at=detail.confirmed_at,
             context=ReceiptContextView(
                 branch_id=detail.branch_id,

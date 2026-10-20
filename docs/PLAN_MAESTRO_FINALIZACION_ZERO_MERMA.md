@@ -511,7 +511,11 @@ adapters and physical installation acceptance; 065 requires the BBVA technical
 contract and integrated checkout flow. 057/067 retain those applicable external
 acceptance limits. No owner lead time, device model or provider is inferred.
 
-The single migration chain adds 0054–0056; no normal local database is migrated.
+The single migration chain adds 0054–0057; no normal local database is migrated.
+Branch-scoped commercial identity and address are frozen into sale, order-payment
+and return receipts without rewriting historical documents or inventing fiscal
+identity. The [Merenna opening profile](operations/merenna-opening-profile.md) is
+prepared from the owner's answers for a new real branch, not applied to demo data.
 Order lead time is explicit versioned configuration with no runtime default.
 Final technical delivery requires all eight Foundation stages and the aggregate
 check for the exact delivered commit. Earlier accepted runs are not evidence for

@@ -42,6 +42,12 @@ export function AdminBranchFormPanel({
   const [name, setName] = useState(branchDetail?.overview.name ?? "");
   const [timezone, setTimezone] = useState(branchDetail?.overview.timezone ?? "");
   const [isActive, setIsActive] = useState(branchDetail?.overview.status !== "inactive");
+  const [receiptCommercialName, setReceiptCommercialName] = useState(
+    branchDetail?.locationContact.receiptCommercialName ?? "",
+  );
+  const [receiptBusinessDescriptor, setReceiptBusinessDescriptor] = useState(
+    branchDetail?.locationContact.receiptBusinessDescriptor ?? "",
+  );
   const [addressLine, setAddressLine] = useState(branchDetail?.locationContact.addressLine ?? "");
   const [city, setCity] = useState(branchDetail?.locationContact.city ?? "");
   const [state, setState] = useState(branchDetail?.locationContact.state ?? "");
@@ -82,6 +88,8 @@ export function AdminBranchFormPanel({
     }
 
     onSubmit({
+      receiptCommercialName: normalizeOptional(receiptCommercialName),
+      receiptBusinessDescriptor: normalizeOptional(receiptBusinessDescriptor),
       addressLine: normalizeOptional(addressLine),
       brandId,
       city: normalizeOptional(city),
@@ -234,6 +242,34 @@ export function AdminBranchFormPanel({
           />
         </label>
       </div>
+
+      <fieldset className="grid min-w-0 gap-2 rounded-2xl border border-[var(--ui-color-border)] p-3">
+        <legend className="px-1 text-sm font-semibold text-slate-900">Encabezado comercial del ticket</legend>
+        <label className="grid min-w-0 gap-1 text-xs font-semibold text-slate-600">
+          Nombre comercial
+          <input
+            className={inputClassName}
+            disabled={isSubmitting}
+            maxLength={160}
+            value={receiptCommercialName}
+            onChange={(event) => setReceiptCommercialName(event.target.value)}
+          />
+        </label>
+        <label className="grid min-w-0 gap-1 text-xs font-semibold text-slate-600">
+          Descripción del negocio
+          <input
+            className={inputClassName}
+            disabled={isSubmitting}
+            maxLength={160}
+            value={receiptBusinessDescriptor}
+            onChange={(event) => setReceiptBusinessDescriptor(event.target.value)}
+          />
+        </label>
+        <p className="text-xs leading-5 text-slate-600">
+          Los tickets nuevos incluyen estos datos y la dirección de la sucursal. Los ya emitidos
+          conservan su encabezado original. Estos campos no cambian la razón social, el RFC ni el régimen fiscal.
+        </p>
+      </fieldset>
 
       <label className="grid min-w-0 gap-1 text-xs font-semibold uppercase tracking-[0.1em] text-slate-500">
         Notas
